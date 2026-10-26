@@ -46,6 +46,7 @@ pub const Result = struct {
 /// must outlive Prepared. Backend work does not consult source files or PI.
 /// This owner grants no cross-revision staging/code-cache validity by itself.
 pub const Prepared = struct {
+    source_digests: [][32]u8 = &.{},
     body_caches: []@import("body_check_cache.zig").Cache = &.{},
     units: []core.Module,
     identity: RuntimeIdentity.Metadata,
@@ -66,6 +67,7 @@ pub const Prepared = struct {
         try copyBodyCacheOffers(a, self.body_caches, self.paths, null, caches, paths);
     }
     pub fn deinit(self: *Prepared, a: Allocator) void {
+        a.free(self.source_digests);
         for (self.body_caches) |*cache| cache.deinit(a);
         a.free(self.body_caches);
         self.identity.deinit(a);
@@ -135,6 +137,7 @@ pub const Prepared = struct {
     pub fn emitWithOptions(self: *const Prepared, a: Allocator, options: backend.CompileOptions) !Result {
         var actual = options;
         actual.identity = self.identity.view();
+        actual.diagnostic_source_digests = self.source_digests;
         actual.unit_order = self.unit_order;
         actual.diagnostic_prelude_unit = self.prelude;
         actual.diagnostic_source_mode = self.source_mode;
@@ -381,6 +384,14 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     // and solver teardown, including cached PI consumption before emission.
     const owners = try a.alloc(RuntimeIdentity.Owner, units.len);
     defer a.free(owners);
+    const source_digests = try a.alloc([32]u8, units.len);
+    errdefer a.free(source_digests);
+    for (source_digests, 1..) |*digest, unit| {
+        const id: u32 = @intCast(unit);
+        if (source.compiledModule(id)) |compiled| {
+            digest.* = compiled.identity.source_digest;
+        } else std.crypto.hash.Blake3.hash(source.unit(id).source, digest, .{});
+    }
     for (owners, 1..) |*owner, unit| owner.* = .{ .unit = @intCast(unit), .path = source.filename(@intCast(unit)) };
     const unit_order = try sourceOrder(a, source);
     errdefer a.free(unit_order);
@@ -404,7 +415,7 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
         check_transferred = true;
     }
     transferred = true;
-    return .{ .ready = .{ .body_caches = body_caches, .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
+    return .{ .ready = .{ .source_digests = source_digests, .body_caches = body_caches, .units = units, .identity = identity, .unit_order = unit_order, .paths = paths, .cached = dependency.modules.len, .borrowed = borrowed, .entry_imports = entry_imports, .entry_implicit_prelude = source.unit(source.entry).implicit_prelude, .entry = source.entry, .prelude = source.prelude_unit, .source_mode = source.input_mode == .source, .source_bytes = source.source_bytes, .stats = stats } };
 }
 
 /// Whether every lane that loads the same modules publishes this first check

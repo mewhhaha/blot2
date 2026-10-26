@@ -443,15 +443,15 @@ Known private pointer stores and dominating exact field loads form closed
 allocation groups. Shared children and cycles may belong to one group; liveness
 is the union of its members' uses. Every member must be constructed in the same
 straight-line segment, with its own valid allocation-base local. An exit
-releases each member's temporary owner once. In tracing modules each recycle
-frees only its own storage; in counted modules it drops that member's counted
-tracer lease and zero-count destruction follows typed edges. Escaping a parent
-also escapes its reachable children. Unknown field reads/copies, overlapping
-writes, conditional field provenance, cross-segment construction and
+releases each member's temporary owner once. Production recycle drops that
+member's counted journal lease, and zero-count destruction follows typed edges.
+Legacy tracing fixtures free only the recycled member's storage. Escaping a
+parent also escapes its reachable children. Unknown field reads/copies,
+overlapping writes, conditional field provenance, cross-segment construction and
 invalidating calls reject the proof. Reference-overlap checking has a bounded
-work budget and conservatively declines wider proofs. Dynamic shared/cyclic
-ownership and reclamation of escaping effect payloads remain required before
-tracing can be removed.
+work budget and conservatively declines wider proofs. Escaping shared/cyclic
+values retain counted ownership and localized trial deletion. Production has no
+general tracing fallback.
 
 [Ragged builders](RAGGED_BUILDERS.md) specifies bounded count/fill admission,
 direct final storage, ownership and ordinary fallback for dependent or filtered
@@ -514,7 +514,8 @@ imports and checked request graphs with the same counted journal through JSPI.
 Failed leave terminalizes active evaluating demands before retirement; request
 cancellation resets them to pending. Externref cleanup and revoked-descriptor
 checks prevent a strong ready memo from rebinding an old host closure. Unknown
-imports retain the complete tracing fallback.
+imports outside the checked ownership contracts reject production emission; they
+do not enable a tracing fallback.
 
 Optimized body captures own their inputs and outputs. Reuse requires exact local
 instructions and types, called bodies, call signatures, arena roles and
@@ -597,17 +598,19 @@ allocation failure to its caller.
 Checked scalar element layouts select pointer-free array allocation and list
 leaves. The descriptor carries this fact through cloning, structural operations
 and conversion. Reference-valued elements use typed owning fields when the whole
-module is admitted, with tracing available during transition; machine i32 alone
-is never evidence that a word is scalar. Runtime list branches remain
+module is admitted; incomplete production ownership is diagnosed. Machine i32
+alone is never evidence that a word is scalar. Runtime list branches remain
 pointerful.
 
 Flat products and structural records with 1–16 checked scalar fields retain
 consecutive payload storage. A generator-owned numeric layout plan also packs
-nested products, records and public, non-opaque, single-constructor nominal
-values when their complete storage has at most sixteen scalar leaves, thirty-two
-object nodes and sixteen levels. References, usage, hidden or open storage and
-exhausted proof bounds decline. Plans contain stable layout IDs, never borrowed
-inference-store or source pointers.
+nested products, records and public, non-opaque nominal values. A sum has at
+most four constructors and stores a discriminant plus the largest scalar arm;
+nested sums use the same guarded plan. Bounds are sixteen physical words,
+thirty-two object nodes, sixty-four logical leaves and sixteen levels.
+References, usage, hidden or open storage and exhausted proof bounds decline.
+Plans contain stable layout IDs, never borrowed inference-store or source
+pointers.
 
 Source lengths count rows; indexing, overflow checks, copies, conversions and
 edits use the same checked stride. Constant serialization matches physical
@@ -641,19 +644,28 @@ memoized results on State writes, or assume closure graphs are always acyclic.
 
 [Shared and cyclic ownership](SHARED_OWNERSHIP.md) specifies typed
 strong/borrowed roots, iterative destruction, suspension ownership and localized
-trial deletion for tasks 030–035. The tracing runtime remains until replacement
-qualification. [Typed RC transition](SHARED_RC.md) describes current admission,
-counted tracer leases and the shared retirement path.
+trial deletion for tasks 030–035. Production source compilation uses counted
+ownership with localized trial deletion. Legacy tracing is isolated to explicit
+partial-runtime fixtures; it is not a production fallback.
+[Typed RC transition](SHARED_RC.md) retains the admission history and shared
+retirement rules.
 
-Wasm values live in linear memory, with a nonmoving tracing arena collector and
-free lists. This does not use the Wasm GC extension. Ownership analysis permits
-in-place updates and allocation elimination; it does not prove every object's
-lifetime. Forever loops collect after allocation traffic reaches the larger of
-64 KiB and a quarter of the arena's high-water mark, including startup data.
-Their activation floor pins earlier objects, which are traced together with loop
-carries, providers and static roots. Collection must not run on a fixed
-iteration cadence: that repeatedly scans large retained collections even when
-each step allocates only a small cursor.
+Wasm values live in nonmoving linear-memory blocks with free lists. This does
+not use the Wasm GC extension. Exact counted edges and root journals preserve
+owners; iterative destruction releases acyclic graphs. Legal strong cycles use
+localized trial deletion. Safe points consider allocation/removal traffic, with
+a minimum of 64 KiB and an additional 64 bytes per surviving visited vertex,
+capped at 262,144 vertices. Forced drains remain ownership-boundary operations.
+An exact `no_cycle` proof covers an object's entire reachable graph for its
+lifetime, including future publication; being acyclic at one instant is
+insufficient.
+
+An acyclic value, an entry that adds no cycle candidates, and an arena that
+executes no graph collector are distinct claims. A program certificate must
+cover initialization, every entrypoint, persistent owners, callees and host
+contracts in the same arena. A local allocation proof or an observed zero-scan
+run cannot certify that complete boundary. Collector-free execution can still
+allocate and perform destruction proportional to a released acyclic graph.
 
 Small aggregate scalar replacement requires full initialization before aliasing
 and fixed field offsets. Every lexical version and loop carry owns separate

@@ -11746,6 +11746,7 @@ const Engine = struct {
             }
             const sequence = try self.types.sequence(if (primitive.is_list) .list else .array, element);
             return switch (primitive.op) {
+                .flatten => self.types.function(try self.types.sequence(.array, sequence), sequence),
                 .length => self.types.function(sequence, T.u32_type),
                 .get => self.types.function(sequence, try self.types.function(T.u32_type, element)),
                 .set => self.types.function(sequence, try self.types.function(T.u32_type, try self.types.function(element, sequence))),

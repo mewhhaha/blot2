@@ -11,6 +11,7 @@ const { values } = parseArgs({
   options: {
     baseline: { type: "string" },
     candidate: { type: "string" },
+    "baseline-std": { type: "string", default: "std" },
     output: { type: "string", default: "build/bench/runtime-boundaries" },
     samples: { type: "string", default: "31" },
     batch: { type: "string", default: "5" },
@@ -29,6 +30,10 @@ const executable = {
   baseline: resolve(values.baseline),
   candidate: resolve(values.candidate),
 };
+const libraries = {
+  baseline: resolve(root, values["baseline-std"]!),
+  candidate: resolve(root, "std"),
+};
 const entry = resolve(root, "benchmarks/runtime-boundaries/main.blot");
 const sha = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) =>
@@ -46,6 +51,7 @@ async function tree(path: string) {
   }
 }
 for (const path of Object.values(executable)) await pin(path);
+if (libraries.baseline !== libraries.candidate) await tree(libraries.baseline);
 for (const path of ["std", "compiler", "benchmarks/runtime-boundaries"]) {
   await tree(resolve(root, path));
 }
@@ -56,6 +62,7 @@ const names = [
   "rc_destroyed",
   "cycle_passes",
   "cycle_vertices",
+  "cycle_edges",
   "cycle_bytes",
 ] as const;
 type Side = keyof typeof executable;
@@ -68,11 +75,12 @@ const report = {
   created_at: new Date().toISOString(),
   engine: Deno.version,
   scope:
-    "Alternating release compiler builds and same-engine Wasm calls. No body instrumentation. Wall times include the host ownership boundary; counters measure traffic, not peak live bytes. Optional variants and pipelines are unresolved controls.",
+    "Alternating release compiler builds and same-engine Wasm calls. No body instrumentation. Wall times include the host ownership boundary; counters measure traffic, not peak live bytes. Each compiler uses its pinned standard library.",
   samples,
   batch,
   pins,
   compilers: executable,
+  standardLibraries: libraries,
   builds: [] as {
     side: Side;
     round: number;
@@ -104,8 +112,8 @@ for (let round = 0; round < 3; round++) {
       entry,
       cacheDirectory: false,
       codegenTier: "optimized",
-      prelude: resolve(root, "std/prelude.blot"),
-      stdRoot: resolve(root, "std"),
+      prelude: resolve(libraries[side], "prelude.blot"),
+      stdRoot: libraries[side],
     });
     try {
       const built = await compiler.build();
@@ -244,6 +252,8 @@ for (const [name, argument, expected] of cases) {
       "wide_generate",
       "scalar_generate",
       "numeric_scratch",
+      "optional_generate",
+      "pipeline",
     ].includes(name)
   ) assert.equal(c.rc_destroyed, 1, name);
   if (name === "reference_scratch") {

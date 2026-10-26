@@ -277,6 +277,7 @@ pub const Owner = struct {
     planned_loops: std.ArrayList(core.Id) = .empty,
     small_values: std.AutoHashMapUnmanaged(core.BindingId, SmallCollection) = .empty,
     row_views: std.ArrayList(RowView) = .empty,
+    diagnostic_context: u32 = 0,
     cursor_directories: std.AutoHashMapUnmanaged(core.Id, CursorDirectory) = .empty,
     small_result: ?struct { root: core.Id, value: *SmallCollection } = null,
     analysis_root: core.Id = 0,
@@ -1875,7 +1876,7 @@ pub const Owner = struct {
             try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels };
         defer emitter.deinit();
         var demands: [max_parameters]InlineDemand = undefined;
         var count: usize = 0;
@@ -2031,7 +2032,7 @@ pub const Owner = struct {
             defer rows.deinit(g.allocator);
             for (producer.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(plan.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
             try g.mapTypeDepth(plan.target.unit, &mappings, &rows, producer.typeOf(body.root), key.result, body.span, 0);
-            var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
+            var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
             defer emitter.deinit();
             for (producer.bodyParameters(body), 0..) |parameter, i| if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
             try emitter.bodyExpression(body.root, depth + 1, false);
@@ -2158,8 +2159,9 @@ pub const Owner = struct {
         }
         try g.refineMappings(key.target.unit, .{ .body = key.target }, full, mappings, rows, body.span);
         if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
+        const diagnostic_context = try self.inlineContext();
         const emitter = try g.allocator.create(Emitter);
-        emitter.* = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
+        emitter.* = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = diagnostic_context, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
         if (small_result) |result| emitter.small_result = .{ .root = body.root, .value = result };
         return emitter;
     }
@@ -2558,8 +2560,9 @@ pub const Owner = struct {
         }
         g.instance_depth += 1;
         defer g.instance_depth -= 1;
+        const diagnostic_context = try self.inlineContext();
         const emitter = try g.allocator.create(Emitter);
-        emitter.* = .{ .generator = g, .unit_id = plan.key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = self.inline_loop or self.loop_targets.items.len != 0 };
+        emitter.* = .{ .generator = g, .unit_id = plan.key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = diagnostic_context, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = self.inline_loop or self.loop_targets.items.len != 0 };
         defer {
             emitter.deinit();
             g.allocator.destroy(emitter);
@@ -2636,7 +2639,7 @@ pub const Owner = struct {
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source_type, key.result, body.span, 0);
         try g.refineMappings(key.target.unit, .{ .body = key.target }, full, &mappings, &rows, body.span);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels };
         defer emitter.deinit();
         // Preserve left-to-right evaluation of every dynamic argument.
         for (arguments, source.bodyParameters(body)[0..arguments.len], 0..) |argument, parameter, index| {
@@ -2754,16 +2757,27 @@ pub const Owner = struct {
         self.computation_values.deinit(self.generator.allocator);
         self.instance_locals.deinit(self.generator.allocator);
     }
-    fn recordSemantic(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
-        if (self.semantic_node == 0 or (op != .call and op != .call_indirect and op != .call_import)) return;
+    fn inlineContext(self: *Emitter) Error!u32 {
         const g = self.generator;
+        if (!g.memory_profile or self.semantic_node == 0) return self.diagnostic_context;
+        return g.diagnostic_contexts.intern(g.allocator, .{ .unit = self.unit_id, .node = self.semantic_node, .parent = self.diagnostic_context }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.ModuleTooLarge => return g.fail(self.unit_id, self.semantic_node, .complexity),
+        };
+    }
+    fn recordSemantic(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
+        if (self.semantic_node == 0) return;
+        const g = self.generator;
+        const call = op == .call or op == .call_indirect or op == .call_import;
+        const memory = g.memory_profile and (ir.fixed(op).bytes != 0 or op == .memory_copy or op == .memory_fill);
+        if (!call and !memory) return;
         var kind: @FieldType(wasm.Module.SemanticSite, "kind") = undefined;
-        if (op == .call and g.module.arena != null and g.module.arena.?.isAllocation(operand)) kind = .allocation else {
-            if (op == .call and g.module.runtimeHelper(operand)) return;
-            kind = .call;
-        }
+        if (memory) kind = .diagnostic_memory else if (op == .call and g.module.arena != null and g.module.arena.?.isAllocation(operand)) kind = .allocation else if (op == .call and g.module.runtimeHelper(operand)) {
+            if (!g.memory_profile) return;
+            kind = .diagnostic_call;
+        } else kind = .call;
         if (self.semantic_context == null) self.semantic_context = .{ .mappings = try g.mappingEvidence(self.mappings), .rows = try g.rowMappingEvidence(self.row_mappings) };
-        try g.module.recordSemanticSite(.{ .function = self.function_id, .place = @intCast(g.module.functions.items[self.function_id].instructions.items.len), .unit = self.unit_id, .node = self.semantic_node, .root = if (self.body) |body| body.root else self.analysis_root, .mappings = self.semantic_context.?.mappings, .rows = self.semantic_context.?.rows, .kind = kind });
+        try g.module.recordSemanticSite(.{ .diagnostic_context = self.diagnostic_context, .function = self.function_id, .place = @intCast(g.module.functions.items[self.function_id].instructions.items.len), .unit = self.unit_id, .node = self.semantic_node, .root = if (self.body) |body| body.root else self.analysis_root, .mappings = self.semantic_context.?.mappings, .rows = self.semantic_context.?.rows, .kind = kind });
     }
     pub fn emit(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
         std.debug.assert(!self.preparing);
@@ -3121,7 +3135,7 @@ pub const Owner = struct {
         try self.emit(if (floating) .f32_store else .i32_store, 4);
         try self.emit(.local_get, address);
     }
-    const Location = struct { owner: u32, container: u32, offset: u32, size: ?u32, wrapped: bool, list_index: ?u32 = null, row_words: u32 = 0, row_layout: layout.Id = 0, array_scalar: ?bool = null, mask: ?u32 = null, scalar_storage: bool = false, shape: ?u32 = null };
+    const Location = struct { owner: u32, container: u32, offset: u32, size: ?u32, wrapped: bool, list_index: ?u32 = null, row_words: u32 = 0, row_layout: layout.Id = 0, array_scalar: ?bool = null, mask: ?u32 = null, scalar_storage: bool = false, shape: ?u32 = null, acyclic: bool = false };
     fn payloadLayout(self: *Emitter, projection: core.Projection, tag: u32, id: core.Id) Error!layout.Id {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -3321,6 +3335,9 @@ pub const Owner = struct {
         const prepared = self.fieldPlan(id, projection_index);
         const projection = prepared.projection;
         const variants = prepared.variants.items;
+        // The checked whole-owner proof covers both its payload and wrapper.
+        // Copies must preserve it before publishing any owning fields.
+        const acyclic = need_size and try g.acyclicLayout(try self.codeLayout(projection.source_type, g.unit(self.unit_id).span(id)));
         var wrapped = projection.nominal.decl != 0;
         if (wrapped) for (g.unit(projection.nominal.unit).nominals) |nominal| {
             if (std.meta.eql(nominal.identity, projection.nominal) and nominal.is_opaque) {
@@ -3380,7 +3397,7 @@ pub const Owner = struct {
                 try self.referenceConstant(shapes.items[0], .static_address);
                 try self.emit(.local_set, shape_local);
             }
-            return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped, .mask = mask, .scalar_storage = scalar_storage, .shape = shape };
+            return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped, .mask = mask, .scalar_storage = scalar_storage, .shape = shape, .acyclic = acyclic };
         }
         try self.emit(.i32_const, std.math.maxInt(u32));
         try self.emit(.local_set, offset);
@@ -3420,7 +3437,7 @@ pub const Owner = struct {
         try self.emit(.if_, 0);
         try self.emit(.unreachable_, 0);
         try self.emit(.end, 0);
-        return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped, .mask = mask, .scalar_storage = scalar_storage, .shape = shape };
+        return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped, .mask = mask, .scalar_storage = scalar_storage, .shape = shape, .acyclic = acyclic };
     }
     fn nonzeroLoad(self: *Emitter, op: wasm.Op, offset: u32) Error!void {
         try self.generator.module.emit(self.function_id, ir.nonzeroRead());
@@ -3641,7 +3658,7 @@ pub const Owner = struct {
                 const arena = try g.module.ensureArena();
                 try self.emit(.local_get, place.size.?);
                 if (place.array_scalar) |scalar_elements| {
-                    try self.allocateArray(scalar_elements, null);
+                    try self.allocateArray(scalar_elements, place.row_layout);
                 } else if (place.scalar_storage) {
                     try self.emit(.call, arena.allocate_scalar);
                 } else if (place.mask) |mask_local| {
@@ -3652,6 +3669,10 @@ pub const Owner = struct {
                     try self.emit(.call, arena.allocate_shaped);
                 } else try self.emit(.call, if (place.row_words != 0) arena.allocate_scalar else arena.allocate);
                 try self.emit(.local_set, container);
+                if (place.acyclic and !place.scalar_storage) {
+                    try self.emit(.local_get, container);
+                    try self.emit(.call, arena.mark_acyclic);
+                }
                 if (place.array_scalar != null or place.mask != null or place.shape != null) try self.emit(.local_get, container);
                 try self.emit(.local_get, container);
                 try self.emit(.local_get, place.container);
@@ -3674,6 +3695,10 @@ pub const Owner = struct {
                 // A copy of a constructor cell: its tag, then its payload.
                 const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .reference } });
                 if (!reuse) {
+                    if (place.acyclic) {
+                        try self.emit(.local_get, wrapper);
+                        try self.emit(.call, g.module.arena.?.mark_acyclic);
+                    }
                     try self.emit(.local_get, wrapper);
                     try self.emit(.local_get, place.owner);
                     try self.emit(.i32_const, 8);
@@ -3782,7 +3807,7 @@ pub const Owner = struct {
         defer resolved.deinit(g.allocator);
         const private = self.privateCursorReference(plan.receiver);
         const receiver = if (private) |fields| fields.values[0] else try self.capture(plan.receiver, depth + 1);
-        var emitter: Emitter = .{ .generator = g, .unit_id = plan.key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
+        var emitter: Emitter = .{ .generator = g, .unit_id = plan.key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels };
         defer emitter.deinit();
         const parameter = producer.bodyParameters(&producer_body)[0].binding;
         try emitter.locals.put(g.allocator, parameter, receiver);
@@ -4212,6 +4237,46 @@ pub const Owner = struct {
     /// owns an allocation base; it never exposes a borrowed interior pointer.
     /// Fixed field operations also let ordinary scalar replacement remove
     /// temporary boxes when the consumer does not let them escape.
+    const NumericPlan = @import("numeric_rows.zig").Plan;
+    /// Nested blocks guard every dereference; an inactive arm never supplies a
+    /// pointer or payload. The same plan controls the packed and owning ABI.
+    fn rowGuard(self: *Emitter, plan: *const NumericPlan, guard: ?u8, objects: ?[]const u32, fields: []const u32) Error!usize {
+        const id = guard orelse return 0;
+        const condition = plan.guards[id];
+        const depth = try self.rowGuard(plan, condition.parent, objects, fields);
+        if (objects) |values| {
+            try self.emit(.local_get, values[condition.owner]);
+            try self.emit(.i32_load, 0);
+        } else try self.emit(.local_get, fields[condition.word]);
+        try self.emit(.i32_const, condition.tag);
+        try self.emit(.i32_eq, 0);
+        try self.emit(.if_, 0);
+        return depth + 1;
+    }
+    fn rowGuardEnd(self: *Emitter, count: usize) Error!void {
+        for (0..count) |_| try self.emit(.end, 0);
+    }
+    fn validateRowTags(self: *Emitter, plan: *const NumericPlan, fields: []const u32) Error!void {
+        for (plan.leaves[0..plan.leaf_count]) |leaf| {
+            if (!leaf.discriminant) continue;
+            const blocks = try self.rowGuard(plan, leaf.guard, null, fields);
+            var first = true;
+            for (plan.guards[0..plan.guard_count]) |guard| {
+                if (guard.owner != leaf.owner or guard.word != leaf.word) continue;
+                try self.emit(.local_get, fields[leaf.word]);
+                try self.emit(.i32_const, guard.tag);
+                try self.emit(.i32_eq, 0);
+                if (!first) try self.emit(.i32_or, 0);
+                first = false;
+            }
+            std.debug.assert(!first);
+            try self.emit(.i32_eqz, 0);
+            try self.emit(.if_, 0);
+            try self.emit(.unreachable_, 0);
+            try self.emit(.end, 0);
+            try self.rowGuardEnd(blocks);
+        }
+    }
     fn unpackRow(self: *Emitter, fields: []const u32, element: layout.Id) Error!void {
         const plan = try self.generator.nestedRow(element) orelse {
             const row = try self.allocateStorage(@intCast(fields.len * 4), true, .scalar);
@@ -4222,64 +4287,102 @@ pub const Owner = struct {
             }
             return self.emit(.local_get, row);
         };
-        std.debug.assert(fields.len == plan.leaf_count);
+        std.debug.assert(fields.len == plan.word_count);
+        try self.validateRowTags(&plan, fields);
         var objects: [32]u32 = undefined;
-        // Children are initialized before their parent is allocated. No GC
-        // safepoint can observe an uninitialized reference in a published box.
+        for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
+            if (storage.guard != null or storage.unit_payload) objects[index] = try self.temporary(.i32);
+        }
+        const result = if (plan.storage[0].guard != null) try self.temporary(.i32) else null;
         var next: usize = plan.storage_count;
         while (next > 0) {
             next -= 1;
             const storage = plan.storage[next];
-            var roles: [16]ir.Role = undefined;
-            for (0..storage.bytes / 4) |index| {
-                roles[index] = if (storage.references & (@as(u16, 1) << @intCast(index)) != 0) .reference else .scalar;
+            const blocks = try self.rowGuard(&plan, storage.guard, null, fields);
+            if (storage.unit_payload) {
+                // Empty variants keep their ordinary immortal representation.
+                // Materializing a packed Nothing must not allocate on every read.
+                try self.nullaryConstructor(storage.tag.?);
+                try self.emit(.local_set, objects[next]);
+                if (storage.parent == null and result != null) {
+                    try self.emit(.local_get, objects[next]);
+                    try self.emit(.local_set, result.?);
+                }
+                try self.rowGuardEnd(blocks);
+                continue;
             }
+            var roles: [16]ir.Role = undefined;
+            for (0..storage.bytes / 4) |index| roles[index] = if (storage.references & (@as(u16, 1) << @intCast(index)) != 0) .reference else .scalar;
             const object = try self.allocateStorage(storage.bytes, storage.references == 0, .{ .words = roles[0 .. storage.bytes / 4], .rest = .scalar });
-            objects[next] = object;
             if (storage.tag) |tag| {
                 try self.emit(.local_get, object);
                 try self.emit(.i32_const, tag);
                 try self.emit(.i32_store, 0);
             }
-            for (plan.leaves[0..plan.leaf_count], fields) |leaf, field| {
-                if (leaf.owner != next) continue;
+            for (plan.leaves[0..plan.leaf_count]) |leaf| {
+                if (leaf.owner != next or leaf.discriminant) continue;
                 try self.emit(.local_get, object);
-                try self.emit(.local_get, field);
+                try self.emit(.local_get, fields[leaf.word]);
                 try self.emit(.i32_store, leaf.offset);
             }
             for (plan.storage[0..plan.storage_count], 0..) |child, index| {
                 if (child.parent == null or child.parent.? != next) continue;
+                const active = try self.rowGuard(&plan, child.guard, null, fields);
                 try self.emit(.local_get, object);
                 try self.emit(.local_get, objects[index]);
                 try self.emit(.i32_store, child.offset);
+                try self.rowGuardEnd(active);
             }
             if (storage.references != 0) try self.markAcyclic(object, storage.layout);
+            // Initialize through the allocation's own local before publishing
+            // an alias. Unguarded rows need no merge local: retaining the direct
+            // owner lets scalar replacement erase their temporary boxes.
+            if (storage.guard != null) {
+                try self.emit(.local_get, object);
+                try self.emit(.local_set, objects[next]);
+            } else objects[next] = object;
+            if (storage.parent == null and result != null) {
+                try self.emit(.local_get, object);
+                try self.emit(.local_set, result.?);
+            }
+            try self.rowGuardEnd(blocks);
         }
-        try self.emit(.local_get, objects[0]);
+        try self.emit(.local_get, result orelse objects[0]);
     }
     fn packRow(self: *Emitter, row: u32, words: u32, element: layout.Id) Error![16]u32 {
         var fields: [16]u32 = undefined;
+        for (fields[0..words]) |*field| field.* = try self.temporary(.i32);
         if (try self.generator.nestedRow(element)) |plan| {
-            std.debug.assert(words == plan.leaf_count);
+            std.debug.assert(words == plan.word_count);
+            // This path can run repeatedly in a loop. Reset padding on every row.
+            if (plan.guard_count != 0) for (fields[0..words]) |field| {
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_set, field);
+            };
             var objects: [32]u32 = undefined;
-            objects[0] = row;
-            for (plan.storage[1..plan.storage_count], 1..) |storage, index| {
+            for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
                 objects[index] = try self.temporary(.i32);
-                try self.emit(.local_get, objects[storage.parent.?]);
-                try self.emit(.i32_load, storage.offset);
+                var blocks: usize = 0;
+                if (storage.parent) |parent| {
+                    blocks = try self.rowGuard(&plan, plan.storage[parent].guard, &objects, &.{});
+                    try self.emit(.local_get, objects[parent]);
+                    try self.emit(.i32_load, storage.offset);
+                } else try self.emit(.local_get, row);
                 try self.emit(.local_set, objects[index]);
+                try self.rowGuardEnd(blocks);
             }
-            for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
-                fields[index] = try self.temporary(.i32);
+            for (plan.leaves[0..plan.leaf_count]) |leaf| {
+                const blocks = try self.rowGuard(&plan, leaf.guard, &objects, &.{});
                 try self.emit(.local_get, objects[leaf.owner]);
                 try self.emit(.i32_load, leaf.offset);
-                try self.emit(.local_set, fields[index]);
+                try self.emit(.local_set, fields[leaf.word]);
+                try self.rowGuardEnd(blocks);
             }
-        } else for (fields[0..words], 0..) |*field, index| {
-            field.* = try self.temporary(.i32);
+            try self.validateRowTags(&plan, fields[0..words]);
+        } else for (fields[0..words], 0..) |field, index| {
             try self.emit(.local_get, row);
             try self.emit(.i32_load, @intCast(index * 4));
-            try self.emit(.local_set, field.*);
+            try self.emit(.local_set, field);
         }
         return fields;
     }
@@ -4437,7 +4540,146 @@ pub const Owner = struct {
         try self.emit(.local_get, value);
         try self.emit(.call, (try self.generator.module.ensureArena()).store_word);
     }
-    fn arrayFill(self: *Emitter, count: u32, value: u32, machine: wasm.ValueType, is_generated: bool, is_list: bool, known: ?u32, element: layout.Id) Error!void {
+    const PackedProducer = struct { template: Template, ty: layout.Id };
+    fn packedValue(self: *Emitter, comptime encoding: bool, id: core.Id, plan: *const NumericPlan, parent: ?u8, offset: u32, fields: []const u32, depth: usize) Error!bool {
+        if (depth >= 64) return false;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        for (plan.leaves[0..plan.leaf_count]) |leaf| {
+            if (leaf.discriminant or parent != leaf.owner or offset != leaf.offset) continue;
+            if (encoding) {
+                if (id == 0) try self.emit(.i32_const, 0) else {
+                    try self.expression(id, depth + 1);
+                    if (leaf.floating) try self.emit(.i32_reinterpret_f32, 0);
+                }
+                try self.emit(.local_set, fields[leaf.word]);
+            }
+            return true;
+        }
+        if (id == 0) return false;
+        const node = source.node(id);
+        if (node.tag == .if_value) {
+            if (encoding) {
+                try self.expression(node.a, depth + 1);
+                try self.emit(.if_, 0);
+                self.labels += 1;
+            }
+            if (!try self.packedValue(encoding, node.b, plan, parent, offset, fields, depth + 1)) return false;
+            if (encoding) try self.emit(.else_, 0);
+            if (!try self.packedValue(encoding, node.c, plan, parent, offset, fields, depth + 1)) return false;
+            if (encoding) {
+                self.labels -= 1;
+                try self.emit(.end, 0);
+            }
+            return true;
+        }
+        if (node.tag != .construct and node.tag != .record and node.tag != .product) {
+            return false;
+        }
+        const tag: ?u32 = if (node.tag == .construct) source.constructor(node.a).tag else null;
+        const selected: u8 = for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
+            if (storage.parent == parent and storage.offset == offset and storage.tag == tag) break @intCast(index);
+        } else return false;
+        if (node.tag == .construct) {
+            if (encoding) if (plan.storage[selected].guard) |active| {
+                const guard = plan.guards[active];
+                // A single-constructor wrapper inherits its parent's guard.
+                if (guard.owner == selected or plan.storage[guard.owner].parent == parent and plan.storage[guard.owner].offset == offset) {
+                    try self.emit(.i32_const, tag.?);
+                    try self.emit(.local_set, fields[guard.word]);
+                }
+            };
+            return self.packedValue(encoding, node.b, plan, selected, 4, fields, depth + 1);
+        }
+        const children = source.children(id);
+        const record = node.tag == .record;
+        const destinations = if (record) source.recordDestinations(id) else &.{};
+        const physical = if (record) try @import("../check/record_order.zig").destinations(g.allocator, source.types, source.types.node(source.typeOf(id)), &g.representations.store.record_names) else &.{};
+        defer g.allocator.free(physical);
+        for (children, 0..) |child, index| {
+            const declared = if (record) destinations[index] else index;
+            const slot = if (physical.len == 0) declared else physical[declared];
+            if (!try self.packedValue(encoding, child, plan, selected, @intCast(slot * 4), fields, depth + 1)) return false;
+        }
+        return true;
+    }
+    fn generatedPackedRow(self: *Emitter, producer: PackedProducer, index: u32, destination: u32, is_list: bool, plan: *const NumericPlan) Error!bool {
+        const g = self.generator;
+        if (self.inline_depth >= 6 or producer.template.templates != 0 or producer.template.staged != 0 or producer.template.callable_instances != 0 or self.dictionary_owner != null) return false;
+        const owner = if (producer.template.unit == 0) self.unit_id else producer.template.unit;
+        const source = g.unit(owner);
+        const node = source.node(producer.template.node);
+        const arrow = g.representations.store.node(producer.ty);
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        var emitter: Emitter = .{ .generator = g, .unit_id = owner, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = &.{}, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = true };
+        defer emitter.deinit();
+        var root: core.Id = undefined;
+        if (node.tag == .reference) {
+            const target = try g.normalize(owner, source.reference(producer.template.node));
+            const unit_ = g.unit(target.unit);
+            const body = unit_.body(target.binding) orelse return false;
+            if (body.parameters.len != 1 or !body.is_function) return false;
+            if ((@import("inline_body.zig").cost(unit_, body.root) orelse return false) > 64) return false;
+            var key: Key = .{ .target = target, .count = 1, .result = arrow.b };
+            key.parameters[0] = arrow.a;
+            key.effects[0] = arrow.c;
+            var service = try g.specializer();
+            var resolved = service.named(key, &.{}) catch |err| return g.specializationFailure(service, err);
+            defer resolved.deinit(g.allocator);
+            try mappings.appendSlice(g.allocator, resolved.mappings.items);
+            try rows.appendSlice(g.allocator, resolved.rows.items);
+            emitter.unit_id = target.unit;
+            root = body.root;
+            try emitter.locals.put(g.allocator, unit_.bodyParameters(body)[0].binding, index);
+            if (g.artifacts) |artifacts| try artifacts.readInlineBody(target);
+        } else if (node.tag == .closure) {
+            const closure_ = source.closures[node.a];
+            if ((@import("inline_body.zig").cost(source, closure_.body) orelse return false) > 64) return false;
+            const key: ClosureKey = .{ .unit = owner, .catalog = node.a, .ty = producer.ty, .captures = producer.template.captures, .scalar_environment = producer.template.scalar_environment, .evidence = producer.template.evidence, .rows = producer.template.rows };
+            try g.resolveClosureMappings(key, &mappings, &rows);
+            root = closure_.body;
+            try emitter.locals.put(g.allocator, closure_.parameter.binding, index);
+        } else return false;
+        emitter.mappings = mappings.items;
+        emitter.row_mappings = rows.items;
+        if (!try emitter.packedValue(false, root, plan, null, 0, &.{}, 0)) return false;
+        if (node.tag == .closure) {
+            const closure_ = source.closures[node.a];
+            for (source.extra[closure_.captures.start..][0..closure_.captures.len], 0..) |binding, position| {
+                const concrete = g.representations.store.children(producer.template.captures)[position];
+                const machine = g.representations.store.machine(concrete);
+                const local = try self.temporary(machine);
+                try self.emit(.local_get, producer.template.environment.?);
+                if (!producer.template.scalar_environment) try self.emit(if (machine == .f32) .f32_load else .i32_load, @intCast(position * 4));
+                try self.emit(.local_set, local);
+                try emitter.locals.put(g.allocator, binding, local);
+            }
+        }
+        var body = try emitter.prepareBody(root, 0, false);
+        defer body.deinit(g.allocator);
+        emitter.body = &body;
+        emitter.analysis_root = root;
+        emitter.mappings = body.mappings;
+        emitter.row_mappings = body.rows;
+        var fields: [16]u32 = undefined;
+        for (fields[0..plan.word_count]) |*field| {
+            field.* = try self.temporary(.i32);
+            try self.emit(.i32_const, 0);
+            try self.emit(.local_set, field.*);
+        }
+        std.debug.assert(try emitter.packedValue(true, root, plan, null, 0, fields[0..plan.word_count], 0));
+        const base = if (is_list) try self.multiplyLocal(index, plan.word_count) else undefined;
+        for (fields[0..plan.word_count], 0..) |field, position| {
+            if (is_list) try self.listWordAddress(destination, base, @intCast(position), false) else try self.arrayAddress(destination, index, plan.stride());
+            try self.emit(.local_get, field);
+            try self.storeScalar(.i32_store, if (is_list) 0 else @intCast(4 + position * 4));
+        }
+        return true;
+    }
+    fn arrayFill(self: *Emitter, count: u32, value: u32, machine: wasm.ValueType, is_generated: bool, is_list: bool, known: ?u32, element: layout.Id, producer: ?PackedProducer) Error!void {
         const row_words = try self.generator.rowWords(element);
         const copied_row_scope = is_generated and try self.generator.nestedRow(element) != null;
         const iteration_cleanup = self.cleanups.mark();
@@ -4491,31 +4733,38 @@ pub const Owner = struct {
             try self.emit(.loop, 0);
             self.labels += 1;
         }
-        if (is_list and row_words == 0) {
-            try self.emit(.local_get, array_);
-            try self.emit(.local_get, index);
-            try self.emit(.call, (try self.generator.module.ensureLists()).address);
-        } else if (!is_list) try self.arrayAddress(array_, index, stride);
-        if (known) |function| {
-            try self.emit(.local_get, value);
-            try self.emit(.local_get, index);
-            try self.providerHead();
-            try self.emit(.call, function);
-        } else if (is_generated) {
-            const signature = try self.generator.module.internType(&.{ .i32, .i32, .i32 }, machine);
-            try self.emit(.local_get, value);
-            try self.emit(.i32_load, 4);
-            try self.emit(.local_get, index);
-            try self.providerHead();
-            try self.emit(.local_get, value);
-            try self.emit(.i32_load, 0);
-            try self.emit(.call_indirect, signature);
-        } else try self.emit(.local_get, value);
-        if (is_list and row_words != 0) {
-            const row = try self.temporary(.i32);
-            try self.emit(.local_set, row);
-            try self.storeListRow(array_, index, row, row_words, element);
-        } else if (is_list) try self.storeCollectionWord(array_, true, machine, 0) else if (!scalar_elements) try self.storeCollectionWord(array_, false, machine, 4) else try self.storeElement(machine, 4, row_words, scalar_elements, element);
+        const direct = if (producer) |candidate| direct: {
+            const plan = try self.generator.nestedRow(element) orelse break :direct false;
+            if (plan.guard_count == 0) break :direct false;
+            break :direct try self.generatedPackedRow(candidate, index, array_, is_list, &plan);
+        } else false;
+        if (!direct) {
+            if (is_list and row_words == 0) {
+                try self.emit(.local_get, array_);
+                try self.emit(.local_get, index);
+                try self.emit(.call, (try self.generator.module.ensureLists()).address);
+            } else if (!is_list) try self.arrayAddress(array_, index, stride);
+            if (known) |function| {
+                try self.emit(.local_get, value);
+                try self.emit(.local_get, index);
+                try self.providerHead();
+                try self.emit(.call, function);
+            } else if (is_generated) {
+                const signature = try self.generator.module.internType(&.{ .i32, .i32, .i32 }, machine);
+                try self.emit(.local_get, value);
+                try self.emit(.i32_load, 4);
+                try self.emit(.local_get, index);
+                try self.providerHead();
+                try self.emit(.local_get, value);
+                try self.emit(.i32_load, 0);
+                try self.emit(.call_indirect, signature);
+            } else try self.emit(.local_get, value);
+            if (is_list and row_words != 0) {
+                const row = try self.temporary(.i32);
+                try self.emit(.local_set, row);
+                try self.storeListRow(array_, index, row, row_words, element);
+            } else if (is_list) try self.storeCollectionWord(array_, true, machine, 0) else if (!scalar_elements) try self.storeCollectionWord(array_, false, machine, 4) else try self.storeElement(machine, 4, row_words, scalar_elements, element);
+        }
         try self.emit(.local_get, index);
         try self.emit(.i32_const, 1);
         try self.emit(.i32_add, 0);
@@ -4648,7 +4897,7 @@ pub const Owner = struct {
                 try self.emit(.local_set, local);
                 break :blk local;
             };
-            return self.arrayFill(count, env, g.representations.store.machine(g.representations.store.node(result).a), true, g.representations.store.node(result).tag == .list, try self.templateFunction(template, callback, false), g.representations.store.node(result).a);
+            return self.arrayFill(count, env, g.representations.store.machine(g.representations.store.node(result).a), true, g.representations.store.node(result).tag == .list, try self.templateFunction(template, callback, false), g.representations.store.node(result).a, .{ .template = template, .ty = callback });
         }
         var locals: [3]u32 = undefined;
         var machines: [3]wasm.ValueType = undefined;
@@ -4908,6 +5157,7 @@ pub const Owner = struct {
         const expected = @import("collection_ops.zig").arity(op);
         if (locals.len == 0 or locals.len != expected or machines.len != expected) return g.fail(self.unit_id, id, .unsupported);
         switch (op) {
+            .flatten => try self.arrayFlatten(locals[0], g.representations.store.node(result_layout).a),
             .simd_load, .simd_store => {
                 // Four word-sized scalar elements move as one v128 value.
                 const element = g.representations.store.scalar(input_node.a) orelse return g.fail(self.unit_id, id, .unsupported);
@@ -4997,8 +5247,8 @@ pub const Owner = struct {
                 if (row_words == 0 and !numeric) try self.storeCollectionWord(changed, false, machines[2], 4) else try self.storeElement(machines[2], 4, row_words, true, g.representations.store.node(input_collection).a);
                 try self.emit(.local_get, changed);
             },
-            .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.representations.store.node(result_layout).tag == .list, null, g.representations.store.node(result_layout).a),
-            .generate => try self.arrayFill(locals[0], locals[1], g.representations.store.machine(g.representations.store.node(result_layout).a), true, g.representations.store.node(result_layout).tag == .list, null, g.representations.store.node(result_layout).a),
+            .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.representations.store.node(result_layout).tag == .list, null, g.representations.store.node(result_layout).a, null),
+            .generate => try self.arrayFill(locals[0], locals[1], g.representations.store.machine(g.representations.store.node(result_layout).a), true, g.representations.store.node(result_layout).tag == .list, null, g.representations.store.node(result_layout).a, null),
             .identity => try self.emit(.local_get, locals[0]),
             .convert => {
                 const words = try g.rowWords(g.representations.store.node(result_layout).a);
@@ -5021,6 +5271,91 @@ pub const Owner = struct {
                 } else try self.arrayPush(locals[0], locals[1], machines[1], op == .prepend, row_words != 0 or g.representations.store.scalar(g.representations.store.node(result_layout).a) != null, row_words, g.representations.store.node(result_layout).a);
             },
         }
+    }
+    /// Flatten consumes already-evaluated chunks. Both passes preserve their
+    /// order; copies use the same physical row plan and owning-word helper as
+    /// concat/slice, so saved chunks remain valid for every element layout.
+    fn arrayFlatten(self: *Emitter, chunks: u32, element: layout.Id) Error!void {
+        const g = self.generator;
+        const words = try g.rowWords(element);
+        const stride = packed_layout.stride(words);
+        const count = try self.temporary(.i32);
+        const total = try self.temporary(.i32);
+        const index = try self.temporary(.i32);
+        const chunk = try self.temporary(.i32);
+        const length = try self.temporary(.i32);
+        const offset = try self.temporary(.i32);
+        const destination = try self.temporary(.i32);
+        try self.emit(.local_get, chunks);
+        try self.emit(.i32_load, 0);
+        try self.emit(.local_set, count);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, total);
+        inline for (.{ false, true }) |copying| {
+            if (copying) {
+                const bytes = try self.arraySize(total, stride);
+                try self.emit(.local_get, bytes);
+                try self.allocateArray(words != 0 or g.representations.store.scalar(element) != null, element);
+                try self.emit(.local_set, destination);
+                try self.emit(.local_get, destination);
+                try self.emit(.local_get, total);
+                try self.emit(.i32_store, 0);
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_set, offset);
+            }
+            try self.emit(.i32_const, 0);
+            try self.emit(.local_set, index);
+            try self.emit(.block, 0);
+            try self.emit(.loop, 0);
+            self.labels += 2;
+            try self.emit(.local_get, index);
+            try self.emit(.local_get, count);
+            try self.emit(.i32_ge_u, 0);
+            try self.emit(.br_if, 1);
+            try self.arrayAddress(chunks, index, 4);
+            try self.emit(.i32_load, 4);
+            try self.emit(.local_tee, chunk);
+            try self.emit(.i32_load, 0);
+            try self.emit(.local_set, length);
+            if (copying) {
+                try self.emit(.local_get, destination);
+                try self.arrayAddress(destination, offset, stride);
+                try self.emit(.i32_const, 4);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_get, chunk);
+                try self.emit(.i32_const, 4);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_get, length);
+                try self.emit(.i32_const, stride);
+                try self.emit(.i32_mul, 0);
+                try self.emit(.call, g.module.arena.?.copy_words);
+                try self.emit(.local_get, offset);
+                try self.emit(.local_get, length);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_set, offset);
+            } else {
+                try self.emit(.local_get, total);
+                try self.emit(.local_get, length);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_tee, offset);
+                try self.emit(.local_get, total);
+                try self.emit(.i32_lt_u, 0);
+                try self.emit(.if_, 0);
+                try self.emit(.unreachable_, 0);
+                try self.emit(.end, 0);
+                try self.emit(.local_get, offset);
+                try self.emit(.local_set, total);
+            }
+            try self.emit(.local_get, index);
+            try self.emit(.i32_const, 1);
+            try self.emit(.i32_add, 0);
+            try self.emit(.local_set, index);
+            try self.emit(.br, 0);
+            self.labels -= 2;
+            try self.emit(.end, 0);
+            try self.emit(.end, 0);
+        }
+        try self.emit(.local_get, destination);
     }
     fn createCollectionCursor(self: *Emitter, first: u32, input_list: bool, row_words: u32) Error!void {
         const g = self.generator;
@@ -6805,6 +7140,7 @@ pub const Owner = struct {
             .mappings = plan.mappings.items,
             .row_mappings = plan.rows.items,
             .cleanups = .{ .parent = &self.cleanups },
+            .diagnostic_context = try self.inlineContext(),
             .labels = self.labels,
             .inline_depth = self.inline_depth + 1,
         };
@@ -6935,6 +7271,7 @@ pub const Owner = struct {
                 .mappings = mappings.items,
                 .row_mappings = rows.items,
                 .cleanups = .{ .parent = &self.cleanups },
+                .diagnostic_context = try self.inlineContext(),
                 .labels = self.labels,
                 .inline_demands = self.inline_demands,
             };
@@ -8890,7 +9227,25 @@ pub const Owner = struct {
         try self.emit(.block, @backingInt(join.result.?));
         try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = checkpoint });
         self.labels += 1;
-        const terminated = try self.suite(id, depth + 1);
+        var pipeline = if (self.dictionary_owner == null and self.inline_depth < 6) @import("pipeline_builder.zig").analyze(g.units, self.unit_id, id) else null;
+        if (pipeline) |plan| {
+            var budget: usize = 256;
+            for (plan.total[0..plan.total_count]) |value| {
+                const previous = g.diagnostic;
+                const total = self.pipelineProof(value, &budget) catch |err| switch (err) {
+                    error.Declined => declined: {
+                        g.diagnostic = previous;
+                        break :declined false;
+                    },
+                    else => return err,
+                };
+                if (!total) {
+                    pipeline = null;
+                    break;
+                }
+            }
+        }
+        const terminated = if (pipeline) |plan| try self.pipelineSuite(id, plan, depth + 1) else try self.suite(id, depth + 1);
         if (terminated) {
             try self.emit(.unreachable_, 0);
         } else if (join.result.? != .none) {
@@ -8904,6 +9259,159 @@ pub const Owner = struct {
         // targeting its end. Wasm still considers code after `end` reachable;
         // seal a bottom-typed block so its caller need not supply a value.
         if (unit_.types.node(unit_.typeOf(id)).tag == .never) try self.emit(.unreachable_, 0);
+    }
+    fn pipelineProof(self: *Emitter, value: core.Id, budget: *usize) Error!bool {
+        const g = self.generator;
+        var probe: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = self.mappings, .row_mappings = self.row_mappings };
+        defer probe.deinit();
+        var body = try probe.prepareBody(value, 0, false);
+        defer body.deinit(g.allocator);
+        probe.body = &body;
+        probe.mappings = body.mappings;
+        probe.row_mappings = body.rows;
+        return probe.pipelineTotal(value, budget, 0);
+    }
+    /// Purity/termination is checked through the exact selected implementation,
+    /// including primitive operator methods. Names and generic signatures do
+    /// not authorize moving a call across eager collection stages.
+    fn pipelineTotal(self: *Emitter, id: core.Id, budget: *usize, depth: usize) Error!bool {
+        if (id == 0) return true;
+        if (budget.* == 0 or depth >= 8) return false;
+        budget.* -= 1;
+        const source = self.generator.unit(self.unit_id);
+        const n = source.node(id);
+        switch (n.tag) {
+            .constant => return true,
+            .reference => {
+                const ref = source.reference(id);
+                if (ref.unit != 0 and ref.unit != self.unit_id) return false;
+                const kind = source.binding(ref.binding).kind;
+                return kind == .parameter or kind == .local;
+            },
+            .logical => return try self.pipelineTotal(n.a, budget, depth) and try self.pipelineTotal(n.b, budget, depth),
+            .if_value => return try self.pipelineTotal(n.a, budget, depth) and try self.pipelineTotal(n.b, budget, depth) and try self.pipelineTotal(n.c, budget, depth),
+            .scalar, .associated => {
+                if (!try self.pipelineTotal(n.a, budget, depth) or !try self.pipelineTotal(n.b, budget, depth)) return false;
+                switch (self.resolvedPlan(id).dispatch) {
+                    .scalar => |op| return op != .i32_div_u and op != .i32_rem_u,
+                    .selected => |selected| {
+                        if (selected.call.extra.items.len != 0 or selected.call.callee != .direct) return false;
+                        return self.pipelineNamedTotal(selected.call.callee.direct, budget, depth + 1);
+                    },
+                    .simd => return false,
+                }
+            },
+            .call => {
+                const named = self.resolvedPlan(id).named;
+                if (named.dictionary_owner != null or named.dictionary_member != null or named.spawn != null or named.call.extra.items.len != 0) return false;
+                for (source.call(id).arguments) |arg| if (!try self.pipelineTotal(arg, budget, depth)) return false;
+                return self.pipelineNamedTotal(named.call.key, budget, depth + 1);
+            },
+            else => return false,
+        }
+    }
+    fn pipelineNamedTotal(self: *Emitter, key: Key, budget: *usize, depth: usize) Error!bool {
+        const g = self.generator;
+        if (depth >= 8 or budget.* == 0 or key.templates != 0 or key.dictionaries or key.template_result) return false;
+        const source = g.unit(key.target.unit);
+        const definition = source.body(key.target.binding) orelse return false;
+        if (!definition.is_function or definition.parameters.len != key.count) return false;
+        var service = try g.specializer();
+        var resolved = service.named(key, &.{}) catch |err| return g.specializationFailure(service, err);
+        defer resolved.deinit(g.allocator);
+        var probe: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items };
+        defer probe.deinit();
+        var body = try probe.prepareBody(definition.root, 0, false);
+        defer body.deinit(g.allocator);
+        probe.body = &body;
+        probe.mappings = body.mappings;
+        probe.row_mappings = body.rows;
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
+        return probe.pipelineTotal(definition.root, budget, depth);
+    }
+    fn pipelineSuite(self: *Emitter, id: core.Id, plan: @import("pipeline_builder.zig").Plan, depth: usize) Error!bool {
+        const g = self.generator;
+        if (g.artifacts) |artifacts| for (plan.dependencies[0..plan.dependency_count]) |dependency| try artifacts.readInlineBody(dependency);
+        const count = try self.capture(plan.count, depth);
+        // Oversized inputs execute the original eager stages, including their
+        // original failure ordering. Every moved scalar expression is total.
+        try self.emit(.local_get, count);
+        try self.emit(.i32_const, (std.math.maxInt(u32) - 4) / 4 / @max(1, plan.width));
+        try self.emit(.i32_le_u, 0);
+        try self.emit(.if_, 0);
+        self.labels += 1;
+        const total = try self.multiplyLocal(count, plan.width);
+        const size = try self.arraySize(total, 4);
+        const destination = try self.temporary(.i32);
+        try self.emit(.local_get, size);
+        try self.allocateArray(true, null);
+        try self.emit(.local_set, destination);
+        try self.emit(.local_get, destination);
+        try self.emit(.local_get, total);
+        try self.emit(.i32_store, 0);
+        const outer = try self.temporary(.i32);
+        const inner = try self.temporary(.i32);
+        const offset = try self.temporary(.i32);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, outer);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, offset);
+        try self.emit(.block, 0);
+        try self.emit(.loop, 0);
+        self.labels += 2;
+        try self.emit(.local_get, outer);
+        try self.emit(.local_get, count);
+        try self.emit(.i32_ge_u, 0);
+        try self.emit(.br_if, 1);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, inner);
+        try self.emit(.block, 0);
+        try self.emit(.loop, 0);
+        self.labels += 2;
+        try self.emit(.local_get, inner);
+        try self.emit(.i32_const, plan.width);
+        try self.emit(.i32_ge_u, 0);
+        try self.emit(.br_if, 1);
+        var emitter: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = self.mappings, .row_mappings = self.row_mappings, .cleanups = .{ .parent = &self.cleanups }, .diagnostic_context = try self.inlineContext(), .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = true };
+        defer emitter.deinit();
+        var captured = self.locals.iterator();
+        while (captured.next()) |entry| try emitter.locals.put(g.allocator, entry.key_ptr.*, entry.value_ptr.*);
+        try emitter.locals.put(g.allocator, plan.outer, outer);
+        try emitter.locals.put(g.allocator, plan.inner, inner);
+        var body = try emitter.prepareBody(plan.value, 0, false);
+        defer body.deinit(g.allocator);
+        emitter.body = &body;
+        emitter.mappings = body.mappings;
+        emitter.row_mappings = body.rows;
+        try self.arrayAddress(destination, offset, 4);
+        try emitter.expression(plan.value, depth + 1);
+        try self.storeScalar(if (try emitter.scalar(plan.value) == .f32) .f32_store else .i32_store, 4);
+        for ([_]u32{ inner, offset }) |local| {
+            try self.emit(.local_get, local);
+            try self.emit(.i32_const, 1);
+            try self.emit(.i32_add, 0);
+            try self.emit(.local_set, local);
+        }
+        try self.emit(.br, 0);
+        self.labels -= 2;
+        try self.emit(.end, 0);
+        try self.emit(.end, 0);
+        try self.emit(.local_get, outer);
+        try self.emit(.i32_const, 1);
+        try self.emit(.i32_add, 0);
+        try self.emit(.local_set, outer);
+        try self.emit(.br, 0);
+        self.labels -= 2;
+        try self.emit(.end, 0);
+        try self.emit(.end, 0);
+        try self.emit(.local_get, destination);
+        try self.save(plan.result, plan.result_source);
+        const fused_terminated = try self.suiteSkip(id, depth, 3);
+        try self.emit(.else_, 0);
+        const ordinary_terminated = try self.suite(id, depth);
+        self.labels -= 1;
+        try self.emit(.end, 0);
+        return fused_terminated and ordinary_terminated;
     }
     fn proofGuard(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -10901,6 +11409,89 @@ pub const Owner = struct {
             .invalid => return g.decline(self.unit_id, p.span, .unsupported),
         }
     }
+    fn matchPackedProduct(self: *Emitter, source_id: core.Id, pattern_id: core.PatternId, view: RowView, plan: *const NumericPlan, owner: u8, failure: u32, record: types.Node, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const order = if (record.tag == .record) try @import("../check/record_order.zig").destinations(g.allocator, source.types, record, &g.representations.store.record_names) else &.{};
+        defer g.allocator.free(order);
+        for (source.patternChildren(pattern_id), 0..) |child, index| {
+            try self.matchPackedPattern(source_id, child, view, plan, owner, @intCast((if (order.len == 0) index else order[index]) * 4), failure, depth + 1);
+        }
+    }
+    fn matchPackedPattern(self: *Emitter, source_id: core.Id, pattern_id: core.PatternId, view: RowView, plan: *const NumericPlan, parent: ?u8, offset: u32, failure: u32, depth: usize) Error!void {
+        if (depth >= 64) return self.generator.fail(self.unit_id, source_id, .complexity);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const pattern = source.pattern(pattern_id);
+        if (pattern.tag == .wildcard) return;
+        for (plan.leaves[0..plan.leaf_count]) |leaf| {
+            if (leaf.discriminant or parent != leaf.owner or offset != leaf.offset) continue;
+            const machine: wasm.ValueType = if (leaf.floating) .f32 else .i32;
+            const local = try self.temporary(machine);
+            try self.loadRowView(view, @as(u32, leaf.word) * 4, machine);
+            try self.emit(.local_set, local);
+            return self.matchPattern(source_id, pattern_id, local, failure, depth + 1);
+        }
+        if (pattern.tag == .bind) {
+            const concrete = try self.codeLayout(pattern.ty, pattern.span);
+            for (plan.storage[0..plan.storage_count]) |storage| {
+                if (storage.parent != parent or storage.offset != offset or storage.layout != concrete) continue;
+                const address = try self.temporary(.i32);
+                try self.emit(.local_get, view.address);
+                try self.emit(.i32_const, @as(u32, storage.word) * 4);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_set, address);
+                try self.row_views.append(g.allocator, .{ .binding = pattern.a, .row = concrete, .address = address, .limit_address = view.limit_address });
+                return;
+            }
+            return g.fail(self.unit_id, source_id, .unsupported);
+        }
+        const tag: ?u32 = if (pattern.tag == .constructor) source.constructor(pattern.a).tag else null;
+        const owner: u8 = for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
+            if (storage.parent == parent and storage.offset == offset and storage.tag == tag) break @intCast(index);
+        } else return g.fail(self.unit_id, source_id, .unsupported);
+        switch (pattern.tag) {
+            .constructor => {
+                if (plan.storage[owner].guard) |active| {
+                    const guard = plan.guards[active];
+                    if (plan.storage[guard.owner].parent == parent and plan.storage[guard.owner].offset == offset) {
+                        try self.loadRowView(view, @as(u32, guard.word) * 4, .i32);
+                        try self.emit(.i32_const, tag.?);
+                        try self.emit(.i32_ne, 0);
+                        try self.emit(.br_if, self.labels - 1 - failure);
+                    }
+                }
+                if (pattern.b != 0) try self.matchPackedPattern(source_id, pattern.b, view, plan, owner, 4, failure, depth + 1);
+            },
+            .product => try self.matchPackedProduct(source_id, pattern_id, view, plan, owner, failure, source.types.node(pattern.ty), depth + 1),
+            .record_payload => {
+                if (pattern.a == 1) {
+                    try self.matchPackedPattern(source_id, pattern.b, view, plan, owner, 0, failure, depth + 1);
+                } else if (source.pattern(pattern.b).tag != .wildcard) try self.matchPackedProduct(source_id, pattern.b, view, plan, owner, failure, source.types.node(pattern.ty), depth + 1);
+            },
+            else => return g.fail(self.unit_id, source_id, .unsupported),
+        }
+    }
+    fn borrowedPattern(self: *Emitter, id: core.PatternId, guard: core.Id, body: core.Id, depth: usize) Error!bool {
+        if (id == 0) return true;
+        if (depth >= 32) return false;
+        const source = self.generator.unit(self.unit_id);
+        const pattern = source.pattern(id);
+        switch (pattern.tag) {
+            .bind => {
+                const concrete = try self.codeLayout(pattern.ty, pattern.span);
+                if (self.generator.representations.store.scalar(concrete)) |scalar_| if (scalar_ != .pointer) return true;
+                if (try self.generator.nestedRow(concrete) == null) return false;
+                return try self.readsRow(source, guard, pattern.a, concrete) and try self.readsRow(source, body, pattern.a, concrete);
+            },
+            .constructor, .record_payload => return self.borrowedPattern(pattern.b, guard, body, depth + 1),
+            .product => {
+                for (source.patternChildren(id)) |child| if (!try self.borrowedPattern(child, guard, body, depth + 1)) return false;
+            },
+            else => {},
+        }
+        return true;
+    }
     fn matchExpression(self: *Emitter, id: core.Id, depth: usize) Error!bool {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -10913,7 +11504,22 @@ pub const Owner = struct {
         var inputs: std.ArrayList(u32) = .empty;
         defer inputs.deinit(scratch);
         try inputs.ensureTotalCapacityPrecise(scratch, @min(plan.inputs.len, 16));
-        for (plan.inputs) |input| {
+        var borrowed: std.ArrayList(?RowView) = .empty;
+        defer borrowed.deinit(scratch);
+        for (plan.inputs, 0..) |input, position| {
+            var view = self.borrowedRowArgument(input);
+            if (view) |candidate| {
+                if (try g.nestedRow(candidate.row) == null) view = null;
+                for (plan.arms) |arm| for (unit_.armRows(arm)) |row| {
+                    const pattern = unit_.rowPatterns(row)[position];
+                    if (!row_projection_uses.packedPattern(unit_, pattern, 0) or !try self.borrowedPattern(pattern, arm.guard, arm.body, 0)) view = null;
+                };
+            }
+            try borrowed.append(scratch, view);
+            if (view) |candidate| {
+                try inputs.append(scratch, candidate.address);
+                continue;
+            }
             if (unit_.types.node(unit_.typeOf(input)).tag == .never) {
                 try self.expression(input, depth + 1);
                 try self.emit(.unreachable_, 0);
@@ -10933,12 +11539,19 @@ pub const Owner = struct {
             const next_arm = self.labels;
             self.labels += 1;
             for (unit_.armRows(arm)) |row| {
+                const view_count = self.row_views.items.len;
+                defer self.row_views.shrinkRetainingCapacity(view_count);
                 const patterns = unit_.rowPatterns(row);
                 if (patterns.len != inputs.items.len) return g.fail(self.unit_id, id, .unsupported);
                 try self.emit(.block, 0);
                 const next_row = self.labels;
                 self.labels += 1;
-                for (patterns, inputs.items) |pattern_id, local| try self.matchPattern(id, pattern_id, local, next_row, depth + 1);
+                for (patterns, inputs.items, borrowed.items) |pattern_id, local, view| {
+                    if (view) |candidate| {
+                        const numeric = (try g.nestedRow(candidate.row)).?;
+                        try self.matchPackedPattern(id, pattern_id, candidate, &numeric, null, 0, next_row, depth + 1);
+                    } else try self.matchPattern(id, pattern_id, local, next_row, depth + 1);
+                }
                 if (arm.guard != 0) {
                     try self.expression(arm.guard, depth + 1);
                     try self.emit(.i32_eqz, 0);

@@ -1525,15 +1525,15 @@ pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summari
     var write: usize = 0;
     for (function.instructions.items, 0..) |inst, at| {
         if (allocation < plan.allocations.items.len and plan.allocations.items[allocation].at == at) {
-            try out.instructions.appendSlice(a, &.{ .{ .op = .i32_const, .operand = plan.allocations.items[allocation].mask }, .{ .op = .call, .operand = module.arena.?.allocate_typed } });
+            try out.instructions.appendSlice(a, &.{ .{ .op = .i32_const, .operand = plan.allocations.items[allocation].mask }, .{ .op = .call, .operand = module.arena.?.allocate_typed, .origin = inst.origin } });
             allocation += 1;
         } else if (write < plan.writes.items.len and plan.writes.items[write].at == at) {
             const site = plan.writes.items[write];
             if (site.kind == .word or site.kind == .float_word) {
                 if (site.kind == .float_word) try out.instructions.append(a, .{ .op = .i32_reinterpret_f32 });
-                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .i32_const, .operand = inst.operand }, .{ .op = .i32_add }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.store_word } });
+                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .i32_const, .operand = inst.operand }, .{ .op = .i32_add }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.store_word, .origin = inst.origin } });
             } else {
-                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_set, .operand = scratch + 2 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 2 }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.copy_words } });
+                try out.instructions.appendSlice(a, &.{ .{ .op = .local_set, .operand = scratch }, .{ .op = .local_set, .operand = scratch + 1 }, .{ .op = .local_set, .operand = scratch + 2 }, .{ .op = .local_get, .operand = site.local }, .{ .op = .local_get, .operand = scratch + 2 }, .{ .op = .local_get, .operand = scratch + 1 }, .{ .op = .local_get, .operand = scratch }, .{ .op = .call, .operand = module.arena.?.copy_words, .origin = inst.origin } });
             }
             write += 1;
         } else try out.instructions.append(a, inst);

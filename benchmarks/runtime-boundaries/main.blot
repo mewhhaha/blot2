@@ -67,6 +67,11 @@ entry const pipeline = fn (count: U32) -> U32 => do:
   let chunks = array.map (fn command => command.lanes) commands
   let lanes = array.flatten chunks
   break array.fold_left (fn total value => total + value) 0 lanes
+entry const pipeline_values = fn (count: U32) -> Array U32 => do:
+  let commands = array.generate count (fn index => #Command {lanes: array.generate 24 (fn lane => index * 24 + lane)})
+  let chunks = array.map (fn command => command.lanes) commands
+  let lanes = array.flatten chunks
+  break lanes
 entry const pipeline_direct = fn (count: U32) -> U32 => do:
   let lanes = array.generate (count * 24) (fn index => index)
   break array.fold_left (fn total value => total + value) 0 lanes

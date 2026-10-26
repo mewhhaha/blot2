@@ -98,7 +98,7 @@ fn currentBytes(session: *const retained.Session, expected: []const u8) !void {
     try std.testing.expectEqualSlices(u8, expected, result.result.compiled.bytes);
     var emission = try session.current.?.artifacts.emission.materialize(a);
     defer emission.deinit();
-    const bytes = try emission.assemble();
+    const bytes = try emission.assembleCheckedWithOptions(.{});
     defer a.free(bytes);
     try std.testing.expectEqualSlices(u8, expected, bytes);
 }

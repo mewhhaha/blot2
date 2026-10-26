@@ -482,7 +482,7 @@ fn checkCurrent(session: *const retained.Session, fixture: *const Fixture, expec
     try checkRetainedResult(&emitted, expected);
     var replayed = try current.artifacts.emission.materialize(a);
     defer replayed.deinit();
-    const bytes = try replayed.assemble();
+    const bytes = try replayed.assembleCheckedWithOptions(.{});
     defer a.free(bytes);
     try std.testing.expectEqualSlices(u8, expected, bytes);
 }

@@ -70,6 +70,9 @@ pub const Encoding = struct {
     rc_admitted: bool,
     wide: bool,
     retire: ?u32,
+    collector_free: bool = false,
+    profile_base: u32 = 0,
+    profile_rows: usize = 0,
 };
 pub const Import = struct {
     module: []u8,

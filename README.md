@@ -274,8 +274,41 @@ See [sources, sizes and methodology](benchmarks/idiomatic/README.md),
 
 ## Runtime boundary benchmarks
 
-The runtime repairs remove temporary numeric boxes across bounded constructor
-and selected-reader paths, load indexed scalar fields directly, and share exact
+Numeric collections now pack bounded reference-free variants, and proved
+rectangular record/map/flatten pipelines build one final buffer. Executed memory
+profiles attribute allocations, copies, ownership operations and cycle visits to
+source. A checked collector-free build option makes the supported whole-module
+memory contract explicit. See the
+[current implementation and qualification](zig-native/RUNTIME_MEMORY_QUALIFICATION.md).
+
+On 26 October, the new LLVM release candidate compared with `fdfaa89` gives the
+following **microseconds per call**, using identical Wasm binaries across three
+engines. Each column compares before → after within that engine:
+
+| Kernel                               |      Deno/V8 µs |     Wasmtime µs |      Firefox µs | Retired objects |
+| ------------------------------------ | --------------: | --------------: | --------------: | --------------: |
+| Optional numeric array, 2,000 rows   |   223.75 → 3.44 |  246.02 → 36.85 |   184.05 → 5.03 |       6,001 → 1 |
+| Record/map/flatten, 2,000 × 24 lanes | 748.75 → 277.80 | 808.61 → 440.06 | 600.40 → 235.60 |       6,005 → 1 |
+
+All 28 kernel witnesses and ownership budgets pass. These are uninstrumented,
+warmed, alternating samples; Wasmtime includes Python host-call overhead, and
+Firefox uses calibrated batches. The combined module grows from 24,160 to 27,850
+bytes; median fresh compilation is 13.29 → 13.38 ms in a three-build screen.
+Packed values escaping through owned APIs can still allocate. See
+[all samples, hashes and application comparisons](benchmarks/results/runtime-memory-2026-10-26.json)
+and [the qualification report](zig-native/RUNTIME_MEMORY_QUALIFICATION.md) for
+limits and diagnostic overhead.
+
+In frozen gdev replays, the isolated acyclic-copy fix cuts process CPU by
+12.5–14.6%. Against the previous compiler, the combined batch leaves colony CPU
+essentially flat and lowers piles CPU about 4%; packed values crossing owned
+APIs add allocation traffic. Fresh compilation of that 240-module snapshot is
+10.07 → 10.10 seconds. All frame/save witnesses match, with stable end-of-run
+memory. The report separates these application costs from the kernel gains.
+
+The following table records the earlier 25 October `fdfaa89` repair batch. The
+runtime repairs remove temporary numeric boxes across bounded constructor and
+selected-reader paths, load indexed scalar fields directly, and share exact
 identity-generated immutable arrays. The same-engine release comparison uses 31
 alternating samples on the host described above:
 
@@ -288,10 +321,20 @@ alternating samples on the host described above:
 
 These are isolated kernels, with compilation and code-size costs reported
 separately. The combined module grows 6.3%; unknown callbacks retain owned
-materialization. Optional variants and record/map/flatten fusion remain open.
-See
+materialization. These historical measurements predate variant packing and
+record/map/flatten fusion. See
 [qualification and raw measurements](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md)
 and [reproduction commands](benchmarks/runtime-boundaries/README.md).
+
+Use `--profile-memory` (client `profileMemory: true`) for diagnostic builds and
+read the executed counters with `memoryProfileReport` from
+`@mewhhaha/blot/memory-profile`. Diagnostic memory and instrumentation overhead
+are reported separately from ordinary release measurements. Use
+`--require-collector-free` (client `requireCollectorFree: true`) to reject a
+module that cannot prove the conservative whole-module contract. Accepted
+modules retain reference counting and destruction; this does not promise
+allocation freedom or bounded destruction time. See the
+[language guide](compiler/guide.md) for supported cases and limitations.
 
 ## Structured tasks
 

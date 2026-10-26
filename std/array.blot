@@ -49,26 +49,8 @@ const filter_map = fn transform => fn (values: Array a) => do:
       selected := [...self, result]
   break Array.from_list selected
 
-const flatten = fn (chunks: Array (Array a)) => do:
-  let count = 0
-  let seed = #Nothing
-  for chunk in chunks:
-    let next_count = count + chunk.length
-    if next_count < count:
-      break @panic "array flatten length overflow"
-    count := next_count
-    if let #Nothing = seed:
-      if Bool.not chunk.is_empty:
-        seed := #Some chunk[0]
-  let #Some first = seed else:
-    break #[]
-  let joined = fill count first
-  let start = 0
-  for chunk in chunks:
-    for offset in 0..chunk.length:
-      joined[start + offset] := chunk[offset]
-    start := self + chunk.length
-  break joined
+// Count once, then copy into one destination using the checked element layout.
+const flatten = fn (chunks: Array (Array a)) => @array.flatten chunks
 
 const concat = fn left => fn right => @array.concat left right
 

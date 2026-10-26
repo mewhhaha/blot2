@@ -60,6 +60,23 @@ keeps its selected tier; start a separate session to compare outputs. Optimized
 body captures are valid only for the tier that produced them. This option does
 not change the optimization mode used to build the native compiler itself.
 
+`profileMemory: true` emits diagnostic counters, pinned source origins and final
+runtime function names. Use `memoryProfileReport(bytes, exports)` from
+`compiler/memory_profile.ts` in the host; the scalar runner is
+`scripts/bench/profile_memory.ts`. Diagnostic traffic is never a release timing.
+Profile builds regenerate source emission after trivia changes so byte spans and
+digests cannot come from an older source revision. The exact output cache
+remains available; imported body edits and restart use the same provenance as a
+fresh build. Machine-code sharing is disabled for these diagnostic modules.
+
+`requireCollectorFree: true` rejects a module unless its complete arena
+satisfies the conservative certificate in
+[the language guide](../compiler/guide.md). Ordinary builds retain collecting
+semantics and publish a certificate or decline reason in
+`blot:collector-contract`. Both settings belong to the session and its
+output-cache policy; open a separate session to change them. The native CLI and
+`blot build` wrapper expose `--profile-memory` and `--require-collector-free`.
+
 An edit loop such as `pen dev` opens its session with `"development"`; every
 release build (`pen build`, test runs, `bench:compile` hashes) opens with the
 default, whose output the development tier never changes

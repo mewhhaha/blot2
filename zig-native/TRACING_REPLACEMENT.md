@@ -1,6 +1,23 @@
 # Tracing replacement work
 
-## Current production audit (19 October 2026)
+## Current memory contract (26 October 2026)
+
+Production uses reference counting and trial deletion for possible strong
+cycles. It has no general tracing fallback. Copied immutable layouts now retain
+their proved acyclic marks. A conservative whole-module certificate can omit
+graph-collection work; `--require-collector-free` rejects a module that cannot
+establish that certificate. Ordinary builds preserve legal cycles, strong memo
+results, suspension and cancellation. Collector-free is distinct from
+allocation-free and bounded destruction latency.
+
+See [the normative guide](../compiler/guide.md), [ownership rules](CONTRACT.md)
+and
+[the current implementation and qualification](RUNTIME_MEMORY_QUALIFICATION.md)
+for the precise admission rules and evidence. The dated audits and development
+diary below preserve their original state and measurements; claims about an
+unfinished tracer or task below are historical.
+
+## Production audit (19 October 2026)
 
 The remaining task-035 implementation notes predate the integrated production
 assembly path. Current source emits through `backend/core_backend.zig`'s
@@ -35,6 +52,8 @@ complete. The current memory/runtime observation is recorded below. The owner's
 15 October no-crash/no-OOM and bounded-memory bar applies; the dated historical
 tracing CPU comparisons below are informational, and their ignored raw artifacts
 were removed under the owner's task-083 decision.
+
+## Earlier implementation diary (historical)
 
 The current production candidate uses counted edges, leases and trial deletion;
 incomplete ownership diagnoses instead of selecting a tracer. The final common

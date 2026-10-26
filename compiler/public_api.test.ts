@@ -135,6 +135,58 @@ Deno.test("CLI builds projects and dependencies, and fails without publishing in
       0,
     );
     equal(await Deno.readFile(output), original);
+    for (const flag of ["--profile-memory", "--require-collector-free"]) {
+      equal(await runCli(executable, ["build", input, output, flag]), 0);
+      const direct = await Deno.readFile(output);
+      const module = new WebAssembly.Module(direct);
+      if (flag === "--profile-memory") {
+        equal(
+          WebAssembly.Module.customSections(module, "blot:memory-profile")
+            .length,
+          1,
+        );
+      } else {
+        const certificate = JSON.parse(
+          new TextDecoder().decode(
+            WebAssembly.Module.customSections(
+              module,
+              "blot:collector-contract",
+            )[0],
+          ),
+        );
+        ok(certificate.sources.length > 0);
+      }
+      equal(
+        await runCli(executable, [
+          "build",
+          input,
+          output,
+          "--dependencies",
+          bundle,
+          flag,
+        ]),
+        0,
+      );
+      equal(await Deno.readFile(output), direct);
+    }
+    equal(await runCli(executable, ["build", input, output]), 0);
+    equal(await Deno.readFile(output), original);
+    await Deno.writeTextFile(
+      input,
+      "entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:\n  use value <- host ()\n  return value\n",
+    );
+    equal(
+      await runCli(executable, [
+        "build",
+        input,
+        output,
+        "--dependencies",
+        bundle,
+        "--require-collector-free",
+      ]),
+      1,
+    );
+    equal(await Deno.readFile(output), original);
     await Deno.writeTextFile(input, "entry const answer = unknown\n");
     equal(await runCli(executable, ["build", input, output]), 1);
     equal(await Deno.readFile(output), original);

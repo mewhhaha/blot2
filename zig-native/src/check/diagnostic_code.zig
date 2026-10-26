@@ -47,6 +47,7 @@ pub const Code = enum {
     complexity,
     invalid_numeric_proof,
     ownership_unproved,
+    collector_free_unproved,
     simd_lane_literal,
     stage_unavailable,
     code_shape_mismatch,
@@ -95,6 +96,7 @@ pub const Code = enum {
             .unresolved_type => "Code emission requires concrete representation evidence",
             .constant_expression => "This compile-time value cannot be evaluated by the native evaluator",
             .complexity => "Typed-core lowering exceeds the native compiler limit",
+            .collector_free_unproved => if (detail.len != 0) detail else "The complete module has no collector-free certificate",
             .ownership_unproved => {
                 if (detail.len != 0) return detail;
                 return "Native emission requires checked ownership for every allocation, field and exit";

@@ -146,6 +146,8 @@ pub const Generator = struct {
     static_data: @import("backend_static_data.zig").State = .{},
     numeric_rows: @import("numeric_rows.zig").Cache = .{},
     persistent_outputs: bool = false,
+    memory_profile: bool = false,
+    diagnostic_contexts: @import("source_origins.zig").ContextPool = .{},
     public_owners: ?@import("../runtime/public_owners.zig").Runtime = null,
     task_context: ?@import("../runtime/task_context.zig").Functions = null,
     request_owner: ?u32 = null,
@@ -282,6 +284,7 @@ pub const Generator = struct {
         };
     }
     fn deinit(self: *Generator) void {
+        self.diagnostic_contexts.deinit(self.allocator);
         self.allocator.free(self.spawn_units);
         self.numeric_rows.deinit(self.allocator);
         self.demand_lowering.deinit(self.allocator);
@@ -347,7 +350,7 @@ pub const Generator = struct {
         const flat = @import("packed_layout.zig").rowWords(&self.representations.store, id);
         if (flat != 0) return flat;
         const plan = try self.nestedRow(id) orelse return 0;
-        return plan.leaf_count;
+        return plan.word_count;
     }
     pub fn collectionRowWords(self: *Generator, id: layout.Id) Allocator.Error!u32 {
         const node = self.representations.store.node(id);
@@ -722,6 +725,7 @@ pub const Generator = struct {
             const parameters = source.types.list(nominal.parameters);
             const arguments = self.representations.store.children(ty);
             if (parameters.len != arguments.len) return self.decline(owner, .{ .start = 0, .end = 0 }, .unresolved_type);
+            if (constructor.payload == 0) return 1; // The absent payload is Unit.
             var mappings: std.ArrayList(Mapping) = .empty;
             defer mappings.deinit(self.allocator);
             for (parameters, arguments) |parameter, argument| try self.mapType(owner, &mappings, parameter, argument, .{ .start = 0, .end = 0 });
@@ -2331,6 +2335,8 @@ pub const CompileOptions = struct {
     policy: @import("../execution_policy.zig").Policy = .{},
     observe_startup: bool = false,
     identity: ?runtime_identity.View = null,
+    diagnostic_source_digests: []const [32]u8 = &.{},
+    compiler_identity: ?[32]u8 = null,
     evidence_noise: bool = false,
     unit_order: []const u32 = &.{},
     diagnostic_source_mode: bool = false,
@@ -2407,6 +2413,7 @@ const CompileRun = struct {
     persisted_principals: ?@import("../reuse/principal_archive.zig").Reader = null,
     query_state: ?completed_specialization_query.State = null,
     constant_state: ?@import("../reuse/constant_receipt_reuse.zig").State = null,
+    origins: ?@import("source_origins.zig").View = null,
     candidate: ?@import("region_candidate.zig").Extension = null,
     /// Four-lane worker view over the assembled module; it borrows bodies
     /// from `candidate` or the generator's module.
@@ -2416,6 +2423,7 @@ const CompileRun = struct {
         if (self.optimized) |*owner| owner.deinit();
         if (self.vectors) |*owner| owner.deinit();
         if (self.candidate) |*owner| owner.deinit();
+        if (self.origins) |*owner| owner.deinit();
         if (self.constant_state) |*state| state.deinit();
         if (self.query_state) |*state| state.deinit();
         if (self.persisted_principals) |*state| state.deinit();
@@ -2455,6 +2463,7 @@ const CompileRun = struct {
         }
         self.generator = try Generator.init(self.allocator, self.units, if (self.recording) &self.journal else null);
         self.generator.inline_named = self.options.inline_named;
+        self.generator.memory_profile = self.options.policy.memory_profile;
         self.generator.speculative_locals = self.speculative_locals;
         if (self.options.constant_limits.steps) |limit| self.generator.evaluator.options.max_steps = limit;
         if (self.options.constant_limits.values) |limit| self.generator.evaluator.options.max_values = limit;
@@ -2486,7 +2495,7 @@ const CompileRun = struct {
     fn prepareReuse(self: *CompileRun, skip_constant_replay: bool) Error!void {
         const principal_previous = self.options.principal_previous orelse self.options.previous;
         const query_previous = self.options.query_previous orelse self.options.previous orelse if (self.options.checkpoint) |checkpoint| (if (checkpoint.semantic) |*owner| &owner.capture else null) else null;
-        if (if (self.options.explain_demands) null else self.options.previous) |previous| {
+        if (if (self.options.explain_demands or self.options.policy.memory_profile) null else self.options.previous) |previous| {
             if (previous.emission.sealed and previous.metadata.pools != null) {
                 self.retained = try artifact_fragment.State.initWithStamps(self.allocator, previous, self.units, self.options.identity, self.options.cached_units, self.stamps);
                 self.generator.retained = &self.retained.?;
@@ -2578,6 +2587,8 @@ const CompileRun = struct {
         };
         if (self.generator.evaluator.constant_receipt_retry) return error.ConstantReceiptRetry;
         self.timing.generate_us = self.clock.lap();
+        // A scalar-only program still needs a valid zero-work diagnostic report.
+        if (self.options.policy.memory_profile) _ = try self.generator.module.ensureArena();
         try self.generator.planning.initializeRuntime(&self.generator);
         if (self.recording) try self.journal.captureOperations(self.generator.planning.runtime_operations.entries.items);
         self.generator.planning.runtime_operations.finish(&self.generator.module) catch |err| switch (err) {
@@ -2590,12 +2601,17 @@ const CompileRun = struct {
         return null;
     }
     fn assemble(self: *CompileRun) Error!Result {
-        if (@import("cohort_candidate.zig").possible(&self.generator.module)) {
+        var source_module: *const wasm.Module = &self.generator.module;
+        if (self.options.policy.memory_profile) {
+            self.origins = try @import("source_origins.zig").View.init(self.allocator, source_module, self.units, self.options.identity, self.options.diagnostic_source_digests, self.generator.diagnostic_contexts.records.items);
+            source_module = &self.origins.?.code.module;
+        }
+        if (@import("cohort_candidate.zig").possible(source_module)) {
             const view = try @import("activation_model.zig").Borrowed.init(self.allocator, &self.generator, self.options.identity);
             defer view.deinit(self.allocator);
-            self.candidate = try @import("region_candidate.zig").prepare(self.allocator, &self.generator.module, view.model());
+            self.candidate = try @import("region_candidate.zig").prepare(self.allocator, source_module, view.model());
         }
-        var assembled_module: *const wasm.Module = &self.generator.module;
+        var assembled_module: *const wasm.Module = source_module;
         if (self.candidate) |*owned| assembled_module = &owned.view.module;
         // Scalar replacement removes the boxes the worker view introduces;
         // the development tier keeps the boxed ABI.
@@ -2607,7 +2623,19 @@ const CompileRun = struct {
         const checkpoint_optimized = if (self.options.checkpoint) |checkpoint| if (checkpoint.optimizer) |*owned| owned else null else null;
         const optimized_previous = retained_optimized orelse checkpoint_optimized;
         var rejection: wasm.OwnershipFailure = .{};
-        const emitted = assembled_module.assembleCheckedWithOptions(.{ .rejection = &rejection, .io = self.options.io, .workers = self.options.policy.codegen_workers, .profile = self.options.profile_backend, .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code, .previous = optimized_previous, .current = if (self.optimized) |*owned| owned else null, .stats = &runtime_optimization }) catch |err| switch (err) {
+        var collector_rejection: @import("collector_contract.zig").Certificate = .{};
+        const emitted = assembled_module.assembleCheckedWithOptions(.{ .compiler_identity = self.options.compiler_identity, .source_digests = self.options.diagnostic_source_digests, .source_names = self.options.identity, .require_collector_free = self.options.policy.require_collector_free, .collector_rejection = &collector_rejection, .memory_profile = if (self.origins) |*owner| owner.sites.items else null, .rejection = &rejection, .io = self.options.io, .workers = self.options.policy.codegen_workers, .profile = self.options.profile_backend, .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code, .previous = optimized_previous, .current = if (self.optimized) |*owned| owned else null, .stats = &runtime_optimization }) catch |err| switch (err) {
+            error.CollectorFreeUnproven => {
+                const message = try self.allocator.print("Collector-free proof declined: {s}; function {?d}, instruction {?d}. Ordinary builds retain collection. The current certificate requires scalar host inputs, direct calls and heap allocations with no owning fields.", .{ @tagName(collector_rejection.reason), collector_rejection.function, collector_rejection.instruction });
+                var location: Diagnostic = .{ .unit = self.entry, .span = .{ .start = 0, .end = 0 }, .code = .collector_free_unproved, .detail = message };
+                if (collector_rejection.function) |function| for (assembled_module.semantic_sites.items) |site| {
+                    if (site.function != function or site.unit == 0 or site.unit > self.units.len) continue;
+                    location.unit = site.unit;
+                    location.span = self.units[site.unit - 1].span(site.root);
+                    break;
+                };
+                return .{ .diagnostic = location, .owned_message = message };
+            },
             error.IncompleteOwnership => {
                 var location: Diagnostic = .{ .unit = self.entry, .span = .{ .start = 0, .end = 0 }, .code = .ownership_unproved };
                 if (rejection.function) |failed| {
@@ -2798,6 +2826,8 @@ const CompileRun = struct {
         }
     }
     fn replayArtifact(self: *CompileRun, result: *Result) Error!void {
+        const replay_contexts = if (self.options.policy.memory_profile) try self.allocator.dupe(@import("source_origins.zig").Context, self.generator.diagnostic_contexts.records.items) else &.{};
+        defer self.allocator.free(replay_contexts);
         self.generator.deinit();
         self.generator_alive = false;
         var replayed = self.journal.materialize(self.allocator) catch |err| switch (err) {
@@ -2806,14 +2836,17 @@ const CompileRun = struct {
             else => return error.InvalidFunctionReference,
         };
         defer replayed.deinit();
-        var replay_candidate = try @import("region_candidate.zig").prepare(self.allocator, &replayed, @import("activation_model.zig").fromPools(self.units, &self.metadata.pools.?));
+        var replay_origins: ?@import("source_origins.zig").View = if (self.options.policy.memory_profile) try .init(self.allocator, &replayed, self.units, self.options.identity, self.options.diagnostic_source_digests, replay_contexts) else null;
+        defer if (replay_origins) |*owned| owned.deinit();
+        const replay_source = if (replay_origins) |*owned| &owned.code.module else &replayed;
+        var replay_candidate = try @import("region_candidate.zig").prepare(self.allocator, replay_source, @import("activation_model.zig").fromPools(self.units, &self.metadata.pools.?));
         defer if (replay_candidate) |*owned| owned.deinit();
-        var replay_module: *const wasm.Module = &replayed;
+        var replay_module: *const wasm.Module = replay_source;
         if (replay_candidate) |*owned| replay_module = &owned.view.module;
         var replay_vectors = if (self.options.policy.codegen_tier == .optimized) try @import("simd_abi.zig").prepare(self.allocator, replay_module) else null;
         defer if (replay_vectors) |*owned| owned.deinit();
         if (replay_vectors) |*owned| replay_module = &owned.module;
-        const actual_bytes = replay_module.assembleCheckedWithOptions(.{ .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code }) catch |err| switch (err) {
+        const actual_bytes = replay_module.assembleCheckedWithOptions(.{ .compiler_identity = self.options.compiler_identity, .source_digests = self.options.diagnostic_source_digests, .source_names = self.options.identity, .require_collector_free = self.options.policy.require_collector_free, .memory_profile = if (replay_origins) |*owned| owned.sites.items else null, .tier = self.options.policy.codegen_tier, .share_machine_code = self.options.policy.share_machine_code }) catch |err| switch (err) {
             error.IncompleteOwnership => return error.InvalidFunctionReference,
             error.OutOfMemory => return error.OutOfMemory,
             error.ModuleTooLarge => return error.ModuleTooLarge,

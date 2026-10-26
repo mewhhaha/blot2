@@ -8,9 +8,326 @@ execution plan; no implementation or qualification is claimed by its creation.
 including the 25 October runtime reports #28–#36. The
 [qualified runtime batch](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md) fixes
 #29/#30/#31/#34 with complete native/release-guest qualification and measured
-kernel improvements. #28/#32/#33/#35/#36 and the broader #25/#27 programs remain
-open. Cold-start attribution, tagged numeric storage, record-pipeline fusion,
-cycle-scan reductions and collector-free contracts are separate remaining work.
+kernel improvements. #28/#32/#33/#35/#36 are implemented and qualified in
+[the completed runtime batch](zig-native/RUNTIME_MEMORY_QUALIFICATION.md). The
+broader #25/#27 programs, including cold-start attribution and ordinary-edit
+compilation latency, remain separate work.
+
+## Remaining runtime issues: implementation plan, 26 October 2026
+
+The user approved implementation of **all five** remaining runtime issues:
+[#28](https://github.com/mewhhaha/blot2/issues/28),
+[#32](https://github.com/mewhhaha/blot2/issues/32),
+[#33](https://github.com/mewhhaha/blot2/issues/33),
+[#35](https://github.com/mewhhaha/blot2/issues/35) and
+[#36](https://github.com/mewhhaha/blot2/issues/36). All five are implemented and
+qualified; see the completion checkpoint in CONTINUE.md and the measured
+qualification report linked above. The plan below records the approved
+implementation and acceptance criteria. The starting point is `fdfaa89` on main;
+#29/#30/#31/#34 are fixed, pushed and closed. The older #25/#27 programs remain
+separate. Completion of one batch does not cancel the remaining work here.
+
+Recommended sequence: define #28's terminology and boundary; implement the small
+attribution foundation for #36; implement #32 and #33; complete #36 and use it
+to fix #35; finish #28's checked certificate. Packing and fusion do not depend
+on completion of the profiler. The actual dependency is that #35 needs
+attribution before changing cycle proofs or scheduling. #28's certificate must
+consume the final proofs and helper behavior rather than invent a second
+ownership analysis.
+
+No language syntax change is proposed. The recommended policy is to preserve
+current collecting behavior and add an optional strict compiler check. A change
+to legal cycle, memo, cancellation or source syntax semantics requires a
+separate concrete proposal to the user.
+
+### 0. Pin the baseline and define the contract vocabulary
+
+- Pin the release compiler, source, standard library, public fixtures, host and
+  engine versions. The existing runtime-boundary result is a baseline, not a
+  promise about the current gdev application.
+- Rebuild and replay both frozen gdev scenes (maxed colony and 2,000 piles) with
+  `fdfaa89`, preserving all-frame/final-save witnesses. The old 17–18% cycle
+  share belongs to an earlier compiler and must be measured again after the four
+  completed repairs. Keep shipping external-O3, raw Wasm and diagnostic variants
+  separately identified.
+- Extend the public controls with mixed tagged variants, escaping/saved values,
+  record pipelines and a cycle reduction derived from the actual application.
+  Keep a fixture containing real cycles as a required counterexample.
+- Distinguish an acyclic value, an entry that creates no cycle candidates, and a
+  program that executes no graph collector. None implies allocation-free,
+  constant-time destruction or a general latency bound.
+
+Primary sources: [runtime fixtures](benchmarks/runtime-boundaries/main.blot),
+[measurement runner](scripts/bench/runtime_boundaries.ts),
+[production audit](zig-native/TRACING_REPLACEMENT.md), and the frozen replay
+configs/harness in `../gdev/performance/runtime/` and `.gdev/runtime-costs/`.
+
+### 1. #36: preserve origins, then count surviving runtime work
+
+Current `allocation_emission.zig` reads `Module.semantic_sites`, whose
+coordinates refer to source-emission instruction positions. Optimizer passes
+replace whole bodies, so those positions cannot identify final executed work.
+The existing heap/copy observers are useful controls; they do not supply source
+attribution.
+
+Implementation:
+
+1. Add optional origin records to the existing runtime IR/artifact path.
+   Identify source sites by pinned source identity, UTF-8 span, operation kind
+   and bounded inline-call context. Remap origins through inlining, scalar
+   replacement, fusion, root lowering and function-index remapping. Deleted
+   sites have no executed cost. Merged origins must remain explicit. Do not
+   infer final sites by matching instruction offsets or runtime helper
+   declaration order.
+2. Preserve those records through retained optimized bodies, parallel assembly
+   and portable artifacts. Version the affected cache/schema formats and verify
+   imported provenance against the current source. IDs are deterministic for an
+   exact pinned build; spans are not universal identities across source edits.
+3. At final assembly, emit a hash-matched source/runtime-symbol sidecar. Add
+   opt-in instrumentation after semantic optimizations. Normal release output
+   has no instrumentation code or runtime tables. Retain `--explain-allocations`
+   as static remarks; executed data must be separately named.
+4. Start with allocation/retirement origins and cycle-candidate reasons so #35
+   can obtain a reduction. Then cover all requested metrics: requested and
+   rounded allocated bytes, current/peak live bytes, retired objects, copied
+   bytes, retain/release counts, actual reuse/copy outcomes, candidate
+   admission, passes/vertices/edges and reclaimed bytes.
+5. Attribute runtime-helper work to both the responsible source operation and
+   helper category. Keep allocation origin distinct from the later release or
+   copy site. Use diagnostic-only object-origin bookkeeping that handles address
+   reuse; do not attach an old allocation's origin to a reused address. Preserve
+   attribution context across nesting, host reentry, traps and suspension.
+6. Keep counters in guest memory rather than invoking a host callback per event.
+   Use explicit overflow/omission reporting and a runtime/unknown bucket.
+   Self-generated profiling traffic is separate. Reports reconcile each metric
+   independently with its runtime total; an unexplained residual is a failure.
+7. Bind every sidecar to the exact Wasm hash. If external `wasm-opt` changes
+   indices/offsets, retain and verify debug names/mappings through that pipeline
+   or reject the stale sidecar. Never apply raw-module offsets to shipping O3.
+
+Code boundaries: `backend/allocation_emission.zig`, `backend/wasm.zig`,
+`backend/runtime_ir.zig`, `backend/runtime_pipeline.zig`,
+`backend/optimized_bodies.zig`, runtime allocation/RC/cycle/copy helpers,
+compiler client/CLI options and `scripts/bench/` reporting.
+
+Close #36 only when reports identify the #29/#34 source fixtures and #35's
+actual application/reduction, cover helper work, separate live memory from
+traffic and reconcile totals. Qualify deterministic fresh/restarted reports,
+eliminated sites, imported/inlined bodies, address reuse, traps and JSPI.
+Measure diagnostic runtime, memory and compile overhead separately. Score
+performance only on uninstrumented release modules. The minimal foundation alone
+does not close this issue.
+
+### 2. #32: generalize the existing numeric row plan to bounded sums
+
+`numeric_rows.Plan.visit` currently rejects a second nominal constructor. Its
+storage tree assumes every payload is present. Packing, unpacking, direct
+projection, constant serialization and host copying share that assumption.
+Removing the rejection alone would read inactive payloads or construct invalid
+objects.
+
+Implementation:
+
+1. Extend the existing numeric plan with discriminant nodes, guarded arms and
+   explicit physical word positions. Use a tag plus storage sized for the
+   largest arm, not the sum of every arm. Nested sums compose the same plan.
+   Start with a proposed cap of four constructors and sixteen total physical
+   words including tags; retain bounded depth/node/visit work and the ordinary
+   fallback. Final bounds must be justified by measured code size and CPU.
+2. Admit only closed reference-free payloads with checked nominal identities.
+   Preserve the current restrictions on private/opaque/usage-qualified and
+   unresolved shapes. Recursive or oversized representations decline; this does
+   not box pointers inside an allegedly scalar row.
+3. Pack only the active arm, preserve F32 bits as raw words and initialize
+   inactive padding deterministically. Unpack only that arm when an ordinary
+   owned value is required. Every array/list operation uses the same stride,
+   bounds and overflow checks; tags never become owning pointers.
+4. Update runtime pack/unpack, static constant serialization, list leaf
+   geometry, host cleanup schemas/decoders and representation/cache versions
+   together. Do not introduce a different hand-written variant layout in each
+   consumer.
+5. Extend destination construction and borrowed pattern-match/projection paths.
+   A compact array that still boxes every generator result or every matched
+   element does not meet this issue. Known nonescaping producers/readers should
+   write/read tag and scalar lanes directly. Escaping or unknown consumers
+   reconstruct an owned active value under the existing ABI.
+
+Code boundaries: `backend/numeric_rows.zig`, `backend/backend_emission.zig`,
+`backend/backend_static_data.zig`, `reuse/row_projection_uses.zig`,
+`backend/host_cleanup_shapes.zig`, and `compiler/guest.ts`.
+
+Close #32 when the 2,000-element optional numeric Array has no per-element heap
+boxes in generation and scalar consumption. For an Array the target is final
+array storage only; persistent Lists may still allocate their normal tree nodes.
+Cover all-present, all-absent and mixed arms, different/nested payload shapes,
+empty/unit arms, imported nominal identities, saved updates, slices/conversion,
+leaf boundaries, invalid input/tag handling, inactive lanes and exact F32 bits.
+Verify owned escaping values and callbacks in both tiers. Report padding/storage
+cost, runtime, peak live bytes, Wasm size and compile cost against flat
+controls.
+
+### 3. #33: carry one destination through a proved collection pipeline
+
+The existing `exact_builder.zig` recognizes rectangular append regions;
+`ragged_builder.zig` handles separately proved count/fill cases. Row borrowing
+removes scalar intermediates, but it does not connect the record/child-array,
+map and flatten boundaries in the reported pipeline.
+
+Implementation:
+
+1. Add bounded producer/consumer analysis over checked Core and known forwarding
+   bodies. Follow the generated record's selected field through map/flatten and
+   prove intermediate collections and records have no other observations,
+   captures, loop carries, returned aliases or deferred uses. Names such as
+   `Command`, `map` or `flatten` confer no optimization authority.
+2. Extend the existing builder plan to carry a final destination and offset
+   through admitted producers. For the fixed 24-lane case, compute the checked
+   total once, allocate one final Array and emit the original outer/inner
+   traversal directly into it. Reuse existing overflow, root/cleanup and builder
+   emission rather than creating a competing allocation pipeline.
+3. Preserve callback evaluations and arithmetic order. Single-use or purity
+   alone does not authorize moving traps, divergence or effects between eager
+   stages. Prove the reordered stages total/non-trapping and effect-free, or
+   preserve their original ordering; otherwise decline. Unused record fields
+   with observable evaluation cannot silently disappear. Keep allocations and
+   resource-failure behavior within the existing optimization contract.
+4. Record every producer/consumer body and layout dependency used by the proof,
+   including imports. Equal type signatures do not validate an edited body.
+5. Keep the initial acceptance scope rectangular. Reuse the ragged count/fill
+   path only when its existing count proof applies without executing callbacks
+   twice. Irregular/effectful or observed pipelines retain normal storage. A
+   later fold fusion may eliminate the final Array, but is not needed to close
+   the reported one-storage case.
+
+Code boundaries: `backend/exact_builder.zig`, `backend/ragged_builder.zig`,
+`backend/function_facts.zig`, checked use/ownership analysis, existing builder
+emission and executable dependency recording.
+
+Close #33 when the reported pipeline retires only final output storage instead
+of 6,005 objects and its work scales linearly with output size. Test zero/one/
+large lengths, overflow, mixed/different lengths as decline controls, callback
+and trap order, exact F32 operation order, saved intermediates and imported body
+edit/revert/fresh parity. Measure native-host Wasm runtime (Wasmtime) and
+browser Wasm runtime separately; Deno kernel timing alone does not satisfy both.
+
+### 4. #35: reduce demonstrated cycle work without weakening ownership
+
+`acyclic_layout.zig` already proves whole reachable plain-data shapes, including
+all constructors of a nominal. It conservatively declines closures, State,
+demands, providers and unknowns. `no_cycle` suppresses both candidate admission
+and traversal; it is a strong lifetime claim. The scheduler already scales its
+traffic threshold with surviving visited vertices.
+
+Implementation:
+
+1. Use #36 to rank candidate sources/layouts, failed proof reasons, rescan
+   frequency, vertices/edges and reclaimed bytes in both pinned application
+   scenes. Extract a standalone reduction with the same reason and scan shape.
+   The previous closure-scratch case has zero scans and is not that reduction.
+2. Try the narrowest demonstrated proof extension first. Candidates include an
+   active immutable constructor whose unused alternatives carry functions, or a
+   concrete closure whose captures are all lifetime-stably acyclic. A callable
+   type or a graph that is acyclic right now is insufficient: State writes,
+   demand memoization, mutable capture cells and future publication must not
+   later introduce a cycle through an object marked `no_cycle`.
+3. Feed proved instance facts through existing allocation/ownership paths,
+   cloning and retained dependency records. Keep reference counting, strong
+   fields and destruction intact. Unknown values retain trial deletion.
+4. If profiling instead shows unavoidable live candidates being repeatedly
+   revisited, evaluate scheduling as a separate change. Charge actual rescan
+   work, respect external owner changes and preserve forced drains. Any change
+   needs a stated bound on deferred cyclic garbage and long-running evidence;
+   lowering the pass count by indefinitely retaining garbage is not progress.
+5. Reprofile after packing/fusion, which can remove candidate graphs entirely.
+   Attribute proof improvements and scheduling changes separately so a reduced
+   workload is not credited to the collector algorithm.
+
+Code boundaries: `backend/acyclic_layout.zig`, allocation/closure construction,
+`runtime/cycles_runtime.zig`, shared RC/retirement and the exact typed edge
+walks.
+
+Close #35 only with fewer scans and lower uninstrumented CPU in both the
+reduction and application replays, unchanged frame/save witnesses and bounded
+long-run memory. Include real strong cycles, duplicate edges, State/demand memo
+cycles, callbacks, startup/persistent owners, suspension/cancellation and forced
+collection. Zero reclaimed bytes in the old profile never licenses disabling
+collection. No numerical speedup is promised before attribution identifies the
+cause.
+
+### 5. #28: make collector-free behavior a checked program property
+
+Define the policy first, implement the final certificate after the proofs above.
+The guide currently describes counted ownership plus trial deletion; parts of
+`CONTRACT.md` and historical runtime documents still describe a production
+tracer. Correct current normative text and label historical sections clearly.
+
+Recommended policy and implementation:
+
+1. Keep legal cycle-forming programs and their existing collecting semantics.
+   Add a proposed opt-in build check, for example `--require-collector-free`,
+   with no new source annotation or restriction in ordinary builds.
+2. Start certification at the complete module/arena boundary: all entrypoints,
+   initialization, persistent roots, callees, callback targets and runtime/host
+   helpers must be covered. An individually acyclic entry can still trigger a
+   safe point on cycles created by another entry in the same arena. Per-entry
+   claims must expose this precondition or require isolated arenas; they cannot
+   silently imply a whole-heap guarantee.
+3. Extend existing ownership/helper summaries with bounded transitive evidence
+   and explicit unknown reasons. Handle recursive call components
+   conservatively; do not replace their unknown edges with success. Incoming
+   host values, indirect calls, demands, task transport and suspension need
+   checked contracts or a precise decline. Reuse the same type/instance facts as
+   runtime emission.
+4. Publish a versioned certificate or diagnostic in the ownership metadata:
+   covered roots, assumptions, compiler/source identity and a reason path to an
+   unproved allocation/capture/callee/helper. Runtime zero-scan observations
+   validate the implementation but are not a proof for every input.
+5. Strict mode rejects an unproved program; ordinary mode retains collection.
+   Remove unreachable collector helpers only when that full proof permits it. No
+   weakening of memoized results, implicit scope conversions or hidden semantic
+   change is permitted to obtain a certificate.
+
+Close #28 when guide, contract and emitted metadata agree; certified ordinary
+workloads execute no graph collector; negative cycle/unknown-callee examples
+produce actionable diagnostics; and ordinary strong-memo/cancellation behavior
+remains qualified. Explicitly document that collector-free can still allocate
+and incur work proportional to a released acyclic graph's size.
+
+### Qualification and publication
+
+Implement the code and permanent regression laws before expensive final release
+measurement. Use focused development checks while developing each boundary; then
+freeze the combined candidate and run full correctness qualification before
+scoring it. Do not call sampled development execution full qualification.
+
+- Use Zig 0.17.0, Safe/noLLVM for development and native tests. Extend the
+  explicit `numeric-aggregates` and ownership regression families as needed. Run
+  the complete exhaustive `deno task test:compiler` gate and zero-finding
+  `deno task lint:zig` before committing compiler changes.
+- Use LLVM release compilers for alternating runtime and compilation pairs. Keep
+  instrumentation, sampling, browser, native-host, external-O3 and raw-Wasm
+  results separately named. Preserve startup/warmup/tiering controls and exact
+  result/ownership witnesses. Never benchmark alongside builds or another run.
+- Reuse the 28 public boundary cases, add the new positive/negative controls and
+  measure scaling. Pin raw samples, Wasm, symbols, source and executable hashes.
+  Track allocation traffic, live/peak bytes, committed capacity, copies, RC
+  work, scans, CPU, wall time, code size and compiler memory separately.
+- Run fresh and retained literal/body/revert/restart compilation against frozen
+  gdev inputs. Keep exact within-compiler parity and intentional cross-compiler
+  Wasm changes distinct. Use the existing 5% fresh CPU guard as an initial
+  regression gate and explicitly assess edit CPU/RSS and code-size growth too.
+- Update README, the guide, numeric/ownership documents, issue triage and this
+  handoff. Preserve unrelated untracked build directories and private inputs.
+- Commit and push qualified changes to main under the existing authorization.
+  Close each issue only after its own criteria above pass and link its source,
+  limitations and reproducible evidence. A profiling foundation, storage-only
+  change or reduced synthetic case is not completion of its broader issue.
+
+If a hypothesis produces no reduction in measured work, record the result and
+move to the next measured cause instead of repeatedly raising limits or adding
+caches. Stop for a concrete language-semantics decision or missing essential
+replay input; keep the unfinished issue and next action explicit. Difficulty or
+completion of the first batch alone is not a reason to abandon this program.
 
 ## Execution checkpoint, 24 October 2026
 

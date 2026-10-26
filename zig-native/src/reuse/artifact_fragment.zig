@@ -594,7 +594,9 @@ pub const State = struct {
                     const function = self.old.emission.functions[site.function];
                     if (site.place >= function.instructions.len) return false;
                     const inst = self.old.emission.instructions[function.instructions.start + site.place];
-                    if (inst.op != .call and inst.op != .call_indirect and inst.op != .call_import) return false;
+                    if (site.kind == .diagnostic_memory) {
+                        if (@import("../backend/runtime_ir.zig").fixed(inst.op).bytes == 0 and inst.op != .memory_copy and inst.op != .memory_fill) return false;
+                    } else if (inst.op != .call and inst.op != .call_indirect and inst.op != .call_import) return false;
                     if (site.kind == .allocation) {
                         const arena = self.old.emission.arena orelse return false;
                         if (inst.op != .call or !arena.isAllocation(inst.operand.value)) return false;

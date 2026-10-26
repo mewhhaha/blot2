@@ -1,18 +1,49 @@
 # Continue here
 
-The runtime repair batch fixes #29/#30/#31/#34 and is correctness-qualified. See
-[the repair report](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md) and
-[issue status](ISSUE_TRIAGE.md). All 2,601 native laws, 1,668 release guests, 48
-smoke tests and 57 tooling tests pass, with exhaustive allocation failures and
-zero Zig lint findings. The prior frontend/benchmark work is committed as
-`9ff812b`; the runtime commit includes the previously pending owned-array
-branch/slice/concat changes. No source work remains excluded from this batch.
+The five remaining runtime issues **#28/#32/#33/#35/#36 are implemented and
+qualified** on top of `fdfaa89`. See
+[the final report](zig-native/RUNTIME_MEMORY_QUALIFICATION.md),
+[all measurements](benchmarks/results/runtime-memory-2026-10-26.json) and
+[issue status](ISSUE_TRIAGE.md). The earlier #29/#30/#31/#34 batch remains
+qualified, pushed and closed.
 
-Release kernel measurements remove per-row boxes, unused indexed loads and
-identity-copy reference traffic. The gdev three-pair screen is 6.852 s fresh,
-3.142 s literal edit and 5.491 s body edit; ordinary edits remain well above one
-second. #28/#32/#33/#35/#36 and the broader #25/#27 programs remain open. CT110
-remains installed locally. Preserve unrelated untracked build directories.
+This batch adds executed source/helper memory attribution, bounded inline
+numeric variants, one-buffer record/map/flatten fusion, acyclic marks on
+retained copies, and a conservative checked collector-free contract. Public APIs
+and ordinary strong-cycle/memo/cancellation behavior remain intact.
+`@array.flatten` uses the existing intrinsic grammar. Strict and diagnostic
+builds work through the CLI, dependency bundles and retained project client.
+
+The final gate passes 2,606 native tests with exhaustive allocation failures,
+1,687 release-Wasm tests, 48 smoke tests and 57 tooling tests; Zig lint has zero
+findings. Three-engine public measurements pass all 28 witnesses and ownership
+budgets. Optional generation and the fused pipeline retire one final array. The
+cycle-only control demonstrates 12.5%/14.6% lower application process CPU with
+94–96% fewer visited vertices. All eighteen 1,200-frame replays preserve
+frame/save witnesses and have zero memory growth in their final 100 frames.
+
+The combined batch is not a universal application speedup: colony CPU is
+essentially flat, piles CPU improves about 4%, and packed optional values
+reconstruct owned results at `ink/ecs.blot:264`. Source attribution also exposes
+large copies at `ink/spatial/point_grid.blot:32`. These are useful future
+levers, not unimplemented requirements in this five-issue batch. Fresh
+compilation of the frozen 240-module application remains about 10.1 seconds;
+ordinary edits and sub-second compilation are not solved here.
+
+The qualified release compiler SHA-256 is
+`fd2119f5528cb164131e1156d35ba97c434393647f1b326ae5aa154db137d923`. The README
+documents local installation of the matching `blot`/`blotc` bundle. The broader
+**#25/#27** programs remain open. Resume their existing completion plan; do not
+reopen these five runtime issues merely because more general representation, ABI
+or collector-free proofs could be added.
+
+Evidence and helper runners are under ignored `build/remaining-runtime/`; the
+portable archive is linked from the report. Development builds use Zig 0.17.0,
+Safe/noLLVM, `ZIG_GLOBAL_CACHE_DIR=/tmp/blot-remaining-zig-cache` and
+`zig-native/zig-out-native-dev/bin/blotc`. The working analyzer is
+`/tmp/ink-zig-analyzer/bin/zig-analyzer`. Preserve unrelated untracked
+`zig-native/build/` and `zig-out-modern/`. Consult the user before changing
+language syntax or cycle/memo/cancellation semantics.
 
 ## Historical checkpoints
 

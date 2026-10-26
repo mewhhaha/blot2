@@ -32,6 +32,8 @@ const usage =
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
+    \\       --profile-memory instruments executed allocation, copy, RC and cycle costs.
+    \\       --require-collector-free rejects modules without a whole-arena certificate.
     \\       --explain-demands reports bounded source-site demand lowering decisions.
     \\       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
@@ -473,6 +475,9 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         for (emission_owners, 0..) |*owner, index| owner.* = .{ .unit = @intCast(index + 1), .path = loaded.filename(@intCast(index + 1)) };
         var emission_identity = try @import("backend/runtime_identity.zig").Metadata.capture(allocator, &loaded.symbols, emission_owners, units.len);
         defer emission_identity.deinit(allocator);
+        const source_digests = try allocator.alloc([32]u8, if (policy.memory_profile or policy.require_collector_free) units.len else 0);
+        defer allocator.free(source_digests);
+        for (source_digests, 1..) |*digest, unit| std.crypto.hash.Blake3.hash(loaded.unit(@intCast(unit)).source, digest, .{});
         const release_start = now(io);
         checked.deinit(allocator);
         checked_live = false;
@@ -493,7 +498,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         var compiled = emitted: {
             const timing = phase_profile.enter(.backend);
             defer timing.exit();
-            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile_requested, .explain_demands = explain_demands, .explain_allocations = explain_allocations, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .compiler_identity = configured_identity, .diagnostic_source_digests = source_digests, .io = io, .policy = policy, .profile_backend = profile_requested, .explain_demands = explain_demands, .explain_allocations = explain_allocations, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
         };
         defer {
             const result_release_start = now(io);
@@ -666,6 +671,18 @@ fn run(init: std.process.Init) !bool {
         var at = first_option;
         while (at < args.len) {
             // Profiling and explanation flags take no value.
+            if (std.mem.eql(u8, args[at], "--require-collector-free")) {
+                if (command != .build and command != .build_project) return false;
+                policy.require_collector_free = true;
+                at += 1;
+                continue;
+            }
+            if (std.mem.eql(u8, args[at], "--profile-memory")) {
+                if (command != .build and command != .build_project) return false;
+                policy.memory_profile = true;
+                at += 1;
+                continue;
+            }
             if (std.mem.eql(u8, args[at], "--profile")) {
                 if (command != .build and command != .build_project) return false;
                 profile = true;
@@ -713,7 +730,7 @@ fn run(init: std.process.Init) !bool {
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
             if (profile or policy.semantic_components or explain_allocations) return false;
-            const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity, .{ .explain_demands = explain_demands });
+            const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity, .{ .compiler_identity = configured_identity, .policy = policy, .explain_demands = explain_demands });
             try output.interface.flush();
             return success;
         }

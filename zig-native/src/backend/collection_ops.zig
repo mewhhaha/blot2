@@ -2,10 +2,10 @@
 const std = @import("std");
 /// `simd_load`/`simd_store` read or replace four consecutive Array elements
 /// with one range check; their lanes are an ordinary four-element product.
-pub const Op = enum(u32) { length, get, set, fill, generate, append, prepend, identity, convert, cursor, cursor_has, cursor_value, cursor_advance, concat, slice, simd_load, simd_store };
+pub const Op = enum(u32) { length, get, set, fill, generate, append, prepend, identity, convert, cursor, cursor_has, cursor_value, cursor_advance, concat, slice, simd_load, simd_store, flatten };
 pub fn arity(op: Op) u8 {
     return switch (op) {
-        .length, .identity, .convert, .cursor, .cursor_has, .cursor_value, .cursor_advance => 1,
+        .length, .identity, .convert, .cursor, .cursor_has, .cursor_value, .cursor_advance, .flatten => 1,
         .get, .fill, .generate, .append, .prepend, .concat, .simd_load => 2,
         .set, .slice, .simd_store => 3,
     };
@@ -20,12 +20,12 @@ pub fn lookup(name: []const u8) ?Primitive {
     if (!is_list and !std.mem.startsWith(u8, name, "@array.")) return null;
     const member = name[if (is_list) @as(usize, 6) else 7..];
     const op: Op = if (std.mem.eql(u8, member, if (is_list) "from_array" else "from_list")) .convert else blk: {
-        inline for (.{ Op.length, Op.get, Op.set, Op.fill, Op.generate, Op.append, Op.prepend, Op.identity, Op.cursor, Op.concat, Op.slice }) |candidate|
+        inline for (.{ Op.length, Op.get, Op.set, Op.fill, Op.generate, Op.append, Op.prepend, Op.identity, Op.cursor, Op.concat, Op.slice, Op.flatten }) |candidate|
             if (std.mem.eql(u8, member, @tagName(candidate))) break :blk candidate;
         return null;
     };
     // Indexed operations are an Array API. List traversal uses compiler-private
     // Core operations, so it does not need source-visible indexing intrinsics.
-    if (is_list and (op == .get or op == .set)) return null;
+    if (is_list and (op == .get or op == .set or op == .flatten)) return null;
     return .{ .op = op, .arity = arity(op), .is_list = is_list };
 }

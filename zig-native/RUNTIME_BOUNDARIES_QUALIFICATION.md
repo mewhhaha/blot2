@@ -1,5 +1,10 @@
 # Runtime boundary repairs
 
+Historical qualification, 25 October 2026 (`fdfaa89`). The follow-up batch is
+documented in
+[Runtime representation, attribution and collection](RUNTIME_MEMORY_QUALIFICATION.md).
+The unresolved controls and measurements below describe this earlier compiler.
+
 Issues #29, #30, #31 and #34 are fixed and correctness-qualified. The complete
 compiler gate, zero-finding Zig lint, public runtime benchmarks and application
 compile-cost screen pass. Broader representation, cycle-collection and

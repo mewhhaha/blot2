@@ -11,6 +11,10 @@ pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []con
     const first = types.node(inputs[0]);
     const result = types.node(output_);
     switch (operation) {
+        .flatten => {
+            try require(first.tag == .array and result.tag == .array);
+            try proof.same(first.a, output_);
+        },
         .length, .get, .set, .append, .prepend, .identity, .concat, .slice => {
             try require(first.tag == .array or first.tag == .list);
             switch (operation) {

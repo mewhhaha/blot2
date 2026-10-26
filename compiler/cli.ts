@@ -8,7 +8,8 @@ const usage = `Usage: blot guide | fmt SOURCE [--check]
        blot build ENTRY [OUTPUT.wasm] [project options]
        blot dependencies ENTRY OUTPUT.blotdep [project options]
 Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
-                 --dependencies FILE, --input-mode project|source, --json`;
+                 --dependencies FILE, --input-mode project|source, --json
+Build options:   --profile-memory, --require-collector-free`;
 
 export async function runCli(
   executable: string | URL = new URL(
@@ -61,6 +62,13 @@ export async function runCli(
       const value = rest[i];
       if (value === "--json") {
         json = true;
+        continue;
+      }
+      if (
+        command === "build" &&
+        ["--profile-memory", "--require-collector-free"].includes(value)
+      ) {
+        options.push(value);
         continue;
       }
       if (

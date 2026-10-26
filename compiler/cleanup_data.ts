@@ -158,8 +158,15 @@ export function readDataSchemas(
     if (node.tag === "record") {
       children = node.fields.map((field) => field.child);
     } else if (node.tag === "product") children = node.children;
-    else if (node.tag === "nominal" && node.variants.length === 1) {
-      children = [node.variants[0].child];
+    else if (node.tag === "nominal" && node.variants.length <= 4) {
+      let words = 0;
+      for (const variant of node.variants) {
+        words = Math.max(words, packedWords(variant.child, active, depth + 1));
+      }
+      if (node.variants.length > 1) words++;
+      active.delete(id);
+      if (words > 16) fail();
+      return words;
     } else fail();
     if (children.length === 0 || children.length > 16) fail();
     let words = 0;
@@ -314,6 +321,29 @@ export function copyData(
     }
     return copy(node.id, load(address), depth);
   }
+  function packedWidth(id: number, active: Set<number>, depth: number): number {
+    if (depth >= 16 || active.has(id)) fail();
+    const node = nodes.get(id)!;
+    if (!node.reference) return 1;
+    active.add(id);
+    let words = 0;
+    if (node.tag === "nominal") {
+      for (const variant of node.variants) {
+        words = Math.max(words, packedWidth(variant.child, active, depth + 1));
+      }
+      if (node.variants.length > 1) words++;
+    } else {
+      const children = node.tag === "record"
+        ? node.fields.map((field) => field.child)
+        : node.children;
+      for (const child of children) {
+        words += packedWidth(child, active, depth + 1);
+      }
+    }
+    active.delete(id);
+    if (words === 0 || words > 16) fail();
+    return words;
+  }
   function packed(
     node: DataNode,
     position: { address: number },
@@ -328,12 +358,29 @@ export function copyData(
       return value;
     }
     if (node.tag === "nominal") {
-      const variant = node.variants[0];
-      return Object.freeze({
-        family: node.name,
-        tag: variant.tag,
-        value: packed(nodes.get(variant.child)!, position, depth + 1),
-      });
+      const start = position.address;
+      let variant = node.variants[0];
+      let end: number | undefined;
+      if (node.variants.length > 1) {
+        const tag = load(position.address);
+        position.address += 4;
+        const selected = node.variants.find((item) => item.tag === tag);
+        if (!selected) {
+          throw new Error("Cleanup packed constructor differs from its schema");
+        }
+        variant = selected;
+        end = start + packedWidth(node.id, new Set(), 0) * 4;
+      }
+      const value = packed(nodes.get(variant.child)!, position, depth + 1);
+      if (end !== undefined) {
+        while (position.address < end) {
+          if (load(position.address) !== 0) {
+            throw new Error("Cleanup packed padding is not canonical");
+          }
+          position.address += 4;
+        }
+      }
+      return Object.freeze({ family: node.name, tag: variant.tag, value });
     }
     if (node.tag === "record") {
       const record: Record<string, DataValue> = {};

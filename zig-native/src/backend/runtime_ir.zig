@@ -313,14 +313,18 @@ pub const FunctionId = enum(u32) { _ };
 pub const LocalId = enum(u32) { _ };
 pub const SignatureId = enum(u32) { _ };
 pub const TableKind = enum(u2) { unknown, callable, demand };
-pub const Instruction = struct {
-    op: Op,
+pub const Instruction = packed struct(u64) {
     operand: u32 = 0,
+    op: Op,
     /// A table slot is a symbolic function target, never an integer literal.
     /// This flag occupies existing padding in the eight-byte instruction.
     table_reference: bool = false,
     /// Checked constructor kind; physical Closure and Demand code fields differ.
     table_kind: TableKind = .unknown,
+    /// Diagnostic source identity, assigned only in a detached assembly view.
+    /// Zero is runtime/generated/unknown. This is never ownership authority.
+    /// Packing the existing flags leaves the instruction at eight bytes.
+    origin: u21 = 0,
 
     pub fn callee(self: Instruction) FunctionId {
         std.debug.assert(self.op == .call);

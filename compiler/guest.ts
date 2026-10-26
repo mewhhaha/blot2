@@ -587,6 +587,21 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   if (version >= 3 && ownership.length !== 1) {
     throw new GuestError("invalid_abi", "Missing root ownership section");
   }
+  const memoryProfile = WebAssembly.Module.customSections(
+    module,
+    "blot:memory-profile",
+  );
+  if (memoryProfile.length > 1) {
+    throw new GuestError("invalid_abi", "Duplicate memory profile section");
+  }
+  if (memoryProfile.length === 1) {
+    for (let word = 0; word < 8; word++) {
+      declare(`blot:profile_identity_${word}`, "global");
+    }
+    // Instrumentation exposes its diagnostic counters through the same memory
+    // as ordinary numeric results, even for scalar-only source exports.
+    if (!exports.has("blot:memory")) declare("blot:memory", "memory");
+  }
   if (
     actualExports.length !== exports.size ||
     actualExports.some((entry) => exports.get(entry.name) !== entry.kind)
@@ -1636,10 +1651,13 @@ export async function instantiateGuest(
   const memory = instance.exports["blot:memory"];
   const allocate = instance.exports["blot:allocate"];
   const reset = instance.exports["blot:reset"];
+  const profiling =
+    WebAssembly.Module.customSections(module, "blot:memory-profile").length ===
+      1;
   if (
     memory !== undefined &&
     (allocate !== undefined || reset !== undefined ||
-      abi.taskDescriptorCount === undefined)
+      (abi.taskDescriptorCount === undefined && !profiling))
   ) {
     if (
       !(memory instanceof WebAssembly.Memory) ||

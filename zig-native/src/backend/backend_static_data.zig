@@ -435,24 +435,38 @@ pub const State = struct {
         if (node.tag != .product or index >= values.len) return g.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
         return values[index];
     }
+    fn numericGuard(g: anytype, plan: *const @import("numeric_rows.zig").Plan, guard: ?u8, values: []const core_eval.ValueId) bool {
+        const id = guard orelse return true;
+        const condition = plan.guards[id];
+        return numericGuard(g, plan, condition.parent, values) and g.evaluator.valueInfo(values[condition.owner]).bits == condition.tag;
+    }
     fn serializeNumericRow(self: *State, g: anytype, row: core_eval.ValueId, plan: @import("numeric_rows.zig").Plan, depth: usize, words: *std.ArrayList(u32)) Error!void {
         var values: [32]core_eval.ValueId = undefined;
-        values[0] = row;
-        for (plan.storage[1..plan.storage_count], 1..) |storage, index| {
-            const owner = storage.parent.?;
-            values[index] = try numericChild(g, values[owner], plan.storage[owner].layout, storage.offset);
+        for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
+            if (storage.parent) |owner| {
+                if (!numericGuard(g, &plan, plan.storage[owner].guard, &values)) continue;
+                values[index] = try numericChild(g, values[owner], plan.storage[owner].layout, storage.offset);
+            } else values[index] = row;
         }
+        var physical: [16]u32 = @splat(0);
         for (plan.leaves[0..plan.leaf_count]) |leaf| {
+            if (!numericGuard(g, &plan, leaf.guard, &values)) continue;
             const storage = plan.storage[leaf.owner];
-            const value = try numericChild(g, values[leaf.owner], storage.layout, leaf.offset);
+            if (leaf.discriminant) {
+                physical[leaf.word] = g.evaluator.valueInfo(values[leaf.owner]).bits;
+                continue;
+            }
             const node = g.representations.store.node(storage.layout);
             const fields = g.representations.store.children(storage.layout);
             const child = if (node.tag == .nominal)
                 try g.nominalPayload((@as(u64, node.a) << 32) | node.b, storage.tag.?, storage.layout)
             else
                 fields[if (node.tag == .record) leaf.offset / 2 + 1 else leaf.offset / 4];
-            try words.append(g.allocator, try self.serialize(g, value, child, depth + 1));
+            if (g.representations.store.node(child).tag == .unit) continue;
+            const value = try numericChild(g, values[leaf.owner], storage.layout, leaf.offset);
+            physical[leaf.word] = try self.serialize(g, value, child, depth + 1);
         }
+        try words.appendSlice(g.allocator, physical[0..plan.word_count]);
     }
     fn serializePackedCollection(self: *State, g: anytype, id: core_eval.ValueId, ty: layout.Id, depth: usize, info: core_eval.ValueInfo, key: SerializedKey, row_words: u32) Error!u32 {
         var words: std.ArrayList(u32) = .empty;

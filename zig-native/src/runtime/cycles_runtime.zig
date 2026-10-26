@@ -22,6 +22,9 @@ pub const visit_guard: u32 = rc.lease | gray | no_cycle;
 /// allocation traffic. Reclaimed vertices do not raise it, so uncollected
 /// cyclic garbage stays bounded by live scan size plus the minimum.
 pub const minimum_traffic: u32 = 65536;
+// Diagnostic contract: helpers are encoded without local renumbering. The
+// collector's current object is explicitly pinned and checked at construction.
+pub const collector_object_local: u32 = 0;
 const traffic_per_vertex_shift = 6;
 const traffic_vertex_cap: u32 = 1 << 18;
 const header = @sizeOf(h.ArenaHeader);
@@ -177,6 +180,7 @@ fn work(c: Code, a: w.Arena, p: Local, comptime phase: enum { discover, live }) 
 }
 fn collect(c: Code, a: w.Arena) Error!void {
     const p = try c.temp();
+    std.debug.assert(p.id == collector_object_local);
     const b = try c.temp();
     const next = try c.temp();
     const pending = try c.temp();

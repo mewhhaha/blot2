@@ -73,6 +73,7 @@ const Scan = struct {
     fn receipt(self: *Scan, function: u32, place: u32) Error!?W.Module.SemanticSite {
         var result: ?W.Module.SemanticSite = null;
         for (self.source.semantic_sites.items) |site| {
+            if (site.kind == .diagnostic_call or site.kind == .diagnostic_memory) continue;
             try self.step();
             if (site.function != function or site.place != place) continue;
             if (result != null) return error.Declined;

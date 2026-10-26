@@ -116,6 +116,9 @@ export interface ZigProjectCompilerOptions {
   codegenTier?: "optimized" | "development";
   /** Prototype: share identical internal machine bodies while keeping table slots. */
   shareMachineCode?: boolean;
+  /** Instrument executed guest memory work; not for release timing. */
+  profileMemory?: boolean;
+  requireCollectorFree?: boolean;
   /** Upper bound for coarse optimizer workers (1..16; default 4). */
   codegenWorkers?: number;
   /** Opt-in private semantic components with 1..16 workers; default stays serial. */
@@ -1138,6 +1141,8 @@ export async function createZigProjectCompiler(
     "explainAllocations",
     "codegenTier",
     "shareMachineCode",
+    "profileMemory",
+    "requireCollectorFree",
     "codegenWorkers",
     "semanticWorkers",
     "frontendWorkers",
@@ -1195,6 +1200,16 @@ export async function createZigProjectCompiler(
     throw new TypeError("codegenTier must be optimized or development");
   }
   if (
+    options.requireCollectorFree !== undefined &&
+    typeof options.requireCollectorFree !== "boolean"
+  ) throw new TypeError("requireCollectorFree must be a boolean");
+  if (
+    options.profileMemory !== undefined &&
+    typeof options.profileMemory !== "boolean"
+  ) {
+    throw new TypeError("profileMemory must be a boolean");
+  }
+  if (
     options.shareMachineCode !== undefined &&
     typeof options.shareMachineCode !== "boolean"
   ) {
@@ -1246,6 +1261,8 @@ export async function createZigProjectCompiler(
     ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
     ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
+    ...(options.profileMemory ? { profileMemory: true } : {}),
+    ...(options.requireCollectorFree ? { requireCollectorFree: true } : {}),
     ...(options.codegenWorkers
       ? { codegenWorkers: options.codegenWorkers }
       : {}),

@@ -369,6 +369,7 @@ pub const Session = struct {
     // Bound lazily, after init's returned Session has reached its final address.
     epoch: ?*Epoch = null,
     policy: Policy = .{},
+    compiler_identity: ?[32]u8 = null,
     profile_backend: bool = false,
     explain_demands: bool = false,
     explain_allocations: bool = false,
@@ -925,7 +926,7 @@ pub const Session = struct {
             const exact = reusable and admitted and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view());
             // Explained spans belong to the actual source bytes. Recompute
             // them after trivia changes rather than publishing old offsets.
-            if (exact or (!self.explain_demands and !self.explain_allocations and reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
+            if (exact or (!self.explain_demands and !self.explain_allocations and !self.policy.memory_profile and !self.policy.require_collector_free and reusable and try snapshot.triviaEqualsPrevious(io, current.snapshot.view()))) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
                 const candidate = try a.create(Candidate);
@@ -985,6 +986,7 @@ pub const Session = struct {
                     defer timing.exit();
                     break :emitted try prepared.emitWithOptions(a, .{
                         .io = io,
+                        .compiler_identity = self.compiler_identity,
                         .profile_backend = self.profile_backend,
                         .explain_demands = self.explain_demands,
                         .explain_allocations = self.explain_allocations,

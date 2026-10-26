@@ -5,6 +5,10 @@
 pub const Policy = struct {
     codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
     share_machine_code: bool = false,
+    /// Diagnostic final-Wasm counters; absent from ordinary release output.
+    memory_profile: bool = false,
+    /// Reject unless the complete module has a checked collector-free certificate.
+    require_collector_free: bool = false,
     codegen_workers: u8 = 1,
     semantic_workers: u8 = 1,
     frontend_workers: u8 = 4,

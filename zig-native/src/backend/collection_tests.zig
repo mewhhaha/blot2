@@ -1129,3 +1129,112 @@ test "identity generation shares immutable storage without granting either alias
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, identityArrayFailures, .{&module});
     try std.testing.expectEqual(stamp, @import("../check/core_snapshot_tests.zig").stamp(module));
 }
+
+test "tagged numeric rows preserve frozen evidence and release every emission allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\type Choice is data = #Empty | #One U32 | #Pair {x: U32, y: U32}
+        \\const make = fn (i: U32) -> Choice => if @u32.eq i 0 then #Empty else if @u32.eq i 1 then #One i else #Pair {x: i, y: 7}
+        \\const read = fn (v: Choice) -> U32 => case v of
+        \\  #Empty => 0
+        \\  #One n => n
+        \\  #Pair (x, y) => @u32.add x y
+        \\entry const run = fn (count: U32) => do:
+        \\  let rows = @array.generate count make
+        \\  let total = 0
+        \\  for row in rows:
+        \\    total := @u32.add self (read row)
+        \\  break total
+    );
+    defer module.deinit(a);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+
+test "rectangular pipelines prove single use and preserve frozen evidence through OOM" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const generate = fn count => fn f => @array.generate count f
+        \\const map = fn f => fn values => generate (@array.length values) (fn i => f values[i])
+        \\const flatten = fn (chunks: Array (Array a)) => @array.flatten chunks
+        \\type Command is data = #Command {lanes: Array U32}
+        \\entry const run = fn (count: U32) => do:
+        \\  let commands = generate count (fn i => #Command {lanes: generate 24 (fn j => @u32.add (@u32.mul i 24) j)})
+        \\  let chunks = map (fn c => c.lanes) commands
+        \\  let lanes = flatten chunks
+        \\  break lanes
+    );
+    defer module.deinit(a);
+    const units = [_]core.Module{module};
+    var found = false;
+    for (module.bodies) |body| if (body.exported) {
+        const plan = @import("pipeline_builder.zig").analyze(&units, 1, body.root);
+        try std.testing.expect(plan != null);
+        try std.testing.expectEqual(@as(u32, 24), plan.?.width);
+        found = true;
+    };
+    try std.testing.expect(found);
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    try packedEmissionFailures(a, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+
+fn profileEmissionFailures(a: std.mem.Allocator, units: []const core.Module) !void {
+    var result = try @import("core_backend.zig").compileWithOptions(a, units, 1, .{ .retain_artifacts = true, .artifact_replay = true, .policy = .{ .memory_profile = true } });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(std.mem.find(u8, result.bytes, "blot:memory-profile") != null);
+    try std.testing.expect(std.mem.find(u8, result.bytes, "\"inline_depth\":1") != null);
+}
+test "executed memory profile owns detached origins metadata and instrumentation through all allocation failures" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\type Pair is data = #Pair {a: U32, b: U32}
+        \\const make = fn (value: U32) => #Pair {a: value, b: @u32.add value 1}
+        \\const generate = fn count => fn make => @array.generate count make
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = generate count make
+        \\  let old = values
+        \\  values[0] := #Pair {a: count, b: count}
+        \\  break @u32.add old[0].a values[0].a
+    );
+    defer module.deinit(a);
+    const units = [_]core.Module{module};
+    const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+    try profileEmissionFailures(a, &units);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, profileEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+}
+
+fn collectorContractFailures(a: std.mem.Allocator, units: []const core.Module, expected: bool) !void {
+    var result = try @import("core_backend.zig").compileWithOptions(a, units, 1, .{ .retain_artifacts = true, .policy = .{ .require_collector_free = true } });
+    defer result.deinit(a);
+    if (expected) {
+        try std.testing.expect(result.diagnostic == null);
+        try std.testing.expect(std.mem.find(u8, result.bytes, "blot:collector-contract") != null);
+    } else {
+        try std.testing.expect(result.diagnostic != null);
+        try std.testing.expectEqual(@import("../check/diagnostic_code.zig").Code.collector_free_unproved, result.diagnostic.?.code);
+        try std.testing.expect(result.owned_message.len > 0);
+    }
+}
+test "collector-free certificate and rejection own their evidence through all allocation failures" {
+    const a = std.testing.allocator;
+    const sources = [_][]const u8{
+        "entry const run = fn (count: U32) => do:\n  let values = @array.generate count (fn i => @u32.add i 1)\n  let sum = 0\n  for value in values:\n    sum := @u32.add self value\n  break sum",
+        "entry const run = fn (count: U32) => do:\n  let values = @array.generate count (fn i => fn n => @u32.add i n)\n  break values[0] count",
+    };
+    for (sources, 0..) |source, index| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        const units = [_]core.Module{module};
+        const before = @import("../check/core_snapshot_tests.zig").stamp(module);
+        try collectorContractFailures(a, &units, index == 0);
+        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, collectorContractFailures, .{ &units, index == 0 });
+        try std.testing.expectEqual(before, @import("../check/core_snapshot_tests.zig").stamp(module));
+    }
+}

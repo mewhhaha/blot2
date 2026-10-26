@@ -5065,6 +5065,25 @@ pub const Session = struct {
         }
         const array = self.valueInfo(values[0]);
         if (array.kind != .array and array.kind != .list) return self.failNode(owner, id, .unsupported);
+        if (operation == .flatten) {
+            var length: u32 = 0;
+            for (self.valueChildren(values[0])) |child| {
+                const chunk = self.valueInfo(child);
+                if (chunk.kind != .array) return self.failNode(owner, id, .unsupported);
+                if (chunk.len >= 4_194_304 -| length) return self.arrayLengthFailure(owner);
+                length += chunk.len;
+            }
+            try self.chargeCells(owner, id, length);
+            const copied = try self.allocator.alloc(ValueId, length);
+            defer self.allocator.free(copied);
+            var offset: usize = 0;
+            for (self.valueChildren(values[0])) |child| {
+                const chunk = self.valueChildren(child);
+                @memcpy(copied[offset..][0..chunk.len], chunk);
+                offset += chunk.len;
+            }
+            return self.makeAggregate(owner, id, .array, 0, 0, copied);
+        }
         if (operation == .cursor) return self.makeAggregate(owner, id, .cursor, 0, 0, &.{values[0]});
         if (operation == .slice) {
             const start = try self.requireScalar(owner, id, values[1]);

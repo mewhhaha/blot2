@@ -403,3 +403,36 @@ Deno.test("structured cleanup independently links the actual schema and payload 
       error instanceof GuestError && error.code === "invalid_abi",
   );
 });
+
+Deno.test("cleanup packed sum rows select their arm and reject invalid tags and inactive padding", () => {
+  const pair = node(5, "product", { children: [3, 3] });
+  const choice = node(6, "nominal", {
+    name: "Choice",
+    variants: [{ tag: 2, child: 3 }, { tag: 7, child: 5 }],
+  });
+  const array = node(7, "array", { child: 6, row_words: 3 });
+  const schemas = readDataSchemas(module([scalar, pair, choice, array]))!;
+  const memory = new WebAssembly.Memory({ initial: 2 });
+  const view = new DataView(memory.buffer), address = 65600;
+  view.setUint32(address - 28, 28, true);
+  view.setUint32(address - 24, 4, true);
+  view.setUint32(address - 16, 1, true);
+  for (const [i, word] of [2, 2, 11, 0, 7, 13, 17].entries()) {
+    view.setUint32(address + i * 4, word, true);
+  }
+  assert.deepEqual(copyData(memory, schemas, 7, address), [
+    { family: "Choice", tag: 2, value: 11 },
+    { family: "Choice", tag: 7, value: [13, 17] },
+  ]);
+  view.setUint32(address + 4, 99, true);
+  assert.throws(
+    () => copyData(memory, schemas, 7, address),
+    /constructor differs/,
+  );
+  view.setUint32(address + 4, 2, true);
+  view.setUint32(address + 12, 1, true);
+  assert.throws(
+    () => copyData(memory, schemas, 7, address),
+    /padding is not canonical/,
+  );
+});

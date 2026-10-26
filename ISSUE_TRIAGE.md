@@ -2,15 +2,20 @@
 
 ## Repair status
 
-The first repair batch fixes #29, #30, #31 and #34, with permanent native/Wasm
-regression laws and a public alternating benchmark. The complete release gate,
-zero-finding Zig lint and application compile-cost screen pass; these four
-issues are ready for closure after the fixes reach main. See
+The first repair batch fixed #29, #30, #31 and #34 at `fdfaa89`; all four are
+pushed and closed. Permanent native/Wasm laws, the complete release gate,
+zero-finding Zig lint and the application compile-cost screen passed. See
 [qualification and measurements](zig-native/RUNTIME_BOUNDARIES_QUALIFICATION.md).
 
-#28, #32, #33, #35 and #36 remain separate open design, representation and
-measurement work. The existing #25/#27 programs also remain open. The original
-triage below records the baseline before these repairs.
+#28, #32, #33, #35 and #36 are implemented and qualified in the second batch.
+All five closure criteria are met, including three-engine kernel measurements,
+source-attributed application reports, cycle-only CPU controls and the full
+native/release-Wasm gate. See
+[the implementation and evidence](zig-native/RUNTIME_MEMORY_QUALIFICATION.md)
+for the bounded variant representation, structural pipeline fusion, executed
+memory attribution, acyclic-copy repair and conservative collector-free check.
+The existing #25/#27 programs remain open. The original triage below records the
+baseline before either batch.
 
 ## Initial assessment, 25 October 2026
 

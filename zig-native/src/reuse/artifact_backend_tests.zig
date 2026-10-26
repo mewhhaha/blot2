@@ -189,7 +189,7 @@ test "retained artifact capture completes runtime storage only after its initial
     try std.testing.expectEqual(global.global, job.global.?);
     var reconstructed = try capture.emission.materialize(a);
     defer reconstructed.deinit();
-    const bytes = try reconstructed.assemble();
+    const bytes = try reconstructed.assembleCheckedWithOptions(.{});
     defer a.free(bytes);
     try std.testing.expectEqualSlices(u8, fresh.bytes, bytes);
 }
@@ -211,7 +211,7 @@ test "movable retained capture owns complete bodies after compiler and result de
     try std.testing.expect(moved.emission.owner == null and moved.emission.clock == null);
     var reconstructed = try moved.emission.materialize(a);
     defer reconstructed.deinit();
-    const actual = try reconstructed.assemble();
+    const actual = try reconstructed.assembleCheckedWithOptions(.{});
     defer a.free(actual);
     try std.testing.expectEqualSlices(u8, expected, actual);
     try std.testing.expect(moved.metadata.pools.?.modules[0].module == &units[0]);

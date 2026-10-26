@@ -97,6 +97,12 @@ pub const Arena = struct {
 };
 pub const OwnershipFailure = struct { fallback: OwnershipFallback = .none, function: ?u32 = null };
 pub const AssemblyOptions = struct {
+    require_collector_free: bool = false,
+    collector_rejection: ?*@import("collector_contract.zig").Certificate = null,
+    memory_profile: ?[]const @import("source_origins.zig").Site = null,
+    compiler_identity: ?[32]u8 = null,
+    source_digests: []const [32]u8 = &.{},
+    source_names: ?@import("runtime_identity.zig").View = null,
     rejection: ?*OwnershipFailure = null,
     io: ?std.Io = null,
     workers: u8 = 1,
@@ -163,6 +169,7 @@ pub const Module = struct {
     /// Owned Core emission coordinates, independent of diagnostic provenance.
     /// Consumers must rederive every logical relationship from the pinned Core.
     pub const SemanticSite = struct {
+        diagnostic_context: u32 = 0,
         function: u32,
         place: u32,
         unit: u32,
@@ -170,7 +177,7 @@ pub const Module = struct {
         root: u32,
         mappings: u32,
         rows: u32,
-        kind: enum { allocation, call },
+        kind: enum { allocation, call, diagnostic_call, diagnostic_memory },
     };
     pub fn recordSemanticSite(self: *Module, site: SemanticSite) Allocator.Error!void {
         if (self.artifacts) |journal| try journal.append(.{ .semantic_site = site });
@@ -1032,6 +1039,7 @@ pub const Module = struct {
     fn assemblePrepared(self: *const Module, options: AssemblyOptions, journals: bool, comptime checked: bool) ![]u8 {
         if (options.import_function_table != null and self.host_references != null) return error.InvalidFunctionReference;
         for (self.functions.items) |function| if (!function.validProviderParameter()) return error.InvalidFunctionReference;
+        var memory_profile: ?@import("memory_profile.zig").Profile = if (self.arena != null and options.memory_profile != null) try .init(self, options.memory_profile.?, options.compiler_identity) else null;
         if (options.stats) |stats| stats.tier = options.tier;
         if (options.current) |current| current.tier = options.tier;
         var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
@@ -1113,6 +1121,14 @@ pub const Module = struct {
             if (options.stats) |stats| stats.* = .{};
             return self.assemblePrepared(options, false, checked);
         }
+        if (memory_profile) |*profile| try profile.bind(bodies);
+        // Unchecked fixtures expose raw helpers and do not establish the source
+        // ownership/host boundary on which the certificate relies.
+        const collector = if (checked) try @import("collector_contract.zig").analyze(self, bodies) else @import("collector_contract.zig").Certificate{ .reason = .unchecked_module };
+        if (options.require_collector_free and !collector.certified) {
+            if (options.collector_rejection) |rejection| rejection.* = collector;
+            return error.CollectorFreeUnproven;
+        }
         const roots_admitted = rc_admitted and passes.roots;
         const resources = self.resourceCount();
         if (resources != 0 and !roots_admitted) return error.InvalidFunctionReference;
@@ -1122,7 +1138,7 @@ pub const Module = struct {
             break :blk self.globals.items[arena.root_enabled].bits & ~@import("../runtime/root_runtime.zig").complete;
         };
         const flags: @import("runtime_flags.zig").Facts = .{ .module = self, .root_mode = root_mode, .rc_admitted = rc_admitted };
-        var code = try @import("machine_code_sharing.zig").Index.initPrepared(self.allocator, self, bodies, options.share_machine_code);
+        var code = try @import("machine_code_sharing.zig").Index.initPrepared(self.allocator, self, bodies, options.share_machine_code and memory_profile == null);
         defer code.deinit();
         if (options.stats) |stats| stats.shared = self.functions.items.len - code.unique;
         if (checked and self.arena != null and !flags.complete()) return error.IncompleteOwnership;
@@ -1185,18 +1201,18 @@ pub const Module = struct {
         if (self.arena != null) {
             try payload.uleb(1);
             try payload.byte(1); // bounded Wasm32 memory
-            const pages: u32 = @intCast(@max(1, (self.data.items.len + 65535) / 65536));
+            const pages: u32 = @intCast(@max(1, ((if (memory_profile) |profile| profile.end else self.data.items.len) + 65535) / 65536));
             try payload.uleb(pages);
             try payload.uleb(65536);
             try output.section(5, payload.items());
             payload.clear();
         }
         if (self.globals.items.len != 0) {
-            try payload.uleb(@intCast(self.globals.items.len));
+            try payload.uleb(@intCast(self.globals.items.len + @as(usize, if (memory_profile != null) 9 else 0)));
             for (self.globals.items, 0..) |global, id| {
                 try payload.byte(@backingInt(global.scalar.machine()));
                 try payload.byte(@intFromBool(global.mutable));
-                var bits = global.bits;
+                var bits = if (memory_profile) |profile| profile.globalValue(id, global.bits) else global.bits;
                 if (self.arena) |arena| {
                     if (id == arena.rc_enabled) bits = @intFromBool(rc_admitted);
                     if (id == arena.root_enabled) bits = root_mode;
@@ -1204,17 +1220,30 @@ pub const Module = struct {
                 try encodeInstruction(&payload, .{ .op = if (global.scalar == .f32) .f32_const else .i32_const, .operand = bits }, self.functions.items.len, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
                 try payload.byte(0x0b);
             }
+            if (memory_profile) |profile| {
+                try payload.raw(&.{ 0x7f, 1, 0x41, 0, 0x0b });
+                for (0..8) |word| {
+                    try payload.raw(&.{ 0x7f, 0, 0x41 });
+                    try payload.sleb(@bitCast(std.mem.readInt(u32, profile.identity[word * 4 ..][0..4], .little)));
+                    try payload.byte(0x0b);
+                }
+            }
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory or self.taskImportNamed("open") != null) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 9 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (memory_profile != null) 8 else 0) + @as(usize, if (self.public_arena) 2 else 0) + @intFromBool(self.public_arena or options.export_memory or memory_profile != null or self.taskImportNamed("open") != null) + @intFromBool(options.export_function_table) + @as(usize, if (self.arena != null) 9 else 0) + @as(usize, if (roots_admitted) 3 else 0) + @intFromBool(roots_admitted and self.host_references != null)));
+        if (memory_profile) |profile| inline for (0..8) |word| {
+            try payload.name("blot:profile_identity_" ++ std.fmt.comptimePrint("{d}", .{word}));
+            try payload.byte(3);
+            try payload.uleb(profile.context_global + 1 + @as(u32, word));
+        };
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
             if (!item.global and item.index >= self.functions.items.len) return error.InvalidFunctionReference;
             try payload.uleb(if (item.global) item.index else code.function(item.index) + import_count);
         }
-        if (self.public_arena or options.export_memory or self.taskImportNamed("open") != null) {
+        if (self.public_arena or options.export_memory or memory_profile != null or self.taskImportNamed("open") != null) {
             try payload.name("blot:memory");
             try payload.byte(2);
             try payload.uleb(0);
@@ -1292,6 +1321,9 @@ pub const Module = struct {
                 .rc_admitted = rc_admitted,
                 .wide = flags.wide(),
                 .retire = self.resourceRetireImport(),
+                .collector_free = collector.certified,
+                .profile_base = if (memory_profile) |profile| profile.base else 0,
+                .profile_rows = if (memory_profile) |profile| profile.sites.len + 2 else 0,
             };
             const encoding_same = if (matcher) |*matches| matches.encodingSame(encoding, code.indexes) else false;
             if (options.current) |current| try current.recordEncoding(encoding, code.indexes);
@@ -1316,19 +1348,28 @@ pub const Module = struct {
                 var instructions: []const Instruction = function.instructions.items;
                 if (optimized) |owned| instructions = owned.instructions.items;
                 var lowered: @import("runtime_flags.zig").Iterator = .{ .facts = flags, .instructions = instructions };
-                try body.uleb(@intCast(locals.len));
+                const observer: ?@import("memory_profile.zig").Function = if (memory_profile) |profile| .init(profile, @intCast(id), function.parameters.len + locals.len) else null;
+                try body.uleb(@intCast(locals.len + (if (observer != null) @import("memory_profile.zig").Function.local_count else @as(usize, 0))));
                 for (locals) |local| {
                     try body.byte(1);
                     try body.byte(@backingInt(local));
                 }
-                while (lowered.next()) |instruction| {
+                if (observer) |profile| {
+                    for (0..@import("memory_profile.zig").Function.local_count) |_| try body.raw(&.{ 1, 0x7f });
+                    try profile.enter(&body, function.entry);
+                }
+                const omit_collector = collector.certified and self.arena != null and (id == self.arena.?.cycle_safe or id == self.arena.?.cycle_collect);
+                if (!omit_collector) while (lowered.next()) |instruction| {
+                    if (observer) |profile| try profile.before(&body, instruction);
                     var encoded = instruction;
                     if (encoded.op == .call) {
                         if (encoded.operand >= self.functions.items.len) return error.InvalidFunctionReference;
                         encoded.operand = code.function(encoded.operand);
                     }
                     try encodeInstruction(&body, encoded, code.unique, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
-                }
+                    if (observer) |profile| try profile.after(&body, instruction);
+                };
+                if (observer) |profile| try profile.finish(&body);
                 try body.byte(0x0b);
                 if (options.current) |current| try current.recordEncoded(id, body.items());
                 try payload.uleb(@intCast(body.items().len));
@@ -1354,6 +1395,60 @@ pub const Module = struct {
             try payload.uleb(@intCast(self.data.items.len));
             try payload.raw(self.data.items);
             try output.section(11, payload.items());
+            payload.clear();
+        }
+        if (memory_profile) |profile| {
+            // Standard final-index function names travel with the exact binary;
+            // CPU profiles and wasm-opt can preserve/remap this name section.
+            var names = Bytes.init(self.allocator);
+            defer names.deinit();
+            try names.uleb(@intCast(self.functions.items.len));
+            for (self.functions.items, 0..) |_, id| {
+                try names.uleb(code.function(@intCast(id)) + import_count);
+                var runtime_name: ?[]const u8 = null;
+                inline for (Arena.function_fields) |field| if (id == @field(profile.arena, field)) {
+                    runtime_name = field;
+                };
+                if (runtime_name) |name| {
+                    const label = try self.allocator.print("blot.runtime.{s}", .{name});
+                    defer self.allocator.free(label);
+                    try names.name(label);
+                } else {
+                    const label = try self.allocator.print("blot.function.{d}", .{id});
+                    defer self.allocator.free(label);
+                    try names.name(label);
+                }
+            }
+            try payload.name("name");
+            try payload.byte(1);
+            try payload.uleb(@intCast(names.items().len));
+            try payload.raw(names.items());
+            try output.section(0, payload.items());
+            payload.clear();
+            const metadata = try profile.metadata(self.allocator);
+            defer self.allocator.free(metadata);
+            try payload.name("blot:memory-profile");
+            try payload.raw(metadata);
+            try output.section(0, payload.items());
+            payload.clear();
+        }
+        {
+            const Source = struct { filename: []const u8, blake3: [32]u8 };
+            const sources = try self.allocator.alloc(Source, if (options.require_collector_free or memory_profile != null) options.source_digests.len else 0);
+            defer self.allocator.free(sources);
+            for (sources, options.source_digests[0..sources.len], 1..) |*source, digest, unit| source.* = .{ .filename = if (options.source_names) |names| names.owner(@intCast(unit)) orelse "" else "", .blake3 = digest };
+            const roots = try self.allocator.dupe(Export, self.exports.items);
+            defer self.allocator.free(roots);
+            for (roots) |*root| if (!root.global) {
+                root.index = code.function(root.index) + import_count;
+            };
+            var encoded_collector = collector;
+            if (encoded_collector.function) |function| encoded_collector.function = code.function(function) + import_count;
+            const metadata = try std.json.Stringify.valueAlloc(self.allocator, .{ .certificate = encoded_collector, .function_indices = "final_wasm", .instruction_indices = "optimized_logical_body", .compiler_identity = options.compiler_identity, .sources = sources, .source_identity_scope = "Exact source digests are included for strict and instrumented builds; the embedded certificate always belongs to this complete Wasm module.", .strict = options.require_collector_free, .roots = roots, .initializer = if (self.start) |start| code.function(start) + import_count else @as(?u32, null) }, .{});
+            defer self.allocator.free(metadata);
+            try payload.name("blot:collector-contract");
+            try payload.raw(metadata);
+            try output.section(0, payload.items());
             payload.clear();
         }
         try payload.name("blot:ownership");

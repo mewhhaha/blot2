@@ -16,7 +16,7 @@ fn product(source: []const ir.Instruction, at: usize) ?Product {
     return .{ .base = part[0], .load = part[1], .factor = part[3], .lane = part[2].operand };
 }
 fn same(left: Product, right: Product) bool {
-    return std.meta.eql(left.base, right.base) and std.meta.eql(left.load, right.load) and std.meta.eql(left.factor, right.factor);
+    return @import("source_origins.zig").same(left.base, right.base) and @import("source_origins.zig").same(left.load, right.load) and @import("source_origins.zig").same(left.factor, right.factor);
 }
 fn pure(inst: ir.Instruction) bool {
     if (inst.table_reference) return false;

@@ -18,10 +18,10 @@ pub fn checkNumeric(source: *const core.Module, root: core.Id, binding: core.Bin
 const Position = union(enum) { storage: u8, leaf: u8 };
 fn childAt(plan: *const numeric_rows.Plan, owner: u8, offset: u32) ?Position {
     for (plan.storage[0..plan.storage_count], 0..) |storage, index| {
-        if (storage.parent == owner and storage.offset == offset) return .{ .storage = @intCast(index) };
+        if (storage.guard == null and storage.parent == owner and storage.offset == offset) return .{ .storage = @intCast(index) };
     }
     for (plan.leaves[0..plan.leaf_count], 0..) |leaf, index| {
-        if (leaf.owner == owner and leaf.offset == offset) return .{ .leaf = @intCast(index) };
+        if (leaf.guard == null and !leaf.discriminant and leaf.owner == owner and leaf.offset == offset) return .{ .leaf = @intCast(index) };
     }
     return null;
 }
@@ -66,14 +66,14 @@ fn numericPosition(source: *const core.Module, id: core.Id, origin: Origin, layo
 /// projected subobject or a bare value still needs its owned representation.
 pub fn numericOffset(source: *const core.Module, id: core.Id, binding: core.BindingId, layouts: *const layout.Store, plan: *const numeric_rows.Plan) ?u32 {
     const position = numericPosition(source, id, .{ .binding = binding }, layouts, plan, 0) orelse return null;
-    return if (position == .leaf) @as(u32, position.leaf) * 4 else null;
+    return if (position == .leaf) @as(u32, plan.leaves[position.leaf].word) * 4 else null;
 }
 
 /// An indexed row uses the same checked projection path as a borrowed loop
 /// row. The caller retains evaluation and bounds checks at the exact origin.
 pub fn numericExpressionOffset(source: *const core.Module, id: core.Id, origin: core.Id, layouts: *const layout.Store, plan: *const numeric_rows.Plan) ?u32 {
     const position = numericPosition(source, id, .{ .expression = origin }, layouts, plan, 0) orelse return null;
-    return if (position == .leaf) @as(u32, position.leaf) * 4 else null;
+    return if (position == .leaf) @as(u32, plan.leaves[position.leaf].word) * 4 else null;
 }
 
 pub fn checkBinding(source: *const core.Module, root: core.Id, definition: core.Id, binding: core.BindingId, layouts: *const layout.Store, row: layout.Id) bool {
@@ -96,6 +96,29 @@ pub fn fieldOffset(source: *const core.Module, index: u32, layouts: *const layou
     const variants = source.projectionVariants(index);
     if (shape.tag != .product or variants.len != 1 or variants[0].field >= layouts.children(row).len) return null;
     return variants[0].field * 4;
+}
+
+/// Structural eligibility only. Emission additionally proves aggregate
+/// binders' uses before giving them borrowed storage.
+pub fn packedPattern(source: *const core.Module, id: core.PatternId, depth: usize) bool {
+    if (id == 0) return true;
+    if (depth >= 32) return false;
+    const pattern_ = source.pattern(id);
+    return switch (pattern_.tag) {
+        .wildcard => true,
+        .bind => true,
+        .constant, .value => switch (source.types.node(pattern_.ty).tag) {
+            .unit, .boolean, .u32, .f32 => true,
+            else => false,
+        },
+        .constructor => packedPattern(source, pattern_.b, depth + 1),
+        .record_payload => (pattern_.a == 1 or source.pattern(pattern_.b).tag == .wildcard or source.pattern(pattern_.b).tag == .product) and packedPattern(source, pattern_.b, depth + 1),
+        .product => blk: {
+            for (source.patternChildren(id)) |child| if (!packedPattern(source, child, depth + 1)) break :blk false;
+            break :blk true;
+        },
+        .invalid => false,
+    };
 }
 
 const Proof = struct {
@@ -167,6 +190,24 @@ const Proof = struct {
                     if (merge.then_binding == self.binding or merge.else_binding == self.binding) return false;
                 }
                 return self.visit(node.a, depth + 1) and self.visit(node.b, depth + 1) and self.visit(node.c, depth + 1);
+            },
+            .match => {
+                const inputs = self.source.matchInputs(id);
+                for (inputs) |input| {
+                    if (self.isRow(input)) {
+                        if (self.numeric == null) return false;
+                    } else if (!self.visit(input, depth + 1)) return false;
+                }
+                for (self.source.matchArms(id)) |arm| {
+                    for (self.source.armRows(arm)) |row| {
+                        for (self.source.rowPatterns(row), inputs) |p, input| {
+                            if (self.isRow(input) and !packedPattern(self.source, p, 0)) return false;
+                            if (!self.pattern(p, depth + 1)) return false;
+                        }
+                    }
+                    if (!self.visit(arm.guard, depth + 1) or !self.visit(arm.body, depth + 1)) return false;
+                }
+                return true;
             },
             .loop => {
                 const loop = self.source.loopInfo(id);

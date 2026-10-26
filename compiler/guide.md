@@ -685,6 +685,22 @@ primitives. Lists have `@list.length`, but no `@list.get` or `@list.set`.
 index order. Lists also have `@list.fill` and `@list.generate`. Empty
 collections can need a `List T` or `Array T` annotation.
 
+`@array.flatten chunks` concatenates an `Array (Array T)` in order.
+`array.flatten` uses this primitive and allocates one destination after checking
+its total size. A bounded, single-use `generate record → map field → flatten`
+pipeline with a fixed child width can write directly into that destination when
+all moved scalar expressions are proved total and effect-free. Saved
+intermediates and unproved callbacks retain eager storage and evaluation order.
+
+Small closed numeric variants can share inline row storage: at most four
+constructors and sixteen words, with a discriminant and space for the largest
+active arm. Inactive padding is zero; F32 words preserve their exact bits. Known
+producers and scalar readers avoid per-element boxes, including borrowed payload
+binders. Escaping values reconstruct their ordinary owned representation; empty
+constructors retain their immortal representation. Reference-bearing, opaque,
+private, recursive and over-budget shapes use the ordinary layout. Array/List
+conversion and slicing use the same checked row plan.
+
 An optimized exact identity copy, such as
 `array.generate values.length (fn index => values[index])`, may share the
 existing immutable array. Both versions remain valid snapshots; later edits to
@@ -757,6 +773,69 @@ counted roots until completion or cancellation. Production emission requires
 complete ownership facts and returns a diagnostic when that proof is incomplete.
 See `zig-native/TRACING_REPLACEMENT.md`, `zig-native/PERSISTENT_ROOTS.md` and
 `zig-native/SUSPENDED_OWNERSHIP.md` for ownership and qualification records.
+
+**Collector-free builds.** `blot build main.blot --require-collector-free`
+requires a proof covering the complete module's arena: every source export,
+initializer and emitted callee. The current certificate accepts scalar host
+inputs and direct calls whose user allocations have no owning fields, with
+checked administrative root/RC helpers. It rejects unknown calls, host imports,
+public arena access, mutable static graphs and reference-bearing allocations.
+This is deliberately conservative: a rejected program may still execute zero
+collector work. A numeric-array host ABI exposes the public arena and therefore
+also declines this first certificate.
+
+Every module includes `blot:collector-contract` JSON with the proof version,
+covered roots, assumptions and either a certificate or an explicit decline
+reason. Strict builds include compiler identity and pinned source digests;
+failure reports `collector_free_unproved`. The certificate assumes calls through
+the ownership ABI, without modifying raw memory/tables/runtime globals or
+calling private helpers. It belongs to the complete Wasm module, not an
+arbitrary export sharing an arena with other code. Certified modules omit
+graph-collection work; reference counting and destruction still run.
+Collector-free does not mean allocation-free, constant-time destruction or
+constant memory use. Ordinary builds preserve legal State, closure and
+strong-demand cycles and collect them with trial deletion; no syntax or
+memoization rule changes.
+
+**Executed memory profiles.** Build with `--profile-memory` to instrument the
+surviving optimized instructions. This is separate from `--explain-allocations`,
+which describes emitted sites before optimization. For an import-free scalar
+entry, run:
+
+```sh
+deno task blot build main.blot build/profile.wasm --profile-memory
+deno run -A scripts/bench/profile_memory.ts --wasm build/profile.wasm \
+  --entry run --argument 2000 --iterations 5 --output build/memory.json
+```
+
+Application hosts can call `memoryProfileReport(bytes, instance.exports)` from
+`compiler/memory_profile.ts` after their normal ownership boundary. The report
+pins the exact Wasm SHA-256 and checks an instance fingerprint before reading
+counter addresses. Supply its optional expected Wasm hash when loading a saved
+artifact. Recompute reports after external `wasm-opt`; an old hash or old module
+metadata must never describe a different binary. Instrumented modules include a
+standard Wasm function-name section with source-function and runtime-helper
+names, using final function indices.
+
+Counters distinguish allocation traffic from current/peak requested live bytes;
+they include rounded bytes, frees, retain/release/retirement traffic, copied and
+filled bytes, loads/stores, allocator reuse versus fresh blocks, and cycle
+candidates/passes/vertices/edges/reclaimed bytes. Allocator reuse is distinct
+from an in-place collection edit. Source rows include pinned BLAKE3 source
+digests, UTF-8 spans and up to four source-emission inline callers. Later
+machine-inlined copies of one origin aggregate into that row; truncated contexts
+are explicit. Runtime-helper categories provide a separate accounting of the
+same totals. Cycle candidates identify owning objects without a lifetime-stable
+acyclic flag; they do not prove a cycle exists. Birth sites own live/freed
+bytes, while the executing source operation owns retain/release and copy work.
+
+The report reconciles source and helper totals independently. Per-site peaks
+occur at different times and cannot be added. Unknown runtime work has an
+explicit row. Counter overflow, missing allocation origins or a full diagnostic
+shadow table make the report incomplete. Profiling reserves separate diagnostic
+memory and adds substantial instruction traffic; its tables and their own
+accesses are excluded from program traffic counts. Measure profiling overhead
+separately and use uninstrumented release modules for performance comparisons.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization. One plain source forwarding wrapper may reach the
