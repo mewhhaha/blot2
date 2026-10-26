@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the fixed source-only
+record/Dest/Result adapter and a private Wasm frame-arena witness. It covers
+`-O0`/`-O2`, target-byte mutation, frame boundary and owner lifecycle controls,
+including zero-byte owners. The adapter has no qualified canonical lowering;
+its public eligibility is false. The frame witness's 768-byte allowance is
+not a derived M11 bound, and general loans, ABI and typed trap cleanup remain
+unqualified.
+
 A combined Goose fixture run passed (exit 0) with the checked source and
 conditional transition gate, a private live-Wasm instance and fixed-window
 fixture, and immutable static-array publication. It covers `-O0`/`-O2`,

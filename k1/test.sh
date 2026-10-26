@@ -148,6 +148,8 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_affine_generated_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/i08_live_affine_adversarial_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/m12_adapter_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/m12_adapter_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/format_k1_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/effect_test.goose"
@@ -179,6 +181,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_forgery_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_link_numeric_test.goose" && node "$script_dir/i08_link_numeric_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/i08_live_authority_test.mjs" && node "$script_dir/i08_live_adversarial_test.mjs" && node "$script_dir/i08_window_fixture_test.mjs" && node "$script_dir/i08_window_oracle_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/frame_emit_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/frame_verify_test.mjs" && node "$script_dir/frame_test.mjs" && node "$script_dir/frame_adversarial_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_transition_test.goose" && node "$script_dir/i08_transition_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_transition_association_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_transition_test.goose" && node "$script_dir/i08_live_authority_test.mjs" && node "$script_dir/i08_live_adversarial_test.mjs")

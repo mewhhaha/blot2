@@ -1,0 +1,4 @@
+// Closed canonical adapter schema. This is a private source subset, not the
+// completed ABI, manifest, machine lowering or an eligibility certificate.
+namespace m12_adapter_schema;
+fn source()->u8[] {return "pub let export: forall [r: Region, n: Nat, c: Nat, d: Domain] => Fn[static, Many, {source: View[r,{x:F32,y:F32,vx:F32,vy:F32},n,d], dt: F32, output: Dest[r,{x:F32,y:F32},c]}, Result[exists [m: Nat, k: Domain] => View[r,{x:F32,y:F32},m,k], Unit]] ! {read r, write r} requires [Le(n,c)] resources {depth: 3, frame: 512} = fn {source: input, dt: step, output: dst} => do:\n  let started = builder.begin_append(dst)\n  let result = project@[r,r,n,c,d](input,step,started)\n  let wrapped = open result as [e] v in do:\n    break pack [n,e] as exists [m: Nat, k: Domain] => View[r,{x:F32,y:F32},m,k] v\n  return #Ok(wrapped)\n";}
