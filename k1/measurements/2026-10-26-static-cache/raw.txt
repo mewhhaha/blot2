@@ -1,0 +1,100 @@
+platform: Linux-6.18.55-x86_64-with-glibc2.41
+goose: goose v2026.3-120-ga108677d (runtime fba599d313fe)
+sha256 static_fast_bench.goose 99891da12c05bcff9a8225d714405a7763aef2c1943e4a9b8fadfa3d8520c2b7
+sha256 static_fast_eval.goose be47bb8c17c41fe065c937f1abe8b1da58efd1afff32980acf6ddf5e51ea9992
+sha256 static_fast_verify.goose 629cf5d7b7137f5ab8850d99fd2a50dda54a84c4c75d62a22c427cce0ad5267d
+sha256 static_product_eval.goose 0e0346d8bdc1487daf76bafd7d54dd6c1a6734abfc4d5a3be16faee17d329882
+sha256 static_product_verify.goose f22addfaa1eda2af31532ef985c2431c1712f91e031ee1b6a187f9bdee7a2a11
+/tmp/k1-static-fast/k1/static_eval.goose:32: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_eval.goose:37: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_eval.goose:37: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_eval.goose:39: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_eval.goose:40: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_eval.goose:41: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_float.goose:15: warning: redundant `as! f32`: a u32 converts to f32 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:35: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:37: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:37: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:39: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:40: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-static-fast/k1/static_product_eval.goose:41: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+parsed ok: 275 top-level declarations, 19 file(s)
+typechecked ok: 209 specialization(s), 29 struct/0 enum instance(s); optimized -O2: 103 inlined, 1 base case(s), 3 folded, 37 propagated, 0 tail loop(s), 0 reassociated
+bce: elided 50/125 index and 16/57 slice checks
+wrote /tmp/k1-goose-home/build/prog/static_fast_bench-83295c7e/static_fast_bench.c (430521 bytes)
+built /tmp/k1-static-fast-bench-8pz1z6n9/bench
+binary sha256: e80b209482c98c14798294901798f60b5ae32c010ea264937c5625180ccdb1ed
+available_cpu_affinity: [0, 1, 2, 3, 4]
+cgroup_cpu_max: 400000 100000
+load_before_after: (1.0771484375, 1.27001953125, 1.13671875) (1.07080078125, 1.26513671875, 1.1357421875)
+benchmark_process_wall_user_sys_seconds: 2.7678521730013017 2.766692 0.0
+cgroup_cpu_stat_delta: {'usage_usec': 2770426, 'user_usec': 2769484, 'system_usec': 941, 'nice_usec': 0, 'nr_periods': 28, 'nr_throttled': 0, 'throttled_usec': 0, 'nr_bursts': 0, 'burst_usec': 0}
+host_proc_stat_cpu_delta: [275, 0, 0, 1106, 0, 0, 0, 1, 0, 0]
+process 0
+case repeated rows=8193 bytes=65544 steps=24580 old_fnv32=108957798 new_fnv32=108957798 verify_parses=2 eval_parses=2
+sample 0 old_ns=24992625 new_ns=1108960
+sample 1 new_ns=1134579 old_ns=24927942
+sample 2 old_ns=24691850 new_ns=1107908
+sample 3 new_ns=1125401 old_ns=24482507
+sample 4 old_ns=24842553 new_ns=1123808
+sample 5 new_ns=1108208 old_ns=24694265
+sample 6 old_ns=24515550 new_ns=1109681
+sample 7 new_ns=1111605 old_ns=24496614
+sample 8 old_ns=24740141 new_ns=1115091
+sample 9 new_ns=1105202 old_ns=24767252
+sample 10 old_ns=24560103 new_ns=1122826
+sample 11 new_ns=1107648 old_ns=24536068
+sample 12 old_ns=24873751 new_ns=1129208
+sample 13 new_ns=1124389 old_ns=24543517
+sample 14 old_ns=24558142 new_ns=1122766
+sample 15 new_ns=1114900 old_ns=24480667
+sample 16 old_ns=24809254 new_ns=1111524
+sample 17 new_ns=1138426 old_ns=24504311
+sample 18 old_ns=24648792 new_ns=1107046
+sample 19 new_ns=1156097 old_ns=24782985
+sample 20 old_ns=24938556 new_ns=1109841
+sample 21 new_ns=1123116 old_ns=24616903
+sample 22 old_ns=24784758 new_ns=1104952
+sample 23 new_ns=1109090 old_ns=24847655
+sample 24 old_ns=24636930 new_ns=1111695
+sample 25 new_ns=1173570 old_ns=24765191
+sample 26 old_ns=24626641 new_ns=1126002
+sample 27 new_ns=1111374 old_ns=24803282
+sample 28 old_ns=24794636 new_ns=1110062
+sample 29 new_ns=1104922 old_ns=24981216
+sample 30 old_ns=24487700 new_ns=1129118
+case unique rows=8193 bytes=65544 steps=24580 old_fnv32=3632770452 new_fnv32=3632770452 verify_parses=16386 eval_parses=16386
+sample 0 old_ns=25353143 new_ns=25044725
+sample 1 new_ns=25754326 old_ns=25194145
+sample 2 old_ns=25126949 new_ns=25285125
+sample 3 new_ns=25250871 old_ns=25103275
+sample 4 old_ns=25315983 new_ns=24914341
+sample 5 new_ns=25289154 old_ns=24963001
+sample 6 old_ns=25471264 new_ns=25113604
+sample 7 new_ns=25485041 old_ns=25306536
+sample 8 old_ns=25051317 new_ns=25426531
+sample 9 new_ns=25455365 old_ns=25386335
+sample 10 old_ns=25471655 new_ns=25252896
+sample 11 new_ns=25241334 old_ns=24970906
+sample 12 old_ns=25035197 new_ns=25493877
+sample 13 new_ns=25124394 old_ns=24940961
+sample 14 old_ns=25030899 new_ns=25246824
+sample 15 new_ns=25109797 old_ns=25076514
+sample 16 old_ns=25128492 new_ns=26175054
+sample 17 new_ns=25050626 old_ns=25477857
+sample 18 old_ns=25228039 new_ns=25246894
+sample 19 new_ns=25460183 old_ns=25288733
+sample 20 old_ns=25122902 new_ns=25651432
+sample 21 new_ns=25438052 old_ns=25348655
+sample 22 old_ns=25302058 new_ns=25393017
+sample 23 new_ns=25102133 old_ns=25180268
+sample 24 old_ns=25369715 new_ns=25339157
+sample 25 new_ns=25079811 old_ns=25604224
+sample 26 old_ns=25106190 new_ns=25275007
+sample 27 new_ns=25243318 old_ns=25201629
+sample 28 old_ns=25003137 new_ns=25547037
+sample 29 new_ns=25183095 old_ns=25302377
+sample 30 old_ns=25009760 new_ns=25519184
+
+repeated n= 31 baseline_ns_p10_median_p90= (24496614, 24694265, 24927942) candidate_ns_p10_median_p90= (1107046, 1111695, 1134579) paired_speedup_p10_median_p90= (21.687, 22.106, 22.431)
+unique n= 31 baseline_ns_p10_median_p90= (25003137, 25194145, 25471264) candidate_ns_p10_median_p90= (25079811, 25275007, 25547037) paired_speedup_p10_median_p90= (0.979, 0.994, 1.014)

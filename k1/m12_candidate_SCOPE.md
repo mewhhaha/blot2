@@ -1,0 +1,19 @@
+# Private particle/window candidate envelope
+
+This candidate is deliberately **ineligible for public M12**. Its purpose is a canonical, bounded and source-bound test envelope for the existing private particle worker and fixed host-window fixture. It does not establish a public ABI, an M12 callable, a live capability, resource proof, authenticated package origin or executable provenance for arbitrary source. The caller supplies trusted expected source/package/module and a 32-byte ABI identity; merely placing those bytes or a hash in an artifact gives no authority.
+
+Encoding is `K1FMAN01`, little-endian U32 total size, then U32-length-prefixed profile `PRIVATE-I08-SOURCE-ORDER-V1`, package, module, kernel name `project`, adapter candidate name `export`, caller-supplied 32-byte ABI identity, and two exact schema strings: the source-order wire shape `source:View[{x:F32,y:F32,vx:F32,vy:F32}];dt:F32;output:{x:F32,y:F32}` and the source adapter shape `source:View[{x:F32,y:F32,vx:F32,vy:F32}];dt:F32;output:Dest[{x:F32,y:F32}]`. The separate strings distinguish the wire output from the source destination; source is first in each, followed by dt.
+
+Twenty-three U32 words encode tag `0x4b310001`, export 91, ingress 256, egress 256, fixed ingress bytes 12, ingress item count 0, input stride 16, input maximum 8, output stride 8, output capacity 8, work bytes 192, kernel depth 2, kernel-declared frame 256, adapter depth 3, adapter-declared frame 512, fixture-only frame model 768, public eligibility 0, checked adapter source candidate present 1, adapter target qualification 0, frame qualification 0, ABI qualification 0, runtime-loan qualification 0, and reserved 0. Finally, kernel source, adapter source and raw kernel target are each U32-length-prefixed. No padding or trailing bytes are permitted. None of these frame numbers asserts a proved combined wrapper bound.
+
+The decoder separately checks all lengths/expected fields and exact supplied identities, independently rebuilds and verifies the kernel source/header/type/bounds/job/affine/conditional-transition chain and the complete source-only adapter candidate, and runs the independent final-target validator against the encoded target. The producer also independently checks its own output. The adapter source is an explicitly present checked candidate, not a completed callable or evidence that the target implements it. The target is the existing private raw particle worker/setup module, not a generated M12 entry wrapper. The 32-byte ABI value is an opaque expected identity, not a completed ABI hash or a digest that authenticates the target. Package/module filesystem authority remains outside this interface.
+
+Candidate verification accepts multiple supported kernel expressions, but the
+private JS source-order wrapper authenticates only the canonical pinned worker
+bytes. A valid candidate therefore does not imply that this wrapper accepts its
+target. The manifest-to-wire execution test covers the canonical worker only;
+other targets need a separately verified target-binding seam.
+
+The payload limit is 131072 bytes; combined kernel/adapter source and individual target limits are 65536. All decoded lengths are checked before following them, and no partially decoded result is returned. O0/O2 tests mutate every envelope byte, truncate at every offset, append data and mismatch source, ABI, package and module. Failure is rejection, not artifact admission or a fallback.
+
+The real specification's complete schemas, numeric substitutions and predicates, manifest hash, host/ABI identities, frame proof, compiled record/Dest/Result adapter, per-domain runtime authority, output alias result, effects, resource provenance, error mapping, M13 certificate and work accounting are not represented or qualified. Those require a separate future format and cannot be made eligible by changing any candidate field.

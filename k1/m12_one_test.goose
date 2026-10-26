@@ -1,0 +1,12 @@
+import std;
+import m12_adapter_schema;
+import m12_adapter_build;
+import m12_adapter_verify;
+fn kernel()->u8[] {return "pub let project: forall [r: Region, s: Region, n: Nat, c: Nat, d: Domain] => Fn[static, Many, (View[r,{x:F32,y:F32,vx:F32,vy:F32},n,d], F32, Builder[s,{x:F32,y:F32},0,c,Append]), exists [e: Domain] => View[s,{x:F32,y:F32},n,e]] ! {read r, write s} requires [Le(n,c)] resources {depth: 2, frame: 256} = fn (source,dt,initial) => do:\n  let built = for i in 0..n carry (b = initial)\n    invariant [Eq(Init(b),i)] do:\n      next (builder.append(b, {x: source[i].x + source[i].vx * dt, y: source[i].y + source[i].vy * dt}))\n  return builder.freeze(built)\n";}
+fn replace(s:u8[:],a:u8[:],b:u8[:])->u8[] {var out:u8[>..]=[];var i:i64=0;var found=false;while i<s.len {if !found && a.len<=s.len-i && s[i..i+a.len]==a {out.append(b);i+=a.len;found=true;}else {out.push(s[i]);i+=1;}}assert(found);return out;}
+import os; import m12_one_emit; import m12_one_target;
+fn main(){let k=kernel();let a=m12_adapter_schema::source();var p,status=m12_adapter_build::build(k,a);assert(status==0);var src:u8[>..]=[];src.append(k);src.append(a);let b=m12_one_emit::emit(p,src);assert(b.len>0 && m12_one_target::verify(p,src,b) && write_file("one-module.wasm",b));assert(!m12_adapter_verify::public_eligible(p,src));
+ for i in b.len {var bad=copy(b);bad[i]^=1;assert(!m12_one_target::verify(p,src,bad));}
+ for i in p.events.len {let old=p.events[i];p.events[i].kind+=1;assert(m12_one_emit::emit(p,src).len==0);p.events[i]=old;}
+ for i in 6 {for f in 13 {let old=p.transition.steps[i];if f==0 {p.transition.steps[i].kind+=1;}else if f==1 {p.transition.steps[i].node+=1;}else if f==2 {p.transition.steps[i].site+=1;}else if f==3 {p.transition.steps[i].subject+=1;}else if f==4 {p.transition.steps[i].version+=1;}else if f==5 {p.transition.steps[i].result+=1;}else if f==6 {p.transition.steps[i].result_version+=1;}else if f==7 {p.transition.steps[i].index+=1;}else if f==8 {p.transition.steps[i].nat+=1;}else if f==9 {p.transition.steps[i].capacity+=1;}else if f==10 {p.transition.steps[i].dep1+=1;}else if f==11 {p.transition.steps[i].dep2+=1;}else {p.transition.steps[i].dep3+=1;}assert(m12_one_emit::emit(p,src).len==0);p.transition.steps[i]=old;}}
+ assert(m12_one_emit::emit(p,"wrong").len==0);print("private source-bound aggregate adapter target passed");}

@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the private source-order
+wire/manifest candidate, import-free one-module adapter and worker, and optional
+static-evaluation cache. It includes `-O0`/`-O2`, independent source/target,
+wire, frame, partial-trap, F32 and 500-program cache differential controls.
+The manifest remains ineligible for public M12; caller loans, the complete
+frame bound, ABI and C09 are not qualified. The paired cache measurement and
+its limits, including a unique-input regression, are in `static_fast_SCOPE.md`.
+
 A combined Goose fixture run passed (exit 0) with the fixed source-only
 record/Dest/Result adapter and a private Wasm frame-arena witness. It covers
 `-O0`/`-O2`, target-byte mutation, frame boundary and owner lifecycle controls,
