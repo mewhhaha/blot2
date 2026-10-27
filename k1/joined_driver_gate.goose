@@ -1,11 +1,8 @@
-// Private deterministic target association check. This recomputes the existing
-// emitter, so equality is not an independent Wasm semantic certificate.
+// Closed independent target decoding for the private joined driver.
+// This is not a public ABI or general M13 certificate.
 namespace joined_driver_gate;
 import joined_public_core;
-import joined_public_verify;
-import joined_public_wasm;
+import joined_target_scalar;
 fn matches(source:u8[:],program:joined_public_core::Program&,target:u8[:])->bool {
- if target.len==0 || !joined_public_verify::verify(source,program) {return false;}
- let expected=joined_public_wasm::emit(source,program);
- return expected.len>0 && expected[..]==target;
+ return joined_target_scalar::verify(source,program,target);
 }

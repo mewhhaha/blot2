@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with an independent bounded Wasm
+decoder for the private joined scalar/loop driver, the limited `Fn` spelling,
+worker range checks, conditional frame composition and target-work metering.
+It covers `-O0`/`-O2`, valid-Wasm instruction mutations, execution, long inputs
+and work-boundary controls. The driver now uses the decoder instead of a
+second emission. These remain private subsets; complete M13, M11, C09, source
+loans and public ABI/admission are not qualified.
+
 A combined Goose fixture run passed (exit 0) with the private joined scalar
 driver, ordered static-work path, fixed-target helper controls and adapter
 control-flow checks. It covers `-O0`/`-O2`, Wasm execution, source and target
