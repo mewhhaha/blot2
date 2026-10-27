@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
+the previous-first private dispatcher, source-derived closed ownership chain
+and actual private leaf-runtime reservation and restore. Source and
+documentation hashes remained unchanged. The sampled dispatcher comparison
+shows accepted-case timings overlapping parity with the earlier private route,
+while rejected cases took 1.22–2.33 times as long; the record includes raw
+samples. These paths do not establish general ownership, public ABI, engine
+stack capacity, trap recovery or complete C09.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
 the private primary-first dispatcher, source-derived Owned fixture and direct
 scalar Wasm encoder were integrated. It includes prior-output comparisons,

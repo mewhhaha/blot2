@@ -1,0 +1,2 @@
+pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:
+  return U32.wrapping_add(x,1)

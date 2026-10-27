@@ -22,15 +22,19 @@ fn build(source:u8[:],p:short_core::Program&,fault:i64)->Result {
  let a=t.nodes[op.a-1];let b=t.nodes[op.b-1];var ak:i64=0;var bk:i64=0;var av:u32=0;var bv:u32=0;
  if a.tag==1 && a.a==1 {} else if a.tag==2 {let n,ok=short_validate::lit(t.source,a);if !ok{return Result {};}ak=1;av=n as u32;}else{return Result {};}
  if b.tag==1 && b.a==1 {} else if b.tag==2 {let n,ok=short_validate::lit(t.source,b);if !ok{return Result {};}bk=1;bv=n as u32;}else{return Result {};}
+ if fault==3 {return Result {matched:true};}
  let flat=common_decl_header::project(source,p.head);let base=p.fn_start;let binding=t.bindings[0];
- if base<0 || base>flat.len || a.end<0 || b.start<a.end || b.start>t.source.len {return Result {};}
+ if flat.len==0 || base<0 || base>flat.len || a.end<0 || b.start<a.end || b.start>t.source.len {return Result {matched:true};}
  var opstart:i64= -1;for i in a.end..b.start {if t.source[i]=='<' {opstart=i;break;}}
- if opstart<0{return Result {};}
+ if opstart<0{return Result {matched:true};}
  var c=scalar_core::build(2,2,ak,av,bk,bv);c.name_start=p.name_start;c.name_end=p.name_end;
  c.parameter_start=base+binding.start;c.parameter_end=base+binding.end;
  c.left_start=base+a.start;c.left_end=base+a.end;c.operator_start=base+opstart;c.operator_end=base+opstart+1;c.right_start=base+b.start;c.right_end=base+b.end;
- let plan=scalar_plan::make(c);if !scalar_plan::validate(plan) {return Result {};}
- if validate::scalar_v2(flat,c,catalog::edition(),catalog::semantic_policy(),catalog::optimization_policy(),catalog::wasm_abi())!=0 {return Result {};}
+ let plan=scalar_plan::make(c);if !scalar_plan::validate(plan) {return Result {matched:true};}
+ if fault==4 {return Result {matched:true};}
+ let source_status=if fault==5 {2} else {validate::scalar_v2(flat,c,catalog::edition(),catalog::semantic_policy(),catalog::optimization_policy(),catalog::wasm_abi())};
+ if source_status==1 {return Result {};}
+ if source_status!=0 {return Result {matched:true};}
  // Once a source-checked legacy plan matches, failures must not select an
  // observably different encoding. Fault modes are private regression hooks.
  if fault==1 {return Result {matched:true};}

@@ -1,0 +1,18 @@
+// Trusted fixed-input diagnostic benchmark adapter; not public compilation.
+import std;
+import os;
+import typed_dispatch;
+import primary_dispatch;
+fn main() {
+ let a=args();if a.len!=4 {exit(2);}var source:u8[>..]=[];if !read_file(a[2],source) {exit(3);}
+ let loops=if a[3]=="once" {1} else if a[3]=="batch" {64} else {0};if loops==0 {exit(4);}
+ if a[1]!="previous" && a[1]!="primary" {exit(5);}
+ var first:u8[>..]=[];var status:i64=0;var argument:i64=0;var result:i64=0;
+ for i in loops {
+  let c=if a[1]=="previous" {typed_dispatch::compile(source)} else {primary_dispatch::compile(source)};
+  if i==0 {status=c.status;argument=c.argument;result=c.result;first.append(c.wasm);}
+  else if c.status!=status || c.argument!=argument || c.result!=result || c.wasm[..]!=first[..] {exit(6);}
+ }
+ let hex="0123456789abcdef";var encoded:u8[>..]=[];for b in first {encoded.push(hex[b/16]);encoded.push(hex[b%16]);}
+ print(status," ",argument," ",result," ",encoded);
+}
