@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The subsequently added private resolver-bound semantic job and partial
+contract meter passed focused `-O0` and `-O2` checks. They cover C-linked
+resolver containment, changed-source execution, staged no-output failures,
+source/identity forgeries and exact budget boundaries. The resolver root and
+package mapping remain trusted, concurrent writes can produce a torn snapshot,
+and the meter covers only the contract traversal. Source, type and proof replay,
+emission and target validation are still unmetered, so this is not a complete
+C09 receipt, public project protocol or cache authority.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
 the corrected Owned-Wasm artifact-directory registration, guarded constant
 offset proofs and private semantic owner. It includes the prior Owned and

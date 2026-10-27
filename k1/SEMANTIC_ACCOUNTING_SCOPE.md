@@ -1,0 +1,20 @@
+# Private short-owner accounting prototype
+
+This scratch candidate instruments the *actual* private `semantic_owner` emission path at its effect/resource contract validation. It remains deliberately incomplete. `semantic_owner_metered::Job` owns one `work::Meter`; one job is created by the compiler per declaration, never copied, reset, deserialized, or supplied by the host. `emit` takes the same owner and meter through its effect/resource traversal, depth/frame check, short emitter and independent target checker. Any failure makes the job terminal and returns empty output; a later retry returns status 3 and empty output. `emit_inner` and the mutable structs are compiler-private trusted machinery, not a security boundary against a forged caller. The only accepted phase argument is 5. A scheduler-owned gate already enforcing a different phase fails closed; this prototype does not establish that earlier phases ran or implement a complete phase scheduler.
+
+The private experimental contract event schedule is:
+
+| Order | Event | Count when valid |
+| --- | --- | ---: |
+| 1 | `work::charge(...,5,7)` before the empty-effect record | 1 |
+| 2 | `work::charge(...,5,10)` before the declared/inferred resource record | 1 |
+| 3 | `work::charge(...,5,6)` before each binding-type entry | B |
+| 4 | `work::charge(...,5,4)` before each Core node, followed by `(...,5,6)` before its type entry | 2N |
+
+The exact valid-path increment for one such traversal is `2 + B + 2N` semantic visits. Each required repetition spends those events again. Charges happen before inspection, so an event beyond 1,048,576 is not executed. The existing `work` priority and receipt apply, including terminal gate and exact-boundary behavior. Prior unmetered traversal charged zero, so adoption changes near-limit results and must never silently reuse prior receipts. This is a private instrumentation revision, not an amended normative policy. Invalid source/identity can fail during earlier unmetered checks, before these events; invalid metadata stops at the relevant inspected event. No diagnostic precedence is claimed for a fully instrumented compiler.
+
+Existing source identity hashing, source/header/lexical replay, parser, node construction, typing, control and fact proof construction and replay, output encoding, and target byte/Core revalidation are **not metered** here. `short_check::verify` runs before this slice and again through the existing emitter/target verifier; those real visits cannot be reconstructed safely by a single precharge from arena size. There is no proof-term interning, proof-edge lifecycle accounting, byte-read/target telemetry, static evaluation, usage/ownership, call-graph effect/resource composition or public authority. The output is a validated private candidate, not evidence that C09 work was enforced.
+
+No cache may use this partial meter as a complete receipt, or skip required validations based on it. Future caching needs an immutable trusted job provenance, exact source and dependency/interface observations, complete per-declaration receipt under a versioned fully defined event schedule and policy identifiers, and equivalence of fresh and warm diagnostic/limit outcomes, including all repeated validations and failure precedence. Unknown or older schedule revisions must miss and recompute with a fresh owner; source digests are lookup accelerators, not authority. Only after every traversed component and cache hit follows that policy can such receipts establish the intended budget. The current slice neither provides nor implements that cache.
+
+O0/O2 tests compare target bytes with the checked unmetered path, verify the exact event formula and repeat charges, seed every limit boundary, exercise forged effect, bad phase, mismatched identity, exhausted depth/frame, failed-job retry and confirm no bytes escape on failure. Bridge independently reviewed the traversal, arithmetic and terminal wrapper. These are focused prototype checks, not full compiler qualification.
