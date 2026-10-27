@@ -4,4 +4,10 @@ This private single-module job takes a trusted live non-copied root descriptor, 
 
 Root handles and package mapping must not be copied, closed or mutated concurrently; the filesystem is not a coherent atomic snapshot and in-place writes during reading can produce a mixed source snapshot. The resolver provides descriptor-root containment under supported Linux openat2 semantics and fails closed on unsupported kernels/platforms. The trusted root policy must address hardlinks and special files; pathname containment alone does not authenticate file content. Linux/host filesystem integrity, immutable source during each semantic check, OOM, host process/engine faults, and asynchronous cancellation are assumptions. Failure injection only covers three explicit staging points, not arbitrary host failure. No K1 public ABI, M11, runtime reservation, C09, engine stack, general import graph or cache qualification follows.
 
+The fused owner path retains source and Core checks plus the independent target
+decoder while avoiding repeated validation of unchanged job-owned data. Its
+different traversal count is not a complete C09 schedule or a compatible cache
+receipt. The controlled private-path comparison and its limitations are in
+`measurements/2026-10-27-semantic-fast/integrated-route/RESULTS.md`.
+
 `GOOSE=/tmp/k1-goose/build/goose GOOSE_HOME=/tmp/k1-goose-home python3 semantic_job_test.py` builds actual Goose+C fixture at O0 and O2. It checks changed and restored source and resulting Wasm execution, guarded constant-offset boundary execution against the shared checker, same-root symlink, denied outside links and path traversal, missing/bad-UTF8/empty source, wrong declaration, insufficient depth and injected read/check/emission-stage failure with no stdout. Package IDs are opaque trusted identifiers, not filesystem paths; the empty identity is rejected. Other lower-level resolver race and fault suites remain separate prerequisites.

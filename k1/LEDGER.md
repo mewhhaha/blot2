@@ -105,6 +105,17 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
+the private resolver job adopted fused validation. It covers frozen-baseline
+status/byte parity, source/Core and target forgeries, resource boundaries,
+resolver and multi-module graph integration. Source and documentation inputs
+remained unchanged during the run. The integrated-route benchmark records
+31 paired samples per case: five successful private workloads had median
+candidate/baseline ratios 0.559–0.707; failure controls were noisy and
+overlapped parity. These results do not compare against the full legacy
+compiler. The changed traversal count is not a complete C09 schedule or a
+compatible cache receipt; immutable, nonconcurrent job data remains required.
+
 The subsequently added private resolver-backed graph job passed focused
 `-O0` and `-O2` C-linked and Wasm execution tests for a single scalar/loop
 module and a bounded U32 direct-call chain. They cover source changes, import

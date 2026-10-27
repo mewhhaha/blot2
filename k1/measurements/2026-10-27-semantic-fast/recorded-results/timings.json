@@ -1,0 +1,3146 @@
+{
+  "pairs": 31,
+  "warmups": 4,
+  "iterations_per_batch": 32,
+  "records": [
+    {
+      "pair": 0,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 9082919,
+      "candidate_ns": 3748152
+    },
+    {
+      "pair": 0,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2342093,
+      "candidate_ns": 2260761
+    },
+    {
+      "pair": 0,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21079365,
+      "candidate_ns": 11492269
+    },
+    {
+      "pair": 0,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3775413,
+      "candidate_ns": 3699791
+    },
+    {
+      "pair": 0,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2190871,
+      "candidate_ns": 2170312
+    },
+    {
+      "pair": 0,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12487486,
+      "candidate_ns": 7091183
+    },
+    {
+      "pair": 0,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3200915,
+      "candidate_ns": 3056333
+    },
+    {
+      "pair": 0,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16818611,
+      "candidate_ns": 8886411
+    },
+    {
+      "pair": 0,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13132857,
+      "candidate_ns": 8255227
+    },
+    {
+      "pair": 0,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4414271,
+      "candidate_ns": 4163742
+    },
+    {
+      "pair": 1,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4331174,
+      "candidate_ns": 4112425
+    },
+    {
+      "pair": 1,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3119211,
+      "candidate_ns": 3080610
+    },
+    {
+      "pair": 1,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3717244,
+      "candidate_ns": 3735147
+    },
+    {
+      "pair": 1,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16734333,
+      "candidate_ns": 9084973
+    },
+    {
+      "pair": 1,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2157027,
+      "candidate_ns": 2128754
+    },
+    {
+      "pair": 1,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2311536,
+      "candidate_ns": 2297310
+    },
+    {
+      "pair": 1,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 14218043,
+      "candidate_ns": 8394678
+    },
+    {
+      "pair": 1,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21437205,
+      "candidate_ns": 13354151
+    },
+    {
+      "pair": 1,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5790172,
+      "candidate_ns": 5046938
+    },
+    {
+      "pair": 1,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12196680,
+      "candidate_ns": 6903060
+    },
+    {
+      "pair": 2,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17211624,
+      "candidate_ns": 10516128
+    },
+    {
+      "pair": 2,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4455047,
+      "candidate_ns": 4309184
+    },
+    {
+      "pair": 2,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3064429,
+      "candidate_ns": 3093483
+    },
+    {
+      "pair": 2,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2274908,
+      "candidate_ns": 1185965
+    },
+    {
+      "pair": 2,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21704046,
+      "candidate_ns": 12682722
+    },
+    {
+      "pair": 2,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3913852,
+      "candidate_ns": 3737261
+    },
+    {
+      "pair": 2,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13048789,
+      "candidate_ns": 8213448
+    },
+    {
+      "pair": 2,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2113174,
+      "candidate_ns": 2175621
+    },
+    {
+      "pair": 2,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5766829,
+      "candidate_ns": 3857827
+    },
+    {
+      "pair": 2,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 15028643,
+      "candidate_ns": 10015077
+    },
+    {
+      "pair": 3,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3115625,
+      "candidate_ns": 3142675
+    },
+    {
+      "pair": 3,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16245486,
+      "candidate_ns": 9860798
+    },
+    {
+      "pair": 3,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12168017,
+      "candidate_ns": 6731298
+    },
+    {
+      "pair": 3,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2349618,
+      "candidate_ns": 2260921
+    },
+    {
+      "pair": 3,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4371782,
+      "candidate_ns": 4497768
+    },
+    {
+      "pair": 3,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2184038,
+      "candidate_ns": 2200888
+    },
+    {
+      "pair": 3,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21444369,
+      "candidate_ns": 11504722
+    },
+    {
+      "pair": 3,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13229748,
+      "candidate_ns": 8565720
+    },
+    {
+      "pair": 3,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5743284,
+      "candidate_ns": 4849137
+    },
+    {
+      "pair": 3,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2635444,
+      "candidate_ns": 3692246
+    },
+    {
+      "pair": 4,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13087752,
+      "candidate_ns": 9551347
+    },
+    {
+      "pair": 4,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2255201,
+      "candidate_ns": 2297600
+    },
+    {
+      "pair": 4,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5774433,
+      "candidate_ns": 3829864
+    },
+    {
+      "pair": 4,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21187266,
+      "candidate_ns": 11320788
+    },
+    {
+      "pair": 4,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3085599,
+      "candidate_ns": 3203810
+    },
+    {
+      "pair": 4,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2131900,
+      "candidate_ns": 2199916
+    },
+    {
+      "pair": 4,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4769878,
+      "candidate_ns": 4215649
+    },
+    {
+      "pair": 4,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17694805,
+      "candidate_ns": 8826428
+    },
+    {
+      "pair": 4,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3656179,
+      "candidate_ns": 3719107
+    },
+    {
+      "pair": 4,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12247155,
+      "candidate_ns": 8415768
+    },
+    {
+      "pair": 5,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2297650,
+      "candidate_ns": 2322146
+    },
+    {
+      "pair": 5,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3071932,
+      "candidate_ns": 3080058
+    },
+    {
+      "pair": 5,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21509341,
+      "candidate_ns": 11128357
+    },
+    {
+      "pair": 5,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12170671,
+      "candidate_ns": 7920749
+    },
+    {
+      "pair": 5,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13153776,
+      "candidate_ns": 8330788
+    },
+    {
+      "pair": 5,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2140585,
+      "candidate_ns": 2118886
+    },
+    {
+      "pair": 5,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5733907,
+      "candidate_ns": 5084158
+    },
+    {
+      "pair": 5,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4349299,
+      "candidate_ns": 4185582
+    },
+    {
+      "pair": 5,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16714245,
+      "candidate_ns": 8941935
+    },
+    {
+      "pair": 5,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3745226,
+      "candidate_ns": 3833581
+    },
+    {
+      "pair": 6,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2292761,
+      "candidate_ns": 2305284
+    },
+    {
+      "pair": 6,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3683931,
+      "candidate_ns": 3753161
+    },
+    {
+      "pair": 6,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12170241,
+      "candidate_ns": 6948425
+    },
+    {
+      "pair": 6,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4395356,
+      "candidate_ns": 4223353
+    },
+    {
+      "pair": 6,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17108695,
+      "candidate_ns": 8914633
+    },
+    {
+      "pair": 6,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5636764,
+      "candidate_ns": 3747029
+    },
+    {
+      "pair": 6,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3085118,
+      "candidate_ns": 3089205
+    },
+    {
+      "pair": 6,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 22279687,
+      "candidate_ns": 11151019
+    },
+    {
+      "pair": 6,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2116230,
+      "candidate_ns": 2256293
+    },
+    {
+      "pair": 6,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13151151,
+      "candidate_ns": 8509203
+    },
+    {
+      "pair": 7,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3680174,
+      "candidate_ns": 3653083
+    },
+    {
+      "pair": 7,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16638363,
+      "candidate_ns": 9937623
+    },
+    {
+      "pair": 7,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4377953,
+      "candidate_ns": 4163670
+    },
+    {
+      "pair": 7,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21354110,
+      "candidate_ns": 11284198
+    },
+    {
+      "pair": 7,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3085408,
+      "candidate_ns": 3044632
+    },
+    {
+      "pair": 7,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 11873434,
+      "candidate_ns": 6946812
+    },
+    {
+      "pair": 7,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2249249,
+      "candidate_ns": 2409840
+    },
+    {
+      "pair": 7,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2119637,
+      "candidate_ns": 2114617
+    },
+    {
+      "pair": 7,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5749746,
+      "candidate_ns": 4838536
+    },
+    {
+      "pair": 7,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13428311,
+      "candidate_ns": 8458217
+    },
+    {
+      "pair": 8,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 7193986,
+      "candidate_ns": 5069611
+    },
+    {
+      "pair": 8,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17070223,
+      "candidate_ns": 10130033
+    },
+    {
+      "pair": 8,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21603578,
+      "candidate_ns": 11352447
+    },
+    {
+      "pair": 8,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3151341,
+      "candidate_ns": 3113711
+    },
+    {
+      "pair": 8,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13153896,
+      "candidate_ns": 8546333
+    },
+    {
+      "pair": 8,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3711543,
+      "candidate_ns": 3710069
+    },
+    {
+      "pair": 8,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2150655,
+      "candidate_ns": 1081408
+    },
+    {
+      "pair": 8,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2324060,
+      "candidate_ns": 2453933
+    },
+    {
+      "pair": 8,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4329372,
+      "candidate_ns": 4304255
+    },
+    {
+      "pair": 8,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 11998439,
+      "candidate_ns": 6776192
+    },
+    {
+      "pair": 9,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2193635,
+      "candidate_ns": 2133012
+    },
+    {
+      "pair": 9,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4355691,
+      "candidate_ns": 4199919
+    },
+    {
+      "pair": 9,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3133990,
+      "candidate_ns": 3069569
+    },
+    {
+      "pair": 9,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2290828,
+      "candidate_ns": 2254159
+    },
+    {
+      "pair": 9,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16985394,
+      "candidate_ns": 8892763
+    },
+    {
+      "pair": 9,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3686055,
+      "candidate_ns": 3685553
+    },
+    {
+      "pair": 9,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 23169906,
+      "candidate_ns": 11395397
+    },
+    {
+      "pair": 9,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 14515190,
+      "candidate_ns": 8361135
+    },
+    {
+      "pair": 9,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13366135,
+      "candidate_ns": 6770742
+    },
+    {
+      "pair": 9,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5878557,
+      "candidate_ns": 3974847
+    },
+    {
+      "pair": 10,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21497940,
+      "candidate_ns": 12389663
+    },
+    {
+      "pair": 10,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12393210,
+      "candidate_ns": 7030589
+    },
+    {
+      "pair": 10,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17563060,
+      "candidate_ns": 9081386
+    },
+    {
+      "pair": 10,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4459596,
+      "candidate_ns": 4239554
+    },
+    {
+      "pair": 10,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5873449,
+      "candidate_ns": 4919259
+    },
+    {
+      "pair": 10,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2129044,
+      "candidate_ns": 2141056
+    },
+    {
+      "pair": 10,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4307954,
+      "candidate_ns": 3020146
+    },
+    {
+      "pair": 10,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13408434,
+      "candidate_ns": 9532692
+    },
+    {
+      "pair": 10,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3128499,
+      "candidate_ns": 2029257
+    },
+    {
+      "pair": 10,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2338377,
+      "candidate_ns": 2330372
+    },
+    {
+      "pair": 11,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2238570,
+      "candidate_ns": 2311296
+    },
+    {
+      "pair": 11,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 22024748,
+      "candidate_ns": 11495074
+    },
+    {
+      "pair": 11,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12942410,
+      "candidate_ns": 7157287
+    },
+    {
+      "pair": 11,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16749632,
+      "candidate_ns": 10298269
+    },
+    {
+      "pair": 11,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2273345,
+      "candidate_ns": 2176974
+    },
+    {
+      "pair": 11,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13469137,
+      "candidate_ns": 8501589
+    },
+    {
+      "pair": 11,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 6219938,
+      "candidate_ns": 5200596
+    },
+    {
+      "pair": 11,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2945486,
+      "candidate_ns": 4885025
+    },
+    {
+      "pair": 11,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4480786,
+      "candidate_ns": 3311132
+    },
+    {
+      "pair": 11,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3139240,
+      "candidate_ns": 3122427
+    },
+    {
+      "pair": 12,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2155995,
+      "candidate_ns": 2273154
+    },
+    {
+      "pair": 12,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3743382,
+      "candidate_ns": 3790451
+    },
+    {
+      "pair": 12,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17957538,
+      "candidate_ns": 10944301
+    },
+    {
+      "pair": 12,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2407646,
+      "candidate_ns": 2628942
+    },
+    {
+      "pair": 12,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21134278,
+      "candidate_ns": 11189080
+    },
+    {
+      "pair": 12,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12107814,
+      "candidate_ns": 6902810
+    },
+    {
+      "pair": 12,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5708269,
+      "candidate_ns": 3755225
+    },
+    {
+      "pair": 12,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2018316,
+      "candidate_ns": 3065211
+    },
+    {
+      "pair": 12,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4445590,
+      "candidate_ns": 4491846
+    },
+    {
+      "pair": 12,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13156781,
+      "candidate_ns": 8311582
+    },
+    {
+      "pair": 13,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3800068,
+      "candidate_ns": 3736659
+    },
+    {
+      "pair": 13,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 24010112,
+      "candidate_ns": 11560547
+    },
+    {
+      "pair": 13,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13719968,
+      "candidate_ns": 8520204
+    },
+    {
+      "pair": 13,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2184528,
+      "candidate_ns": 2129515
+    },
+    {
+      "pair": 13,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2323920,
+      "candidate_ns": 1260826
+    },
+    {
+      "pair": 13,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12979244,
+      "candidate_ns": 8437088
+    },
+    {
+      "pair": 13,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3248774,
+      "candidate_ns": 2173718
+    },
+    {
+      "pair": 13,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 6820446,
+      "candidate_ns": 3794969
+    },
+    {
+      "pair": 13,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 17038947,
+      "candidate_ns": 9940938
+    },
+    {
+      "pair": 13,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4454245,
+      "candidate_ns": 4160384
+    },
+    {
+      "pair": 14,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21292474,
+      "candidate_ns": 11307513
+    },
+    {
+      "pair": 14,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4416054,
+      "candidate_ns": 4229464
+    },
+    {
+      "pair": 14,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16380319,
+      "candidate_ns": 8900718
+    },
+    {
+      "pair": 14,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2140666,
+      "candidate_ns": 1067913
+    },
+    {
+      "pair": 14,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3049431,
+      "candidate_ns": 3206856
+    },
+    {
+      "pair": 14,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1191535,
+      "candidate_ns": 2259369
+    },
+    {
+      "pair": 14,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5900519,
+      "candidate_ns": 3767317
+    },
+    {
+      "pair": 14,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13222344,
+      "candidate_ns": 8279252
+    },
+    {
+      "pair": 14,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 11825935,
+      "candidate_ns": 6864898
+    },
+    {
+      "pair": 14,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3680124,
+      "candidate_ns": 3742521
+    },
+    {
+      "pair": 15,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12931689,
+      "candidate_ns": 6808993
+    },
+    {
+      "pair": 15,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3266087,
+      "candidate_ns": 4163601
+    },
+    {
+      "pair": 15,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3188041,
+      "candidate_ns": 3083064
+    },
+    {
+      "pair": 15,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21376802,
+      "candidate_ns": 11237882
+    },
+    {
+      "pair": 15,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16319104,
+      "candidate_ns": 8884346
+    },
+    {
+      "pair": 15,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2173037,
+      "candidate_ns": 2114296
+    },
+    {
+      "pair": 15,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2311597,
+      "candidate_ns": 2244881
+    },
+    {
+      "pair": 15,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3694631,
+      "candidate_ns": 3690163
+    },
+    {
+      "pair": 15,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13165869,
+      "candidate_ns": 8516907
+    },
+    {
+      "pair": 15,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5630694,
+      "candidate_ns": 3824465
+    },
+    {
+      "pair": 16,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3076391,
+      "candidate_ns": 3124531
+    },
+    {
+      "pair": 16,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5767139,
+      "candidate_ns": 3699139
+    },
+    {
+      "pair": 16,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12237888,
+      "candidate_ns": 6977920
+    },
+    {
+      "pair": 16,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21627973,
+      "candidate_ns": 11484564
+    },
+    {
+      "pair": 16,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3725469,
+      "candidate_ns": 3695864
+    },
+    {
+      "pair": 16,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13425846,
+      "candidate_ns": 8249496
+    },
+    {
+      "pair": 16,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2116100,
+      "candidate_ns": 2149753
+    },
+    {
+      "pair": 16,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4389725,
+      "candidate_ns": 4180492
+    },
+    {
+      "pair": 16,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16447966,
+      "candidate_ns": 9078000
+    },
+    {
+      "pair": 16,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1212054,
+      "candidate_ns": 2283002
+    },
+    {
+      "pair": 17,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3127827,
+      "candidate_ns": 3106498
+    },
+    {
+      "pair": 17,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2245633,
+      "candidate_ns": 2212039
+    },
+    {
+      "pair": 17,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16395808,
+      "candidate_ns": 9193797
+    },
+    {
+      "pair": 17,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5746720,
+      "candidate_ns": 4907666
+    },
+    {
+      "pair": 17,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3707706,
+      "candidate_ns": 3831879
+    },
+    {
+      "pair": 17,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12152026,
+      "candidate_ns": 6751346
+    },
+    {
+      "pair": 17,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4342356,
+      "candidate_ns": 3091229
+    },
+    {
+      "pair": 17,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13184754,
+      "candidate_ns": 8387214
+    },
+    {
+      "pair": 17,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2237226,
+      "candidate_ns": 2255641
+    },
+    {
+      "pair": 17,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21456773,
+      "candidate_ns": 11371603
+    },
+    {
+      "pair": 18,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4484713,
+      "candidate_ns": 4160144
+    },
+    {
+      "pair": 18,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 14291139,
+      "candidate_ns": 6692876
+    },
+    {
+      "pair": 18,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3913241,
+      "candidate_ns": 3761096
+    },
+    {
+      "pair": 18,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3050221,
+      "candidate_ns": 3060261
+    },
+    {
+      "pair": 18,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2323048,
+      "candidate_ns": 2358285
+    },
+    {
+      "pair": 18,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21226139,
+      "candidate_ns": 12098757
+    },
+    {
+      "pair": 18,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16166638,
+      "candidate_ns": 8826558
+    },
+    {
+      "pair": 18,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5889358,
+      "candidate_ns": 4948543
+    },
+    {
+      "pair": 18,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2137560,
+      "candidate_ns": 2131229
+    },
+    {
+      "pair": 18,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13498853,
+      "candidate_ns": 8741950
+    },
+    {
+      "pair": 19,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13207707,
+      "candidate_ns": 8412763
+    },
+    {
+      "pair": 19,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4360390,
+      "candidate_ns": 4193747
+    },
+    {
+      "pair": 19,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16842085,
+      "candidate_ns": 8879678
+    },
+    {
+      "pair": 19,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2011503,
+      "candidate_ns": 3065120
+    },
+    {
+      "pair": 19,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3722854,
+      "candidate_ns": 3759764
+    },
+    {
+      "pair": 19,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12651403,
+      "candidate_ns": 7871617
+    },
+    {
+      "pair": 19,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2387939,
+      "candidate_ns": 2368593
+    },
+    {
+      "pair": 19,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 22737625,
+      "candidate_ns": 11366744
+    },
+    {
+      "pair": 19,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5675416,
+      "candidate_ns": 3758671
+    },
+    {
+      "pair": 19,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2240834,
+      "candidate_ns": 2128433
+    },
+    {
+      "pair": 20,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5782749,
+      "candidate_ns": 3749373
+    },
+    {
+      "pair": 20,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1259282,
+      "candidate_ns": 2260300
+    },
+    {
+      "pair": 20,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4560175,
+      "candidate_ns": 4196242
+    },
+    {
+      "pair": 20,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 14383262,
+      "candidate_ns": 8260336
+    },
+    {
+      "pair": 20,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16399705,
+      "candidate_ns": 9117935
+    },
+    {
+      "pair": 20,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3044722,
+      "candidate_ns": 3067525
+    },
+    {
+      "pair": 20,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3775723,
+      "candidate_ns": 3710891
+    },
+    {
+      "pair": 20,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 14191072,
+      "candidate_ns": 6835153
+    },
+    {
+      "pair": 20,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 23461303,
+      "candidate_ns": 11731738
+    },
+    {
+      "pair": 20,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2128353,
+      "candidate_ns": 2194657
+    },
+    {
+      "pair": 21,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21109151,
+      "candidate_ns": 11094793
+    },
+    {
+      "pair": 21,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3738734,
+      "candidate_ns": 3687939
+    },
+    {
+      "pair": 21,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 17454594,
+      "candidate_ns": 9927864
+    },
+    {
+      "pair": 21,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13167772,
+      "candidate_ns": 8266037
+    },
+    {
+      "pair": 21,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5680316,
+      "candidate_ns": 3740096
+    },
+    {
+      "pair": 21,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2149112,
+      "candidate_ns": 2107483
+    },
+    {
+      "pair": 21,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2021202,
+      "candidate_ns": 3107380
+    },
+    {
+      "pair": 21,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2307179,
+      "candidate_ns": 2302299
+    },
+    {
+      "pair": 21,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 11973893,
+      "candidate_ns": 6740685
+    },
+    {
+      "pair": 21,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4348017,
+      "candidate_ns": 4170965
+    },
+    {
+      "pair": 22,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 1986436,
+      "candidate_ns": 3063968
+    },
+    {
+      "pair": 22,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16580293,
+      "candidate_ns": 8961502
+    },
+    {
+      "pair": 22,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5901230,
+      "candidate_ns": 4767093
+    },
+    {
+      "pair": 22,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12194927,
+      "candidate_ns": 6954837
+    },
+    {
+      "pair": 22,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21454007,
+      "candidate_ns": 11269220
+    },
+    {
+      "pair": 22,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1222624,
+      "candidate_ns": 2251844
+    },
+    {
+      "pair": 22,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4360209,
+      "candidate_ns": 4158681
+    },
+    {
+      "pair": 22,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3673923,
+      "candidate_ns": 3653483
+    },
+    {
+      "pair": 22,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1032948,
+      "candidate_ns": 1042986
+    },
+    {
+      "pair": 22,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13086079,
+      "candidate_ns": 8320249
+    },
+    {
+      "pair": 23,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5705002,
+      "candidate_ns": 3826328
+    },
+    {
+      "pair": 23,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2236236,
+      "candidate_ns": 2259239
+    },
+    {
+      "pair": 23,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3721462,
+      "candidate_ns": 3722373
+    },
+    {
+      "pair": 23,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4548883,
+      "candidate_ns": 4325495
+    },
+    {
+      "pair": 23,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 16520311,
+      "candidate_ns": 9030941
+    },
+    {
+      "pair": 23,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21518398,
+      "candidate_ns": 12624153
+    },
+    {
+      "pair": 23,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3149007,
+      "candidate_ns": 3248203
+    },
+    {
+      "pair": 23,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2113806,
+      "candidate_ns": 2155824
+    },
+    {
+      "pair": 23,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13640198,
+      "candidate_ns": 8392043
+    },
+    {
+      "pair": 23,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 14665795,
+      "candidate_ns": 8438430
+    },
+    {
+      "pair": 24,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 1075107,
+      "candidate_ns": 2266783
+    },
+    {
+      "pair": 24,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21851021,
+      "candidate_ns": 12593985
+    },
+    {
+      "pair": 24,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3086381,
+      "candidate_ns": 3094656
+    },
+    {
+      "pair": 24,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12416584,
+      "candidate_ns": 7117582
+    },
+    {
+      "pair": 24,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4854186,
+      "candidate_ns": 2357232
+    },
+    {
+      "pair": 24,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16304186,
+      "candidate_ns": 9903208
+    },
+    {
+      "pair": 24,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13182270,
+      "candidate_ns": 8350565
+    },
+    {
+      "pair": 24,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5789281,
+      "candidate_ns": 3732702
+    },
+    {
+      "pair": 24,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3796693,
+      "candidate_ns": 3737611
+    },
+    {
+      "pair": 24,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4386338,
+      "candidate_ns": 4284457
+    },
+    {
+      "pair": 25,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3752801,
+      "candidate_ns": 2659259
+    },
+    {
+      "pair": 25,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2128052,
+      "candidate_ns": 2137740
+    },
+    {
+      "pair": 25,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2043093,
+      "candidate_ns": 3096700
+    },
+    {
+      "pair": 25,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 17496853,
+      "candidate_ns": 9255844
+    },
+    {
+      "pair": 25,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13204441,
+      "candidate_ns": 8294300
+    },
+    {
+      "pair": 25,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13199822,
+      "candidate_ns": 6883994
+    },
+    {
+      "pair": 25,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5768582,
+      "candidate_ns": 3728123
+    },
+    {
+      "pair": 25,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2281140,
+      "candidate_ns": 2278284
+    },
+    {
+      "pair": 25,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21695590,
+      "candidate_ns": 11399475
+    },
+    {
+      "pair": 25,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4441161,
+      "candidate_ns": 4178149
+    },
+    {
+      "pair": 26,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13302004,
+      "candidate_ns": 8485067
+    },
+    {
+      "pair": 26,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2283143,
+      "candidate_ns": 2402087
+    },
+    {
+      "pair": 26,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 11934619,
+      "candidate_ns": 7969270
+    },
+    {
+      "pair": 26,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3210292,
+      "candidate_ns": 3136314
+    },
+    {
+      "pair": 26,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3751357,
+      "candidate_ns": 3740257
+    },
+    {
+      "pair": 26,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 16480317,
+      "candidate_ns": 8904785
+    },
+    {
+      "pair": 26,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 22004349,
+      "candidate_ns": 11612345
+    },
+    {
+      "pair": 26,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4467300,
+      "candidate_ns": 4188026
+    },
+    {
+      "pair": 26,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 6538506,
+      "candidate_ns": 4992585
+    },
+    {
+      "pair": 26,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2217881,
+      "candidate_ns": 2144643
+    },
+    {
+      "pair": 27,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4603977,
+      "candidate_ns": 4249131
+    },
+    {
+      "pair": 27,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3062334,
+      "candidate_ns": 3180175
+    },
+    {
+      "pair": 27,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 12599396,
+      "candidate_ns": 7233239
+    },
+    {
+      "pair": 27,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 21736646,
+      "candidate_ns": 11763317
+    },
+    {
+      "pair": 27,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 5943410,
+      "candidate_ns": 3898143
+    },
+    {
+      "pair": 27,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 17050637,
+      "candidate_ns": 8959578
+    },
+    {
+      "pair": 27,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2132240,
+      "candidate_ns": 2150515
+    },
+    {
+      "pair": 27,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2718219,
+      "candidate_ns": 3738323
+    },
+    {
+      "pair": 27,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2252255,
+      "candidate_ns": 2374985
+    },
+    {
+      "pair": 27,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 15319168,
+      "candidate_ns": 8522668
+    },
+    {
+      "pair": 28,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17646414,
+      "candidate_ns": 9391469
+    },
+    {
+      "pair": 28,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3744134,
+      "candidate_ns": 3692287
+    },
+    {
+      "pair": 28,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2125107,
+      "candidate_ns": 2144704
+    },
+    {
+      "pair": 28,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 4393131,
+      "candidate_ns": 4250974
+    },
+    {
+      "pair": 28,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 5795002,
+      "candidate_ns": 4896887
+    },
+    {
+      "pair": 28,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13381954,
+      "candidate_ns": 8412561
+    },
+    {
+      "pair": 28,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2313620,
+      "candidate_ns": 2237979
+    },
+    {
+      "pair": 28,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 21523969,
+      "candidate_ns": 11949407
+    },
+    {
+      "pair": 28,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 15169886,
+      "candidate_ns": 7985451
+    },
+    {
+      "pair": 28,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2097395,
+      "candidate_ns": 3026137
+    },
+    {
+      "pair": 29,
+      "case": "missing_module",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2127181,
+      "candidate_ns": 2178717
+    },
+    {
+      "pair": 29,
+      "case": "comment_4k",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 13601296,
+      "candidate_ns": 9599940
+    },
+    {
+      "pair": 29,
+      "case": "u32_identity",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 6820575,
+      "candidate_ns": 3740968
+    },
+    {
+      "pair": 29,
+      "case": "bool_short",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 22273264,
+      "candidate_ns": 13029934
+    },
+    {
+      "pair": 29,
+      "case": "guard_offset",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 20609432,
+      "candidate_ns": 9253569
+    },
+    {
+      "pair": 29,
+      "case": "invalid_effect",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 2334108,
+      "candidate_ns": 2311466
+    },
+    {
+      "pair": 29,
+      "case": "wrong_export",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3690373,
+      "candidate_ns": 3745105
+    },
+    {
+      "pair": 29,
+      "case": "bounded_loop",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 13532187,
+      "candidate_ns": 6976738
+    },
+    {
+      "pair": 29,
+      "case": "depth_limit",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 4647288,
+      "candidate_ns": 4143312
+    },
+    {
+      "pair": 29,
+      "case": "invalid_type",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3035575,
+      "candidate_ns": 3069799
+    },
+    {
+      "pair": 30,
+      "case": "depth_limit",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 3268461,
+      "candidate_ns": 4175252
+    },
+    {
+      "pair": 30,
+      "case": "comment_4k",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 14923866,
+      "candidate_ns": 8508092
+    },
+    {
+      "pair": 30,
+      "case": "bounded_loop",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 12318088,
+      "candidate_ns": 6870499
+    },
+    {
+      "pair": 30,
+      "case": "invalid_effect",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2308089,
+      "candidate_ns": 2393521
+    },
+    {
+      "pair": 30,
+      "case": "bool_short",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 23198549,
+      "candidate_ns": 11447025
+    },
+    {
+      "pair": 30,
+      "case": "u32_identity",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 7215706,
+      "candidate_ns": 4715065
+    },
+    {
+      "pair": 30,
+      "case": "guard_offset",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 17625495,
+      "candidate_ns": 10478658
+    },
+    {
+      "pair": 30,
+      "case": "wrong_export",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3741429,
+      "candidate_ns": 2721105
+    },
+    {
+      "pair": 30,
+      "case": "missing_module",
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "baseline_ns": 2237387,
+      "candidate_ns": 2224093
+    },
+    {
+      "pair": 30,
+      "case": "invalid_type",
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline_ns": 3325178,
+      "candidate_ns": 3131735
+    }
+  ],
+  "cpu_before": {
+    "usage_usec": 33112019045,
+    "user_usec": 30270593760,
+    "system_usec": 2841425285,
+    "nice_usec": 0,
+    "nr_periods": 269086,
+    "nr_throttled": 30308,
+    "throttled_usec": 1755026310,
+    "nr_bursts": 0,
+    "burst_usec": 0
+  },
+  "cpu_after": {
+    "usage_usec": 33116667235,
+    "user_usec": 30274582539,
+    "system_usec": 2842084695,
+    "nice_usec": 0,
+    "nr_periods": 269136,
+    "nr_throttled": 30308,
+    "throttled_usec": 1755026310,
+    "nr_bursts": 0,
+    "burst_usec": 0
+  },
+  "environment_before": {
+    "affinity": [
+      0
+    ],
+    "cpu_max": "400000 100000",
+    "cpuset_effective": "0-4",
+    "loadavg": "0.25 0.51 0.64 1/735 682160"
+  },
+  "environment_after": {
+    "affinity": [
+      0
+    ],
+    "cpu_max": "400000 100000",
+    "cpuset_effective": "0-4",
+    "loadavg": "0.31 0.52 0.65 1/735 682860"
+  },
+  "manifest_sha256": "cb352b3af6f23fc85c258184ce2078a833274b8b84d4cf4d86d7027f69f45fbb"
+}

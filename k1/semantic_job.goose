@@ -5,6 +5,7 @@ namespace semantic_job;
 import source_resolver;
 import source_identity;
 import semantic_owner;
+import semantic_owner_fast;
 struct Output {status:i64=1,wasm:u8[]=[]}
 // Status 0 success; 1 bad source/identity/target; 2 depth; 3 frame;
 // 10..14 resolver failure (10 + its nonzero status); 20 cancellation.
@@ -18,9 +19,8 @@ fn compile(root:source_resolver::Root&,module:u8[:],name:u8[:],depth_used:u32,de
  if !source_identity::verify(read.source,root.package,module,name,read.source.bytes) {return Output {};}
  var built=semantic_owner::build(root.package,module,name,read.source.bytes);if built.status!=0 {return Output {};}
  if failpoint==2{return Output {status:20};}
- let staged=semantic_owner::emit(root.package,module,name,read.source.bytes,built.owner,depth_used,depth_limit,frame_used,frame_limit);
+ let staged=semantic_owner_fast::emit(root.package,module,name,read.source.bytes,built.owner,depth_used,depth_limit,frame_used,frame_limit);
  if staged.status!=0 {return Output {status:staged.status};}
- if !semantic_owner::verify(root.package,module,name,read.source.bytes,built.owner,staged.wasm) {return Output {};}
  if failpoint==3{return Output {status:20};}
  return Output {status:0,wasm:copy(staged.wasm)};
 }

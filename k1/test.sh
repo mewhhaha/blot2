@@ -23,6 +23,7 @@ node "$script_dir/joined_driver_independent_cli_test.mjs" "$script_dir/build/blo
 python3 "$script_dir/abi_fixed_oracle.py"
 python3 "$script_dir/source_resolver_test.py"
 python3 "$script_dir/semantic_job_test.py"
+python3 "$script_dir/semantic_job_fast_parity_test.py"
 python3 "$script_dir/semantic_graph_job_test.py"
 python3 "$script_dir/particle_expr_oracle_test.py"
 python3 "$script_dir/graph_oracle_test.py"
@@ -248,6 +249,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/offset_test.goose" && node "$script_dir/offset_test.mjs" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/offset_independent_audit.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_leaf_test.goose" && node "$script_dir/semantic_leaf_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_owner_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_leaf_independent_audit.goose" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_owner_independent_audit.goose" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_owner_offset_test.goose" && node "$script_dir/semantic_owner_offset_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_owner_metered_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_meter_independent_audit.goose")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/semantic_owner_fast_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/primary_singleline_test.goose" && node "$script_dir/primary_singleline_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/primary_singleline_independent_audit.goose")
     (cd "$test_dir" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/typed_dispatch_test.goose" && node "$script_dir/typed_dispatch_test.mjs" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/typed_wrapper_independent_audit.goose" && node "$script_dir/typed_wrapper_independent_audit.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_host_test.goose" && node "$script_dir/scalar_host_wasm_test.mjs" && node "$script_dir/scalar_host_preflight_test.mjs" && node "$script_dir/scalar_host_private_test.mjs" && node "$script_dir/scalar_host_independent_test.mjs")

@@ -1,0 +1,4 @@
+pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:
+  if x <= 4294967290:
+    return x + 5
+  return x

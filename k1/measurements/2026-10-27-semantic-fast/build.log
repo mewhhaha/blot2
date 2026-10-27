@@ -1,0 +1,10 @@
+parsed ok: 731 top-level declarations, 64 file(s)
+typechecked ok: 762 specialization(s), 127 struct/0 enum instance(s); optimized -O2: 233 inlined, 28 base case(s), 177 folded, 62 propagated, 0 tail loop(s), 0 reassociated
+bce: elided 382/667 index and 35/89 slice checks
+wrote /tmp/k1-semantic-bench-home/build/prog/semantic_job_bench-4fc7fb90/semantic_job_bench.c (1645377 bytes)
+built /tmp/k1-semantic-fast/bench-driver
+/tmp/k1-semantic-fast/k1/unified_guard.goose:123: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-semantic-fast/k1/unified_frontend.goose:26: warning: redundant `as u64`: a u32 converts to u64 implicitly here
+/tmp/k1-semantic-fast/k1/unified_frontend.goose:32: warning: redundant `as u64`: a u8 converts to u64 implicitly here
+building the package semantic_job_bench's C
+compiling the runtime for gcc 14.2.0
