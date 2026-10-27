@@ -185,5 +185,9 @@ use this harness with the recorded main release.
 
 See [MAIN_COMPARISON.md](MAIN_COMPARISON.md#reproduction) for commands and limits.
 `package_main.py` freezes its 209 records, committed main provenance, current gate
-and all source/log evidence. `plot_main.py` renders both charts from the verified
-published JSON, without new measurements. Earlier packages remain unchanged.
+and all source/log evidence. `plot_main.py` renders Gnorp-inspired vertical charts
+from the verified published JSON, without new measurements. Runtime uses paired
+throughput (`Zig time / Goose time`, taller is faster); compile time uses each
+compiler's median milliseconds (shorter is quicker). All observed ranges remain
+visible. Zig/main and Goose/new K1 have explicit labels and consistent colors.
+Earlier packages remain unchanged.

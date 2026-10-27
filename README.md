@@ -132,11 +132,14 @@ loop kernels, with the required export ownership boundaries included.
 [The direct comparison](benchmarks/MAIN_COMPARISON.md) records all 209 measurements,
 absolute timings, ranges, source equivalence and exact compiler provenance.
 
-![Runtime comparison against main, with both V8 modes shown separately](benchmarks/charts/main-runtime-comparison.svg)
+![Vertical runtime throughput bars: gold Zig main and mint Goose K1, with both V8 modes](benchmarks/charts/main-runtime-comparison.svg)
 
-Main is 100% for each workload and engine; lower is better. Whiskers show all
-five observed pairs, not confidence intervals. The generic gaps persist in the
-optimizing-only control. Ordinary-loop differences are small and unresolved.
+The shard-haulers compare **Zig (the old compiler on `main`)** with **Goose (the
+new K1 compiler)**. Runtime bars show relative throughput: Zig is 1.00×, and
+**taller is faster**. A 0.25× bar means one quarter of Zig's work per second.
+Mint whiskers show all five paired throughput ratios, not confidence intervals.
+The generic gaps persist in the optimizing-only control. Ordinary-loop
+differences are small and unresolved.
 
 Against the previous K1, the latest runtime pass makes the measured **generic
 integer loop 4.5–4.9× faster** and reduces generic F32 loop time by **15–19%** across default and
@@ -146,10 +149,8 @@ remain roughly unchanged. These are five reference-checked kernels, with a fresh
 engine process for every sample, rather than a whole-application speedup.
 [Runtime results and limitations](benchmarks/RUNTIME.md) preserve all 228 records.
 
-![Runtime comparison against previous K1, with default and optimizing-only V8 shown separately](benchmarks/charts/runtime-comparison.svg)
-
-Previous K1 is 100% for each workload and engine; lower is better. Bars show
-paired medians and whiskers show the full observed ranges across five pairs.
+[The earlier before/after Goose chart](benchmarks/charts/runtime-comparison.svg)
+remains separate from the Zig comparison.
 
 The preceding structural changes reduced **fresh compile time by roughly 7–15%**
 against the previous qualified K1 at the largest measured scales. They borrow
@@ -161,6 +162,11 @@ The fresh comparison against `main` uses five counterbalanced pairs on a Ryzen 7
 7800X3D, 128 functions/callers except the 127-depth chain. Both are native release
 compilers; K1 uses `--opt=off` and main uses its default pipeline. Fresh process
 compilation medians include startup and publication:
+
+![Vertical compile-time bars: gold Zig main and mint Goose K1, in milliseconds](benchmarks/charts/main-compile-comparison.svg)
+
+Here **shorter is quicker**. Bar heights and labels are median milliseconds;
+whiskers show each compiler's full observed range across five builds.
 
 | Workload | Main ms | K1 ms |
 | --- | ---: | ---: |

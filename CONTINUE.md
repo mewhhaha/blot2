@@ -89,6 +89,17 @@ are included where exported (main's pair fixture). No retained-session or
 compiler rebuild comparison was added. The bounded comparison is complete;
 no optimization search follows automatically from these regressions.
 
+## Chart presentation
+
+The requested Gnorp-inspired vertical charts now compare Zig/main (gold) with
+Goose/new K1 (mint), using the unchanged `main-comparison` evidence. Runtime shows
+relative throughput, with Zig at 1.00× and taller bars meaning faster execution;
+compile time shows actual median milliseconds, where shorter is quicker. Captions
+and legends distinguish these metrics and the old Zig compiler from earlier
+Goose snapshots. Original pixel creatures and shard textures do not affect bar
+heights. Recreate SVG/PNG with `python3 benchmarks/plot_main.py`. No new benchmarks
+or compiler changes are part of this presentation update.
+
 ## Earlier work and reproduction
 
 The prior structural pass borrowed validator Core views, replaced proof SCC

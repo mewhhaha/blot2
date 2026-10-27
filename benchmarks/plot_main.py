@@ -1,4 +1,7 @@
-"""Render the archived K1/main comparisons. Requires matplotlib; no new timings."""
+"""Render verified data as Gnorp-inspired vertical charts; requires matplotlib.
+
+Original vector artwork is decorative; bar silhouettes retain exact data heights.
+"""
 from pathlib import Path
 import hashlib
 import json
@@ -9,30 +12,36 @@ os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "blot-ma
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-from matplotlib.ticker import PercentFormatter
+from matplotlib.offsetbox import AnnotationBbox, DrawingArea
+from matplotlib.patches import Patch, Rectangle
+from matplotlib.ticker import FuncFormatter
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "results/main-comparison"
 OUT = ROOT / "charts"
 MANIFEST = json.loads((DATA / "manifest.json").read_text())
 RUNTIME = [
-    ("generic_recurrence", "Generic integer loop\n1,024 steps"),
-    ("generic_affine", "Generic F32 loop\n128 steps"),
-    ("generic_pair", "Generic 8-byte pair\n1,024 steps"),
-    ("recurrence", "Integer loop\n1,024 steps"),
-    ("affine_loop", "F32 loop\n128 steps"),
+    ("recurrence", "Integer\n1,024 steps"), ("affine_loop", "F32\n128 steps"),
+    ("generic_recurrence", "Generic integer\n1,024 steps"),
+    ("generic_affine", "Generic F32\n128 steps"),
+    ("generic_pair", "Generic pair\n1,024 steps"),
 ]
 COMPILE = [
-    ("independent", "Independent functions"), ("calls", "Shared callee"),
-    ("chains", "Call chain (127)"), ("diamonds", "Diamonds"),
-    ("generics", "Generic calls"), ("closures", "Captured closures"),
-    ("modules", "Imported modules"), ("proofs", "Guarded arithmetic"),
-    ("domains", "Static domains"),
+    ("independent", "Independent\nfunctions"), ("calls", "Shared\ncallee"),
+    ("chains", "Call chain\n(127)"), ("diamonds", "Diamonds"),
+    ("generics", "Generic\ncalls"), ("closures", "Captured\nclosures"),
+    ("modules", "Imported\nmodules"), ("proofs", "Guarded\narithmetic"),
+    ("domains", "Static\ndomains"),
 ]
+BG, PANEL, GRID = "#171E29", "#202A38", "#344152"
+TEXT, MUTED = "#F5F0DB", "#B7C2CA"
+GOLD, MINT, MONO = "#F6BE5A", "#80DBBC", "DejaVu Sans Mono"
 plt.rcParams.update({
     "font.family": "DejaVu Sans", "font.size": 12,
-    "svg.fonttype": "none", "svg.hashsalt": "blot-main-comparison-v1",
+    "svg.fonttype": "none", "svg.hashsalt": "blot-quarry-v1",
+    "figure.facecolor": BG, "axes.facecolor": PANEL,
+    "text.color": TEXT, "axes.labelcolor": MUTED,
+    "xtick.color": TEXT, "ytick.color": MUTED,
     "axes.spines.top": False, "axes.spines.right": False,
     "axes.spines.left": False, "axes.spines.bottom": False,
 })
@@ -44,37 +53,90 @@ def rows(name):
     return {row["family"]: row for row in json.loads(source.read_text())["comparisons"]}
 
 
-def panel(ax, data, order, metric, title, limit, ticks):
-    y = list(range(len(order) - 1, -1, -1))
-    ratios = [data[key][metric]["paired_candidate_over_baseline"] for key, _ in order]
-    mid = [r["median"] * 100 for r in ratios]
-    low, high = ([r[k] * 100 for r in ratios] for k in ("min", "max"))
-    assert all(0 <= a <= b <= c < limit for a, b, c in zip(low, mid, high))
-    ax.barh(y, [100] * len(y), height=0.60, color="#DEE6EF", zorder=2)
-    ax.barh(y, mid, height=0.34, color="#087E8B", zorder=3)
-    ax.errorbar(mid, y, xerr=([b-a for a,b in zip(low,mid)], [c-b for b,c in zip(mid,high)]),
-                fmt="none", ecolor="#183844", elinewidth=1.3, capsize=3, zorder=4)
-    for pos, value, hi in zip(y, mid, high):
-        ax.text(hi + limit * 0.025, pos, f"{value / 100:.2f}×", va="center",
-                fontsize=11, fontweight="bold", color="#183844")
-    ax.axvline(100, color="#75889B", linestyle=(0, (3, 3)), linewidth=1.1, zorder=1)
-    ax.set_xlim(0, limit)
-    ax.set_ylim(-0.6, len(y) - 0.4)
-    ax.set_xticks(ticks)
-    ax.xaxis.set_major_formatter(PercentFormatter(xmax=100, decimals=0))
-    ax.tick_params(axis="both", length=0, labelcolor="#40546A", pad=8)
-    ax.xaxis.grid(True, color="#EEF2F6", linewidth=0.8)
+def hauler(color, scale=1.4):
+    """Original pixel creature drawn in points, outside the data rectangle."""
+    pixels = ["   hhh    ", "  hhhhh   ", "  wwwww   ", " wwwweww  ",
+              " wwwwwww  ", "  wwwww   ", "  ww ww   ", "  dd dd   "]
+    palette = {"h": color, "w": TEXT, "e": BG, "d": MUTED}
+    drawing = DrawingArea(14 * scale, 11 * scale, clip=False)
+    for row, line in enumerate(pixels):
+        for col, token in enumerate(line):
+            if token in palette:
+                drawing.add_artist(Rectangle((col * scale, (8-row) * scale), scale, scale,
+                                             facecolor=palette[token], edgecolor="none"))
+    for x, y in [(10, 2), (11, 2), (12, 2), (11, 3), (12, 3), (12, 4)]:
+        drawing.add_artist(Rectangle((x*scale, y*scale), scale, scale,
+                                     facecolor=color, edgecolor="none"))
+    return drawing
+
+
+def quarry_mark(fig):
+    rock = DrawingArea(78, 56, clip=False)
+    for x, y, w, h, color in [
+        (7, 6, 64, 9, "#465667"), (1, 15, 72, 20, "#5C6C7D"),
+        (11, 35, 53, 9, "#6A7D8D"), (23, 44, 28, 6, "#80919E"),
+        (14, 25, 17, 6, "#81909A"), (42, 14, 21, 5, "#43505E"),
+        (32, 32, 5, 10, "#354252"), (37, 27, 12, 5, "#354252"),
+    ]:
+        rock.add_artist(Rectangle((x, y), w, h, facecolor=color, edgecolor="none"))
+    fig.add_artist(AnnotationBbox(rock, (0.91, 0.91), xycoords=fig.transFigure, frameon=False))
+    for x, color in [(0.86, GOLD), (0.965, MINT)]:
+        fig.add_artist(AnnotationBbox(hauler(color, 2.2), (x, 0.88),
+                                     xycoords=fig.transFigure, frameon=False))
+
+
+def heading(fig, chapter, title, subtitle, direction):
+    fig.text(0.055, 0.952, f"THE BENCHMARK QUARRY  /  {chapter}",
+             fontfamily=MONO, fontsize=11, color=MINT, fontweight="bold")
+    fig.text(0.055, 0.89, title, fontsize=28, fontweight="bold")
+    fig.text(0.055, 0.845, subtitle, fontsize=12.5, color=MUTED)
+    fig.legend(handles=[Patch(facecolor=GOLD, label="Zig · old compiler on main"),
+                        Patch(facecolor=MINT, label="Goose · new K1 compiler")],
+               loc="upper left", bbox_to_anchor=(0.05, 0.817), frameon=False,
+               ncols=2, labelcolor=TEXT, fontsize=12, handlelength=1.2, columnspacing=2)
+    fig.text(0.95, 0.785, direction, ha="right", fontfamily=MONO, fontsize=11,
+             color=MINT, fontweight="bold")
+    quarry_mark(fig)
+
+
+def scaffold(ax, labels, ceiling, ticks, ylabel):
+    ax.set_ylim(0, ceiling)
+    ax.set_xlim(-0.65, len(labels) - 0.35)
+    ax.set_yticks(ticks)
+    ax.set_xticks(range(len(labels)), labels)
+    ax.tick_params(axis="x", length=0, pad=24, labelsize=10.5)
+    ax.tick_params(axis="y", length=0, pad=8, labelsize=10)
+    ax.set_ylabel(ylabel, labelpad=10, fontsize=11)
+    ax.yaxis.grid(True, color=GRID, linewidth=0.7)
     ax.set_axisbelow(True)
-    ax.set_title(title, loc="left", fontsize=14, fontweight="bold", pad=21, color="#14283D")
-    ax.set_yticks(y, [label for _, label in order], fontsize=12, color="#203B50")
+    ax.axhline(0, color=MUTED, linewidth=2, zorder=5)
 
 
-def heading(fig, title, subtitle):
-    fig.text(0.05, 0.945, title, fontsize=25, fontweight="bold", color="#14283D")
-    fig.text(0.05, 0.89, subtitle, fontsize=13, color="#40546A")
-    fig.legend(handles=[Patch(facecolor="#DEE6EF", label="main · 1e39b5d"),
-                        Patch(facecolor="#087E8B", label="Goose K1 · current")],
-               loc="upper left", bbox_to_anchor=(0.045, 0.855), frameon=False, ncols=2, fontsize=12)
+def stack(ax, x, height, color, quantum, width=0.31):
+    ax.bar(x, height, width=width, color=color, zorder=3)
+    # Brick seams do not round or extend the exact top of the solid silhouette.
+    for row in range(1, int(height / quantum) + 1):
+        y = row * quantum
+        if y < height:
+            ax.plot([x-width/2, x+width/2], [y, y], color=PANEL, alpha=0.36,
+                    linewidth=0.8, zorder=4, solid_capstyle="butt")
+            offset = width * (0.14 if row % 2 else -0.14)
+            ax.plot([x+offset, x+offset], [y-quantum, y], color=PANEL,
+                    alpha=0.27, linewidth=0.8, zorder=4, solid_capstyle="butt")
+    ax.add_artist(AnnotationBbox(hauler(color), (x, 0), xybox=(0, -10),
+                                xycoords="data", boxcoords="offset points", frameon=False,
+                                annotation_clip=False, zorder=6))
+
+
+def whisker(ax, x, mid, low, high):
+    assert 0 < low <= mid <= high
+    ax.errorbar(x, mid, yerr=[[mid-low], [high-mid]], fmt="none", ecolor=TEXT,
+                elinewidth=1.1, capsize=3, capthick=1.1, zorder=7)
+
+
+def footer(fig, line1, line2, line3):
+    for y, line in [(0.125, line1), (0.082, line2), (0.04, line3)]:
+        fig.text(0.055, y, line, fontsize=10.5 if y > 0.04 else 9.5, color=MUTED)
 
 
 def save(fig, name, title, description):
@@ -87,35 +149,70 @@ def save(fig, name, title, description):
     plt.close(fig)
 
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 7.3), sharey=True)
-fig.subplots_adjust(left=0.235, right=0.975, top=0.72, bottom=0.22, wspace=0.10)
-for ax, name, title in zip(axes, ["default", "optimizing"],
-                          ["Default V8", "Optimizing-only V8 · control"]):
-    panel(ax, rows(name), RUNTIME, "runtime_ns_per_call", title, 800, [0, 100, 300, 500, 700])
-    ax.axhline(1.5, color="#E2E8F0", linewidth=0.9, zorder=1)
-heading(fig, "Runtime versus main", "main = 100% for each kernel and engine. Lower is better; above 100% is slower.")
-fig.text(0.05, 0.12, "Bars: median paired runtime ratio. Whiskers: all five pairs, not confidence intervals.",
-         fontsize=10.5, color="#40546A")
-fig.text(0.05, 0.075, "Fresh engines · 20,000 warmup + 20,000 timed calls · required export ownership hooks included",
-         fontsize=10.5, color="#40546A")
-fig.text(0.05, 0.035, "main default pipeline / K1 --opt=off · equivalent loop kernels, not gdev · data: benchmarks/results/main-comparison/",
-         fontsize=10, color="#60758A")
-save(fig, "main-runtime-comparison", "Blot Goose K1 runtime versus main",
-     "K1 generic integer loop takes 1.20/1.13 times main runtime, generic F32 3.61/4.24 times, "
-     "and generic pair 6.40/6.55 times, in default/optimizing-only V8. Ordinary loops are near parity.")
+def runtime():
+    fig, axes = plt.subplots(1, 2, figsize=(15, 8.8), sharey=True)
+    fig.subplots_adjust(left=0.075, right=0.97, top=0.66, bottom=0.26, wspace=0.12)
+    for ax, name, title in zip(axes, ["default", "optimizing"],
+                              ["01  DEFAULT V8", "02  OPTIMIZING-ONLY V8"]):
+        data = rows(name)
+        scaffold(ax, [label for _, label in RUNTIME], 1.48, [0, 0.5, 1],
+                 "Relative work per second" if name == "default" else "")
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.1f}×"))
+        ax.axhline(1, color=GOLD, linestyle=(0, (3, 4)), alpha=0.5, linewidth=1, zorder=2)
+        ax.set_title(title, loc="left", fontfamily=MONO, fontsize=12, pad=18,
+                     color=TEXT, fontweight="bold")
+        for i, (key, _) in enumerate(RUNTIME):
+            ratio = data[key]["runtime_ns_per_call"]["paired_candidate_over_baseline"]
+            # Five positive pairs: reciprocal(median time ratio) = median speed ratio.
+            mid, low, high = 1/ratio["median"], 1/ratio["max"], 1/ratio["min"]
+            assert high < 1.3
+            stack(ax, i-0.18, 1, GOLD, 0.1)
+            stack(ax, i+0.18, mid, MINT, 0.1)
+            whisker(ax, i+0.18, mid, low, high)
+            ax.text(i-0.18, 1.035, "1.00", ha="center", va="bottom",
+                    color=GOLD, fontfamily=MONO, fontsize=9.5)
+            ax.text(i+0.18, high+0.035, f"{mid:.2f}", ha="center", va="bottom",
+                    color=MINT, fontfamily=MONO, fontsize=9.5, fontweight="bold")
+    heading(fig, "01 / RUNTIME", "Same job. How much can they haul?",
+            "Relative throughput for each benchmark · Zig on main = 1.00× in each engine", "TALLER = FASTER")
+    footer(fig,
+           "Shard stacks = work per second, relative to Zig. 0.25× means one quarter of Zig's throughput.",
+           "Five paired samples · mint whiskers show the full paired range, not confidence intervals · Zig is the fixed reference",
+           "20k warmup + 20k timed calls · fresh engines · required ownership hooks included · main default / K1 --opt=off · 2026-10-27")
+    save(fig, "main-runtime-comparison", "Zig main versus Goose K1: runtime throughput",
+         "Vertical bars with original Gnorp-inspired shard-haulers. Taller means faster. "
+         "Main is 1.00x. Median paired K1/main throughput: integer 1.04/1.06, F32 1.10/0.92, "
+         "generic integer 0.83/0.88, generic F32 0.28/0.24, generic pair 0.16/0.15 in default/optimizing-only V8. "
+         "Whiskers show all five paired ratios, not confidence intervals. Synthetic kernels, not gdev.")
 
-data = rows("compile") | rows("compile-chains")
-fig, ax = plt.subplots(figsize=(12, 8.7))
-fig.subplots_adjust(left=0.25, right=0.95, top=0.74, bottom=0.20)
-panel(ax, data, COMPILE, "wall_ms", "Fresh process compilation", 215, [0, 50, 100, 150, 200])
-heading(fig, "Compile time versus main", "main = 100% for each family. Lower is better; above 100% is slower.")
-fig.text(0.05, 0.12, "Bars: median paired wall-time ratio. Whiskers: all five pairs, not confidence intervals.",
-         fontsize=10.5, color="#40546A")
-fig.text(0.05, 0.075, "128 functions/callers, except 127-depth chain · includes startup and publication · no retained session",
-         fontsize=10.5, color="#40546A")
-fig.text(0.05, 0.035, "Native release binaries · main default pipeline / K1 --opt=off · synthetic corpus · host placement and cache uncontrolled",
-         fontsize=10, color="#60758A")
-save(fig, "main-compile-comparison", "Blot Goose K1 compile time versus main",
-     "K1 is faster on measured call chains, closures, diamonds and generic calls; "
-     "proof-heavy compilation takes 1.13 times main and static domains 1.71 times.")
-print("Rendered runtime and compile SVG/PNG charts from verified archived measurements.")
+
+def compilation():
+    data = rows("compile") | rows("compile-chains")
+    fig, ax = plt.subplots(figsize=(15, 8.8))
+    fig.subplots_adjust(left=0.075, right=0.97, top=0.70, bottom=0.26)
+    scaffold(ax, [label for _, label in COMPILE], 31, [0, 5, 10, 15, 20, 25, 30], "Compile time (ms)")
+    for i, (key, _) in enumerate(COMPILE):
+        for who, offset, color in [("baseline", -0.18, GOLD), ("candidate", 0.18, MINT)]:
+            timing = data[key]["wall_ms"][who]
+            mid, low, high = (timing[k] for k in ["median", "min", "max"])
+            assert high < 28
+            stack(ax, i+offset, mid, color, 1.0)
+            whisker(ax, i+offset, mid, low, high)
+            ax.text(i+offset, high+0.55, f"{mid:.2f}", ha="center", va="bottom",
+                    color=color, fontfamily=MONO, fontsize=9.5, fontweight="bold")
+    heading(fig, "02 / COMPILE", "How long until the quarry opens?",
+            "Fresh program compilation · native release compilers · actual elapsed milliseconds", "SHORTER = QUICKER")
+    footer(fig,
+           "Shard stacks = time spent compiling. Values are medians; whiskers show all five observations, not confidence intervals.",
+           "128 functions/callers, except 127-depth chain · includes process startup and publication · no retained session",
+           "Zig main 1e39b5d / Goose K1 e2ceba0 · main default / K1 --opt=off · host placement and cache uncontrolled · 2026-10-27")
+    save(fig, "main-compile-comparison", "Zig main versus Goose K1: fresh compile time",
+         "Vertical gold and mint shard stacks show actual median milliseconds and observed ranges. "
+         "Shorter is quicker. Call chains: Zig 8.65ms, Goose 5.23ms. Guarded arithmetic: 22.27/24.90ms. "
+         "Static domains: 7.71/13.03ms. Synthetic program builds, not compiler executable rebuilds or gdev.")
+
+
+if __name__ == "__main__":
+    runtime()
+    compilation()
+    print("Rendered vertical quarry charts from verified archived measurements; no benchmarks rerun.")

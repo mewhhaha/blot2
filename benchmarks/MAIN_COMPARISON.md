@@ -12,11 +12,20 @@ It adds measurements and charts; it makes no compiler changes.
 
 ## Runtime
 
-![Current K1 runtime versus main, including regressions](charts/main-runtime-comparison.svg)
+![Gnorp-inspired vertical runtime throughput bars: Zig main versus Goose K1](charts/main-runtime-comparison.svg)
+
+The gold shard-haulers represent **Zig, the old compiler on main**; mint represents
+**Goose, the new K1 compiler**. Runtime bars show relative throughput: Zig is
+1.00× for each workload and engine, and **taller is faster**. Goose's bar is the
+median of the five paired `Zig time / Goose time` ratios. Its whiskers span all
+five ratios. The fixed Zig reference has no whisker. For example, 0.25× means one
+quarter of Zig's work per second. The zero baseline and exact bar heights remain
+unchanged by the decorative shard seams or creatures.
 
 Times below are median microseconds per complete kernel call. Ratios are medians
 of the five paired K1/main observations, rather than ratios of the two medians.
 Ranges show all observed paired ratios and are not confidence intervals.
+These table ratios describe **time**, the reciprocal of the chart's **throughput**.
 
 ### Default V8
 
@@ -52,7 +61,11 @@ or prove that specialization is necessary.
 
 ## Fresh compilation
 
-![Current K1 compilation time versus main](charts/main-compile-comparison.svg)
+![Gnorp-inspired vertical compile-time bars, with absolute milliseconds and observed ranges](charts/main-compile-comparison.svg)
+
+Compile bars show each compiler's actual median milliseconds, so **shorter is
+quicker**. Whiskers span its five individual times. The table also reports paired
+time ratios, which differ from ratios of the two absolute medians.
 
 Each family has 128 functions/callers, except the 127-depth chain. Wall time
 includes fresh process startup, loading, checking, validation, lowering and
@@ -155,8 +168,12 @@ python3 benchmarks/plot_main.py
 ```
 
 The plotter reads the published JSON and verifies its hashes; it does not rerun
-measurements. The snapshot-specific `package_main.py` validates both compiler
-identities, provenance, qualified inputs, logs, exact pair inventory, sources,
+measurements. The vertical shard stacks and original pixel creatures are inspired
+by [(the) Gnorp Apologue](https://gnorp.dev/). Decorations are outside the data or
+clipped within each bar's exact silhouette; no game assets are bundled.
+
+The snapshot-specific `package_main.py` validates both compiler identities,
+provenance, qualified inputs, logs, exact pair inventory, sources,
 Wasm hashes and matching results, then refuses to overwrite a published package.
 It expects the provenance snapshot archived under
 `build/main-comparison-provenance/`; use a new `--out` directory when reproducing.
