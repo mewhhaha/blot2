@@ -45,9 +45,9 @@ fn operation(units: []const core.Module, owner: u32, id: core.Id, wanted: core.A
     const producer = &units[wrapper.target.unit - 1];
     var forwarded = operation(units, wrapper.target.unit, wrapper.body.root, wanted, plan, depth + 1) orelse return null;
     var used: u8 = 0;
-    for (forwarded.arguments[0..forwarded.count]) |*argument| {
-        const position = known.parameterPosition(producer, wrapper.target.unit, producer.bodyParameters(&wrapper.body), argument.*, &used) orelse return null;
-        argument.* = call.arguments[position];
+    for (0..forwarded.count) |i| {
+        const position = known.parameterPosition(producer, wrapper.target.unit, producer.bodyParameters(&wrapper.body), forwarded.arguments[i], &used) orelse return null;
+        forwarded.arguments[i] = call.arguments[position];
     }
     // Every actual argument must be evaluated once in written order. The
     // admitted operations here are generate/length/flatten, without permutations.

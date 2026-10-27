@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+After the Zig lint cleanup, `deno task lint:zig` passed with zero findings
+across 531 source files and one analyzer fixture. The unfiltered legacy
+compiler gate also passed with Zig 0.17.0 and the native backend, using four
+native shards and the full allocation-failure mode: 2,607 native inventory
+tests and the guest tests. This validates the changed legacy files, not the
+incomplete Goose K1 implementation.
+
 A combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
 integrating the private scalar/loop arena, source-to-target caller binding and
 the versioned private work-schedule correction. It includes independent

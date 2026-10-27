@@ -279,10 +279,18 @@ pub const Recorder = struct {
         try self.summaries_seen.put(a, value.key, value.result);
         self.summary_publications.appendAssumeCapacity(value);
     }
+    fn sourceInventoryFull(self: *const Recorder) bool {
+        var remaining = self.max_reads;
+        for ([_]usize{ self.sources.items.len, self.source_units.items.len, self.interfaces.items.len }) |length| {
+            if (length >= remaining) return true;
+            remaining -= length;
+        }
+        return false;
+    }
     pub fn source(self: *Recorder, a: Allocator, target: core.BindingRef) Allocator.Error!void {
         if (!self.eligible or !self.source_complete) return;
         if (self.sources_seen.contains(target)) return;
-        if (target.unit == 0 or target.binding == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
+        if (target.unit == 0 or target.binding == 0 or self.sourceInventoryFull()) {
             self.source_complete = false;
             return;
         }
@@ -292,7 +300,7 @@ pub const Recorder = struct {
     }
     pub fn interface(self: *Recorder, a: Allocator, target: core.BindingRef) Allocator.Error!void {
         if (!self.eligible or !self.source_complete or self.interfaces_seen.contains(target)) return;
-        if (target.unit == 0 or target.binding == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
+        if (target.unit == 0 or target.binding == 0 or self.sourceInventoryFull()) {
             self.source_complete = false;
             return;
         }
@@ -302,7 +310,7 @@ pub const Recorder = struct {
     }
     pub fn sourceUnit(self: *Recorder, a: Allocator, unit: u32) Allocator.Error!void {
         if (!self.eligible or !self.source_complete or self.source_units_seen.contains(unit)) return;
-        if (unit == 0 or self.sources.items.len + self.source_units.items.len + self.interfaces.items.len >= self.max_reads) {
+        if (unit == 0 or self.sourceInventoryFull()) {
             self.source_complete = false;
             return;
         }

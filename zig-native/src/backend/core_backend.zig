@@ -191,6 +191,8 @@ pub const Generator = struct {
         for (units) |unit_| for (unit_.closures) |closure_| {
             if (unit_.types.node(closure_.parameter.ty).tag == .scoped) scoped_effects = true;
         };
+        // The pointer array is owned by Generator; deinit frees spawn_units.
+        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         const spawn_units: []const *const core.Module = spawn: {
             for (units) |unit_| for (unit_.bindings) |binding| {
                 if (binding.capability_flow != .spawn_task) continue;

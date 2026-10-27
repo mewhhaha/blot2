@@ -7004,6 +7004,8 @@ const Engine = struct {
             }
             const result = try self.types.product(results[0..input_shape.b]);
             self.expr_types[head] = try self.types.functionWithEffects(input, result, self.ambient);
+            // This returns a type ID; no local slice escapes.
+            // zig-analyzer: disable-next-line returning-local-slice
             return result;
         }
         if (operation == .spawn) {
@@ -7054,6 +7056,8 @@ const Engine = struct {
                 self.expr_types[self.tree.node(self.tree.node(id).a).a] = tail;
             } else self.expr_types[self.tree.node(id).a] = tail;
             self.expr_types[head] = try self.types.function(input, tail);
+            // This returns a type ID; no local slice escapes.
+            // zig-analyzer: disable-next-line returning-local-slice
             return result;
         }
         if (operation == .split) {
@@ -7135,6 +7139,8 @@ const Engine = struct {
             self.expr_types[head] = try self.types.function(input, range_arrow);
             self.expr_types[self.tree.node(id).a] = callback_type;
             self.expr_types[self.tree.node(self.tree.node(id).a).a] = range_arrow;
+            // This returns a type ID; no local slice escapes.
+            // zig-analyzer: disable-next-line returning-local-slice
             return result;
         }
         if (operation == .join or operation == .cancel) {
@@ -7161,6 +7167,8 @@ const Engine = struct {
             var result = T.unit;
             if (operation == .join) result = arrow.b;
             self.expr_types[head] = try self.types.functionWithEffects(input, result, arrow.c);
+            // This returns a type ID; no local slice escapes.
+            // zig-analyzer: disable-next-line returning-local-slice
             return result;
         }
         try self.diagnostic(.task_regions_overlap, id);

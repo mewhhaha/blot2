@@ -149,18 +149,35 @@ fn blockSize(class: usize) usize {
 test "freed blocks return to their class and are reused before any new slab" {
     var heap: Heap = .{};
     const a = heap.allocator();
+    // Guarded errdefer below is disarmed when this allocation is freed.
+    // zig-analyzer: disable-next-line missing-errdefer
     const first = try a.alloc(u8, 24);
+    var first_live = true;
+    errdefer if (first_live) a.free(first);
+    // zig-analyzer: disable-next-line missing-errdefer
     const second = try a.alloc(u8, 30);
+    var second_live = true;
+    errdefer if (second_live) a.free(second);
     try std.testing.expectEqual(@intFromPtr(first.ptr) + 32, @intFromPtr(second.ptr));
     a.free(first);
+    first_live = false;
     // The same class reuses the freed block; another class never does.
+    // zig-analyzer: disable-next-line missing-errdefer
     const other = try a.alloc(u8, 100);
+    var other_live = true;
+    errdefer if (other_live) a.free(other);
     try std.testing.expect(other.ptr != first.ptr);
+    // zig-analyzer: disable-next-line missing-errdefer
     const again = try a.alloc(u8, 17);
+    var again_live = true;
+    errdefer if (again_live) a.free(again);
     try std.testing.expectEqual(first.ptr, again.ptr);
     a.free(again);
+    again_live = false;
     a.free(second);
+    second_live = false;
     a.free(other);
+    other_live = false;
     const empty = Heap.snapshot(a).?;
     try std.testing.expect(empty.complete);
     try std.testing.expectEqual(@as(usize, 0), empty.live_class_bytes);
@@ -177,16 +194,18 @@ test "blocks above the largest class are mapped directly and keep their bytes ac
     var heap: Heap = .{};
     const a = heap.allocator();
     var large = try a.alloc(u8, slab_len);
+    defer a.free(large);
     @memset(large, 0x5a);
     // A small class never grows into a mapped block in place, or back.
     const small = try a.alloc(u8, 64);
+    var small_len: usize = small.len;
+    defer a.free(small[0..small_len]);
     try std.testing.expect(!a.resize(small, slab_len));
     try std.testing.expect(!a.resize(large, 64));
     large = try a.realloc(large, 3 * slab_len);
     for (large[0..slab_len]) |byte| try std.testing.expectEqual(@as(u8, 0x5a), byte);
     try std.testing.expect(a.resize(small, 33));
-    a.free(small[0..33]);
-    a.free(large);
+    small_len = 33;
 }
 
 test "sub-word allocations retain a complete free-list link" {
@@ -207,11 +226,11 @@ test "alignment selects a class at least as large as the alignment" {
     var heap: Heap = .{};
     const a = heap.allocator();
     const wide = try a.alignedAlloc(u8, .fromByteUnits(4096), 16);
+    defer a.free(wide);
     try std.testing.expect(std.mem.isAligned(@intFromPtr(wide.ptr), 4096));
     const words = try a.alloc(u64, 3);
+    defer a.free(words);
     try std.testing.expect(std.mem.isAligned(@intFromPtr(words.ptr), @alignOf(u64)));
-    a.free(words);
-    a.free(wide);
 }
 
 test "an alternating workload reaches a fixed footprint" {

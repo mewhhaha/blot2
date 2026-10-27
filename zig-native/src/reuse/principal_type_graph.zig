@@ -529,7 +529,7 @@ fn temporaryCopyLaw(allocator: std.mem.Allocator) !void {
     const shared = try source.fresh();
     // Exercise both sides of each stack/heap boundary, with nested arrays
     // live together. Destination publication must never retain their storage.
-    var arguments: [33]T.Id = @splat(shared);
+    const arguments: [33]T.Id = @splat(shared);
     var fields: [17]T.Field = undefined;
     var labels: [33]T.Effects.Label = undefined;
     for ([_]usize{ 1, 16, 17, 32, 33 }) |count| {

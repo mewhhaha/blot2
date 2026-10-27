@@ -629,3 +629,20 @@ test "principal anonymous module dependencies reject memo replay after unrelated
     try std.testing.expectEqual(@as(usize, 0), edited.principal.call_publications_replayed);
     try std.testing.expectEqual(.module_image, edited.principal.source_declines[0].reason);
 }
+
+test "combined source inventory accepts exactly max and rejects next unique input" {
+    var recorder: inputs.Recorder = .{ .eligible = true, .max_reads = 3 };
+    defer recorder.deinit(a);
+    try recorder.source(a, .{ .unit = 1, .binding = 1 });
+    try recorder.interface(a, .{ .unit = 1, .binding = 2 });
+    try recorder.sourceUnit(a, 2);
+    try std.testing.expect(recorder.source_complete);
+    try recorder.sourceUnit(a, 2);
+    try std.testing.expect(recorder.source_complete);
+    try recorder.source(a, .{ .unit = 1, .binding = 3 });
+    try std.testing.expect(!recorder.source_complete);
+    var empty: inputs.Recorder = .{ .eligible = true, .max_reads = 0 };
+    defer empty.deinit(a);
+    try empty.sourceUnit(a, 1);
+    try std.testing.expect(!empty.source_complete);
+}

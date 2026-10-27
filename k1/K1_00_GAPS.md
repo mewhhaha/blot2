@@ -93,7 +93,8 @@ the applicable contracts below are established; legacy remains the default.
    structural no-managed-helper certificate. Record exact source and toolchain
    identities and run the repository's required lint and unfiltered compiler
    gate. The [ledger](LEDGER.md#validation-evidence) records the current
-   baseline lint failure and incomplete full gate; neither is a pass.
+   prior baseline lint failure and the subsequent passing lint and legacy
+   compiler gate. Neither qualifies the incomplete Goose K1 path.
 
 ## Questions requiring an explicit resolution
 
