@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with a source-derived, checked
+bridge Core required by the private fixed caller emitter and a lexical
+U32-to-Bool proof/target path. It covers `-O0`/`-O2`, forged Core and source,
+target mutations, wire/failure oracles and generated predicate execution.
+The caller lowerer remains fixed-template and its erased `space.end` depends on
+the private runtime model; the predicate path is not yet integrated into the
+general callable dispatcher. General loans, public ABI, M11 and C09 remain
+unqualified.
+
 A combined Goose fixture run passed (exit 0) with a private U32-to-Bool
 predicate path and a source-linked primitive schema/dictionary subset. It
 includes `-O0`/`-O2`, forged type/source/schema and Wasm execution controls.

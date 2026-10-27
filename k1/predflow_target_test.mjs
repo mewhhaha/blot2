@@ -1,0 +1,3 @@
+import {strict as assert} from 'node:assert';import{readFileSync}from'node:fs';
+for(let i=0;i<4;i++){const bytes=readFileSync(`predflow-${i}.wasm`);assert(WebAssembly.validate(bytes));const f=(await WebAssembly.instantiate(bytes)).instance.exports.f;for(const x of [0,1,98,99,100,0x7fffffff,0xfffffffe,0xffffffff])assert.equal(f(0,x)>>>0,i<2?Number(x<99):i===2?0:1);}
+const changed=readFileSync('predflow-mutant.wasm');assert(WebAssembly.validate(changed));const f=(await WebAssembly.instantiate(changed)).instance.exports.f;assert.equal(f(0,0xffffffff)>>>0,1);console.log('predicate target canonical Bool execution and valid Wasm mutation passed');
