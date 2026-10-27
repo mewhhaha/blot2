@@ -111,6 +111,7 @@ for level in 0 2; do
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/source_owned_extra_audit.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/owned_chain_test.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/owned_chain_independent_audit.goose"
+    (cd "$test_dir" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/owned_wasm_test.goose" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/owned_wasm_forgery_test.goose" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/owned_wasm_matrix_test.goose" && node "$script_dir/owned_wasm_matrix_test.mjs")
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_fault_test.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_compat_test.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_independent_matrix.goose"

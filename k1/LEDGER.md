@@ -105,6 +105,12 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The subsequently added source-derived private Owned-Wasm fixture passed
+focused `-O0` and `-O2` checks: 336 executed lifecycle/status cases per level,
+cross-source forgery controls and target byte mutations and truncations. Its
+decoder and emitter share source-plan extraction and low-level Wasm helpers;
+fixed private state is not the general K1 allocator or canonical Owned ABI.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
 the private dispatcher began retaining call-local recognition and propagating
 recognized emitter failures immediately. It includes source mutations and
