@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
+the private dispatcher began retaining call-local recognition and propagating
+recognized emitter failures immediately. It includes source mutations and
+truncations, injected failures in all six earlier frontends, compatibility
+matrices and executed Wasm. Source and documentation hashes remained unchanged.
+The controlled private dispatcher comparison and its limitations are recorded
+in `measurements/2026-10-27-disposition/RESULTS.md`; neither it nor the tests
+qualify full C09, public admission or actual host OOM handling.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
 the previous-first private dispatcher, source-derived closed ownership chain
 and actual private leaf-runtime reservation and restore. Source and

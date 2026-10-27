@@ -3,9 +3,14 @@ namespace common_decl_dispatch;
 import generic_callable;
 import common_decl_frontend;
 import common_decl_wasm;
-fn compile(source:u8[:])->generic_callable::Result {
- let old=generic_callable::compile(source);if old.status==0{return old;}
- var p=common_decl_frontend::parse(source);if p.status!=0{return old;}
+// Internal chain helper: `recognized` is a fresh, caller-owned local flag;
+// only the outer compile_record entry resets it. Never use it as admission.
+fn compile_into_fault(source:u8[:],recognized:bool&,fault:i64)->generic_callable::Result {
+ let old=generic_callable::compile_into_fault(source,recognized,fault);if old.status==0 || recognized{return old;}
+ var p=common_decl_frontend::parse(source);if p.status!=0{return old;}recognized=true;if fault==14{return generic_callable::Result {status:1};}
  let bytes=common_decl_wasm::emit(source,p.program);if bytes.len==0{return generic_callable::Result {status:1};}
  return generic_callable::Result {argument:p.program.header.argument,result:p.program.header.result,wasm:bytes};
 }
+
+fn compile_into(source:u8[:],recognized:bool&)->generic_callable::Result {return compile_into_fault(source,recognized,0);}
+fn compile(source:u8[:])->generic_callable::Result {var recognized=false;return compile_into(source,recognized);}

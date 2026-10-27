@@ -7,10 +7,16 @@ import common_decl_dispatch;
 import typed_canonical_frontend;
 import typed_canonical_check;
 import typed_canonical_wasm;
-fn compile(source:u8[:])->generic_callable::Result {
- let previous=common_decl_dispatch::compile(source);if previous.status==0{return previous;}
- var parsed=typed_canonical_frontend::parse(source);if parsed.status!=0{return previous;}
+// Internal chain helper: `recognized` is a fresh, caller-owned local flag;
+// only the outer compile_record entry resets it. Never use it as admission.
+fn compile_into_fault(source:u8[:],recognized:bool&,fault:i64)->generic_callable::Result {
+ let previous=common_decl_dispatch::compile_into_fault(source,recognized,fault);if previous.status==0 || recognized{return previous;}
+ var parsed=typed_canonical_frontend::parse(source);if parsed.status!=0{return previous;}recognized=true;if fault==15{return generic_callable::Result {status:1};}
  if !typed_canonical_check::verify(source,parsed.program){return generic_callable::Result {status:1};}
  let bytes=typed_canonical_wasm::emit(source,parsed.program);if bytes.len==0{return generic_callable::Result {status:1};}
  return generic_callable::Result {argument:1,result:1,wasm:bytes};
 }
+
+fn compile_record_fault(source:u8[:],recognized:bool&,fault:i64)->generic_callable::Result {recognized=false;return compile_into_fault(source,recognized,fault);}
+fn compile_record(source:u8[:],recognized:bool&)->generic_callable::Result {return compile_record_fault(source,recognized,0);}
+fn compile(source:u8[:])->generic_callable::Result {var recognized=false;return compile_record(source,recognized);}

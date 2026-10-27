@@ -115,6 +115,8 @@ for level in 0 2; do
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_compat_test.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_independent_matrix.goose"
     "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_replay_six_independent.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_disposition_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_disposition_six_fault_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/closure_audit_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_limits_test.goose"

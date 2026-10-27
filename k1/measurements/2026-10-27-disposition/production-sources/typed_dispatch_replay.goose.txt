@@ -1,0 +1,17 @@
+// Private opt-in dispatcher only. Old checked results are returned unchanged;
+// the typed scalar/loop arena handles a narrow previously rejected U32 subset.
+// No public K1 ABI, resource, ownership, effect or C09 admission follows.
+namespace typed_dispatch_replay;
+import generic_callable_replay;
+import generic_callable;
+import common_decl_dispatch_replay;
+import typed_canonical_frontend;
+import typed_canonical_check;
+import typed_canonical_wasm;
+fn compile(source:u8[:])->generic_callable::Result {
+ let previous=common_decl_dispatch_replay::compile(source);if previous.status==0{return previous;}
+ var parsed=typed_canonical_frontend::parse(source);if parsed.status!=0{return previous;}
+ if !typed_canonical_check::verify(source,parsed.program){return generic_callable::Result {status:1};}
+ let bytes=typed_canonical_wasm::emit(source,parsed.program);if bytes.len==0{return generic_callable::Result {status:1};}
+ return generic_callable::Result {argument:1,result:1,wasm:bytes};
+}

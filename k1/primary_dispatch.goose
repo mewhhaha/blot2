@@ -25,9 +25,9 @@ fn previous_recognizes(source:u8[:])->bool {
  let f=typed_canonical_frontend::parse(source);return f.status==0;
 }
 fn compile_with_fault(source:u8[:],fault:i64)->generic_callable::Result {
- let previous=typed_dispatch::compile(source);
+ var recognized=false;let previous=typed_dispatch::compile_record_fault(source,recognized,fault);
  if previous.status==0 && fault!=7 {return previous;}
- if previous_recognizes(source) {if fault==7 && previous.status==0 {return generic_callable::Result {status:1};}return previous;}
+ if recognized {if fault==7 && previous.status==0 {return generic_callable::Result {status:1};}return previous;}
  if previous.status==0 {return generic_callable::Result {status:1};}
  var p=short_frontend::parse(source);
  if p.status!=0 {return previous;}

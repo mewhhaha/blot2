@@ -1,0 +1,12 @@
+// Prior typed callable dispatch stays first for byte and diagnostic compatibility.
+namespace common_decl_dispatch_replay;
+import generic_callable_replay;
+import generic_callable;
+import common_decl_frontend;
+import common_decl_wasm;
+fn compile(source:u8[:])->generic_callable::Result {
+ let old=generic_callable_replay::compile(source);if old.status==0{return old;}
+ var p=common_decl_frontend::parse(source);if p.status!=0{return old;}
+ let bytes=common_decl_wasm::emit(source,p.program);if bytes.len==0{return generic_callable::Result {status:1};}
+ return generic_callable::Result {argument:p.program.header.argument,result:p.program.header.result,wasm:bytes};
+}

@@ -1,0 +1,4 @@
+pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:
+  let out = for i in 0..x carry (a=17) do:
+    next (i)
+  return out
