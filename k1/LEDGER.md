@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The subsequently added private resolver-backed graph job passed focused
+`-O0` and `-O2` C-linked and Wasm execution tests for a single scalar/loop
+module and a bounded U32 direct-call chain. They cover source changes, import
+cycles and ambiguity, path and capacity failures, and staged no-output
+failures. Root/package mapping, names, capacities and ABI values are trusted;
+the single-module branch checks ABI length only. File reads need not form an
+atomic revision. This is not a general project protocol, public ABI or C09.
+
 The subsequently added private resolver-bound semantic job and partial
 contract meter passed focused `-O0` and `-O2` checks. They cover C-linked
 resolver containment, changed-source execution, staged no-output failures,

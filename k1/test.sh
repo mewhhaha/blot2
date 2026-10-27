@@ -23,6 +23,7 @@ node "$script_dir/joined_driver_independent_cli_test.mjs" "$script_dir/build/blo
 python3 "$script_dir/abi_fixed_oracle.py"
 python3 "$script_dir/source_resolver_test.py"
 python3 "$script_dir/semantic_job_test.py"
+python3 "$script_dir/semantic_graph_job_test.py"
 python3 "$script_dir/particle_expr_oracle_test.py"
 python3 "$script_dir/graph_oracle_test.py"
 python3 "$script_dir/bounds_oracle_test.py"
