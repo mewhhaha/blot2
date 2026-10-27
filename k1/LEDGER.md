@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A fresh combined Goose fixture run passed (exit 0) with private U32/Bool
+callables, the independent Bool target decoder, selected static layout
+metering, and optional solver-free audit generation. It covers `-O0`/`-O2`,
+source/Core/target forgery, canonical Bool execution, counter boundaries and
+fail-closed audit controls. An earlier run was interrupted (exit 130) after
+shared files changed during execution; it is not a passing gate. Raw Bool
+callers must supply 0 or 1, resource bounds are not proved, and the layout
+meter and optional audit do not qualify C09, M11, ABI or public admission.
+
 A combined Goose fixture run passed (exit 0) with additional actual F32,
 image-copy and comparison metering and independently transcribed selected ABI
 anchors. It includes `-O0`/`-O2`, arbitrary-bit F32 differential, byte-mutation

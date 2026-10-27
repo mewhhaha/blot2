@@ -1,0 +1,1 @@
+import {strict as assert} from 'node:assert';import {readFileSync} from 'node:fs';const bytes=readFileSync('bool-independent.wasm');assert(WebAssembly.validate(bytes));const f=(await WebAssembly.instantiate(bytes)).instance.exports.f;assert.equal(f(0,0),42);assert.equal(f(0,1),11);console.log('independent Bool nested-branch canonical inputs passed');
