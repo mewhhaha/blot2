@@ -280,8 +280,14 @@ fn verify(tree: mixed_core::Tree&, expected_source: u8[:]) -> bool {
     } else {
         let name=r.t;if !ident(s,name) {r.bad=true;}else {bump(s,r);let empty:i64[0]=[];let id=binding(s,r,tree,name,1,r.function_target,empty);activate(r,id);count=1;}
     }
-    take(s,r,5,"=>"); take(s,r,1,"do"); take(s,r,5,":"); kind(s,r,6); kind(s,r,7);
-    let body=suite(s,r,tree,r.function_target); kind(s,r,8);
+    take(s,r,5,"=>"); var body=Term {};
+    if text(s,r.t,1,"do") {
+        take(s,r,1,"do"); take(s,r,5,":"); kind(s,r,6); kind(s,r,7);
+        body=suite(s,r,tree,r.function_target); kind(s,r,8);
+    } else {
+        if !text(s,r.t,1,"return") {return false;}
+        body=statement(s,r,tree,r.function_target);
+    }
     while !r.bad && r.t.kind==6 {bump(s,r);}
     if r.bad || r.t.kind!=0 || body.id==0 {return false;}
     let root=event(r,tree,mixed_core::Node {tag:18,start:function.start,end:body.end,a:body.id,b:count,target:r.function_target});

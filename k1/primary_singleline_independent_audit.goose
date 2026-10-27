@@ -1,0 +1,8 @@
+import std;import short_frontend;import short_check;import short_legacy_wasm;
+fn main(){for source in ["pub let pred: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => return x < 7\n", "pub let pred: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return 4294967295 < x\n"] {
+ var p=short_frontend::parse(source);assert(p.status==0 && short_check::verify(source,p.program));let out=short_legacy_wasm::emit(source,p.program);assert(out.len>0);
+ for i in source.len {var bad:u8[>..]=[];bad.append(source);bad[i]^=1;assert(!short_check::verify(bad,p.program) && short_legacy_wasm::emit(bad,p.program).len==0);}
+ for i in p.program.tree.nodes.len {for f in 11 {var bad=copy(p.program);if f==0 {bad.tree.nodes[i].tag=999;}else if f==1 {bad.tree.nodes[i].start= -1;}else if f==2 {bad.tree.nodes[i].end=9223372036854775807;}else if f==3 {bad.tree.nodes[i].a= -1;}else if f==4 {bad.tree.nodes[i].b= -1;}else if f==5 {bad.tree.nodes[i].c= -1;}else if f==6 {bad.tree.nodes[i].d= -1;}else if f==7 {bad.tree.nodes[i].e= -1;}else if f==8 {bad.tree.nodes[i].f= -1;}else if f==9 {bad.tree.nodes[i].g= -1;}else {bad.tree.nodes[i].target= -1;}assert(!short_check::verify(source,bad) && short_legacy_wasm::emit(source,bad).len==0);}}
+ for i in p.program.types.len {var bad=copy(p.program);bad.types[i]^=3;assert(!short_check::verify(source,bad));}
+ for i in p.program.tree.bindings.len {for f in 4 {var bad=copy(p.program);if f==0 {bad.tree.bindings[i].start= -1;}else if f==1 {bad.tree.bindings[i].end=9223372036854775807;}else if f==2 {bad.tree.bindings[i].kind=999;}else {bad.tree.bindings[i].scope= -1;}assert(!short_check::verify(source,bad));}}
+ }print("independent single-line/multiline full-source and Core forgery controls passed");}

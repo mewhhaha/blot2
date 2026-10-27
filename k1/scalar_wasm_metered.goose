@@ -5,6 +5,7 @@ namespace scalar_wasm_metered;
 import scalar_plan;
 import scalar_plan_metered;
 import wasm;
+import wasm_fast;
 import work;
 
 struct Emitted { status: u32 = 0, receipt: work::Receipt = work::Receipt {}, bytes: u8[] = [] }
@@ -45,7 +46,7 @@ fn emit(name: u8[:], plan: scalar_plan::ScalarLoweringPlan, meter: work::Meter&)
         wasm::emit_operand(body, result);
     }
     body.push(0x0b);
-    let bytes = wasm::emit_body(name, body);
+    let bytes = wasm_fast::emit_body(name, body);
     if bytes.len == 0 { return Emitted { status: 1 }; }
     return Emitted { bytes: bytes };
 }

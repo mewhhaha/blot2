@@ -62,6 +62,7 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/fixture_geometry_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/fixture_geometry_metered_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/wasm_scalar_validation_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/wasm_fast_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/work_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/work_schedule_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/proof_scopes_test.goose"
@@ -104,6 +105,13 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/owned_program_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/owned_program_mutation_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/owned_program_adversarial_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/source_owned_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/source_owned_runtime_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/source_owned_forgery_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/source_owned_extra_audit.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_fault_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_compat_test.goose"
+    "$GOOSE" --quiet --debug "-O$level" "$script_dir/primary_dispatch_independent_matrix.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/closure_audit_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_adversarial_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/locals_limits_test.goose"
@@ -229,6 +237,7 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/ops_test.goose" && node "$script_dir/ops_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/ops_independent_audit.goose" && node "$script_dir/ops_independent_audit.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/ops_old_bytes_audit.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/le_fact_test.goose" && node "$script_dir/le_fact_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/le_independent_audit.goose" && node "$script_dir/le_independent_audit.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/path_test.goose" && node "$script_dir/path_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/path_independent_cache_audit.goose" && node "$script_dir/path_independent_cache_audit.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/path_compat_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/path_depth_test.goose" && node "$script_dir/path_depth_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/path_iterative_independent_audit.goose" && node "$script_dir/path_iterative_independent_audit.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/primary_singleline_test.goose" && node "$script_dir/primary_singleline_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/primary_singleline_independent_audit.goose")
     (cd "$test_dir" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/typed_dispatch_test.goose" && node "$script_dir/typed_dispatch_test.mjs" && "$GOOSE" --quiet --debug "-O$level" "$script_dir/typed_wrapper_independent_audit.goose" && node "$script_dir/typed_wrapper_independent_audit.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/scalar_host_test.goose" && node "$script_dir/scalar_host_wasm_test.mjs" && node "$script_dir/scalar_host_preflight_test.mjs" && node "$script_dir/scalar_host_private_test.mjs" && node "$script_dir/scalar_host_independent_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/leaf_resource_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/leaf_resource_independent_audit.goose" && node "$script_dir/leaf_resource_test.mjs")

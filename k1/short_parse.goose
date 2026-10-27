@@ -284,10 +284,15 @@ fn parse(s: u8[:]) -> mixed_core::Tree, i64 {
         if id==0 {return mixed_core::Tree {},if p.status==0 {1} else {p.status};}
         activate(p,id); advance(s,p); count=1;
     }
-    if !take(s,p,5,"=>") || !take(s,p,1,"do") || !take(s,p,5,":") || !take_kind(s,p,6) || !take_kind(s,p,7) {
-        return mixed_core::Tree {},if p.status==0 { 1 } else { p.status };
+    if !take(s,p,5,"=>") { return mixed_core::Tree {},if p.status==0 {1} else {p.status}; }
+    var body:i64=0;
+    if is(s,p.t,1,"do") {
+        if !take(s,p,1,"do") || !take(s,p,5,":") || !take_kind(s,p,6) || !take_kind(s,p,7) {return mixed_core::Tree {},if p.status==0 {1} else {p.status};}
+        body=suite(s,p); if body==0 || !take_kind(s,p,8) {return mixed_core::Tree {},if p.status==0 {1} else {p.status};}
+    } else {
+        if !is(s,p.t,1,"return") {return mixed_core::Tree {},1;}
+        body=statement(s,p); if body==0 {return mixed_core::Tree {},if p.status==0 {1} else {p.status};}
     }
-    let body=suite(s,p); if body==0 || !take_kind(s,p,8) { return mixed_core::Tree {},if p.status==0 { 1 } else { p.status }; }
     while p.status==0 && p.t.kind==6 { advance(s,p); }
     if p.status!=0 || p.t.kind!=0 { return mixed_core::Tree {},if p.status==0 { 1 } else { p.status }; }
     let root=emit(p,mixed_core::Node { tag:18,start:f.start,end:p.nodes[body-1].end,a:body,b:count,target:p.function_target });

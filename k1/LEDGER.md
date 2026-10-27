@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
+the private primary-first dispatcher, source-derived Owned fixture and direct
+scalar Wasm encoder were integrated. It includes prior-output comparisons,
+source/Core/target forgery and failure controls, loan and move tests, exact
+budget checks, bytewise encoder parity and executed Wasm. Source and
+documentation hashes remained unchanged during the run. These remain bounded
+fixtures; general capability authority, public ABI, allocation-failure handling
+and complete C09 are not qualified.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
 the branch-sensitive short-circuit proofs and private leaf-resource planning.
 It includes prior-output compatibility, deep 118–127 operand chains,
