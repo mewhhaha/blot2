@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The subsequently added private leaf host passed focused `-O0` and `-O2`
+reservation, target-pin, hostile-intrinsic and sticky-poison controls. It uses
+captured synchronous Wasm constructors and a null-prototype host to avoid the
+tested post-import thenable substitution. Trusted initialization and
+nonconcurrent initial target copying remain assumptions; a trap discards the
+private instance rather than proving general recovery or public ABI/M11.
+
 The subsequently added source-derived private Owned-Wasm fixture passed
 focused `-O0` and `-O2` checks: 336 executed lifecycle/status cases per level,
 cross-source forgery controls and target byte mutations and truncations. Its
