@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The subsequently added private multiline imported-leaf lift passed focused
+`-O0` and `-O2` C-linked graph and Wasm execution checks. Its independent
+controls cover original/synthetic source correspondence, graph forgeries,
+identity/literal values and resource boundaries. It supports only terminal
+U32 identity or literal leaves; synthetic normalization may hit graph limits,
+and trusted ABI/root inputs and non-atomic filesystem reads remain unqualified.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
 the private resolver job adopted fused validation. It covers frozen-baseline
 status/byte parity, source/Core and target forgeries, resource boundaries,

@@ -1,0 +1,1 @@
+c_sources = ["source_resolver.c", "project_probe.c"];
