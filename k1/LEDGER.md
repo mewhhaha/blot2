@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) at `-O0` and `-O2` after
+integrating the private scalar/loop arena, source-to-target caller binding and
+the versioned private work-schedule correction. It includes independent
+source, target and mutation controls, generated loop execution and stale
+receipt fallback tests. Source and documentation inputs remained unchanged;
+the suite regenerated its ignored `k1/build/blot-k1` executable. These are
+bounded private paths, not public ABI, general loans or full C09 qualification.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2`
 with the private typed scalar Core, branch-aware direct fixed-caller lowering,
 and source-instantiated tuple generic fixtures. It includes source and Core

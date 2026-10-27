@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+let state=0x12345678;for(let i=0;i<120;i++){let wasm=await readFile(`ind-canonical-${i}.wasm`);assert(WebAssembly.validate(wasm));let f=new WebAssembly.Instance(new WebAssembly.Module(wasm)).exports.f;let n=(i*7+3)%11,k=(i*31+1)%257;let input=[0,1,n,Math.max(0,n-1),n+1,0x7fffffff,0xffffffff];for(let j=0;j<100;j++){state=(Math.imul(state,1664525)+1013904223)>>>0;input.push(state);}for(let x of input)assert.equal(f(0,x)>>>0,(Math.min(x,n)*k)>>>0);}
+console.log('independent 120-program loop carry/stop Wasm oracle passed');

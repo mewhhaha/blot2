@@ -71,6 +71,13 @@ The private command-line scalar fixture uses this scheduled driver. This
 mechanism does not prove that a phase performed all mandatory checks and does
 not prevent trusted internal code from altering its in-memory meter.
 
+Private scalar visit schedule 2 charges parent-node dereferences in syntax
+verification, changing exact counts and near-limit outcomes relative to the
+earlier undercount. The retained scalar fixture rejects mismatched schedule
+revisions and recomputes fresh. This implementation revision is not a new
+normative semantic policy or an authenticated receipt; malformed-edge charge
+precedence remains unresolved. See `C09_VISIT_SCHEDULE_MIGRATION.md`.
+
 The separate `proof_scopes::Job` experiment tracks active and peak fact and
 prerequisite edges in its own meter. Facts remain live until their scope closes;
 children must close first and dependent facts discharge in reverse construction

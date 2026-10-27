@@ -20,7 +20,7 @@ struct Observation {
 }
 struct Observations { count: u32 = 0, values: Observation[16] = [Observation {}; 16] }
 struct Entry {
-    sealed: bool = false, source_len: u32 = 0, source: u8[4096] = [0; 4096],
+    sealed: bool = false, visit_schedule: u32 = 0, source_len: u32 = 0, source: u8[4096] = [0; 4096],
     target_len: u32 = 0, target: u8[8192] = [0; 8192],
     observations: Observations = Observations {}, receipt: work::ScheduledWork = work::ScheduledWork {},
     plan: scalar_plan::ScalarLoweringPlan = scalar_plan::ScalarLoweringPlan {}
@@ -79,7 +79,7 @@ fn receipt_valid(job: work::ScheduledWork&) -> bool {
     return sum == job.meter.semantic as u64;
 }
 fn entry_valid(e: Entry&) -> bool {
-    return e.sealed && e.source_len <= 4096 && e.target_len > 0 && e.target_len <= 8192 &&
+    return e.sealed && e.visit_schedule == scalar_scheduled::private_visit_schedule() && e.source_len <= 4096 && e.target_len > 0 && e.target_len <= 8192 &&
         observations_valid(e.observations) && receipt_valid(e.receipt);
 }
 fn add1(n: u64) -> u64 { if n == 18446744073709551615 { return n; } return n + 1; }
@@ -155,7 +155,7 @@ fn compile(session: Session&, source: u8[:], observations: Observations&, policy
     }
     if validation_status != 0 { return Result { status: 4 }; }
     if session_target_exact::verify(completed.bytes, validation) != 0 { return Result { status: 4 }; }
-    var staged = Entry { sealed: true, source_len: source.len as u32, target_len: completed.bytes.len as u32,
+    var staged = Entry { sealed: true, visit_schedule: scalar_scheduled::private_visit_schedule(), source_len: source.len as u32, target_len: completed.bytes.len as u32,
         observations: observations, receipt: job, plan: plan };
     for b, i in source { staged.source[i] = b; }
     for b, i in completed.bytes { staged.target[i] = b; }

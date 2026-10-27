@@ -95,6 +95,9 @@ fn validate_impl(arena: Arena&, visits: ValidationWork&, meter: work::Meter&) ->
         if !visits.enabled && (n.parent < 1 || n.parent > i || n.reference < 0 || n.reference > i) { return 1; }
         if !visit(visits, meter, 3) { return visits.failure; } // parent edge
         if n.parent < 1 || n.parent > i { return 1; }
+        // C09 prototype schedule 2: the represented parent edge and the
+        // parent node reached through it are distinct required visits.
+        if visits.enabled && !visit(visits, meter, 2) { return visits.failure; }
         let parent = arena.nodes[n.parent - 1];
         if n.start < parent.start || n.end > parent.end { return 1; }
         var ctx = contexts[n.parent - 1];

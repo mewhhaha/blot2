@@ -33,7 +33,12 @@ retention path derives a plan with an extra unmetered parser pass before its
 target recheck, so this telemetry does not constitute complete C09 accounting.
 
 A hit requires exact source bytes, the current fixed semantic-policy string,
-and exact ordered positive/negative observations. The trusted query engine
+the current private scalar visit-schedule revision, and exact ordered
+positive/negative observations. Revision 2 adds previously missing parent-node
+visits; unknown, missing and older revisions decline reuse and run fresh work.
+This revision is an internal cache compatibility key, not a new normative
+policy or an integrity seal. See `C09_VISIT_SCHEDULE_MIGRATION.md` for the
+boundary and remaining accounting gaps. The trusted query engine
 must supply a complete, authoritative observation sequence; this fixture does
 not discover module, provider, origin, static or recursion dependencies. The
 observations are test data for this private scalar fixture, which has no

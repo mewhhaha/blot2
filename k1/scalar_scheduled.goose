@@ -13,6 +13,10 @@ import validate;
 import catalog;
 import fixture_geometry;
 
+// Internal cache/receipt compatibility revision for this partial scalar
+// traversal only; this is not a new normative K1 semantic policy.
+fn private_visit_schedule() -> u32 { return 2; }
+
 // 0 success, 1 invalid input/representation, 2 semantic limit,
 // 3 Core limit, 4 internal accounting/phase failure.
 struct Result {
