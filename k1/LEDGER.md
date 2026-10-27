@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the guarded caller, a
+fixed-target machine decoder and caller-flow witness, conditional frame model,
+and shared aggregate work-meter prototype. It includes `-O0`/`-O2`, target
+mutation, frame-frontier, wire/cleanup, forged proof and work-boundary controls.
+The machine path and selected slot checks do not establish M11 depth or a
+complete frame bound; the caller's helper/loan authority and C09 remain
+unqualified.
+
 A combined Goose fixture run passed (exit 0) with the private in-module caller,
 actual scalar lexer/source-byte metering and provisional operation registry.
 It covers `-O0`/`-O2`, target-byte and truncation rejection, wire and cleanup

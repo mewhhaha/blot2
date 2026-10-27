@@ -180,6 +180,16 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/static_b_cache_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_b_differential_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_b_independent_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_parse_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_verify_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_eval_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_publish_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_pipeline_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_differential_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_independent_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_ag_forgery_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/frame_contract_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/frame_contract_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_adapter_independent_test.goose"
@@ -206,7 +216,8 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_candidate_adversarial_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_candidate_wire_emit.goose" && node "$script_dir/m12_candidate_wire_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_test.goose" && node "$script_dir/m12_one_test.mjs" && node "$script_dir/m12_one_bridge_oracle_test.mjs")
-    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_target_test.goose" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_alternate_test.goose" && node "$script_dir/m12_internal_alternate_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_target_test.goose" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs" && node "$script_dir/m12_internal_zero_guard_test.mjs" && node "$script_dir/m12_internal_zero_guard_adversarial_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_alternate_test.goose" && node "$script_dir/m12_internal_alternate_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_adversarial_test.goose" && node "$script_dir/m12_caller_flow_frontier_test.mjs" && node "$script_dir/i08_machine_test.mjs" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_variant_test.goose" && node "$script_dir/m12_one_variant_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/joined_public_test.goose" && node "$script_dir/joined_public_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/joined_bridge_audit.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_cross_source_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/frame_emit_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/m12_one_independent_bodies_test.mjs" && node "$script_dir/m12_one_independent_geometry_test.mjs" && node "$script_dir/m12_one_independent_numeric_test.mjs" && node "$script_dir/m12_one_partial_fault_test.mjs")

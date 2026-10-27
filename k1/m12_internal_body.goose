@@ -46,6 +46,12 @@ fn body()->u8[] {
  get(o,12);get(o,6);b(o,0x49);get(o,12);get(o,6);get(o,5);c(o,16);b(o,0x6c);b(o,0x6a);b(o,0x4f);b(o,0x72);open(o);
  c(o,32800);get(o,12);b(o,0x6a);b(o,0x2d);b(o,0);b(o,0);b(o,0x45);b(o,0x45);invalid_if(o);end(o);
  get(o,12);c(o,1);b(o,0x6a);set(o,12);b(o,0x0c);b(o,0);end(o);end(o);
+ // Fixed adapter scratch addresses require frame frontier zero. Reject before
+ // configuration, reservation, copying or source effects; do not trap.
+ memload(o,404);b(o,0x45);b(o,0x45);open(o);
+ setword(o,36864,0x4b310001);setword(o,36868,91);setword(o,36872,5);
+ for a in [36876 as u32,36880,36884,36888,36892] {setword(o,a,0);}
+ clear_busy(o);c(o,5);b(o,0x0f);end(o);
  // Frame entry precedes all reservation and placement.
  c(o,1024);call(o,16);check_zero(o);call(o,18);set(o,14);get(o,14);b(o,0x45);b(o,0x45);open(o);
  get(o,14);c(o,4294967291);b(o,0x47);trap_if(o);

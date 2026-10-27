@@ -1,0 +1,15 @@
+import {strict as assert} from 'node:assert';
+import {readFileSync} from 'node:fs';
+const e=new WebAssembly.Instance(new WebAssembly.Module(readFileSync('private-invoke.wasm'))).exports;
+const m=new Uint8Array(e.memory.buffer),d=new DataView(m.buffer);
+const p=32768;d.setUint32(p,0x4b310001,true);d.setUint32(p+4,91,true);d.setUint32(p+12,28,true);
+d.setUint32(p+32,1,true);d.setUint32(p+36,12,true);d.setFloat32(p+40,.5,true);
+for(let j=0;j<4;j++)d.setFloat32(p+44+j*4,j+1,true);
+d.setUint32(404,16,true);m.fill(0xa5,36896,37120);
+const ingress=Uint8Array.from(m.subarray(32768,33024)),owners=Uint8Array.from(m.subarray(16,148));
+assert.equal(e.invoke(91,60,224),5);assert.deepEqual(m.subarray(32768,33024),ingress);assert.deepEqual(m.subarray(16,148),owners);
+assert.equal(d.getUint32(404,true),16);assert.equal(d.getUint32(416,true),0);
+assert.deepEqual(Array.from({length:8},(_,i)=>d.getUint32(36864+4*i,true)),[0x4b310001,91,5,0,0,0,0,0]);
+assert(m.subarray(36896,37120).every(x=>x===0xa5));
+d.setUint32(404,0,true);assert.equal(e.invoke(91,60,224),0);assert.equal(e.frame_top(),0);
+console.log('private nonzero-frontier pre-effect rejection and zero-frontier recovery passed');
