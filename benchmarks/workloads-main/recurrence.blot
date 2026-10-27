@@ -1,0 +1,9 @@
+const advance = fn (state: U32) -> U32 => @u32.add (@u32.mul state 1664525) 1013904223
+entry const run = fn (seed: U32) -> U32 => do:
+  let state = seed
+  let total = 0
+  for ignored in 0..1024:
+    let updated = advance state
+    state := updated
+    total := @u32.add self updated
+  break total

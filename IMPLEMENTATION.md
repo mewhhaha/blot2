@@ -260,3 +260,13 @@ partial writes, typed generic/fixed paths and exact byte/call counters.
 pass with fresh engine processes: generic integer/F32 kernels improve, aggregate
 and ordinary controls remain roughly unchanged. The pass is complete; there is
 no ongoing optimization search or pending required check.
+
+## Direct comparison with main
+
+[MAIN_COMPARISON.md](benchmarks/MAIN_COMPARISON.md) adds 209 measurements of the
+unchanged qualified compiler against main `1e39b5d`, with its installed release
+hash verified against committed provenance. The charts expose generic runtime
+regressions as well as compile-time gains and gaps. This benchmark/documentation
+addition changes no qualified compiler input; the 116-native/92-integration gate
+and 197-input manifest remain valid. It does not extend the implemented language
+or establish application-wide parity.

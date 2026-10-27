@@ -1,0 +1,10 @@
+const identity = fn value => value
+entry const run = fn (seed: U32) -> U32 => do:
+  let state = seed
+  let total = 0
+  for ignored in 0..1024:
+    let (prior,accumulated) = identity (state,total)
+    let updated = @u32.add (@u32.mul prior 1664525) 1013904223
+    state := updated
+    total := @u32.add accumulated updated
+  break total

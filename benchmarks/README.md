@@ -1,6 +1,10 @@
 # K1 measurement corpus
 
-[Current runtime measurements](RUNTIME.md) cover two bounded lowering changes
+[Current comparison against main](MAIN_COMPARISON.md) measures equivalent loop
+kernels and fresh compilation with both exact qualified binaries. It includes
+remaining generic runtime regressions and a separate comparison chart.
+
+[Previous/new K1 runtime measurements](RUNTIME.md) cover two bounded lowering changes
 with fresh engine processes, exact kernel references and compile controls.
 
 [Earlier structural measurements](STRUCTURAL.md) isolate borrowed validator views,
@@ -169,3 +173,17 @@ The public harness accepts other compiler paths; the baseline above is the saved
 local candidate for this investigation. `benchmarks/package_runtime.py` freezes
 this specific qualified pass and verifies its baseline, source hashes and exact
 paired outputs. Historical packages retain their original harness versions.
+
+## Current main comparison
+
+`benchmarks/compare_main.ts` is the snapshot-specific loop harness for main
+`1e39b5d` versus the qualified rewrite. It pairs `workloads-main/` source with
+`workloads/`, shares exact reference models, and runs each artifact in
+`main_runtime_worker.ts`. Optional ownership export hooks run inside each timed
+invocation when present. The packager verifies the pinned main binary identity;
+use this harness with the recorded main release.
+
+See [MAIN_COMPARISON.md](MAIN_COMPARISON.md#reproduction) for commands and limits.
+`package_main.py` freezes its 209 records, committed main provenance, current gate
+and all source/log evidence. `plot_main.py` renders both charts from the verified
+published JSON, without new measurements. Earlier packages remain unchanged.

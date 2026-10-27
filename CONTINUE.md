@@ -3,12 +3,15 @@
 Worktree: `/home/mewhhaha/.codex/worktrees/0409/blot2`, branch `rewrite/goose-k1`.
 Draft PR: https://github.com/mewhhaha/blot2/pull/43, targeting `main`.
 The user requested the draft PR, then a bounded runtime performance pass with Sol
-review. The PR was opened after pushing `900ede2`; the bounded runtime follow-up is
-complete and recorded below. All agent lanes are frozen,
+review. The PR was opened after pushing `900ede2`; the bounded runtime follow-up
+and the requested direct comparison against main are complete and recorded below.
+Sol also reviewed the new benchmark's equivalence and boundary handling.
+All agent lanes are frozen,
 all required checks and measurements are complete, and no jobs remain running.
 Do not continue an open-ended optimization search without a new user request.
 
-Read [current runtime results](benchmarks/RUNTIME.md),
+Read [the direct main comparison](benchmarks/MAIN_COMPARISON.md),
+[the previous/new K1 runtime results](benchmarks/RUNTIME.md),
 [implementation ledger](IMPLEMENTATION.md), [contracts](docs/CONTRACT.md) and
 [normative snapshots](docs/spec/INDEX.md). The earlier
 [structural](benchmarks/STRUCTURAL.md) and [parity](benchmarks/PARITY.md) reports
@@ -62,11 +65,29 @@ call in default V8: paired ratio 0.220, about 4.5× faster. Optimizing-only rati
 less time. Ordinary kernels and the eight-byte aggregate fallback remain roughly
 unchanged. Nine compile controls give paired ratios 0.959–1.023, with no established
 compile-time change. All samples/ranges are retained; CPU placement/load/frequency
-and cache remain uncontrolled. No new gdev or legacy comparison was made.
+and cache remain uncontrolled. That pass did not compare against main; the
+separate follow-up below now does. No new gdev measurement was made.
 
 The selected changes passed and have useful measured results. Stop here rather
 than tuning these kernels further. The initial release inliner remains qualified
 but its earlier general runtime benefit is unresolved; no inlining limits changed.
+
+## Completed comparison against main
+
+The requested follow-up compares this exact qualified K1 with main `1e39b5d`
+using its installed hash-matched release `fd2119f5…`. Both committed main
+provenance blobs are archived. No compiler inputs or binaries changed.
+
+Five counterbalanced pairs, two fresh-engine modes and nine compile families
+produce 209 records under `benchmarks/results/main-comparison/`. Ordinary loops
+are near parity. Generic integer takes 1.13–1.20× main's time, generic F32
+3.61–4.24×, generic pair 6.40–6.55×. Call-chain/closure/diamond/generic compilation
+is faster in every measured pair, while proof guards and static domains take
+about 13% and 71% more time. All paired ranges remain visible in the report.
+K1 uses `--opt=off`; main uses its default pipeline. Required ownership hooks
+are included where exported (main's pair fixture). No retained-session or
+compiler rebuild comparison was added. The bounded comparison is complete;
+no optimization search follows automatically from these regressions.
 
 ## Earlier work and reproduction
 

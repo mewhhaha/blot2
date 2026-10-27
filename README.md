@@ -124,8 +124,22 @@ stores, two multiplies, two adds and no calls inside the loop.
 
 ## Performance
 
-The latest runtime pass makes the measured **generic integer loop 4.5–4.9×
-faster** and reduces generic F32 loop time by **15–19%** across default and
+Compared directly with **`main` at `1e39b5d`**, ordinary integer/F32 loops are
+roughly at parity. Generic loops still take longer: **1.13–1.20×** main's time for
+integers, **3.61–4.24×** for F32 and **6.40–6.55×** for eight-byte pairs, across
+default and optimizing-only V8. These are median paired ratios from equivalent
+loop kernels, with the required export ownership boundaries included.
+[The direct comparison](benchmarks/MAIN_COMPARISON.md) records all 209 measurements,
+absolute timings, ranges, source equivalence and exact compiler provenance.
+
+![Runtime comparison against main, with both V8 modes shown separately](benchmarks/charts/main-runtime-comparison.svg)
+
+Main is 100% for each workload and engine; lower is better. Whiskers show all
+five observed pairs, not confidence intervals. The generic gaps persist in the
+optimizing-only control. Ordinary-loop differences are small and unresolved.
+
+Against the previous K1, the latest runtime pass makes the measured **generic
+integer loop 4.5–4.9× faster** and reduces generic F32 loop time by **15–19%** across default and
 optimizing-only V8. It removes unused phi scratch and lowers four-byte payload
 copies to raw word loads/stores. Ordinary loops and the aggregate-copy fallback
 remain roughly unchanged. These are five reference-checked kernels, with a fresh
@@ -143,23 +157,28 @@ validator table views and use a forward-only proof-graph traversal. The
 [structural report](benchmarks/STRUCTURAL.md) separates isolated changes, combined
 results and remaining limits.
 
-Five counterbalanced pairs on a Ryzen 7 7800X3D, 128 functions/callers except the
-127-depth chain. This legacy table belongs to the preceding structural snapshot;
-the runtime pass did not rerun the legacy comparison. Both are native release
-compilers; K1 uses `--opt=off` and legacy uses its default pipeline. Fresh process
-compilation medians:
+The fresh comparison against `main` uses five counterbalanced pairs on a Ryzen 7
+7800X3D, 128 functions/callers except the 127-depth chain. Both are native release
+compilers; K1 uses `--opt=off` and main uses its default pipeline. Fresh process
+compilation medians include startup and publication:
 
-| Workload | Legacy ms | K1 ms |
+| Workload | Main ms | K1 ms |
 | --- | ---: | ---: |
-| Independent functions | 4.98 | 4.57 |
-| Shared callee | 5.78 | 5.07 |
-| Call chain (127) | 8.26 | 5.23 |
-| Diamonds | 18.11 | 15.57 |
-| Generic calls | 5.75 | 4.86 |
-| Captured closures | 10.20 | 7.83 |
-| Imported modules | 10.71 | 10.61 |
-| Guarded arithmetic | 22.56 | 25.39 |
-| Static domains | 7.35 | 13.23 |
+| Independent functions | 5.03 | 4.84 |
+| Shared callee | 5.24 | 4.55 |
+| Call chain (127) | 8.65 | 5.23 |
+| Diamonds | 18.17 | 15.71 |
+| Generic calls | 5.50 | 4.89 |
+| Captured closures | 10.90 | 7.85 |
+| Imported modules | 11.69 | 11.13 |
+| Guarded arithmetic | 22.27 | 24.90 |
+| Static domains | 7.71 | 13.03 |
+
+The [compile-time chart and paired ranges](benchmarks/MAIN_COMPARISON.md#fresh-compilation)
+show clear gains on chains, closures, diamonds and generic calls. Independent
+functions, shared-callee and module ranges cross parity. Proof-heavy and
+static-domain compilation still take about 13% and 71% more time respectively.
+These are synthetic program compilations, not compiler rebuilds or migrated `gdev`.
 
 In the separate previous/new K1 comparison, 128-caller body edits fell from
 6.96 to 6.29 ms and unchanged requests from 7.31 to 6.34 ms. All off-tier Wasm
@@ -179,7 +198,10 @@ includes the JS/Wasm boundary; engine state and host load affect the results.
 
 [Current qualification and raw evidence](benchmarks/results/runtime/manifest.json)
 pin 116 native tests, 92 integration tests, the editor gate and 228 measurement
-records; the earlier structural package preserves its 1,177 records. These are synthetic workloads and five loop kernels, not migrated `gdev`.
+records. The [direct main comparison](benchmarks/results/main-comparison/manifest.json)
+adds 209 records with the same qualified compiler; the earlier structural package
+preserves its 1,177 records. These are synthetic workloads and five loop kernels,
+not migrated `gdev`.
 Modules are near compile-time parity; proof-heavy and static-domain compilation
 still trail legacy. Required validation, syntax, ABI and shared generic bodies
 remain intact. Ordinary Wasm publication guarantees atomic visibility rather
