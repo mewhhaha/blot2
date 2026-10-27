@@ -35,3 +35,20 @@ fn reserve_failure(st:State&)->bool {
  if !st.frame || st.owner || st.space!=0 || st.input!=0 || st.output!=0 || st.handled || st.done{return false;}
  st.frame=false;st.done=true;return true;
 }
+
+// Replays invocation-local resources on each status edge. Busy, invalid and
+// frame-limit paths create no resources; reserve failure leaves only a frame.
+// Success and OutputTooSmall share all loan/Space/owner/frame cleanup. The
+// trap edge explicitly poisons the instance and makes no cleanup claim.
+fn branch_exit(kind:u32,cleanup:u32,phase:u32)->bool {
+ if kind>=1 && kind<=3 {return cleanup==0 && phase==0;}
+ if kind==4 {if cleanup!=1 || phase!=1{return false;}var st=State {frame:true};return reserve_failure(st) && st.done && !st.frame && !st.owner && st.space==0;}
+ if kind==5 || kind==6 {
+  if cleanup!=2 || phase!=7{return false;}var st=State {};
+  for i in 7 {if !transition(st,(i+1) as u32){return false;}}
+  if !st.frame || !st.owner || st.space!=3 || st.input!=3 || st.output!=2 || st.handled{return false;}
+  for i in 6 {if !transition(st,(i+8) as u32){return false;}}
+  return st.done && !st.frame && !st.owner && st.space==0 && st.input==0 && st.output==0;
+ }
+ if kind==7 {return cleanup==3 && phase==255;}return false;
+}

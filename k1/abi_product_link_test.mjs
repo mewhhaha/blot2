@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
+const wasm=await readFile('abi-product.wasm');const mod=new WebAssembly.Module(wasm);assert.deepEqual(WebAssembly.Module.imports(mod),[]);const i=new WebAssembly.Instance(mod);const m=new Uint8Array(i.exports.memory.buffer),d=new DataView(m.buffer);
+for(let n=2;n<=16;n++){m.fill(0xaa,2044,2116);for(let j=0;j<n;j++)d.setUint32(1024+4*j,(j*2654435761)>>>0,true);d.setUint32(256,4*n,true);d.setUint32(260,4,true);d.setUint32(264,3,true);d.setUint32(268,7,true);i.exports.identity(0,2048,256,1024);for(let j=0;j<n;j++)assert.equal(d.getUint32(2048+4*j,true),d.getUint32(1024+4*j,true));assert.equal(d.getUint32(2044,true),0xaaaaaaaa);assert.equal(d.getUint32(2048+4*n,true),0xaaaaaaaa);}
+console.log('generic worker copies U32 products of 2..16 elements');

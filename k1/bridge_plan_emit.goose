@@ -1,36 +1,20 @@
 // Fixed source-bound bridge lowering. Independent Core replay precedes all
-// output; the checked template supplies non-Core wire and control segments.
+// output; typed operations and branch policies directly emit the caller body.
 namespace bridge_plan_emit;
 import bridge_plan_core;
 import bridge_plan_verify;
-import bridge_plan_sites;
+import bridge_direct_body;
 import m12_adapter_core;
 import m12_one_emit;
 import m12_one_target;
-import m12_internal_body;
+
 import m12_internal_target;
 import i08_same_target;
 import pool_guest;
 fn emit(p:m12_adapter_core::Program&,source:u8[:],plan:bridge_plan_core::Plan&)->u8[] {
  if !bridge_plan_verify::verify(p,source,plan){return [];}
  let base=m12_one_emit::emit(p,source);if base.len<8 || !m12_one_target::verify(p,source,base){return [];}
- let template=m12_internal_body::body();let parsed=bridge_plan_sites::scan(template);if !parsed.ok{return [];}
- let f=parsed.sites;
- let sites:i64[13]=[f[1],f[2],f[4],f[5],f[5],f[6],f[7],f[8],f[8],f[9],f[10],f[10],f[11]];
- let calls:u8[13]=[18,0,5,0,6,8,21,0,13,12,0,11,19];
- var code:u8[>..]=[];var at:i64=0;
- for i in 13 {
-  let site=sites[i];if site<at || site>template.len{return [];}
-  code.append(template[at..site]);
-  if plan.ops[i]==4 || plan.ops[i]==8 || plan.ops[i]==11 {
-   // Copy-completion markers and explicit Space.end erase to zero bytes.
-   at=site;
-  }else {
-   if site+2>template.len || template[site]!=0x10 || template[site+1]!=calls[i]{return [];}
-   code.push(0x10);code.push(calls[i]);at=site+2;
-  }
- }
- if at>template.len{return [];}code.append(template[at..]);if code.len!=template.len{return [];}
+ let code=bridge_direct_body::body(plan);if code.len==0{return [];}
  // Assemble a fresh module directly; no whole caller is emitted before Core.
  var cursor:i64=8;var out:u8[>..]=[];out.append(base[..8]);
  let t=i08_same_target::section(base,cursor,1);if !t.ok{return [];}out.append(base[t.start..t.end]);cursor=t.end;

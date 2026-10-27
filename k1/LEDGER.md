@@ -105,6 +105,20 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2`
+with the private typed scalar Core, branch-aware direct fixed-caller lowering,
+and source-instantiated tuple generic fixtures. It includes source and Core
+forgery controls, independent target checks and executed Wasm tests. Source and
+documentation hashes were unchanged during the run. These fixed profiles do
+not establish general ownership, callable resources, M10/M11/M12/M13 or full
+C09, and public K1 admission remains disabled.
+
+A C09 audit also found an uncharged parent-node read in the private syntax
+verifier. A scratch correction changes one scalar fixture's measured visits
+from 815 to 827 and requires a private schedule revision and fresh fallback for
+old cache entries. Source-byte telemetry and other required traversals remain
+incomplete; the scratch correction is not included in this checkpoint.
+
 A combined Goose fixture run passed (exit 0) after connecting the lexical
 U32-to-Bool predicate to the private callable dispatcher. It covers `-O0` and
 `-O2`, source/proof/target forgery, generated execution and a 64-case
