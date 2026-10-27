@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the private in-module caller,
+actual scalar lexer/source-byte metering and provisional operation registry.
+It covers `-O0`/`-O2`, target-byte and truncation rejection, wire and cleanup
+oracles, lexer parity, work-counter boundaries and ABI candidate mutations.
+The caller still requires a trusted private runtime; its fixed frame and
+general loans are not qualified. Metering and the operation inventory remain
+partial and do not establish C09 or the M10 ABI.
+
 A combined Goose fixture run passed (exit 0) with the private public-shaped
 scalar/loop source seam, branch-aware source-local builder plan, metered scalar
 helpers and partial ABI inventory. The run covers `-O0`/`-O2`, forged source
