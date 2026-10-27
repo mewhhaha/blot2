@@ -105,6 +105,17 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
+the corrected Owned-Wasm artifact-directory registration, guarded constant
+offset proofs and private semantic owner. It includes the prior Owned and
+host controls, source identity and resource-boundary forgeries, 320 independent
+offset/alias/polarity cases per level, target execution and compatibility
+checks. Source and documentation hashes remained unchanged. The earlier run
+failed because the Owned-Wasm test was registered before `test_dir` existed;
+that registration was moved after directory creation before this passing run.
+Caller-supplied identity and capacity, general effect composition, public
+ABI, complete ownership and C09 remain unqualified.
+
 The subsequently added private leaf host passed focused `-O0` and `-O2`
 reservation, target-pin, hostile-intrinsic and sticky-poison controls. It uses
 captured synchronous Wasm constructors and a null-prototype host to avoid the

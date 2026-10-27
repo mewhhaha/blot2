@@ -51,6 +51,16 @@ fn reference(t:mixed_core::Tree&,id:i64,s:State)->i64 {
  var cur=id;var steps:i64=0;while cur>0 && cur<=t.nodes.len && t.nodes[cur-1].tag==20 {steps+=1;if steps>128{return 0;}cur=t.nodes[cur-1].a;}
  if cur<1 || cur>t.nodes.len{return 0;}let n=t.nodes[cur-1];if n.tag!=1 || n.a<1 || n.a>=257{return 0;}return s.alias[n.a];
 }
+// Independently reconstruct the terminal upper bound from its active source
+// comparison and polarity; the evidence does not carry a trusted number.
+fn terminal_limit(t:mixed_core::Tree&,guard_id:i64,polarity:bool,slot:i64,s:State)->u64,bool {
+ if guard_id<1 || guard_id>t.nodes.len{return 0,false;}let g=t.nodes[guard_id-1];
+ if g.tag==22 && polarity && reference(t,g.a,s)==slot {let limit,ok=literal(t,g.b);if ok && limit>0{return limit-1,true;}return 4294967294,true;}
+ if g.tag==22 && !polarity && reference(t,g.b,s)==slot {let limit,ok=literal(t,g.a);if ok{return limit,true;}}
+ if g.tag==28 && polarity && reference(t,g.a,s)==slot {let limit,ok=literal(t,g.b);if ok{return limit,true;}}
+ if g.tag==28 && !polarity && reference(t,g.b,s)==slot {let limit,ok=literal(t,g.a);if ok && limit>0{return limit-1,true;}}
+ return 0,false;
+}
 fn add_edge(s:State&,left:i64,right:i64,guard_id:i64,truth:bool)->bool {
  if left==0 || right==0 || left==right{return true;}if left<0 || left>=257 || right<0 || right>=257 || guard_id<1 || s.count>=64{return false;}
  s.relations[s.count]=Relation {left:left,right:right,guard_id:guard_id,truth:truth};s.count+=1;return true;
@@ -65,14 +75,16 @@ recursive fn numeric(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::
  let a,aok=literal(t,n.a);let b,bok=literal(t,n.b);
  if (aok && a==0) || (bok && b==0) || (aok && bok && a+b<=4294967295){return true;}
  var subject:i64=0;var ref:i64=0;var one:i64=0;
- if bok && b==1 {subject=reference(t,n.a,s);ref=n.a;one=n.b;}else if aok && a==1 {subject=reference(t,n.b,s);ref=n.b;one=n.a;}
+ var offset:u64=0;
+ if bok && b>0 {subject=reference(t,n.a,s);ref=n.a;one=n.b;offset=b;}else if aok && a>0 {subject=reference(t,n.b,s);ref=n.b;one=n.a;offset=a;}
  if subject<1 || subject>=257 || r.at<0 || r.at>=events.len{return false;}let e=events[r.at];r.at+=1;
  if e.subject!=subject || e.reference!=ref || e.one!=one || e.addition!=id || e.count<0 || e.count>16{return false;}
  var current=subject;
  for j in e.count {var found=false;for k in s.count {let edge=s.relations[k];if edge.left==current && edge.guard_id==e.guards[j] && edge.truth==e.edges[j] {current=edge.right;found=true;break;}}
   if !found || current<1 || current>=257{return false;}}
  for j in e.count..16 {if e.guards[j]!=0 || e.edges[j]{return false;}}
- return s.origin[current]>0 && e.guard_id==s.origin[current] && e.truth==s.polarity[current];
+ if s.origin[current]<=0 || e.guard_id!=s.origin[current] || e.truth!=s.polarity[current] {return false;}
+ let limit,valid=terminal_limit(t,e.guard_id,e.truth,current,s);return valid && limit+offset<=4294967295;
 }
 fn expression(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->bool {
  var cur=id;var ndepth=depth;
@@ -109,10 +121,10 @@ fn branch(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:]
     if n.tag==22 {
      if left>0 && yes.origin[left]==0 {yes.origin[left]=f.id;yes.polarity[left]=true;}
      if !add_edge(yes,left,right,f.id,true) || !add_edge(no,right,left,f.id,false){return Split {};}
-     let bound,ok=literal(t,n.a);if ok && bound==4294967294 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
+     let bound,ok=literal(t,n.a);if ok && bound<4294967295 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
     } else {
-     let bound,ok=literal(t,n.b);if ok && bound==4294967294 && left>0 && yes.origin[left]==0 {yes.origin[left]=f.id;yes.polarity[left]=true;}
-     let floor,valid=literal(t,n.a);if valid && floor==4294967295 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
+     let bound,ok=literal(t,n.b);if ok && bound<4294967295 && left>0 && yes.origin[left]==0 {yes.origin[left]=f.id;yes.polarity[left]=true;}
+     let floor,valid=literal(t,n.a);if valid && floor>0 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
     }done=Split {valid:true,yes:yes,no:no,yes_live:true,no_live:true};
    }else {return Split {};}stack.pop();have=true;continue;
   }

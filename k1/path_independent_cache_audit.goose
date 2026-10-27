@@ -37,7 +37,7 @@ fn main(){
  yes("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if #False:\n    return (x + 1) < 5\n  else:\n    return #True\n",7,0);
  yes("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let y = x\n  let z = y\n  return 4294967295 <= z || (x + 1) < 5\n",8,1);
  no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if (x < 4294967295 && #False) || #True:\n    return (x + 1) < 5\n  return #False\n");
- no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return 4294967294 <= x || (x + 1) < 5\n");
+ let now_safe="pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return 4294967294 <= x || (x + 1) < 5\n";var safe=short_frontend::parse(now_safe);assert(safe.status==0 && short_check::verify(now_safe,safe.program));
  no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if #True:\n    return #True\n  else:\n    return missing < 5\n");
  no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return #True || (x + #True) < 5\n");
  print("independent extra path checks passed");

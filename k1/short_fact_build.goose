@@ -14,6 +14,18 @@ fn literal(t:mixed_core::Tree&,id:i64)->u64,bool {
  if id<1 || id>t.nodes.len {return 0,false;}let n=t.nodes[id-1];if n.tag!=2 || n.start<0 || n.end<=n.start || n.end>t.source.len {return 0,false;}
  var v:u64=0;for c in t.source[n.start..n.end] {if c<'0' || c>'9' {return 0,false;}let d=(c-'0') as u64;if v>(4294967295-d)/10 {return 0,false;}v=v*10+d;}return v,true;
 }
+// A recorded source guard provides an unsigned upper bound for its exact
+// terminal alias. Variable-to-variable strict guards prove at least non-MAX.
+fn guard_limit(t:mixed_core::Tree&,id:i64,truth:bool,subject:i64,e:Env)->u64,bool {
+ if id<1 || id>t.nodes.len {return 0,false;}let n=t.nodes[id-1];
+ if n.tag==22 && truth && ref(t,n.a,e)==subject {
+  let v,ok=literal(t,n.b);if ok && v>0 {return v-1,true;}return 4294967294,true;
+ }
+ if n.tag==22 && !truth && ref(t,n.b,e)==subject {let v,ok=literal(t,n.a);if ok {return v,true;}}
+ if n.tag==28 && truth && ref(t,n.a,e)==subject {let v,ok=literal(t,n.b);if ok {return v,true;}}
+ if n.tag==28 && !truth && ref(t,n.b,e)==subject {let v,ok=literal(t,n.a);if ok && v>0 {return v-1,true;}}
+ return 0,false;
+}
 fn path(e:Env,slot:i64)->Route {
  if slot<1 || slot>=257 {return Route {};}
  var visited:bool[257]=[false;257];var queue:i64[257]=[0;257];var prev:i64[257]=[0;257];var via:i64[257]=[0;257];
@@ -39,8 +51,10 @@ recursive fn numeric(t:mixed_core::Tree&,id:i64,e:Env,events:mixed_fact_core::Ev
    let x,xok=literal(t,n.a);let y,yok=literal(t,n.b);
    if (xok && x==0) || (yok && y==0) || (xok && yok && x+y<=4294967295) {return 0;}
    var subject:i64=0;var reference:i64=0;var one:i64=0;
-   if yok && y==1 {subject=ref(t,n.a,e);reference=n.a;one=n.b;}else if xok && x==1 {subject=ref(t,n.b,e);reference=n.b;one=n.a;}
+   var offset:u64=0;
+   if yok && y>0 {subject=ref(t,n.a,e);reference=n.a;one=n.b;offset=y;}else if xok && x>0 {subject=ref(t,n.b,e);reference=n.b;one=n.a;offset=x;}
    let route=path(e,subject);if route.status!=0{return route.status;}
+   let bound,ok=guard_limit(t,e.facts[route.terminal],e.truth[route.terminal],route.terminal,e);if !ok || bound+offset>4294967295{return 5;}
    events.push(mixed_fact_core::Evidence {guard_id:e.facts[route.terminal],truth:e.truth[route.terminal],subject:subject,reference:reference,one:one,addition:id,count:route.count,guards:route.guards,edges:route.truth});
   }return 0;
  }
@@ -82,10 +96,10 @@ fn condition(t:mixed_core::Tree&,id:i64,env:Env,events:mixed_fact_core::Evidence
     if n.tag==22 {
      if a>0 && yes.facts[a]==0 {yes.facts[a]=f.id;yes.truth[a]=true;}
      let x=edge(yes,a,b,f.id,true);if x!=0{return Cond {status:x};}let y=edge(no,b,a,f.id,false);if y!=0{return Cond {status:y};}
-     let bound,ok=literal(t,n.a);if ok && bound==4294967294 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
+     let bound,ok=literal(t,n.a);if ok && bound<4294967295 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
     } else {
-     let bound,ok=literal(t,n.b);if ok && bound==4294967294 && a>0 && yes.facts[a]==0 {yes.facts[a]=f.id;yes.truth[a]=true;}
-     let floor,valid=literal(t,n.a);if valid && floor==4294967295 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
+     let bound,ok=literal(t,n.b);if ok && bound<4294967295 && a>0 && yes.facts[a]==0 {yes.facts[a]=f.id;yes.truth[a]=true;}
+     let floor,valid=literal(t,n.a);if valid && floor>0 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
     }done=Cond {yes:yes,no:no,yes_live:true,no_live:true};
    } else {return Cond {status:1};}
    stack.pop();have=true;continue;
