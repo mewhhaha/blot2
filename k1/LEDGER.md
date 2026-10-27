@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with additional actual F32,
+image-copy and comparison metering and independently transcribed selected ABI
+anchors. It includes `-O0`/`-O2`, arbitrary-bit F32 differential, byte-mutation
+and work-cutoff controls. The ABI anchors cover only selected provisional
+records and all admissions remain closed. Runtime allocation/serialization,
+metadata and other required traversals remain unmetered, so this is neither a
+complete C09 receipt nor a qualified M10 ABI.
+
 A combined Goose fixture run passed (exit 0) with an independent bounded Wasm
 decoder for the private joined scalar/loop driver, the limited `Fn` spelling,
 worker range checks, conditional frame composition and target-work metering.

@@ -1,0 +1,15 @@
+# Independent normative anchor audit (scratch)
+
+The existing 80 records are private proposals, not admitted operation IDs. The existing independent decoder uses an expected table generated from the same transcription as the producer, so it is a byte-format check, not a semantic specification oracle. All 80 record flags are zero and `abi_overload_gaps::publicly_eligible` returns false for every input; no provisional record, matching digest, name, or numeric ID grants executable or ABI authority.
+
+The independent audit program transcribes selected requirements from K1-LANG §§4–6,8, K1-CORE C03 and K1-MEM M02/M04–M06/M09–M10, including ordinary arithmetic/shift evidence, wrapping arithmetic, fallible-result uncertainty, F32 arithmetic and bit-preserving negation, reserve/allocation error priority and rollback, destination splitting, builder prefix/version transitions, view domain freshness, reset epochs, Owned opening/sealing, descriptor layout, owner states and dictionary flags. These anchors match the present private records. O0/O2 run `abi_normative_audit.goose`, and it checks every single-byte changed registry still cannot pass the public eligibility gate. This confirms selected anchors, not the other fields or all ABI behavior.
+
+Review gaps that prevent changing the gate:
+
+- C03 calls for finite concrete entries for each supported type/mode/effect/evidence/transition/failure/target combination. The 80 records use schematic T/mode variables, some `or` signatures and unspecified errors; they are not that expansion and cannot identify an admitted overload.
+- All source type-class/layout derivations remain to be independently validated, including recursive structural budgets, every sum/Result and existential combination, zero-sized logical authority, schema-ID resolution and indirect generic conventions. Listing descriptor words is not a layout proof.
+- The profile's M12 outline does not independently establish concrete completed-callable identity, all binder mappings, alias-safe returned inputs, arbitrary wire schemas, transitive branded-type exclusion, exact per-schema validation and full failure/lifecycle behavior.
+- Primitive evaluators, lowerings, concrete target feasibility, proof/effect/loan/region authority, helper behavior and module interfaces have not been linked to these entries. C03 also includes control/product/variant/call/closure/package/refinement forms beyond the named primitive-family inventory; this audit does not certify their completed-Core validation.
+- No canonical complete serialization/schema and exact hash agreement across real independently validated interface, implementation, manifest and certificate has been established. A digest of this proposal is not the qualified `K1-WASM32-ABI1` hash.
+
+In these records `none` must be read only as no *additional named proposition*, not absence of well-typed operand, provenance, liveness, borrow, or effect requirements. Since the private format does not separately formalize those background obligations, callers must not use it to grant operation authority. All unresolved cases remain rejected rather than inferred from a byte match.
