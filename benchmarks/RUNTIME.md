@@ -51,6 +51,13 @@ fallback. These are loop kernels, not a migrated application. CPU placement,
 frequency, load and filesystem cache remain uncontrolled on the shared workstation.
 All samples and ranges are retained. The harness smoke check was functional only.
 
+![Runtime comparison against previous K1, with default and optimizing-only V8 shown separately](charts/runtime-comparison.svg)
+
+Previous K1 is 100% for each workload and engine; lower is better. Bars use
+median paired ratios, and whiskers show the five pairs' full range, not confidence
+intervals. [Download SVG](charts/runtime-comparison.svg) or
+[PNG](charts/runtime-comparison.png). The absolute timings follow below.
+
 Default-engine medians, microseconds per complete kernel call:
 
 | Kernel | Previous µs | New µs | Paired new/previous | Paired range |
@@ -106,3 +113,9 @@ rebuild-time claim is made in this pass. Inlining policy and its previous unreso
 runtime results remain separate. The bounded pass is complete; further work should
 start from a new workload/profile question rather than continuing to tune these
 five kernels.
+
+## Recreate the chart
+
+With matplotlib installed, run `python3 benchmarks/plot_runtime.py`. The script
+verifies the archived result hashes and writes SVG/PNG charts without rerunning
+benchmarks or modifying the evidence package.

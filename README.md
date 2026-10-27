@@ -132,6 +132,11 @@ remain roughly unchanged. These are five reference-checked kernels, with a fresh
 engine process for every sample, rather than a whole-application speedup.
 [Runtime results and limitations](benchmarks/RUNTIME.md) preserve all 228 records.
 
+![Runtime comparison against previous K1, with default and optimizing-only V8 shown separately](benchmarks/charts/runtime-comparison.svg)
+
+Previous K1 is 100% for each workload and engine; lower is better. Bars show
+paired medians and whiskers show the full observed ranges across five pairs.
+
 The preceding structural changes reduced **fresh compile time by roughly 7–15%**
 against the previous qualified K1 at the largest measured scales. They borrow
 validator table views and use a forward-only proof-graph traversal. The
@@ -174,7 +179,7 @@ includes the JS/Wasm boundary; engine state and host load affect the results.
 
 [Current qualification and raw evidence](benchmarks/results/runtime/manifest.json)
 pin 116 native tests, 92 integration tests, the editor gate and 228 measurement
-records; the earlier structural package preserves its 1,177 records. These are synthetic workloads and two loop kernels, not migrated `gdev`.
+records; the earlier structural package preserves its 1,177 records. These are synthetic workloads and five loop kernels, not migrated `gdev`.
 Modules are near compile-time parity; proof-heavy and static-domain compilation
 still trail legacy. Required validation, syntax, ABI and shared generic bodies
 remain intact. Ordinary Wasm publication guarantees atomic visibility rather
