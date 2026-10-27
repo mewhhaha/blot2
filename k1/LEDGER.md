@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with the private joined scalar
+driver, ordered static-work path, fixed-target helper controls and adapter
+control-flow checks. It covers `-O0`/`-O2`, Wasm execution, source and target
+forgery, ordered work boundaries and helper failure tests. The driver remains
+private and its target association currently re-emits with the same producer;
+the ordered work and fixed helper checks do not qualify full C09 or general
+ownership, M11 or ABI admission.
+
 A combined Goose fixture run passed (exit 0) with the guarded caller, a
 fixed-target machine decoder and caller-flow witness, conditional frame model,
 and shared aggregate work-meter prototype. It includes `-O0`/`-O2`, target

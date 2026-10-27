@@ -7,6 +7,8 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export GOOSE_HOME
 export GOOSE
 "$script_dir/build.sh"
+node "$script_dir/joined_driver_test.mjs" "$script_dir/build/blot-k1"
+node "$script_dir/joined_driver_independent_cli_test.mjs" "$script_dir/build/blot-k1"
 "$GOOSE" --debug "$script_dir/lexer_test.goose"
 "$GOOSE" --debug "$script_dir/syntax_test.goose"
 "$GOOSE" --debug "$script_dir/frontend_test.goose"
@@ -188,7 +190,12 @@ for level in 0 2; do
     "$GOOSE" --debug "-O$level" "$script_dir/static_ag_differential_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_ag_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/static_ag_forgery_test.goose"
-    "$GOOSE" --debug "-O$level" "$script_dir/frame_contract_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_order_target_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_order_image_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_order_differential_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/static_order_independent_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/joined_driver_gate_test.goose"
+    "$GOOSE" --debug "-O$level" "$script_dir/joined_driver_independent_audit.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/frame_contract_independent_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_depth_test.goose"
     "$GOOSE" --debug "-O$level" "$script_dir/mixed_compat_test.goose"
@@ -198,6 +205,7 @@ done
 test_dir=$(mktemp -d)
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 for level in 0 2; do
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/frame_contract_test.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/abi_profile_reference_emit.goose" && python3 "$script_dir/abi_profile_reference_test.py")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_guest_emit.goose" && node "$script_dir/pool_guest_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/pool_builder_guest_emit.goose" && node "$script_dir/pool_builder_guest_test.mjs")
@@ -217,7 +225,9 @@ for level in 0 2; do
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_candidate_wire_emit.goose" && node "$script_dir/m12_candidate_wire_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_test.goose" && node "$script_dir/m12_one_test.mjs" && node "$script_dir/m12_one_bridge_oracle_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_target_test.goose" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs" && node "$script_dir/m12_internal_zero_guard_test.mjs" && node "$script_dir/m12_internal_zero_guard_adversarial_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/m12_internal_alternate_test.goose" && node "$script_dir/m12_internal_alternate_test.mjs")
-    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_adversarial_test.goose" && node "$script_dir/m12_caller_flow_frontier_test.mjs" && node "$script_dir/i08_machine_test.mjs" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/m12_caller_flow_adversarial_test.goose" && node "$script_dir/m12_caller_flow_frontier_test.mjs" && node "$script_dir/i08_machine_test.mjs" && node "$script_dir/i08_flow_test.mjs" && node "$script_dir/m12_internal_oracle_test.mjs" && node "$script_dir/m12_internal_wire_audit_test.mjs" && node "$script_dir/m12_internal_cleanup_fault_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_helper_source_test.goose" && node "$script_dir/m12_helper_contract_test.mjs" && node "$script_dir/m12_helper_contract_test.mjs" alternate-invoke.wasm && node "$script_dir/m12_helper_slots_test.mjs" && node "$script_dir/m12_helper_slot_controls_test.mjs")
+    (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/static_order_test.goose" && node "$script_dir/static_order_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_variant_test.goose" && node "$script_dir/m12_one_variant_test.mjs")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/joined_public_test.goose" && node "$script_dir/joined_public_test.mjs" && "$GOOSE" --debug "-O$level" "$script_dir/joined_bridge_audit.goose")
     (cd "$test_dir" && "$GOOSE" --debug "-O$level" "$script_dir/m12_one_cross_source_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/frame_emit_test.goose" && "$GOOSE" --debug "-O$level" "$script_dir/i08_live_source_test.goose" && node "$script_dir/m12_one_independent_bodies_test.mjs" && node "$script_dir/m12_one_independent_geometry_test.mjs" && node "$script_dir/m12_one_independent_numeric_test.mjs" && node "$script_dir/m12_one_partial_fault_test.mjs")
