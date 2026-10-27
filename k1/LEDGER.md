@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) with a private U32-to-Bool
+predicate path and a source-linked primitive schema/dictionary subset. It
+includes `-O0`/`-O2`, forged type/source/schema and Wasm execution controls.
+The predicate supports only a restricted body without local bindings; the
+primitive schemas do not cover M10 or authenticate runtime slots and loans.
+Resource contracts and public ABI/admission remain unqualified.
+
 A fresh combined Goose fixture run passed (exit 0) with private U32/Bool
 callables, the independent Bool target decoder, selected static layout
 metering, and optional solver-free audit generation. It covers `-O0`/`-O2`,

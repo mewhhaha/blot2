@@ -1,0 +1,7 @@
+# Private U32-to-Bool callable slice
+
+This private common callable entry additionally accepts one noncapturing U32 -> Bool declaration in arrow or `Fn[static,Many,U32,Bool]` spelling, with explicit empty effects and numeric resources. It replays the original header and source, normalizes only the fixed-width type spelling, and independently verifies an existing scalar Core against its source. Its only result form is the existing checked unsigned less-than subset. Wasm is checked against the rebased source and scalar plan by the existing private target decoder; the custom section data is not authenticated as metadata.
+
+Status 0 means accepted. A malformed or unsupported header generally returns 1; where a header is recognized, its existing private body parser status is preserved. The entry returns no Wasm on failure. This is not a complete diagnostic taxonomy. The header reconstructor is reused by producer and checker; the existing scalar body recognizer independently replays projected source/Core.
+
+Lexical lets, general expressions, arbitrary control flow and calls, nonempty effects, other types, lifetimes, Once, generics, contracts, captures and multiple declarations are unsupported. Resource numbers are recognized but not proved. The three callable alternatives use distinct body Core representations, not a unified expression arena. No public compiler admission, verified host ABI, authenticated artifact, full C09 accounting or M13 qualification is implied.
