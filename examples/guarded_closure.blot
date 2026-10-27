@@ -1,0 +1,5 @@
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:1024} = fn x => do:
+  if x<100:
+    let plus_one = fn (u:Unit) => return x+1
+    return plus_one(())
+  return 0

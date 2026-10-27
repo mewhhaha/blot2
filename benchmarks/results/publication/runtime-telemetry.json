@@ -1,0 +1,78 @@
+{
+  "format": "K1-RUNTIME-TELEMETRY-1",
+  "mode": "instrumented attribution; no timing samples",
+  "command": [
+    "build/blot",
+    "build",
+    "examples/particles.blot",
+    "--opt=off",
+    "--telemetry",
+    "--bridge-config=examples/particles.json",
+    "-o",
+    "build/runtime-telemetry-particles.wasm"
+  ],
+  "compiler_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+  "source_sha256": "997ebf044f6456b0e612f4d9d958d754448920f19e62d15d4b3c54f750401988",
+  "wasm_sha256": "37a9ac0b0a08a42f56503054d762a24733504b1bb133d425cb4563404568892d",
+  "abi_hash": "c28cdfcbe37be7dbe90acf944c4dad911981e88427e0d29a3a2404b354f0f42f",
+  "geometry_hash": "532393fbbc0600ca2772f66d90b4a5252e7e38e1b00c9ad8d48816c1bd916e29",
+  "samples": [
+    {
+      "count": 0,
+      "status": "Ok",
+      "counters": {
+        "backing_reservations": "1",
+        "backing_successes": "1",
+        "backing_failures": "0",
+        "region_resets": "0",
+        "region_releases": "1",
+        "backing_live_bytes": "0",
+        "backing_high_water_bytes": "24576",
+        "result_high_water_bytes": "16",
+        "scratch_high_water_bytes": "256",
+        "initialized_bytes": "100",
+        "copied_bytes": "20",
+        "source_calls": "1",
+        "loop_iterations": "0"
+      }
+    },
+    {
+      "count": 1,
+      "status": "Ok",
+      "counters": {
+        "backing_reservations": "1",
+        "backing_successes": "1",
+        "backing_failures": "0",
+        "region_resets": "0",
+        "region_releases": "1",
+        "backing_live_bytes": "0",
+        "backing_high_water_bytes": "24576",
+        "result_high_water_bytes": "16",
+        "scratch_high_water_bytes": "256",
+        "initialized_bytes": "132",
+        "copied_bytes": "44",
+        "source_calls": "1",
+        "loop_iterations": "1"
+      }
+    },
+    {
+      "count": 1024,
+      "status": "Ok",
+      "counters": {
+        "backing_reservations": "1",
+        "backing_successes": "1",
+        "backing_failures": "0",
+        "region_resets": "0",
+        "region_releases": "1",
+        "backing_live_bytes": "0",
+        "backing_high_water_bytes": "24576",
+        "result_high_water_bytes": "8200",
+        "scratch_high_water_bytes": "256",
+        "initialized_bytes": "32868",
+        "copied_bytes": "24596",
+        "source_calls": "1",
+        "loop_iterations": "1024"
+      }
+    }
+  ]
+}

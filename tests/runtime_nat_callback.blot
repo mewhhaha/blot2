@@ -1,0 +1,8 @@
+let count: forall [n: Nat] => Unit -> U32 ! {} resources {depth:1,frame:0}
+= fn () => return n
+let through: forall [n: Nat] => Unit -> U32 ! {} resources {depth:3,frame:256}
+= fn () => do:
+  let callback = count@[n]
+  return callback(())
+pub let run: Unit -> U32 ! {} resources {depth:4,frame:512} = fn () => return through@[4294967295](())
+pub let zero: Unit -> U32 ! {} resources {depth:4,frame:512} = fn () => return through@[0](())

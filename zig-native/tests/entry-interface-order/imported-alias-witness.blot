@@ -1,2 +1,0 @@
-import {alias} from "./library"
-entry const failure = alias (@panic "left witness") (@panic "right witness")

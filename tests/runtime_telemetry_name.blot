@@ -1,0 +1,1 @@
+pub let blot_telemetry: Unit -> U32 ! {} resources {depth:1,frame:64} = fn () => return 42

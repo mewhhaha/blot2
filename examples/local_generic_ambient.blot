@@ -1,0 +1,6 @@
+let preserve: forall [T:Type] where [Plain(T)] => T -> T ! {} resources {depth:3,frame:2048} = fn input => do:
+  let choose: forall [U:Type] where [Plain(U)] => Fn[local,Many,U,T] ! {} resources {depth:1,frame:256} = fn value => do:
+    let _ = value
+    return input
+  return choose@[T](input)
+pub let run: U32 -> U32 ! {} resources {depth:4,frame:4096} = fn input => return preserve@[U32](input)

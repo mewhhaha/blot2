@@ -1,0 +1,29 @@
+type Particle = {x: F32, y: F32, vx: F32, vy: F32}
+type Position = {x: F32, y: F32}
+type Positions[r: Region] =
+  exists [m: Nat, e: Domain] => View[r,Position,m,e]
+
+pub let project_early:
+  forall [r: Region, n: Nat, c: Nat, d: Domain] =>
+  Fn[static, Many,
+    {source: View[r,Particle,n,d], dt: F32, output: Dest[r,Position,c]},
+    Result[Positions[r],Unit]]
+  ! {read r, write r}
+  requires [Le(n,c)]
+  resources {depth: 1, frame: 2048}
+= fn {source: source, dt: dt, output: output} => do:
+  let initial = builder.begin_append(output)
+  let built = for i in 0..n carry (b = initial)
+    invariant [Eq(Init(b),i)] do:
+      let row = source[i]
+      if row.x < 0.0:
+        builder.discard(b)
+        return #Err(())
+      next (builder.append(b, {x: row.x + row.vx * dt, y: row.y + row.vy * dt}))
+  if dt < 0.0:
+    builder.discard(built)
+    return #Err(())
+  let frozen = builder.freeze(built)
+  let positions = open frozen as [e] positions_view in do:
+    break pack [n,e] as Positions[r] positions_view
+  return #Ok(positions)

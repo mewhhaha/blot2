@@ -1,0 +1,2 @@
+import * as helpers from "./helpers"
+entry const copy_identity = fn (source: Array U32) -> Array U32 => helpers.identity source

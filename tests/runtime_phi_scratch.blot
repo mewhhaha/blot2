@@ -1,0 +1,27 @@
+pub let sum: U32 -> U32 ! {} resources {depth:1,frame:128} = fn count => do:
+  let answer = for i in 0..count carry (n = 17) do:
+    next (U32.wrapping_add(n,i))
+  return answer
+pub let join: U32 -> U32 ! {} resources {depth:1,frame:128} = fn value => do:
+  let answer = do:
+    if value<10:
+      break U32.wrapping_add(value,3)
+    else:
+      break U32.wrapping_add(value,7)
+  return answer
+pub let swap: U32 -> U32 ! {} resources {depth:1,frame:256} = fn value => do:
+  let (first,second,flag,_) = for i in 0..3 carry (a = value,b = 7,odd = #False,unit = ()) do:
+    next (b,a,!odd,unit)
+  if flag:
+    return second
+  else:
+    return first
+pub let swap_float: F32 -> F32 ! {} resources {depth:1,frame:256} = fn value => do:
+  let (_,second) = for i in 0..3 carry (a = value,b = -0.0) do:
+    next (b,a)
+  return second
+let loop_value: forall [T:Type] where [Share(T)] => T -> T ! {} resources {depth:1,frame:2048} = fn item => do:
+  let answer = for i in 0..3 carry (value = item) do:
+    next (value)
+  return answer
+pub let fallback: U32 -> U32 ! {} resources {depth:2,frame:4096} = fn value => return loop_value@[U32](value)

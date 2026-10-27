@@ -1,0 +1,18 @@
+let nested:
+  forall [T:Type] where [Plain(T)] =>
+  T -> Result[Result[(T,T),Unit],Unit] ! {} resources {depth:1,frame:4096}
+= fn item => return #Ok(#Ok((item,item)))
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:8192} = fn item => do:
+  case nested@[U32](item):
+    #Err(_) => return 0
+    #Ok(inner) => do:
+      case inner:
+        #Err(_) => return 0
+        #Ok((first,second)) => return U32.wrapping_add(first,second)
+pub let run_float: F32 -> F32 ! {} resources {depth:2,frame:8192} = fn item => do:
+  case nested@[F32](item):
+    #Err(_) => return 0.0
+    #Ok(inner) => do:
+      case inner:
+        #Err(_) => return 0.0
+        #Ok((first,second)) => return first+second

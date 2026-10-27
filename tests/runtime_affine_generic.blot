@@ -1,0 +1,19 @@
+let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:1024} = fn value => return value
+type Payload[r:Region] = Unit
+pub let run: Unit -> U32 ! {reserve,release} resources {depth:4,frame:4096} = fn () => do:
+  let built = owned@[Payload[_],#Cancelled](0) as r free in do:
+    seal(free,())
+  case built:
+    #Err(_) => return 0
+    #Ok(handle) => do:
+      let transferred = identity@[Owned[Payload[_]]](handle)
+      owned.close(transferred)
+      return 1
+pub let unit: Unit -> U32 ! {} resources {depth:2,frame:2048} = fn () => do:
+  let _ = identity@[Unit](())
+  return 1
+pub let error: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => do:
+  let returned = identity@[Result[(U32,U32),(U32,U32)]](#Err((value,7)))
+  case returned:
+    #Ok(_) => return 0
+    #Err((answer,_)) => return answer

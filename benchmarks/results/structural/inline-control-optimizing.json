@@ -1,0 +1,413 @@
+{
+  "metadata": {
+    "mode": "optimizing",
+    "runs": [
+      {
+        "round": 0,
+        "command": [
+          "deno",
+          "run",
+          "--v8-flags=--no-liftoff",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-optimizing/0"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:10.941Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 1,
+        "command": [
+          "deno",
+          "run",
+          "--v8-flags=--no-liftoff",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=fast",
+          "--baseline-opt=release",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-optimizing/1"
+        ],
+        "reversed_labels": true,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:11.356Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "fast",
+          "baseline_opt": "release",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 2,
+        "command": [
+          "deno",
+          "run",
+          "--v8-flags=--no-liftoff",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-optimizing/2"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:11.772Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 3,
+        "command": [
+          "deno",
+          "run",
+          "--v8-flags=--no-liftoff",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=fast",
+          "--baseline-opt=release",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-optimizing/3"
+        ],
+        "reversed_labels": true,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:12.188Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "fast",
+          "baseline_opt": "release",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 4,
+        "command": [
+          "deno",
+          "run",
+          "--v8-flags=--no-liftoff",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-optimizing/4"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:12.613Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      }
+    ],
+    "method": "Five fresh Deno processes; counterbalanced tier order; labels normalized candidate=release/baseline=fast; phase samples separate."
+  },
+  "samples": 20,
+  "comparisons": [
+    {
+      "family": "diamonds",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 21.483328,
+          "min": 20.807787,
+          "max": 27.527042
+        },
+        "candidate": {
+          "median": 21.647049,
+          "min": 21.217638,
+          "max": 22.686432
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0147915164726806,
+          "min": 0.770792517408881,
+          "max": 1.0902856704559691
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 21.172,
+          "min": 20.522,
+          "max": 26.766
+        },
+        "candidate": {
+          "median": 21.284999999999997,
+          "min": 20.935,
+          "max": 22.223
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0110051010768941,
+          "min": 0.7821489949936486,
+          "max": 1.0828866582204464
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 13100,
+          "min": 12864,
+          "max": 13332
+        },
+        "candidate": {
+          "median": 12964,
+          "min": 12872,
+          "max": 13316
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9987998799879988,
+          "min": 0.9760388231725812,
+          "max": 1.0080845771144278
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 14.011646745391621,
+          "min": 13.193132360471088,
+          "max": 15.194666458653405
+        },
+        "candidate": {
+          "median": 13.501574100742419,
+          "min": 13.137750816052227,
+          "max": 13.927043330773172
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9888729390811797,
+          "min": 0.8885732462428114,
+          "max": 0.9967588639665849
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+pub type Graph[r: Region, T: Type] where [Plain(T)] =
+  exists [d: Domain, n: Nat, e: Domain, m: Nat] =>
+    {nodes: View[r,T,n,d], edges: View[r,(Index[d,n],Index[d,n]),m,e]}
+
+pub let build:
+  forall [r: Region, T: Type, n: Nat, d: Domain, m: Nat, raw_domain: Domain, c: Nat]
+  where [Plain(T)] =>
+  Fn[static,Many,(View[r,T,n,d],View[r,(U32,U32),m,raw_domain],Dest[r,(Index[d,n],Index[d,n]),c]),Result[Graph[r,T],Unit]]
+  ! {read r,write r} requires [Le(m,c)] resources {depth:1,frame:4096}
+= fn (nodes,raw,output) => do:
+  let initial = builder.begin_append(output)
+  let built = for i in 0..m carry (b=initial)
+    invariant [Eq(Init(b),i)] do:
+      let row = raw[i]
+      case index.try_make(nodes,row.0):
+        #None => do:
+          builder.discard(b)
+          return #Err(())
+        #Some(left) => do:
+          case index.try_make(nodes,row.1):
+            #None => do:
+              builder.discard(b)
+              return #Err(())
+            #Some(right) => next (builder.append(b,(left,right)))
+  let frozen = builder.freeze(built)
+  let graph = open frozen as [e] edges in do:
+    break pack [d,n,e,m] as Graph[r,T] {nodes:nodes,edges:edges}
+  return #Ok(graph)
+
+pub let sum:
+  forall [r: Region] => Graph[r,U32] -> U32
+  ! {read r} resources {depth:1,frame:4096}
+= fn graph => return open graph as [d,n,e,m] fields in do:
+  let total = for i in 0..m carry (acc=0) do:
+    let row = fields.edges[i]
+    let left = fields.nodes[row.0]
+    let right = fields.nodes[row.1]
+    next (U32.wrapping_add(acc,U32.wrapping_add(left,right)))
+  break total

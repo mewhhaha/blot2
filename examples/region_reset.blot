@@ -1,0 +1,7 @@
+let reset: Unit -> Result[Unit,ReserveError] ! {reserve,release}
+= fn () => return region@[Unit](4) as r (owner,free) in do:
+  space.end(free)
+  let (next_owner,next_free) = region.reset(owner)
+  space.end(next_free)
+  region.close(next_owner)
+  break ()

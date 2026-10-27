@@ -1,2 +1,0 @@
-import {compare} from "./library"
-entry const failure = compare (@panic "left witness") (@panic "right witness")

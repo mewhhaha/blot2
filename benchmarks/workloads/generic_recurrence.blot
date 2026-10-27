@@ -1,0 +1,9 @@
+let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:1024} =
+  fn value => return value
+
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:4096} = fn seed => do:
+  let answer = for i in 0..1024 carry (state = seed, total = 0) do:
+    let updated = identity@[U32](U32.wrapping_add(U32.wrapping_mul(state,1664525),1013904223))
+    next (updated,U32.wrapping_add(total,updated))
+  let (state,total) = answer
+  return total

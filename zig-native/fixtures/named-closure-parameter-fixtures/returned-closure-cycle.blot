@@ -1,4 +1,0 @@
-let r: U32 = saved ()
-const make = fn () => fn () => r
-const saved = make ()
-entry const answer = fn () => r

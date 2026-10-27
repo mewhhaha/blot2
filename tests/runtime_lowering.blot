@@ -1,0 +1,15 @@
+let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:1024} = fn value => return value
+pub let run: U32 -> U32 ! {} resources {depth:2,frame:2048} = fn value => return identity@[U32](value)
+pub let guarded: U32 -> U32 ! {} resources {depth:1,frame:0} = fn value => do:
+  if value < 4294967295:
+    let first = value + 1
+    if first < 4294967295:
+      let second = first + 1
+      if second < 4294967295:
+        return second + 1
+      else:
+        return second
+    else:
+      return first
+  else:
+    return value

@@ -1,0 +1,7 @@
+{
+  "language": "k1",
+  "function": "copy_identity",
+  "types": { "T": "U32" },
+  "input_maxima": [1024],
+  "output_capacity": 1024
+}

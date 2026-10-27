@@ -1,0 +1,13 @@
+pub type Wire = {flag:Bool,choice:#Small(U32) | #Large((U32,U32))}
+type Output[r: Region, T: Type] where [Plain(T)] =
+  exists [m: Nat, e: Domain] => View[r,T,m,e]
+
+pub let copy_identity:
+  forall [r: Region, T: Type, n: Nat, c: Nat, d: Domain] where [Plain(T)] =>
+  Fn[static, Many,
+    {src: View[r,T,n,d], dst: Dest[r,T,c]},
+    Result[Output[r,T],Unit]]
+  ! {} resources {depth: 1, frame: 1024}
+= fn {src: source, dst: output} => do:
+  dest.discard(output)
+  return #Ok(pack [n,d] as Output[r,T] source)

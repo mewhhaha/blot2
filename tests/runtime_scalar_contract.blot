@@ -1,0 +1,9 @@
+pub let checked_add: U32 -> U32 ! {} requires [AddFits(arg,1)] resources {depth:1,frame:0} = fn x => return x+1
+pub let checked_sub: U32 -> U32 ! {} requires [SubFits(arg,1)] resources {depth:1,frame:0} = fn x => return x-1
+pub let checked_mul: U32 -> U32 ! {} requires [MulFits(arg,2)] resources {depth:1,frame:0} = fn x => return x*2
+pub let multiply_zero: U32 -> U32 ! {} requires [MulFits(arg,0)] resources {depth:1,frame:0} = fn x => return x*0
+pub let equal: U32 -> U32 ! {} requires [Eq(arg,1)] resources {depth:1,frame:0} = fn x => return x
+pub let less: U32 -> U32 ! {} requires [Lt(arg,32)] resources {depth:1,frame:0} = fn x => return 1<<x
+pub let at_most: U32 -> U32 ! {} requires [Le(arg,1)] resources {depth:1,frame:0} = fn x => return x
+pub let complement: U32 -> U32 ! {} requires [Eq(arg,MAX-4294967294)] resources {depth:1,frame:0} = fn x => return x
+pub let boolean: Bool -> Bool ! {} resources {depth:1,frame:0} = fn x => return x

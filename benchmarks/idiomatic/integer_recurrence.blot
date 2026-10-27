@@ -1,7 +1,0 @@
-entry const run = fn (seed: U32) -> U32 => do:
-  let state = seed
-  let total = 0
-  for ignored in 0..65536:
-    state := self * 1664525 + 1013904223
-    total := self + state / 65536
-  break total

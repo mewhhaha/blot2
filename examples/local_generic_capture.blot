@@ -1,0 +1,7 @@
+pub let run: U32 -> U32 ! {} resources {depth:4,frame:2048} = fn seed => do:
+  let choose: forall [T:Type] where [Plain(T)] => Fn[local,Many,T,U32] ! {} resources {depth:1,frame:64} = fn value => do:
+    let _ = value
+    return seed
+  let direct = choose@[U32](0)
+  let nested = fn (u:Unit) => return choose@[Bool](#True)
+  return nested(())

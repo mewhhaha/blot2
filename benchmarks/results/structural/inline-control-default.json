@@ -1,0 +1,408 @@
+{
+  "metadata": {
+    "mode": "default",
+    "runs": [
+      {
+        "round": 0,
+        "command": [
+          "deno",
+          "run",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-default/0"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:08.379Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 1,
+        "command": [
+          "deno",
+          "run",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=fast",
+          "--baseline-opt=release",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-default/1"
+        ],
+        "reversed_labels": true,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:08.900Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "fast",
+          "baseline_opt": "release",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 2,
+        "command": [
+          "deno",
+          "run",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-default/2"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:09.426Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 3,
+        "command": [
+          "deno",
+          "run",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=fast",
+          "--baseline-opt=release",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-default/3"
+        ],
+        "reversed_labels": true,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:09.937Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "fast",
+          "baseline_opt": "release",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      },
+      {
+        "round": 4,
+        "command": [
+          "deno",
+          "run",
+          "-A",
+          "scripts/benchmark.ts",
+          "--baseline=build/blot",
+          "--baseline-kind=k1",
+          "--opt=release",
+          "--baseline-opt=fast",
+          "--families=diamonds",
+          "--scales=128",
+          "--rounds=1",
+          "--runtime-warmup=1000000",
+          "--runtime-calls=500000",
+          "--build-label=qualified-release-isolated-engine",
+          "--out=build/bench-structural-inline-control-default/4"
+        ],
+        "reversed_labels": false,
+        "metadata": {
+          "timestamp": "2026-10-26T22:34:10.440Z",
+          "os": {
+            "target": "x86_64-unknown-linux-gnu",
+            "arch": "x86_64",
+            "os": "linux",
+            "vendor": "unknown",
+            "env": "gnu",
+            "standalone": false
+          },
+          "deno": {
+            "deno": "2.9.7",
+            "v8": "15.0.245.2-rusty",
+            "typescript": "6.0.3"
+          },
+          "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+          "commit": "102963640f603cdcaf197c977357860b57f03c57",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "qualification": {
+            "input_manifest_sha256": "32c050991a86eec699074c07a52add676ebef9f795685c3f6490743ab054b928",
+            "finished": "2026-10-26T22:31:27.333787+00:00",
+            "mode": "--release"
+          },
+          "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "baseline_kind": "k1",
+          "candidate_opt": "release",
+          "baseline_opt": "fast",
+          "baseline_revision": null,
+          "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+          "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+          "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+          "candidate_build": "qualified-release-isolated-engine",
+          "threads": 1,
+          "cache": "fresh process; filesystem cache uncontrolled",
+          "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+          "rounds": 1,
+          "scales": [
+            128
+          ],
+          "runtime_calls_requested": 500000,
+          "runtime_warmup_requested": 1000000,
+          "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+        }
+      }
+    ],
+    "method": "Five fresh Deno processes; counterbalanced tier order; labels normalized candidate=release/baseline=fast; phase samples separate."
+  },
+  "samples": 20,
+  "comparisons": [
+    {
+      "family": "diamonds",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 21.95592,
+          "min": 20.596027,
+          "max": 22.253302
+        },
+        "candidate": {
+          "median": 21.599229,
+          "min": 21.233689,
+          "max": 22.14586
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.005249199304789,
+          "min": 0.9706078226053824,
+          "max": 1.056268472652652
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 21.233,
+          "min": 20.344,
+          "max": 21.668
+        },
+        "candidate": {
+          "median": 21.275999999999996,
+          "min": 21.006,
+          "max": 21.828
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0049843086579289,
+          "min": 0.9880648307249336,
+          "max": 1.0560232220609578
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 13128,
+          "min": 12676,
+          "max": 13144
+        },
+        "candidate": {
+          "median": 13044,
+          "min": 13020,
+          "max": 13204
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.004265691651432,
+          "min": 0.9905660377358491,
+          "max": 1.029031240138845
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 55.388812884024574,
+          "min": 43.957313268049205,
+          "max": 60.28451620903739
+        },
+        "candidate": {
+          "median": 45.92806339605733,
+          "min": 43.49914394521259,
+          "max": 52.68927211341532
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.7961023137055153,
+          "min": 0.7750680477598779,
+          "max": 1.1986463274522519
+        }
+      }
+    }
+  ]
+}

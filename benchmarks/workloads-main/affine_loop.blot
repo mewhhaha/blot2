@@ -1,0 +1,8 @@
+const scale = fn (value: F32) -> F32 => @f32.mul value 1.0001
+const offset = fn (value: F32) -> F32 => @f32.add value 0.5
+const transform = fn (value: F32) -> F32 => offset (scale value)
+entry const run = fn (seed: F32) -> F32 => do:
+  let value = seed
+  for ignored in 0..128:
+    value := transform self
+  break value

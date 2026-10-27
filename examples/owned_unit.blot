@@ -1,0 +1,14 @@
+type UnitPayload[r: Region] = Unit
+let owned_unit:
+  Unit -> Result[Unit,#Reserve(ReserveError) | #Body(#Cancelled)]
+  ! {reserve,release}
+= fn () => do:
+  let built = owned@[UnitPayload[_],#Cancelled](0) as r free in do:
+    seal(free,())
+  case built:
+    #Err(error) => return #Err(error)
+    #Ok(handle) => do:
+      let value = owned.open(handle) as r payload in do:
+        break payload
+      owned.close(handle)
+      return #Ok(value)

@@ -1,0 +1,5 @@
+let identity: forall [T: Type] => Fn[static,Many,T,T] ! {} resources {depth: 1, frame: 1024}
+= fn value => return value
+pub let run: U32 -> U32 ! {} resources {depth: 3, frame: 2048} = fn value => do:
+  let f = identity@[U32]
+  return f(value)

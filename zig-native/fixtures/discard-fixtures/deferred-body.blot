@@ -1,6 +1,0 @@
-const identity = fn value => value
-const missing = fn value => value.no_such_member
-entry const answer = fn () => do:
-  let unused = (missing, identity, fn input => input.no_such_member)
-  break 42
-entry const folded = answer ()

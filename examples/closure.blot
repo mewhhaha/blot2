@@ -1,0 +1,3 @@
+pub let invoke: F32 -> F32 ! {} resources {depth: 2, frame: 1024} = fn bias => do:
+  let add_bias = fn (x: F32) => return x + bias
+  return add_bias(3.0)

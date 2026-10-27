@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Blot K1",
+  "scopeName": "source.blot.k1",
+  "fileTypes": ["blot"],
+  "patterns": [
+    {"name": "comment.line.double-slash.blot", "match": "//.*$"},
+    {"name": "string.quoted.double.import.blot", "begin": "(?<=import)\\s+\"", "end": "\""},
+    {"name": "keyword.control.blot", "match": "\\b(import|as|pub|let|static|local|type|fn|in|do|return|break|continue|next|stop|seal|abort|if|else|case|for|carry|invariant|forall|exists|where|requires|ensures|on_true|on_false|resources|region|owned|pack|open)\\b"},
+    {"name": "storage.type.blot", "match": "\\b(Unit|Bool|U32|F32|RegionOwner|Space|Dest|EnvDest|Builder|View|Index|Fn|Owned|Result|Option|Type|Region|Nat|Domain|Plain|Share|Many|Once|Append|Resize)\\b"},
+    {"name": "constant.numeric.blot", "match": "\\b[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\\b"},
+    {"name": "constant.language.variant.blot", "match": "#[A-Za-z_][A-Za-z_0-9]*"},
+    {"name": "keyword.operator.blot", "match": "=>|->|\\.\\.|<<|>>|<=|>=|==|!=|&&|\\|\\||[+*/%<>=&^|!~@-]"}
+  ]
+}

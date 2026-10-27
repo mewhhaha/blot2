@@ -1,0 +1,6 @@
+pub let run: U32 -> U32 ! {} resources {depth:3,frame:1024} = fn input => do:
+  let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:256} = fn value => return value
+  let scalar = identity@[U32](input)
+  let pair = identity@[(U32,U32)]((scalar,42))
+  let (answer,_) = pair
+  return answer

@@ -1,0 +1,5 @@
+let region_unit: Unit -> Result[Unit,ReserveError] ! {reserve,release}
+= fn () => return region@[Unit](0) as r (owner,free) in do:
+  space.end(free)
+  region.close(owner)
+  break ()

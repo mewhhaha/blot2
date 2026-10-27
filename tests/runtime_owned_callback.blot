@@ -1,0 +1,19 @@
+type Callback[r: Region] = Fn[r,Many,F32,F32] ! {} resources {depth: 1, frame: 0}
+let create: F32 -> Result[Owned[Callback[_]],#Reserve(ReserveError) | #Body(AllocError)] ! {reserve,release}
+= fn bias => return owned@[Callback[_],AllocError](4) as r free in do:
+  case env.try_alloc(free,4):
+    #Err((rest,error)) => abort(rest,error)
+    #Ok((rest,destination)) => do:
+      let callback: Callback[r] = fn in destination (x: F32) => return x+bias
+      seal(rest,callback)
+
+
+pub let invoke: F32 -> F32 ! {reserve,release} resources {depth: 4, frame: 4096}
+= fn bias => do:
+  case create(bias):
+    #Err(_) => return 0.0
+    #Ok(owner) => do:
+      let answer = owned.open(owner) as r callback in do:
+        break callback(2.0)
+      owned.close(owner)
+      return answer

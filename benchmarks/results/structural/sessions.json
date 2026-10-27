@@ -1,0 +1,992 @@
+{
+  "metadata": {
+    "format": "K1-PAIRED-SESSIONS-1",
+    "rounds": 5,
+    "scales": [
+      8,
+      32,
+      128
+    ],
+    "method": "sequential pairs; alternate process order; fresh process per scale and outer round",
+    "compiler_sha256": {
+      "baseline": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+      "candidate": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527"
+    },
+    "harness_sha256": "fdc22e5aec7aa3de3d63c2a5d9724fb4bafd49d10eda4283b8341341821ace6d",
+    "runs": [
+      {
+        "compiler": "baseline",
+        "pair_round": 0,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-baseline",
+          "--compiler=build/structural-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/baseline-round-0"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:20Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/structural-baseline/blot",
+          "build_label": "structural-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 0,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/candidate-round-0"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:20Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "structural-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 1,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/candidate-round-1"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "structural-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 1,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-baseline",
+          "--compiler=build/structural-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/baseline-round-1"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/structural-baseline/blot",
+          "build_label": "structural-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 2,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-baseline",
+          "--compiler=build/structural-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/baseline-round-2"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/structural-baseline/blot",
+          "build_label": "structural-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 2,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/candidate-round-2"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "structural-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 3,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/candidate-round-3"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "structural-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 3,
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-baseline",
+          "--compiler=build/structural-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/baseline-round-3"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/structural-baseline/blot",
+          "build_label": "structural-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "baseline",
+        "pair_round": 4,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-baseline",
+          "--compiler=build/structural-baseline/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/baseline-round-4"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:21Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "f84aa746934c4b9ef5cc818bf7402f19f07beffb63b558000d30c0cccdbdb14a",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/structural-baseline/blot",
+          "build_label": "structural-baseline",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      },
+      {
+        "compiler": "candidate",
+        "pair_round": 4,
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "command": [
+          "python3",
+          "scripts/benchmark_sessions.py",
+          "--rounds=1",
+          "--scales=8,32,128",
+          "--build-label=structural-candidate",
+          "--compiler=build/blot",
+          "--out=/home/mewhhaha/.codex/worktrees/0409/blot2/build/bench-structural-sessions/candidate-round-4"
+        ],
+        "metadata": {
+          "timestamp": "2026-10-26T22:32:22Z",
+          "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+          "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor",
+          "candidate_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+          "compiler": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+          "build_label": "structural-candidate",
+          "threads": 1,
+          "rounds": 1,
+          "scales": [
+            8,
+            32,
+            128
+          ],
+          "instrumentation": "phase and work counters enabled; request wall includes cache decode/encode and publication",
+          "cache": "fresh process per scale/round; successive in-process revisions; filesystem cache uncontrolled"
+        }
+      }
+    ]
+  },
+  "samples": 300,
+  "comparisons": [
+    {
+      "case": "abi-edit",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.599777,
+          "min": 0.567787,
+          "max": 0.686497
+        },
+        "candidate": {
+          "median": 0.512017,
+          "min": 0.501087,
+          "max": 0.679026
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8536789506766682,
+          "min": 0.7732837871105045,
+          "max": 1.1850842180401657
+        }
+      }
+    },
+    {
+      "case": "abi-edit",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.587327,
+          "min": 0.564577,
+          "max": 0.607407
+        },
+        "candidate": {
+          "median": 0.540127,
+          "min": 0.518558,
+          "max": 0.668246
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9224282214166895,
+          "min": 0.8537241092051951,
+          "max": 1.1836224288272459
+        }
+      }
+    },
+    {
+      "case": "abi-edit",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.671206,
+          "min": 0.562608,
+          "max": 0.719446
+        },
+        "candidate": {
+          "median": 0.631456,
+          "min": 0.545817,
+          "max": 0.694617
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9654887232676254,
+          "min": 0.8045331332626797,
+          "max": 1.135772012363431
+        }
+      }
+    },
+    {
+      "case": "body-edit",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.895155,
+          "min": 0.637537,
+          "max": 1.023935
+        },
+        "candidate": {
+          "median": 0.615417,
+          "min": 0.605297,
+          "max": 0.747826
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.7924194018384593,
+          "min": 0.6010313154643605,
+          "max": 1.0689685461392828
+        }
+      }
+    },
+    {
+      "case": "body-edit",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.86483,
+          "min": 1.745671,
+          "max": 2.151259
+        },
+        "candidate": {
+          "median": 1.536232,
+          "min": 1.459083,
+          "max": 1.792501
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8332334693312148,
+          "min": 0.8179399512627455,
+          "max": 0.8937453983594826
+        }
+      }
+    },
+    {
+      "case": "body-edit",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 6.961314,
+          "min": 6.666435,
+          "max": 7.54154
+        },
+        "candidate": {
+          "median": 6.287587,
+          "min": 5.76574,
+          "max": 6.472946
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9281446812649883,
+          "min": 0.821207303234999,
+          "max": 0.9589602238677793
+        }
+      }
+    },
+    {
+      "case": "bridge-first",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.624507,
+          "min": 0.587967,
+          "max": 0.807396
+        },
+        "candidate": {
+          "median": 0.636786,
+          "min": 0.523928,
+          "max": 0.714977
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8659010190194841,
+          "min": 0.8060679022437565,
+          "max": 1.1568158872335192
+        }
+      }
+    },
+    {
+      "case": "bridge-first",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.878415,
+          "min": 0.867606,
+          "max": 1.071964
+        },
+        "candidate": {
+          "median": 0.774506,
+          "min": 0.744266,
+          "max": 0.913795
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8714739178843853,
+          "min": 0.8472828902056545,
+          "max": 1.0492817302953679
+        }
+      }
+    },
+    {
+      "case": "bridge-first",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.019269,
+          "min": 1.97289,
+          "max": 2.103209
+        },
+        "candidate": {
+          "median": 1.676081,
+          "min": 1.588012,
+          "max": 1.72517
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8446947867637375,
+          "min": 0.7550424137591651,
+          "max": 0.8709157631697662
+        }
+      }
+    },
+    {
+      "case": "fresh",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.163529,
+          "min": 1.93991,
+          "max": 2.373798
+        },
+        "candidate": {
+          "median": 2.067839,
+          "min": 1.841951,
+          "max": 2.178979
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9554582259437271,
+          "min": 0.8513641370187318,
+          "max": 1.1232371604868268
+        }
+      }
+    },
+    {
+      "case": "fresh",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.778235,
+          "min": 2.332688,
+          "max": 3.050034
+        },
+        "candidate": {
+          "median": 2.404228,
+          "min": 2.249218,
+          "max": 2.912365
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9083094122707401,
+          "min": 0.7882626882192132,
+          "max": 1.0716341034247516
+        }
+      }
+    },
+    {
+      "case": "fresh",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 5.841189,
+          "min": 5.59382,
+          "max": 6.178308
+        },
+        "candidate": {
+          "median": 5.456982,
+          "min": 5.173412,
+          "max": 5.882449
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.924844203066956,
+          "min": 0.877030234061677,
+          "max": 1.0070636303670366
+        }
+      }
+    },
+    {
+      "case": "interface-edit",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.658597,
+          "min": 0.600747,
+          "max": 0.764896
+        },
+        "candidate": {
+          "median": 0.697876,
+          "min": 0.537227,
+          "max": 0.747607
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.950366542128773,
+          "min": 0.815714313912757,
+          "max": 1.2104722027926738
+        }
+      }
+    },
+    {
+      "case": "interface-edit",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.624832,
+          "min": 1.558822,
+          "max": 1.782301
+        },
+        "candidate": {
+          "median": 1.439553,
+          "min": 1.412012,
+          "max": 1.738181
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8925462268602192,
+          "min": 0.8828808147550024,
+          "max": 1.036481791006684
+        }
+      }
+    },
+    {
+      "case": "interface-edit",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 6.256957,
+          "min": 6.091098,
+          "max": 6.371357
+        },
+        "candidate": {
+          "median": 5.356522,
+          "min": 5.330922,
+          "max": 5.913549
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8751988557728017,
+          "min": 0.8497119335296871,
+          "max": 0.9697843385431921
+        }
+      }
+    },
+    {
+      "case": "rejected-edit",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.244009,
+          "min": 0.201858,
+          "max": 0.263319
+        },
+        "candidate": {
+          "median": 0.170809,
+          "min": 0.168309,
+          "max": 0.188449
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.7723034806093217,
+          "min": 0.6579813837968395,
+          "max": 0.8461839510943335
+        }
+      }
+    },
+    {
+      "case": "rejected-edit",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.568997,
+          "min": 0.524107,
+          "max": 0.627397
+        },
+        "candidate": {
+          "median": 0.415518,
+          "min": 0.404548,
+          "max": 0.518028
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.7718805511088385,
+          "min": 0.6622887900324675,
+          "max": 0.8563621124881595
+        }
+      }
+    },
+    {
+      "case": "rejected-edit",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.88854,
+          "min": 1.773831,
+          "max": 1.981989
+        },
+        "candidate": {
+          "median": 1.514892,
+          "min": 1.414412,
+          "max": 1.681211
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8021498088470458,
+          "min": 0.7753327591626392,
+          "max": 0.8532376839102919
+        }
+      }
+    },
+    {
+      "case": "source-origins",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.649526,
+          "min": 0.643897,
+          "max": 1.045595
+        },
+        "candidate": {
+          "median": 0.596137,
+          "min": 0.579977,
+          "max": 0.714697
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9003750427234629,
+          "min": 0.5701414027419794,
+          "max": 1.1099554742451043
+        }
+      }
+    },
+    {
+      "case": "source-origins",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.742191,
+          "min": 1.682841,
+          "max": 2.095679
+        },
+        "candidate": {
+          "median": 1.532452,
+          "min": 1.498122,
+          "max": 1.797421
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8838629097488984,
+          "min": 0.7472947205045454,
+          "max": 0.9106338626168484
+        }
+      }
+    },
+    {
+      "case": "source-origins",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 7.062673,
+          "min": 6.433256,
+          "max": 7.541801
+        },
+        "candidate": {
+          "median": 5.898289,
+          "min": 5.75191,
+          "max": 8.857503
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8441886273041215,
+          "min": 0.814409785077123,
+          "max": 1.1744546163442922
+        }
+      }
+    },
+    {
+      "case": "static-edit",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.629587,
+          "min": 0.610556,
+          "max": 0.710226
+        },
+        "candidate": {
+          "median": 0.599407,
+          "min": 0.568007,
+          "max": 0.640187
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9021898482656091,
+          "min": 0.8439665683880906,
+          "max": 1.0485311748635668
+        }
+      }
+    },
+    {
+      "case": "static-edit",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.613992,
+          "min": 1.570752,
+          "max": 1.88677
+        },
+        "candidate": {
+          "median": 1.463522,
+          "min": 1.411443,
+          "max": 1.737771
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9317333353705741,
+          "min": 0.7726018539620622,
+          "max": 1.1042988176472157
+        }
+      }
+    },
+    {
+      "case": "static-edit",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 6.430966,
+          "min": 6.175697,
+          "max": 6.794194
+        },
+        "candidate": {
+          "median": 5.373891,
+          "min": 5.177663,
+          "max": 5.540031
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8386051380171338,
+          "min": 0.8051143482954194,
+          "max": 0.8504301374246384
+        }
+      }
+    },
+    {
+      "case": "unchanged",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.900295,
+          "min": 0.873086,
+          "max": 1.104714
+        },
+        "candidate": {
+          "median": 0.958965,
+          "min": 0.812036,
+          "max": 1.030725
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9622568158214807,
+          "min": 0.8680663049440851,
+          "max": 1.1750760412058971
+        }
+      }
+    },
+    {
+      "case": "unchanged",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 2.128649,
+          "min": 1.94718,
+          "max": 2.142898
+        },
+        "candidate": {
+          "median": 1.80937,
+          "min": 1.694901,
+          "max": 1.86551
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8443565676014443,
+          "min": 0.7950556984642225,
+          "max": 0.9580572931110632
+        }
+      }
+    },
+    {
+      "case": "unchanged",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 7.311492,
+          "min": 6.917304,
+          "max": 7.911998
+        },
+        "candidate": {
+          "median": 6.339196,
+          "min": 6.258067,
+          "max": 6.883184
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8871153660731617,
+          "min": 0.7985613747627337,
+          "max": 0.9950674424602418
+        }
+      }
+    },
+    {
+      "case": "valid-revert",
+      "scale": 8,
+      "wall_ms": {
+        "baseline": {
+          "median": 0.671956,
+          "min": 0.656986,
+          "max": 0.788276
+        },
+        "candidate": {
+          "median": 0.602147,
+          "min": 0.588947,
+          "max": 0.726196
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8964376714267884,
+          "min": 0.7638783877728106,
+          "max": 1.0807195709242867
+        }
+      }
+    },
+    {
+      "case": "valid-revert",
+      "scale": 32,
+      "wall_ms": {
+        "baseline": {
+          "median": 1.717121,
+          "min": 1.686461,
+          "max": 2.141678
+        },
+        "candidate": {
+          "median": 1.742661,
+          "min": 1.452322,
+          "max": 2.0239
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0148737334177382,
+          "min": 0.685524154424708,
+          "max": 1.1772808471256697
+        }
+      }
+    },
+    {
+      "case": "valid-revert",
+      "scale": 128,
+      "wall_ms": {
+        "baseline": {
+          "median": 6.847544,
+          "min": 6.399797,
+          "max": 7.530881
+        },
+        "candidate": {
+          "median": 6.049448,
+          "min": 5.846219,
+          "max": 6.370967
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.8913923006555343,
+          "min": 0.7762994794367352,
+          "max": 0.9954951696124111
+        }
+      }
+    }
+  ]
+}

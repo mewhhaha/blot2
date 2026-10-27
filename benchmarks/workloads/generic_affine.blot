@@ -1,0 +1,7 @@
+let identity: forall [T:Type] => T -> T ! {} resources {depth:1,frame:1024} =
+  fn value => return value
+
+pub let run: F32 -> F32 ! {} resources {depth:2,frame:4096} = fn seed => do:
+  let answer = for i in 0..128 carry (value = seed) do:
+    next (identity@[F32](value * 1.0001 + 0.5))
+  return answer

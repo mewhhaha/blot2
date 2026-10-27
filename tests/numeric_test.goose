@@ -1,0 +1,28 @@
+import src.numeric;
+fn expect_f32(text: const u8[:], expected: u32) {
+    let bits, ok = parse_decimal_f32(text);
+    if !ok || bits != expected { print("decimal conversion mismatch: ", text, " expected ", expected, " got ", bits); }
+    assert(ok && bits == expected);
+}
+fn test_numeric() {
+    expect_f32("0.0", 0);
+    expect_f32("1.0", 0x3f800000);
+    expect_f32("1.000000059604644775390625", 0x3f800000);
+    expect_f32("1.00000005960464477539062500000000000000000000000000001", 0x3f800001);
+    expect_f32("1.00000017881393432617187499999999999999999999999999999", 0x3f800001);
+    expect_f32("1.000000178813934326171875", 0x3f800002);
+    expect_f32("1.4012984643248170709237295832899161312802619418765e-45", 1);
+    expect_f32("7.00649232162408535461864791644958065640130970938257885878534141944895541342930300743319094181060791015625e-46", 0);
+    expect_f32("7.006492321624085354618647916449580656401309709382578858785341419448955413429303007433190941810607910156251e-46", 1);
+    expect_f32("3.40282346638528859811704183484516925440e38", 0x7f7fffff);
+    expect_f32("3.40282356779733661637539395458142568448e38", 0x7f800000);
+    expect_f32("1e999999999999999999999999", 0x7f800000);
+    expect_f32("1e-999999999999999999999999", 0);
+    expect_f32("0.0e99999999999999999999", 0);
+    var near:u8[>..] = [];
+    near.append("1.000000059604644775390625");
+    for i in 300 { near.push('0'); }
+    near.push('1'); expect_f32(near, 0x3f800001);
+    let bits, ok = parse_decimal_f32("1e"); assert(!ok);
+    print("NUM exact binary32 rounding and subnormal/overflow boundaries passed");
+}

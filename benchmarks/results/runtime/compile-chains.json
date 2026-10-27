@@ -1,0 +1,121 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T23:03:55.701Z",
+    "os": {
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "vendor": "unknown",
+      "env": "gnu",
+      "standalone": false
+    },
+    "deno": {
+      "deno": "2.9.7",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "cpu": "model name\t: AMD Ryzen 7 7800X3D 8-Core Processor",
+    "commit": "900ede209ca16b9728347fbcea58d44228a3b16f",
+    "candidate_sha256": "94b3d24012f8868a8eb7e8e6351edcfea9529c3d7de36845d10b0b2e47f032bd",
+    "candidate_path": "/home/mewhhaha/.codex/worktrees/0409/blot2/build/blot",
+    "qualification": {
+      "input_manifest_sha256": "27e9627f595ffe94ff0a2955c600ef977cd1262638152326700716c8fb85d67e",
+      "finished": "2026-10-26T23:02:53.575196+00:00",
+      "mode": "--release"
+    },
+    "baseline_sha256": "ca49141eea94f5f3e1cb3d87930bb41b5409e5dedc777b991c6ed6b2eebcf527",
+    "baseline_kind": "k1",
+    "candidate_opt": "off",
+    "baseline_opt": "off",
+    "baseline_revision": null,
+    "harness_sha256": "53eddbd36679ff2581ced756d4cac286c1ea27b937b8923a5b8eb89787101ebd",
+    "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+    "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+    "candidate_build": "qualified-runtime-followup-compile-control",
+    "threads": 1,
+    "cache": "fresh process; filesystem cache uncontrolled",
+    "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+    "rounds": 5,
+    "scales": [
+      127
+    ],
+    "runtime_calls_requested": 20000,
+    "runtime_warmup_requested": 0,
+    "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+  },
+  "samples": 12,
+  "comparisons": [
+    {
+      "family": "chains",
+      "scale": 127,
+      "wall_ms": {
+        "baseline": {
+          "median": 5.908428,
+          "min": 5.454259,
+          "max": 6.215187
+        },
+        "candidate": {
+          "median": 5.892008,
+          "min": 5.406889,
+          "max": 6.217046
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9972209189990976,
+          "min": 0.8699479195074902,
+          "max": 1.1391127557382221
+        }
+      },
+      "cpu_ms": {
+        "baseline": {
+          "median": 5.553,
+          "min": 5.284,
+          "max": 5.643
+        },
+        "candidate": {
+          "median": 5.4959999999999996,
+          "min": 5.159999999999999,
+          "max": 5.707
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0045487627365357,
+          "min": 0.9224168752234535,
+          "max": 1.0401211203633611
+        }
+      },
+      "peak_rss_kib": {
+        "baseline": {
+          "median": 12868,
+          "min": 12812,
+          "max": 13088
+        },
+        "candidate": {
+          "median": 13048,
+          "min": 12784,
+          "max": 13224
+        },
+        "paired_candidate_over_baseline": {
+          "median": 0.9978606356968215,
+          "min": 0.9770712320391317,
+          "max": 1.032157352482048
+        }
+      },
+      "runtime_ns_per_call": {
+        "baseline": {
+          "median": 439.5444606048441,
+          "min": 192.74612568333413,
+          "max": 512.8833441998096
+        },
+        "candidate": {
+          "median": 490.61803500676905,
+          "min": 214.50393700787126,
+          "max": 533.8326395506284
+        },
+        "paired_candidate_over_baseline": {
+          "median": 1.0408461214187088,
+          "min": 0.7119668024219872,
+          "max": 1.1757518789485757
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+pub let run: Unit -> U32 ! {} resources {depth:4,frame:4096} = fn () => do:
+  let packed = pack [42] as (exists [n:Nat] => Unit) ()
+  return open packed as [n] unused in do:
+    let choose: forall [T:Type] where [Plain(T)] => Fn[local,Many,T,U32] ! {} resources {depth:1,frame:256} = fn value => do:
+      let _ = value
+      return n
+    let nested = fn (u:Unit) => return choose@[Bool](#True)
+    break nested(())

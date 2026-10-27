@@ -1,0 +1,30 @@
+let exercise: Unit -> Result[Result[U32,AllocError],ReserveError] ! {reserve,release}
+= fn () => return region@[Result[U32,AllocError]](12) as r (owner,free) in do:
+  let (rest,answer): (Space[r],Result[U32,AllocError]) = do:
+    case region.try_alloc@[U32](free,3):
+      #Err((unused,error)) => break (unused,#Err(error))
+      #Ok((unused,destination)) => do:
+        let b0 = builder.begin_resize(destination)
+        let b1 = builder.append(b0,10)
+        let b2 = builder.append(b1,20)
+        let b3 = builder.append(b2,30)
+        let old = builder.read(b3,1)
+        let b4 = builder.set(b3,1,99)
+        let b5 = builder.truncate(b4,2)
+        let packed = builder.freeze(b5)
+        let answer = open packed as [d] a in do:
+          let sliced = view.slice(a,1,1)
+          let final = open sliced as [e] sub in do:
+            break sub[0]
+          break U32.wrapping_add(old,final)
+        break (unused,#Ok(answer))
+  space.end(rest)
+  region.close(owner)
+  break answer
+pub let run: Unit -> U32 ! {reserve,release} resources {depth:4,frame:8192} = fn () => do:
+  case exercise(()):
+    #Err(_) => return 0
+    #Ok(result) => do:
+      case result:
+        #Err(_) => return 0
+        #Ok(answer) => return answer

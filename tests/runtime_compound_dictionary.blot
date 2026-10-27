@@ -1,0 +1,11 @@
+let identity: forall [T: Type] => T -> T ! {} resources {depth:1,frame:1024}
+= fn item => return item
+let through: forall [T: Type] where [Plain(T)] => T -> T ! {} resources {depth:2,frame:4096}
+= fn item => do:
+  let pair = identity@[(T,T)]((item,item))
+  let (first,_) = pair
+  return first
+pub let run: U32 -> U32 ! {} resources {depth:3,frame:8192}
+= fn value => return through@[U32](value)
+pub let run_float: F32 -> F32 ! {} resources {depth:3,frame:8192}
+= fn value => return through@[F32](value)

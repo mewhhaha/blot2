@@ -1,0 +1,8 @@
+let identity: forall [T: Type] => Fn[static,Many,T,T] ! {} resources {depth: 1, frame: 1024}
+= fn value => return value
+let through: forall [T: Type] => Fn[static,Many,T,T] ! {} resources {depth: 3, frame: 4096}
+= fn value => do:
+  let callback = identity@[T]
+  return callback(value)
+pub let run: U32 -> U32 ! {} resources {depth: 4, frame: 8192}
+= fn value => return through@[U32](value)

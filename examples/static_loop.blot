@@ -1,0 +1,6 @@
+let count = fn (limit: U32) => do:
+  let result = for i in 0..limit carry (n = 0) invariant [Eq(n,i)] do:
+    next (n+1)
+  return result
+static let answer = count(42)
+pub let run: Unit -> U32 ! {} resources {depth:1,frame:256} = fn () => return answer

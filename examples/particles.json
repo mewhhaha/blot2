@@ -1,0 +1,6 @@
+{
+  "language": "k1",
+  "function": "project",
+  "input_maxima": [1024],
+  "output_capacity": 1024
+}

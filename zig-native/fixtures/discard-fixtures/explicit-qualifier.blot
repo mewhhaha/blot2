@@ -1,3 +1,0 @@
-entry const answer = fn () => do:
-  let ignored: (U32, U32) where { associated "missing" Bool Bool Bool } = (40, 2)
-  break 0

@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-26T19:21:47.485Z",
+    "os": {
+      "target": "x86_64-unknown-linux-gnu",
+      "arch": "x86_64",
+      "os": "linux",
+      "vendor": "unknown",
+      "env": "gnu",
+      "standalone": false
+    },
+    "deno": {
+      "deno": "2.9.7",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "cpu": "unavailable",
+    "commit": "102963640f603cdcaf197c977357860b57f03c57",
+    "candidate_sha256": "b54c172a659c9346604fb7dae5b8b76eb9852a96e9f962ce4ab858e5ab013292",
+    "qualification": {
+      "input_manifest_sha256": "91d402345ffe5509f93f61642889c8422a3cfe65baac8f18836849250919b25f",
+      "finished": "2026-10-26T19:15:32.302910+00:00",
+      "mode": "--release"
+    },
+    "baseline_sha256": "7b61cff1941de683e99269dc2a3c30cc137201d9bca8f98e90a8d0bbc02366b2",
+    "baseline_kind": "k1",
+    "baseline_revision": "102963640f603cdcaf197c977357860b57f03c57",
+    "harness_sha256": "5ee30465cc5d1a3156291bca6dd46640af190fc5e1beafc96fb4ea50fb04c2ff",
+    "goose_revision": "a108677d300cb0e8bbb842c35a353abe67a20c6c",
+    "policy": "K1-SEM-POLICY-1 / K1-OPT-POLICY-1 / K1-WASM32-ABI1",
+    "candidate_build": "sol-review-release",
+    "threads": 1,
+    "cache": "fresh process; filesystem cache uncontrolled",
+    "instrumentation": "separate phase-attribution build; timing samples omit --timings",
+    "rounds": 5,
+    "scales": [
+      8,
+      32,
+      127
+    ],
+    "runtime_calls_requested": 500000,
+    "runtime_warmup_requested": 1000000,
+    "runtime_method": "pre-resolved exports; checksum-checked warmup and timed loops; includes JS/Wasm boundary"
+  },
+  "summary": [
+    {
+      "family": "chains",
+      "scale": 8,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 4.737778,
+      "min_ms": 4.498149,
+      "max_ms": 16.496671
+    },
+    {
+      "family": "chains",
+      "scale": 8,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 7.542524,
+      "min_ms": 7.248895,
+      "max_ms": 8.721288
+    },
+    {
+      "family": "chains",
+      "scale": 32,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 5.618283,
+      "min_ms": 5.387995,
+      "max_ms": 6.013541
+    },
+    {
+      "family": "chains",
+      "scale": 32,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 10.766709,
+      "min_ms": 9.809762,
+      "max_ms": 11.023907
+    },
+    {
+      "family": "chains",
+      "scale": 127,
+      "compiler": "candidate",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 9.579874,
+      "min_ms": 8.4428,
+      "max_ms": 10.816448
+    },
+    {
+      "family": "chains",
+      "scale": 127,
+      "compiler": "baseline",
+      "samples": 5,
+      "failures": 0,
+      "median_ms": 22.025384,
+      "min_ms": 20.454942,
+      "max_ms": 23.349798
+    }
+  ]
+}

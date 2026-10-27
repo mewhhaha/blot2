@@ -1,2 +1,0 @@
-let first: U32 = first
-entry const answer = fn () => first

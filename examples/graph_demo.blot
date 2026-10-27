@@ -1,0 +1,118 @@
+import "./graph.blot" as graphs
+
+pub let run: Unit -> U32 ! {reserve,release} resources {depth:3,frame:16384}
+= fn () => do:
+  let reserved = region@[U32](128) as r (owner,free) in do:
+    let (rest,value): (Space[r],U32) = do:
+      case region.try_alloc@[U32](free,2):
+        #Err((s,error)) => break (s,99)
+        #Ok((s,node_dest)) => do:
+          let frozen_nodes = array.in(node_dest,#[10,32])
+          let constructed: (Space[r],U32) = open frozen_nodes as [d] nodes in do:
+            case region.try_alloc@[(U32,U32)](s,2):
+              #Err((s2,error)) => break (s2,99)
+              #Ok((s2,raw_dest)) => do:
+                let frozen_raw = array.in(raw_dest,#[(0,1),(1,0)])
+                let answer: (Space[r],U32) = open frozen_raw as [raw_domain] raw in do:
+                  case region.try_alloc@[(Index[d,2],Index[d,2])](s2,2):
+                    #Err((s3,error)) => break (s3,99)
+                    #Ok((s3,edge_dest)) => do:
+                      case graphs.build@[r,U32,2,d,2,raw_domain,2](nodes,raw,edge_dest):
+                        #Err(()) => break (s3,7)
+                        #Ok(graph) => break (s3,graphs.sum@[r](graph))
+                break answer
+          break constructed
+    space.end(rest)
+    region.close(owner)
+    break value
+  case reserved:
+    #Err(error) => return 99
+    #Ok(value) => return value
+
+pub let late_failure: Unit -> U32 ! {reserve,release} resources {depth:3,frame:16384}
+= fn () => do:
+  let reserved = region@[U32](128) as r (owner,free) in do:
+    let (rest,value): (Space[r],U32) = do:
+      case region.try_alloc@[U32](free,2):
+        #Err((s,error)) => break (s,99)
+        #Ok((s,node_dest)) => do:
+          let frozen_nodes = array.in(node_dest,#[10,32])
+          let constructed: (Space[r],U32) = open frozen_nodes as [d] nodes in do:
+            case region.try_alloc@[(U32,U32)](s,2):
+              #Err((s2,error)) => break (s2,99)
+              #Ok((s2,raw_dest)) => do:
+                let frozen_raw = array.in(raw_dest,#[(0,1),(0,2)])
+                let answer: (Space[r],U32) = open frozen_raw as [raw_domain] raw in do:
+                  case region.try_alloc@[(Index[d,2],Index[d,2])](s2,2):
+                    #Err((s3,error)) => break (s3,99)
+                    #Ok((s3,edge_dest)) => do:
+                      case graphs.build@[r,U32,2,d,2,raw_domain,2](nodes,raw,edge_dest):
+                        #Err(()) => break (s3,7)
+                        #Ok(graph) => break (s3,graphs.sum@[r](graph))
+                break answer
+          break constructed
+    space.end(rest)
+    region.close(owner)
+    break value
+  case reserved:
+    #Err(error) => return 99
+    #Ok(value) => return value
+
+pub let empty: Unit -> U32 ! {reserve,release} resources {depth:3,frame:16384}
+= fn () => do:
+  let reserved = region@[U32](128) as r (owner,free) in do:
+    let (rest,value): (Space[r],U32) = do:
+      case region.try_alloc@[U32](free,0):
+        #Err((s,error)) => break (s,99)
+        #Ok((s,node_dest)) => do:
+          let frozen_nodes = array.in(node_dest,#[])
+          let constructed: (Space[r],U32) = open frozen_nodes as [d] nodes in do:
+            case region.try_alloc@[(U32,U32)](s,0):
+              #Err((s2,error)) => break (s2,99)
+              #Ok((s2,raw_dest)) => do:
+                let frozen_raw = array.in(raw_dest,#[])
+                let answer: (Space[r],U32) = open frozen_raw as [raw_domain] raw in do:
+                  case region.try_alloc@[(Index[d,0],Index[d,0])](s2,0):
+                    #Err((s3,error)) => break (s3,99)
+                    #Ok((s3,edge_dest)) => do:
+                      case graphs.build@[r,U32,0,d,0,raw_domain,0](nodes,raw,edge_dest):
+                        #Err(()) => break (s3,7)
+                        #Ok(graph) => break (s3,graphs.sum@[r](graph))
+                break answer
+          break constructed
+    space.end(rest)
+    region.close(owner)
+    break value
+  case reserved:
+    #Err(error) => return 99
+    #Ok(value) => return value
+
+pub let zero_nodes_invalid: Unit -> U32 ! {reserve,release} resources {depth:3,frame:16384}
+= fn () => do:
+  let reserved = region@[U32](128) as r (owner,free) in do:
+    let (rest,value): (Space[r],U32) = do:
+      case region.try_alloc@[U32](free,0):
+        #Err((s,error)) => break (s,99)
+        #Ok((s,node_dest)) => do:
+          let frozen_nodes = array.in(node_dest,#[])
+          let constructed: (Space[r],U32) = open frozen_nodes as [d] nodes in do:
+            case region.try_alloc@[(U32,U32)](s,1):
+              #Err((s2,error)) => break (s2,99)
+              #Ok((s2,raw_dest)) => do:
+                let frozen_raw = array.in(raw_dest,#[(0,0)])
+                let answer: (Space[r],U32) = open frozen_raw as [raw_domain] raw in do:
+                  case region.try_alloc@[(Index[d,0],Index[d,0])](s2,1):
+                    #Err((s3,error)) => break (s3,99)
+                    #Ok((s3,edge_dest)) => do:
+                      case graphs.build@[r,U32,0,d,1,raw_domain,1](nodes,raw,edge_dest):
+                        #Err(()) => break (s3,7)
+                        #Ok(graph) => break (s3,graphs.sum@[r](graph))
+                break answer
+          break constructed
+    space.end(rest)
+    region.close(owner)
+    break value
+  case reserved:
+    #Err(error) => return 99
+    #Ok(value) => return value
+

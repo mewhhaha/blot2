@@ -1,0 +1,17 @@
+pub let checked: (U32,U32) -> U32 ! {} resources {depth:1,frame:128}
+= fn (x,y) => do:
+  if x<100 && y<100:
+    return x+1
+  return 0
+pub let negated: (U32,U32) -> U32 ! {} resources {depth:1,frame:128}
+= fn (x,y) => do:
+  if !(x>=100 || y>=100):
+    return y+1
+  return 0
+let bounded: U32 -> Bool ! {} on_true [Lt(arg,100)] resources {depth:1,frame:128}
+= fn x => return x<100
+pub let predicates: (U32,U32) -> U32 ! {} resources {depth:2,frame:512}
+= fn (x,y) => do:
+  if bounded(x) && bounded(y):
+    return x+1
+  return 0

@@ -1,0 +1,6 @@
+const identity = fn value => value
+entry const run = fn (seed: F32) -> F32 => do:
+  let value = seed
+  for ignored in 0..128:
+    value := identity (@f32.add (@f32.mul self 1.0001) 0.5)
+  break value

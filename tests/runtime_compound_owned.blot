@@ -1,0 +1,17 @@
+type PairPayload[r: Region,T: Type] = (T,T)
+let make:
+  forall [T: Type] where [Plain(T)] =>
+  T -> Result[Owned[PairPayload[_,T]],#Reserve(ReserveError) | #Body(#Cancelled)]
+  ! {reserve,release} resources {depth:3,frame:8192}
+= fn item => return owned@[PairPayload[_,T],#Cancelled](0) as r free in do:
+  seal(free,(item,item))
+pub let run: U32 -> U32 ! {reserve,release} resources {depth:4,frame:16384}
+= fn value => do:
+  case make@[U32](value):
+    #Err(_) => return 0
+    #Ok(handle) => do:
+      let answer = owned.open(handle) as r payload in do:
+        let (first,_) = payload
+        break first
+      owned.close(handle)
+      return answer
