@@ -11,6 +11,6 @@ fn main(){
   else {s.append("pub let f: Bool -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let a = x || #False\n  let b = x || #True\n  return a && b\n");}
   var p=short_frontend::parse(s);if p.status!=0 {print("rejected ",i," ",s);}assert(p.status==0 && short_check::verify(s,p.program));let out=short_emit::emit(s,p.program);assert(out.len>0 && short_target::verify(s,p.program,out));assert(write_file(str("ind-short-",i,".wasm"),out));
  }
- for s in ["pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return (x < 4294967295) && (x + 1) < 5\n", "pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return #False && (x + 1) < 5\n", "pub let f: Bool -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return x || 1\n"] {let p=short_frontend::parse(s);assert(p.status!=0 && p.program.source.len==0);}
- print("independent short-circuit nested precedence and conservative proof controls passed");
+ for s in ["pub let f: Bool -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return x || 1\n"] {let p=short_frontend::parse(s);assert(p.status!=0 && p.program.source.len==0);}
+ print("independent short-circuit nested precedence and type controls passed");
 }

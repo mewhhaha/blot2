@@ -18,6 +18,6 @@ fn main(){for arg in 1..3 {for res in 1..3 {for form in 1..3 {let a=if arg==1 {"
  no("pub let f: Bool -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let total = for i in 0..x carry (a=0) do:\n    next (a)\n  return x\n");
  no("pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let safe = x < 4294967295\n  if safe:\n    return x + 1\n  return 0\n");
  no("pub let f: Bool -> Bool ! {host} resources {depth: 1, frame: 0} = fn x => do:\n  return x\n");
- no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return #False && (x + 1) < 5\n");
+ let dead=short_frontend::parse("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return #False && (x + 1) < 5\n");assert(dead.status==0);
  no("pub let f: Bool -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return x && 1\n");
  print("source-bound short-circuit typed scalar/loop passed");}

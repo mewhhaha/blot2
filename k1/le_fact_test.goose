@@ -11,5 +11,5 @@ fn main(){yes("pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x 
  no("pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if x <= 4294967295:\n    return x + 1\n  return x\n");
  no("pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if 4294967294 <= x:\n    return x + 1\n  return x\n");
  no("pub let f: U32 -> U32 ! {} resources {depth: 1, frame: 0} = fn x => do:\n  if x <= 4294967294:\n    return x\n  return x + 1\n");
- no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return x <= 4294967294 && x + 1 < 5\n");
+ let safe="pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  return x <= 4294967294 && x + 1 < 5\n";var result=short_frontend::parse(safe);assert(result.status==0 && short_check::verify(safe,result.program) && short_emit::emit(safe,result.program).len>0);
  print("source-bound nonstrict guard successor evidence passed");}

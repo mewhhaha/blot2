@@ -105,6 +105,14 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
+the branch-sensitive short-circuit proofs and private leaf-resource planning.
+It includes prior-output compatibility, deep 118–127 operand chains,
+forged-cycle rejection, source/target mutation controls and resource-boundary
+execution. Source and documentation hashes remained unchanged during the
+run. The leaf check relies on trusted capacity inputs and does not establish
+runtime reservation, a general call graph, M11, public ABI or full C09.
+
 The source-gated fixed-caller copy checker passed focused `-O0` and `-O2`
 tests after the combined run below. They exercised 342 count/offset copies per
 level and rejected eleven valid-Wasm loop mutations as well as individual-byte

@@ -55,12 +55,12 @@ fn add_edge(s:State&,left:i64,right:i64,guard_id:i64,truth:bool)->bool {
  if left==0 || right==0 || left==right{return true;}if left<0 || left>=257 || right<0 || right>=257 || guard_id<1 || s.count>=64{return false;}
  s.relations[s.count]=Relation {left:left,right:right,guard_id:guard_id,truth:truth};s.count+=1;return true;
 }
-recursive fn expression(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->bool {
+recursive fn numeric(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->bool {
  if depth>=128 || id<1 || id>t.nodes.len{return false;}let n=t.nodes[id-1];
  if n.tag>=1 && n.tag<=4{return true;}
- if n.tag==20{return expression(t,n.a,s,events,r,depth+1);}
- if n.tag!=19 && n.tag!=21 && n.tag!=22 && n.tag!=23 && n.tag!=24 && n.tag!=25 && n.tag!=26 && n.tag!=27 && n.tag!=28{return false;}
- if !expression(t,n.a,s,events,r,depth+1) || !expression(t,n.b,s,events,r,depth+1){return false;}
+ if n.tag==20{return numeric(t,n.a,s,events,r,depth+1);}
+ if n.tag!=19 && n.tag!=21 && n.tag!=22 && n.tag!=25 && n.tag!=26 && n.tag!=27 && n.tag!=28{return false;}
+ if !numeric(t,n.a,s,events,r,depth+1) || !numeric(t,n.b,s,events,r,depth+1){return false;}
  if n.tag!=21{return true;}
  let a,aok=literal(t,n.a);let b,bok=literal(t,n.b);
  if (aok && a==0) || (bok && b==0) || (aok && bok && a+b<=4294967295){return true;}
@@ -73,6 +73,62 @@ recursive fn expression(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_cor
   if !found || current<1 || current>=257{return false;}}
  for j in e.count..16 {if e.guards[j]!=0 || e.edges[j]{return false;}}
  return s.origin[current]>0 && e.guard_id==s.origin[current] && e.truth==s.polarity[current];
+}
+fn expression(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->bool {
+ var cur=id;var ndepth=depth;
+ loop {if ndepth>=128 || cur<1 || cur>t.nodes.len {return false;}let n=t.nodes[cur-1];
+  if n.tag==20 {cur=n.a;ndepth+=1;continue;}
+  if n.tag==23 || n.tag==24 {let c=branch(t,cur,s,events,r,ndepth+1);return c.valid;}
+  return numeric(t,cur,s,events,r,ndepth);
+ }
+}
+// Rebuild reachable predecessor facts independently; intersections require the
+// same subject, source-origin node and polarity on both paths.
+struct Split {valid:bool=false,yes:State=State {},no:State=State {},yes_live:bool=false,no_live:bool=false}
+fn identical(a:Relation,b:Relation)->bool {return a.left==b.left && a.right==b.right && a.guard_id==b.guard_id && a.truth==b.truth;}
+fn common(a:State,b:State)->State {
+ var out=a;for i in 257 {if a.alias[i]!=b.alias[i] {out.alias[i]=i;}if a.origin[i]!=b.origin[i] || a.polarity[i]!=b.polarity[i] {out.origin[i]=0;out.polarity[i]=false;}}
+ out.count=0;for i in a.count {for j in b.count {if identical(a.relations[i],b.relations[j]) {out.relations[out.count]=a.relations[i];out.count+=1;break;}}}return out;
+}
+// Independent iterative predecessor replay avoids recursion on long chains.
+struct BranchFrame {id:i64=0,phase:i64=0,state:State=State {},left:Split=Split {}}
+fn branch(t:mixed_core::Tree&,id:i64,s:State,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->Split {
+ if depth>=128 {return Split {};}var stack:BranchFrame[>..]=[BranchFrame {id:id,state:s}];var done=Split {};var have=false;var steps:i64=0;
+ while stack.len>0 {
+  if steps>=32768 {return Split {};}steps+=1;
+  if stack.len>128 {return Split {};}let pos=stack.len-1;let f=stack[pos];if f.id<1 || f.id>t.nodes.len{return Split {};}let n=t.nodes[f.id-1];
+  if f.phase==0 {
+   if n.tag==20 {stack[pos].id=n.a;continue;}
+   if n.tag==23 || n.tag==24 {stack[pos].phase=1;stack.push(BranchFrame {id:n.a,state:f.state});continue;}
+   if n.tag==3 {done=Split {valid:true,yes:f.state,yes_live:true};}
+   else if n.tag==4 {done=Split {valid:true,no:f.state,no_live:true};}
+   else if n.tag==1 {done=Split {valid:true,yes:f.state,no:f.state,yes_live:true,no_live:true};}
+   else if n.tag==22 || n.tag==28 {
+    if !numeric(t,f.id,f.state,events,r,0){return Split {};}
+    var yes=f.state;var no=f.state;let left=reference(t,n.a,f.state);let right=reference(t,n.b,f.state);
+    if n.tag==22 {
+     if left>0 && yes.origin[left]==0 {yes.origin[left]=f.id;yes.polarity[left]=true;}
+     if !add_edge(yes,left,right,f.id,true) || !add_edge(no,right,left,f.id,false){return Split {};}
+     let bound,ok=literal(t,n.a);if ok && bound==4294967294 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
+    } else {
+     let bound,ok=literal(t,n.b);if ok && bound==4294967294 && left>0 && yes.origin[left]==0 {yes.origin[left]=f.id;yes.polarity[left]=true;}
+     let floor,valid=literal(t,n.a);if valid && floor==4294967295 && right>0 && no.origin[right]==0 {no.origin[right]=f.id;no.polarity[right]=false;}
+    }done=Split {valid:true,yes:yes,no:no,yes_live:true,no_live:true};
+   }else {return Split {};}stack.pop();have=true;continue;
+  }
+  if !have {return Split {};}
+  if f.phase==1 {
+   let left=done;if !left.valid{return left;}stack[pos].left=left;have=false;
+   if n.tag==23 && !left.yes_live {done=Split {valid:true,no:left.no,no_live:left.no_live};stack.pop();have=true;continue;}
+   if n.tag==24 && !left.no_live {done=Split {valid:true,yes:left.yes,yes_live:left.yes_live};stack.pop();have=true;continue;}
+   stack[pos].phase=2;stack.push(BranchFrame {id:n.b,state:if n.tag==23 {left.yes} else {left.no}});continue;
+  }
+  if f.phase!=2{return Split {};}let left=f.left;let right=done;if !right.valid{return right;}
+  if n.tag==23 {var no=left.no;var live=left.no_live;if right.no_live {if live {no=common(no,right.no);}else {no=right.no;live=true;}}done=Split {valid:true,yes:right.yes,yes_live:right.yes_live,no:no,no_live:live};}
+  else if n.tag==24 {var yes=left.yes;var live=left.yes_live;if right.yes_live {if live {yes=common(yes,right.yes);}else {yes=right.yes;live=true;}}done=Split {valid:true,yes:yes,yes_live:live,no:right.no,no_live:right.no_live};}
+  else {return Split {};}stack.pop();have=true;
+ }
+ return if have {done} else {Split {}};
 }
 recursive fn walk(t:mixed_core::Tree&,id:i64,s:State&,events:mixed_fact_core::Evidence[:],r:Reader&,depth:i64)->bool {
  if depth>64 || id<1 || id>t.nodes.len{return false;}let n=t.nodes[id-1];
@@ -97,17 +153,9 @@ recursive fn walk(t:mixed_core::Tree&,id:i64,s:State&,events:mixed_fact_core::Ev
   var inside=fresh();return walk(t,n.e,inside,events,r,depth+1);
  }
  if n.tag==14 {
-  if !expression(t,n.a,s,events,r,0){return false;}var yes=s;var no=s;var id=n.a;var count:i64=0;
-  while id>0 && id<=t.nodes.len && t.nodes[id-1].tag==20 {id=t.nodes[id-1].a;count+=1;if count>128{return false;}}
-  if id>0 && id<=t.nodes.len && t.nodes[id-1].tag==22 {
-   let comparison=t.nodes[id-1];let left=reference(t,comparison.a,s);let right=reference(t,comparison.b,s);
-   if left>0 && yes.origin[left]==0 {yes.origin[left]=id;yes.polarity[left]=true;}
-   if !add_edge(yes,left,right,id,true) || !add_edge(no,right,left,id,false){return false;}
-  } else if id>0 && id<=t.nodes.len && t.nodes[id-1].tag==28 {
-   let comparison=t.nodes[id-1];let left=reference(t,comparison.a,s);let bound,ok=literal(t,comparison.b);
-   if ok && bound==4294967294 && left>0 && yes.origin[left]==0 {yes.origin[left]=id;yes.polarity[left]=true;}
-  }
-  if !walk(t,n.b,yes,events,r,depth+1){return false;}if n.c!=0 && !walk(t,n.c,no,events,r,depth+1){return false;}return true;
+  let c=branch(t,n.a,s,events,r,0);if !c.valid{return false;}
+  if c.yes_live {var yes=c.yes;if !walk(t,n.b,yes,events,r,depth+1){return false;}}
+  if n.c!=0 && c.no_live {var no=c.no;if !walk(t,n.c,no,events,r,depth+1){return false;}}return true;
  }
  if n.tag==9 || n.tag==10 || n.tag==13 {return expression(t,n.a,s,events,r,0);}
  return n.tag==11 || n.tag==12;

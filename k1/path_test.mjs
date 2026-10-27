@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import{readFileSync}from'node:fs';
+for(let i=0;i<6;i++){let bytes=readFileSync(`path-${i}.wasm`);assert(WebAssembly.validate(bytes));let f=(await WebAssembly.instantiate(bytes)).instance.exports.f;for(const x of [0,1,2,3,4,5,0xfffffffe,0xffffffff]){let want=i===0?Number(x<0xffffffff && x+1<5):i===1?Number(x>0xfffffffe || x+1<5):i===2?0:i===3?1:i===4?Number(x<0xffffffff && x+1<4):Number(x<=0xfffffffe && x+1<5);assert.equal(f(0,x)>>>0,want);}}
+console.log('short-circuit predecessor execution and U32 boundaries passed');
+const loopBytes=readFileSync('path-loop.wasm');assert(WebAssembly.validate(loopBytes));const loop=(await WebAssembly.instantiate(loopBytes)).instance.exports.f;for(const x of [0,1,2,3,4,5,100,0xffffffff])assert.equal(loop(0,x)>>>0,Math.min(x,4));console.log('short-circuit loop proof executes with bounded stops');

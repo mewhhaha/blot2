@@ -29,12 +29,12 @@ fn path(e:Env,slot:i64)->Route {
 fn edge(e:Env&,a:i64,b:i64,guard_id:i64,truth:bool)->i64 {
  if a==0 || b==0 || a==b {return 0;}if e.count>=64 {return 2;}e.edges[e.count]=Edge {left:a,right:b,guard_id:guard_id,truth:truth};e.count+=1;return 0;
 }
-recursive fn value(t:mixed_core::Tree&,id:i64,e:Env,events:mixed_fact_core::Evidence[>..]&,depth:i64)->i64 {
+recursive fn numeric(t:mixed_core::Tree&,id:i64,e:Env,events:mixed_fact_core::Evidence[>..]&,depth:i64)->i64 {
  if depth>=128 || id<1 || id>t.nodes.len {return 2;}let n=t.nodes[id-1];
  if n.tag>=1 && n.tag<=4 {return 0;}
- if n.tag==20 {return value(t,n.a,e,events,depth+1);}
- if n.tag==19 || n.tag==21 || n.tag==22 || n.tag==23 || n.tag==24 || n.tag==25 || n.tag==26 || n.tag==27 || n.tag==28 {
-  let a=value(t,n.a,e,events,depth+1);if a!=0{return a;}let b=value(t,n.b,e,events,depth+1);if b!=0{return b;}
+ if n.tag==20 {return numeric(t,n.a,e,events,depth+1);}
+ if n.tag==19 || n.tag==21 || n.tag==22 || n.tag==25 || n.tag==26 || n.tag==27 || n.tag==28 {
+  let a=numeric(t,n.a,e,events,depth+1);if a!=0{return a;}let b=numeric(t,n.b,e,events,depth+1);if b!=0{return b;}
   if n.tag==21 {
    let x,xok=literal(t,n.a);let y,yok=literal(t,n.b);
    if (xok && x==0) || (yok && y==0) || (xok && yok && x+y<=4294967295) {return 0;}
@@ -45,6 +45,64 @@ recursive fn value(t:mixed_core::Tree&,id:i64,e:Env,events:mixed_fact_core::Evid
   }return 0;
  }
  return 1;
+}
+fn value(t:mixed_core::Tree&,id:i64,e:Env,events:mixed_fact_core::Evidence[>..]&,depth:i64)->i64 {
+ var cur=id;var ndepth=depth;
+ loop {if ndepth>=128 || cur<1 || cur>t.nodes.len {return 2;}let n=t.nodes[cur-1];
+  if n.tag==20 {cur=n.a;ndepth+=1;continue;}
+  if n.tag==23 || n.tag==24 {let c=condition(t,cur,e,events,ndepth+1);return c.status;}
+  return numeric(t,cur,e,events,ndepth);
+ }
+}
+// Two predecessor states retain only exact facts common to all live paths.
+struct Cond {status:i64=0,yes:Env=Env {},no:Env=Env {},yes_live:bool=false,no_live:bool=false}
+fn same_edge(a:Edge,b:Edge)->bool {return a.left==b.left && a.right==b.right && a.guard_id==b.guard_id && a.truth==b.truth;}
+fn intersect(a:Env,b:Env)->Env {
+ var out=a;for i in 257 {if a.aliases[i]!=b.aliases[i] {out.aliases[i]=i;}if a.facts[i]!=b.facts[i] || a.truth[i]!=b.truth[i] {out.facts[i]=0;out.truth[i]=false;}}
+ out.count=0;for i in a.count {for j in b.count {if same_edge(a.edges[i],b.edges[j]) {out.edges[out.count]=a.edges[i];out.count+=1;break;}}}return out;
+}
+// Explicit heap-backed stack keeps long left-associated Bool chains bounded.
+struct CondFrame {id:i64=0,phase:i64=0,env:Env=Env {},left:Cond=Cond {}}
+fn condition(t:mixed_core::Tree&,id:i64,env:Env,events:mixed_fact_core::Evidence[>..]&,depth:i64)->Cond {
+ if depth>=128 {return Cond {status:2};}
+ var stack:CondFrame[>..]=[CondFrame {id:id,env:env}];var done=Cond {};var have=false;var steps:i64=0;
+ while stack.len>0 {
+  if steps>=32768 {return Cond {status:2};}steps+=1;
+  if stack.len>128 {return Cond {status:2};}let pos=stack.len-1;let f=stack[pos];
+  if f.id<1 || f.id>t.nodes.len {return Cond {status:1};}let n=t.nodes[f.id-1];
+  if f.phase==0 {
+   if n.tag==20 {stack[pos].id=n.a;continue;}
+   if n.tag==23 || n.tag==24 {stack[pos].phase=1;stack.push(CondFrame {id:n.a,env:f.env});continue;}
+   if n.tag==3 {done=Cond {yes:f.env,yes_live:true};}
+   else if n.tag==4 {done=Cond {no:f.env,no_live:true};}
+   else if n.tag==1 {done=Cond {yes:f.env,no:f.env,yes_live:true,no_live:true};}
+   else if n.tag==22 || n.tag==28 {
+    let status=numeric(t,f.id,f.env,events,0);if status!=0{return Cond {status:status};}
+    var yes=f.env;var no=f.env;let a=ref(t,n.a,f.env);let b=ref(t,n.b,f.env);
+    if n.tag==22 {
+     if a>0 && yes.facts[a]==0 {yes.facts[a]=f.id;yes.truth[a]=true;}
+     let x=edge(yes,a,b,f.id,true);if x!=0{return Cond {status:x};}let y=edge(no,b,a,f.id,false);if y!=0{return Cond {status:y};}
+     let bound,ok=literal(t,n.a);if ok && bound==4294967294 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
+    } else {
+     let bound,ok=literal(t,n.b);if ok && bound==4294967294 && a>0 && yes.facts[a]==0 {yes.facts[a]=f.id;yes.truth[a]=true;}
+     let floor,valid=literal(t,n.a);if valid && floor==4294967295 && b>0 && no.facts[b]==0 {no.facts[b]=f.id;no.truth[b]=false;}
+    }done=Cond {yes:yes,no:no,yes_live:true,no_live:true};
+   } else {return Cond {status:1};}
+   stack.pop();have=true;continue;
+  }
+  if !have {return Cond {status:1};}
+  if f.phase==1 {
+   let left=done;if left.status!=0{return left;}stack[pos].left=left;have=false;
+   if n.tag==23 && !left.yes_live {done=Cond {no:left.no,no_live:left.no_live};stack.pop();have=true;continue;}
+   if n.tag==24 && !left.no_live {done=Cond {yes:left.yes,yes_live:left.yes_live};stack.pop();have=true;continue;}
+   stack[pos].phase=2;stack.push(CondFrame {id:n.b,env:if n.tag==23 {left.yes} else {left.no}});continue;
+  }
+  if f.phase!=2 {return Cond {status:1};}let left=f.left;let right=done;if right.status!=0{return right;}
+  if n.tag==23 {var no=left.no;var live=left.no_live;if right.no_live {if live {no=intersect(no,right.no);}else {no=right.no;live=true;}}done=Cond {yes:right.yes,yes_live:right.yes_live,no:no,no_live:live};}
+  else if n.tag==24 {var yes=left.yes;var live=left.yes_live;if right.yes_live {if live {yes=intersect(yes,right.yes);}else {yes=right.yes;live=true;}}done=Cond {yes:yes,yes_live:live,no:right.no,no_live:right.no_live};}
+  else {return Cond {status:1};}stack.pop();have=true;
+ }
+ return if have {done} else {Cond {status:1}};
 }
 // A sequence is flattened without consuming the nesting budget; lexical
 // branch and loop nesting remain independently bounded.
@@ -68,18 +126,9 @@ recursive fn statement(t:mixed_core::Tree&,id:i64,env:Env&,events:mixed_fact_cor
   var inside=fresh();return walk(t,n.e,inside,events,depth+1);
  }
  if n.tag==14 {
-  let st=value(t,n.a,env,events,0);if st!=0{return st;}
-  var yes=env;var no=env;var cond=n.a;var steps:i64=0;
-  while cond>0 && cond<=t.nodes.len && t.nodes[cond-1].tag==20 {steps+=1;if steps>128{return 2;}cond=t.nodes[cond-1].a;}
-  if cond>0 && cond<=t.nodes.len && t.nodes[cond-1].tag==22 {
-   let g=t.nodes[cond-1];let a=ref(t,g.a,env);let b=ref(t,g.b,env);
-   if a>0 && yes.facts[a]==0 {yes.facts[a]=cond;yes.truth[a]=true;}
-   let s=edge(yes,a,b,cond,true);if s!=0{return s;}let z=edge(no,b,a,cond,false);if z!=0{return z;}
-  } else if cond>0 && cond<=t.nodes.len && t.nodes[cond-1].tag==28 {
-   let g=t.nodes[cond-1];let a=ref(t,g.a,env);let bound,ok=literal(t,g.b);
-   if ok && bound==4294967294 && a>0 && yes.facts[a]==0 {yes.facts[a]=cond;yes.truth[a]=true;}
-  }
-  let y=walk(t,n.b,yes,events,depth+1);if y!=0{return y;}if n.c!=0 {return walk(t,n.c,no,events,depth+1);}return 0;
+  let c=condition(t,n.a,env,events,0);if c.status!=0{return c.status;}
+  if c.yes_live {var yes=c.yes;let y=walk(t,n.b,yes,events,depth+1);if y!=0{return y;}}
+  if n.c!=0 && c.no_live {var no=c.no;return walk(t,n.c,no,events,depth+1);}return 0;
  }
  if n.tag==13 || n.tag==9 || n.tag==10 {return value(t,n.a,env,events,0);}
  if n.tag==11 || n.tag==12 {return 0;}
