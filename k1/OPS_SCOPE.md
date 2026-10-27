@@ -1,0 +1,5 @@
+# Private scalar/loop U32 operation extension
+
+This scratch revision extends the reviewed source-owned short-circuit scalar/loop arena with `U32.wrapping_sub`, `U32.wrapping_mul`, bitwise `&`, and unsigned `<=`. Source parsing and independent source reconstruction enforce precedence and type requirements. Existing checked additions still require their independent proof replay. Wrapping arithmetic and bitwise operations preserve U32 bit semantics; Wasm lowering is checked independently against the original source and Core before bytes return.
+
+The true edge of `x <= 4294967294` proves the exact source-bound U32 subject is below MAX; no other `<=` facts or Boolean short-circuit facts are transported. Short-circuit proof analysis also checks both operands conservatively. Bool input requires canonical 0 or 1; immutable expected original source and no concurrent mutation are required. Other missing syntax, full reachability, SSA/invariants, ownership, effects, resource checks, public ABI, M13 and complete C09 remain unsupported. Sampled old target-byte equality and an independent runtime oracle are not full equivalence or a compiler-speed result.

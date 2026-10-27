@@ -1,0 +1,1 @@
+import assert from 'node:assert/strict';import{readFileSync}from'node:fs';const bytes=readFileSync('le-fact-0.wasm');assert(WebAssembly.validate(bytes));const f=(await WebAssembly.instantiate(bytes)).instance.exports.f;for(const x of [0,1,7,0xfffffffe,0xffffffff])assert.equal(f(0,x)>>>0,x===0xffffffff?x:(x+1)>>>0);console.log('nonstrict source guard runtime boundaries passed');

@@ -105,6 +105,15 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
+the private U32/Bool scalar/loop arena, bounded short-circuit and arithmetic
+paths, old-first dispatcher, narrow guard proof and private scalar host
+fixture. It includes independent source/target mutation checks, generated
+execution, prior-output comparisons, and host preflight and poison tests.
+Source and documentation hashes remained unchanged during the run. These
+fixtures do not qualify the public ABI, general resources or complete C09;
+the short-circuit proof still rejects some valid guarded expressions.
+
 After the Zig lint cleanup, `deno task lint:zig` passed with zero findings
 across 531 source files and one analyzer fixture. The unfiltered legacy
 compiler gate also passed with Zig 0.17.0 and the native backend, using four

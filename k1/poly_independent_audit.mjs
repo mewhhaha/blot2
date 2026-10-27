@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';let state=0x42133791;
+for(let i=0;i<80;i++){const b=await readFile(`ind-poly-${i}.wasm`),f=new WebAssembly.Instance(new WebAssembly.Module(b)).exports.f;let lim=(i*7+3)%11,k=(i*13+1)%64,values=i%4<2?[0,1]:[0,1,lim,lim+1,0xffffffff];if(i%4>=2)for(let j=0;j<50;j++){state=(Math.imul(state,1664525)+1013904223)>>>0;values.push(state);}for(const x of values){const want=i%4===0?x:i%4===1?(x?5*k:0):i%4===2?Number(Math.min(x,lim)<lim):Math.min(x,lim)*k;const y=f(0,x)>>>0;assert.equal(y,want>>>0);if(i%4===0||i%4===2)assert(y===0||y===1);}}
+console.log('independent 80-program four-signature Bool/U32 loop oracle passed');

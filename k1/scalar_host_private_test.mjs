@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync,mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {pathToFileURL} from 'node:url';import {create} from './scalar_host.mjs';
+const bytes=Uint8Array.from(readFileSync('scalar-host-0.wasm'));const h=await create(bytes);
+assert.deepEqual(h.invoke(0,2),{status:'Ok',value:42});assert.deepEqual(h.invoke(1,128),{status:'Ok',value:11});
+for(let x of [2,0xffffffff,NaN,{},'1'])assert.deepEqual(h.invoke(x,2),{status:'InvalidInput'});
+assert.deepEqual(h.invoke(2,{}),{status:'InvalidInput'});
+for(let d of [0,1,129,0xffffffff,NaN,{},'2'])assert.deepEqual(h.invoke(1,d),{status:'DepthLimit'});
+for(let i=0;i<bytes.length;i++){let b=Uint8Array.from(bytes);b[i]^=1;await assert.rejects(create(b));await assert.rejects(create(bytes.subarray(0,i)));}
+class Spoof extends Uint8Array{get length(){return 0}every(){return true}}let s=new Spoof(bytes.length);s.set(bytes);assert.deepEqual((await create(s)).invoke(1,2),{status:'Ok',value:11});s[0]^=1;await assert.rejects(create(s));await assert.rejects(create(new Proxy(bytes,{})));let d=Uint8Array.from(bytes);structuredClone(d.buffer,{transfer:[d.buffer]});await assert.rejects(create(d));
+// Test-only: pin a source-body trap in a temporary copy. Public create rejects
+// those bytes; the temporary test copy exercises poison handling explicitly.
+let mutated=Uint8Array.from(bytes),pos=8;function leb(){let n=0,k=0;for(;;){let x=mutated[pos++];n+=(x&127)*2**k;if(!(x&128))return n;k+=7;}}let found=false;while(pos<mutated.length){let id=mutated[pos++],n=leb(),end=pos+n;if(id===10){assert.equal(leb(),2);leb();assert.equal(mutated[pos],0);assert.equal(mutated[pos+1],0x20);mutated[pos+1]=0;found=true;break;}pos=end;}assert(found&&WebAssembly.validate(mutated));await assert.rejects(create(mutated));
+let original=Buffer.from(bytes).toString('hex'),patched=Buffer.from(mutated).toString('hex');let source=readFileSync(new URL('./scalar_host.mjs',import.meta.url),'utf8');assert(source.includes(original));let dir=mkdtempSync(join(tmpdir(),'scalar-poison-test-'));let module=join(dir,'host-test.mjs');writeFileSync(module,source.replace(original,patched));const test=await import(pathToFileURL(module));const bad=await test.create(mutated);assert.deepEqual(bad.invoke(2,2),{status:'InvalidInput'});assert.deepEqual(bad.invoke(1,0),{status:'DepthLimit'});assert.deepEqual(bad.invoke(1,2),{status:'Poisoned'});assert.deepEqual(bad.invoke(0,2),{status:'Poisoned'});
+console.log('private copied scalar host, target pin, input validation and sticky trap poison passed');

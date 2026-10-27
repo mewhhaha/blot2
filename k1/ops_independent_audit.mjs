@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';let state=0x72628195;
+for(let i=0;i<100;i++){const b=await readFile(`ind-ops-${i}.wasm`),f=new WebAssembly.Instance(new WebAssembly.Module(b)).exports.f,k=(i*17+3)%257,m=(i*29+1)%511,mask=(i*41+7)%65536,limit=(i*19+9)%65536;let xs=[0,1,2,255,256,0x7fffffff,0x80000000,0xfffffffe,0xffffffff];for(let j=0;j<100;j++){state=(Math.imul(state,1664525)+1013904223)>>>0;xs.push(state);}for(let x of xs){const want=i%2===0?(Math.imul((x-k)>>>0,m)&mask)>>>0:Number((x&mask)<=limit);assert.equal(f(0,x)>>>0,want);}}
+let b=await readFile('ind-safe.wasm'),f=new WebAssembly.Instance(new WebAssembly.Module(b)).exports.f;for(let x of [0,1,0xfffffffe,0xffffffff])assert.equal(f(0,x)>>>0,x===0xffffffff?0:(x+1)>>>0);
+console.log('independent 100-program unsigned/wrapping/and/less-equal oracle passed');
