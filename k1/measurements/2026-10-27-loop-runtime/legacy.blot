@@ -1,0 +1,5 @@
+entry const f = fn (x: U32) -> U32 => do:
+  let out = 17
+  for i in 0..x:
+    out := i
+  break out
