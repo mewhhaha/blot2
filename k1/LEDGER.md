@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+A combined Goose fixture run passed (exit 0) after connecting the lexical
+U32-to-Bool predicate to the private callable dispatcher. It covers `-O0` and
+`-O2`, source/proof/target forgery, generated execution and a 64-case
+compatibility matrix for earlier supported callables. The fallback preserves
+generic prior diagnostics for some rejected lexical forms; resource, ABI,
+M13 and C09 qualification remain open.
+
 A combined Goose fixture run passed (exit 0) with a source-derived, checked
 bridge Core required by the private fixed caller emitter and a lexical
 U32-to-Bool proof/target path. It covers `-O0`/`-O2`, forged Core and source,

@@ -1,0 +1,2 @@
+import {strict as assert} from 'node:assert';import{readFileSync}from'node:fs';
+for(let i=0;i<3;i++){const bytes=readFileSync(`preddecl-${i}.wasm`);assert(WebAssembly.validate(bytes));const f=(await WebAssembly.instantiate(bytes)).instance.exports.f;for(let x of [0,1,98,99,100,0x7fffffff,0xfffffffe,0xffffffff])assert.equal(f(0,x)>>>0,i===2?1:Number(x<99));}console.log('lexical predicate dispatch canonical boundary execution passed');

@@ -5,3 +5,9 @@
 The Bool path rechecks exact source, declared signature, header spans, projection and the typed body before emission. Its closed target checker independently decodes the fixed emitted Wasm against that source-bound typed tree before returning bytes; it is not a general Wasm or M13 validator. Its producer and verifier share one header reconstructor. Source/header status 1 denotes malformed or unsupported syntax, while typed Bool body status 13 is an unbound name, 14 is a type mismatch and 15 is a missing return. U32 errors preserve their existing private fixture status; no general diagnostic taxonomy is claimed. All failures return an empty byte array.
 
 The U32-to-Bool path supports only the existing narrow unsigned comparison body; see `predicate_SCOPE.md`. General functions, multiple declarations, function calls, types beyond the listed signatures, effect rows other than empty, ownership, generics, contracts, closures and multiline headers are unsupported. The U32-to-U32 and Bool-to-U32 paths require `do:` bodies; the narrow predicate path also accepts its supported single-line return. Resource declarations are parsed but not proven against actual resource use. The body families remain distinct checked Core representations with a dispatching entry; they are not a common expression/loop IR. No public compiler admission, authenticated artifact, ABI, M13, or C09 qualification is implied.
+
+The existing simple U32-to-Bool predicate path remains first; when it rejects,
+a source-bound lexical predicate fallback can admit U32 locals, branches and
+short-circuit proofs with independently decoded private Wasm. Rejected lexical
+programs retain the prior predicate status, which may be generic unsupported.
+See `PREDFLOW_DECL_SCOPE.md` for the bounded fallback and qualification limits.

@@ -17,7 +17,7 @@ fn main(){
  no("pub let f: U32 -> Bool ! {host} resources {depth: 1, frame: 0} = fn x => return x < 7\n");
  no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => return x\n");
  no("pub let f: Fn[static,Once,U32,Bool] ! {} resources {depth: 1, frame: 0} = fn x => return x < 7\n");
- no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let y = x\n  return y < 7\n");
+ {let s="pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => do:\n  let y = x\n  return y < 7\n";let legacy=predicate_frontend::parse(s);let compiled=generic_callable::compile(s);assert(legacy.status!=0 && compiled.status==0 && compiled.argument==1 && compiled.result==2 && compiled.wasm.len>0);}
  no("pub let f: U32 -> Bool ! {} resources {depth: 1, frame: 0} = fn x => return y < 7\n");
  print("private predicate callable source and type controls passed");
 }
