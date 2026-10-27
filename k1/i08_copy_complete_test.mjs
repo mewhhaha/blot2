@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+import {decode} from './i08_machine_decode.mjs';import {check,diagnosticForTests} from './i08_copy_complete.mjs';
+const bytes=readFileSync(process.argv[2]||'private-invoke.wasm'),good=check(bytes);assert(good.ok,good.error);assert.equal(good.logicalByteIterations,576);assert.equal(good.placementCases,8046);assert(good.inputBytesCopiedExactlyOnceOnNormalPath&&good.zeroCountHasNoRead);assert(!good.unforgeableAuthority&&!good.publicEligible&&!good.m11Qualified);
+let c=decode(bytes).bodies[22].ops,at=good.matchedCopySite;for(let [name,index,value] of [['initial-index',at+3,1],['row-stride',at+9,8],['source-offset-local',at+17,5],['dest-local',at+13,10],['increment',at+24,2]]){
+ let x=Uint8Array.from(bytes);x[c[index].at+1]=value;assert(WebAssembly.validate(x),name);assert(!check(x).ok,name+' pin');assert(!diagnosticForTests(x).ok,name+' shape');console.log(name,'rejected');}
+let t=Uint8Array.from(bytes);structuredClone(t.buffer,{transfer:[t.buffer]});assert(!check(t).ok);assert(!check(new Proxy(bytes,{})).ok);
+const {instance}=await WebAssembly.instantiate(bytes),e=instance.exports,m=new Uint8Array(e.memory.buffer),v=new DataView(m.buffer);let cases=0;
+for(let n=0;n<=8;n++)for(let off=12;off+16*n<=224;off+=4){let wire=new Uint8Array(32+off+16*n),w=new DataView(wire.buffer);w.setUint32(0,0x4b310001,true);w.setUint32(4,91,true);w.setUint32(12,wire.length-32,true);w.setUint32(32,n,true);w.setUint32(36,off,true);for(let j=0;j<16*n;j++)wire[32+off+j]=(j*73+n*19+off)&255;
+ m.fill(0,32768,33024);m.set(wire,32768);m.fill(0xa5,4096,4288);const before=Uint8Array.from(m.subarray(32768,33024));assert.equal(e.invoke(91,wire.length,0),2);assert.deepEqual(m.subarray(4096,4096+16*n),wire.subarray(32+off));assert.deepEqual(m.subarray(32768,33024),before);assert.equal(v.getUint32(144,true),0);assert.equal(v.getUint32(416,true),0);assert.equal(e.frame_top(),0);cases++;}
+console.log(`actual caller copied every expected byte in ${cases} offset/count cases, with cleanup`);

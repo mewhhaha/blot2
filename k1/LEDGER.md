@@ -105,6 +105,13 @@ evidence, not full K1 qualification.
 
 ## Validation evidence
 
+The source-gated fixed-caller copy checker passed focused `-O0` and `-O2`
+tests after the combined run below. They exercised 342 count/offset copies per
+level and rejected eleven valid-Wasm loop mutations as well as individual-byte
+mutations and truncations. The checker depends on initialized ingress,
+allocator and descriptor geometry and a protected private instance; it is not
+a general capability, M11 or trap-cleanup proof.
+
 A clean combined Goose fixture run passed (exit 0) at `-O0` and `-O2` with
 the private U32/Bool scalar/loop arena, bounded short-circuit and arithmetic
 paths, old-first dispatcher, narrow guard proof and private scalar host
