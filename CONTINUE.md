@@ -8,16 +8,20 @@ proof. The fixed 512-slot ordinal table allocates nothing; every probe is
 bounded and charged. It clears the actual-main validation-budget boundary. A
 typed game forwarder with inferred effects, an explicit F32 music result and a
 generic sound-policy receiver clear the subsequent tutorial.music_reveal
-callback proof. Attempt `main-ff803d6142b9d0bb` now reaches a storage-layout
-error in world_storage: an array element lacks a fixed inline layout. No main
-Wasm or Pen frame has passed; budgets and proof rules are unchanged.
+callback proof. An explicit set.Set math.Vec4 annotation at the clearing-members
+allocation clears the subsequent layout error. Attempt `main-a4f8c5d5de900dd9`
+now fails at world_storage.application's returned policy record (line684):
+selected call type exceeds the supported bound. The guard in
+scoped_backend.selectionType combines depth>128 and exhausted work; distinguish
+them and identify the repeated/type path before changing code. Do not increase
+either bound. No main Wasm or Pen frame has passed.
 
-The reported span0..0 is lost when shape substitutes a type argument and calls
-shape(actual_unit, 0, actual_ty). The generic message does not establish that a
-particular owner contains resizable data: unresolved/function/unknown nominal
-types use the same fallthrough. Trace the existing failed shape unwind to its
-nonzero source node, including substitution, record-field and nominal-payload
-edges. Identify that exact row before changing storage.
+The earlier zero-span layout diagnostic was an unresolved generic map key, not
+evidence of a nested resizable payload. Tracing the existing failure unwind
+identified clearing_members at world_storage:186; both clearing APIs already
+require set.Set math.Vec4. The allocation annotation preserves that contract,
+owner lifetime and separate bucket storage. Diagnostic source was restored
+exactly.
 
 All **76** package/core contract laws pass with zero failures, skips, leaks or
 logged errors, and all **2,674** native tests compile. The new laws cover record

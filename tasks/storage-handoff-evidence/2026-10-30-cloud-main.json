@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-ff803d6142b9d0bb",
+    "attempt": "build/gdev-first-frame/main-a4f8c5d5de900dd9",
     "configured_identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
     "diagnostic": {
       "filename": "gdev/src/world_storage.blot",
       "stage": "emit",
       "code": "storage_unsupported",
-      "start": 0,
-      "end": 0,
-      "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here",
+      "start": 42534,
+      "end": 42747,
+      "message": "The selected call type exceeds the supported bound",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -670,5 +670,53 @@
     "codegen_check": "passed",
     "result": "clears prior callback proof; reaches backend shape layout failure with no source-proof diagnostics",
     "qualification": "no main Wasm or Pen frame"
+  },
+  "clearing_owner_layout": {
+    "diagnostic_attempt": "main-bf3d82cb55dfccc6",
+    "diagnostic_identity": "4d0a547c9b6429de5efbecd5448d1130aa98ca8174018a7e5ec377f1487644c1",
+    "trace": [
+      "LAYOUT_LEAF unit=2 node=0 type=32523 tag=variable a=4256 b=0 c=0 depth=6 args=35",
+      "LAYOUT_SHAPE unit=2 node=0 type=32523 tag=variable span=0..0 depth=6 args=35",
+      "LAYOUT_SUB formal=18:1362 actual=2:32523 environment=0 source=18:0 depth=5",
+      "LAYOUT_FIELD unit=18 node=0 type=1399 ordinal=0 name=<product>",
+      "LAYOUT_SHAPE unit=18 node=0 type=1399 tag=product span=0..0 depth=4 args=35",
+      "LAYOUT_SUB formal=18:1368 actual=18:1399 environment=0 source=18:63 depth=3",
+      "LAYOUT_NOMINAL unit=18 node=63 type=1400 identity=1:219 name=Maybe origin=std/prelude constructor=1 tag=0 payload=1368",
+      "LAYOUT_SHAPE unit=18 node=63 type=1400 tag=nominal span=1612..1615 depth=2 args=34",
+      "LAYOUT_FIELD unit=18 node=63 type=1404 ordinal=1 name=item",
+      "LAYOUT_SHAPE unit=18 node=63 type=1404 tag=record span=1612..1615 depth=1 args=34",
+      "LAYOUT_NOMINAL unit=18 node=63 type=1443 identity=18:145 name=Entry origin=../../ink/lib/map.blot constructor=10 tag=0 payload=1404",
+      "LAYOUT_SHAPE unit=18 node=63 type=1443 tag=nominal span=1612..1615 depth=0 args=32",
+      "LAYOUT_INVOKE unit=18 binding=7 name=empty",
+      "LAYOUT_INVOKE unit=89 binding=4 name=empty",
+      "LAYOUT_BIND unit=2 node=260 binding=3987 initializer=259 span=8234..8250",
+      "LAYOUT_INVOKE unit=2 binding=1 name=with_owners",
+      "LAYOUT_INVOKE unit=2 binding=20 name=run",
+      "LAYOUT_INVOKE unit=265 binding=1 name=main"
+    ],
+    "diagnostic_source_restored_exactly": true,
+    "finding": "world_storage:186 clearing_members=set.empty() retains unresolved map key type2:32523; both clearing APIs require set.Set math.Vec4. No nested/resizable payload identified.",
+    "fix": "Annotate only owner clearing_members:set.Set math.Vec4; preserve separate buckets and lifetimes.",
+    "gdev_checkpoint": "66aaa52a2854f9fe2cfe67c0e09daca394aab47b",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-a4f8c5d5de900dd9",
+      "identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/world_storage.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 42534,
+          "end": 42747,
+          "message": "The selected call type exceeds the supported bound",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "codegen_check": "passed",
+    "qualification": "no main Wasm/frame"
   }
 }

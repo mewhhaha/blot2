@@ -1,11 +1,11 @@
 # Owned-storage rewrite: active task index
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
-handoff evidence. Record field-name indexing clears the exhausted render
-validation budget; a typed music-policy forwarder clears the next callback
-proof. Main now reaches an array-element layout diagnostic in world_storage. No
-real Gdev main Wasm or Pen frame has passed. The earlier full compiler gate
-stopped at its protocol smoke span assertion (three passed, one failed); see
+handoff evidence. The candidate has advanced through checked source validation
+and initial owner layouts, but no real Gdev main Wasm or Pen frame has passed.
+Keep changing compile frontiers in CONTINUE.md and its linked evidence. The
+earlier full compiler gate stopped at its protocol smoke span assertion (three
+passed, one failed); see
 [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
 ## Immediate milestone
