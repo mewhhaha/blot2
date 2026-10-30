@@ -36,10 +36,19 @@ lint findings. Astra xhigh reviewed the iterator proof and collection
 refinement. The required full gate was attempted through the configured proxy
 and remains blocked fetching locked Baba.
 
-Actual main attempt `main-ae40bc851636d8a9` advances to Ink editor.blot:820,
-`brush.encode_stored origin faces`, with an unresolved storage layout/binding. A
-separate error-tracing diagnostic build is running to locate the exact return.
-No main Wasm or Pen frame has passed. Continue through this frontier to the real
+Actual main attempt `main-ae40bc851636d8a9` advanced to Ink editor.blot:820,
+`brush.encode_stored origin faces`. Error tracing found that planValue changed
+borrow descriptors to View/Ref/Link while retaining the source owner's semantic
+type witness. The planner now attaches the checked operation result type with
+its captured environment; owner roots and nominal identity checks are unchanged.
+Astra xhigh independently confirmed the cause. The new two-mode executed-Wasm
+law fails on the preceding compiler and passes here for all three capabilities,
+repeated calls, distinct owners and sync/async execution. The existing reader
+owner/epoch/offset execution law passes. Sixteen of 17 native call laws pass;
+the primitive-associated-partials layout failure remains the documented baseline
+failure. Changed production lint is clean; the full gate was attempted and is
+still blocked by the registry proxy. A normal real-main retry is running. No
+main Wasm or Pen frame has passed. Continue through this frontier to the real
 frame; do not stop at another handoff.
 
 Implemented changes clear the preceding boundaries: record field-name indexing

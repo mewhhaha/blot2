@@ -1556,14 +1556,15 @@ const Generator = struct {
             .storage => {
                 const op: @import("../check/storage_ops.zig").Op = @fromBackingInt(@intCast(n.c));
                 const args = m.children(id);
-                if (op == .view) {
+                if (op == .view or op == .at or op == .link) {
                     var receiver = (try self.planValue(m, args[0], remaining, depth + 1)) orelse return null;
-                    receiver.tag = .view;
-                    return receiver;
-                }
-                if (op == .at or op == .link) {
-                    var receiver = (try self.planValue(m, args[0], remaining, depth + 1)) orelse return null;
-                    receiver.tag = if (op == .at) .ref else .link;
+                    receiver.tag = if (op == .view) .view else if (op == .at) .ref else .link;
+                    // Roots describe physical provenance; the checked result
+                    // describes the selected capability, not its source owner.
+                    receiver.type_evidence = .{
+                        .root = .{ .unit = m.unit, .ty = n.ty },
+                        .arguments = try self.captureTypes(),
+                    };
                     return receiver;
                 }
             },

@@ -127,6 +127,7 @@ export const devCheckAreas = {
       "zig-native/tests/storage_calls_execution.test.ts",
       "zig-native/tests/storage_type_keys_execution.test.ts",
       "zig-native/tests/storage_comprehensions_execution.test.ts",
+      "zig-native/tests/storage_reader_witnesses_execution.test.ts",
       "zig-native/tests/storage_capacity_execution.test.ts",
       "zig-native/tests/storage_simd_execution.test.ts",
       "zig-native/tests/storage_flat_data_execution.test.ts",

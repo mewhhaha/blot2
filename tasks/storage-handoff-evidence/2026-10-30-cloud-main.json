@@ -899,5 +899,15 @@
       ]
     },
     "qualification": "incomplete; main advances to Ink saved-editor encoder, no Wasm/frame"
+  },
+  "planned_borrow_witnesses": {
+    "fix": "View/Ref/Link planned descriptors retain physical roots and replace source-owner semantic evidence with the checked operation result and captured environment",
+    "review": "Astra xhigh independently identified mismatched ResizeArray evidence passed to View Face helper",
+    "baseline": "new executed-Wasm test fails emit storage_unsupported on preceding diagnostic compiler",
+    "executed_wasm": "2 new tests pass in both modes, each sync/async; all three capabilities, repeated calls, distinct owners; existing reader epoch/offset test passes",
+    "native": "complete 2682 inventory compiled; calls family16/17 pass; primitive-associated-partials failure reproduces known baseline",
+    "lint": "scoped_backend.zig zero findings",
+    "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
+    "main_retry": "running; no frame yet"
   }
 }
