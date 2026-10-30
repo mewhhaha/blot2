@@ -7,25 +7,25 @@ const executable = Deno.args[0] ??
 const source = `
 type Box f is data = #Box f
 type Factory a is data = #Factory a
-const Factory.boxed = fn (factory: Factory a) => #Box (fn value => {item: value, factory: factory})
-entry const integer = fn (seed: U32) => do:
+const Factory.boxed = func (factory: Factory a) => return #Box (func value => return {item: value, factory: factory})
+entry const integer = func (seed: U32) => return do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
   break @u32.add (mapper seed).item 1
-entry const floating = fn (seed: F32) => do:
+entry const floating = func (seed: F32) => return do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
   break @f32.add (mapper seed).item 0.5
-entry const reference = fn (seed: Array U32) => do:
+entry const reference = func (seed: Array U32) => return do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored
   let kept = (mapper seed).item
   let pressure = @array.fill 8192 42
   break if @u32.eq pressure[0] 42 then kept else @panic "pressure changed"
-entry const zero_width = fn (seed: U32) => do:
+entry const zero_width = func (seed: U32) => return do:
   let factory = #Factory seed
   let stored = factory.boxed
   let #Box mapper = stored

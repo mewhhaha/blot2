@@ -37,7 +37,7 @@ interpreted.
 const left: code [U32, row {}] = @code.quote 40
 const right: code [U32, row {}] = @code.quote 2
 const answer_code = @code.quote (@u32.add (@code.splice left) (@code.splice right))
-entry const answer = fn () => @code.emit answer_code
+entry const answer = func () => return @code.emit answer_code
 const checked_answer: U32 = @code.run answer_code
 ```
 

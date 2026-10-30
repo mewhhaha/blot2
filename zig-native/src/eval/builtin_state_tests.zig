@@ -11,17 +11,17 @@ const a = std.testing.allocator;
 
 const source =
     \\data Cell value = #Cell value
-    \\const read = fn witness => @state.get witness
-    \\const answer = fn () => do:
-    \\  let (_, #Cell result) = @state.run (#Cell 42) (fn () =>
-    \\    read (fn ignored -> Cell U32 => @panic "witness must never be invoked"))
+    \\const read = func witness => return @state.get witness
+    \\const answer = func () => return do:
+    \\  let (_, #Cell result) = @state.run (#Cell 42) (func () => return
+    \\    read (func ignored : Cell U32 => return @panic "witness must never be invoked"))
     \\  break result
     \\entry const unsigned = answer ()
     \\entry const floating = do:
-    \\  let (_, #Cell result) = @state.run (#Cell 1.25) (fn () =>
-    \\    read (fn ignored -> Cell F32 => @panic "floating witness called"))
+    \\  let (_, #Cell result) = @state.run (#Cell 1.25) (func () => return
+    \\    read (func ignored : Cell F32 => return @panic "floating witness called"))
     \\  break result
-    \\entry const runtime = fn () => answer ()
+    \\entry const runtime = func () => return answer ()
 ;
 
 fn lower(allocator: std.mem.Allocator) !core.Module {

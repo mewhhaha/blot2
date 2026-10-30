@@ -2,12 +2,12 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("runtime ordinary scalar wrappers support partial and higher-order calls", async () => {
   await compileAndRun(`
-const add = fn left => fn right => @u32.add left right
+const add = func left => return func right => return @u32.add left right
 const plus_one = add 1
-const apply = fn callable => fn value => callable value
-entry const run = fn (value: U32) -> U32 => add (apply plus_one value) 1
-entry const convert = fn (value: U32) -> F32 => do:
-  let conversion = fn (input: U32) -> F32 => @u32.to_f32 input
+const apply = func callable => return func value => return callable value
+entry const run = func (value: U32) : U32 => return add (apply plus_one value) 1
+entry const convert = func (value: U32) : F32 => return do:
+  let conversion = func (input: U32) : F32 => return @u32.to_f32 input
   break conversion value
 `, guest => {
     equal(guest.call("run", 40), 42);
@@ -19,7 +19,7 @@ entry const convert = fn (value: U32) -> F32 => do:
 Deno.test("runtime panic remains lazy while unused definitions still pass semantic checking", async () => {
   await compileAndRun(`
 const unused = @panic "unused trap"
-entry const run = fn (flag: Bool) -> U32 => if flag then 42 else @panic "runtime trap"
+entry const run = func (flag: Bool) : U32 => return if flag then 42 else @panic "runtime trap"
 `, guest => {
     equal(guest.call("run", true), 42);
     let trapped = false;

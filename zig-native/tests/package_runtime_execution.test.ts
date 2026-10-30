@@ -22,9 +22,9 @@ function completeOwnership(bytes: Uint8Array<ArrayBuffer>): void {
 Deno.test("runtime existential scalar carriers select both witnesses and reseal lexical openings", async () => {
   await compileAndRun(
     `type Item = exists [a] => a
-const make: Bool -> Item = fn flag => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-const reseal: Item -> Item = fn item => unpack item as [a] value in pack [a] value as Item
-entry const answer = fn (flag: Bool) => unpack (reseal (make flag)) as [a] value in 42
+const make: Bool -> Item = func flag => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+const reseal: Item -> Item = func item => return unpack item as [a] value in pack [a] value as Item
+entry const answer = func (flag: Bool) => return unpack (reseal (make flag)) as [a] value in 42
 `,
     (guest, bytes) => {
       completeOwnership(bytes);
@@ -38,9 +38,9 @@ entry const answer = fn (flag: Bool) => unpack (reseal (make flag)) as [a] value
 Deno.test("runtime existential operation adapters preserve heterogeneous payloads", async () => {
   await compileAndRun(
     `type Item = exists [a] => (a, a -> U32)
-const make: Bool -> Item = fn flag => if flag then pack [U32] (42, fn value => value) as Item else pack [Bool] (#True, fn value => if value then 7 else 9) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (flag: Bool) => read (make flag)
+const make: Bool -> Item = func flag => return if flag then pack [U32] (42, func value => return value) as Item else pack [Bool] (true, func value => return if value then 7 else 9) as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (flag: Bool) => return read (make flag)
 `,
     (guest, bytes) => {
       completeOwnership(bytes);
@@ -54,13 +54,13 @@ entry const answer = fn (flag: Bool) => read (make flag)
 Deno.test("runtime package adapters carry references floats records and independent openings", async () => {
   await compileAndRun(
     `type Item = exists [a] => { value: a, run: a -> U32 }
-const floats: F32 -> Item = fn value => pack [F32] { value: value, run: fn number => @f32.to_u32 number } as Item
-const arrays: U32 -> Item = fn value => pack [Array U32] { value: #[value, 7], run: fn values => @array.get values 0 } as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in body.run body.value
-entry const answer = fn (value: U32) => do:
+const floats: F32 -> Item = func value => return pack [F32] { value: value, run: func number => return @f32.to_u32 number } as Item
+const arrays: U32 -> Item = func value => return pack [Array U32] { value: #[value, 7], run: func values => return @array.get values 0 } as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in body.run body.value
+entry const answer = func (value: U32) => return do:
   let items = #[arrays value, floats (@u32.to_f32 value)]
   break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
-entry const nested = fn (value: U32) => unpack (arrays value) as [a] left in unpack (floats 3.0) as [b] right in @u32.add (left.run left.value) (right.run right.value)
+entry const nested = func (value: U32) => return unpack (arrays value) as [a] left in unpack (floats 3.0) as [b] right in @u32.add (left.run left.value) (right.run right.value)
 `,
     (guest, bytes) => {
       completeOwnership(bytes);
@@ -90,9 +90,9 @@ entry const nested = fn (value: U32) => unpack (arrays value) as [a] left in unp
 Deno.test("runtime package adapters preserve multiple binders and boxed callback results", async () => {
   await compileAndRun(
     `type Item = exists [a, b] => (a, a -> b, b -> U32)
-const make: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item
-const read: Item -> U32 = fn item => unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
-entry const answer = fn (value: U32) => read (make value)
+const make: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item
+const read: Item -> U32 = func item => return unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+entry const answer = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       completeOwnership(bytes);
@@ -105,9 +105,9 @@ entry const answer = fn (value: U32) => read (make value)
 Deno.test("runtime package calls preserve traps and independent subsequent invocations", async () => {
   await compileAndRun(
     `type Item = exists [a] => (a, a -> U32)
-const make: Bool -> Item = fn value => pack [Bool] (value, fn flag => if flag then 42 else @panic "sealed operation trap") as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (value: Bool) => read (make value)
+const make: Bool -> Item = func value => return pack [Bool] (value, func flag => return if flag then 42 else @panic "sealed operation trap") as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (value: Bool) => return read (make value)
 `,
     (guest, bytes) => {
       completeOwnership(bytes);
@@ -127,7 +127,7 @@ entry const answer = fn (value: Bool) => read (make value)
 Deno.test("package abstraction rejects direct reflection and hidden value escape", async () => {
   await compileExpectedFailure(
     `type Item = exists [a] => a
-const wrong: Item -> Bool = fn item => unpack item as [a] value in @type.same value 0
+const wrong: Item -> Bool = func item => return unpack item as [a] value in @type.same value 0
 entry const answer = 42
 `,
     "abstract_representation_access",
@@ -136,7 +136,7 @@ entry const answer = 42
   );
   await compileExpectedFailure(
     `type Item = exists [a] => a
-const wrong: Item -> U32 = fn item => unpack item as [a] value in value
+const wrong: Item -> U32 = func item => return unpack item as [a] value in value
 entry const answer = 42
 `,
     "package_escape",
@@ -149,9 +149,9 @@ Deno.test("package carrier revisions preserve fresh bytes after witness edits fa
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const original = `type Item = exists [a] => (a, a -> U32)
-const make: U32 -> Item = fn value => pack [Array U32] (#[value, 7], fn values => @array.get values 0) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (value: U32) => read (make value)
+const make: U32 -> Item = func value => return pack [Array U32] (#[value, 7], func values => return @array.get values 0) as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (value: U32) => return read (make value)
 `;
   const changed = original.replace("#[value, 7]", "#[@u32.add value 1, 7]");
   const failed = original.replace("pack [Array U32]", "pack [Bool]");

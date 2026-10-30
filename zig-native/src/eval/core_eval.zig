@@ -840,7 +840,7 @@ fn retainedGraphScenario(a: Allocator, module: *const core.Module) !void {
     try std.testing.expectEqual(@as(usize, 0), pruned.queries.count());
 }
 test "retained immutable principal graphs outlive sessions validate dependencies and release leases through OOM" {
-    var module = try bodyRecipeLower("entry const identity = fn value => value\nconst dependency = fn value => value\n");
+    var module = try bodyRecipeLower("entry const identity = func value => return value\nconst dependency = func value => return value\n");
     defer module.deinit(std.testing.allocator);
     try retainedGraphScenario(std.testing.allocator, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, retainedGraphScenario, .{&module});
@@ -872,7 +872,7 @@ fn largeInterfaceScenario(a: Allocator, module: *const core.Module, binding: cor
 }
 test "completed body interfaces admit large ordinary type graphs with exact rigid owners through OOM" {
     const a = std.testing.allocator;
-    var module = try bodyRecipeLower("entry const identity = fn value => value\n");
+    var module = try bodyRecipeLower("entry const identity = func value => return value\n");
     defer module.deinit(a);
     const binding = for (module.bodies) |body| {
         if (body.exported) break body.binding;
@@ -921,7 +921,7 @@ fn sourceBodyDependencyScenario(a: Allocator, module: *core.Module, root: core.B
 }
 test "source interface authority checks every reached declaration body through allocation failures" {
     const a = std.testing.allocator;
-    var module = try bodyRecipeLower("const producer: U32 -> U32 = fn value => @u32.add value 1\nentry const relay: U32 -> U32 = fn value => producer value\nconst unrelated = #True\n");
+    var module = try bodyRecipeLower("const producer: U32 -> U32 = func value => return @u32.add value 1\nentry const relay: U32 -> U32 = func value => return producer value\nconst unrelated = true\n");
     defer module.deinit(a);
     var producer: core.BindingId = 0;
     var root: core.BindingId = 0;
@@ -2424,7 +2424,7 @@ pub const Session = struct {
                 .if_value, .if_stmt, .state_provider => for ([_]core.Id{ n.a, n.b, n.c }) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
-                .block, .suite, .product, .record, .array, .array_op, .call, .contract_method => for (module.children(key.node)) |id| {
+                .block, .suite, .product, .record, .array, .array_op, .storage, .call, .contract_method => for (module.children(key.node)) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
                 .bind => try work.append(self.allocator, .{ .owner = key.owner, .node = n.b }),
@@ -3299,7 +3299,7 @@ pub const Session = struct {
                         if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } });
                     },
-                    .call, .contract_method, .block, .suite, .product, .record, .array, .array_op => {
+                    .call, .contract_method, .block, .suite, .product, .record, .array, .array_op, .storage => {
                         const children = module.children(operation.id);
                         var index = children.len;
                         while (index != 0) {
@@ -3881,7 +3881,7 @@ pub const Session = struct {
                 .if_value, .if_stmt => return try self.prepare(n.a) and try self.prepare(n.b) and try self.prepare(n.c),
                 .bind => return self.prepare(n.b),
                 .return_ => return self.prepare(n.a),
-                .block, .suite, .array, .array_op => {
+                .block, .suite, .array, .array_op, .storage => {
                     for (self.module.children(id)) |child| if (!try self.prepare(child)) return false;
                 },
                 .loop => {
@@ -4439,6 +4439,7 @@ pub const Session = struct {
             },
             .record_merge => return self.recordMerge(owner, id, frame),
             .array_op => return self.arrayOperation(owner, id, frame),
+            .storage => return self.fail(owner, self.units[owner].span(id), .stage_unavailable),
             .closure => return self.closureExpression(owner, id, frame),
             .suspend_ => return self.suspensionExpression(owner, id, frame),
             .force => {
@@ -4820,6 +4821,7 @@ pub const Session = struct {
         const outcome = try self.expression(owner, node.a, frame);
         if (outcome != .value) return outcome;
         const value_ = outcome.value;
+        if (op == .evaluate) return outcome;
         if (op == .emit or op == .run) return self.executeCode(owner, id, value_, frame);
         const info = self.valueInfo(value_);
         if (op == .same) {
@@ -8812,7 +8814,9 @@ const ClosureRegion = struct {
                 const actual = try self.project(try self.importType(caller, callee_type, 0));
                 if (actual == 0) break;
                 const selected = try self.session.selectTemplate(caller_owner, site, reference, actual);
-                try self.session.prepare(selected);
+                // Interface selection and principal descriptions inspect source
+                // contracts without evaluating the selected method's constants.
+                if (!self.source_interface and !self.building_principal) try self.session.prepare(selected);
                 return self.collectCall(caller, selected, callee_type, arguments);
             }
         }
@@ -11606,6 +11610,7 @@ const ClosureRegion = struct {
             },
             .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle, .proof_guard => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
             .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
+            .storage => try work.appendSlice(self.session.allocator, module.children(id)),
             .array_op => try self.collectArrayNode(scope, id, work),
             .block, .suite, .product, .record, .array, .call => try work.appendSlice(self.session.allocator, module.children(id)),
             .bind => {
@@ -12855,7 +12860,7 @@ const ClosureRegion = struct {
                         if (metadata.applied > body.parameters.len) return error.UnresolvedType;
                         break :count body.parameters.len - metadata.applied;
                     } else if (metadata.origin == .anonymous) count: {
-                        // `fn a => fn b => ...` is curried like a named body:
+                        // `func a => return func b => return ...` is curried like a named body:
                         // a closure literal that is the whole body is this
                         // closure's own arrow, not a returned callback.
                         const module = &self.session.units[source.owner];
@@ -13185,7 +13190,7 @@ fn privateLexicalScenario(a: Allocator, module: *const core.Module, workers: u8)
 }
 test "private semantic lexical components remap capture interfaces without exporting live handles through allocation failures" {
     var module = try bodyRecipeLower(
-        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\const make: U32 -> (U32 -> U32 ! {}) = func captured => return func value => return @u32.add captured value
         \\entry const first = make 1
         \\entry const other = make 2
     );
@@ -13219,10 +13224,10 @@ test "a shared private session derives every unit fact Session.init derives thro
     var module = try bodyRecipeLower(
         \\type Pair is data = #Pair { left: U32, right: U32 }
         \\type Shape is data = #Square { side: U32 } | #Rect { width: U32, height: U32 }
-        \\entry const area = fn (shape: Shape) => case shape of
+        \\entry const area = func (shape: Shape) => return case shape of
         \\  #Square { side } => @u32.mul side side
         \\  #Rect { width, height } => @u32.mul width height
-        \\entry const total = fn (pair: Pair) => @u32.add pair.left pair.right
+        \\entry const total = func (pair: Pair) => return @u32.add pair.left pair.right
     );
     defer module.deinit(std.testing.allocator);
     const units = [_]core.Module{module};
@@ -13264,9 +13269,9 @@ fn privateRecursiveScenario(a: Allocator, module: *const core.Module, workers: u
 }
 test "private semantic known recursive components publish every member atomically beside independent jobs" {
     var module = try bodyRecipeLower(
-        \\entry const even: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
-        \\entry const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else even (@u32.sub value 1)
-        \\entry const independent = fn value => @u32.add value 1
+        \\entry const even: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
+        \\entry const odd: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else even (@u32.sub value 1)
+        \\entry const independent = func value => return @u32.add value 1
     );
     defer module.deinit(std.testing.allocator);
     for ([_]u8{ 1, 4 }) |workers| try privateRecursiveScenario(std.testing.allocator, &module, workers);
@@ -13275,9 +13280,9 @@ test "private semantic known recursive components publish every member atomicall
 test "private semantic declined jobs preserve successful siblings and late active dependencies return to serial inference" {
     const a = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\entry const leaf = fn value => @u32.add value 1
-        \\entry const caller: U32 -> U32 = fn value => leaf value
-        \\entry const independent: U32 -> U32 = fn value => @u32.add value 2
+        \\entry const leaf = func value => return @u32.add value 1
+        \\entry const caller: U32 -> U32 = func value => return leaf value
+        \\entry const independent: U32 -> U32 = func value => return @u32.add value 2
     );
     defer module.deinit(a);
     for ([_]u8{ 1, 4 }) |workers| {
@@ -13342,9 +13347,9 @@ fn privateDeclineScenario(a: Allocator, module: *const core.Module, workers: u8)
 }
 test "private semantic declines are offered once and the serial path still decides them" {
     var module = try bodyRecipeLower(
-        \\entry const first: U32 -> U32 = fn value => @u32.add value 1
-        \\entry const second: U32 -> U32 = fn value => @u32.add value 2
-        \\entry const third: U32 -> U32 = fn value => @u32.add value 3
+        \\entry const first: U32 -> U32 = func value => return @u32.add value 1
+        \\entry const second: U32 -> U32 = func value => return @u32.add value 2
+        \\entry const third: U32 -> U32 = func value => return @u32.add value 3
     );
     defer module.deinit(std.testing.allocator);
     for ([_]u8{ 1, 4 }) |workers| try privateDeclineScenario(std.testing.allocator, &module, workers);
@@ -13353,7 +13358,7 @@ test "private semantic declines are offered once and the serial path still decid
 test "private semantic recursive generic jobs keep distinct complete U32 and F32 inputs" {
     const a = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\entry const recursive = fn value => fn (count: U32) => if @u32.eq count 0 then value else recursive value (@u32.sub count 1)
+        \\entry const recursive = func value => return func (count: U32) => return if @u32.eq count 0 then value else recursive value (@u32.sub count 1)
     );
     defer module.deinit(a);
     for ([_]u8{ 0, 1, 4 }) |workers| {
@@ -13504,24 +13509,24 @@ fn bodyRecipeImmutableLaw(module: *const core.Module, wanted: []const []const u8
 test "body recipes preserve complete recursive SCC scope histories and independent scalar instances" {
     var module = try bodyRecipeLower(
         \\infixl 60 (+) = add
-        \\const add = fn left => fn right => @type.call "add" left right
-        \\const U32.add = fn left => fn right => @u32.add left right
-        \\const F32.add = fn left => fn right => @f32.add left right
-        \\const recursive = fn value => fn (count: U32) => do:
+        \\const add = func left => return func right => return @type.call "add" left right
+        \\const U32.add = func left => return func right => return @u32.add left right
+        \\const F32.add = func left => return func right => return @f32.add left right
+        \\const recursive = func value => return func (count: U32) => return do:
         \\  if @u32.eq count 0:
         \\    return value
         \\  return recursive (value + value) (@u32.sub count 1)
-        \\entry const integer = fn () => recursive 21 1
-        \\entry const floating = fn () => recursive 1.25 1
-        \\const even = fn (value: U32) => do:
+        \\entry const integer = func () => return recursive 21 1
+        \\entry const floating = func () => return recursive 1.25 1
+        \\const even = func (value: U32) => return do:
         \\  if @u32.eq value 0:
         \\    return 42
         \\  return odd (@u32.sub value 1)
-        \\const odd = fn (value: U32) => do:
+        \\const odd = func (value: U32) => return do:
         \\  if @u32.eq value 0:
         \\    return 42
         \\  return even (@u32.sub value 1)
-        \\entry const mutual = fn () => even 5
+        \\entry const mutual = func () => return even 5
     );
     defer module.deinit(std.testing.allocator);
     const wanted: []const []const u8 = &.{ "integer", "floating", "mutual" };
@@ -13656,8 +13661,8 @@ test "body recipes decline bounded wide walks and preserve cached low-quota pref
 fn specializationCapacityScenario(specialization: bool) !void {
     const allocator = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\const plus = fn captured => fn value => @u32.add captured value
-        \\const lift = fn callback => fn value => callback value
+        \\const plus = func captured => return func value => return @u32.add captured value
+        \\const lift = func callback => return func value => return callback value
         \\entry const callback = lift (plus 42)
         \\entry const previous = lift (plus 43)
     );
@@ -13806,13 +13811,13 @@ test "concrete self runtime method interface terminates without executing recurs
     const allocator = std.testing.allocator;
     for ([_][]const u8{
         \\type Box is data = #Box U32
-        \\const Box.read: Box -> U32 where {} = fn (value: Box) => value.read
-        \\entry const selected: Unit -> U32 = fn () => (#Box 1).read
+        \\const Box.read: Box -> U32 where {} = func (value: Box) => return value.read
+        \\entry const selected: Unit -> U32 = func () => return (#Box 1).read
         \\entry const answer = 42
         ,
         \\type Box is data = #Box U32
-        \\const Box.read: Box -> U32 where {} = fn value => value.read
-        \\entry const selected: Unit -> U32 = fn () => (#Box 1).read
+        \\const Box.read: Box -> U32 where {} = func value => return value.read
+        \\entry const selected: Unit -> U32 = func () => return (#Box 1).read
         \\entry const answer = 42
         ,
     }) |source| {
@@ -13827,11 +13832,11 @@ test "concrete self runtime method remains fuel-limited when a constant forces r
     const allocator = std.testing.allocator;
     for ([_][]const u8{
         \\type Box is data = #Box U32
-        \\const Box.read: Box -> U32 where {} = fn (value: Box) => value.read
+        \\const Box.read: Box -> U32 where {} = func (value: Box) => return value.read
         \\entry const answer = (#Box 1).read
         ,
         \\type Box is data = #Box U32
-        \\const Box.read: Box -> U32 where {} = fn value => value.read
+        \\const Box.read: Box -> U32 where {} = func value => return value.read
         \\entry const answer = (#Box 1).read
         ,
     }) |source| {
@@ -13912,7 +13917,7 @@ fn lexicalRowIndexScenario(a: Allocator, module: *const core.Module) !void {
 }
 
 test "lexical row scope index preserves unrelated binders and imports appended during sharing through OOM" {
-    var module = try bodyRecipeLower("const apply = fn f => fn value => f value\nentry const answer = 7");
+    var module = try bodyRecipeLower("const apply = func f => return func value => return f value\nentry const answer = 7");
     defer module.deinit(std.testing.allocator);
     try lexicalRowIndexScenario(std.testing.allocator, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, lexicalRowIndexScenario, .{&module});
@@ -13991,11 +13996,11 @@ test "Session unit lookup preserves dense implicit sparse and duplicate first ow
 
 test "principal source containment owns nested closures and local reads with bounded allocation failure cleanup" {
     var module = try bodyRecipeLower(
-        \\const first = fn (x: U32) => do:
-        \\  let captured = fn (y: U32) => @u32.add x y
+        \\const first = func (x: U32) => return do:
+        \\  let captured = func (y: U32) => return @u32.add x y
         \\  break captured
-        \\const second = fn (x: U32) => @u32.sub x 1
-        \\const force = fn ~(value: U32) => @force value
+        \\const second = func (x: U32) => return @u32.sub x 1
+        \\const force = func ~(value: U32) => return @force value
         \\entry const delayed = force (@u32.add 1 2)
         \\entry const answer = 7
     );
@@ -14157,9 +14162,9 @@ fn closedSourceSharingScenario(a: Allocator, module: *const core.Module) !void {
 test "closed source imports share immutable graphs but isolate variables limits rollback and OOM" {
     const a = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\const closed = fn (xs: Array { value: U32, enabled: Bool }) => xs
-        \\const generic = fn xs => xs
-        \\entry const answer = fn () => 42
+        \\const closed = func (xs: Array { value: U32, enabled: Bool }) => return xs
+        \\const generic = func xs => return xs
+        \\entry const answer = func () => return 42
     );
     defer module.deinit(a);
     try closedSourceSharingScenario(a, &module);
@@ -14304,8 +14309,8 @@ fn mandatoryHeaderHistoryScenario(allocator: Allocator, module: *const core.Modu
 test "mandatory header inputs preserve unknown aliases rows rollback recycling saturation and ownership" {
     const allocator = std.testing.allocator;
     for ([_][]const u8{
-        "entry const required: a -> b -> Unit where { type_rep a, type_rep b } = fn left => fn right => ()\n",
-        "entry const required: Unit -> Unit ! {| e} where { effect_rep ! {| e} } = fn () => ()\n",
+        "entry const required: a -> b -> Unit where { type_rep a, type_rep b } = func left => return func right => return ()\n",
+        "entry const required: Unit -> Unit ! {| e} where { effect_rep ! {| e} } = func () => return ()\n",
     }) |source| {
         var module = try bodyRecipeLower(source);
         defer module.deinit(allocator);
@@ -14372,12 +14377,12 @@ test "newly revealed source selection cycles decline without publishing partial 
     var module = try bodyRecipeLower(
         \\type Seed is data = #Seed
         \\type Box a is data = #Box a
-        \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
-        \\const f_0 = fn value => @type.call "build" value #Seed
-        \\entry const parent: a -> a = fn value => (f_0 value).read
-        \\const Box.read: Box a -> a = fn box => case box of
+        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
+        \\const f_0 = func value => return @type.call "build" value #Seed
+        \\entry const parent: a -> a = func value => return (f_0 value).read
+        \\const Box.read: Box a -> a = func box => return case box of
         \\  #Box value => value
-        \\entry const recursive_read: Box a -> a = fn box => case box of
+        \\entry const recursive_read: Box a -> a = func box => return case box of
         \\  #Box value => parent value
     );
     defer module.deinit(allocator);
@@ -14406,9 +14411,9 @@ test "source head theorems require immutable fixed heads and retain mismatches c
     const allocator = std.testing.allocator;
     var module = try bodyRecipeLower(
         \\type Cell a is data = #Cell a
-        \\const closed = fn ignored => @state.get (#Cell 0)
-        \\const parametric = fn (witness: Cell a) -> Cell a => @state.get witness
-        \\const open = fn witness => @state.get witness
+        \\const closed = func ignored => return @state.get (#Cell 0)
+        \\const parametric = func (witness: Cell a) : Cell a => return @state.get witness
+        \\const open = func witness => return @state.get witness
         \\entry const answer = 42
     );
     defer module.deinit(allocator);
@@ -14492,7 +14497,7 @@ fn constantWarmQueryScenario(allocator: Allocator, module: *const core.Module) !
 
 test "constant receipt records ordinary warm query barriers and declines unowned canonical budget changes" {
     const allocator = std.testing.allocator;
-    var module = try bodyRecipeLower("const callback = fn () -> U32 => 42\nentry const answer = 42\n");
+    var module = try bodyRecipeLower("const callback = func () : U32 => return 42\nentry const answer = 42\n");
     defer module.deinit(allocator);
     try constantWarmQueryScenario(allocator, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, constantWarmQueryScenario, .{&module});
@@ -14617,8 +14622,8 @@ fn shapeMemberScenario(allocator: Allocator, module: *const core.Module) !void {
 }
 test "shape only generic collection members preserve ordinary answers fuel and allocation failure" {
     var module = try bodyRecipeLower(
-        \\entry const count_array: Array a -> U32 = fn values => @array.length values
-        \\entry const count_list: List a -> U32 = fn values => @list.length values
+        \\entry const count_array: Array a -> U32 = func values => return @array.length values
+        \\entry const count_list: List a -> U32 = func values => return @list.length values
     );
     defer module.deinit(std.testing.allocator);
     try shapeMemberScenario(std.testing.allocator, &module);
@@ -14628,10 +14633,10 @@ test "shape only generic collection members preserve ordinary answers fuel and a
 test "shape only member proofs retain changed bodies typed inputs effects and resource limits" {
     const allocator = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\entry const generic: Array a -> U32 = fn values => @array.length values
-        \\entry const concrete: Array U32 -> U32 = fn values => @array.length values
-        \\entry const changed: Array a -> U32 = fn values => @u32.add 1 (@array.length values)
-        \\entry const foreign: Array a -> U32 ! {Foreign} = fn values => @array.length values
+        \\entry const generic: Array a -> U32 = func values => return @array.length values
+        \\entry const concrete: Array U32 -> U32 = func values => return @array.length values
+        \\entry const changed: Array a -> U32 = func values => return @u32.add 1 (@array.length values)
+        \\entry const foreign: Array a -> U32 ! {Foreign} = func values => return @array.length values
     );
     defer module.deinit(allocator);
     var session = try Session.init(allocator, &.{module});
@@ -14701,7 +14706,7 @@ fn constantViewDescriptorScenario(allocator: Allocator, module: *const core.Modu
 
 test "constant view receipts compare exact closure descriptors across metadata slots" {
     const allocator = std.testing.allocator;
-    var module = try bodyRecipeLower("const callback = fn (value: U32) => @u32.add value 1\n");
+    var module = try bodyRecipeLower("const callback = func (value: U32) => return @u32.add value 1\n");
     defer module.deinit(allocator);
     try constantViewDescriptorScenario(allocator, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, constantViewDescriptorScenario, .{&module});

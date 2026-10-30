@@ -78,7 +78,7 @@ fn nonemptyReplayFailure(allocator: std.mem.Allocator, fixture: *const Fixture, 
 }
 
 test "principal nonempty projected rows own translated results through edits reverts and allocation failures" {
-    const prefix = "entry const builder: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break local ";
+    const prefix = "entry const builder: U32 where { type_rep U32 } = do:\n  let local = func value => return value\n  break local ";
     var before = try Fixture.init(prefix ++ "42\n");
     defer before.deinit();
     var after = try Fixture.init(prefix ++ "43\n");
@@ -101,11 +101,11 @@ test "principal nonempty projected rows own translated results through edits rev
 test "principal observed sources retain memo outputs across unrelated body edits and reject consumed source edits" {
     // Establish both operation names before the edited declaration, so the
     // negative case tests source admission with the same ordered namespace.
-    const operations = "const add = fn value => @u32.add value 2\nconst subtract = fn value => @u32.sub value 2\n";
-    const prefix = operations ++ "const local = fn value => @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
-    var before = try Fixture.init(prefix ++ "const unrelated = fn value => @u32.add value 2\n");
+    const operations = "const add = func value => return @u32.add value 2\nconst subtract = func value => return @u32.sub value 2\n";
+    const prefix = operations ++ "const local = func value => return @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
+    var before = try Fixture.init(prefix ++ "const unrelated = func value => return @u32.add value 2\n");
     defer before.deinit();
-    var after = try Fixture.init(prefix ++ "const unrelated = fn value => @u32.sub value 2\n");
+    var after = try Fixture.init(prefix ++ "const unrelated = func value => return @u32.sub value 2\n");
     defer after.deinit();
     var initial = try before.emit(.{ .retain_artifacts = true });
     defer initial.deinit(a);
@@ -120,7 +120,7 @@ test "principal observed sources retain memo outputs across unrelated body edits
     try std.testing.expect(edited.diagnostic == null);
     try std.testing.expect(edited.principal.call_publications_replayed > 0);
     try std.testing.expectEqualSlices(u8, fresh.bytes, edited.bytes);
-    var changed = try Fixture.init(operations ++ "const local = fn value => @u32.sub value 1\nentry const answer: U32 where { type_rep U32 } = local 41\nconst unrelated = fn value => @u32.sub value 2\n");
+    var changed = try Fixture.init(operations ++ "const local = func value => return @u32.sub value 1\nentry const answer: U32 where { type_rep U32 } = local 41\nconst unrelated = func value => return @u32.sub value 2\n");
     defer changed.deinit();
     var expected = try changed.emit(.{});
     defer expected.deinit(a);
@@ -154,7 +154,7 @@ fn checkedInterfaceReplay(allocator: std.mem.Allocator, fixture: *const Fixture,
     try std.testing.expectEqualSlices(u8, expected, result.bytes);
 }
 test "checked interface observations preserve principal inference while staged body edits execute current code through OOM" {
-    const prefix = "const add = fn (x: U32) -> U32 => @u32.add x 1\nconst sub = fn (x: U32) -> U32 => @u32.sub x 1\nconst local = fn (x: U32) -> U32 => ";
+    const prefix = "const add = func (x: U32) : U32 => return @u32.add x 1\nconst sub = func (x: U32) : U32 => return @u32.sub x 1\nconst local = func (x: U32) : U32 => return ";
     const suffix = " x 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
     var before = try Fixture.init(prefix ++ "@u32.add" ++ suffix);
     defer before.deinit();
@@ -180,8 +180,8 @@ test "checked interface observations preserve principal inference while staged b
 }
 
 test "checked requirement observations retain transitive headers through body edits and allocation failures" {
-    const prefix = "const add = fn (x: U32) -> U32 => @u32.add x 1\nconst sub = fn (x: U32) -> U32 => @u32.sub x 1\nconst local: U32 -> U32 where { type_rep U32 } = fn x => ";
-    const suffix = " x 1\nconst wrapper: U32 -> U32 where { type_rep U32 } = fn x => local x\nentry const answer: U32 where { type_rep U32 } = wrapper 41\n";
+    const prefix = "const add = func (x: U32) : U32 => return @u32.add x 1\nconst sub = func (x: U32) : U32 => return @u32.sub x 1\nconst local: U32 -> U32 where { type_rep U32 } = func x => return ";
+    const suffix = " x 1\nconst wrapper: U32 -> U32 where { type_rep U32 } = func x => return local x\nentry const answer: U32 where { type_rep U32 } = wrapper 41\n";
     var before = try Fixture.init(prefix ++ "@u32.add" ++ suffix);
     defer before.deinit();
     var after = try Fixture.init(prefix ++ "@u32.sub" ++ suffix);
@@ -207,13 +207,13 @@ test "checked requirement observations retain transitive headers through body ed
 test "completed inferred result interfaces preserve body edits and reverts without recollecting principals through OOM" {
     const prefix =
         "type Token is data = #Token U32\n" ++
-        "const Token.from = fn value => #Token (@f32.to_u32 value)\n" ++
-        "const from = fn value => @type.result \"from\" value\n" ++
-        "const floor_impl = fn value => @f32.floor value\n" ++
-        "const ceil_impl = fn value => @f32.ceil value\n" ++
+        "const Token.from = func value => return #Token (@f32.to_u32 value)\n" ++
+        "const from = func value => return @type.result \"from\" value\n" ++
+        "const floor_impl = func value => return @f32.floor value\n" ++
+        "const ceil_impl = func value => return @f32.ceil value\n" ++
         "const floor = floor_impl\n" ++
         "const ceil = ceil_impl\n" ++
-        "const local = fn value => from (";
+        "const local = func value => return from (";
     const suffix = " value)\nentry const answer: U32 where { type_rep U32 } = case local 41.25 of\n  #Token value => value\n";
     var before = try Fixture.init(prefix ++ "floor" ++ suffix);
     defer before.deinit();
@@ -365,7 +365,7 @@ fn summaryReplayFailures(allocator: std.mem.Allocator, fixture: *const Fixture) 
 }
 
 test "principal summary replay requires exact inputs and results without publishing global certificates through OOM" {
-    var fixture = try Fixture.init("const local = fn value => @u32.add value 1\nentry const answer = local 41\n");
+    var fixture = try Fixture.init("const local = func value => return @u32.add value 1\nentry const answer = local 41\n");
     defer fixture.deinit();
     try summaryReplayFailures(a, &fixture);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, summaryReplayFailures, .{&fixture});
@@ -453,7 +453,7 @@ test "principal nominal replay requires exact memo inputs and publishes atomical
 
 const nominal_prelude =
     \\type Box is data = #Box U32
-    \\const extract = fn (box: Box) -> U32 => case box of
+    \\const extract = func (box: Box) : U32 => return case box of
     \\  #Box value => value
     \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box
 ;
@@ -602,8 +602,8 @@ test "principal anonymous module observations own their inputs and permit duplic
 }
 
 test "principal anonymous module dependencies reject memo replay after unrelated body changes" {
-    const prefix = "const add = fn value => @u32.add value 2\nconst sub = fn value => @u32.sub value 2\nconst local = fn value => @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
-    const suffix = "const changed = fn value => ";
+    const prefix = "const add = func value => return @u32.add value 2\nconst sub = func value => return @u32.sub value 2\nconst local = func value => return @u32.add value 1\nentry const answer: U32 where { type_rep U32 } = local 41\n";
+    const suffix = "const changed = func value => return ";
     var before = try Fixture.init(prefix ++ suffix ++ "@u32.add value 2\n");
     defer before.deinit();
     var after = try Fixture.init(prefix ++ suffix ++ "@u32.sub value 2\n");

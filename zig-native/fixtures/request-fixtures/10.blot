@@ -1,6 +1,6 @@
 
 type Inputs is effect = { left: Unit -> U32, right: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Inputs.left () =>
@@ -9,7 +9,7 @@ const handled = fn computation => do:
         yield 2
       complete value =>
         break value
-entry const answer = fn () => handled (@computation (fn () => do:
+entry const answer = func () => return handled (@computation (func () => return do:
   use left <- Inputs.left ()
   use right <- Inputs.right ()
   break @u32.add left right

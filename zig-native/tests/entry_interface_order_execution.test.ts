@@ -44,10 +44,10 @@ Deno.test("generic value interfaces reject before constant bounds or panic while
   );
 });
 const source =
-  `const maker = fn captured => fn (value: U32) => @u32.add captured value
+  `const maker = func captured => return func (value: U32) => return @u32.add captured value
 entry const selected = maker 21
-entry const answer = if #True then 42 else @panic "unreachable"
-entry const typed: Unit -> U32 = fn () => @array.get #[] 0
+entry const answer = if true then 42 else @panic "unreachable"
+entry const typed: Unit -> U32 = func () => return @array.get #[] 0
 `;
 for (const asynchronous of [false, true]) {
   Deno.test(`interface preflight preserves staged closures and runtime traps (${asynchronous ? "JSPI" : "sync"})`, async () => {
@@ -85,7 +85,7 @@ Deno.test("imported helpers and aliases preserve deferred witness validation whi
     for (
       const [name, code, steps, origin] of [
         ["imported-witness", "invalid_annotation", false, 46],
-        ["imported-alias-witness", "ambiguous_associated", false, 39],
+        ["imported-alias-witness", "ambiguous_associated", false, 53],
         ["imported-index", "entry_type", false, undefined],
         ["runtime-array-prefix", "entry_let_type", false, 10],
         ["generic-function-prefix", "entry_type", false, 12],

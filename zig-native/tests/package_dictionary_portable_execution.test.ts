@@ -4,18 +4,18 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer = `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
 type Item = exists [a] where { Render a } => a
-const make: Bool -> Item = fn flag => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-const both = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
+const make: Bool -> Item = func flag => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+const both = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
 `;
 const consumer = `import {make, read, both} from "./identity"
-entry const answer = fn (flag: Bool) => read (make flag)
-entry const combined = fn (flag: Bool) => both (make flag) (make #False)
-entry const collection = fn (flag: Bool) => do:
-  let items = #[make flag, make #False]
+entry const answer = func (flag: Bool) => return read (make flag)
+entry const combined = func (flag: Bool) => return both (make flag) (make false)
+entry const collection = func (flag: Bool) => return do:
+  let items = #[make flag, make false]
   break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
@@ -93,7 +93,7 @@ Deno.test("predicate package goals preserve independent stored methods across so
         for (
           const failed of [
             consumer.replace("read (make flag)", "read 42"),
-            consumer.replace("read (make flag)", "both (make flag) #True"),
+            consumer.replace("read (make flag)", "both (make flag) true"),
           ]
         ) {
           const live = await source.build({ sources: { [entry]: failed } });

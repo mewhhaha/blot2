@@ -6,11 +6,11 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const cycleDefinitions = `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-const cycle = fn (seed: U32) => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+const cycle = func (seed: U32) => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use first <- delayed ()
     use State.set #End
@@ -27,7 +27,7 @@ const cycle = fn (seed: U32) => do:
 `;
 
 const cycleSource = `${cycleDefinitions}
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let index = 0
   let sum = 0
   for ever:
@@ -35,7 +35,7 @@ entry const run = fn (count: U32) => do:
       break sum
     sum := self + cycle index
     index := self + 1
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 async function compileCyclesInBothTiers(
@@ -236,9 +236,9 @@ Deno.test("a large retained heap preserves its owner while local cycle passes us
 
 const suspendedSource = `${cycleDefinitions}
 
-entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:
-  use outcome <- @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:
+  use outcome <- @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use first <- delayed ()
     use State.set #End
@@ -256,7 +256,7 @@ entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:
   )
   let (_, result) = outcome
   break result
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 Deno.test("live JSPI memo cycles survive local pressure and retire on settlement or rejection", async () => {
@@ -320,7 +320,7 @@ Deno.test("live JSPI memo cycles survive local pressure and retire on settlement
 const cancellationSource = `${cycleDefinitions}
 
 type Tick is effect = { read: U32 -> U32 }
-const abort = fn computation => do:
+const abort = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -328,12 +328,12 @@ const abort = fn computation => do:
       complete value =>
         break value
   break 7
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let sum = 0
   for index in 0..count:
-    let work = @computation (fn () => do:
-      use outcome <- @effect.run State.get State.set #End (fn () => do:
-        let delayed = keep (get (fn () => #End))
+    let work = @computation (func () => return do:
+      use outcome <- @effect.run State.get State.set #End (func () => return do:
+        let delayed = keep (get (func () => return #End))
         use State.set (#Next delayed)
         use first <- delayed ()
         use State.set #End
@@ -351,7 +351,7 @@ entry const run = fn (count: U32) => do:
     let result = abort work
     sum := self + result
   break sum
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 Deno.test("canceling suspended request cycles removes roots and reclaims ready memo graphs", async () => {
@@ -384,14 +384,14 @@ Deno.test("canceling suspended request cycles removes roots and reclaims ready m
 Deno.test("scalar List constructors snapshots and edits skip cycle scans", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let values = @list.fill count 42
   let original = values
   values := [1, 2, 3, ...self]
   let joined_array = @array.from_list values
   let original_array = @array.from_list original
   break joined_array[3] + original_array[0]
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -414,7 +414,7 @@ entry const memory = fn () -> Array U32 => #[]
 Deno.test("zero-child admitted source keeps cycle work absent and validates counter metadata", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let values = @array.fill count 42
   let original = values
   values[0] := 7

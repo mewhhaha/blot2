@@ -380,7 +380,7 @@ const Parser = struct {
         } else {
             _ = try self.expect(.l_paren);
             const op = self.advance();
-            if (!operatorTag(op.tag)) return self.fail(.expected_token);
+            if (!operatorTag(op.tag) or op.tag == .kw_and or op.tag == .kw_or) return self.fail(.expected_token);
             symbol = try self.intern(self.text(op));
             _ = try self.expect(.r_paren);
             _ = try self.expect(.equal);
@@ -507,7 +507,7 @@ const Parser = struct {
                 var annotation: Id = 0;
                 if (self.eat(.colon)) annotation = try self.typeExpression();
                 _ = try self.expect(.equal);
-                if (!self.at(.kw_fn)) return self.fail(.expected_token);
+                if (!self.at(.kw_func)) return self.fail(.expected_token);
                 const value = try self.expression();
                 const method = try self.add(.value_decl, member, value, try self.extra(&.{ annotation, 0, 0, 0, 0, 0, 0, 0, 0 }), member_start);
                 try members.append(self.allocator, method);
@@ -599,6 +599,14 @@ const Parser = struct {
         try self.enter();
         defer self.depth -= 1;
         const start = self.current().start;
+        if (self.at(.caret) or (self.at(.symbol) and std.mem.eql(u8, self.text(self.current()), "&"))) {
+            const link = self.advance().tag == .caret;
+            const view = !link and self.eat(.l_bracket);
+            const name = try self.add(.type_name, try self.intern(if (link) "@storage.Link" else if (view) "@storage.View" else "@storage.Ref"), 0, 0, start);
+            const element = if (view) try self.typeExpression() else try self.typeAtom();
+            if (view) _ = try self.expect(.r_bracket);
+            return self.add(.type_apply, name, element, 0, start);
+        }
         if (self.word("code") and self.peek(1) == .l_bracket) {
             _ = self.advance();
             _ = try self.expect(.l_bracket);
@@ -805,14 +813,14 @@ const Parser = struct {
         defer self.depth -= 1;
         if (self.at(.identifier) and self.word("pack") and self.peek(1) == .l_bracket) return self.packagePack();
         if (self.at(.identifier) and self.word("unpack") and self.packageOpeningAhead()) return self.packageUnpack();
-        if (self.at(.kw_fn)) return self.lambda();
+        if (self.at(.kw_func)) return self.lambda();
         if (self.at(.kw_do)) return self.doBlock();
         if (self.at(.kw_if)) return self.ifExpression();
         if (self.at(.kw_case)) return self.caseExpression();
         return self.infix();
     }
     fn lambda(self: *Parser) Error!Id {
-        const start = (try self.expect(.kw_fn)).start;
+        const start = (try self.expect(.kw_func)).start;
         const Parameter = struct { node: Id, pattern: Id, name: symbols.Symbol, start: u32 };
         var fixed: [8]Parameter = undefined;
         var overflow: std.ArrayList(Parameter) = .empty;
@@ -841,6 +849,7 @@ const Parser = struct {
                 }
             } else name = try self.lowerIdentifier();
             const parameter = try self.add(.parameter, name, annotation, try self.extra(&.{ @as(u32, @intFromBool(demanded)) | (@as(u32, @intFromBool(unit)) << 1), constraints.predicates.start, constraints.predicates.len, constraints.node }), item_start);
+            if (pattern_parameter != 0) self.tree.extra.items[self.tree.node(parameter).c] |= 8;
             const item: Parameter = .{ .node = parameter, .pattern = pattern_parameter, .name = name, .start = item_start };
             if (count < fixed.len) {
                 fixed[count] = item;
@@ -849,13 +858,16 @@ const Parser = struct {
                 try overflow.append(self.allocator, item);
             }
             count += 1;
-            if (!self.at(.tilde) and !self.at(.l_paren) and !self.at(.identifier)) break;
+            if (!self.eat(.arrow)) break;
             if (count >= 256) return self.fail(.nesting_limit);
         }
-        const result = if (self.eat(.arrow)) try self.typeExpression() else 0;
+        const result = if (self.eat(.colon)) try self.typeExpression() else 0;
         _ = try self.expect(.fat_arrow);
+        const returned = self.eat(.kw_return);
+        if (!returned and !self.at(.kw_do)) return self.fail(.function_return_required);
         var body = try self.expression();
         const parameters = if (count <= fixed.len) fixed[0..count] else overflow.items;
+        if (!returned) self.tree.extra.items[self.tree.node(parameters[parameters.len - 1].node).c] |= 4;
         var index = parameters.len;
         while (index != 0) {
             index -= 1;
@@ -863,8 +875,8 @@ const Parser = struct {
             if (parameter.pattern != 0) {
                 const argument = try self.add(.name, parameter.name, 0, 0, parameter.start);
                 const binding = try self.add(.let_stmt, parameter.pattern, argument, try self.extra(&.{ 0, 0, 0, 0, 0 }), parameter.start);
-                const returned = try self.add(.return_stmt, body, 0, 0, parameter.start);
-                body = try self.listNode(.block, &.{ binding, returned }, parameter.start);
+                const result_statement = try self.add(.return_stmt, body, 0, 0, parameter.start);
+                body = try self.listNode(.block, &.{ binding, result_statement }, parameter.start);
             }
             body = try self.add(.lambda, parameter.node, body, if (index == parameters.len - 1) result else 0, if (index == 0) start else parameter.start);
         }
@@ -888,6 +900,9 @@ const Parser = struct {
         return self.add(.if_expr, condition, consequence, try self.expression(), start);
     }
     fn lookupFixity(self: *const Parser, symbol: symbols.Symbol, named: bool) ?Fixity {
+        const spelling = self.pool.get(symbol);
+        if (std.mem.eql(u8, spelling, "and") or std.mem.eql(u8, spelling, "or"))
+            return .{ .symbol = symbol, .precedence = if (std.mem.eql(u8, spelling, "and")) 25 else 20, .association = 1, .named = false };
         for (self.fixities.items) |fixity| if (fixity.symbol == symbol and fixity.named == named) return fixity;
         if (named) return .{ .symbol = symbol, .precedence = 80, .association = 0, .named = true };
         return null;
@@ -925,7 +940,7 @@ const Parser = struct {
             const op = try self.readOperator();
             unknown = unknown or !op.known;
             try operators.append(self.allocator, op);
-            const rhs = if (self.at(.kw_fn) or self.at(.kw_do) or self.at(.kw_if) or self.at(.kw_case)) try self.expression() else try self.prefix();
+            const rhs = if (self.at(.kw_func) or self.at(.kw_do) or self.at(.kw_if) or self.at(.kw_case)) try self.expression() else try self.prefix();
             try operands.append(self.allocator, rhs);
         }
         if (operators.items.len == 0) return head;
@@ -980,6 +995,19 @@ const Parser = struct {
     }
     fn prefix(self: *Parser) Error!Id {
         const t = self.current();
+        if (t.tag == .caret or (t.tag == .symbol and std.mem.eql(u8, self.text(t), "&"))) {
+            _ = self.advance();
+            const operand = try self.postfix();
+            const node = self.tree.node(operand);
+            if (node.tag == .index_access) return self.collectionIntrinsic(if (t.tag == .caret) "@storage.link" else "@storage.at", &.{ node.a, node.b }, t.start);
+            if (t.tag == .caret) return self.fail(.expected_expression);
+            // The range expression has already built a borrowed view.
+            var head = operand;
+            while (self.tree.node(head).tag == .apply) head = self.tree.node(head).a;
+            if (self.tree.node(head).tag == .intrinsic and std.mem.eql(u8, self.pool.get(self.tree.node(head).a), "@storage.view")) return operand;
+            if (node.tag != .name and node.tag != .field_access) return self.fail(.expected_expression);
+            return self.collectionIntrinsic("@storage.ref", &.{operand}, t.start);
+        }
         if (t.tag == .star and self.peek(1) == .l_paren) {
             _ = self.advance();
             const grouped = try self.atom();
@@ -1059,8 +1087,14 @@ const Parser = struct {
             } else if (self.at(.l_bracket) and self.current().start == self.tree.span(value).end) {
                 _ = self.advance();
                 const index = try self.expression();
-                _ = try self.expect(.r_bracket);
-                value = try self.add(.index_access, value, index, 0, start);
+                if (self.eat(.dot_dot)) {
+                    const limit = try self.expression();
+                    _ = try self.expect(.r_bracket);
+                    value = try self.collectionIntrinsic("@storage.view", &.{ value, index, limit }, start);
+                } else {
+                    _ = try self.expect(.r_bracket);
+                    value = try self.add(.index_access, value, index, 0, start);
+                }
             } else break;
         }
         return value;
@@ -1099,6 +1133,10 @@ const Parser = struct {
                 if (self.index != end) return self.fail(.expected_token);
                 _ = try self.expect(.pipe);
                 return self.collectionIntrinsic("@task.receive", &.{receiver}, start);
+            },
+            .kw_true, .kw_false => {
+                _ = self.advance();
+                return self.add(.boolean, @intFromBool(t.tag == .kw_true), 0, 0, start);
             },
             .integer => {
                 _ = self.advance();
@@ -1140,13 +1178,19 @@ const Parser = struct {
             },
             .hash => {
                 _ = self.advance();
+                if (std.mem.eql(u8, self.text(t), "#") and self.word("run") and self.peek(1) != .dot) {
+                    _ = self.advance();
+                    self.tree.has_typed_staging = true;
+                    const value = try self.expression();
+                    return self.collectionIntrinsic("@code.evaluate", &.{value}, start);
+                }
+                if (std.mem.eql(u8, self.text(t), "#") and self.at(.kw_do)) {
+                    self.tree.has_typed_staging = true;
+                    const value = try self.doBlock();
+                    return self.collectionIntrinsic("@code.evaluate", &.{value}, start);
+                }
                 if (self.at(.l_bracket)) return self.collection(false, start);
                 if (self.at(.l_brace)) return self.record(0, start);
-                if (self.at(.kw_true) or self.at(.kw_false)) {
-                    const value: u32 = @intFromBool(self.eat(.kw_true));
-                    if (value == 0) _ = try self.expect(.kw_false);
-                    return self.add(.boolean, value, 0, 0, start);
-                }
                 const name = try self.qualified();
                 if (self.at(.l_brace)) return self.record(name, start);
                 return self.add(.constructor_ref, name, 0, 0, start);
@@ -1580,15 +1624,14 @@ const Parser = struct {
         const t = self.current();
         const start = t.start;
         if (self.eat(.caret)) return self.add(.pattern_value, try self.qualified(), 0, 0, start);
-        if (self.at(.type_identifier) or self.at(.kw_true) or self.at(.kw_false)) return self.identifierSyntax();
+        if (self.at(.kw_true) or self.at(.kw_false)) {
+            _ = self.advance();
+            return self.add(.pattern_boolean, @intFromBool(t.tag == .kw_true), 0, 0, start);
+        }
+        if (self.at(.type_identifier)) return self.identifierSyntax();
         if (self.at(.identifier)) return self.add(.pattern_name, try self.lowerIdentifier(), 0, 0, start);
         if (self.eat(.integer)) return self.integerLiteral(t, .pattern_integer);
         if (self.eat(.hash)) {
-            if (self.at(.kw_true) or self.at(.kw_false)) {
-                const value: u32 = @intFromBool(self.eat(.kw_true));
-                if (value == 0) _ = try self.expect(.kw_false);
-                return self.add(.pattern_boolean, value, 0, 0, start);
-            }
             const name = try self.constructorPatternName();
             const payload = if (self.at(.l_brace)) try self.constructorFields() else if (patternTag(self.current().tag)) try self.pattern() else 0;
             return self.add(.pattern_constructor, name, payload, 0, start);
@@ -1672,25 +1715,25 @@ const Parser = struct {
 };
 fn operatorTag(tag: Tag) bool {
     return switch (tag) {
-        .symbol, .dollar, .star, .caret, .pipe => true,
+        .symbol, .dollar, .star, .caret, .pipe, .kw_and, .kw_or => true,
         else => false,
     };
 }
 fn atomTag(tag: Tag) bool {
     return switch (tag) {
-        .integer, .float, .string, .intrinsic, .identifier, .type_identifier, .selector, .hash, .l_paren, .l_bracket, .l_brace, .colon => true,
+        .integer, .float, .string, .intrinsic, .identifier, .type_identifier, .selector, .hash, .l_paren, .l_bracket, .l_brace, .colon, .kw_true, .kw_false => true,
         else => false,
     };
 }
 fn typeAtomTag(tag: Tag) bool {
     return switch (tag) {
-        .identifier, .type_identifier, .intrinsic, .l_paren, .l_bracket, .l_brace, .tilde => true,
+        .identifier, .type_identifier, .intrinsic, .l_paren, .l_bracket, .l_brace, .tilde, .caret, .symbol => true,
         else => false,
     };
 }
 fn patternTag(tag: Tag) bool {
     return switch (tag) {
-        .identifier, .integer, .hash, .caret, .l_paren, .l_brace => true,
+        .identifier, .integer, .hash, .caret, .l_paren, .l_brace, .kw_true, .kw_false => true,
         else => false,
     };
 }

@@ -21,9 +21,9 @@ const Fixture = struct {
         var dir = std.testing.tmpDir(.{});
         errdefer dir.cleanup();
         if (prelude) {
-            try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:Unit->U32=fn()=>prelude_value 42\n" });
-            try dir.dir.writeFile(io, .{ .sub_path = "prelude.blot", .data = "import {identity} from \"./bootstrap\"\nconst prelude_value=fn value=>identity value\n" });
-            try dir.dir.writeFile(io, .{ .sub_path = "bootstrap.blot", .data = "const identity=fn value=>value\n" });
+            try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:Unit->U32=func()=> return prelude_value 42\n" });
+            try dir.dir.writeFile(io, .{ .sub_path = "prelude.blot", .data = "import {identity} from \"./bootstrap\"\nconst prelude_value=func value=> return identity value\n" });
+            try dir.dir.writeFile(io, .{ .sub_path = "bootstrap.blot", .data = "const identity=func value=> return value\n" });
         } else {
             inline for (.{ "main", "left", "right", "shared" }) |name| try dir.dir.writeFile(io, .{ .sub_path = name ++ ".blot", .data = @import("fixtures").source("closure-fixtures/" ++ name ++ ".blot") });
         }

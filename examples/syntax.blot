@@ -8,72 +8,72 @@ type Vec2 is data = #Vec2 { x: F32, y: F32 }
 type Mode is data = #Running | #Paused
 type Event is data = #Tick U32 | #SetMode Mode | #Reset
 
-const add = fn left => fn right => U32.add left right
-const dot = fn left => fn right => do:
+const add = func left => return func right => return U32.add left right
+const dot = func left => return func right => return do:
   let #Vec2 { x: lx, y: ly } = left
   let #Vec2 { x: rx, y: ry } = right
   break lx * rx + ly * ry
 
-const Vec2.scaled = fn value => fn factor => do:
+const Vec2.scaled = func value => return func factor => return do:
   let #Vec2 { x, y } = value
   break #Vec2 { x: x * factor, y: y * factor }
 
 // Demand parameters defer an expression and share its first result.
-const and_then = fn left => fn ~right =>
-  if left then @demand right else #False
+const and_then = func left => return func ~right => return
+  if left then @demand right else false
 
-const unwrap_or_else = fn candidate => fn ~fallback => case candidate of
+const unwrap_or_else = func candidate => return func ~fallback => return case candidate of
   #Some value => value
   #Nothing => @demand fallback
 
-entry const short_circuit = fn () => do:
+entry const short_circuit = func () => return do:
   let empty: Array U32 = #[]
-  break and_then #False (empty[0] > 0)
+  break and_then false (empty[0] > 0)
 
-entry const lazy_fallback = fn () => do:
+entry const lazy_fallback = func () => return do:
   let empty: Array U32 = #[]
   break unwrap_or_else (#Some 42) empty[0]
 
-entry const factorial = fn value => do:
+entry const factorial = func value => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
 
-const choose = fn first => fn enabled => fn fallback => case first, enabled, fallback of
-  #Some value, #True, _ => value
+const choose = func first => return func enabled => return func fallback => return case first, enabled, fallback of
+  #Some value, true, _ => value
   _, _, #Some value => value
   _, _, _ => 0
 
-const double_or_zero = fn candidate => do:
+const double_or_zero = func candidate => return do:
   let #Some value = candidate else:
     break 0
   break value * 2
 
-const react = fn event => fn ticks => case event of
+const react = func event => return func ticks => return case event of
   #Tick count => ticks + count
   #SetMode #Running => ticks
   #SetMode #Paused => ticks
   #Reset => 0
 
 entry const operator_example = 1 `add` 2 * 3
-entry const recursive_example = fn (value: U32) => factorial value
-entry const matching_example = fn () => choose #Nothing #False (#Some (double_or_zero (#Some 21)))
-entry const event_example = fn () => react (#Tick 2) 40
+entry const recursive_example = func (value: U32) => return factorial value
+entry const matching_example = func () => return choose #Nothing false (#Some (double_or_zero (#Some 21)))
+entry const event_example = func () => return react (#Tick 2) 40
 
-entry const vector_example = fn () => do:
+entry const vector_example = func () => return do:
   let position = #Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
   break position >< scaled
 
-entry const array_snapshot = fn () => do:
+entry const array_snapshot = func () => return do:
   let original = #[1, 2, 3]
   let next = original
   next[1] := 20
   break original[1] + next[1]
 
 type Counter a is effect = { advance: a -> a }
-const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)
+const local_counter = @effect.provider (Counter.advance U32) (func value => return value + 1)
 
-entry const provider_example = fn () => do local_counter:
+entry const provider_example = func () => return do local_counter:
   use next <- Counter.advance U32 41
   break next

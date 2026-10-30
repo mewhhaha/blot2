@@ -133,7 +133,24 @@ pub const Copier = struct {
                     mapped = try self.destination.freshEffects();
                     try self.row_variables.put(self.allocator, index, mapped.?);
                 }
-                break :blk self.destination.effects.node(mapped orelse return error.TypeLimit).tail;
+                const replacement = self.destination.effects.node(mapped orelse return error.TypeLimit);
+                // A row substitution carries its destination operation labels
+                // as well as its tail. Copying only the tail erased a closed
+                // Foreign substitution into the empty row. These labels are
+                // already interned in the destination; do not relocate them.
+                for (self.destination.effects.list(replacement.labels)) |label| {
+                    if (self.associated) try self.destination.chargeProjection();
+                    var present = false;
+                    for (labels.items) |existing| {
+                        if (self.associated) try self.destination.chargeProjection();
+                        if (existing == label) {
+                            present = true;
+                            break;
+                        }
+                    }
+                    if (!present) try labels.append(self.allocator, label);
+                }
+                break :blk replacement.tail;
             },
         };
         const result = self.destination.effects.row(labels.items, tail) catch |err| return T.effectError(err);

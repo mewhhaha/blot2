@@ -1,11 +1,11 @@
 // Executable: the host supplies advance; declaring an effect grants no IO.
 type Counter a is effect = { advance: a -> a }
 
-const tick = fn value => do:
+const tick = func value => return do:
   use next <- Counter.advance U32 value
   break next
 
-entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider (Counter.advance U32) advance):
+entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do (@effect.provider (Counter.advance U32) advance):
   use next <- tick 41
   break next
 
@@ -13,7 +13,7 @@ entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider 
 entry const uses_host = @effect.has (@effect.of main) Foreign
 
 // Tests can handle the same source effect without any host authority.
-const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)
-entry const mocked = fn () => do local_counter:
+const local_counter = @effect.provider (Counter.advance U32) (func value => return value + 1)
+entry const mocked = func () => return do local_counter:
   use next <- tick 41
   break next

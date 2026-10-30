@@ -1,7 +1,7 @@
 # Multi-parameter and named-call qualification
 
-Issue #22 permits `fn a b => body` as source shorthand for
-`fn a => fn b => body`. The final result annotation belongs to the last
+Issue #22 permits `func a -> b => return body` as source shorthand for
+`func a => return func b => return body`. The final result annotation belongs to the last
 stage. Calls remain left-associative, so partial application and higher-order
 use have exactly the same lowering as the explicit form. A record parameter
 provides named fields at a call site; the field names belong to its public

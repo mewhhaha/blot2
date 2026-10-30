@@ -66,7 +66,7 @@ noncommutative groups. Cached tree/query combinations follow contiguous source
 interval order.
 
 U32 addition modulo 2^32 qualifies with identity 0 and inverse
-`fn value => @u32.sub 0 value`; overflow retains wrapping behavior. F32
+`func value => return @u32.sub 0 value`; overflow retains wrapping behavior. F32
 addition/multiplication do not satisfy this associativity contract, including
 ordinary finite values, NaNs, infinities and signed zero. Use `rolling.fold`
 with explicit F32 operations for a sequential reduction. No fast path may infer

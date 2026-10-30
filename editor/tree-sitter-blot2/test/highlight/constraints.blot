@@ -1,9 +1,9 @@
-const where = fn where => where
+const where = func where => return where
 
-const twice: a -> a where { associated "add" a a a } = fn value => value + value
+const twice: a -> a where { associated "add" a a a } = func value => return value + value
 //                    ^ keyword.control
 
 const read: a -> b ! {Reader.ask | e} where {
   field "first" a b,
   effect_rep ! {| e},
-} = fn value => value.first
+} = func value => return value.first

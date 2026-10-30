@@ -6,10 +6,10 @@ const check = @import("check.zig");
 const ast = @import("../parse/ast.zig");
 const a = std.testing.allocator;
 const source =
-    \\entry const run = fn () => do:
+    \\entry const run = func () => return do:
     \\  let total = 0
     \\  for index in 0..3:
-    \\    if #True:
+    \\    if true:
     \\      total := @u32.add self 1
     \\      let total = 99
     \\      use total
@@ -61,10 +61,10 @@ test "loop normal successors and break lexical snapshots retain distinct binding
 }
 test "loop breaks isolate lambdas and named use remains monomorphic" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
-        .{ .source = "const bad = fn () => do:\n  break\n", .code = .break_scope },
-        .{ .source = "const bad = fn () => do:\n  for ever:\n    let nested = fn () => do:\n      break\n    break\n", .code = .break_scope },
-        .{ .source = "const identity = fn value => value\nconst bad = fn () => do:\n  use once <- identity\n  use once 1\n  break once 1.0\n", .code = .type_mismatch },
-        .{ .source = "const bad = fn () => do:\n  for ever:\n    break\n    use ()\n", .code = .unreachable_statement },
+        .{ .source = "const bad = func () => return do:\n  break\n", .code = .break_scope },
+        .{ .source = "const bad = func () => return do:\n  for ever:\n    let nested = func () => return do:\n      break\n    break\n", .code = .break_scope },
+        .{ .source = "const identity = func value => return value\nconst bad = func () => return do:\n  use once <- identity\n  use once 1\n  break once 1.0\n", .code = .type_mismatch },
+        .{ .source = "const bad = func () => return do:\n  for ever:\n    break\n    use ()\n", .code = .unreachable_statement },
     };
     for (cases) |case| {
         var fixture = try Fixture.init(case.source);

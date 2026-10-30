@@ -1,6 +1,7 @@
 "!" @operator
 "#" @operator
 "$" @operator
+"&" @operator
 "(" @punctuation.bracket
 ")" @punctuation.bracket
 "*" @operator
@@ -26,8 +27,6 @@
 "·" @operator
 (binding_else "else" @keyword)
 (binding "let" @keyword)
-(boolean_constructor_pattern value: "False" @keyword)
-(boolean_constructor_pattern value: "True" @keyword)
 (case_arm "if" @keyword)
 (case_expression "case" @keyword)
 (case_expression "of" @keyword)
@@ -36,11 +35,12 @@
 (collection_if "else" @keyword)
 (collection_if "if" @keyword)
 (collection_if "then" @keyword)
-(collection_lambda "fn" @keyword)
+(collection_infix_tail operator: "and" @keyword)
+(collection_infix_tail operator: "or" @keyword)
+(collection_lambda "func" @keyword)
+(collection_lambda "return" @keyword)
 (comprehension_binding "let" @keyword)
 (conditional "if" @keyword)
-(constructor_reference value: "False" @keyword)
-(constructor_reference value: "True" @keyword)
 (contract_type_member "type" @keyword)
 (contract_type "is" @keyword)
 (contract_type "type" @keyword)
@@ -76,7 +76,10 @@
 (import_binding alias: "as" @keyword)
 (import_declaration "froM" @keyword)
 (import_declaration "import" @keyword)
-(lambda "fn" @keyword)
+(infix_tail operator: "and" @keyword)
+(infix_tail operator: "or" @keyword)
+(lambda "func" @keyword)
+(lambda "return" @keyword)
 (named_fixity associativity: "infix" @keyword)
 (named_fixity associativity: "infixl" @keyword)
 (named_fixity associativity: "infixr" @keyword)
@@ -127,10 +130,12 @@
 (source_identifier "pack" @keyword)
 (source_identifier "region" @keyword)
 (source_identifier "row" @keyword)
+(source_identifier "run" @keyword)
 (source_identifier "shared" @keyword)
 (source_identifier "unique" @keyword)
 (source_identifier "unpack" @keyword)
 (source_identifier "where" @keyword)
+(static_run "run" @keyword)
 (symbolic_fixity associativity: "infix" @keyword)
 (symbolic_fixity associativity: "infixl" @keyword)
 (symbolic_fixity associativity: "infixr" @keyword)
@@ -164,6 +169,7 @@
 (type_application) @type
 (demand_type) @type
 (type_atom) @type
+(storage_type) @type
 (code_type) @type
 (descriptor_type) @type
 (proof_type) @type
@@ -171,11 +177,12 @@
 (type_binder) @type
 (type_group) @type
 (member_access) @variable.other.member
+(boolean) @constant.builtin
 (type_witness) @type
 (record) @type
 (record_values) @type
 (record_value) @type
-(boolean_constructor_pattern) @constant.builtin
+(boolean_pattern) @constant.builtin
 (record_pattern) @type
 (record_pattern_field) @variable.other.member
 (quantified_type) @type

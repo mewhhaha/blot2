@@ -60,7 +60,7 @@ Explanations change no selection, no selection order and no reported diagnostic.
   allocation-failure sweep covers checker and backend explanations; a mutant
   that lists an identical right owner fails the law.
 - [A process law](tests/dispatch_explanation.test.ts) checks `1 + 2.5` and
-  `#True + #False` through the CLI with the standard prelude; a project server
+  `true + false` through the CLI with the standard prelude; a project server
   session that fails on an imported type without `add`, explains a selected
   member's result conflict, and recovers to the original Wasm; and a type from a
   compiled dependency bundle.

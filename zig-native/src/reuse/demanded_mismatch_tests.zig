@@ -9,7 +9,7 @@ const core = @import("../check/core.zig");
 const backend = @import("../backend/core_backend.zig");
 const format = @import("dependency_format.zig");
 const a = std.testing.allocator;
-const input = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.read\nentry const answer: Unit -> U32 = fn () => (#Box 1).read ()\n";
+const input = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer: Unit -> U32 = func () => return (#Box 1).read ()\n";
 const native_message = "cannot unify (Unit -> U32 ! {| ?e2}) with U32";
 
 const Observation = struct {
@@ -89,16 +89,16 @@ fn compileScenario(allocator: std.mem.Allocator, source: []const u8, point: u32)
     try std.testing.expectEqualSlices(u8, result.owned_message, result.diagnostic.?.detail);
 }
 test "demanded nested member mismatch preserves body origin and owned detail after Core destruction under every allocation failure" {
-    try compileScenario(a, input, 110);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compileScenario, .{ input, @as(u32, 110) });
+    try compileScenario(a, input, 128);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compileScenario, .{ input, @as(u32, 128) });
 }
 test "member token origin survives independent prefix text and whitespace without eager checking unused bodies" {
     const prefix = "// unrelated offset\nconst unrelated = 99\n";
     const shifted = prefix ++ input;
-    try compileScenario(a, shifted, prefix.len + 110);
-    const spaced = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.  read\nentry const answer: Unit -> U32 = fn () => (#Box 1).read ()\n";
-    try compileScenario(a, spaced, 112);
-    const unused = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.read\nentry const answer = 42\n";
+    try compileScenario(a, shifted, prefix.len + 128);
+    const spaced = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.  read\nentry const answer: Unit -> U32 = func () => return (#Box 1).read ()\n";
+    try compileScenario(a, spaced, 130);
+    const unused = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer = 42\n";
     var module = try lower(a, unused);
     defer module.deinit(a);
     var result = try backend.compile(a, &.{module}, 1);
@@ -107,16 +107,16 @@ test "member token origin survives independent prefix text and whitespace withou
     try std.testing.expect(result.bytes.len > 8);
 }
 test "a demanded body mismatch follows caller order and does not replace a prior owned diagnostic" {
-    const definitions = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.read\n" ++
-        "type Other is data = #Other U32\nconst Other.read: Other -> (Unit -> F32) where {} = fn (value: Other) => fn () => value.read\n";
-    const first_box = definitions ++ "entry const first: Unit -> U32 = fn () => (#Box 1).read ()\nentry const second: Unit -> F32 = fn () => (#Other 1).read ()\n";
-    const first_other = definitions ++ "entry const second: Unit -> F32 = fn () => (#Other 1).read ()\nentry const first: Unit -> U32 = fn () => (#Box 1).read ()\n";
+    const definitions = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\n" ++
+        "type Other is data = #Other U32\nconst Other.read: Other -> (Unit -> F32) where {} = func (value: Other) => return func () => return value.read\n";
+    const first_box = definitions ++ "entry const first: Unit -> U32 = func () => return (#Box 1).read ()\nentry const second: Unit -> F32 = func () => return (#Other 1).read ()\n";
+    const first_other = definitions ++ "entry const second: Unit -> F32 = func () => return (#Other 1).read ()\nentry const first: Unit -> U32 = func () => return (#Box 1).read ()\n";
     for ([_][]const u8{ first_box, first_other }, 0..) |source, index| {
         var module = try lower(a, source);
         defer module.deinit(a);
         var result = try backend.compile(a, &.{module}, 1);
         defer result.deinit(a);
-        try std.testing.expectEqual(@as(u32, if (index == 0) 110 else 235), result.diagnostic.?.span.start);
+        try std.testing.expectEqual(@as(u32, if (index == 0) 128 else 271), result.diagnostic.?.span.start);
         try std.testing.expectEqualStrings(if (index == 0) native_message else "cannot unify (Unit -> F32 ! {| ?e2}) with F32", result.diagnostic.?.message());
     }
     var module = try lower(a, input);
@@ -142,12 +142,12 @@ fn portableScenario(allocator: std.mem.Allocator) !void {
         break :owned try format.decode(core.Module, allocator, bytes, key);
     };
     defer format.deinit(allocator, &decoded);
-    try std.testing.expectEqual(@as(u32, 110), decoded.projections[0].diagnostic_point);
+    try std.testing.expectEqual(@as(u32, 128), decoded.projections[0].diagnostic_point);
     try @import("../check/frozen_core_validation.zig").validate(allocator, &decoded, .{ .source_length = input.len });
     const before = @import("../check/core_snapshot_tests.zig").stamp(decoded);
     var result = try backend.compile(allocator, &.{decoded}, 1);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u32, 110), result.diagnostic.?.span.start);
+    try std.testing.expectEqual(@as(u32, 128), result.diagnostic.?.span.start);
     try std.testing.expectEqualStrings(native_message, result.diagnostic.?.message());
     decoded.projections[0].diagnostic_point = input.len + 1;
     try std.testing.expect(!std.mem.eql(u8, &before, &@import("../check/core_snapshot_tests.zig").stamp(decoded)));

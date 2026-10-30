@@ -9,27 +9,27 @@ data Wrapped = #Wrapped { value:(U32,F32) }
 data Action = #Action { action:U32 -> F32 }
 const box = #Box
 const pair = #Pair
-const unbox = fn value => case value of
+const unbox = func value => return case value of
   #Box payload => payload
-const total = fn value => case value of
+const total = func value => return case value of
   #Pair (x,y) => @f32.add (@u32.to_f32 x) y
-const invoke = fn constructor => fn value => unbox (constructor value)
+const invoke = func constructor => return func value => return unbox (constructor value)
 const ready = invoke #Box
-const retain = fn () => do:
+const retain = func () => return do:
   let constructor = #Box
-  break fn value => unbox (constructor value)
-entry const unsigned = fn (value:U32) => ready value
-entry const floating = fn (value:F32) => unbox (box value)
-entry const captured = fn (value:F32) => (retain ()) value
-entry const local = fn (value:F32) => do:
+  break func value => return unbox (constructor value)
+entry const unsigned = func (value:U32) => return ready value
+entry const floating = func (value:F32) => return unbox (box value)
+entry const captured = func (value:F32) => return (retain ()) value
+entry const local = func (value:F32) => return do:
   let constructor = #Box
   break unbox (constructor value)
-entry const mixed = fn (value:U32) => total (pair (value,2.5))
-entry const wrapped = fn (value:F32) => case #Wrapped (40,value) of
+entry const mixed = func (value:U32) => return total (pair (value,2.5))
+entry const wrapped = func (value:F32) => return case #Wrapped (40,value) of
   #Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-entry const function_field = fn (value:U32) => case #Action (fn item=>@u32.to_f32 item) of
+entry const function_field = func (value:U32) => return case #Action (func item=> return @u32.to_f32 item) of
   #Action action => action value
-entry const old_version = fn (value:U32) => do:
+entry const old_version = func (value:U32) => return do:
   let original = (value,2.5)
   let selected = pair original
   selected.x := 99
@@ -58,20 +58,20 @@ data Pair = #Pair { x:U32,y:F32 }
 data Callback = #Callback { action:Unit -> F32 ! {Foreign} }
 const pair = #Pair
 const callback = #Callback
-const total = fn value => case value of
+const total = func value => return case value of
   #Pair (x,y) => @f32.add (@u32.to_f32 x) y
-const first = fn host => do:
+const first = func host => return do:
   use host 0
   break 40
-const second = fn host => do:
+const second = func host => return do:
   use host 1
   break 2.5
-entry const ordered = fn (host:U32 -> U32 ! {Foreign}) => do:
+entry const ordered = func (host:U32 -> U32 ! {Foreign}) => return do:
   use selected <- pair (first host,second host)
   break total selected
-entry const boxed = fn (host:Unit -> F32 ! {Foreign}) => case callback host of
+entry const boxed = func (host:Unit -> F32 ! {Foreign}) => return case callback host of
   #Callback action => action ()
-entry const pure = fn () => 7
+entry const pure = func () => return 7
 `;
 Deno.test("callable record constructor arguments run once in source order and retain selected callback rows",async()=>{
  for(const asynchronous of [false,true])await compileAndRun(orderedSource,async guest=>{
@@ -98,25 +98,25 @@ Deno.test("callable record constructors reject incompatible argument shapes and 
  for(const [source,code]of[
   ["data Pair=#Pair {x:U32,y:F32}\nentry const answer=#Pair 42\n","type_mismatch"],
   ["data Box=#Box {value:F32}\nentry const answer=#Box 42\n","type_mismatch"],
-  ["type Read is effect={read:Unit -> U32}\ndata Box=#Box {action:Unit -> U32}\nentry const answer=#Box (fn()=>Read.read ())\n","effect_mismatch"],
+  ["type Read is effect={read:Unit -> U32}\ndata Box=#Box {action:Unit -> U32}\nentry const answer=#Box (func()=> return Read.read ())\n","effect_mismatch"],
  ]as const)await compileExpectedFailure(source,code);
 });
 
 export const stateSource = `
 data Cell a = #Cell { value:a }
 const cell = #Cell
-const unsigned_witness = fn () -> Cell U32 => @panic "type witness executed"
-const floating_witness = fn () -> Cell F32 => @panic "type witness executed"
-entry const unsigned_state = fn (value:U32) => do:
-  let (#Cell final,selected) = @state.run (cell value) (fn () => do:
+const unsigned_witness = func () : Cell U32 => return @panic "type witness executed"
+const floating_witness = func () : Cell F32 => return @panic "type witness executed"
+entry const unsigned_state = func (value:U32) => return do:
+  let (#Cell final,selected) = @state.run (cell value) (func () => return do:
     use @state.set (cell (@u32.add value 1))
     use box <- @state.get unsigned_witness
     let #Cell result = box
     break result
   )
   break @u32.add final selected
-entry const floating_state = fn (value:F32) => do:
-  let (#Cell final,selected) = @state.run (cell value) (fn () => do:
+entry const floating_state = func (value:F32) => return do:
+  let (#Cell final,selected) = @state.run (cell value) (func () => return do:
     use @state.set (cell (@f32.add value 1.0))
     use box <- @state.get floating_witness
     let #Cell result = box

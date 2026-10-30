@@ -25,7 +25,7 @@ def seeded(original: str, depth: int) -> str:
     )
     seeded = seeded.replace(
         "  stacks: #[],",
-        """  stacks: array.generate 151 (fn (index: U32) => #salt.Stack {
+        """  stacks: array.generate 151 (func (index: U32) => return #salt.Stack {
     x: 12.0 + U32.to_f32 (index % 13) * 1.5,
     z: -9.0 + U32.to_f32 (index / 13) * 1.5,
     count: DEPTH, turn: 0.0, lift: 0.0, fall: 0.0, jolt: 0.0,

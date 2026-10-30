@@ -7,7 +7,7 @@
   replay, with verified pre-fix failure controls on 19 October 2026.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
-  2026 (`effect_mismatch` on `fn () => ecs.checkpoint engine` with a generic
+  2026 (`effect_mismatch` on `func () => return ecs.checkpoint engine` with a generic
   `engine`); owner asked for it to be finished on 17 October 2026.
 - **Execution:** Follow the
   [task order and completion rules](README.md#completion-rules).
@@ -21,7 +21,7 @@ compiles when the checked type widened that callback's row.
 
 The evaluator rebuilt a captured static value's type from its fields in
 `ClosureRegion.addAggregate` (`zig-native/src/eval/core_eval.zig`, nominal arm).
-A stored `fn () => ()` has an exact closed pure row, which fixed the invariant
+A stored `func () => return ()` has an exact closed pure row, which fixed the invariant
 nominal argument before the capture was unified with the checker's declared
 type, whose row lists six State operations. `openCovariant` does not descend
 into nominal arguments by design, so `captureShape` failed with

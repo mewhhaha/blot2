@@ -5,11 +5,11 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
-entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
+entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use initial <- host 0
   let seed = initial[0]
   let count = initial[1]
-  let worker = fn (value: U32) => do:
+  let worker = func (value: U32) => return do:
     use reply <- host (value + 1)
     let local = #[value, value + 1]
     let pressure = @array.fill 8192 value
@@ -21,10 +21,10 @@ entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
     use produced <- worker index
     sum := self + produced
   break sum
-entry const floating = fn (host: F32 -> Array F32 ! {Foreign}) => do:
+entry const floating = func (host: F32 -> Array F32 ! {Foreign}) => return do:
   use initial <- host 0.0
   let seed = initial[0]
-  let worker = fn (value: F32) => do:
+  let worker = func (value: F32) => return do:
     use reply <- host value
     let local = #[value]
     if value == 0.0:

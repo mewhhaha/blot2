@@ -10,7 +10,7 @@ function primitiveSpine(value: string) {
   return value;
 }
 function genericSpine(value: string) {
-  for (let step = 0; step < 12; step++) value = `(fn item => item) (${value})`;
+  for (let step = 0; step < 12; step++) value = `(func item => return item) (${value})`;
   return value;
 }
 
@@ -19,16 +19,16 @@ Deno.test("body checker reuse relocates and follows executable edits through rej
   const entry = `${directory}/main.blot`;
   const source = (seed: string, prefix = "", helper = "@u32.add value seed") =>
     `${prefix}const seed = ${seed}
-const helper = fn (value: U32) -> U32 => ${
+const helper = func (value: U32) : U32 => return ${
       helper.replaceAll("value", `(${primitiveSpine("value")})`)
     }
-entry const answer = fn (argument: U32) -> U32 => helper argument
-entry const captured = fn (outer: U32) -> U32 => (fn (inner: U32) -> U32 => @u32.add outer inner) seed
-entry const pair = fn (value: U32) => #[value, seed]
+entry const answer = func (argument: U32) : U32 => return helper argument
+entry const captured = func (outer: U32) : U32 => return (func (inner: U32) : U32 => return @u32.add outer inner) seed
+entry const pair = func (value: U32) => return #[value, seed]
 const unrelated = 7
 `;
   const inserted =
-    "const fresh_spelling = fn (earlier: F32) -> F32 => @f32.add earlier 4.0\n";
+    "const fresh_spelling = func (earlier: F32) : F32 => return @f32.add earlier 4.0\n";
   const revisions = [
     [source("2"), 42],
     [source("@u32.add 2 1", inserted), 43],
@@ -97,9 +97,9 @@ Deno.test("body checker reuse tracks original imported producer names at stable 
   const producer = `${directory}/dep.blot`;
   const source = (name: string, constant: number) => ({
     [producer]:
-      `const ${name} = fn (x: U32) -> U32 => @u32.add x ${constant}\n`,
+      `const ${name} = func (x: U32) : U32 => return @u32.add x ${constant}\n`,
     [entry]:
-      `import {${name} as exposed} from "./dep"\nentry const run = fn (x: U32) -> U32 => exposed x\nconst untouched = 7\n`,
+      `import {${name} as exposed} from "./dep"\nentry const run = func (x: U32) : U32 => return exposed x\nconst untouched = 7\n`,
   });
   const retained = await createZigProjectCompiler({
     executable,
@@ -146,23 +146,23 @@ Deno.test("body checker reuse relocates generic binders and updates specialized 
   const directory = await Deno.makeTempDir({ prefix: "blot-body-binders-" });
   const entry = `${directory}/main.blot`;
   const source = (identity: string, prefix = "") =>
-    `${prefix}const identity = fn outer => (${identity}) (${
+    `${prefix}const identity = func outer => return (${identity}) (${
       genericSpine("outer")
     })
-const box = fn x => #[${genericSpine("x")}]
-entry const scalar = fn (x: U32) -> U32 => identity x
-entry const floating = fn (x: F32) -> F32 => identity x
-entry const reference = fn (x: U32) => box (identity x)
+const box = func x => return #[${genericSpine("x")}]
+entry const scalar = func (x: U32) : U32 => return identity x
+entry const floating = func (x: F32) : F32 => return identity x
+entry const reference = func (x: U32) => return box (identity x)
 `;
   const revisions = [
-    source("fn x => x"),
+    source("func x => return x"),
     source(
-      "fn x => x",
-      "const new_type_and_spelling = fn (x: Bool) -> Bool => x\n",
+      "func x => return x",
+      "const new_type_and_spelling = func (x: Bool) : Bool => return x\n",
     ),
-    source("fn x => (fn inner => inner) x"),
-    source("fn x => missing_name"),
-    source("fn x => x"),
+    source("func x => return (func inner => return inner) x"),
+    source("func x => return missing_name"),
+    source("func x => return x"),
   ];
   const retained = await createZigProjectCompiler({
     executable,
@@ -213,10 +213,10 @@ entry const reference = fn (x: U32) => box (identity x)
 Deno.test("body checker reuse preserves symbolic Foreign callback effects after binder relocation", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-body-effects-" });
   const entry = `${directory}/main.blot`;
-  const body = `const apply = fn callback => fn argument => callback (${
+  const body = `const apply = func callback => return func argument => return callback (${
     genericSpine("argument")
   })
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => apply host 42
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return apply host 42
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -227,7 +227,7 @@ entry const run = fn (host: U32 -> U32 ! {Foreign}) => apply host 42
     for (
       const [index, text] of [
         body,
-        `const earlier_spelling = fn (x: F32) -> F32 => @f32.add x 2.0\n${body}`,
+        `const earlier_spelling = func (x: F32) : F32 => return @f32.add x 2.0\n${body}`,
       ].entries()
     ) {
       const fresh = await createZigProjectCompiler({
@@ -278,13 +278,13 @@ Deno.test("body checker reuse relocates opaque receipts through source and compi
   const producer = `${directory}/tokens.blot`;
   const bundle = `${directory}/tokens.blotdep`;
   const library = `opaque type Token = U32
-const make = fn (value: U32) => #Token value
-const read = fn (#Token value) => value
+const make = func (value: U32) => return #Token value
+const read = func (#Token value) => return value
 `;
   const source = (seed: number, prefix = "") =>
     `import {Token, make, read} from "./tokens"
 ${prefix}const seed = ${seed}
-entry const run = fn (value: U32) => @u32.add (read (make (${
+entry const run = func (value: U32) => return @u32.add (read (make (${
       primitiveSpine("value")
     }))) seed
 `;
@@ -310,7 +310,7 @@ entry const run = fn (value: U32) => @u32.add (read (make (${
             source(2),
             source(
               3,
-              "const earlier_spelling = fn (x: Bool) -> Bool => x\n",
+              "const earlier_spelling = func (x: Bool) : Bool => return x\n",
             ),
             source(4),
           ].entries()
@@ -338,8 +338,8 @@ entry const run = fn (value: U32) => @u32.add (read (make (${
           }
         }
         const referenceLibrary = `opaque type Token = Array U32
-const make = fn (value: U32) => #Token #[value]
-const read = fn (#Token value) => @array.get value 0
+const make = func (value: U32) => return #Token #[value]
+const read = func (#Token value) => return @array.get value 0
 `;
         await Deno.writeTextFile(producer, referenceLibrary);
         if (dependencies !== undefined) {
@@ -400,21 +400,21 @@ Deno.test("body checker reuse relocates generic opaque scalar and owning referen
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", helper = "make") =>
     `${prefix}opaque type Box a = a
-const make = fn value => #Box value
-const read = fn (#Box value) => value
-const identity = fn (value: Box a) -> Box a => ${genericSpine("value")}
+const make = func value => return #Box value
+const read = func (#Box value) => return value
+const identity = func (value: Box a) : Box a => return ${genericSpine("value")}
 type Pair [left, right] = (left, right)
-const shaped = fn (value: Pair [U32, F32]) -> U32 => ${genericSpine("40")}
-const arrayed = fn (value: Array a) -> Array a => ${genericSpine("value")}
-entry const pair = fn (value: U32) => shaped (value, 2.0)
-entry const array_value = fn (value: U32) => arrayed #[value]
-entry const unsigned = fn (value: U32) => read (identity (${helper} (${
+const shaped = func (value: Pair [U32, F32]) : U32 => return ${genericSpine("40")}
+const arrayed = func (value: Array a) : Array a => return ${genericSpine("value")}
+entry const pair = func (value: U32) => return shaped (value, 2.0)
+entry const array_value = func (value: U32) => return arrayed #[value]
+entry const unsigned = func (value: U32) => return read (identity (${helper} (${
       primitiveSpine("value")
     })))
-entry const floating = fn (value: F32) => read (identity (${helper} (${
+entry const floating = func (value: F32) => return read (identity (${helper} (${
       genericSpine("value")
     })))
-entry const reference = fn (value: U32) => read (identity (${helper} #[${
+entry const reference = func (value: U32) => return read (identity (${helper} #[${
       primitiveSpine("value")
     }]))
 `;
@@ -486,21 +486,21 @@ Deno.test("body checker reuse reconstructs shared predicates and revokes selecte
     let annotation = "";
     if (annotated) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `${prefix}type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} (${
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} (${
       primitiveSpine("left")
     }) right)
-const add = fn left => fn right => @type.call "add" (${
+const add = func left => return func right => return @type.call "add" (${
       genericSpine("left")
     }) right
-const forwarded = fn left => fn right => add (${genericSpine("left")}) right
-const alias = fn left => fn right => forwarded (${genericSpine("left")}) right
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (alias (make (${
+const forwarded = func left => return func right => return add (${genericSpine("left")}) right
+const alias = func left => return func right => return forwarded (${genericSpine("left")}) right
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (alias (make (${
       primitiveSpine("value")
     })) (make 2))
-entry const strict = fn (value: U32) => require_pure run
+entry const strict = func (value: U32) => return require_pure run
 `;
   };
   const retained = await createZigProjectCompiler({
@@ -569,12 +569,12 @@ Deno.test("body checker reuse relocates shaped records with owning payloads and 
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", read = "read") =>
     `${prefix}opaque type Entry { head, tail } = { head: head, tail: tail }
-const make = fn value => #Entry value
-const read = fn (#Entry { tail }) => tail
-entry const unsigned = fn (value: U32) => ${read} (make { head: value, tail: #[${
+const make = func value => return #Entry value
+const read = func (#Entry { tail }) => return tail
+entry const unsigned = func (value: U32) => return ${read} (make { head: value, tail: #[${
       primitiveSpine("value")
     }] })
-entry const floating = fn (value: F32) => ${read} (make { head: value, tail: #[${
+entry const floating = func (value: F32) => return ${read} (make { head: value, tail: #[${
       genericSpine("value")
     }] })
 `;
@@ -645,18 +645,18 @@ Deno.test("body checker reuse relocates shared producer schemes through source a
   const bundle = `${directory}/numbers.blotdep`;
   const library = (operation = "@u32.add") =>
     `type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const add = fn left => fn right => @type.call "add" left right
-const forwarded = fn left => fn right => add left right
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const add = func left => return func right => return @type.call "add" left right
+const forwarded = func left => return func right => return add left right
 `;
   const source = (prefix = "", target = "forwarded") =>
     `import {Number, make, read, forwarded} from "./numbers"
-${prefix}const wrapper = fn left => fn right => ${target} (${
+${prefix}const wrapper = func left => return func right => return ${target} (${
       genericSpine("left")
     }) right
-entry const run = fn (value: U32) => read (wrapper (make value) (make 2))
+entry const run = func (value: U32) => return read (wrapper (make value) (make 2))
 `;
   async function pack() {
     const result = await new Deno.Command(executable, {
@@ -674,7 +674,7 @@ entry const run = fn (value: U32) => read (wrapper (make value) (make 2))
       const options = { executable, entry, prelude: null, dependencies };
       const retained = await createZigProjectCompiler(options);
       try {
-        const prefix = "const earlier_spelling = fn (x: F32) => x\n";
+        const prefix = "const earlier_spelling = func (x: F32) => return x\n";
         for (
           const [index, text] of [
             source(),
@@ -750,21 +750,21 @@ Deno.test("body checker reuse recreates declared qualifications with current evi
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `${prefix}type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const twice: a -> a where { ${clause} } = fn value => @type.call "add" (${
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const twice: a -> a where { ${clause} } = func value => return @type.call "add" (${
       genericSpine("value")
     }) value
-const identity: a -> a where { type_rep a } = fn value => ${
+const identity: a -> a where { type_rep a } = func value => return ${
       genericSpine("value")
     }
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (identity (twice (make value)))
-entry const strict = fn () => require_pure run
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (identity (twice (make value)))
+entry const strict = func () => return require_pure run
 `;
   };
-  const prefix = "const new_spelling = fn (x: F32) => x\n";
+  const prefix = "const new_spelling = func (x: F32) => return x\n";
   const cases = [
     [source(), 80],
     [source(prefix), 80],
@@ -831,19 +831,19 @@ Deno.test("body checker reuse preserves portable qualified producer origins afte
     operation = "@u32.add",
     clause = 'associated "add" a a a',
   ) =>
-    `const earlier = fn value => ${earlier}
+    `const earlier = func value => return ${earlier}
 type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const twice: a -> a where { ${clause} } = fn value => @type.call "add" value value
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const twice: a -> a where { ${clause} } = func value => return @type.call "add" value value
 `;
   const source = (prefix = "", target = "twice") =>
     `import {Number, make, read, twice} from "./numbers"
-${prefix}const wrapper: a -> a where {associated "add" a a a} = fn value => ${target} (${
+${prefix}const wrapper: a -> a where {associated "add" a a a} = func value => return ${target} (${
       genericSpine("value")
     })
-entry const run = fn (value: U32) => read (wrapper (make value))
+entry const run = func (value: U32) => return read (wrapper (make value))
 `;
   async function pack() {
     const result = await new Deno.Command(executable, {
@@ -861,7 +861,7 @@ entry const run = fn (value: U32) => read (wrapper (make value))
       const options = { executable, entry, prelude: null, dependencies };
       const retained = await createZigProjectCompiler(options);
       try {
-        const prefix = "const new_spelling = fn (x: F32) => x\n";
+        const prefix = "const new_spelling = func (x: F32) => return x\n";
         for (
           const [index, text] of [
             source(),
@@ -942,7 +942,7 @@ Deno.test("body checker reuse relocates block scope mutation joins and case bind
   const entry = `${directory}/main.blot`;
   const source = (seed: string, prefix = "", operation = "@u32.add") =>
     `${prefix}const seed = ${seed}
-const helper = fn (value: U32) -> U32 => do:
+const helper = func (value: U32) : U32 => return do:
   let count = ${primitiveSpine("value")}
   if @u32.lt value 8:
     count := ${operation} self seed
@@ -951,7 +951,7 @@ const helper = fn (value: U32) -> U32 => do:
   break case count of
     0 => seed
     result => @u32.add result seed
-entry const run = fn (value: U32) -> U32 => helper value
+entry const run = func (value: U32) : U32 => return helper value
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -1018,10 +1018,10 @@ Deno.test("body checker reuse preserves owning constructor case payloads across 
       fallback = "\n  #Unused => #[0]";
     }
     return `${prefix}type Packet is data = ${recipe}
-const make = fn (value: U32) => #Packet { head: value, tail: #[value, @u32.add value ${increment}] }
-const read = fn (packet: Packet) => case packet of
+const make = func (value: U32) => return #Packet { head: value, tail: #[value, @u32.add value ${increment}] }
+const read = func (packet: Packet) => return case packet of
   #Packet { tail } => ${genericSpine("tail")}${fallback}
-entry const run = fn (value: U32) => read (make value)
+entry const run = func (value: U32) => return read (make value)
 `;
   };
   const retained = await createZigProjectCompiler({
@@ -1090,17 +1090,17 @@ Deno.test("body checker reuse restores generic local binders rows and owning res
   const entry = `${directory}/main.blot`;
   const source = (seed = "2", prefix = "", argument = "argument") =>
     `${prefix}const seed = ${seed}
-const helper = fn callback => fn (value: U32) => do:
-  let identity = fn item => item
-  let apply = fn action => fn argument => action ${argument}
+const helper = func callback => return func (value: U32) => return do:
+  let identity = func item => return item
+  let apply = func action => return func argument => return action ${argument}
   let fraction = identity 3.0
   let owning = identity #[value]
   break @u32.add (apply callback (${genericSpine("value")})) seed
-const copy = fn (value: Array U32) -> Array U32 => do:
-  let identity = fn item => item
+const copy = func (value: Array U32) : Array U32 => return do:
+  let identity = func item => return item
   break identity (${genericSpine("value")})
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => helper host 42
-entry const packed = fn (value: U32) => copy #[value, seed]
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return helper host 42
+entry const packed = func (value: U32) => return copy #[value, seed]
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -1183,10 +1183,10 @@ Deno.test("body checker reuse restores complete dotted field paths after failed 
   const entry = `${directory}/main.blot`;
   const source = (seed = "2", prefix = "") =>
     `${prefix}const seed = ${seed}
-const helper = fn (value: { head: U32, tail: F32 }) -> U32 => @u32.add (${
+const helper = func (value: { head: U32, tail: F32 }) : U32 => return @u32.add (${
       genericSpine("value.head")
     }) seed
-entry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }
+entry const run = func (value: U32) : U32 => return helper { head: value, tail: 1.0 }
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -1252,13 +1252,13 @@ Deno.test("body checker reuse relocates concrete postfix field variants and owni
     extra = "",
   ) =>
     `${prefix}type Packet is data = #Packet { head: U32, tail: Array U32 } | #Alternate { tail: Array U32, head: U32 } ${extra}
-const get = fn (value: { head: U32, tail: Array U32 }) => ${
+const get = func (value: { head: U32, tail: Array U32 }) => return ${
       genericSpine("(value).tail")
     }
-const read = fn (value: Packet) => ${genericSpine("(value).tail")}
-const make = fn (value: U32) => #${constructor} { head: value, tail: #[value, @u32.add value ${increment}] }
-entry const run = fn (value: U32) => read (make value)
-entry const plain = fn (value: U32) => get { head: value, tail: #[value] }
+const read = func (value: Packet) => return ${genericSpine("(value).tail")}
+const make = func (value: U32) => return #${constructor} { head: value, tail: #[value, @u32.add value ${increment}] }
+entry const run = func (value: U32) => return read (make value)
+entry const plain = func (value: U32) => return get { head: value, tail: #[value] }
 `;
   const options = { executable, entry, prelude: null };
   const retained = await createZigProjectCompiler(options);
@@ -1320,19 +1320,19 @@ Deno.test("body checker reuse restores chained dotted nominal paths from source 
   const bundle = `${directory}/packets.blotdep`;
   const library = (increment = "1", extra = "") =>
     `type Packet is data = #Packet { head: U32, nested: { tail: Array U32, marker: F32 } } | #Alternate { nested: { marker: F32, tail: Array U32 }, head: U32 } ${extra}
-const make = fn value => #Alternate { nested: { marker: 1.0, tail: #[value, @u32.add value ${increment}] }, head: value }
+const make = func value => return #Alternate { nested: { marker: 1.0, tail: #[value, @u32.add value ${increment}] }, head: value }
 `;
   const source = (prefix = "", body = "value.nested.tail") =>
     `import {Packet, make} from "./packets"
 ${prefix}type LocalPacket = Packet
-const read = fn (value: LocalPacket) => ${genericSpine(body)}
-entry const run = fn (value: U32) => read (make value)
+const read = func (value: LocalPacket) => return ${genericSpine(body)}
+entry const run = func (value: U32) => return read (make value)
 `;
   async function pack() {
     await Deno.writeTextFile(
       entry,
       `import {Packet, make} from "./packets"
-entry const pack = fn (value: U32) => value
+entry const pack = func (value: U32) => return value
 `,
     );
     const result = await new Deno.Command(executable, {
@@ -1433,29 +1433,29 @@ Deno.test("body checker reuse owns inferred local associated principals and cand
     extra = "",
   ) =>
     `${prefix}type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
 type FloatNumber is data = #FloatNumber F32
-const make_float = fn value => #FloatNumber value
-const read_float = fn (#FloatNumber value) => value
-const FloatNumber.add = fn (#FloatNumber left) => fn (#FloatNumber right) => #FloatNumber (@f32.add left right)
+const make_float = func value => return #FloatNumber value
+const read_float = func (#FloatNumber value) => return value
+const FloatNumber.add = func (#FloatNumber left) => return func (#FloatNumber right) => return #FloatNumber (@f32.add left right)
 type Numbers is data = #Numbers (Array U32)
-const make_numbers = fn value => #Numbers value
-const read_numbers = fn (#Numbers value) => value
-const Numbers.add = fn (#Numbers left) => fn (#Numbers right) => #Numbers (@array.concat left right)
-${extra}const twice = fn value => do:
-  let local = fn amount => @type.call "${member}" (${
+const make_numbers = func value => return #Numbers value
+const read_numbers = func (#Numbers value) => return value
+const Numbers.add = func (#Numbers left) => return func (#Numbers right) => return #Numbers (@array.concat left right)
+${extra}const twice = func value => return do:
+  let local = func amount => return @type.call "${member}" (${
       genericSpine("amount")
     }) amount
   break local value
-entry const unsigned = fn (value: U32) => read (twice (make value))
-entry const floating = fn (value: F32) => read_float (twice (make_float value))
-entry const packed = fn (value: U32) => read_numbers (twice (make_numbers #[value, @u32.add value 1]))
+entry const unsigned = func (value: U32) => return read (twice (make value))
+entry const floating = func (value: F32) => return read_float (twice (make_float value))
+entry const packed = func (value: U32) => return read_numbers (twice (make_numbers #[value, @u32.add value 1]))
 `;
   const prefix = "const earlier_spelling = { tail: 3.0, head: 2 }\n";
   const extra =
-    "type Extra is data = #Extra U32\nconst Extra.add = fn (#Extra left) => fn (#Extra right) => #Extra left\n";
+    "type Extra is data = #Extra U32\nconst Extra.add = func (#Extra left) => return func (#Extra right) => return #Extra left\n";
   const retained = await createZigProjectCompiler({
     executable,
     entry,
@@ -1536,25 +1536,25 @@ Deno.test("body checker reuse revokes local principals for source and compiled s
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
 `;
   };
   const source = (prefix = "", name = "local") =>
     `import {Number, make, read} from "./numbers"
-${prefix}const twice = fn value => do:
-  let local = fn amount => @type.call "add" (${genericSpine("amount")}) amount
+${prefix}const twice = func value => return do:
+  let local = func amount => return @type.call "add" (${genericSpine("amount")}) amount
   break ${name} value
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (twice (make value))
-entry const strict = fn () => require_pure run
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (twice (make value))
+entry const strict = func () => return require_pure run
 `;
   async function pack() {
     await Deno.writeTextFile(
       entry,
       `import {Number, make, read} from "./numbers"
-entry const pack = fn (value: U32) => value
+entry const pack = func (value: U32) => return value
 `,
     );
     const result = await new Deno.Command(executable, {
@@ -1638,12 +1638,12 @@ Deno.test("body checker reuse owns result directed local principals", async () =
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", increment = "0", member = "from") =>
     `${prefix}type Number is data = #Number U32
-const Number.from = fn (value: U32) => #Number (@u32.add value ${increment})
-const read = fn (#Number value) => value
-const convert = fn (value: U32) -> Number => do:
-  let local = fn amount => @type.result "${member}" (${genericSpine("amount")})
+const Number.from = func (value: U32) => return #Number (@u32.add value ${increment})
+const read = func (#Number value) => return value
+const convert = func (value: U32) : Number => return do:
+  let local = func amount => return @type.result "${member}" (${genericSpine("amount")})
   break local value
-entry const run = fn (value: U32) => read (convert value)
+entry const run = func (value: U32) => return read (convert value)
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -1710,13 +1710,13 @@ Deno.test("body checker reuse preserves selected Foreign traces in inferred loca
     `${prefix}type Host = U32 -> U32 ! {Foreign}
 type Pure = U32 -> U32
 type Input is data = #Input { value: U32, callback: ${callbackType} }
-const make = fn callback => #Input { value: 40, callback: callback }
-const read = fn (value: Input) => (value).value
-const Input.add = fn (#Input { value: left, callback: invoke }) => fn (#Input { value: right, callback: ignored }) => #Input { value: invoke (${operation} left right), callback: invoke }
-const twice = fn value => do:
-  let local = fn amount => @type.call "add" (${genericSpine("amount")}) amount
+const make = func callback => return #Input { value: 40, callback: callback }
+const read = func (value: Input) => return (value).value
+const Input.add = func (#Input { value: left, callback: invoke }) => return func (#Input { value: right, callback: ignored }) => return #Input { value: invoke (${operation} left right), callback: invoke }
+const twice = func value => return do:
+  let local = func amount => return @type.call "add" (${genericSpine("amount")}) amount
   break local value
-entry const run = fn (callback: Host) => read (twice (make callback))
+entry const run = func (callback: Host) => return read (twice (make callback))
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -1804,18 +1804,18 @@ Deno.test("body checker reuse relocates written local association and representa
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `${prefix}type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const twice = fn value => do:
-  let identity: a -> a where { type_rep a } = fn amount => ${
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const twice = func value => return do:
+  let identity: a -> a where { type_rep a } = func amount => return ${
       genericSpine("amount")
     }
-  let local: a -> a where { associated "${clause}" a a a } = fn amount => @type.call "add" amount amount
+  let local: a -> a where { associated "${clause}" a a a } = func amount => return @type.call "add" amount amount
   break identity (local value)
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (twice (make value))
-entry const strict = fn () => require_pure run
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (twice (make value))
+entry const strict = func () => return require_pure run
 `;
   };
   const retained = await createZigProjectCompiler({
@@ -1891,29 +1891,29 @@ Deno.test("body checker reuse preserves exported local qualification origins in 
   ) => {
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `const earlier = fn value => ${earlier}
+    return `const earlier = func value => return ${earlier}
 type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const factory = fn amount => do:
-  let local: a -> a where { associated "${clause}" a a a } = fn value => @type.call "add" value value
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const factory = func amount => return do:
+  let local: a -> a where { associated "${clause}" a a a } = func value => return @type.call "add" value value
   break local amount
 `;
   };
   const source = (prefix = "", factory = "factory") =>
     `import {Number, make, read, factory} from "./numbers"
-${prefix}const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (${factory} (make (${
+${prefix}const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (${factory} (make (${
       genericSpine("value")
     })))
-entry const strict = fn () => require_pure run
+entry const strict = func () => return require_pure run
 `;
   async function pack() {
     await Deno.writeTextFile(
       entry,
       `import {Number, make, read, factory} from "./numbers"
-entry const pack = fn (value: U32) => value
+entry const pack = func (value: U32) => return value
 `,
     );
     const result = await new Deno.Command(executable, {
@@ -2028,15 +2028,15 @@ Deno.test("body checker reuse relocates producer units and bindings through sour
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `${prefix}type Number is data = #Number U32
-const make = fn value => #Number value
-const read = fn (#Number value) => value
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const factory = fn amount => do:
-  let local: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+const make = func value => return #Number value
+const read = func (#Number value) => return value
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const factory = func amount => return do:
+  let local: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
   break local amount
 type Box is data = #Box {payload: Number, tail: Array U32}
-const make_box = fn value => #Box {payload: make value, tail: #[value, @u32.add value 1]}
-const scalar = fn (value: U32) => @u32.add value 2
+const make_box = func value => return #Box {payload: make value, tail: #[value, @u32.add value 1]}
+const scalar = func (value: U32) => return @u32.add value 2
 `;
   };
   const imports = (inserted: boolean, target: string) => {
@@ -2049,16 +2049,16 @@ const scalar = fn (value: U32) => @u32.add value 2
     if (missing) factory = "missing_factory";
     return `${
       imports(inserted, target)
-    }const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (${factory} (make (${
+    }const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (${factory} (make (${
       genericSpine("value")
     })))
-entry const strict = fn () => require_pure run
-entry const primitive = fn (value: U32) => exposed (${genericSpine("value")})
-entry const shape = fn (value: U32) => do:
+entry const strict = func () => return require_pure run
+entry const primitive = func (value: U32) => return exposed (${genericSpine("value")})
+entry const shape = func (value: U32) => return do:
   let chosen = ${genericSpine("(make_box value)")}
   break read chosen.payload
-entry const owned = fn (value: U32) => do:
+entry const owned = func (value: U32) => return do:
   let chosen = ${genericSpine("(make_box value)")}
   break chosen.tail
 `;
@@ -2068,7 +2068,7 @@ entry const owned = fn (value: U32) => do:
       entry,
       `${
         imports(inserted, target)
-      }entry const pack = fn (value: U32) => value\n`,
+      }entry const pack = func (value: U32) => return value\n`,
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2185,7 +2185,7 @@ Deno.test("body checker reuse resolves imported annotation heads with exact sour
     if (concrete) element = "U32";
     return `${prefix}type Wrapper a is data = #Wrapper {value: a, owning: Array U32}
 type Alias a = Wrapper ${element}
-const make = fn value => #Wrapper {value, owning: #[value, @u32.add value 1]}
+const make = func value => return #Wrapper {value, owning: #[value, @u32.add value 1]}
 `;
   };
   const imports = (mode: string, inserted: boolean) => {
@@ -2216,11 +2216,11 @@ const make = fn value => #Wrapper {value, owning: #[value, @u32.add value 1]}
     }
     if (missing) head = "Missing";
     return `${imports(mode, inserted)}const marker = ${marker}
-const hold = fn (value: ${head} U32) => ${genericSpine("value")}
-entry const run = fn (value: U32) => do:
+const hold = func (value: ${head} U32) => return ${genericSpine("value")}
+entry const run = func (value: U32) => return do:
   let #${constructor} {value: result, owning: items} = hold (${make} value)
   break @u32.add result (@array.length items)
-entry const owned = fn (value: U32) => do:
+entry const owned = func (value: U32) => return do:
   let #${constructor} {value: result, owning: items} = hold (${make} value)
   break items
 `;
@@ -2228,7 +2228,7 @@ entry const owned = fn (value: U32) => do:
   async function pack(mode: string, inserted = false) {
     await Deno.writeTextFile(
       entry,
-      `${imports(mode, inserted)}entry const pack = fn (value: U32) => value\n`,
+      `${imports(mode, inserted)}entry const pack = func (value: U32) => return value\n`,
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2364,10 +2364,10 @@ Deno.test("body checker reuse owns shared local relays through source and compil
     let twice = '@type.call "add" amount amount';
     if (!qualified) twice = "amount";
     return `${prefix}type Number is data = #Number ${payload}
-const make = fn (value: U32) => ${make}
-const read = fn (#Number value) => ${read}
-const Number.add${annotation} = fn (#Number left) => fn (#Number right) => #Number (${operation} left right)
-const twice = fn amount => ${twice}
+const make = func (value: U32) => return ${make}
+const read = func (#Number value) => return ${read}
+const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const twice = func amount => return ${twice}
 `;
   };
   const imports = (inserted: boolean) => {
@@ -2379,19 +2379,19 @@ const twice = fn amount => ${twice}
   const source = (inserted = false, missing = false) => {
     let target = "exposed";
     if (missing) target = "missing_twice";
-    return `${imports(inserted)}const pipeline = fn value => do:
-  let local = fn amount => ${target} (${genericSpine("amount")})
-  let relay = fn amount => local amount
+    return `${imports(inserted)}const pipeline = func value => return do:
+  let local = func amount => return ${target} (${genericSpine("amount")})
+  let relay = func amount => return local amount
   break relay value
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const run = fn (value: U32) => read (pipeline (make value))
-entry const strict = fn () => require_pure run
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const run = func (value: U32) => return read (pipeline (make value))
+entry const strict = func () => return require_pure run
 `;
   };
   async function pack(inserted = false) {
     await Deno.writeTextFile(
       entry,
-      `${imports(inserted)}entry const pack = fn (value: U32) => value\n`,
+      `${imports(inserted)}entry const pack = func (value: U32) => return value\n`,
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2499,7 +2499,7 @@ Deno.test("body checker reuse owns Foreign arrows through source compiled change
     if (pure) effects = "";
     let value = "value";
     if (changed) value = "@u32.add value 1";
-    return `const invoke = fn (host: U32 -> U32 ! {${effects}}) => fn (value: U32) => host (${value})\n`;
+    return `const invoke = func (host: U32 -> U32 ! {${effects}}) => return func (value: U32) => return host (${value})\n`;
   };
   const source = (inserted = false, pure = false, missing = false) => {
     let prefix = "";
@@ -2508,21 +2508,21 @@ Deno.test("body checker reuse owns Foreign arrows through source compiled change
     let target = "host";
     if (pure) {
       effects = "";
-      target = "fn (value: U32) => value";
+      target = "func (value: U32) => return value";
     }
     let helper = "invoke";
     if (missing) helper = "missing_invoke";
     return `import {invoke} from "./callbacks"
-${prefix}const relay = fn (host: U32 -> U32 ! {${effects}}) => ${helper} host (${
+${prefix}const relay = func (host: U32 -> U32 ! {${effects}}) => return ${helper} host (${
       genericSpine("40")
     })
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => relay (${target})
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return relay (${target})
 `;
   };
   async function pack() {
     await Deno.writeTextFile(
       entry,
-      'import {invoke} from "./callbacks"\nentry const pack = fn (value: U32) => value\n',
+      'import {invoke} from "./callbacks"\nentry const pack = func (value: U32) => return value\n',
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2563,8 +2563,8 @@ entry const run = fn (host: U32 -> U32 ! {Foreign}) => relay (${target})
             let entryText = source(inserted, pure, missing === true);
             if (missing === "closed") {
               entryText = entryText.replace(
-                "const relay = fn",
-                "const relay: (U32 -> U32 ! {Foreign}) -> U32 ! {} = fn",
+                "const relay = func",
+                "const relay: (U32 -> U32 ! {Foreign}) -> U32 ! {} = func",
               );
             }
             const sources = {
@@ -2636,7 +2636,7 @@ Deno.test("body checker reuse owns array selectors through source compiled chang
   const library = (changed = false) => {
     let index = "0";
     if (changed) index = "1";
-    return `const first = fn (values: Array a) => (${
+    return `const first = func (values: Array a) => return (${
       genericSpine("values")
     })[${index}]\n`;
   };
@@ -2645,17 +2645,17 @@ Deno.test("body checker reuse owns array selectors through source compiled chang
     if (inserted) prefix = "const earlier_spelling = {tail: 3.0, head: 2}\n";
     return `import {first} from "./arrays"
 ${prefix}const slot = ${index}
-const select = fn (values: Array a) => (${genericSpine("values")})[slot]
-entry const run = fn (value: U32) => select #[value, @u32.add value 1]
-entry const floating = fn (value: F32) => select #[value, @f32.add value 1.0]
-entry const packed = fn (value: U32) => select #[#[value], #[@u32.add value 1]]
-entry const imported = fn (value: U32) => first #[value, @u32.add value 1]
+const select = func (values: Array a) => return (${genericSpine("values")})[slot]
+entry const run = func (value: U32) => return select #[value, @u32.add value 1]
+entry const floating = func (value: F32) => return select #[value, @f32.add value 1.0]
+entry const packed = func (value: U32) => return select #[#[value], #[@u32.add value 1]]
+entry const imported = func (value: U32) => return first #[value, @u32.add value 1]
 `;
   };
   async function pack() {
     await Deno.writeTextFile(
       entry,
-      'import {first} from "./arrays"\nentry const pack = fn (value: U32) => value\n',
+      'import {first} from "./arrays"\nentry const pack = func (value: U32) => return value\n',
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -2775,15 +2775,15 @@ Deno.test("body checker reuse owns generic explicit and dotted fields through so
     let annotation = "";
     if (candidate === "foreign") annotation = ": Scalar -> U32 ! {Foreign}";
     let member =
-      `const Scalar.item${annotation} = fn (#Scalar value) => ${operation} value 1\n`;
+      `const Scalar.item${annotation} = func (#Scalar value) => return ${operation} value 1\n`;
     if (candidate === true) {
-      member += "const F32.item = fn (value: F32) => value\n";
+      member += "const F32.item = func (value: F32) => return value\n";
     }
     return `type Scalar is data = #Scalar U32
-const wrap = fn (value: U32) => #Scalar value
+const wrap = func (value: U32) => return #Scalar value
 type Box is data = #Box {${fields}}
-const make = fn (value: U32) => #Box {${values}}
-const project: a -> b where { field "item" a b } = fn value => ${
+const make = func (value: U32) => return #Box {${values}}
+const project: a -> b where { field "item" a b } = func value => return ${
       genericSpine("value.item")
     }
 ${member}`;
@@ -2801,30 +2801,30 @@ ${member}`;
     // Written field constraints require an actual field. Keep the existing
     // associated-method controls under their inferred member principal.
     const methodGetter = declared
-      ? `const method_extract = fn value => ${getter}\n`
+      ? `const method_extract = func value => return ${getter}\n`
       : "";
     return `import {Box, make, Scalar, wrap, project} from "./boxes"
-${prefix}const extract${requirement} = fn value => ${getter}
-${methodGetter}const scoped = fn value => do:
-  let local${requirement} = fn row => ${local}
+${prefix}const extract${requirement} = func value => return ${getter}
+${methodGetter}const scoped = func value => return do:
+  let local${requirement} = func row => return ${local}
   break local value
-const require_pure = fn (callback: U32 -> U32) => callback 40
-entry const selected = fn (value: U32) => ${
+const require_pure = func (callback: U32 -> U32) => return callback 40
+entry const selected = func (value: U32) => return ${
       declared ? "method_extract" : "extract"
     } (wrap value)
-entry const strict = fn () => require_pure selected
-entry const local = fn (value: U32) => scoped (make value)
-entry const run = fn (value: U32) => extract (make value)
-entry const forwarded = fn (value: U32) => ${
+entry const strict = func () => return require_pure selected
+entry const local = func (value: U32) => return scoped (make value)
+entry const run = func (value: U32) => return extract (make value)
+entry const forwarded = func (value: U32) => return ${
       genericSpine("project (make value)")
     }
-entry const packed = fn (value: U32) => extract {tail: 3.0, item: #[value]}
+entry const packed = func (value: U32) => return extract {tail: 3.0, item: #[value]}
 `;
   };
   async function pack() {
     await Deno.writeTextFile(
       entry,
-      'import {Box, make, Scalar, wrap, project} from "./boxes"\nentry const pack = fn (value: U32) => value\n',
+      'import {Box, make, Scalar, wrap, project} from "./boxes"\nentry const pack = func (value: U32) => return value\n',
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -3002,7 +3002,7 @@ Deno.test("body checker reuse owns if let joins captures and effect traces throu
     let extra = "";
     if (variant) extra = "#Earlier | ";
     return `type Maybe a is data = ${extra}#None | #Some a
-const some = fn value => #Some value
+const some = func value => return #Some value
 const none = #None
 `;
   };
@@ -3011,49 +3011,49 @@ const none = #None
     if (inserted) prefix = "const earlier_spelling = {head: 3.0, tail: 2}\n";
     return `import {Maybe, Some, some, none} from "./maybe"
 ${prefix}const seed = ${seed}
-const choose = fn (value: Maybe U32) => do:
+const choose = func (value: Maybe U32) => return do:
   let result = seed
   if let #Some amount = value:
     result := @u32.add (${genericSpine("amount")}) seed
   else:
     result := ${fallback}
   break result
-const pack = fn (value: Maybe (Array U32)) => do:
+const pack = func (value: Maybe (Array U32)) => return do:
   let result = #[seed]
   if let #Some amount = value:
     result := @array.identity (${genericSpine("amount")})
   break result
-const negative = fn (value: F32) => -(${genericSpine("value")})
-const matching = fn (value: U32) => do:
+const negative = func (value: F32) => return -(${genericSpine("value")})
+const matching = func (value: U32) => return do:
   if let ^seed = value:
     break 1
   break 0
-const collected = fn (value: U32) => @array.slice (@array.concat (@array.prepend (@array.append #[value] seed) seed) (@array.fill 2 value)) 0 3
-const listed = fn (value: U32) => @list.from_array (@array.from_list (@list.append [value] seed))
-const generated = fn (value: U32) => @array.generate 2 (fn (index: U32) => @u32.add value index)
-const projected = fn (value: U32) => @product.get (3.0, value) 1
-const action = fn callback => fn (value: Maybe U32) => do:
+const collected = func (value: U32) => return @array.slice (@array.concat (@array.prepend (@array.append #[value] seed) seed) (@array.fill 2 value)) 0 3
+const listed = func (value: U32) => return @list.from_array (@array.from_list (@list.append [value] seed))
+const generated = func (value: U32) => return @array.generate 2 (func (index: U32) => return @u32.add value index)
+const projected = func (value: U32) => return @product.get (3.0, value) 1
+const action = func callback => return func (value: Maybe U32) => return do:
   if let #Some amount = value:
     break callback (${genericSpine("amount")})
   break callback seed
-entry const fraction = fn (value: F32) => negative value
-entry const matched = fn (value: U32) => matching value
-entry const collection = fn (value: U32) => collected value
-entry const list_count = fn (value: U32) => @list.length (listed value)
-entry const generator = fn (value: U32) => @array.get (generated value) 1
-entry const pair = fn (value: U32) => projected value
-entry const run = fn (value: U32) => choose (some value)
-entry const empty = fn () => choose none
-entry const packed = fn (value: U32) => pack (some #[value, seed])
-entry const empty_packed = fn () => pack none
-entry const invoke = fn (host: U32 -> U32 ! {Foreign}) => action host (some 40)
-entry const absent = fn (host: U32 -> U32 ! {Foreign}) => action host none
+entry const fraction = func (value: F32) => return negative value
+entry const matched = func (value: U32) => return matching value
+entry const collection = func (value: U32) => return collected value
+entry const list_count = func (value: U32) => return @list.length (listed value)
+entry const generator = func (value: U32) => return @array.get (generated value) 1
+entry const pair = func (value: U32) => return projected value
+entry const run = func (value: U32) => return choose (some value)
+entry const empty = func () => return choose none
+entry const packed = func (value: U32) => return pack (some #[value, seed])
+entry const empty_packed = func () => return pack none
+entry const invoke = func (host: U32 -> U32 ! {Foreign}) => return action host (some 40)
+entry const absent = func (host: U32 -> U32 ! {Foreign}) => return action host none
 `;
   };
   async function pack() {
     await Deno.writeTextFile(
       entry,
-      'import {Maybe, Some, some, none} from "./maybe"\nentry const pack = fn (value: U32) => value\n',
+      'import {Maybe, Some, some, none} from "./maybe"\nentry const pack = func (value: U32) => return value\n',
     );
     const result = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -3182,15 +3182,15 @@ Deno.test("body cache directory preserves dependency execution through bootstrap
   const earlier = `${directory}/earlier.blot`;
   const text = (seed: string) =>
     `const changed = ${seed}
-const read = fn (value: U32) => @u32.add (${primitiveSpine("value")}) changed
-const stable = fn (value: U32) => @u32.add (${primitiveSpine("value")}) 41
+const read = func (value: U32) => return @u32.add (${primitiveSpine("value")}) changed
+const stable = func (value: U32) => return @u32.add (${primitiveSpine("value")}) 41
 `;
   const main = `import * as dep from "./dep"
-entry const answer = fn (value: U32) => @u32.add (dep.read value) (dep.stable value)
+entry const answer = func (value: U32) => return @u32.add (dep.read value) (dep.stable value)
 `;
   const reordered = `import {value} from "./earlier"
 import * as dep from "./dep"
-entry const answer = fn (argument: U32) => @u32.add (dep.read argument) (@u32.add (dep.stable argument) value)
+entry const answer = func (argument: U32) => return @u32.add (dep.read argument) (@u32.add (dep.stable argument) value)
 `;
   const retained = await createZigProjectCompiler({
     executable,
@@ -3203,7 +3203,7 @@ entry const answer = fn (argument: U32) => @u32.add (dep.read argument) (@u32.ad
         [text("8"), main, 129],
         [text("@u32.add 8 1"), main, 130],
         [text("@u32.add 8 1"), reordered, 130],
-        [text("#False"), reordered, null],
+        [text("false"), reordered, null],
         [text("8"), reordered, 129],
       ] as const
     ) {

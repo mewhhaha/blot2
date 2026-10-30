@@ -5,8 +5,8 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
-const keep = fn ~value => fn () => @demand value
-entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
+const keep = func ~value => return func () => return @demand value
+entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   let seed = 41
   let delayed = keep (host seed)
   let alias = delayed
@@ -15,7 +15,7 @@ entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
   let pressure = @array.fill 8192 seed
   use second <- alias ()
   break first[0] + second[0] + pressure[0]
-entry const floating = fn (host: F32 -> F32 ! {Foreign}) => do:
+entry const floating = func (host: F32 -> F32 ! {Foreign}) => return do:
   let delayed = keep (host (-0.0))
   let alias = delayed
   use first <- delayed ()

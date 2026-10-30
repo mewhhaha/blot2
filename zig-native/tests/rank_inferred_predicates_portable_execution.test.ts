@@ -5,19 +5,19 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer = `type Source a is contract = { type Item }
 impl Number : Source U32 = { type Item = U32 }
-const keep: a -> (Source.Item a) -> (Source.Item a) where { Source a } = fn witness => fn value => value
+const keep: a -> (Source.Item a) -> (Source.Item a) where { Source a } = func witness => return func value => return value
 type Identity = forall [a] => a -> a
-const identity: Identity = fn value => value
+const identity: Identity = func value => return value
 type Point is data = #Point { x: U32 }
-const Point.add = fn (left: Point) => fn (right: U32) => @u32.add left.x right
-const combine = fn left => fn right => @type.call "add" left right
-const represented: a -> a where { type_rep a } = fn value => value
-const field = fn value => value.x
-const forward = fn value => combine value 22
-const calculate = fn (value: U32) => keep value (forward (#Point {x: represented (field {x: value})}))
+const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
+const combine = func left => return func right => return @type.call "add" left right
+const represented: a -> a where { type_rep a } = func value => return value
+const field = func value => return value.x
+const forward = func value => return combine value 22
+const calculate = func (value: U32) => return keep value (forward (#Point {x: represented (field {x: value})}))
 `;
 const consumer = `import {identity, calculate} from "./identity"
-entry const answer = fn (value: U32) => identity (calculate value)
+entry const answer = func (value: U32) => return identity (calculate value)
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
   for (const asynchronous of [false, true]) {
@@ -90,10 +90,10 @@ Deno.test("ordinary inferred predicate schemes retain exact publication through 
         checkpoint = await archive.exportCheckpoint();
         for (
           const failed of [
-            consumer.replace("calculate value", "calculate #True"),
+            consumer.replace("calculate value", "calculate true"),
             consumer.replace(
               "calculate value",
-              "calculate (fn value => value)",
+              "calculate (func value => return value)",
             ),
           ]
         ) {

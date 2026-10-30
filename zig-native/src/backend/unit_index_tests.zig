@@ -31,25 +31,25 @@ const declarations =
     \\type System [route, start] is data = #Route route | #Start start
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
     \\type Render a is contract = { const show: a -> U32 }
-    \\impl Number : Render U32 = { const show = fn value => value }
-    \\const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
-    \\const empty = fn () => do:
-    \\  let scope = fn world => fn action => do:
+    \\impl Number : Render U32 = { const show = func value => return value }
+    \\const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
+    \\const empty = func () => return do:
+    \\  let scope = func world => return func action => return do:
     \\    use result <- action ()
     \\    break (world, result)
     \\  break #B { initial: (), s: scope }
-    \\const run = fn b => fn action => do:
+    \\const run = func b => return func action => return do:
     \\  let #B { initial, s } = b
     \\  break s initial action
-    \\const counter = fn () => do:
+    \\const counter = func () => return do:
     \\  use value <- State.get ()
     \\  State.set (@u32.add value 1)
     \\  break value
-    \\entry const main = fn (x: U32) => do:
+    \\entry const main = func (x: U32) => return do:
     \\  let b = empty ()
-    \\  let (_, r) = run b (fn () => x)
+    \\  let (_, r) = run b (func () => return x)
     \\  let boxed = #[b, b]
-    \\  let systems = #[#Route (fn (e: u) => e), #Start (fn () => ())]
+    \\  let systems = #[#Route (func (e: u) => return e), #Start (func () => return ())]
     \\  break @u32.add (@u32.add r (render x)) (@u32.add (@array.length boxed) (@array.length systems))
 ;
 
@@ -116,11 +116,11 @@ test "unit quantified variable sets agree with a scan of every declaration and s
 
 const flows =
     \\data Maybe a = #Some a | #Nothing
-    \\const Cursor.next = fn (cursor: Cursor collection) =>
+    \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
     \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
     \\  else #Nothing
-    \\const progress = fn (values: Array U32) => do:
+    \\const progress = func (values: Array U32) => return do:
     \\  let original = @array.cursor values
     \\  let cursor = original
     \\  let total = 0
@@ -133,16 +133,16 @@ const flows =
     \\    total := @u32.add self value
     \\    cursor := rest
     \\  break cursor
-    \\const sum = fn (count: U32) => do:
+    \\const sum = func (count: U32) => return do:
     \\  let total = 0
     \\  let last = 0
     \\  for index in 0..count:
     \\    if @u32.lt index 3:
     \\      last := index
     \\    total := @u32.add self index
-    \\  let read = fn (bias: U32) => @u32.add (@u32.add total last) bias
+    \\  let read = func (bias: U32) => return @u32.add (@u32.add total last) bias
     \\  break read 1
-    \\entry const run = fn (values: Array U32) => @u32.add (sum (@array.length values)) (if @cursor.has (progress values) then 1 else 0)
+    \\entry const run = func (values: Array U32) => return @u32.add (sum (@array.length values)) (if @cursor.has (progress values) then 1 else 0)
 ;
 
 fn local(source: *const core.Module, id: core.Id, binding: core.BindingId) bool {

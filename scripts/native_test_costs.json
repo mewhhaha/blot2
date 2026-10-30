@@ -1639,7 +1639,7 @@
     "parse.parser_tests.test.parser allocation failures release trees symbols and scratch stacks": 2431047,
     "parse.parser_tests.test.qualified names intern member identities before semantic checking": 152885,
     "parse.parser_tests.test.quantified packages retain sorted binders evidence and exact lexical openings": 4600711,
-    "parse.parser_tests.test.real examples standard library and gdev surface grammar parse completely": 293209945,
+    "parse.parser_tests.test.repository examples and standard library surface grammar parse completely": 293209945,
     "parse.parser_tests.test.return exits a function while break value finishes a do and bare break exits a loop": 201788,
     "parse.parser_tests.test.spark and receive lower to checked task operations with bounded syntax": 341994,
     "parse.parser_tests.test.spark binds call arguments before creating the child": 103022,

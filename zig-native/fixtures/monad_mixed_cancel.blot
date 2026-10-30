@@ -1,9 +1,9 @@
 type Validate is effect = { check: U32 -> U32 }
 type Box value is data = #Box value
-const Box.pure = fn ignored => #Box 42
-const Box.bind = fn candidate => fn next => case candidate of
+const Box.pure = func ignored => return #Box 42
+const Box.bind = func candidate => return func next => return case candidate of
   #Box value => next value
-const checked = fn computation => do (@do.monad Box):
+const checked = func computation => return do (@do.monad Box):
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -12,8 +12,8 @@ const checked = fn computation => do (@do.monad Box):
         break 41
       complete () =>
         break ()
-entry const answer = fn () => do:
-  let #Box value = checked (@computation (fn () => do:
+entry const answer = func () => return do:
+  let #Box value = checked (@computation (func () => return do:
     use Validate.check 0
     break ()
   ))

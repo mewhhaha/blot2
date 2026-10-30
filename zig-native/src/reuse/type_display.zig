@@ -185,7 +185,8 @@ fn render(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, depth: usize, bu
                 name = nominal.name;
                 break;
             };
-            try text(engine, bytes, if (name == 0) "Type" else engine.pool.get(name));
+            const storage = @import("../check/storage_types.zig");
+            try text(engine, bytes, if (storage.identity(node.a, node.b)) |kind| storage.name(kind) else if (name == 0) "Type" else engine.pool.get(name));
             if (node.tag == .nominal) for (0..engine.types.nominalArguments(node).len) |index| {
                 if (budget.* == 0) {
                     try text(engine, bytes, " ...");

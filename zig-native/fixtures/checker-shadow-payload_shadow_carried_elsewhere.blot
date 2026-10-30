@@ -1,8 +1,8 @@
 
 type Counter is effect = { first: U32 -> U32, next: Unit -> U32 }
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 40
-  for request in @requests (@computation (fn () => do:
+  for request in @requests (@computation (func () => return do:
     use Counter.first 5
     use Counter.next ()
     break ()

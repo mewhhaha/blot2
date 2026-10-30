@@ -15,18 +15,18 @@ const types = @import("../check/types.zig");
 const a = std.testing.allocator;
 const key: format.Key = .{ .compiler = @splat(17), .settings = @splat(18), .source = @splat(19), .dependencies = @splat(20) };
 const prelude_source =
-    \\const U32.add = fn left => fn right => @u32.add left right
-    \\const U32.sub = fn left => fn right => @u32.sub left right
+    \\const U32.add = func left => return func right => return @u32.add left right
+    \\const U32.sub = func left => return func right => return @u32.sub left right
 ;
-const helper_source = "const calculate = fn (value: U32) => U32.add value 3\n";
+const helper_source = "const calculate = func (value: U32) => return U32.add value 3\n";
 const initial_source =
     \\import * as helper from "./helper"
-    \\entry const answer: U32 -> U32 = fn value => helper.calculate value
+    \\entry const answer: U32 -> U32 = func value => return helper.calculate value
     \\entry const schema = 8
 ;
 const edited_source =
     \\import * as helper from "./helper"
-    \\entry const answer: U32 -> U32 = fn value => helper.calculate value
+    \\entry const answer: U32 -> U32 = func value => return helper.calculate value
     \\entry const schema = 9
 ;
 

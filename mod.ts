@@ -43,6 +43,7 @@ export type {
   NativeAssetOptions,
 } from "./compiler/native_assets.ts";
 export type {
+  StorageBudgets,
   ZigProjectBuildOptions,
   ZigProjectBuildResult,
   ZigProjectBuildStats,

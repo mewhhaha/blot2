@@ -1,20 +1,20 @@
 
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         break 21
       complete value =>
         break value
-const make_generator = fn () => do:
+const make_generator = func () => return do:
   use Validate.check 0
   break @panic "generator construction continued"
-entry const answer = fn () => do:
-  let count = checked (@computation (fn () =>
+entry const answer = func () => return do:
+  let count = checked (@computation (func () => return
     @array.length (@array.generate (Validate.check 0) (@panic "generator evaluated"))
   ))
-  let generator = checked (@computation (fn () =>
+  let generator = checked (@computation (func () => return
     @array.length (@array.generate 2 (make_generator ()))
   ))
   break @u32.add count generator

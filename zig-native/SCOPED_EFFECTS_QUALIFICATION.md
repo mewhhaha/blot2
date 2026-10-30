@@ -9,7 +9,7 @@ where they say 058/059 remain open, or claim no full gate, they are historical.
 
 ## Supported boundary
 
-Direct `@effect.scope (fn (capability: Family Arguments) => body)` creates fresh
+Direct `@effect.scope (func (capability: Family Arguments) => return body)` creates fresh
 authority on every guest entry. Member operations, local aliases, capturing
 local thunks and ordinary providers preserve the exact owner. Nested same-typed
 State capabilities return `[11,102,10,100]`; callback forwarding returns 119 and
@@ -181,7 +181,7 @@ An ordinary explicit effect-family parameter owns a quantified identity-variable
 edge separately from its family payload. Schemes freshen that edge with the
 parameter's operation rows; checking constrains it to the argument's identity.
 Function result annotations can name the parameter operation, for example
-`fn (state: State a) -> a ! {state.get} => state.get ()`. Exact Unit member
+`func (state: State a) : a ! {state.get} => return state.get ()`. Exact Unit member
 invocation has a public no-capture/no-store claim, validated against immutable
 Core and its selected parameter. Other helpers remain conservative.
 
@@ -211,7 +211,7 @@ precise same-lifetime State stores remain open in 058/059.
 ## Curried callback boundary
 
 The exact helper
-`fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`
+`func (state: State a) => return func (callback: Unit -> a ! {state.get | e}) => return callback ()`
 owns a two-binder invocation claim. Immutable Core validation checks its exact
 Unit invocation and callback binder; source and compiled interfaces preserve
 that claim. Named, inline and demand specialization seed the first capability's

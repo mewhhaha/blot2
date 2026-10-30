@@ -2,8 +2,8 @@
 Scoped value binders in complete arrow annotations
 ==================
 
-const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
-const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+const read: (state: State a) -> a ! {state.get} = func input => return input.get ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = func input => return func callback => return callback ()
 
 ---
 
@@ -29,6 +29,7 @@ const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.ge
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier)
   (method_call
     (identifier)
@@ -69,8 +70,10 @@ const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.ge
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (lambda_header
     (identifier))
   (operator)
+  (keyword)
   (identifier)
   (parenthesized))

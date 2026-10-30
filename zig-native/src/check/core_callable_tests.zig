@@ -8,12 +8,12 @@ const core = @import("core.zig");
 const a = std.testing.allocator;
 const source =
     \\infixl 60 (+) = _fixity_add
-    \\const add = fn left => fn right => @u32.add left right
+    \\const add = func left => return func right => return @u32.add left right
     \\const scalar_partial = add 21
     \\const array_value = @array.fill 2 20
     \\const unused_trap = @panic "bad\n\t\" UTF8 🦊"
-    \\entry const run = fn (input: U32) -> U32 => @array.length array_value + scalar_partial input
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\entry const run = func (input: U32) : U32 => return @array.length array_value + scalar_partial input
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 const Fixture = struct {
     tree: ast.Tree,

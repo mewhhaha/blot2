@@ -6,17 +6,17 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
-entry const normal = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => #[7, 9]) (fn owner => ()) (fn loan => @u32.add (@usage.length loan) (host ()))
-entry const nested = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => #[7, 9]) (fn owner => ()) (fn outer => @resource.scope (fn () => [1.5, 2.5, 3.5]) (fn owner => ()) (fn inner => @u32.add (@usage.length outer) (@u32.add (@usage.length inner) (host ()))))
-entry const early = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => do:
+entry const normal = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return #[7, 9]) (func owner => return ()) (func loan => return @u32.add (@usage.length loan) (host ()))
+entry const nested = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return #[7, 9]) (func owner => return ()) (func outer => return @resource.scope (func () => return [1.5, 2.5, 3.5]) (func owner => return ()) (func inner => return @u32.add (@usage.length outer) (@u32.add (@usage.length inner) (host ()))))
+entry const early = func () => return @resource.scope (func () => return #[1, 2]) (func owner => return ()) (func loan => return do:
   break @usage.length loan
 )
-entry const trapped = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => @u32.div (@usage.length loan) 0)
-entry const cleanup_failed = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn outer => @resource.scope (fn () => [1.5, 2.5, 3.5]) (fn owner => @panic "cleanup") (fn inner => @usage.length inner))
-entry const acquire_failed = fn () => @resource.scope (fn () -> unique (Array U32) => @panic "acquire") (fn owner => ()) (fn loan => @usage.length loan)
-entry const surviving = fn (value: U32) => @resource.scope (fn () => #[value, @u32.add value 1]) (fn owner => ()) (fn loan => #[value, @usage.length loan])
-entry const scalar = fn () => @resource.scope (fn () => 1.5) (fn owner => ()) (fn loan => @usage.read loan)
-entry const memory = fn () -> Array U32 => #[]
+entry const trapped = func () => return @resource.scope (func () => return #[1, 2]) (func owner => return ()) (func loan => return @u32.div (@usage.length loan) 0)
+entry const cleanup_failed = func () => return @resource.scope (func () => return #[1, 2]) (func owner => return ()) (func outer => return @resource.scope (func () => return [1.5, 2.5, 3.5]) (func owner => return @panic "cleanup") (func inner => return @usage.length inner))
+entry const acquire_failed = func () => return @resource.scope (func () : unique (Array U32) => return @panic "acquire") (func owner => return ()) (func loan => return @usage.length loan)
+entry const surviving = func (value: U32) => return @resource.scope (func () => return #[value, @u32.add value 1]) (func owner => return ()) (func loan => return #[value, @usage.length loan])
+entry const scalar = func () => return @resource.scope (func () => return 1.5) (func owner => return ()) (func loan => return @usage.read loan)
+entry const memory = func () : Array U32 => return #[]
 `;
 
 Deno.test("reference resource journals own payload roots through cleanup traps host rejection and suspension", async () => {
@@ -240,9 +240,9 @@ Deno.test("reference resources preserve source archive checkpoint restart and fa
   const dependency = `${directory}/scope.blot`;
   const dependencies = `${directory}/scope.blotdep`;
   const producer =
-    `const run = fn (value: U32) => @resource.scope (fn () => #[value, @u32.add value 1]) (fn owner => ()) (fn loan => @usage.length loan)\n`;
+    `const run = func (value: U32) => return @resource.scope (func () => return #[value, @u32.add value 1]) (func owner => return ()) (func loan => return @usage.length loan)\n`;
   const consumer =
-    `import {run} from "./scope"\nentry const answer = fn (value: U32) => run value\n`;
+    `import {run} from "./scope"\nentry const answer = func (value: U32) => return run value\n`;
   try {
     await Deno.writeTextFile(entry, consumer);
     await Deno.writeTextFile(dependency, producer);

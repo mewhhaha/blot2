@@ -4,20 +4,20 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `const identity = fn (index: U32) => do:
+const library = `const identity = func (index: U32) => return do:
   let multiplied = @u32.mul 1 index
   let masked = @u32.bit_and multiplied 0xffffffff
   let shifted = @u32.shl masked 32
   let zero = @u32.bit_xor index index
   break @u32.div (@u32.bit_or shifted zero) 1
-const lookup = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
-const guarded = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@u32.div index 0) else 0
+const lookup = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
+const guarded = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@u32.div index 0) else 0
 `;
 const source = `import {identity, lookup, guarded} from "./logic"
-entry const echo = fn (index: U32) => identity index
-entry const answer = fn (index: U32) => lookup index
-entry const trap = fn (index: U32) => guarded index
-entry const snapshot = fn (value: U32) => #[value]
+entry const echo = func (index: U32) => return identity index
+entry const answer = func (index: U32) => return lookup index
+entry const trap = func (index: U32) => return guarded index
+entry const snapshot = func (value: U32) => return #[value]
 `;
 
 async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
@@ -91,7 +91,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         await observe(expected);
         checkpoint = await archive.exportCheckpoint();
         const invalid = await archive.build({
-          sources: { [entry]: source.replace("lookup index", "lookup #True") },
+          sources: { [entry]: source.replace("lookup index", "lookup true") },
         });
         assert(!invalid.success);
         assert.deepEqual(await archive.exportCheckpoint(), checkpoint);

@@ -275,6 +275,13 @@ fn scan(allocator: Allocator, source: []const u8, result: *Result) Allocator.Err
             try emit(&result.tokens, allocator, .intrinsic, start, at);
             continue;
         }
+        // An adjacent dollar introduces a constructor. A separated dollar
+        // retains application/fixity syntax during the source migration.
+        if (c == '$' and at + 1 < source.len and (lower(source[at + 1]) or upper(source[at + 1]) or source[at + 1] == '_')) {
+            at += 1;
+            try emit(&result.tokens, allocator, .hash, start, at);
+            continue;
+        }
         if (symbolic(c) or c == '/') {
             at += 1;
             if (c != '/') while (at < source.len and symbolic(source[at])) {
@@ -407,7 +414,7 @@ fn layout(allocator: Allocator, source: []const u8, result: *Result) Allocator.E
                 while (first > 0 and !brokenLine(source, raw.items[first - 1], raw.items[first])) first -= 1;
                 request_clause = raw.items[first].tag == .kw_effect or raw.items[first].tag == .kw_complete;
                 for (raw.items[first .. index - 1]) |part| {
-                    if (part.tag == .equal or part.tag == .kw_fn or part.tag == .fat_arrow) request_clause = false;
+                    if (part.tag == .equal or part.tag == .kw_func or part.tag == .fat_arrow) request_clause = false;
                 }
             }
             const suite = previous.?.tag == .colon or previous.?.tag == .kw_of or request_clause;
@@ -477,7 +484,7 @@ fn annotationColon(source: []const u8, tokens: []const Token, index: usize) bool
         }
         if (nested != 0) continue;
         switch (tag) {
-            .kw_let, .kw_const, .kw_fn => return true,
+            .kw_let, .kw_const, .kw_func => return true,
             .identifier => if (std.mem.eql(u8, tokens[cursor].text(source), "impl")) return true,
             .newline, .equal, .fat_arrow, .left_arrow, .comma => return false,
             else => {},

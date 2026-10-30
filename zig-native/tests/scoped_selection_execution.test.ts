@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const chooseBody =
-  `const choose = fn flag => fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+  `const choose = func flag => return func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let selected = if flag then left else right
   let alias = identity selected
   use outer <- do (@effect.state left.get left.set 7):
@@ -25,14 +25,14 @@ const chooseBody =
   let (state, result) = outer
   break result
 ))
-const settle = fn initial => @effect.scope (fn (left: State a) => @effect.scope (fn (right: State a) => do:
-  let selected = if #True then left else right
+const settle = func initial => return @effect.scope (func (left: State a) => return @effect.scope (func (right: State a) => return do:
+  let selected = if true then left else right
   let (state, result) = do (@effect.state selected.get selected.set initial):
     use selected.set 7
     break read selected
   break result
 ))
-const floating_choose = fn flag => @effect.scope (fn (left: State F32) => @effect.scope (fn (right: State F32) => do:
+const floating_choose = func flag => return @effect.scope (func (left: State F32) => return @effect.scope (func (right: State F32) => return do:
   let selected = if flag then left else right
   use outer <- do (@effect.state left.get left.set 1.5):
     use inner <- do (@effect.state right.get right.set 2.5):
@@ -51,22 +51,22 @@ const floating_choose = fn flag => @effect.scope (fn (left: State F32) => @effec
 `;
 const libraries = {
   parameter: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const read = fn (state: State a) => state.get ()
-const identity = fn value => value
+const read = func (state: State a) => return state.get ()
+const identity = func value => return value
 ${chooseBody}`,
   arrow: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
-const identity = fn value => value
+const read: (state: State a) -> a ! {state.get} = func input => return input.get ()
+const identity = func value => return value
 ${chooseBody}`,
 };
 const main = `import {choose, floating_choose, settle} from "./state"
-entry const answer = fn host => choose #True host
-entry const other = fn host => choose #False host
-entry const floating = fn () => floating_choose #False
-entry const settled = fn (value: U32) => settle value
+entry const answer = func host => return choose true host
+entry const other = func host => return choose false host
+entry const floating = func () => return floating_choose false
+entry const settled = func (value: U32) => return settle value
 `;
 const unmatched = `import {State} from "./state"
-entry const invalid = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const invalid = func flag => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let selected = if flag then left else right
   use nested <- do (@effect.state selected.get selected.set 7):
     break left.get ()
@@ -78,7 +78,7 @@ const rejectedSelections = [
   { code: "capability_escape", body: "break selected" },
   { code: "capability_escape", body: "break [selected]" },
   { code: "capability_escape", body: "break selected.get" },
-  { code: "capability_escape", body: "break fn () => selected.get ()" },
+  { code: "capability_escape", body: "break func () => return selected.get ()" },
   {
     code: "capability_escape",
     body: `let independent = if flag then left else right
@@ -89,7 +89,7 @@ const rejectedSelections = [
   },
   {
     code: "capability_escape",
-    body: `let later = fn () => if flag then left else right
+    body: `let later = func () => return if flag then left else right
   break later`,
   },
   {
@@ -244,7 +244,7 @@ for (const { syntax, library, codegenTier } of cases) {
           );
           for (const rejectedSelection of rejectedSelections) {
             const badSource = `import {State} from "./state"
-entry const invalid = fn flag => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const invalid = func flag => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let selected = if flag then left else right
   ${rejectedSelection.body}
 ))
@@ -269,13 +269,13 @@ entry const invalid = fn flag => @effect.scope (fn (left: State U32) => @effect.
           assert.deepEqual(afterUnmatched.bytes, built.bytes);
           if (dependencies === undefined) {
             const before = await compiler.exportCheckpoint();
-            let fragment = "=> state.get ()";
-            let replacement = `=> do:
+            let fragment = "=> return state.get ()";
+            let replacement = `=> return do:
   let operation = state.get
   break operation ()`;
             if (syntax === "arrow") {
-              fragment = "=> input.get ()";
-              replacement = `=> do:
+              fragment = "=> return input.get ()";
+              replacement = `=> return do:
   let operation = input.get
   break operation ()`;
             }

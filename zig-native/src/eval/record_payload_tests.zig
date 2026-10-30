@@ -31,7 +31,7 @@ const record_source =
     \\data Box a = #Box { value: a }
     \\data Wrapped = #Wrapped { value: (U32,F32) }
     \\data Empty = #Empty {}
-    \\const unbox = fn box => case box of
+    \\const unbox = func box => return case box of
     \\  #Box value => value
     \\entry const pair = case #Pair { y: 2.5, x: 40 } of
     \\  #Pair payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
@@ -117,7 +117,7 @@ fn negativeScenario(allocator: std.mem.Allocator) !void {
         .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair payload=>@u32.add payload 0\n", .code = .type_mismatch },
         .{ .source = "data Empty=#Empty {}\nentry const answer=case #Empty {} of\n  #Empty payload=>42\n", .code = .constructor_arity },
         .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:#True,left:#False} of\n  #Pair (#True,_)=>0\n  #Pair {left:#False,right:#False}=>42\n", .code = .non_exhaustive_match },
+        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:true,left:false} of\n  #Pair (true,_)=>0\n  #Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
     }) |case| {
         var lexed = try lexer.lex(allocator, case.source);
         defer lexed.deinit(allocator);
@@ -155,7 +155,7 @@ fn importedScenario(allocator: std.mem.Allocator) !void {
     producer_tree.deinit(allocator);
     tree_live = false;
     const consumer_source =
-        \\const unbox = fn box => case box of
+        \\const unbox = func box => return case box of
         \\  #Imported value => value
         \\entry const unsigned = unbox (#Imported {value:42})
         \\entry const floating = unbox (#Imported {value:42.5})
@@ -188,32 +188,32 @@ test "imported generic record payload views keep producer identity after source 
 
 const generic_record_source =
     \\type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
-    \\const identity = fn value => value
-    \\const packed = #Pack { unused: identity, selected: fn (value: U32) => @u32.add value 1 }
-    \\const invoke = fn callback => callback 1
-    \\const sum = fn packed => fn (left: U32) => fn (right: U32) => do:
+    \\const identity = func value => return value
+    \\const packed = #Pack { unused: identity, selected: func (value: U32) => return @u32.add value 1 }
+    \\const invoke = func callback => return callback 1
+    \\const sum = func packed => return func (left: U32) => return func (right: U32) => return do:
     \\  let #Pack { selected } = packed
     \\  break selected (@u32.add left right)
-    \\const run = fn packed => fn (value: U32) => invoke (fn extra => do:
+    \\const run = func packed => return func (value: U32) => return invoke (func extra => return do:
     \\  let #Pack { selected } = packed
     \\  break selected (@u32.add value extra))
-    \\entry const answer = fn (value: U32) => run packed value
-    \\entry const partial = fn (value: U32) => invoke (sum packed value)
-    \\entry const chain = fn (value: U32) => do:
+    \\entry const answer = func (value: U32) => return run packed value
+    \\entry const partial = func (value: U32) => return invoke (sum packed value)
+    \\entry const chain = func (value: U32) => return do:
     \\  let callback = sum packed
     \\  break invoke (callback value)
 ;
 const curried_record_source =
     \\type Clock is effect = { tick: Unit -> U32 }
     \\type Pack callback is data = #Pack { callback: callback, marker: U32 }
-    \\const prepare = fn (amount: U32) => fn (value: U32) => do:
+    \\const prepare = func (amount: U32) => return func (value: U32) => return do:
     \\  use current <- Clock.tick ()
     \\  break @u32.add current (@u32.add value amount)
     \\const packed = #Pack { callback: prepare, marker: 42 }
-    \\const read = fn pack => do:
+    \\const read = func pack => return do:
     \\  let #Pack { marker } = pack
     \\  break marker
-    \\entry const answer = fn () => read packed
+    \\entry const answer = func () => return read packed
 ;
 fn retainedRecordEmission(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true, .artifact_replay = true });

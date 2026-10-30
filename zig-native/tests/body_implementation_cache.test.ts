@@ -11,7 +11,7 @@ function spine(value: string) {
 const implementation = (amount: number) =>
   `impl ScalarSource : Source U32 = {
   type Item = U32,
-  const first = fn value => @u32.add value ${amount},
+  const first = func value => return @u32.add value ${amount},
 }
 `;
 const ordinarySource = (
@@ -21,11 +21,11 @@ const ordinarySource = (
 ) => `
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 ${head}
-const unrelated = fn (value: U32) => @u32.add (${spine("value")}) 7
-const selected = fn (value: U32) => @u32.add (${
+const unrelated = func (value: U32) => return @u32.add (${spine("value")}) 7
+const selected = func (value: U32) => return @u32.add (${
   spine("Source.first value")
 }) ${caller}
-entry const run = fn (value: U32) => @u32.add (${
+entry const run = func (value: U32) => return @u32.add (${
   spine("unrelated value")
 }) (selected value)
 `;
@@ -48,13 +48,13 @@ for (
       let text = ordinarySource(method, caller, head);
       if (annotation === "alias") {
         text = "type Scalar = U32\n" + text.replace(
-          "const unrelated = fn (value: U32)",
-          "const unrelated = fn (value: Scalar)",
+          "const unrelated = func (value: U32)",
+          "const unrelated = func (value: Scalar)",
         );
       }
       if (annotation === "associated") {
         text =
-          "type Number is data = #Number U32\nconst Number.twice = fn (#Number value) => fn (delta: U32) => @u32.add value delta\n" +
+          "type Number is data = #Number U32\nconst Number.twice = func (#Number value) => return func (delta: U32) => return @u32.add value delta\n" +
           text.replace(
             `@u32.add (${spine("value")}) 7`,
             `@type.call "twice" (#Number (${spine("value")})) 7`,
@@ -76,18 +76,18 @@ for (
       const records: unknown[] = [];
       const badHead = `impl ScalarSource : Source F32 = {
   type Item = F32,
-  const first = fn value => @f32.add value 1.0,
+  const first = func value => return @f32.add value 1.0,
 }`;
       const changedItem = `impl ScalarSource : Source U32 = {
   type Item = F32,
-  const first = fn value => @u32.to_f32 value,
+  const first = func value => return @u32.to_f32 value,
 }`;
       const conditional = (witness: string) =>
         `type Ready a is contract = { type Proof }
 ${witness}
 impl ScalarSource : Source U32 where { Ready U32 } = {
   type Item = U32,
-  const first = fn value => @u32.add value 4,
+  const first = func value => return @u32.add value 4,
 }`;
       const ready = "impl ReadyScalar : Ready U32 = { type Proof = U32 }";
       const revisions: (readonly [string, number | null])[] = [
@@ -166,7 +166,7 @@ impl ScalarSource : Source U32 where { Ready U32 } = {
           [source(), 88],
           [
             source() +
-            "\ntype Float is data = #Float F32\nconst Float.twice = fn (#Float value) => fn (delta: F32) => @f32.add value delta\n",
+            "\ntype Float is data = #Float F32\nconst Float.twice = func (#Float value) => return func (delta: F32) => return @f32.add value delta\n",
             88,
           ],
           [source(), 88],
@@ -283,7 +283,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
       }
       if (local) {
         selected =
-          `do:\n  let forward = fn item => Source.first item\n  break ${
+          `do:\n  let forward = func item => return Source.first item\n  break ${
             selected.replace("Source.first value", "forward value")
           }`;
       }
@@ -293,13 +293,13 @@ type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 ${implementation(amount)}
 impl FloatSource : Source F32 = {
   type Item = F32,
-  const first = fn value => @f32.add value 0.5,
+  const first = func value => return @f32.add value 0.5,
 }
-const selected = fn value => ${selected}
-entry const run = fn (value: U32) => selected value
-entry const fraction = fn (value: F32) => selected value
-entry const captures = fn (value: U32) => do:
-  let forward = fn item => (Source.first value, Source.first item)
+const selected = func value => return ${selected}
+entry const run = func (value: U32) => return selected value
+entry const fraction = func (value: F32) => return selected value
+entry const captures = func (value: U32) => return do:
+  let forward = func item => return (Source.first value, Source.first item)
   let whole = forward 1
   let fraction = forward 0.5
   break @u32.add (@product.get whole 0) (@product.get fraction 0)
@@ -389,8 +389,8 @@ entry const sibling = ${sibling}
     const source = (sibling: string, prefix = "") =>
       `${prefix}
 import { Source, ScalarSource } from "./source"
-const selected = fn (value: U32) => ${spine("Source.first value")}
-entry const run = fn (value: U32) => selected value
+const selected = func (value: U32) => return ${spine("Source.first value")}
+entry const run = func (value: U32) => return selected value
 entry const sibling = ${sibling}
 `;
     try {

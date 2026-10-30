@@ -141,18 +141,18 @@ const Generator = struct {
 
 const fixture_source =
     \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
-    \\const factory = fn (number: U32) => fn (extra: U32) => @u32.add number extra
+    \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
     \\entry const schema: U32 = 7
     \\const bundle = #Bundle { answer: 42, read: factory 40 }
     \\entry const answer: U32 = bundle.read 2
 ;
 const unsolved_source =
     \\type Bundle read is data = #Bundle { read: read, callbacks: Array read }
-    \\const factory = fn number => fn extra => number
+    \\const factory = func number => return func extra => return number
     \\entry const schema: U32 = 7
     \\const bundle = do:
     \\  let read = factory 42
-    \\  break #Bundle { read: read, callbacks: @array.generate 1 (fn (index: U32) => read) }
+    \\  break #Bundle { read: read, callbacks: @array.generate 1 (func (index: U32) => return read) }
     \\entry const answer: U32 = bundle.read ()
 ;
 fn successful(result: *const backend.Result) !void {
@@ -340,7 +340,7 @@ test "source template rejects a foreign fresh evaluator owner and quotas before 
 test "source template independently imports F32 captures without sharing U32 evidence ordinals" {
     const floating =
         \\type Bundle is data = #Bundle { answer: F32, read: F32 -> F32 }
-        \\const factory = fn (number: F32) => fn (extra: F32) => @f32.add number extra
+        \\const factory = func (number: F32) => return func (extra: F32) => return @f32.add number extra
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { answer: 42.0, read: factory 40.0 }
         \\entry const answer: F32 = bundle.read 2.0
@@ -366,12 +366,12 @@ test "source template declines actual provider and State captures instead of pre
     const provider_source =
         \\effect Read: Unit -> F32
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\const reader = @effect.provider Read (fn () => 1.75)
+        \\const reader = @effect.provider Read (func () => return 1.75)
         \\const state = @effect.state (State.get F32) (State.set F32) 1.75
         \\entry const schema: U32 = 7
         \\entry const folded = do reader:
         \\  break Read ()
-        \\entry const answer = fn (value: F32) => do:
+        \\entry const answer = func (value: F32) => return do:
         \\  let (next, old) = do state:
         \\    use old <- State.get F32 ()
         \\    use State.set F32 (@f32.add old value)
@@ -406,10 +406,10 @@ test "source template declines actual provider and State captures instead of pre
 test "source template declines active waiting values before admitting an independent scalar root" {
     const pending_source =
         \\entry const scalar: U32 = 42
-        \\const keep = fn ~(value: U32) => value
+        \\const keep = func ~(value: U32) => return value
         \\const pending = keep 42
         \\entry const schema: U32 = 7
-        \\entry const answer = fn () => @force pending
+        \\entry const answer = func () => return @force pending
     ;
     var before = try Fixture.init(pending_source);
     defer before.deinit();
@@ -437,7 +437,7 @@ test "source template declines active waiting values before admitting an indepen
 test "source template rejects independently valid old pools even when source identity ordinals collide" {
     const alternate_source =
         \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
-        \\const factory = fn (number: U32) => fn (extra: U32) => @u32.add number extra
+        \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { answer: 42, read: factory 39 }
         \\entry const answer: U32 = bundle.read 2
@@ -499,7 +499,7 @@ test "source template imported closure and record storage survive complete old a
 test "source template keeps generic source variables and empty rows attached to the exact closure owner" {
     const generic_source =
         \\type Bundle is data = #Bundle { read: U32 -> U32 }
-        \\const factory = fn number => fn (extra: U32) => number
+        \\const factory = func number => return func (extra: U32) => return number
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { read: factory 42 }
         \\entry const answer: U32 = bundle.read 2
@@ -526,7 +526,7 @@ test "source template keeps generic source variables and empty rows attached to 
 test "source template preserves distinct captures of the same callback source" {
     const distinct_source =
         \\type Bundle is data = #Bundle { first: U32 -> U32, second: U32 -> U32 }
-        \\const factory = fn (number: U32) => fn (extra: U32) => @u32.add number extra
+        \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { first: factory 40, second: factory 2 }
         \\entry const answer: U32 = @u32.add (bundle.first 0) (bundle.second 0)
@@ -592,7 +592,7 @@ test "source template rejects malformed cycles and compiler-owned nominal identi
 test "source template declines changed callback source despite identical capture representation and namespace ordinals" {
     const changed_source =
         \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
-        \\const factory = fn (number: U32) => fn (extra: U32) => @u32.sub number extra
+        \\const factory = func (number: U32) => return func (extra: U32) => return @u32.sub number extra
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { answer: 42, read: factory 40 }
         \\entry const answer: U32 = bundle.read 2
@@ -613,7 +613,7 @@ test "source template declines changed callback source despite identical capture
 }
 test "source template exact discovered-value cutoff includes active ancestors" {
     for ([_]usize{ 65_535, 65_536 }) |count| {
-        const large_source = try a.print("const values: Array U32 = @array.generate {d} (fn (index: U32) -> U32 => index)\nentry const schema: U32 = 7\nentry const answer: U32 = @array.length values\n", .{count});
+        const large_source = try a.print("const values: Array U32 = @array.generate {d} (func (index: U32) : U32 => return index)\nentry const schema: U32 = 7\nentry const answer: U32 = @array.length values\n", .{count});
         defer a.free(large_source);
         var before = try Fixture.init(large_source);
         defer before.deinit();
@@ -680,7 +680,7 @@ test "source template unsolved graph exhaustive OOM leaves values and query publ
 test "source template generic same-source callbacks retain distinct U32 and F32 scoped captures" {
     const source =
         \\type Bundle [first, second] is data = #Bundle { first: first, second: second }
-        \\const factory = fn number => fn extra => number
+        \\const factory = func number => return func extra => return number
         \\entry const schema: U32 = 7
         \\const bundle = #Bundle { first: factory 42, second: factory 42.0 }
         \\entry const answer: U32 = bundle.first ()
@@ -806,9 +806,9 @@ test "source template local qualified callback follows changed global source dep
         \\type Bundle read is data = #Bundle read
         \\entry const schema: U32 = 7
         \\const bundle = do:
-        \\  let read = fn extra => schema
+        \\  let read = func extra => return schema
         \\  break #Bundle read
-        \\entry const answer: U32 = @array.length (@array.generate 1 (fn (index: U32) => bundle))
+        \\entry const answer: U32 = @array.length (@array.generate 1 (func (index: U32) => return bundle))
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -830,9 +830,9 @@ fn anchorDir() !std.testing.TmpDir {
     var dir = std.testing.tmpDir(.{});
     errdefer dir.cleanup();
     const values =
-        \\const items = @array.generate 2 (fn (index: U32) => if @u32.eq index 0 then 40 else 2)
+        \\const items = @array.generate 2 (func (index: U32) => return if @u32.eq index 0 then 40 else 2)
         \\const alias = items
-        \\const twin = @array.generate 2 (fn (index: U32) => if @u32.eq index 0 then 40 else 2)
+        \\const twin = @array.generate 2 (func (index: U32) => return if @u32.eq index 0 then 40 else 2)
     ;
     const main =
         \\import * as values from "./values"
@@ -841,13 +841,13 @@ fn anchorDir() !std.testing.TmpDir {
         \\  let items = values.items
         \\  let alias = values.alias
         \\  let twin = values.twin
-        \\  let read = fn extra => (items, alias, twin)
+        \\  let read = func extra => return (items, alias, twin)
         \\  break #Bundle { read: read }
         \\entry const schema: U32 = 7
-        \\entry const answer = fn (index: U32) => do:
+        \\entry const answer = func (index: U32) => return do:
         \\  let (first, second, third) = bundle.read ()
         \\  break @u32.add (@array.get first index) (@u32.add (@array.get second index) (@array.get third index))
-        \\entry const direct = fn (index: U32) => @array.get values.items index
+        \\entry const direct = func (index: U32) => return @array.get values.items index
     ;
     inline for (.{ .{ "prelude.blot", "" }, .{ "values.blot", values }, .{ "main.blot", main } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
     return dir;
@@ -864,22 +864,22 @@ test "refinement early cutoff consumes fresh call proofs across runtime body edi
     defer dir.cleanup();
     const main =
         \\import * as values from "./values"
-        \\const unused = fn (value: U32) => @u32.sub value 1
-        \\entry const warm = fn (value: U32) => values.adjust value
-        \\entry const answer = fn (value: U32) => @u32.add (values.adjust value) 40
+        \\const unused = func (value: U32) => return @u32.sub value 1
+        \\entry const warm = func (value: U32) => return values.adjust value
+        \\entry const answer = func (value: U32) => return @u32.add (values.adjust value) 40
         \\entry const folded: U32 = values.adjust 20
     ;
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "" });
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = main });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = "const adjust = fn (value: U32) => @u32.add value 1\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = "const adjust = func (value: U32) => return @u32.add value 1\n" });
     var before = try Fixture.project(&dir);
     defer before.deinit();
     var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     for ([_][]const u8{
-        "const adjust = fn (value: U32) => @u32.add value 2\n",
-        "const adjust = fn (value: U32) => @u32.sub value 2\n",
+        "const adjust = func (value: U32) => return @u32.add value 2\n",
+        "const adjust = func (value: U32) => return @u32.sub value 2\n",
     }) |source| {
         try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = source });
         var after = try Fixture.project(&dir);
@@ -949,7 +949,7 @@ test "constant receipt partial semantic import decline preserves ordinary aliase
         a.free(expression);
         expression = next;
     }
-    const source = try a.print("const input = 1\nconst seed = @u32.add input 0\nconst expensive = do:\n  let represented: Array U32 = #[{s}]\n  break represented\nentry const run = fn () => @array.get expensive 0\n", .{expression});
+    const source = try a.print("const input = 1\nconst seed = @u32.add input 0\nconst expensive = do:\n  let represented: Array U32 = #[{s}]\n  break represented\nentry const run = func () => return @array.get expensive 0\n", .{expression});
     defer a.free(source);
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -1113,10 +1113,10 @@ test "source template absent headers survive destruction of the complete old sou
 
 test "completed specialization query replays concrete captured callback without skipping ordinary constant fuel" {
     const source =
-        \\const factory = fn number => fn extra => number
+        \\const factory = func number => return func extra => return number
         \\const callback = factory 42
         \\entry const schema: U32 = 7
-        \\entry const answer = fn (extra: U32) -> U32 => callback extra
+        \\entry const answer = func (extra: U32) : U32 => return callback extra
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -1140,19 +1140,19 @@ test "completed specialization query replays concrete captured callback without 
 }
 
 const query_source =
-    \\const factory = fn number => fn extra => number
+    \\const factory = func number => return func extra => return number
     \\const callback = factory 42
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
     \\const run_value: U32 = callback 0
 ;
 
 const completed_capture_source =
-    \\const add = fn extra => @u32.add extra 42
-    \\const factory = fn invoke => fn extra => invoke extra
+    \\const add = func extra => return @u32.add extra 42
+    \\const factory = func invoke => return func extra => return invoke extra
     \\const callback = factory add
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
     \\const run_value: U32 = callback 0
 ;
 
@@ -1202,10 +1202,10 @@ test "completed selected capture graphs replay without inference and publish ato
 const independent_query_source = query_source ++
     \\
     \\const factor: U32 = 5
-    \\const checked = fn (number: U32) -> U32 => @u32.add number factor
-    \\const floating = fn (number: F32) -> F32 => number
-    \\const listed = fn (items: List U32) -> List U32 => items
-    \\const arrayed = fn (items: Array U32) -> Array U32 => items
+    \\const checked = func (number: U32) : U32 => return @u32.add number factor
+    \\const floating = func (number: F32) : F32 => return number
+    \\const listed = func (items: List U32) : List U32 => return items
+    \\const arrayed = func (items: Array U32) : Array U32 => return items
     \\type CallablePayload is data = #CallablePayload (U32 -> U32)
 ;
 
@@ -1388,9 +1388,9 @@ test "independent call proof preserves List versus Array nominal identity and re
         \\
         \\data Left = #Left U32
         \\data Right = #Right U32
-        \\const left = fn (item: Left) -> Left => item
+        \\const left = func (item: Left) : Left => return item
         \\type Read a is effect = { get: Unit -> a }
-        \\const requested = fn () -> U32 => Read.get ()
+        \\const requested = func () : U32 => return Read.get ()
     ;
     var fixture = try Fixture.init(source);
     defer fixture.deinit();
@@ -1581,19 +1581,19 @@ fn queryExpected(g: *Generator, old: *const capture.Capture, value: u32) !u32 {
 
 const source_row_query =
     \\type Read a is effect = { get: Unit -> a }
-    \\const factory = fn action => fn value => action value
-    \\const callback = factory (fn () => Read.get ())
+    \\const factory = func action => return func value => return action value
+    \\const callback = factory (func () => return Read.get ())
     \\entry const schema: U32 = 7
-    \\entry const answer = fn () -> U32 => @effect.reader Read.get 0 (fn () => 42) callback
+    \\entry const answer = func () : U32 => return @effect.reader Read.get 0 (func () => return 42) callback
     \\const evaluated: U32 = answer ()
 ;
 
 test "semantic catalog imports nominal evidence while executable layout remains rejected" {
     const source =
         \\data Box a = #Box a
-        \\entry const schema = fn () -> U32 => 7
+        \\entry const schema = func () : U32 => return 7
         \\const boxed = #Box 42
-        \\entry const answer = fn (value: U32) => do:
+        \\entry const answer = func (value: U32) => return do:
         \\  let #Box fixed = boxed
         \\  break @u32.add value fixed
     ;
@@ -1873,12 +1873,12 @@ test "completed specialization query selected values and remapped receipt surviv
 }
 
 const paired_query_source =
-    \\const factory = fn number => fn extra => number
+    \\const factory = func number => return func extra => return number
     \\const left = factory 42
     \\const right = factory 2
     \\entry const schema: U32 = 7
-    \\entry const answer_left = fn (extra: U32) -> U32 => left extra
-    \\entry const answer_right = fn (extra: U32) -> U32 => right extra
+    \\entry const answer_left = func (extra: U32) : U32 => return left extra
+    \\entry const answer_right = func (extra: U32) : U32 => return right extra
     \\const run_left: U32 = left 0
     \\const run_right: U32 = right 0
 ;
@@ -2195,11 +2195,11 @@ test "source declared effect query structurally remaps a nominal operation argum
     const source =
         \\type Payload is data = #Payload { value: U32 }
         \\type Read a is effect = { get: Unit -> a }
-        \\const factory = fn action => fn value => action value
-        \\const callback = factory (fn () => Read.get ())
+        \\const factory = func action => return func value => return action value
+        \\const callback = factory (func () => return Read.get ())
         \\entry const schema: U32 = 7
-        \\entry const answer = fn () -> U32 => do:
-        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (fn () => #Payload { value: 42 }) callback
+        \\entry const answer = func () : U32 => return do:
+        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (func () => return #Payload { value: 42 }) callback
         \\  break payload.value
     ;
     var before = try Fixture.init(source);
@@ -2341,11 +2341,11 @@ test "query graph scratch clears declined alias candidates and rejects changed l
 }
 
 const scratch_span_source =
-    \\const first = @array.generate 2 (fn (index: U32) => if @u32.eq index 0 then 40 else 2)
-    \\const second = @array.generate 2 (fn (index: U32) => if @u32.eq index 0 then 2 else 40)
+    \\const first = @array.generate 2 (func (index: U32) => return if @u32.eq index 0 then 40 else 2)
+    \\const second = @array.generate 2 (func (index: U32) => return if @u32.eq index 0 then 2 else 40)
     \\const bundle = (first, second)
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (index: U32) => do:
+    \\entry const answer = func (index: U32) => return do:
     \\  let (left, right) = bundle
     \\  break @u32.add (@array.get left index) (@array.get right index)
 ;
@@ -2712,8 +2712,8 @@ fn sparseInspectionScenario(allocator: Allocator, pools: *const artifacts.Pools,
 
 test "source template inspection visits a small graph without indexing unrelated captured values" {
     const source =
-        \\const padding: Array U32 = @array.generate 32768 (fn (index: U32) -> U32 => index)
-        \\const tiny: Array U32 = @array.generate 2 (fn (index: U32) -> U32 => if @u32.eq index 0 then 40 else 2)
+        \\const padding: Array U32 = @array.generate 32768 (func (index: U32) : U32 => return index)
+        \\const tiny: Array U32 = @array.generate 2 (func (index: U32) : U32 => return if @u32.eq index 0 then 40 else 2)
         \\entry const schema: U32 = 7
         \\entry const answer: U32 = @u32.add (@array.length padding) (@array.get tiny 0)
     ;
@@ -2779,13 +2779,13 @@ fn generativeSourceGuardScenario(allocator: Allocator, fixture: *const Fixture) 
 test "source callable templates decline generative schemes and erased body identities with OOM" {
     const source =
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag then left else right
-        \\const hidden = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-        \\  let picked = choose #True left right
-        \\  let deferred = fn () => picked.get ()
+        \\const choose = func flag => return func (left: State a) => return func (right: State a) => return if flag then left else right
+        \\const hidden = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+        \\  let picked = choose true left right
+        \\  let deferred = func () => return picked.get ()
         \\  break 11
         \\))
-        \\const ordinary = fn (value: U32) => @u32.add value 1
+        \\const ordinary = func (value: U32) => return @u32.add value 1
         \\entry const answer = 3
     ;
     var fixture = try Fixture.init(source);
@@ -2872,7 +2872,7 @@ test "refinement generative presence belongs to current and retained immutable s
     try std.testing.expect(lease.has_generative_sources);
     var generated = try Fixture.init(
         "type State a is effect = { get: Unit -> a }\n" ++
-            "const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag then left else right\n" ++
+            "const choose = func flag => return func (left: State a) => return func (right: State a) => return if flag then left else right\n" ++
             "entry const answer = 3",
     );
     defer generated.deinit();

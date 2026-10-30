@@ -9,11 +9,280 @@ const Equations = @import("scheme_equations.zig");
 fn require(ok: bool) Error!void {
     if (!ok) return error.InvalidArtifact;
 }
+/// Successful lexical proofs for exactly one immutable compilation environment.
+/// This is never serialized or retained across source revisions. It caches
+/// bodies, not instantiated signatures, call rows, handlers or borrow scopes.
+pub const SourceProofCache = struct {
+    const TargetKey = struct { unit: u32, target_unit: u32, target_binding: core.BindingId };
+    const FactKey = struct { unit: u32, root: T.Id };
+    allocator: std.mem.Allocator,
+    units: []const *const core.Module,
+    completed: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
+    targets: std.AutoHashMapUnmanaged(TargetKey, std.ArrayList(core.BindingId)) = .empty,
+    indexed_catalogs: std.AutoHashMapUnmanaged(u32, void) = .empty,
+    usage_facts: std.AutoHashMapUnmanaged(FactKey, bool) = .empty,
+    module_work: ?[]usize = null,
+    exhausted_unit: ?u32 = null,
+    pub fn init(allocator: std.mem.Allocator, units: []const *const core.Module) Equations.Error!SourceProofCache {
+        if (units.len == 0) return error.InvalidArtifact;
+        for (units, 0..) |unit, index| {
+            if (unit.unit == 0) return error.InvalidArtifact;
+            for (units[0..index]) |prior| if (prior == unit or prior.unit == unit.unit) return error.InvalidArtifact;
+        }
+        return .{ .allocator = allocator, .units = try allocator.dupe(*const core.Module, units) };
+    }
+    /// Opt-in source checking envelope: each immutable module keeps one shared
+    /// allowance across all roots and recursive bodies. The total is bounded
+    /// by the validated module inventory times this unchanged local allowance.
+    /// `init` retains the caller's explicit global-budget contract.
+    pub fn initWithModuleBudget(allocator: std.mem.Allocator, units: []const *const core.Module, work_per_module: usize) Equations.Error!SourceProofCache {
+        if (work_per_module == 0) return error.InvalidArtifact;
+        _ = std.math.mul(usize, units.len, work_per_module) catch return error.InvalidArtifact;
+        var cache = try init(allocator, units);
+        errdefer cache.deinit();
+        const work = try allocator.alloc(usize, units.len);
+        @memset(work, work_per_module);
+        cache.module_work = work;
+        return cache;
+    }
+    /// Source-only inventory envelope for large, finite modules. Small units
+    /// retain one million work steps; larger immutable graphs receive 256
+    /// steps per node/word, capped at 32 million for each module. The whole
+    /// compilation is consequently bounded by 32 million times its module
+    /// inventory. No completed lookup or nested body replenishes an allowance.
+    /// Explicit global and fixed-module budget APIs above remain unchanged.
+    pub fn initWithInventoryBudget(allocator: std.mem.Allocator, units: []const *const core.Module) Equations.Error!SourceProofCache {
+        const base: usize = 1_000_000;
+        const cap: usize = 32_000_000;
+        _ = std.math.mul(usize, units.len, cap) catch return error.InvalidArtifact;
+        var cache = try initWithModuleBudget(allocator, units, base);
+        errdefer cache.deinit();
+        for (units, cache.module_work.?) |unit, *remaining| {
+            var inventory: usize = 0;
+            for ([_]usize{ unit.nodes.len, unit.extra.len, unit.types.nodes.len, unit.types.extra.len, unit.obligations.len }) |count|
+                inventory = std.math.add(usize, inventory, count) catch return error.InvalidArtifact;
+            const proportional = std.math.mul(usize, inventory, 256) catch return error.InvalidArtifact;
+            remaining.* = @min(cap, @max(base, proportional));
+        }
+        return cache;
+    }
+    pub fn moduleRemaining(self: *const SourceProofCache, unit: u32) ?usize {
+        const work = self.module_work orelse return null;
+        for (self.units, work) |owner, remaining| if (owner.unit == unit) return remaining;
+        return null;
+    }
+    pub fn exhaustedUnit(self: *const SourceProofCache) ?u32 {
+        return self.exhausted_unit;
+    }
+    pub fn remainingTotal(self: *const SourceProofCache) ?usize {
+        const work = self.module_work orelse return null;
+        var total: usize = 0;
+        for (work) |remaining| total += remaining;
+        return total;
+    }
+    fn moduleWork(self: *SourceProofCache, module: *const core.Module) ?*usize {
+        const work = self.module_work orelse return null;
+        for (self.units, 0..) |owner, index| if (owner == module) return &work[index];
+        return null;
+    }
+    pub fn deinit(self: *SourceProofCache) void {
+        var targets = self.targets.valueIterator();
+        while (targets.next()) |bindings| bindings.deinit(self.allocator);
+        self.targets.deinit(self.allocator);
+        self.indexed_catalogs.deinit(self.allocator);
+        self.usage_facts.deinit(self.allocator);
+        if (self.module_work) |work| self.allocator.free(work);
+        self.completed.deinit(self.allocator);
+        self.allocator.free(self.units);
+        self.* = undefined;
+    }
+    fn environment(self: *const SourceProofCache, units: []const *const core.Module) bool {
+        return std.mem.eql(*const core.Module, self.units, units);
+    }
+    fn owns(self: *const SourceProofCache, module: *const core.Module) bool {
+        for (self.units) |unit| if (unit == module) return true;
+        return false;
+    }
+    fn contains(self: *const SourceProofCache, module: *const core.Module, binding: core.BindingId) bool {
+        return self.owns(module) and self.completed.contains(.{ .unit = module.unit, .binding = binding });
+    }
+    fn reserve(self: *SourceProofCache, count: usize) Equations.Error!void {
+        const extra = std.math.cast(u32, count) orelse return error.InvalidArtifact;
+        try self.completed.ensureUnusedCapacity(self.allocator, extra);
+    }
+    fn publish(self: *SourceProofCache, module: *const core.Module, binding: core.BindingId) void {
+        std.debug.assert(self.owns(module));
+        self.completed.putAssumeCapacity(.{ .unit = module.unit, .binding = binding }, {});
+    }
+    /// A structural fact, independent of lexical/effect authority. Mutable
+    /// solver graphs are inspected directly and never read or publish facts.
+    pub fn containsUsage(self: *SourceProofCache, module: *const core.Module, root: T.Id, remaining: *usize) Equations.Error!bool {
+        var immutable = false;
+        for (self.units) |owner| if (owner.unit == module.unit and
+            owner.types.nodes.ptr == module.types.nodes.ptr and owner.types.nodes.len == module.types.nodes.len and
+            owner.types.extra.ptr == module.types.extra.ptr and owner.types.extra.len == module.types.extra.len and
+            owner.nominals.ptr == module.nominals.ptr and owner.nominals.len == module.nominals.len)
+        {
+            immutable = true;
+            break;
+        };
+        const key: FactKey = .{ .unit = module.unit, .root = root };
+        if (remaining.* == 0) return error.InvalidArtifact;
+        remaining.* -= 1;
+        if (immutable) if (self.usage_facts.get(key)) |fact| return fact;
+        var work: @import("usage_check.zig").Work = .{ .remaining = remaining.* };
+        defer remaining.* = work.remaining;
+        const fact = @import("usage_check.zig").containsNominalWork(&module.types, module.nominals, root, &work) catch return error.InvalidArtifact;
+        if (immutable) try self.usage_facts.put(self.allocator, key, fact);
+        return fact;
+    }
+    fn targetBindings(self: *SourceProofCache, module: *const core.Module, target_: core.BindingRef, remaining: *usize) Equations.Error![]const core.BindingId {
+        // Solver views replace only the type graph. Index the exact immutable
+        // binding catalog they borrow, never the substituted type environment.
+        var catalog: ?*const core.Module = null;
+        for (self.units) |owner| if (owner.unit == module.unit and owner.bindings.ptr == module.bindings.ptr and owner.bindings.len == module.bindings.len) {
+            catalog = owner;
+            break;
+        };
+        const source = catalog orelse return error.InvalidArtifact;
+        if (!self.indexed_catalogs.contains(source.unit)) try self.indexCatalog(source, remaining);
+        const key: TargetKey = .{ .unit = module.unit, .target_unit = target_.unit, .target_binding = target_.binding };
+        return if (self.targets.get(key)) |bindings| bindings.items else &.{};
+    }
+    /// Index exact declaration targets once, preserving ordinal order and both
+    /// local target spellings. This is catalog lookup only: each matched binding
+    /// still proves its producer link, instantiated signature and performed rows.
+    fn indexCatalog(self: *SourceProofCache, module: *const core.Module, remaining: *usize) Equations.Error!void {
+        var pending: std.AutoHashMapUnmanaged(TargetKey, std.ArrayList(core.BindingId)) = .empty;
+        defer pending.deinit(self.allocator);
+        errdefer {
+            var lists = pending.valueIterator();
+            while (lists.next()) |list| list.deinit(self.allocator);
+        }
+        for (module.bindings, 0..) |binding, ordinal| {
+            if (remaining.* == 0) return error.InvalidArtifact;
+            remaining.* -= 1;
+            const id: core.BindingId = @intCast(ordinal);
+            const targets = [_]core.BindingRef{ .{ .binding = id }, .{ .unit = module.unit, .binding = id }, binding.target };
+            for (targets[0..if (binding.kind == .external) @as(usize, 3) else 2]) |target_| {
+                const item = try pending.getOrPut(self.allocator, .{ .unit = module.unit, .target_unit = target_.unit, .target_binding = target_.binding });
+                if (!item.found_existing) item.value_ptr.* = .empty;
+                try item.value_ptr.append(self.allocator, id);
+            }
+        }
+        // Allocate before publication; a failed index leaves no partial facts.
+        try self.targets.ensureUnusedCapacity(self.allocator, pending.count());
+        try self.indexed_catalogs.ensureUnusedCapacity(self.allocator, 1);
+        var entries = pending.iterator();
+        while (entries.next()) |entry| self.targets.putAssumeCapacity(entry.key_ptr.*, entry.value_ptr.*);
+        self.indexed_catalogs.putAssumeCapacity(module.unit, {});
+    }
+};
 const Admission = Equations.Admission;
+test "source target catalog indexes exact aliases once and publishes atomically" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, targetCatalogScenario, .{});
+}
+fn targetCatalogScenario(allocator: std.mem.Allocator) !void {
+    var bindings = [_]core.Binding{
+        .{ .kind = .local, .ty = T.u32_type, .scheme = .{}, .target = .{ .binding = 0 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .external, .ty = T.u32_type, .scheme = .{}, .target = .{ .unit = 2, .binding = 7 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .external, .ty = T.u32_type, .scheme = .{}, .target = .{ .unit = 2, .binding = 7 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .kind = .external, .ty = T.u32_type, .scheme = .{}, .target = .{ .binding = 1 }, .span = .{ .start = 0, .end = 0 } },
+    };
+    const module: core.Module = .{
+        .unit = 1,
+        .types = .{ .nodes = &.{}, .extra = &.{} },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &bindings,
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    var cache = try SourceProofCache.init(allocator, &.{&module});
+    defer cache.deinit();
+    var remaining: usize = bindings.len - 1;
+    if (cache.targetBindings(&module, .{ .unit = 2, .binding = 7 }, &remaining)) |_| return error.TestExpectedError else |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
+    try std.testing.expectEqual(@as(u32, 0), cache.targets.count());
+    try std.testing.expectEqual(@as(u32, 0), cache.indexed_catalogs.count());
+    remaining = bindings.len;
+    try std.testing.expectEqualSlices(core.BindingId, &.{ 1, 2 }, try cache.targetBindings(&module, .{ .unit = 2, .binding = 7 }, &remaining));
+    try std.testing.expectEqual(@as(usize, 0), remaining);
+    // Distinct local spellings remain exact: only the unqualified target has
+    // the extra imported alias. Hits and absent targets spend no further scan.
+    try std.testing.expectEqualSlices(core.BindingId, &.{ 1, 3 }, try cache.targetBindings(&module, .{ .binding = 1 }, &remaining));
+    try std.testing.expectEqualSlices(core.BindingId, &.{1}, try cache.targetBindings(&module, .{ .unit = 1, .binding = 1 }, &remaining));
+    try std.testing.expectEqual(@as(usize, 0), (try cache.targetBindings(&module, .{ .unit = 9, .binding = 7 }, &remaining)).len);
+}
+fn sourceRowIndexScenario(allocator: std.mem.Allocator) !void {
+    const rows = try allocator.alloc(T.Effects.Row, 5001);
+    defer allocator.free(rows);
+    for (rows, 0..) |*row, id| row.* = .{ .tail = .{ .variable = @intCast(id * 2) } };
+    var module: core.Module = .{
+        .unit = 1,
+        .types = .{ .nodes = &.{}, .extra = &.{}, .effects = .{ .rows = rows, .variable_count = 10001 } },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    var remaining: usize = 1_000_000;
+    var workspace: Equations.Workspace = .{ .allocator = allocator };
+    var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
+    defer {
+        for (admission.source_rows.items) |index| allocator.free(index.rows);
+        admission.source_rows.deinit(allocator);
+    }
+    var scopes: contracts.Context = .{ .types = &module.types, .remaining = &remaining, .large_plain_graph = true, .source_instances = true };
+    var walker: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission };
+    const selected = walker.rowsForVariable(10000) catch |err| return if (workspace.oom) error.OutOfMemory else err;
+    try std.testing.expectEqualSlices(T.Effects.Id, &.{5000}, selected);
+    try std.testing.expect(!scopes.closed_rows.contains(5000) and !scopes.pure_rows.contains(5000));
+    var second: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission };
+    const before = remaining;
+    try std.testing.expectEqualSlices(T.Effects.Id, &.{5000}, try second.rowsForVariable(10000));
+    try std.testing.expect(before - remaining < 20);
+    try std.testing.expectEqual(@as(usize, 0), (try second.rowsForVariable(9999)).len);
+    var exhausted: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
+    defer exhausted.source_rows.deinit(allocator);
+    var failed: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &exhausted };
+    remaining = 1;
+    if (failed.rowsForVariable(10000)) |_| return error.TestExpectedError else |err| {
+        if (workspace.oom) return error.OutOfMemory;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
+    try std.testing.expectEqual(@as(usize, 0), exhausted.source_rows.items.len);
+    try std.testing.expect(failed.source_row_index == null);
+}
+test "source row indexes retain high identities without granting lexical authority through allocation failure" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sourceRowIndexScenario, .{});
+}
+
 // Call-site anonymous structs must not instantiate the recursive proof engine.
-const Context = struct { units: []const *const core.Module = &.{} };
+const Context = struct { units: []const *const core.Module = &.{}, source_proofs: ?*SourceProofCache = null };
 fn contextView(context: anytype) Context {
-    return .{ .units = if (@hasField(@TypeOf(context), "units")) context.units else &.{} };
+    return .{ .units = if (@hasField(@TypeOf(context), "units")) context.units else &.{}, .source_proofs = if (@hasField(@TypeOf(context), "source_proofs")) context.source_proofs else null };
 }
 pub fn executable(module: *const core.Module, context: anytype) Error!void {
     var remaining: usize = 65_536;
@@ -48,11 +317,45 @@ pub fn parametricBody(module: *const core.Module, binding: core.BindingId, conte
 /// Reconstruct one body's interface, allowing ordinary scheme equations for
 /// inferred callee requirements. This does not certify the enclosing module.
 pub fn checkedInterfaceBody(module: *const core.Module, binding: core.BindingId, context: anytype, remaining: *usize, allocator: std.mem.Allocator) Equations.Error!void {
+    return checkedInterfaceBodyOrigin(module, binding, context, remaining, allocator, null, null);
+}
+/// A caller-owned cache must belong to the exact immutable module environment.
+/// Each actual call still proves its instantiated signature and performed rows.
+pub fn checkedInterfaceBodyCached(cache: *SourceProofCache, module: *const core.Module, binding: core.BindingId, remaining: *usize, failure: ?*?Equations.SourceFailure, proved: ?*std.ArrayList(core.BindingRef)) Equations.Error!void {
+    if (!cache.owns(module)) return error.InvalidArtifact;
+    return checkedInterfaceBodyOrigin(module, binding, .{ .units = cache.units, .source_proofs = cache }, remaining, cache.allocator, failure, proved);
+}
+/// Completed claims belong only to this already bounds-checked immutable source
+/// context. Publish them together after every recursive header hypothesis has
+/// discharged; a failed proof publishes none. They are not portable evidence.
+pub fn checkedInterfaceBodyOrigin(module: *const core.Module, binding: core.BindingId, context: anytype, remaining: *usize, allocator: std.mem.Allocator, failure: ?*?Equations.SourceFailure, proved: ?*std.ArrayList(core.BindingRef)) Equations.Error!void {
+    const source_context = contextView(context);
+    if (source_context.source_proofs) |cache| {
+        if (!cache.environment(source_context.units) or !cache.owns(module)) return error.InvalidArtifact;
+        cache.exhausted_unit = null;
+    }
     var workspace: Equations.Workspace = .{ .allocator = allocator };
-    var admission: Admission = .{ .remaining = remaining, .workspace = &workspace, .source_bodies = true };
+    var admission: Admission = .{ .remaining = remaining, .workspace = &workspace, .source_bodies = true, .source_failure = failure };
+    defer admission.bodies.deinit(allocator);
+    defer {
+        for (admission.source_rows.items) |index| allocator.free(index.rows);
+        admission.source_rows.deinit(allocator);
+        for (admission.source_definitions.items) |index| allocator.free(index.values);
+        admission.source_definitions.deinit(allocator);
+    }
     workspace.admission = &admission;
-    sourceBody(module, binding, contextView(context), &admission) catch return if (workspace.oom) error.OutOfMemory else error.InvalidArtifact;
+    sourceBody(module, binding, source_context, &admission) catch {
+        // Temporary integration trace, compiled only with error tracing enabled.
+        if (@errorReturnTrace()) |trace| std.debug.dumpErrorReturnTrace(trace);
+        return if (workspace.oom) error.OutOfMemory else error.InvalidArtifact;
+    };
     if (workspace.oom) return error.OutOfMemory;
+    // Reserve every output before publishing any receipt. Allocation failure
+    // cannot publish a partially completed proof batch.
+    if (proved) |claims| try claims.ensureUnusedCapacity(allocator, admission.bodies.items.len);
+    if (source_context.source_proofs) |cache| try cache.reserve(admission.bodies.items.len);
+    if (proved) |claims| for (admission.bodies.items) |body| claims.appendAssumeCapacity(.{ .unit = body.module.unit, .binding = body.binding });
+    if (source_context.source_proofs) |cache| for (admission.bodies.items) |body| cache.publish(body.module, body.binding);
 }
 /// Declaration-sized source authority. Active recursive declarations use their
 /// own headers as hypotheses, just as module admission does; all reached bodies
@@ -61,16 +364,34 @@ pub fn checkedInterfaceBody(module: *const core.Module, binding: core.BindingId,
 /// for the complete source context. It never certifies a serialized package.
 fn sourceBody(module: *const core.Module, binding: core.BindingId, context: Context, admission: *Admission) Error!void {
     std.debug.assert(admission.source_bodies);
-    try require(binding != 0 and binding < module.bindings.len and module.bindings.len <= 4096);
+    try require(binding != 0 and binding < module.bindings.len);
     try require(module.binding(binding).kind == .global);
     const body = module.body(binding) orelse return error.InvalidArtifact;
-    for (admission.bodies[0..admission.body_count]) |prior| if (prior.module == module and prior.binding == binding) return;
-    try require(admission.body_count < admission.bodies.len);
-    const before = admission.body_count;
-    errdefer admission.body_count = before;
-    admission.bodies[admission.body_count] = .{ .module = module, .binding = binding };
-    admission.body_count += 1;
-    var scopes: contracts.Context = .{ .types = &module.types, .remaining = admission.remaining, .executable = true, .obligations = module.obligations, .large_plain_graph = true };
+    if (context.source_proofs) |cache| {
+        try require(cache.owns(module));
+        if (cache.contains(module, binding)) return;
+    }
+    errdefer if (admission.source_failure) |failure| {
+        if (failure.* == null) failure.* = .{ .unit = module.unit, .span = body.span };
+    };
+    for (admission.bodies.items) |prior| if (prior.module == module and prior.binding == binding) return;
+    const prior_remaining = admission.remaining;
+    if (context.source_proofs) |cache| if (cache.moduleWork(module)) |work| {
+        admission.remaining = work;
+    };
+    defer admission.remaining = prior_remaining;
+    errdefer if (context.source_proofs) |cache| {
+        if (cache.module_work != null and admission.remaining.* == 0 and cache.exhausted_unit == null) cache.exhausted_unit = module.unit;
+    };
+    try require(admission.bodies.items.len < 65_536);
+    const before = admission.bodies.items.len;
+    errdefer admission.bodies.shrinkRetainingCapacity(before);
+    const workspace = admission.workspace orelse return error.InvalidArtifact;
+    admission.bodies.append(workspace.allocator, .{ .module = module, .binding = binding }) catch {
+        workspace.oom = true;
+        return error.InvalidArtifact;
+    };
+    var scopes: contracts.Context = .{ .types = &module.types, .remaining = admission.remaining, .executable = true, .obligations = module.obligations, .large_plain_graph = true, .source_instances = true };
     try scopes.initialize();
     var walker: Walker = .{ .module = module, .context = context, .scopes = &scopes, .admission = admission };
     try walker.proveBody(body.*);
@@ -192,6 +513,7 @@ const Walker = struct {
     row_index: [4096]T.Effects.Id = undefined,
     row_index_len: usize = 0,
     rows_indexed: bool = false,
+    source_row_index: ?[]const T.Effects.Id = null,
     closed_rows: T.List = .{},
     foreign_allowed: bool = false,
     body_row: T.Effects.Id = 0,
@@ -287,7 +609,10 @@ const Walker = struct {
         defer if (quantified) self.scopes.leave();
         try self.header(signature, self.module.parameters[body.parameters.start..][0..body.parameters.len], body.root, false);
         try self.bodyStorage(self.module.parameters[body.parameters.start..][0..body.parameters.len], body.root);
-        try self.expression(body.root, 0);
+        self.expression(body.root, 0) catch |err| {
+            std.debug.print("NUM_BODY unit={d} binding={d} name={s} span={d}..{d}\n", .{ self.module.unit, body.binding, self.module.name(body.declaration_name), body.span.start, body.span.end });
+            return err;
+        };
         try require(self.scopes.opening_count == 0);
     }
     fn units(self: *Self) []const *const core.Module {
@@ -344,39 +669,77 @@ const Walker = struct {
         }
     }
     fn rowsForVariable(self: *Self, variable: u32) Error![]const T.Effects.Id {
-        if (!self.rows_indexed) {
-            for (self.module.types.effects.rows, 0..) |row, id| {
-                try self.step(0);
-                if (row.tail != .variable) continue;
-                try require(self.row_index_len < self.row_index.len);
-                self.row_index[self.row_index_len] = @intCast(id);
-                self.row_index_len += 1;
-            }
-            const Sort = struct {
-                types: *const core.Types,
-                remaining: *usize,
-                fn less(context: @This(), first: T.Effects.Id, second: T.Effects.Id) bool {
-                    context.remaining.* -|= 1;
-                    return context.types.row(first).tail.variable < context.types.row(second).tail.variable;
+        const index = if (self.admission.source_bodies) try self.sourceRows() else package_rows: {
+            if (!self.rows_indexed) {
+                for (self.module.types.effects.rows, 0..) |row, id| {
+                    try self.step(0);
+                    if (row.tail != .variable) continue;
+                    try require(self.row_index_len < self.row_index.len);
+                    self.row_index[self.row_index_len] = @intCast(id);
+                    self.row_index_len += 1;
                 }
-            };
-            std.mem.sortUnstable(T.Effects.Id, self.row_index[0..self.row_index_len], Sort{ .types = &self.module.types, .remaining = self.scopes.remaining }, Sort.less);
-            try require(self.scopes.remaining.* != 0);
-            self.rows_indexed = true;
-        }
+                try self.sortRows(self.row_index[0..self.row_index_len]);
+                self.rows_indexed = true;
+            }
+            break :package_rows self.row_index[0..self.row_index_len];
+        };
         var first: usize = 0;
-        var end = self.row_index_len;
+        var end = index.len;
         while (first < end) {
             try self.step(0);
             const middle = first + (end - first) / 2;
-            if (self.module.types.row(self.row_index[middle]).tail.variable < variable) first = middle + 1 else end = middle;
+            if (self.module.types.row(index[middle]).tail.variable < variable) first = middle + 1 else end = middle;
         }
         end = first;
-        while (end < self.row_index_len) : (end += 1) {
+        while (end < index.len) : (end += 1) {
             try self.step(0);
-            if (self.module.types.row(self.row_index[end]).tail.variable != variable) break;
+            if (self.module.types.row(index[end]).tail.variable != variable) break;
         }
-        return self.row_index[first..end];
+        return index[first..end];
+    }
+    fn sortRows(self: *Self, rows: []T.Effects.Id) Error!void {
+        const Sort = struct {
+            types: *const core.Types,
+            remaining: *usize,
+            fn less(context: @This(), first: T.Effects.Id, second: T.Effects.Id) bool {
+                context.remaining.* -|= 1;
+                return context.types.row(first).tail.variable < context.types.row(second).tail.variable;
+            }
+        };
+        std.mem.sortUnstable(T.Effects.Id, rows, Sort{ .types = &self.module.types, .remaining = self.scopes.remaining }, Sort.less);
+        try require(self.scopes.remaining.* != 0);
+    }
+    fn sourceRows(self: *Self) Error![]const T.Effects.Id {
+        if (self.source_row_index) |rows| return rows;
+        for (self.admission.source_rows.items) |index| if (index.module == self.module) {
+            self.source_row_index = index.rows;
+            return index.rows;
+        };
+        const workspace = self.admission.workspace orelse return error.InvalidArtifact;
+        var pending: std.ArrayList(T.Effects.Id) = .empty;
+        defer pending.deinit(workspace.allocator);
+        for (self.module.types.effects.rows, 0..) |row, id| {
+            try self.step(0);
+            if (row.tail != .variable) continue;
+            pending.append(workspace.allocator, @intCast(id)) catch {
+                workspace.oom = true;
+                return error.InvalidArtifact;
+            };
+        }
+        try self.sortRows(pending.items);
+        const rows = pending.toOwnedSlice(workspace.allocator) catch {
+            workspace.oom = true;
+            return error.InvalidArtifact;
+        };
+        errdefer workspace.allocator.free(rows);
+        // Source-sized lookup only: lexical closed/pure authority stays on the
+        // walker. No partial index is retained on budget or allocation failure.
+        self.admission.source_rows.append(workspace.allocator, .{ .module = self.module, .rows = rows }) catch {
+            workspace.oom = true;
+            return error.InvalidArtifact;
+        };
+        self.source_row_index = rows;
+        return rows;
     }
     fn closeRows(self: *Self, owned_rows: T.List) Error!void {
         for (self.module.types.list(owned_rows)) |variable| {
@@ -428,10 +791,46 @@ const Walker = struct {
         for (self.units()) |unit| if (unit.unit == reference.unit) return unit;
         return error.InvalidArtifact;
     }
+    fn containsUsage(self: *Self, root: T.Id) Error!bool {
+        if (self.context.source_proofs) |cache| return cache.containsUsage(self.module, root, self.scopes.remaining) catch |err| {
+            if (err == error.OutOfMemory) if (self.admission.workspace) |workspace| {
+                workspace.oom = true;
+            };
+            return error.InvalidArtifact;
+        };
+        var work: @import("usage_check.zig").Work = .{ .remaining = self.scopes.remaining.* };
+        defer self.scopes.remaining.* = work.remaining;
+        return @import("usage_check.zig").containsNominalWork(&self.module.types, self.module.nominals, root, &work) catch return error.InvalidArtifact;
+    }
+    /// A large source summary can hide many prerequisite-only variables.
+    /// Only observable root variables belong to the endpoint correspondence;
+    /// the dynamic equation solver independently instantiates the full scheme.
+    fn endpointScheme(self: *Self, owner: *const core.Module, binding: core.BindingId) Error!T.Scheme {
+        const declaration = owner.binding(binding);
+        var endpoint = declaration.scheme;
+        if (!self.admission.source_bodies or owner.types.node(endpoint.root).tag == .forall or
+            (endpoint.variables.len <= 128 and endpoint.row_variables.len <= 128)) return endpoint;
+        try require(declaration.public_variables.len <= contracts.ordinary_source_type_limit and declaration.public_rows.len <= 128);
+        for (owner.types.list(declaration.public_variables)) |formal| {
+            try self.step(0);
+            try require(std.mem.findScalar(T.Id, owner.types.list(endpoint.variables), formal) != null);
+        }
+        for (owner.types.list(declaration.public_rows)) |formal| {
+            try self.step(0);
+            try require(std.mem.findScalar(T.Id, owner.types.list(endpoint.row_variables), formal) != null);
+        }
+        endpoint.variables = declaration.public_variables;
+        endpoint.row_variables = declaration.public_rows;
+        return endpoint;
+    }
     fn principal(self: *Self, reference: core.BindingRef, expected: T.Id) Error!void {
         _ = try self.principalMapping(reference, expected);
     }
     fn principalMapping(self: *Self, reference: core.BindingRef, expected: T.Id) Error!contracts.Principal {
+        const instances_before = self.scopes.instance_variables;
+        const rows_before = self.scopes.instance_rows;
+        errdefer self.scopes.instance_variables = instances_before;
+        errdefer self.scopes.instance_rows = rows_before;
         const owner = try self.target(reference);
         try require(reference.binding != 0 and reference.binding < owner.bindings.len);
         const declaration = owner.binding(reference.binding);
@@ -468,32 +867,43 @@ const Walker = struct {
             const quantified = owner.types.node(signature);
             for (owner.types.list(.{ .start = quantified.b, .len = quantified.c }), proof.witnesses[0..quantified.c]) |binder, witness| {
                 if (witness == 0 or owner.types.node(binder).b != 0) continue;
-                var work: @import("usage_check.zig").Work = .{ .remaining = self.scopes.remaining.* };
-                defer self.scopes.remaining.* = work.remaining;
-                try require(!(@import("usage_check.zig").containsNominalWork(&self.module.types, self.module.nominals, witness, &work) catch return error.InvalidArtifact));
+                try require(!try self.containsUsage(witness));
             }
         } else if (owner.types.node(signature).tag != .forall and (declaration.scheme.variables.len != 0 or declaration.scheme.row_variables.len != 0)) {
             var projection: @import("scheme_projection.zig").Resolver = .{ .module = self.module, .producer = owner, .binding = reference.binding };
             proof.projection_resolver = projection.resolver();
-            try proof.instantiateScheme(declaration.scheme, expected);
+            const endpoint_scheme = try self.endpointScheme(owner, reference.binding);
+            try proof.instantiateScheme(endpoint_scheme, expected);
             const quantifier_use = self.module.types.node(expected).tag == .forall;
             if (quantifier_use) try self.scopes.enter(expected);
             defer if (quantifier_use) self.scopes.leave();
-            proof.instance = declaration.scheme.variables;
-            proof.instance_rows = declaration.scheme.row_variables;
-            try self.instantiatedGoals(owner, declaration.scheme, &proof, 0);
+            proof.instance = endpoint_scheme.variables;
+            proof.instance_rows = endpoint_scheme.row_variables;
+            try self.instantiatedGoals(owner, reference.binding, declaration.scheme, &proof, 0);
+            if (self.admission.source_bodies and self.scopes.source_instances) {
+                for (proof.scheme_row_witnesses[0..endpoint_scheme.row_variables.len]) |witness| {
+                    try self.step(0);
+                    const row = witness orelse continue;
+                    const tail = self.module.types.row(row.row).tail;
+                    if (tail == .variable) try self.scopes.instance_rows.set(tail.variable);
+                }
+            }
             proof.instance = .{};
             proof.instance_rows = .{};
-            for (proof.witnesses[0..declaration.scheme.variables.len]) |witness| {
+            for (proof.witnesses[0..endpoint_scheme.variables.len]) |witness| {
                 if (witness == 0) continue;
                 // The independently checked identity body returns its sole
                 // argument exactly once. It can forward a value carrying a
                 // scoped callback contract without treating it as plain data.
                 if (declaration.capability_flow == .identity or declaration.capability_flow == .consume_task or declaration.capability_flow == .spawn_task) continue;
-                var work: @import("usage_check.zig").Work = .{ .remaining = self.scopes.remaining.* };
-                defer self.scopes.remaining.* = work.remaining;
-                try require(!(@import("usage_check.zig").containsNominalWork(&self.module.types, self.module.nominals, witness, &work) catch return error.InvalidArtifact));
+                try require(!try self.containsUsage(witness));
             }
+            // Unused fields of a known polymorphic record can retain ordinary
+            // inference holes. The exact producer scheme and every prerequisite
+            // above establish these instances before any leaf is admitted.
+            if (self.admission.source_bodies and self.scopes.source_instances) for (proof.witnesses[0..endpoint_scheme.variables.len]) |witness| {
+                if (witness != 0) try self.scopes.sourceInstance(witness, 0);
+            };
         } else try proof.validate(signature, expected);
         proof.projection_resolver = null;
         proof.version_pairs = &.{};
@@ -546,11 +956,44 @@ const Walker = struct {
         while (count != 0) {
             try self.step(depth);
             var progress = false;
+            // Physical fields supply exact type equations. Establish those
+            // before choosing a generic prerequisite hypothesis: otherwise a
+            // fresh codec output can be guessed equal to an unrelated caller
+            // buffer before the known Codec.encode field fixes its Array type.
+            if (self.admission.source_bodies) {
+                var physical_progress = true;
+                while (physical_progress and count != 0) {
+                    physical_progress = false;
+                    for (pending) |*goal| {
+                        if (goal.ty == 0 or (goal.kind != .field and goal.kind != .writable_field)) continue;
+                        // Field identity needs only the current receiver head.
+                        // Deep resolution traverses every unrelated access field
+                        // again; strict field matching resolves selected children.
+                        try self.step(depth);
+                        goal.ty = solver.store.head(goal.ty, 0);
+                        if (!try self.physicalField(goal.*, depth + 1)) continue;
+                        inline for (.{ "other", "result", "signature" }) |field| {
+                            try self.step(depth);
+                            @field(goal.*, field) = solver.store.head(@field(goal.*, field), 0);
+                        }
+                        const point = solver.store.mark();
+                        if (!try self.closedGoal(goal.*, depth + 1)) {
+                            solver.rollback(point);
+                            try require(!solver.oom);
+                            continue;
+                        }
+                        goal.ty = 0;
+                        count -= 1;
+                        progress = true;
+                        physical_progress = true;
+                    }
+                }
+            }
             for (pending) |*goal| {
                 if (goal.ty == 0) continue;
                 inline for (.{ "ty", "other", "result", "signature" }) |field| @field(goal.*, field) = solver.resolve(@field(goal.*, field)) catch |err| return solver.readerError(err);
                 const point = solver.store.mark();
-                if (!try self.goalGiven(goal.*, depth + 1) and !try self.closedGoal(goal.*, depth + 1)) {
+                if (!try self.prerequisiteGoal(goal.*, depth + 1)) {
                     solver.rollback(point);
                     try require(!solver.oom);
                     continue;
@@ -559,8 +1002,92 @@ const Walker = struct {
                 count -= 1;
                 progress = true;
             }
-            try require(progress);
+            if (!progress) {
+                for (pending) |goal| {
+                    if (goal.ty == 0) continue;
+                    std.debug.print("NUM_PENDING producer={d} kind={s} op={s} span={d}..{d} ty={d}:{any} other={d}:{any} result={d}:{any}\n", .{ producer.unit, @tagName(goal.kind), @tagName(goal.operator), goal.span.start, goal.span.end, goal.ty, self.module.types.node(goal.ty), goal.other, self.module.types.node(goal.other), goal.result, self.module.types.node(goal.result) });
+                    inline for (.{ "ty", "other", "result", "signature" }) |field| {
+                        const type_id = @field(goal, field);
+                        const leaf = self.module.types.node(type_id);
+                        if (leaf.tag == .rigid and leaf.c == 0) {
+                            const original = self.origin orelse self.module;
+                            const prefix = leaf.b < original.types.nodes.len and original.types.node(leaf.b).tag == .variable;
+                            var active = false;
+                            for (self.scopes.schemes[0..self.scopes.scheme_count]) |scheme_| {
+                                if (std.mem.findScalar(T.Id, self.module.types.list(scheme_.variables), leaf.b) != null) active = true;
+                            }
+                            const solver_owned = if (self.scopes.solver) |owner| owner.ownsRigid(leaf) else false;
+                            std.debug.print("NUM_CLASS role={s} original_unit={d} original_id={d} prefix_variable={any} checked_instance={any} active_scheme_binder={any} solver_owned={any} source_instances={any}\n", .{ field, original.unit, leaf.b, prefix, self.scopes.instance_variables.contains(leaf.b), active, solver_owned, self.scopes.source_instances });
+                        }
+                    }
+                    if (goal.kind == .field and self.module.types.node(goal.ty).tag == .rigid) {
+                        const source_module = self.origin orelse self.module;
+                        std.debug.print("ROOT_FIELD name={s} owner={d} result={d}\n", .{ source_module.fieldSpelling(goal.name) orelse "?", goal.ty, goal.result });
+                        for (self.scopes.schemes[0..self.scopes.scheme_count]) |scheme_| {
+                            std.debug.print("ROOT_SCHEME root={d} vars={any} rows={any} goals={d}\n", .{ scheme_.root, self.module.types.list(scheme_.variables), self.module.types.list(scheme_.row_variables), scheme_.obligations.len });
+                            for (try self.scopes.schemeGoals(scheme_)) |given_| {
+                                std.debug.print("ROOT_GIVEN kind={s} identity={d}:{d} ty={d}:{any} other={d} result={d} name={d}\n", .{ @tagName(given_.kind), given_.identity.unit, given_.identity.decl, given_.ty, self.module.types.node(given_.ty), given_.other, given_.result, given_.name });
+                                if (given_.kind == .callee_use) {
+                                    const pack = self.module.types.node(given_.ty);
+                                    if (pack.tag == .product) std.debug.print("ROOT_PACK {any}\n", .{self.module.types.list(.{ .start = pack.a, .len = pack.b })});
+                                }
+                            }
+                        }
+                    }
+                    if (self.admission.source_failure) |failure| {
+                        if (failure.* == null) failure.* = .{ .unit = producer.unit, .span = goal.span };
+                    }
+                    break;
+                }
+                return error.InvalidArtifact;
+            }
         }
+    }
+    fn physicalField(self: *Self, goal: core.Obligation, depth: usize) Error!bool {
+        const owner = self.module.types.node(goal.ty);
+        if (owner.tag == .record) {
+            for (0..owner.b) |ordinal| {
+                try self.step(depth);
+                if (self.module.types.recordField(owner, ordinal).name == goal.name) return true;
+            }
+            return false;
+        }
+        if (owner.tag != .nominal or @import("storage_types.zig").identity(owner.a, owner.b) != null) return false;
+        for (self.module.associated) |method| {
+            try self.step(depth);
+            if (method.identity.unit == owner.a and method.identity.decl == owner.b and method.member == goal.name) return false;
+        }
+        for (self.module.constructors) |constructor| {
+            try self.step(depth);
+            const family = self.module.nominals[constructor.nominal];
+            if (family.identity.unit != owner.a or family.identity.decl != owner.b or family.constructors.len != 1) continue;
+            const payload = self.module.types.node(constructor.payload);
+            if (payload.tag != .record) continue;
+            for (0..payload.b) |ordinal| {
+                try self.step(depth);
+                if (self.module.types.recordField(payload, ordinal).name == goal.name) return true;
+            }
+        }
+        return false;
+    }
+    fn prerequisiteGoal(self: *Self, goal: core.Obligation, depth: usize) Error!bool {
+        return self.prerequisiteGoalMode(goal, depth, true);
+    }
+    fn prerequisiteGoalMode(self: *Self, goal: core.Obligation, depth: usize, shared: bool) Error!bool {
+        // Instantiating a function's prerequisites does not call that function.
+        // Match check.zig's proveImplementationPredicate: the prerequisite's
+        // own invocation carrier supplies its ambient. Producer/principal
+        // checks still prove the actual method fits that complete signature;
+        // arguments() checks real execution against the enclosing body row.
+        const prior_row = self.body_row;
+        defer self.body_row = prior_row;
+        const signature = if (goal.kind == .resolver_dispatch) goal.other else goal.signature;
+        if (signature != 0) {
+            const arrow = self.module.types.node(signature);
+            try require(arrow.tag == .function);
+            self.body_row = arrow.c;
+        }
+        return try self.goalGivenMode(goal, depth + 1, shared) or try self.closedGoal(goal, depth + 1);
     }
     fn solveInstantiated(self: *Self, workspace: *Equations.Workspace, producer: *const core.Module, source_scheme: T.Scheme, mapping: *contracts.Principal, depth: usize) Error!void {
         var solver = Equations.Solver.init(workspace.allocator, self.module, self.scopes, self.scopes.remaining) catch |err| {
@@ -574,7 +1101,10 @@ const Walker = struct {
             return error.InvalidArtifact;
         };
         defer copy.deinit();
-        for (producer.types.list(source_scheme.variables), mapping.witnesses[0..source_scheme.variables.len]) |formal, witness| {
+        for (producer.types.list(source_scheme.variables)) |formal| {
+            const ordinal = std.mem.findScalar(T.Id, mapping.left.list(mapping.instance), formal) orelse continue;
+            try require(ordinal < mapping.witnesses.len);
+            const witness = mapping.witnesses[ordinal];
             if (witness == 0) continue;
             const fresh = copy.mapping.get(formal) orelse return error.InvalidArtifact;
             solver.unify(fresh, witness) catch |err| {
@@ -582,8 +1112,10 @@ const Walker = struct {
                 return error.InvalidArtifact;
             };
         }
-        for (producer.types.list(source_scheme.row_variables), mapping.scheme_row_witnesses[0..source_scheme.row_variables.len]) |formal, witness| {
-            const actual = witness orelse continue;
+        for (producer.types.list(source_scheme.row_variables)) |formal| {
+            const ordinal = std.mem.findScalar(T.Id, mapping.left.list(mapping.instance_rows), formal) orelse continue;
+            try require(ordinal < mapping.scheme_row_witnesses.len);
+            const actual = mapping.scheme_row_witnesses[ordinal] orelse continue;
             var labels: [256]T.Effects.Label = undefined;
             var length: usize = 0;
             for (solver.graph.rowLabels(actual.row), 0..) |label, index| {
@@ -617,23 +1149,70 @@ const Walker = struct {
             return err;
         };
     }
-    fn goalRows(self: *Self, signature: T.Id, depth: usize) Error!void {
-        // Invocation predicates perform these rows. A task_receive predicate
-        // only relates an input shape to its latent result/effects; its actual
-        // receive node and ordinary call edge prove execution separately.
+    fn goalRows(self: *Self, signature: T.Id, arity: ?usize, depth: usize) Error!void {
+        // Only applied arrows execute. In particular, selecting a callback
+        // field does not execute the callback returned by the getter. The full
+        // signature is still proved by goalMatches/principal before this check.
         var cursor = signature;
         var count: usize = 0;
-        while (cursor != 0 and self.module.types.node(cursor).tag == .function) {
+        while ((arity == null or count < arity.?) and cursor != 0 and self.module.types.node(cursor).tag == .function) {
             try self.step(depth + count);
             const arrow = self.module.types.node(cursor);
             try self.allowedRow(arrow.c, true);
             cursor = arrow.b;
             count += 1;
         }
-        try require(count != 0);
+        try require(count != 0 and (arity == null or count == arity.?));
     }
-    fn goalMatches(self: *Self, proof: *contracts.Principal, wanted: anytype, given: anytype, covariant_signature: bool) Error!bool {
+    fn goalArity(self: *Self, kind: T.ObligationKind, signature: T.Id) ?usize {
+        const arrow = self.module.types.node(signature);
+        // Explicit qualifications carry one Unit -> Unit effect witness,
+        // independently of the arity of the operation they qualify.
+        if (arrow.tag == .function and arrow.a == T.unit and arrow.b == T.unit) return 1;
+        return switch (kind) {
+            .dispatch => 2,
+            .field, .receiver, .result_dispatch => 1,
+            else => null,
+        };
+    }
+    fn canonicalCallee(self: *Self, identity_: T.NominalIdentity, types: *const core.Types, public: T.Id) Error!T.NominalIdentity {
+        var owner = try self.target(.{ .unit = identity_.unit, .binding = identity_.decl });
+        var binding = identity_.decl;
+        var forwards: usize = 0;
+        while (true) {
+            try self.step(forwards);
+            try require(binding != 0 and binding < owner.bindings.len);
+            const declaration = owner.binding(binding);
+            try require(public < types.nodes.len);
+            const pack = types.node(public);
+            try require(pack.tag == .product and pack.b == declaration.public_variables.len + declaration.public_rows.len);
+            if (declaration.kind != .external) {
+                try require(declaration.kind == .global and owner.body(binding) != null);
+                try sourceBody(owner, binding, self.context, self.admission);
+                return .{ .unit = owner.unit, .decl = binding };
+            }
+            var target_ = declaration.target;
+            if (target_.unit == 0) target_.unit = owner.unit;
+            const next = try self.target(target_);
+            try require(target_.binding != 0 and target_.binding < next.bindings.len);
+            const imported = next.binding(target_.binding);
+            try require(declaration.public_variables.len == imported.public_variables.len and declaration.public_rows.len == imported.public_rows.len);
+            owner = next;
+            binding = target_.binding;
+            forwards += 1;
+        }
+    }
+    fn goalMatches(self: *Self, proof: *contracts.Principal, wanted_: anytype, given_: anytype, covariant_signature: bool) Error!bool {
         try self.step(0);
+        var wanted = wanted_;
+        var given = given_;
+        if (self.admission.source_bodies and wanted.kind == .callee_use and given.kind == .callee_use and !std.meta.eql(wanted.identity, given.identity)) {
+            // Imports preserve the checked predicate's local proxy identity.
+            // The proxy and producer describe the same dictionary only when
+            // their exact target chain and public argument packs agree.
+            wanted.identity = try self.canonicalCallee(wanted.identity, proof.left, wanted.ty);
+            given.identity = try self.canonicalCallee(given.identity, proof.right, given.ty);
+        }
         const solver = self.scopes.solver;
         const point = if (solver) |owner| owner.store.mark() else null;
         var accepted = false;
@@ -663,14 +1242,84 @@ const Walker = struct {
         accepted = true;
         return true;
     }
+    /// A negative metadata search grants no predicate authority. Follow every
+    /// forwarded callee summary before rejecting a candidate, so unrelated
+    /// factory helpers do not require importing their entire type graph.
+    /// Positive candidates still pass the ordinary body/type/row proof below.
+    fn reachableHeader(self: *Self, initial: *const core.Module, binding: core.BindingId, wanted: core.Obligation, depth: usize) Error!bool {
+        const solver = self.scopes.solver orelse return true;
+        const allocator = solver.store.allocator;
+        var pending: std.ArrayList(core.BindingRef) = .empty;
+        defer pending.deinit(allocator);
+        var visited: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty;
+        defer visited.deinit(allocator);
+        pending.append(allocator, .{ .unit = initial.unit, .binding = binding }) catch return solver.readerError(error.OutOfMemory);
+        while (pending.pop()) |reference_| {
+            var reference = reference_;
+            var owner = try self.target(reference);
+            var forwards: usize = 0;
+            while (true) {
+                try self.step(depth + forwards);
+                try require(reference.binding != 0 and reference.binding < owner.bindings.len);
+                const declaration = owner.binding(reference.binding);
+                if (declaration.kind != .external) break;
+                var target_ = declaration.target;
+                if (target_.unit == 0) target_.unit = owner.unit;
+                const next = try self.target(target_);
+                try require(target_.binding != 0 and target_.binding < next.bindings.len);
+                const imported = next.binding(target_.binding);
+                try require(declaration.public_variables.len == imported.public_variables.len and declaration.public_rows.len == imported.public_rows.len);
+                reference = target_;
+                owner = next;
+                forwards += 1;
+            }
+            reference.unit = owner.unit;
+            const seen = visited.getOrPut(allocator, reference) catch return solver.readerError(error.OutOfMemory);
+            if (seen.found_existing) continue;
+            const declaration = owner.binding(reference.binding);
+            // Unknown lexical producers are not evidence for a negative result.
+            if (declaration.kind != .global or owner.body(reference.binding) == null) return true;
+            for (owner.obligations[declaration.scheme.obligations.start..][0..declaration.scheme.obligations.len]) |goal| {
+                try self.step(depth);
+                if (goal.kind == .callee_use) {
+                    pending.append(allocator, .{ .unit = if (goal.identity.unit == 0) owner.unit else goal.identity.unit, .binding = goal.identity.decl }) catch return solver.readerError(error.OutOfMemory);
+                } else if (goal.kind == wanted.kind and goal.name == wanted.name and goal.operator == wanted.operator and std.meta.eql(goal.identity, wanted.identity)) return true;
+            }
+        }
+        return false;
+    }
     fn sharedGoal(self: *Self, wanted: ?core.Obligation, given: core.Obligation, depth: usize) Error!bool {
         try self.step(depth);
         const solver = self.scopes.solver orelse return false;
         try require(given.kind == .callee_use and given.other == 0 and given.result == 0 and given.signature == 0 and given.name == 0 and given.operator == .none);
-        const owner = try self.target(.{ .unit = given.identity.unit, .binding = given.identity.decl });
-        try require(given.identity.decl != 0 and given.identity.decl < owner.bindings.len);
-        const declaration = owner.binding(given.identity.decl);
-        try require(declaration.kind == .global and owner.body(given.identity.decl) != null);
+        var owner = try self.target(.{ .unit = given.identity.unit, .binding = given.identity.decl });
+        var binding = given.identity.decl;
+        try require(binding != 0 and binding < owner.bindings.len);
+        var declaration = owner.binding(binding);
+        // An imported source summary names a local external proxy. Its target
+        // and public argument positions identify the actual producer; only that
+        // producer's scheme and independently checked body supply requirements.
+        // This does not widen portable package admission.
+        var forwards: usize = 0;
+        while (declaration.kind == .external) {
+            try self.step(depth + forwards);
+            try require(self.admission.source_bodies);
+            var target_ = declaration.target;
+            if (target_.unit == 0) target_.unit = owner.unit;
+            const next = try self.target(target_);
+            try require(target_.binding != 0 and target_.binding < next.bindings.len);
+            const imported = next.binding(target_.binding);
+            try require(declaration.public_variables.len == imported.public_variables.len and declaration.public_rows.len == imported.public_rows.len);
+            owner = next;
+            binding = target_.binding;
+            declaration = imported;
+            forwards += 1;
+        }
+        try require(declaration.kind == .global and owner.body(binding) != null);
+        if (wanted) |target_goal| {
+            if (!try self.reachableHeader(owner, binding, target_goal, depth + 1)) return false;
+        }
+        if (self.admission.source_bodies) try sourceBody(owner, binding, self.context, self.admission);
         const product = self.module.types.node(given.ty);
         try require(product.tag == .product and product.b == declaration.public_variables.len + declaration.public_rows.len);
         const parts = solver.store.allocator.dupe(T.Id, self.module.types.list(.{ .start = product.a, .len = product.b })) catch {
@@ -700,38 +1349,95 @@ const Walker = struct {
         }
         if (wanted) |target_goal| {
             for (owner.obligations[declaration.scheme.obligations.start..][0..declaration.scheme.obligations.len]) |source_goal| {
+                try self.step(depth);
+                // These immutable headers are the first exact checks in
+                // goalMatches. Unrelated fields need neither instantiation
+                // nor private receiver grounding. A nested callee remains a
+                // candidate because its checked prerequisites may supply the
+                // requested predicate.
+                if (source_goal.kind != .callee_use and
+                    (source_goal.kind != target_goal.kind or source_goal.name != target_goal.name or
+                        source_goal.operator != target_goal.operator or !std.meta.eql(source_goal.identity, target_goal.identity))) continue;
                 var goal = source_goal;
                 inline for (.{ "ty", "other", "result", "signature" }) |field| @field(goal, field) = solver.copy(&copy, @field(source_goal, field)) catch |err| return solver.readerError(err);
                 if (goal.kind == .callee_use) {
                     if (!try self.sharedGoal(target_goal, goal, depth + 1)) continue;
                 } else {
+                    if ((goal.kind == .field or goal.kind == .writable_field) and
+                        !try self.groundSharedFieldOwner(solver, owner, declaration.scheme, &copy, goal.ty, depth + 1)) continue;
                     var proof: contracts.Principal = .{ .left = self.scopes.types, .right = self.scopes.types, .remaining = self.scopes.remaining, .views = self.scopes };
                     if (!try self.goalMatches(&proof, goal, target_goal, true)) {
                         try require(!solver.oom);
                         continue;
                     }
-                    if (goal.kind != .task_receive and goal.signature != 0) try self.goalRows(goal.signature, depth + 1);
+                    if (target_goal.kind != .task_receive and target_goal.signature != 0) try self.goalRows(target_goal.signature, self.goalArity(target_goal.kind, target_goal.signature), depth + 1);
                 }
                 accepted = true;
                 return true;
             }
             return false;
         }
-        try self.solverGoals(solver, owner, declaration.scheme, &copy, depth + 1);
+        self.solverGoals(solver, owner, declaration.scheme, &copy, depth + 1) catch |err| {
+            std.debug.print("NUM_SUMMARY caller={d} producer={d}:{d} span={d}..{d}\n", .{ self.module.unit, owner.unit, binding, given.span.start, given.span.end });
+
+            return err;
+        };
         accepted = true;
         return true;
     }
+    /// A callee summary may quantify variables used only by prerequisites.
+    /// Its public argument pack does not identify those variables. In
+    /// particular, access.brushes -> pool and pool.at -> element must remain
+    /// correlated: the fresh pool cannot be chosen by matching a requested
+    /// field from an unrelated receiver. Establish accessor dependencies from
+    /// independently available fields before exporting such a field fact.
+    fn groundSharedFieldOwner(self: *Self, solver: *Equations.Solver, producer: *const core.Module, source_scheme: T.Scheme, copy: *@import("check_scheme_import.zig").Copier, receiver: T.Id, depth: usize) Error!bool {
+        if (solver.store.node(solver.store.head(receiver, 0)).tag != .variable) return true;
+        const source_goals = producer.obligations[source_scheme.obligations.start..][0..source_scheme.obligations.len];
+        const completed = solver.store.allocator.alloc(bool, source_goals.len) catch {
+            solver.oom = true;
+            return error.InvalidArtifact;
+        };
+        defer solver.store.allocator.free(completed);
+        @memset(completed, false);
+        var progress = true;
+        while (progress) {
+            try self.step(depth);
+            progress = false;
+            for (source_goals, completed) |source_goal, *done| {
+                if (done.* or (source_goal.kind != .field and source_goal.kind != .writable_field)) continue;
+                var goal = source_goal;
+                inline for (.{ "ty", "other", "result", "signature" }) |field| @field(goal, field) = solver.copy(copy, @field(source_goal, field)) catch |err| return solver.readerError(err);
+                goal.ty = solver.resolve(goal.ty) catch |err| return solver.readerError(err);
+                if (solver.store.node(goal.ty).tag == .variable) continue;
+                const point = solver.store.mark();
+                if (!try self.prerequisiteGoalMode(goal, depth + 1, false)) {
+                    solver.rollback(point);
+                    try require(!solver.oom);
+                    continue;
+                }
+                done.* = true;
+                progress = true;
+                if (solver.store.node(solver.store.head(receiver, 0)).tag != .variable) return true;
+            }
+        }
+        return false;
+    }
     fn goalGiven(self: *Self, wanted: core.Obligation, depth: usize) Error!bool {
+        return self.goalGivenMode(wanted, depth, true);
+    }
+    fn goalGivenMode(self: *Self, wanted: core.Obligation, depth: usize, shared: bool) Error!bool {
         try self.step(depth);
         for (self.scopes.schemes[0..self.scopes.scheme_count]) |principal_value| {
             for (try self.scopes.schemeGoals(principal_value)) |given| {
                 if (given.kind == .callee_use and wanted.kind != .callee_use and self.scopes.solver != null) {
+                    if (!shared) continue;
                     if (try self.sharedGoal(wanted, given, depth + 1)) return true;
                     continue;
                 }
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, self.goalArity(given.kind, given.signature), depth + 1);
                 return true;
             }
         }
@@ -739,7 +1445,7 @@ const Walker = struct {
             for (self.module.types.quantifierGoals(owner)) |given| {
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, self.goalArity(given.kind, given.signature), depth + 1);
                 return true;
             }
         }
@@ -749,7 +1455,7 @@ const Walker = struct {
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes, .instance = .{ .start = owner.b, .len = owner.c } };
                 @memcpy(proof.witnesses[0..opening.binders.len], self.module.types.list(opening.binders));
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
-                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(try self.mappedRoot(&proof, given.signature, depth + 1), depth + 1);
+                if (given.kind != .task_receive and given.signature != 0) try self.goalRows(try self.mappedRoot(&proof, given.signature, depth + 1), self.goalArity(given.kind, given.signature), depth + 1);
                 return true;
             }
         }
@@ -781,11 +1487,47 @@ const Walker = struct {
         }
         return error.InvalidArtifact;
     }
-    fn instantiatedGoals(self: *Self, producer: *const core.Module, principal_value: T.Scheme, mapping: *contracts.Principal, depth: usize) Error!void {
+    /// The caller can retain one checked callee dictionary instead of its
+    /// expanded prerequisites. Its hidden witnesses stay correlated when the
+    /// exact declaration and every public type/effect argument agree.
+    fn givenInvocation(self: *Self, producer: *const core.Module, binding: core.BindingId, mapping: *contracts.Principal, depth: usize) Error!bool {
+        const declaration = producer.binding(binding);
+        for (self.scopes.schemes[0..self.scopes.scheme_count]) |caller_scheme| {
+            for (try self.scopes.schemeGoals(caller_scheme)) |given| {
+                if (given.kind != .callee_use) continue;
+                try require(given.other == 0 and given.result == 0 and given.signature == 0 and given.name == 0 and given.operator == .none);
+                var reference: core.BindingRef = .{ .unit = given.identity.unit, .binding = given.identity.decl };
+                var steps: usize = 0;
+                while (true) {
+                    try self.step(depth + steps);
+                    const owner = try self.target(reference);
+                    try require(reference.binding != 0 and reference.binding < owner.bindings.len);
+                    const source = owner.binding(reference.binding);
+                    if (source.kind != .external) {
+                        reference.unit = owner.unit;
+                        break;
+                    }
+                    reference = source.target;
+                    if (reference.unit == 0) reference.unit = owner.unit;
+                    steps += 1;
+                }
+                if (reference.unit != producer.unit or reference.binding != binding) continue;
+                _ = try self.canonicalCallee(given.identity, &self.module.types, given.ty);
+                const pack = self.module.types.node(given.ty);
+                try require(pack.tag == .product and pack.b == declaration.public_variables.len + declaration.public_rows.len);
+                var proof = mapping.*;
+                proof.publicArguments(declaration.public_variables, declaration.public_rows, self.module.types.list(.{ .start = pack.a, .len = pack.b })) catch continue;
+                return true;
+            }
+        }
+        return false;
+    }
+    fn instantiatedGoals(self: *Self, producer: *const core.Module, binding: core.BindingId, principal_value: T.Scheme, mapping: *contracts.Principal, depth: usize) Error!void {
         if (principal_value.obligations.len == 0) return;
         try self.step(depth + self.goal_depth);
         self.goal_depth += 1;
         defer self.goal_depth -= 1;
+        if (self.admission.source_bodies and try self.givenInvocation(producer, binding, mapping, depth + 1)) return;
         if (self.admission.workspace) |workspace| {
             var direct = mapping.*;
             var found_all = true;
@@ -845,7 +1587,7 @@ const Walker = struct {
             if (found) continue;
             var actual: core.Obligation = .{ .ty = 0, .kind = goal.kind, .span = .{ .start = 0, .end = 0 }, .name = goal.name, .operator = goal.operator, .identity = goal.identity };
             inline for (.{ "ty", "other", "result", "signature" }) |field| @field(actual, field) = try self.mappedRoot(mapping, @field(goal, field), depth + 1);
-            try require(try self.goalGiven(actual, depth + 1) or try self.closedGoal(actual, depth + 1));
+            try require(try self.prerequisiteGoal(actual, depth + 1));
         }
     }
     fn identity(self: *Self, root: T.Id) ?T.NominalIdentity {
@@ -865,11 +1607,21 @@ const Walker = struct {
     fn closedGoal(self: *Self, goal: core.Obligation, depth: usize) Error!bool {
         try self.step(depth);
         switch (goal.kind) {
+            .record_merge => {
+                const left = self.module.types.node(goal.ty);
+                const right = self.module.types.node(goal.other);
+                const result = self.module.types.node(goal.result);
+                if (left.tag != .record or right.tag != .record or result.tag != .record) return false;
+                // Instantiation discharges the retained generic dictionary
+                // against the same exact physical merge used by concrete Core.
+                try self.recordMergeFields(left, right, result, depth + 1);
+                return true;
+            },
             .callee_use => return self.sharedGoal(null, goal, depth + 1),
             .collection => {
                 const sequence = self.module.types.node(goal.ty);
-                if (sequence.tag != .array and sequence.tag != .list) return false;
-                try self.strictSame(sequence.a, goal.result);
+                const element = if (sequence.tag == .list) sequence.a else @import("storage_types.zig").readableElement(&self.module.types, goal.ty) orelse return false;
+                try self.strictSame(element, goal.result);
                 return true;
             },
             .task_receive => {
@@ -900,6 +1652,14 @@ const Walker = struct {
             },
             .field, .writable_field => {
                 const owner = self.module.types.node(goal.ty);
+                if (goal.kind == .field) if (self.identity(goal.ty)) |family| {
+                    if (family.unit == 0 or @import("storage_types.zig").identity(family.unit, family.decl) != null) {
+                        var member = goal;
+                        member.kind = .receiver;
+                        member.other = T.unit;
+                        return self.closedGoal(member, depth + 1);
+                    }
+                };
                 if (owner.tag == .record) {
                     for (0..owner.b) |ordinal| {
                         try self.step(depth);
@@ -913,7 +1673,12 @@ const Walker = struct {
                 if (owner.tag != .nominal) return false;
                 if (goal.kind == .field) for (self.module.associated) |method| {
                     try self.step(depth);
-                    if (method.identity.unit == owner.a and method.identity.decl == owner.b and method.member == goal.name) return false;
+                    if (method.identity.unit == owner.a and method.identity.decl == owner.b and method.member == goal.name) {
+                        var member = goal;
+                        member.kind = .receiver;
+                        member.other = T.unit;
+                        return self.closedGoal(member, depth + 1);
+                    }
                 };
                 var count: usize = 0;
                 for (self.module.constructors) |constructor| {
@@ -929,9 +1694,26 @@ const Walker = struct {
                         try self.step(depth);
                         const field = self.module.types.recordField(payload, ordinal);
                         if (field.name != goal.name) continue;
-                        var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes, .instance = constructor.scheme.variables, .instance_rows = constructor.scheme.row_variables };
-                        try proof.validate(signature.b, goal.ty);
-                        try proof.validate(field.ty, goal.result);
+                        if (self.scopes.solver) |solver| {
+                            // Caller inference variables are rigid in this
+                            // solver. Constructor formals have a separate,
+                            // independently declared binder owner: instantiate
+                            // only those through the immutable source scheme.
+                            const source_owner = self.origin orelse self.module;
+                            try require(source_owner.unit == self.module.unit);
+                            var frozen: @import("frozen_types.zig").Graph = undefined;
+                            var copy = solver.importer(source_owner, &frozen, constructor.scheme) catch |err| return solver.readerError(err);
+                            defer copy.deinit();
+                            const instantiated_output = solver.copy(&copy, signature.b) catch |err| return solver.readerError(err);
+                            const value = solver.copy(&copy, field.ty) catch |err| return solver.readerError(err);
+                            var proof: contracts.Principal = .{ .left = self.scopes.types, .right = self.scopes.types, .remaining = self.scopes.remaining, .views = self.scopes };
+                            try proof.validate(instantiated_output, goal.ty);
+                            try proof.validate(value, goal.result);
+                        } else {
+                            var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes, .instance = constructor.scheme.variables, .instance_rows = constructor.scheme.row_variables };
+                            try proof.validate(signature.b, goal.ty);
+                            try proof.validate(field.ty, goal.result);
+                        }
                         found = true;
                         break;
                     }
@@ -987,7 +1769,7 @@ const Walker = struct {
                 const family = resolvers.resolverIdentity(self.module, goal.ty) orelse return false;
                 const reference = try resolvers.methodWorkspace(self.module, self.units(), family, goal.name, self.scopes.remaining, self.admission.workspace);
                 try self.principal(reference, goal.other);
-                try self.goalRows(goal.other, depth + 1);
+                try self.goalRows(goal.other, null, depth + 1);
                 return true;
             },
             .type_eq => {
@@ -1013,13 +1795,26 @@ const Walker = struct {
                         if (goal.signature == 0) continue;
                         // The local imported binding is independently linked
                         // to its producer before its signature grants authority.
+                        if (self.context.source_proofs) |cache| {
+                            const bindings = cache.targetBindings(self.module, method.target, self.scopes.remaining) catch |err| {
+                                if (err == error.OutOfMemory) if (self.admission.workspace) |workspace| {
+                                    workspace.oom = true;
+                                };
+                                return error.InvalidArtifact;
+                            };
+                            for (bindings) |binding| {
+                                try self.step(depth);
+                                if (try self.associatedTarget(binding, goal, depth + 1)) return true;
+                            }
+                            continue;
+                        }
                         for (self.module.bindings, 0..) |binding, ordinal| {
                             try self.step(depth);
                             if ((method.target.unit == 0 or method.target.unit == self.module.unit) and method.target.binding == ordinal) {
-                                if (try self.associatedTarget(@intCast(ordinal), goal.signature, depth + 1)) return true;
+                                if (try self.associatedTarget(@intCast(ordinal), goal, depth + 1)) return true;
                             }
                             if (binding.kind == .external and std.meta.eql(binding.target, method.target)) {
-                                if (try self.associatedTarget(@intCast(ordinal), goal.signature, depth + 1)) return true;
+                                if (try self.associatedTarget(@intCast(ordinal), goal, depth + 1)) return true;
                             }
                         }
                     }
@@ -1050,25 +1845,32 @@ const Walker = struct {
             else => return false,
         }
     }
-    fn associatedTarget(self: *Self, binding: core.BindingId, signature: T.Id, depth: usize) Error!bool {
+    fn associatedTarget(self: *Self, binding: core.BindingId, goal: core.Obligation, depth: usize) Error!bool {
+        const signature = goal.signature;
         try self.step(depth);
+        const prior_failure = if (self.admission.source_failure) |failure| failure.* else null;
         const pure_rows = self.scopes.pure_rows;
         const closed_rows = self.scopes.closed_rows;
+        const instance_variables = self.scopes.instance_variables;
+        const instance_rows = self.scopes.instance_rows;
         const solver = self.scopes.solver;
         const point = if (solver) |owner| owner.store.mark() else null;
         var accepted = false;
         defer {
             if (!accepted) {
+                if (self.admission.source_failure) |failure| failure.* = prior_failure;
                 if (solver) |owner| owner.rollback(point.?);
                 self.scopes.pure_rows = pure_rows;
                 self.scopes.closed_rows = closed_rows;
+                self.scopes.instance_variables = instance_variables;
+                self.scopes.instance_rows = instance_rows;
             }
         }
         self.principal(.{ .binding = binding }, signature) catch {
             try require(self.scopes.remaining.* != 0);
             return false;
         };
-        self.goalRows(signature, depth + 1) catch {
+        self.goalRows(signature, self.goalArity(goal.kind, signature), depth + 1) catch {
             try require(self.scopes.remaining.* != 0);
             return false;
         };
@@ -1308,6 +2110,9 @@ const Walker = struct {
         return std.mem.findScalar(T.Effects.Label, self.module.types.rowLabels(id), T.foreign_operation) != null;
     }
     fn scalarContract(self: *Self, operation: core.Op, inputs: []const T.Id, output_: T.Id) Error!void {
+        if (inputs.len != 0 and self.module.types.node(inputs[0]).tag == .product) {
+            return @import("simd_contracts.zig").validate(&self.module.types, operation, inputs, output_);
+        }
         try self.step(0);
         const unary = switch (operation) {
             .neg, .abs, .ceil, .floor, .trunc, .sqrt, .convert_u32_f32, .convert_f32_u32 => true,
@@ -1434,7 +2239,7 @@ const Walker = struct {
             else => return error.InvalidArtifact,
         }
     }
-    fn pattern(self: *Self, id: core.PatternId, expected: T.Id, definitions: ?*std.bit_set.Static(4096), depth: usize) Error!void {
+    fn pattern(self: *Self, id: core.PatternId, expected: T.Id, definitions: ?*Definitions, depth: usize) Error!void {
         try self.step(depth);
         const p = self.module.pattern(id);
         try self.same(p.ty, expected);
@@ -1448,7 +2253,7 @@ const Walker = struct {
                 try self.scheme(binding.scheme);
                 if (definitions) |locals_| {
                     try require(!locals_.isSet(p.a));
-                    locals_.set(p.a);
+                    try locals_.set(p.a);
                 }
             },
             .product => {
@@ -1481,7 +2286,15 @@ const Walker = struct {
             .record_payload => {
                 const shape = self.module.types.node(expected);
                 try require(shape.tag == .record and p.a == shape.b and p.b != 0 and p.c == 0);
-                try self.pattern(p.b, expected, definitions, depth + 1);
+                if (shape.b == 1) {
+                    try self.pattern(p.b, self.module.types.recordField(shape, 0).ty, definitions, depth + 1);
+                } else {
+                    const child = self.module.pattern(p.b);
+                    const input = self.module.types.node(child.ty);
+                    try require(input.tag == .product and input.b == shape.b);
+                    for (self.module.types.list(.{ .start = input.a, .len = input.b }), 0..) |part, index| try self.same(part, self.module.types.recordField(shape, index).ty);
+                    try self.pattern(p.b, child.ty, definitions, depth + 1);
+                }
             },
             .constant => try require(p.b == 0 and p.c == 0 and (self.module.types.node(expected).tag == .u32 or self.module.types.node(expected).tag == .boolean or self.module.types.node(expected).tag == .f32)),
             .value => {
@@ -1496,6 +2309,7 @@ const Walker = struct {
         try self.step(depth);
         const p = self.module.pattern(id);
         if (p.tag == .bind) return p.a == binding;
+        if (p.tag == .constructor or p.tag == .record_payload) return p.b != 0 and try self.binds(p.b, binding, depth + 1);
         if (p.tag == .product) for (self.module.patternChildren(id)) |child| {
             if (try self.binds(child, binding, depth + 1)) return true;
         };
@@ -1547,6 +2361,7 @@ const Walker = struct {
     }
     fn lookupDefinition(self: *Self, binding: core.BindingId, depth: usize) Error!core.Id {
         try self.step(depth);
+        if (self.admission.source_bodies) return self.sourceDefinition(binding, depth);
         try require(binding < self.definitions.len);
         if (!self.definitions_indexed) {
             for (self.module.nodes) |node| {
@@ -1559,6 +2374,36 @@ const Walker = struct {
             self.definitions_indexed = true;
         }
         return self.definitions[binding];
+    }
+    fn sourceDefinition(self: *Self, binding: core.BindingId, depth: usize) Error!core.Id {
+        try require(binding < self.module.bindings.len);
+        for (self.admission.source_definitions.items) |index| if (index.module == self.module) return index.values[binding];
+        const workspace = self.admission.workspace orelse return error.InvalidArtifact;
+        // The source context already owns validated bounds. Charge its actual
+        // extent before allocating; publish only a completely checked index.
+        if (self.module.bindings.len > self.scopes.remaining.*) {
+            self.scopes.remaining.* = 0;
+            return error.InvalidArtifact;
+        }
+        self.scopes.remaining.* -= self.module.bindings.len;
+        const values = workspace.allocator.alloc(core.Id, self.module.bindings.len) catch {
+            workspace.oom = true;
+            return error.InvalidArtifact;
+        };
+        errdefer workspace.allocator.free(values);
+        @memset(values, 0);
+        for (self.module.nodes) |node| {
+            try self.step(depth);
+            if (node.tag != .bind) continue;
+            try require(node.a < values.len and self.module.binding(node.a).kind == .local);
+            try require(values[node.a] == 0 or values[node.a] == node.b);
+            values[node.a] = node.b;
+        }
+        self.admission.source_definitions.append(workspace.allocator, .{ .module = self.module, .values = values }) catch {
+            workspace.oom = true;
+            return error.InvalidArtifact;
+        };
+        return values[binding];
     }
     fn capturesOpening(self: *Self, source: core.Id, depth: usize) Error!bool {
         try self.step(depth);
@@ -1712,12 +2557,24 @@ const Walker = struct {
         } else @import("../eval/body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
         return children.found;
     }
-    const Definitions = std.bit_set.Static(4096);
+    const Definitions = struct {
+        const empty: @This() = .{};
+        facts: @import("package_row_facts.zig").Facts = .{},
+        fn isSet(self: *const @This(), binding: core.BindingId) bool {
+            return self.facts.contains(binding);
+        }
+        fn set(self: *@This(), binding: core.BindingId) Error!void {
+            try self.facts.set(binding);
+        }
+        fn eql(self: *const @This(), other: @This()) bool {
+            return self.facts.eql(&other.facts);
+        }
+    };
     fn declareStorage(self: *Self, binding: core.BindingId, definitions: *Definitions) Error!void {
         try require(binding != 0 and !definitions.isSet(binding));
         const kind = self.module.binding(binding).kind;
         try require(kind == .local or kind == .parameter);
-        definitions.set(binding);
+        try definitions.set(binding);
     }
     fn bodyStorage(self: *Self, parameters: []const core.Parameter, body: core.Id) Error!void {
         var definitions: Definitions = .empty;
@@ -1757,7 +2614,7 @@ const Walker = struct {
         try self.step(depth);
         if (source == 0) return false;
         const node = self.module.node(source);
-        for (self.module.dictionary_uses) |use| if (use.introduction != 0 and use.introduction == source) definitions.set(use.binding);
+        for (self.module.dictionary_uses) |use| if (use.introduction != 0 and use.introduction == source) try definitions.set(use.binding);
         switch (node.tag) {
             .reference => {
                 const reference = self.module.reference(source);
@@ -1795,7 +2652,7 @@ const Walker = struct {
                 _ = try self.storage(node.a, definitions, depth + 1);
                 var local = definitions.*;
                 try self.declareStorage(node.b, &local);
-                for (self.module.dictionary_uses) |use| if (use.opening == node.b) local.set(use.binding);
+                for (self.module.dictionary_uses) |use| if (use.opening == node.b) try local.set(use.binding);
                 _ = try self.storage(self.module.packageOpening(source).body, &local, depth + 1);
             },
             .if_value, .if_stmt => {
@@ -1803,6 +2660,9 @@ const Walker = struct {
                 var branches = [_]Definitions{ definitions.*, definitions.* };
                 var exits: [2]bool = undefined;
                 for ([_]core.Id{ node.b, node.c }, &branches, &exits) |branch, *local, *exited| exited.* = try self.storage(branch, local, depth + 1);
+                // The checker directly names a surviving branch's successor
+                // when the other branch exits; no merge binding is necessary.
+                if (node.tag == .if_stmt and exits[0] != exits[1]) definitions.* = branches[if (exits[0]) 1 else 0];
                 try self.storageMerges(source, definitions, &branches, &exits);
                 return node.tag == .if_stmt and exits[0] and exits[1];
             },
@@ -1811,6 +2671,8 @@ const Walker = struct {
                 var branches: [2]Definitions = undefined;
                 var exits: [2]bool = undefined;
                 var all_exit = true;
+                var survivor: Definitions = undefined;
+                var continuing: usize = 0;
                 for (self.module.matchArms(source), 0..) |arm, index| {
                     var local = definitions.*;
                     for (self.module.armRows(arm), 0..) |row, ordinal| {
@@ -1824,11 +2686,16 @@ const Walker = struct {
                     _ = try self.storage(arm.guard, &local, depth + 1);
                     const exited = try self.storage(arm.body, &local, depth + 1);
                     all_exit = all_exit and exited;
+                    if (!exited) {
+                        survivor = local;
+                        continuing += 1;
+                    }
                     if (index < branches.len) {
                         branches[index] = local;
                         exits[index] = exited;
                     }
                 }
+                if (self.module.matchInfo(source).statement and continuing == 1) definitions.* = survivor;
                 if (self.module.branchMerges(source).len != 0) {
                     try require(self.module.matchArms(source).len == 2);
                     try self.storageMerges(source, definitions, &branches, &exits);
@@ -2069,20 +2936,32 @@ const Walker = struct {
             },
         }
     }
-    fn projectionContract(self: *Self, source: core.Id, projection: core.Projection, depth: usize) Error!void {
+    fn projectionContract(self: *Self, source: core.Id, projection: core.Projection, writing: bool, depth: usize) Error!void {
         const owner = self.module.types.node(projection.source_type);
         if (projection.nominal.unit != 0 or projection.nominal.decl != 0) return self.nominalProjection(projection, depth + 1);
         if (projection.variants.len == 0) {
+            const goal: core.Obligation = .{ .ty = projection.source_type, .kind = if (writing) .writable_field else .field, .name = projection.field, .result = projection.result_type, .span = self.module.span(source) };
+            // An inferred getter may have become a concrete physical field
+            // through an earlier callee equation. Reconstruct that field from
+            // the checked constructor catalog before seeking a named method.
+            if (try self.goalGiven(goal, depth + 1) or try self.closedGoal(goal, depth + 1)) return;
+            if (writing) {
+                // An inferred rebinding records an update requirement rather
+                // than a separate writable-field requirement. This profile
+                // admits it only when both field and owner keep their types.
+                const update_goal: core.Obligation = .{ .ty = projection.source_type, .kind = .update, .name = projection.field, .other = projection.result_type, .result = projection.source_type, .span = self.module.span(source) };
+                if (try self.goalGiven(update_goal, depth + 1)) return;
+                return error.InvalidArtifact;
+            }
             // Symbolic getters carry no physical nominal projection.
             // Reconstruct the original receiver from its checked type;
             // the ordinary member/scheme proof still owns selection.
-            if (owner.tag == .nominal) {
+            if (T.receiverIdentity(owner)) |family| {
                 var member = projection;
-                member.nominal = .{ .unit = owner.a, .decl = owner.b };
-                return self.nominalProjection(member, depth + 1);
+                member.nominal = family;
+                return self.memberProjection(member, depth + 1);
             }
-            const goal: core.Obligation = .{ .ty = projection.source_type, .kind = .field, .name = projection.field, .result = projection.result_type, .span = self.module.span(source) };
-            return require(try self.goalGiven(goal, depth + 1));
+            return error.InvalidArtifact;
         }
         try require(projection.variants.len == 1);
         const variant = self.module.projection_variants[projection.variants.start];
@@ -2111,6 +2990,10 @@ const Walker = struct {
         const selectors = self.module.updateSelectors(source);
         const path = self.module.updatePath(source);
         try require(selectors.len == 0 or path.len == 0);
+        var through_array = false;
+        const has_index = for (selectors) |selector| {
+            if (selector.kind == .index) break true;
+        } else false;
         for (selectors) |selector| {
             try self.step(depth);
             try self.strictSame(selected, selector.source_type);
@@ -2119,12 +3002,12 @@ const Walker = struct {
                 const projection = self.module.projection(selector.projection);
                 try self.strictSame(selected, projection.source_type);
                 try self.strictSame(selector.result_type, projection.result_type);
-                try self.projectionContract(source, projection, depth + 1);
+                try self.projectionContract(source, projection, through_array or !has_index, depth + 1);
             } else {
+                through_array = true;
                 try require(selector.projection == 0);
-                const array = self.module.types.node(selected);
-                try require(array.tag == .array);
-                try self.strictSame(array.a, selector.result_type);
+                const element = @import("storage_types.zig").arrayElement(&self.module.types, selected) orelse return error.InvalidArtifact;
+                try self.strictSame(element, selector.result_type);
                 try self.expression(selector.index, depth + 1);
                 try self.strictSame(T.u32_type, self.module.typeOf(selector.index));
             }
@@ -2133,7 +3016,7 @@ const Walker = struct {
         for (path) |id| {
             const projection = self.module.projection(id);
             try self.strictSame(selected, projection.source_type);
-            try self.projectionContract(source, projection, depth + 1);
+            try self.projectionContract(source, projection, true, depth + 1);
             selected = projection.result_type;
         }
         const binding = self.module.binding(info.self_binding);
@@ -2149,7 +3032,28 @@ const Walker = struct {
         const left = self.module.types.node(self.module.typeOf(node.a));
         const right = self.module.types.node(self.module.typeOf(node.b));
         const result = self.module.types.node(node.ty);
-        try require(left.tag == .record and right.tag == .record and result.tag == .record);
+        if (left.tag != .record or right.tag != .record or result.tag != .record) {
+            // The checker retains an exact merge dictionary when an ordinary
+            // source helper abstracts its record inputs or result. That
+            // dictionary proves this operation, not any physical field layout.
+            // Known non-record heads and portable bodies still fail closed.
+            try require(self.admission.source_bodies);
+            for ([_]T.Node{ left, right, result }) |head| switch (head.tag) {
+                .record, .variable, .bound, .rigid, .projection => {},
+                else => return error.InvalidArtifact,
+            };
+            try require(try self.goalGivenMode(.{
+                .kind = .record_merge,
+                .ty = self.module.typeOf(node.a),
+                .other = self.module.typeOf(node.b),
+                .result = node.ty,
+                .span = self.module.span(source),
+            }, depth + 1, false));
+            return;
+        }
+        try self.recordMergeFields(left, right, result, depth);
+    }
+    fn recordMergeFields(self: *Self, left: T.Node, right: T.Node, result: T.Node, depth: usize) Error!void {
         var output_: usize = 0;
         for (0..left.b) |index| {
             try self.step(depth);
@@ -2165,7 +3069,10 @@ const Walker = struct {
             try require(output_ < result.b);
             const actual = self.module.types.recordField(result, output_);
             try require(field.name == actual.name);
-            try self.strictSame(field.ty, actual.ty);
+            // Selection preserves an identical opaque type without granting
+            // its executable row, package or borrow authority. Different IDs
+            // still require the full structural equality proof.
+            if (field.ty != actual.ty) try self.strictSame(field.ty, actual.ty);
             output_ += 1;
         }
         for (0..right.b) |index| {
@@ -2183,7 +3090,10 @@ const Walker = struct {
             try require(output_ < result.b);
             const actual = self.module.types.recordField(result, output_);
             try require(field.name == actual.name);
-            try self.strictSame(field.ty, actual.ty);
+            // Selection preserves an identical opaque type without granting
+            // its executable row, package or borrow authority. Different IDs
+            // still require the full structural equality proof.
+            if (field.ty != actual.ty) try self.strictSame(field.ty, actual.ty);
             output_ += 1;
         }
         try require(output_ == result.b);
@@ -2206,8 +3116,7 @@ const Walker = struct {
                 try require(info.end == 0);
                 try self.expression(info.first, depth + 1);
                 const array = self.module.types.node(self.module.typeOf(info.first));
-                try require(array.tag == .array);
-                element = array.a;
+                element = if (array.tag == .list) array.a else @import("storage_types.zig").readableElement(&self.module.types, self.module.typeOf(info.first)) orelse return error.InvalidArtifact;
             },
         }
         for (self.module.loopCarries(source)) |carry| {
@@ -2215,7 +3124,10 @@ const Walker = struct {
             inline for (.{ "iteration", "backedge", "outgoing" }) |field| try self.strictSame(input, self.module.binding(@field(carry, field)).ty);
             try require(self.module.binding(carry.iteration).initializer == 0 and self.module.binding(carry.outgoing).initializer == 0);
         }
-        if (element != 0) try self.pattern(info.pattern, element, null, depth + 1);
+        if (info.pattern != 0) {
+            try require(element != 0);
+            try self.pattern(info.pattern, element, null, depth + 1);
+        }
         const owner: ControlOwner = .{ .node = source, .parent = self.loop_owner };
         self.loop_owner = &owner;
         defer self.loop_owner = owner.parent;
@@ -2244,11 +3156,11 @@ const Walker = struct {
         for (self.module.matchArms(source)) |arm| {
             const rows = self.module.armRows(arm);
             try require(rows.len != 0);
-            var names: ?std.bit_set.Static(4096) = null;
+            var names: ?Definitions = null;
             for (rows) |row| {
                 const patterns = self.module.rowPatterns(row);
                 try require(patterns.len == inputs.len);
-                var definitions: std.bit_set.Static(4096) = .empty;
+                var definitions: Definitions = .empty;
                 for (patterns, inputs) |pattern_, input| try self.pattern(pattern_, self.module.typeOf(input), &definitions, depth + 1);
                 if (names) |prior| try require(prior.eql(definitions));
                 names = definitions;
@@ -2266,6 +3178,9 @@ const Walker = struct {
     }
 
     fn expression(self: *Self, source: core.Id, depth: usize) Error!void {
+        errdefer if (self.admission.source_failure) |failure| {
+            if (failure.* == null) failure.* = .{ .unit = self.module.unit, .span = self.module.span(source) };
+        };
         try self.step(depth);
         if (source == 0) return;
         const node = self.module.node(source);
@@ -2274,7 +3189,10 @@ const Walker = struct {
             try self.principal(self.module.reference(source), node.ty);
         }
         try self.providerRows(source, depth + 1);
-        if (node.tag != .closure and node.tag != .suspend_) try self.scopes.visit(node.ty);
+        // A call's checked producer establishes its instantiated result rows,
+        // just as a reference does above. Validate that result only after the
+        // complete call correspondence and actual operands have passed.
+        if (node.tag != .closure and node.tag != .suspend_ and node.tag != .call and node.tag != .apply) try self.scopes.visit(node.ty);
         switch (node.tag) {
             .package_pack => {
                 const witnesses = self.module.types.list(.{ .start = node.b, .len = node.c });
@@ -2413,6 +3331,8 @@ const Walker = struct {
                 const outer_rows = self.closed_rows;
                 const outer_pure = self.scopes.pure_rows;
                 const outer_closed = self.scopes.closed_rows;
+                const outer_instances = self.scopes.instance_variables;
+                const outer_instance_rows = self.scopes.instance_rows;
                 const outer_foreign = self.foreign_allowed;
                 const outer_body_row = self.body_row;
                 const outer_handled = self.handled_count;
@@ -2421,6 +3341,8 @@ const Walker = struct {
                 defer self.closed_rows = outer_rows;
                 defer self.scopes.pure_rows = outer_pure;
                 defer self.scopes.closed_rows = outer_closed;
+                defer self.scopes.instance_variables = outer_instances;
+                defer self.scopes.instance_rows = outer_instance_rows;
                 defer self.foreign_allowed = outer_foreign;
                 defer self.body_row = outer_body_row;
                 self.closed_rows = closure.closed_rows;
@@ -2511,6 +3433,7 @@ const Walker = struct {
                 } else try require(self.module.types.node(signature).tag != .forall);
                 try self.arguments(signature, &.{node.b}, node.ty, null);
                 if (try self.capturesOpening(node.b, depth + 1)) try require(try self.openingOperation(node.a, depth + 1));
+                try self.scopes.visit(node.ty);
             },
             .effect_provider => {
                 const provider = self.module.types.node(node.ty);
@@ -2655,8 +3578,9 @@ const Walker = struct {
                 }
                 const producer = try self.target(call.target);
                 const callee_scheme = producer.binding(call.target.binding).scheme;
-                mapping.instance = callee_scheme.variables;
-                mapping.instance_rows = callee_scheme.row_variables;
+                const endpoint_scheme = try self.endpointScheme(producer, call.target.binding);
+                mapping.instance = endpoint_scheme.variables;
+                mapping.instance_rows = endpoint_scheme.row_variables;
                 var projection: @import("scheme_projection.zig").Resolver = .{ .module = self.module, .producer = producer, .binding = call.target.binding, .applied = &mapping };
                 var resolver: ?contracts.PrincipalProjectionResolver = null;
                 if (producer.types.node(callee_scheme.root).tag != .forall and callee_scheme.obligations.len != 0) resolver = projection.resolver();
@@ -2668,13 +3592,14 @@ const Walker = struct {
                     if (try self.capturesOpening(argument, depth + 1)) try require(try self.genericOperation(call.target));
                 }
                 try self.arguments(call.callee_type, call.arguments, node.ty, resolver);
+                try self.scopes.visit(node.ty);
             },
             .project => {
                 try self.expression(node.a, depth + 1);
                 const projection = self.module.projection(node.b);
                 try self.same(projection.source_type, self.module.typeOf(node.a));
                 try self.same(projection.result_type, node.ty);
-                try self.projectionContract(source, projection, depth + 1);
+                try self.projectionContract(source, projection, false, depth + 1);
             },
             .bind => {
                 const binding = self.module.binding(node.a);
@@ -2697,11 +3622,15 @@ const Walker = struct {
                 try self.pattern(node.a, self.module.typeOf(node.b), null, depth + 1);
             },
             .return_ => {
-                const owner = self.return_owner orelse return error.InvalidArtifact;
-                try require(node.b == owner.node);
+                var owner = self.return_owner;
+                while (owner) |candidate| {
+                    if (candidate.node == node.b) break;
+                    owner = candidate.parent;
+                }
+                try require(owner != null);
                 try self.expression(node.a, depth + 1);
                 try require(self.module.types.node(node.ty).tag == .never);
-                try self.same(self.module.typeOf(node.b), self.module.typeOf(node.a));
+                if (self.module.typeOf(node.a) != T.never) try self.same(self.module.typeOf(node.b), self.module.typeOf(node.a));
                 try require(!try self.capturesOpening(node.a, depth + 1));
             },
             .loop => try self.loop(source, depth + 1),
@@ -2743,15 +3672,17 @@ const Walker = struct {
                 }
             },
             .product, .record, .array => {
-                var aggregate = self.module.types.node(node.ty);
+                var aggregate_type = node.ty;
+                var aggregate = self.module.types.node(aggregate_type);
                 if (aggregate.tag == .usage) {
                     try require(aggregate.b == @backingInt(T.UsageKind.unique) and aggregate.c == 0);
-                    aggregate = self.module.types.node(aggregate.a);
+                    aggregate_type = aggregate.a;
+                    aggregate = self.module.types.node(aggregate_type);
                 }
-                try require((node.tag == .product and aggregate.tag == .product and node.b == aggregate.b) or (node.tag == .record and aggregate.tag == .record and node.b == aggregate.b) or (node.tag == .array and aggregate.tag == .array));
+                try require((node.tag == .product and aggregate.tag == .product and node.b == aggregate.b) or (node.tag == .record and aggregate.tag == .record and node.b == aggregate.b) or (node.tag == .array and (aggregate.tag == .list or @import("storage_types.zig").isArray(&self.module.types, aggregate_type))));
                 for (self.module.children(source), 0..) |child, index| {
                     try self.expression(child, depth + 1);
-                    var expected = aggregate.a;
+                    var expected = if (node.tag == .array and aggregate.tag != .list) @import("storage_types.zig").arrayElement(&self.module.types, aggregate_type).? else aggregate.a;
                     if (node.tag == .product) expected = self.module.types.list(.{ .start = aggregate.a, .len = aggregate.b })[index];
                     if (node.tag == .record) expected = self.module.types.recordField(aggregate, self.module.extra[node.c + index]).ty;
                     try self.same(expected, self.module.typeOf(child));
@@ -2813,10 +3744,15 @@ const Walker = struct {
                     try self.scalarContract(node.op, inputs[0..count], node.ty);
                 } else {
                     try require(node.op == .and_ or node.op == .or_);
-                    try self.same(T.boolean, self.module.typeOf(node.a));
-                    try self.same(T.boolean, self.module.typeOf(node.b));
+                    if (self.module.typeOf(node.a) != T.never) try self.same(T.boolean, self.module.typeOf(node.a));
+                    if (self.module.typeOf(node.b) != T.never) try self.same(T.boolean, self.module.typeOf(node.b));
                     try self.same(T.boolean, node.ty);
                 }
+            },
+            .storage => {
+                const contract_ = try @import("storage_core.zig").contract(self.module, source);
+                for (self.module.children(source)) |argument| try self.expression(argument, depth + 1);
+                for (contract_.pairs[0..contract_.len]) |pair| try self.strictSame(pair.expected, pair.actual);
             },
             .array_op => {
                 var inputs: [3]T.Id = undefined;

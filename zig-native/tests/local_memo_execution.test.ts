@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const sum = `
-const sum = fn (count: U32) => fn ~(value: U32) => do:
+const sum = func (count: U32) => return func ~(value: U32) => return do:
   let first = value
   let second = first
   let total = 0
@@ -17,12 +17,12 @@ const sum = fn (count: U32) => fn ~(value: U32) => do:
 Deno.test("local memo callee loops need no arena or thunk table", async () => {
   await compileAndRun(
     `${sum}
-entry const run = fn (count: U32) => sum count 21
-entry const zero = fn (divisor: U32) => sum 0 (@u32.div 1 divisor)
-const ignore = fn ~(value: U32) => do:
+entry const run = func (count: U32) => return sum count 21
+entry const zero = func (divisor: U32) => return sum 0 (@u32.div 1 divisor)
+const ignore = func ~(value: U32) => return do:
   let alias = value
   break 42
-entry const skipped = fn (divisor: U32) => ignore (@u32.div 1 divisor)
+entry const skipped = func (divisor: U32) => return ignore (@u32.div 1 divisor)
 `,
     (guest, bytes) => {
       for (const count of [0, 1, 2, 1000]) {
@@ -64,7 +64,7 @@ for (const asynchronous of [false, true]) {
   Deno.test(`local memo nested creation scopes and aliases preserve effects (${mode})`, async () => {
     await compileAndRun(
       `${sum}
-const selected = fn (count: U32) => fn ~(value: U32) => do:
+const selected = func (count: U32) => return func ~(value: U32) => return do:
   let alias = value
   let total = 0
   for i in 0..count:
@@ -74,7 +74,7 @@ const selected = fn (count: U32) => fn ~(value: U32) => do:
       use current <- @demand alias
       total := @u32.add self current
   break total
-const early = fn (count: U32) => fn ~(value: U32) => do:
+const early = func (count: U32) => return func ~(value: U32) => return do:
   let total = 0
   for i in 0..count:
     if @u32.eq i 2:
@@ -82,26 +82,26 @@ const early = fn (count: U32) => fn ~(value: U32) => do:
     use current <- @demand value
     total := @u32.add self current
   break total
-const exclusive = fn (left: Bool) => fn ~(value: U32) => do:
+const exclusive = func (left: Bool) => return func ~(value: U32) => return do:
   if left:
     break @demand value
   else:
     break @demand value
-entry const outside = fn (host: U32 -> U32 ! {Foreign}) => sum 8 (host 21)
-entry const once = fn (host: U32 -> U32 ! {Foreign}) => exclusive #False (host 7)
-entry const inside = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const outside = func (host: U32 -> U32 ! {Foreign}) => return sum 8 (host 21)
+entry const once = func (host: U32 -> U32 ! {Foreign}) => return exclusive false (host 7)
+entry const inside = func (host: U32 -> U32 ! {Foreign}) => return do:
   let total = 0
   for i in 0..4:
     for j in 0..3:
       use current <- sum j (host (@u32.add (@u32.mul i 10) j))
       total := @u32.add self current
   break total
-entry const conditional = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const conditional = func (host: U32 -> U32 ! {Foreign}) => return do:
   use skipped <- selected 1 (host 99)
   use read <- selected 4 (host 7)
   break @u32.add skipped read
-entry const stopped = fn (host: U32 -> U32 ! {Foreign}) => early 100 (host 9)
-entry const captured = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const stopped = func (host: U32 -> U32 ! {Foreign}) => return early 100 (host 9)
+entry const captured = func (host: U32 -> U32 ! {Foreign}) => return do:
   let before = 21
   use answer <- sum 2 (host before)
   before := 99
@@ -161,15 +161,15 @@ entry const folded = sum 8 21
       await compileAndRun(
         `
 type Tick is effect = { read: U32 -> U32 }
-const rows = @list.generate 257 (fn i => {a: i, b: i})
-const walk = fn (rows: List {a: U32, b: U32}) => fn ~(value: U32) => do:
+const rows = @list.generate 257 (func i => return {a: i, b: i})
+const walk = func (rows: List {a: U32, b: U32}) => return func ~(value: U32) => return do:
   let total = 0
   for row in rows:
     use current <- @demand value
     total := @u32.add self (@u32.add row.a current)
   break total
-const work = @computation (fn () => walk rows (Tick.read 1))
-const abort = fn (log: U32 -> U32 ! {Foreign}) => do:
+const work = @computation (func () => return walk rows (Tick.read 1))
+const abort = func (log: U32 -> U32 ! {Foreign}) => return do:
   for request in @requests work:
     case request of
       effect Tick.read value =>
@@ -178,11 +178,11 @@ const abort = fn (log: U32 -> U32 ! {Foreign}) => do:
       complete value =>
         break value
   break 7
-entry const aborted = fn (log: U32 -> U32 ! {Foreign}) => do:
+entry const aborted = func (log: U32 -> U32 ! {Foreign}) => return do:
   for i in 0..2048:
     use ignored <- abort log
   break 7
-entry const resumed = fn (log: U32 -> U32 ! {Foreign}) => do:
+entry const resumed = func (log: U32 -> U32 ! {Foreign}) => return do:
   for request in @requests work:
     case request of
       effect Tick.read value =>
@@ -191,9 +191,9 @@ entry const resumed = fn (log: U32 -> U32 ! {Foreign}) => do:
       complete value =>
         break value
   break 0
-const scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn value => 7)):
+const scoped = func ~(value: U32) => return do (@effect.provider Tick.read (func value => return 7)):
   break @u32.add (@demand value) (@demand value)
-entry const provided = fn (ignored: U32) => scoped (Tick.read ignored)
+entry const provided = func (ignored: U32) => return scoped (Tick.read ignored)
 `,
         async (guest) => {
           const trace: number[] = [];
@@ -242,7 +242,7 @@ entry const provided = fn (ignored: U32) => scoped (Tick.read ignored)
 Deno.test("local memo managed results remain roots during forever-loop collection", async () => {
   await compileAndRun(
     `
-const run = fn (count: U32) => fn ~(value: Array U32) => do:
+const run = func (count: U32) => return func ~(value: Array U32) => return do:
   let total = 0
   let i = 0
   for ever:
@@ -252,8 +252,8 @@ const run = fn (count: U32) => fn ~(value: Array U32) => do:
     i := @u32.add self 1
     if @u32.eq i count:
       break cached
-const forward = fn (count: U32) => fn ~(value: Array U32) => run count (@demand value)
-entry const answer = fn (count: U32) => forward count #[21, 22, 23]
+const forward = func (count: U32) => return func ~(value: Array U32) => return run count (@demand value)
+entry const answer = func (count: U32) => return forward count #[21, 22, 23]
 `,
     (guest) => {
       for (const count of [1, 100, 1000, 3000]) {
@@ -270,18 +270,18 @@ entry const answer = fn (count: U32) => forward count #[21, 22, 23]
 Deno.test("local memo loop traps publish no result and later creations remain independent", async () => {
   await compileAndRun(
     `${sum}
-const floating = fn (count: U32) => fn ~(value: F32) => do:
+const floating = func (count: U32) => return func ~(value: F32) => return do:
   let total = 0.0
   for i in 0..count:
     total := @f32.add self (@demand value)
   break total
-entry const divide = fn (count: U32) => sum count (@u32.div 100 0)
-entry const failed = fn (host: U32 -> U32 ! {Foreign}) => sum 4 (host 21)
-entry const floats = fn (count: U32) => floating count 1.5
-const drop = fn (divisor: U32) => fn ~(_: U32) => do:
+entry const divide = func (count: U32) => return sum count (@u32.div 100 0)
+entry const failed = func (host: U32 -> U32 ! {Foreign}) => return sum 4 (host 21)
+entry const floats = func (count: U32) => return floating count 1.5
+const drop = func (divisor: U32) => return func ~(_: U32) => return do:
   use @u32.div 100 divisor
   break 42
-entry const discarded = fn (divisor: U32) => drop divisor (@u32.div 1 0)
+entry const discarded = func (divisor: U32) => return drop divisor (@u32.div 1 0)
 `,
     (guest) => {
       equal(guest.call("divide", 0), 0);
@@ -334,7 +334,7 @@ Deno.test("local memo retained callee edits preserve stable types and failure re
   try {
     await Deno.writeTextFile(
       entry,
-      'import { sum } from "./library"\nentry const run = fn (count: U32) => sum count 21\n',
+      'import { sum } from "./library"\nentry const run = func (count: U32) => return sum count 21\n',
     );
     await Deno.writeTextFile(library, sum);
     const retained = await createZigProjectCompiler(options);
@@ -384,7 +384,7 @@ Deno.test("local memo retained callee edits preserve stable types and failure re
 Deno.test("counted local Array memos survive callee iteration retirement and recycled allocation pressure", async () => {
   await compileAndRun(
     `
-const run = fn (count: U32) => fn ~(value: Array U32) => do:
+const run = func (count: U32) => return func ~(value: Array U32) => return do:
   let total = 0
   let index = 0
   for ever:
@@ -397,8 +397,8 @@ const run = fn (count: U32) => fn ~(value: Array U32) => do:
       if @u32.eq total (@u32.mul count (@u32.sub count 1)):
         break cached
       break @panic "the pressure loop lost its values"
-const forward = fn (count: U32) => fn ~(value: Array U32) => run count (@demand value)
-entry const answer = fn (count: U32) => forward count #[21, 22, 23]
+const forward = func (count: U32) => return func ~(value: Array U32) => return run count (@demand value)
+entry const answer = func (count: U32) => return forward count #[21, 22, 23]
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);

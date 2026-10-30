@@ -20,10 +20,10 @@ Deno.test("qualified primitive associated calls preserve pure implementations th
   for (const direct of [false, true]) {
     for (const local of [false, true]) {
       const source = `type Tick is effect = Unit -> Unit
-const twice: a -> a ! {Tick} where { associated "add" a a a ! {} } = fn value => do:
+const twice: a -> a ! {Tick} where { associated "add" a a a ! {} } = func value => return do:
   use Tick ()
   break ${direct ? '@type.call "add" value value' : "value + value"}
-entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
+entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
   ${local ? "let alias=twice\n  break alias 21" : "break twice 21"}
 entry const folded=answer ()
 `;
@@ -52,11 +52,11 @@ Deno.test("dispatched written schemes retain implementation effects and unsatisf
   await compileAndRun(
     `effect Read: Unit -> U32
 type Box is data = #Box U32
-const Box.twice: Box -> (Unit -> Box ! {Read}) where { associated "add" U32 U32 U32 ! {} } = fn box => fn () => do:
+const Box.twice: Box -> (Unit -> Box ! {Read}) where { associated "add" U32 U32 U32 ! {} } = func box => return func () => return do:
   let #Box value = box
   use offset <- Read ()
   break #Box (@u32.add (@type.call "add" value value) offset)
-entry const answer = fn (value: U32) => do (@effect.provider Read (fn () => 1)):
+entry const answer = func (value: U32) => return do (@effect.provider Read (func () => return 1)):
   use box <- (#Box value).twice ()
   let #Box result = box
   break result
@@ -69,9 +69,9 @@ entry const answer = fn (value: U32) => do (@effect.provider Read (fn () => 1)):
   );
   await compileExpectedFailure(
     `type Box a is data = #Box a
-const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => box
-entry const answer = fn () => do:
-  let #Box value = (#Box #True).twice
+const Box.twice: Box a -> Box a where { associated "add" a a a } = func box => return box
+entry const answer = func () => return do:
+  let #Box value = (#Box true).twice
   break 42
 `,
     "missing_associated",

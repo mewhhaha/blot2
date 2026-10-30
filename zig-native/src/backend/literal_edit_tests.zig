@@ -12,14 +12,14 @@ const a = std.testing.allocator;
 // in it previously disabled every retained fragment of the module.
 const source =
     \\type Reader a is effect = { ask: Unit -> a }
-    \\const reader = fn value => @effect.provider (Reader.ask U32) (fn () => value)
+    \\const reader = func value => return @effect.provider (Reader.ask U32) (func () => return value)
     \\const forty = reader 40
     \\const other = 0
-    \\entry const answer = fn () => do forty:
+    \\entry const answer = func () => return do forty:
     \\  use value <- Reader.ask U32 ()
     \\  break @u32.add value 1
-    \\entry const plain = fn (x: U32) => @u32.add x 2
-    \\entry const unrelated = fn () => other
+    \\entry const plain = func (x: U32) => return @u32.add x 2
+    \\entry const unrelated = func () => return other
 ;
 const Fixture = struct {
     units: []core.Module,
@@ -77,7 +77,7 @@ test "literal edits beside effect witnesses keep unrelated retained bodies" {
         .{ .from = "reader 40", .to = "reader 41", .reuses = true },
         // A larger witness body shifts the witness node, changing the
         // operation catalog: the module's fragments decline conservatively.
-        .{ .from = "(fn () => value)", .to = "(fn () => @u32.add value 0)", .reuses = false },
+        .{ .from = "(func () => return value)", .to = "(func () => return @u32.add value 0)", .reuses = false },
     };
     for (cases) |case| {
         const text = try std.mem.replaceOwned(u8, a, source, case.from, case.to);
@@ -117,7 +117,7 @@ test "a changed operation catalog declines retained fragments of the module" {
     var initial = try before.compile(a, null);
     defer initial.deinit(a);
     // A second provider adds an operation value and shifts the catalog.
-    const text = try std.mem.replaceOwned(u8, a, source, "const other = 0", "const other = 0\nconst forty_one = reader 41\nentry const second = fn () => do forty_one:\n  use value <- Reader.ask U32 ()\n  break value");
+    const text = try std.mem.replaceOwned(u8, a, source, "const other = 0", "const other = 0\nconst forty_one = reader 41\nentry const second = func () => return do forty_one:\n  use value <- Reader.ask U32 ()\n  break value");
     defer a.free(text);
     var after = try Fixture.init(text);
     defer after.deinit();

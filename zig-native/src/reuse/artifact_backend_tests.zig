@@ -28,14 +28,14 @@ fn lower(source: []const u8) !core.Module {
 const provider_source =
     \\effect Read: Unit -> F32
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\const reader = @effect.provider Read (fn () => 1.75)
+    \\const reader = @effect.provider Read (func () => return 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
     \\  break Read ()
-    \\entry const callback = fn () => do reader:
+    \\entry const callback = func () => return do reader:
     \\  break Read ()
-    \\entry const answer = fn (value: F32) => do:
-    \\  let dynamic = @effect.provider Read (fn () => value)
+    \\entry const answer = func (value: F32) => return do:
+    \\  let dynamic = @effect.provider Read (func () => return value)
     \\  let local = @effect.state (State.get F32) (State.set F32) value
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
@@ -49,9 +49,9 @@ const provider_source =
 ;
 
 const collection_source =
-    \\const frozen = @list.generate 513 (fn index => index)
-    \\entry const build = fn (count: U32) => do:
-    \\  let xs = [value | value <- @array.generate count (fn i => i)]
+    \\const frozen = @list.generate 513 (func index => return index)
+    \\entry const build = func (count: U32) => return do:
+    \\  let xs = [value | value <- @array.generate count (func i => return i)]
     \\  xs := [(@array.from_list frozen)[512], ...self, 42]
     \\  let array = @array.from_list xs
     \\  array[0] := 40
@@ -78,11 +78,11 @@ test "local refinement and closed source sharing preserve exact Wasm staging and
 }
 
 const partition_source =
-    \\const plus = fn (value: U32) => @u32.add value 1
-    \\const twice = fn (value: U32) => @u32.add (plus value) (plus value)
-    \\const recurse = fn (value: U32) -> U32 => if @u32.eq value 0 then twice value else recurse (@u32.sub value 1)
+    \\const plus = func (value: U32) => return @u32.add value 1
+    \\const twice = func (value: U32) => return @u32.add (plus value) (plus value)
+    \\const recurse = func (value: U32) : U32 => return if @u32.eq value 0 then twice value else recurse (@u32.sub value 1)
     \\entry const folded: U32 where { type_rep U32 } = @u32.add (twice 20) (recurse 3)
-    \\entry const answer = fn (value: U32) => @u32.add (twice value) (recurse value)
+    \\entry const answer = func (value: U32) => return @u32.add (twice value) (recurse value)
 ;
 fn partitionScenario(allocator: std.mem.Allocator, module: *const core.Module, expected: []const u8) !void {
     var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true });
@@ -133,9 +133,9 @@ test "Gate A backend reconstructs solved captures providers State Demand Foreign
 
 test "artifact replay preserves codegen tiers and physical sharing without merging semantic jobs" {
     var module = try lower(
-        \\const left = fn (value: U32) => @u32.add value 7
-        \\const right = fn (value: U32) => @u32.add value 7
-        \\entry const answer = fn (value: U32) => @u32.add (left value) (right value)
+        \\const left = func (value: U32) => return @u32.add value 7
+        \\const right = func (value: U32) => return @u32.add value 7
+        \\entry const answer = func (value: U32) => return @u32.add (left value) (right value)
     );
     defer module.deinit(a);
     const Tier = @import("../compilation_tier.zig").Tier;
@@ -160,7 +160,7 @@ fn allocationScenario(allocator: std.mem.Allocator, module: *const core.Module) 
     try std.testing.expect(result.diagnostic == null and result.artifacts != null);
 }
 test "Gate A complete job capture publication and reconstruction release each failed allocation without mutating pinned Core" {
-    var module = try lower("const identity = fn value => value\nentry const answer = fn () => identity 42\n");
+    var module = try lower("const identity = func value => return value\nentry const answer = func () => return identity 42\n");
     defer module.deinit(a);
     const before = metadata.stamp(module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationScenario, .{&module});
@@ -168,7 +168,7 @@ test "Gate A complete job capture publication and reconstruction release each fa
 }
 
 test "retained artifact capture completes runtime storage only after its initializer is emitted" {
-    var module = try lower("entry let cell: U32 = 41\nentry const answer = fn () => @u32.add cell 1\n");
+    var module = try lower("entry let cell: U32 = 41\nentry const answer = func () => return @u32.add cell 1\n");
     defer module.deinit(a);
     var fresh = try backend.compileWithOptions(a, &.{module}, 1, .{});
     defer fresh.deinit(a);

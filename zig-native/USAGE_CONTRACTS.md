@@ -68,7 +68,7 @@ its captured owners into the demand. Cancellation may retry a demand, so its
 body cannot consume an affine capture without a restart-safe checked protocol. A
 demand parameter moves its captured owners once only when the callee declares it
 affine before generic instantiation (`~(value: unique T)`); a generic demand
-parameter such as `keep = fn ~value` stays retryable, so a consuming capture is
+parameter such as `keep = func ~value` stays retryable, so a consuming capture is
 rejected there. This is fixed at the call as `demand_once`. Ready demands retain
 their strong results; usage contracts never weaken memos.
 
@@ -133,8 +133,8 @@ nothing.
 | ------------------------------------------------------------------ | ---------------------------------------------------- |
 | Move `unique T` into a once closure, then call once or discard     | Accept; one owner/drop path.                         |
 | Store the same unique value in two fields                          | Reject duplicate owner.                              |
-| `@usage.borrow value (fn loan => inspect loan)` returning U32      | Accept if inspect has a read-loan contract.          |
-| Return `loan`, `fn () => inspect loan`, or a package containing it | Reject borrow escape.                                |
+| `@usage.borrow value (func loan => return inspect loan)` returning U32      | Accept if inspect has a read-loan contract.          |
+| Return `loan`, `func () => return inspect loan`, or a package containing it | Reject borrow escape.                                |
 | Conditionally invoke once, then invoke it after the branch         | Reject possible second invocation.                   |
 | Resource scopes A then B, callback returns or cancels              | Trace acquire A, acquire B, drop B, drop A.          |
 | Trap/host failure while B lives                                    | Host leave attempts B then A; no stale callback use. |

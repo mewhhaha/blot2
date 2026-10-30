@@ -9,14 +9,14 @@ const a = std.testing.allocator;
 
 const source =
     \\infixl 60 (+) = _fixity_add
-    \\const marker = fn (value: U32) -> U32 => value + 1
-    \\entry const snapshots = fn (value: U32) -> U32 => do:
+    \\const marker = func (value: U32) : U32 => return value + 1
+    \\entry const snapshots = func (value: U32) : U32 => return do:
     \\  let before = #[value, marker value]
     \\  let after = @array.set before 0 (marker value)
     \\  let filled = @array.fill 2 (marker value)
     \\  break before[0] + after[0] + @array.length filled
-    \\entry const empty = fn () -> Array F32 => #[]
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\entry const empty = func () : Array F32 => return #[]
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 const Fixture = struct {
     tree: ast.Tree,
@@ -112,7 +112,7 @@ fn textLowering(allocator: std.mem.Allocator, tree: *const ast.Tree, pool: *cons
 }
 
 test "runtime text lowers UTF8 literals to Unicode scalars through allocation failures" {
-    const text_source = "entry const text = fn () => \"é🙂\"\nentry const empty = fn () => \"\"\n";
+    const text_source = "entry const text = func () => return \"é🙂\"\nentry const empty = func () => return \"\"\n";
     var lexed = try lexer.lex(a, text_source);
     defer lexed.deinit(a);
     var pool: symbols.Pool = .{};

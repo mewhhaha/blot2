@@ -31,13 +31,13 @@ fn classify(a: A, module: *const core.Module, target: u32, limits: demand.Limits
 test "demand summary exclusive branches join dynamically and forwarding records every body" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const choose = fn ~(value: U32) => if @u32.eq (@demand value) 0 then 1 else 2
-        \\const exclusive = fn ~(value: U32) => if #True then @demand value else @demand value
-        \\const both = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-        \\const escape = fn ~(value: U32) => if #True then fn () => @demand value else fn () => @demand value
-        \\const ignore = fn ~(value: U32) => 42
-        \\const forward = fn ~(value: U32) => both (@demand value)
-        \\entry const run = fn (x: U32) => exclusive x
+        \\const choose = func ~(value: U32) => return if @u32.eq (@demand value) 0 then 1 else 2
+        \\const exclusive = func ~(value: U32) => return if true then @demand value else @demand value
+        \\const both = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+        \\const escape = func ~(value: U32) => return if true then func () => return @demand value else func () => return @demand value
+        \\const ignore = func ~(value: U32) => return 42
+        \\const forward = func ~(value: U32) => return both (@demand value)
+        \\entry const run = func (x: U32) => return exclusive x
     );
     defer module.deinit(a);
     const expected = [_]demand.Outcome{ .once, .once, .repeated, .escaping, .never, .repeated };
@@ -67,8 +67,8 @@ fn ownership(a: A, module: *const core.Module, target: u32) !void {
 test "demand summary ownership survives every allocation failure and budget exhaustion" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-        \\entry const run = fn (x: U32) => twice x
+        \\const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+        \\entry const run = func (x: U32) => return twice x
     );
     defer module.deinit(a);
     const body = module.bodies[1];
@@ -80,14 +80,14 @@ test "demand summary ownership survives every allocation failure and budget exha
 test "demand summary aliases preserve identity and an outside creation repeats in a loop" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const alias = fn ~(value: U32) => do:
+        \\const alias = func ~(value: U32) => return do:
         \\  let second = value
         \\  break @demand second
-        \\const looped = fn ~(value: U32) => do:
+        \\const looped = func ~(value: U32) => return do:
         \\  for index in 0..3:
         \\    use @demand value
         \\  break 42
-        \\entry const run = fn (x: U32) => alias x
+        \\entry const run = func (x: U32) => return alias x
     );
     defer module.deinit(a);
     try std.testing.expectEqual(demand.Outcome.once, try classify(a, &module, module.bodies[1].binding, .{}));
@@ -102,8 +102,8 @@ test "demand summary aliases preserve identity and an outside creation repeats i
 test "demand summary recursive checked graphs converge and bounded components decline" {
     const a = std.testing.allocator;
     for ([_][]const u8{
-        "const once = fn ~(value: U32) => if #True then @demand value else once (@demand value)\nentry const run = fn (x: U32) => once x\n",
-        "const even = fn ~(value: U32) => if #True then @demand value else odd (@demand value)\nconst odd = fn ~(value: U32) => even (@demand value)\nentry const run = fn (x: U32) => even x\n",
+        "const once = func ~(value: U32) => return if true then @demand value else once (@demand value)\nentry const run = func (x: U32) => return once x\n",
+        "const even = func ~(value: U32) => return if true then @demand value else odd (@demand value)\nconst odd = func ~(value: U32) => return even (@demand value)\nentry const run = func (x: U32) => return even x\n",
     }) |source| {
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -132,14 +132,14 @@ const Fixture = struct {
     }
 };
 const retained_before =
-    \\const leaf = fn ~(value: U32) => if #True then @demand value else 42
-    \\const forward = fn ~(value: U32) => leaf (@demand value)
-    \\entry const run = fn (x: U32) => forward x
+    \\const leaf = func ~(value: U32) => return if true then @demand value else 42
+    \\const forward = func ~(value: U32) => return leaf (@demand value)
+    \\entry const run = func (x: U32) => return forward x
 ;
 const retained_after =
-    \\const leaf = fn ~(value: U32) => if #True then 42 else @demand value
-    \\const forward = fn ~(value: U32) => leaf (@demand value)
-    \\entry const run = fn (x: U32) => forward x
+    \\const leaf = func ~(value: U32) => return if true then 42 else @demand value
+    \\const forward = func ~(value: U32) => return leaf (@demand value)
+    \\entry const run = func (x: U32) => return forward x
 ;
 test "demand summary retained exact bodies reject stable type edits and survive no op generations" {
     const a = std.testing.allocator;
@@ -197,13 +197,13 @@ test "demand summary forwarding growth visits retained nodes and edges linearly"
     for ([_]usize{ 8, 16, 32, 64, 128 }) |count| {
         var source: std.ArrayList(u8) = .empty;
         defer source.deinit(a);
-        try source.appendSlice(a, "const f0 = fn ~(value: U32) => @demand value\n");
+        try source.appendSlice(a, "const f0 = func ~(value: U32) => return @demand value\n");
         for (1..count) |index| {
-            const line = try a.print("const f{d} = fn ~(value: U32) => f{d} (@demand value)\n", .{ index, index - 1 });
+            const line = try a.print("const f{d} = func ~(value: U32) => return f{d} (@demand value)\n", .{ index, index - 1 });
             defer a.free(line);
             try source.appendSlice(a, line);
         }
-        const entry = try a.print("entry const run = fn (x: U32) => f{d} x\n", .{count - 1});
+        const entry = try a.print("entry const run = func (x: U32) => return f{d} x\n", .{count - 1});
         defer a.free(entry);
         try source.appendSlice(a, entry);
         var module = try lower(a, source.items);
@@ -232,11 +232,11 @@ test "demand summary aggregate escape unknown callbacks and provider barriers st
     const a = std.testing.allocator;
     var module = try lower(a,
         \\type Tick is effect = { read: Unit -> U32 }
-        \\const stored = fn ~(value: U32) => { item: value }
-        \\const callback = fn ~(value: U32) => fn (next: ~U32 -> U32) => next (@demand value)
-        \\const guarded = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 42)):
+        \\const stored = func ~(value: U32) => return { item: value }
+        \\const callback = func ~(value: U32) => return func (next: ~U32 -> U32) => return next (@demand value)
+        \\const guarded = func ~(value: U32) => return do (@effect.provider Tick.read (func () => return 42)):
         \\  break @demand value
-        \\entry const run = fn () => guarded (Tick.read ())
+        \\entry const run = func () => return guarded (Tick.read ())
     );
     defer module.deinit(a);
     try std.testing.expectEqual(demand.Outcome.escaping, try classify(a, &module, module.bodies[1].binding, .{}));
@@ -247,12 +247,12 @@ test "demand summary aggregate escape unknown callbacks and provider barriers st
 test "demand summary loop fresh creation has one use per dynamic instance" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const looped = fn ~(value: U32) => do:
+        \\const looped = func ~(value: U32) => return do:
         \\  for index in 0..3:
         \\    let pending = value
         \\    use @demand pending
         \\  break 42
-        \\entry const run = fn (x: U32) => looped x
+        \\entry const run = func (x: U32) => return looped x
     );
     defer module.deinit(a);
     // Source suspension creation currently occurs at argument applications.

@@ -1,4 +1,4 @@
-"fn" @keyword.function
+"func" @keyword.function
 ["import" "from" "as"] @keyword.control.import
 (export_declaration "export" @keyword.control.import)
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
@@ -74,5 +74,7 @@
 (escape_sequence) @constant.character.escape
 
 (constructor_marker) @punctuation.special
+(dollar_constructor) @constructor
+(staging_marker) @keyword.directive
 (constructor_reference qualifier: (_) @namespace)
 (constructor_reference name: (type_identifier) @constructor)

@@ -10,15 +10,15 @@ const a = std.testing.allocator;
 const source =
     \\type Point is data = #Point { x: U32 }
     \\type Bucket is data = #Bucket { points: Array Point }
-    \\const make = fn (initial: Bucket) => do:
+    \\const make = func (initial: Bucket) => return do:
     \\  let bucket = initial
-    \\  break fn (index: U32) => do:
+    \\  break func (index: U32) => return do:
     \\    bucket.points[index].x := do:
     \\      let other = #[40]
     \\      other[0] := @u32.add self 2
     \\      break other[0]
     \\    break bucket.points[index].x
-    \\entry const run = fn () -> U32 => (make (#Bucket { points: #[#Point { x: 1 }] })) 0
+    \\entry const run = func () : U32 => return (make (#Bucket { points: #[#Point { x: 1 }] })) 0
 ;
 
 const Fixture = struct {

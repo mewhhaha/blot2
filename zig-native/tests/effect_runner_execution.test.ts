@@ -3,9 +3,9 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("effect runner: generic_run", async () => {
   await compileAndRun(
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
-const run = fn initial => fn action => @effect.run State.get State.set initial action
-entry const answer = fn () => do:
-  let (next,previous) = run 41 (fn () => do:
+const run = func initial => return func action => return @effect.run State.get State.set initial action
+entry const answer = func () => return do:
+  let (next,previous) = run 41 (func () => return do:
     use previous <- State.get ()
     use State.set (@u32.add previous 1)
     break previous)
@@ -20,7 +20,7 @@ entry const answer = fn () => do:
 Deno.test("effect runner: reader_function_witness", async () => {
   await compileAndRun(
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const answer = fn () -> U32 => @effect.reader State.get (fn () -> U32 => @panic "witness called") (fn () => 42) (fn () -> U32 => State.get ())
+entry const answer = func () : U32 => return @effect.reader State.get (func () : U32 => return @panic "witness called") (func () => return 42) (func () : U32 => return State.get ())
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) equal(guest.call("answer", null), 42);
@@ -31,9 +31,9 @@ entry const answer = fn () -> U32 => @effect.reader State.get (fn () -> U32 => @
 Deno.test("effect runner: writer_forwarding", async () => {
   await compileAndRun(
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const answer = fn () => do:
-  let (next,result) = @effect.run State.get State.set 0 (fn () =>
-    @effect.writer State.set (fn () -> U32 => @panic "witness called") (fn value => State.set value) (fn () => do:
+entry const answer = func () => return do:
+  let (next,result) = @effect.run State.get State.set 0 (func () => return
+    @effect.writer State.set (func () : U32 => return @panic "witness called") (func value => return State.set value) (func () => return do:
       use State.set 42
       break 42))
   break @u32.add next result
@@ -47,11 +47,11 @@ entry const answer = fn () => do:
 Deno.test("effect runner: action_operand_before_installation", async () => {
   await compileAndRun(
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const answer = fn () => do:
-  let (next,result) = @effect.run State.get State.set 41 (fn () =>
-    @effect.reader State.get 0 (fn () => 99) (do:
+entry const answer = func () => return do:
+  let (next,result) = @effect.run State.get State.set 41 (func () => return
+    @effect.reader State.get 0 (func () => return 99) (do:
       use before <- State.get ()
-      break (fn () -> U32 => before)))
+      break (func () : U32 => return before)))
   break @u32.add next result
 `,
     (guest) => {

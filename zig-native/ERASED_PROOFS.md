@@ -38,7 +38,7 @@ for capability rows. For example:
 ```blot
 const at: (values: Array a) -> (index: U32) ->
   (@proof.Index values index) -> a =
-  fn values => fn index => fn proof => @array.get values index
+  func values => return func index => return func proof => return @array.get values index
 ```
 
 Instantiation substitutes the checked identities of the first two arguments into
@@ -71,7 +71,7 @@ Contradictory automatic branch facts make that successor unreachable after
 evaluating its guard. They never supply a witness to a reachable successor.
 
 ```blot
-entry const checked = fn (values: Array U32) => fn (index: U32) => do:
+entry const checked = func (values: Array U32) => return func (index: U32) => return do:
   let valid = @proof.index values index
   break at values index valid
 ```
@@ -160,7 +160,7 @@ ordinary guard below evaluates once. The access retains its load and result but
 removes its redundant bounds comparison:
 
 ```blot
-entry const guarded = fn (values: Array U32) => fn (index: U32) => do:
+entry const guarded = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     break @array.get values index
   break 0
@@ -174,7 +174,7 @@ comparison requires proof from its checked body before supplying these facts.
 A new index version keeps its own check:
 
 ```blot
-entry const next = fn (values: Array U32) => fn (index: U32) => do:
+entry const next = func (values: Array U32) => return func (index: U32) => return do:
   if index < @array.length values:
     index := index + 1
     break @array.get values index

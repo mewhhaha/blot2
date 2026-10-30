@@ -1,0 +1,59 @@
+Task test:compiler deno run --allow-read --allow-write --allow-run --allow-env scripts/test_compiler.ts
+smoke-build: starting
+smoke-build: 4.08s, exit 0, cache not-applicable
+smoke: starting
+smoke: 1.31s, exit 1, cache not-applicable
+./zig-native/tests/stage_chain_budget.test.ts => CLI rejects inference budget exhaustion without publishing output ... ok (27ms)
+./zig-native/tests/zig_project_protocol.test.ts => wire contract: build, rejection details, revisions, checkpoint and close ... FAILED (30ms)
+./zig-native/tests/stage_chain_budget.test.ts => fresh and retained stage-chain rejection agrees and the server recovers unchanged ... ok (66ms)
+./zig-native/tests/zig_project_client.test.ts => Zig project client queues revisions and preserves entry edit/error/missing/correction bytes ... ok (358ms)
+
+ ERRORS
+
+wire contract: build, rejection details, revisions, checkpoint and close => ./zig-native/tests/zig_project_protocol.test.ts:228:6
+error: AssertionError: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    {
+      kind: 'left_operand',
+      path: '/tmp/blot-protocol-2e69f1640d6d9805/main.blot',
+      span: {
++       end: 42,
+-       end: 43,
+        start: 38
+      }
+    },
+    {
+      kind: 'right_operand',
+      path: '/tmp/blot-protocol-2e69f1640d6d9805/main.blot',
+      span: {
++       end: 47,
+-       end: 48,
+        start: 43
+      }
+    }
+  ]
+
+        equal(explanation.contexts, [
+        ^
+    at file:///home/mewhhaha/src/blot2/zig-native/tests/zig_project_protocol.test.ts:404:9
+
+ FAILURES
+
+wire contract: build, rejection details, revisions, checkpoint and close => ./zig-native/tests/zig_project_protocol.test.ts:228:6
+
+FAILED | 3 passed | 1 failed (360ms)
+
+Check zig-native/tests/zig_project_protocol.test.ts
+Check zig-native/tests/zig_project_client.test.ts
+Check zig-native/tests/stage_chain_budget.test.ts
+error: Test failed
+
+Timing record: /home/mewhhaha/src/blot2/build/bench/iteration/timings.json
+error: Uncaught (in promise) Error: smoke failed; logs: /home/mewhhaha/src/blot2/build/bench/iteration/run-3bbae4122376e65b
+        throw new Error(`${name} failed; logs: ${runDirectory}`);
+              ^
+    at phase (file:///home/mewhhaha/src/blot2/scripts/test_compiler.ts:395:15)
+    at async main (file:///home/mewhhaha/src/blot2/scripts/test_compiler.ts:504:7)
+    at async file:///home/mewhhaha/src/blot2/scripts/test_compiler.ts:643:23

@@ -2,91 +2,91 @@ import {Row, make_row} from "./rows"
 import * as array from "std/array"
 type Pair is data = #Pair {a: U32, b: U32}
 type Command is data = #Command {lanes: Array U32}
-entry const direct = fn (steps: U32) -> U32 => do:
+entry const direct = func (steps: U32) : U32 => return do:
   let rows = array.generate 2000 make_row
   let total = 0
   for pass in 0..steps:
     for row in rows:
       total := self + row.count
   break total
-entry const selected = fn (steps: U32) -> U32 => do:
+entry const selected = func (steps: U32) : U32 => return do:
   let rows = array.generate 2000 make_row
-  let read = if steps % 2 == 0 then (fn (row: Row) -> U32 => row.count) else (fn (row: Row) -> U32 => row.id)
+  let read = if steps % 2 == 0 then (func (row: Row) : U32 => return row.count) else (func (row: Row) : U32 => return row.id)
   let total = 0
   for pass in 0..steps:
     for row in rows:
       total := self + read row
   break total
-entry const indexed = fn (steps: U32) -> U32 => do:
+entry const indexed = func (steps: U32) : U32 => return do:
   let rows = array.generate 2000 make_row
   let total = 0
   for pass in 0..steps:
     for index in 0..rows.length:
       total := self + rows[index].count
   break total
-entry const nominal_generate = fn (count: U32) -> U32 => do:
-  let rows = array.generate count (fn index => #Pair {a: index + 1, b: index + 1})
+entry const nominal_generate = func (count: U32) : U32 => return do:
+  let rows = array.generate count (func index => return #Pair {a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     total := self + row.a
   break total
-entry const wide_generate = fn (count: U32) -> U32 => do:
+entry const wide_generate = func (count: U32) : U32 => return do:
   let rows = array.generate count make_row
   let total = 0
   for row in rows:
     total := self + row.count
   break total
-entry const pair_fixed = fn (ignored: U32) -> U32 => do:
-  let rows = array.generate 2000 (fn index => #Pair {a: index + 1, b: index + 1})
+entry const pair_fixed = func (ignored: U32) : U32 => return do:
+  let rows = array.generate 2000 (func index => return #Pair {a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     total := self + row.a
   break total
-entry const scalar_generate = fn (count: U32) -> U32 => do:
-  let rows = array.generate count (fn index => {a: index + 1, b: index + 1})
+entry const scalar_generate = func (count: U32) : U32 => return do:
+  let rows = array.generate count (func index => return {a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     total := self + row.a
   break total
-entry const optional_generate = fn (count: U32) -> U32 => do:
-  let rows = array.generate count (fn index => #Some (#Pair {a: index + 1, b: index + 1}))
+entry const optional_generate = func (count: U32) : U32 => return do:
+  let rows = array.generate count (func index => return #Some (#Pair {a: index + 1, b: index + 1}))
   let total = 0
   for row in rows:
     if let #Some value = row:
       total := self + value.a
   break total
-entry const optional_scalar = fn (count: U32) -> U32 => do:
-  let rows = array.generate count (fn index => {present: #True, a: index + 1, b: index + 1})
+entry const optional_scalar = func (count: U32) : U32 => return do:
+  let rows = array.generate count (func index => return {present: true, a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     if row.present:
       total := self + row.a
   break total
-entry const pipeline = fn (count: U32) -> U32 => do:
-  let commands = array.generate count (fn index => #Command {lanes: array.generate 24 (fn lane => index * 24 + lane)})
-  let chunks = array.map (fn command => command.lanes) commands
+entry const pipeline = func (count: U32) : U32 => return do:
+  let commands = array.generate count (func index => return #Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
+  let chunks = array.map (func command => return command.lanes) commands
   let lanes = array.flatten chunks
-  break array.fold_left (fn total value => total + value) 0 lanes
-entry const pipeline_values = fn (count: U32) -> Array U32 => do:
-  let commands = array.generate count (fn index => #Command {lanes: array.generate 24 (fn lane => index * 24 + lane)})
-  let chunks = array.map (fn command => command.lanes) commands
+  break array.fold_left (func total -> value => return total + value) 0 lanes
+entry const pipeline_values = func (count: U32) : Array U32 => return do:
+  let commands = array.generate count (func index => return #Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
+  let chunks = array.map (func command => return command.lanes) commands
   let lanes = array.flatten chunks
   break lanes
-entry const pipeline_direct = fn (count: U32) -> U32 => do:
-  let lanes = array.generate (count * 24) (fn index => index)
-  break array.fold_left (fn total value => total + value) 0 lanes
-entry const reference_scratch = fn (steps: U32) -> U32 => do:
-  let saved = array.generate 512 (fn index => fn offset => index + offset)
+entry const pipeline_direct = func (count: U32) : U32 => return do:
+  let lanes = array.generate (count * 24) (func index => return index)
+  break array.fold_left (func total -> value => return total + value) 0 lanes
+entry const reference_scratch = func (steps: U32) : U32 => return do:
+  let saved = array.generate 512 (func index => return func offset => return index + offset)
   let total = 0
   for step in 0..steps:
-    let copied = array.generate saved.length (fn index => saved[index])
+    let copied = array.generate saved.length (func index => return saved[index])
     let selected = copied[step % copied.length]
     total := self + selected step
   break total
-entry const numeric_scratch = fn (steps: U32) -> U32 => do:
-  let saved = array.generate 512 (fn index => index)
+entry const numeric_scratch = func (steps: U32) : U32 => return do:
+  let saved = array.generate 512 (func index => return index)
   let total = 0
   for step in 0..steps:
-    let copied = array.generate saved.length (fn index => saved[index])
+    let copied = array.generate saved.length (func index => return saved[index])
     total := self + copied[step % copied.length] + step
   break total

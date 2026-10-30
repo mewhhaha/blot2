@@ -9,9 +9,9 @@ const T = @import("types.zig");
 const a = std.testing.allocator;
 
 const source =
-    \\const keep = fn ~(value: U32) => fn () => @force value
-    \\const ignore = fn ~(value: U32) => 42
-    \\entry const snapshot = fn (start: U32) -> U32 => do:
+    \\const keep = func ~(value: U32) => return func () => return @force value
+    \\const ignore = func ~(value: U32) => return 42
+    \\entry const snapshot = func (start: U32) : U32 => return do:
     \\  let saved = start
     \\  let read = keep saved
     \\  saved := 0

@@ -5,30 +5,30 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer = `
-const share: unique (Array U32) -> shared (Array U32) = fn owner => @usage.share owner
-const size: shared (Array U32) -> U32 = fn values => @u32.add (@usage.length values) (@usage.length values)
-const integer = fn (owner: unique U32) => do:
+const share: unique (Array U32) -> shared (Array U32) = func owner => return @usage.share owner
+const size: shared (Array U32) -> U32 = func values => return @u32.add (@usage.length values) (@usage.length values)
+const integer = func (owner: unique U32) => return do:
   let shared = @usage.share owner
   break @u32.add (@usage.read shared) (@usage.read shared)
-const float = fn (owner: unique F32) => do:
+const float = func (owner: unique F32) => return do:
   let shared = @usage.share owner
   break @f32.add (@usage.read shared) (@usage.read shared)
-const list = fn (owner: unique (List U32)) => do:
+const list = func (owner: unique (List U32)) => return do:
   let shared = @usage.share owner
   break @u32.add (@usage.length shared) (@usage.length shared)
 `;
 const consumer = `
 import {share, size, integer, float, list} from "./share"
-entry const length = fn (value: U32) => size (share #[value, @u32.add value 1])
-entry const scalar = fn (value: U32) => integer 21
-entry const floating = fn (value: F32) => float 1.5
-entry const listed = fn (value: U32) => list [value, @u32.add value 1, @u32.add value 2]
-entry const surviving = fn (value: U32) => do:
+entry const length = func (value: U32) => return size (share #[value, @u32.add value 1])
+entry const scalar = func (value: U32) => return integer 21
+entry const floating = func (value: F32) => return float 1.5
+entry const listed = func (value: U32) => return list [value, @u32.add value 1, @u32.add value 2]
+entry const surviving = func (value: U32) => return do:
   let values = share #[value, @u32.add value 1]
   break #[value, @u32.add value (@u32.sub (@usage.length values) 1)]
-entry const captured = fn (value: U32) => do:
+entry const captured = func (value: U32) => return do:
   let owner: unique (Array U32) = #[value, @u32.add value 1]
-  let transfer: once (Unit -> shared (Array U32)) = fn () => @usage.share owner
+  let transfer: once (Unit -> shared (Array U32)) = func () => return @usage.share owner
   let shared = transfer ()
   break size shared
 `;
@@ -124,8 +124,8 @@ Deno.test("explicit sharing preserves ownership across imports archive retained 
           sources: {
             [entry]: consumer,
             [dependency]: producer.replace(
-              "fn owner => @usage.share owner",
-              "fn owner => (@usage.share owner, owner)",
+              "func owner => return @usage.share owner",
+              "func owner => return (@usage.share owner, owner)",
             ),
           },
         });

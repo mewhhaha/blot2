@@ -139,27 +139,27 @@ const cases = [_]Case{
     // constructor_pattern_lower
     .{ .source =
     \\type Box is data = #Box U32
-    \\entry const answer = fn value => case value of
+    \\entry const answer = func value => return case value of
     \\  #box amount => amount
     \\
     , .valid = false, .start = 28, .end = 33 },
     // constructor_pattern_qualified_lower
     .{ .source =
-    \\entry const answer = fn value => case value of
+    \\entry const answer = func value => return case value of
     \\  #ns.box amount => amount
     \\
     , .valid = false, .start = 0, .end = 5 },
     // constructor_pattern_upper
     .{ .source =
     \\type Box is data = #Box U32
-    \\entry const answer = fn () => case #Box 42 of
+    \\entry const answer = func () => return case #Box 42 of
     \\  #Box amount => amount
     \\
     , .valid = true },
     // qualified_selector_upper
     .{ .source =
     \\type Box is data = #Box U32
-    \\const Box.Upper = fn box => case box of
+    \\const Box.Upper = func box => return case box of
     \\  #Box value => value
     \\entry const answer = (#Box 42).Upper
     \\
@@ -167,7 +167,7 @@ const cases = [_]Case{
     // bare_selector_upper
     .{ .source =
     \\type Box is data = #Box U32
-    \\const Box.Upper = fn box => case box of
+    \\const Box.Upper = func box => return case box of
     \\  #Box value => value
     \\entry const answer = .Upper (#Box 42)
     \\
@@ -196,20 +196,20 @@ const cases = [_]Case{
     , .valid = true },
     // row_tail_upper
     .{ .source =
-    \\const identity: a -> a ! {| E} = fn value => value
+    \\const identity: a -> a ! {| E} = func value => return value
     \\entry const answer = identity 42
     \\
     , .valid = false, .start = 0, .end = 5 },
     // row_tail_lower
     .{ .source =
-    \\const identity: a -> a ! {| e} = fn value => value
+    \\const identity: a -> a ! {| e} = func value => return value
     \\entry const answer = identity 42
     \\
     , .valid = true },
     // effect_use_binder_upper
     .{ .source =
     \\effect tick: Unit -> U32
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  use Value <- tick ()
     \\  break 42
     \\
@@ -217,7 +217,7 @@ const cases = [_]Case{
     // effect_use_binder_lower
     .{ .source =
     \\effect tick: Unit -> U32
-    \\entry const answer = fn () => do (@effect.provider tick (fn () => 42)):
+    \\entry const answer = func () => return do (@effect.provider tick (func () => return 42)):
     \\  use value <- tick ()
     \\  break value
     \\
@@ -225,15 +225,15 @@ const cases = [_]Case{
     // effect_use_value_upper
     .{ .source =
     \\type Tick is effect = Unit -> U32
-    \\entry const answer = fn () => do (@effect.provider Tick (fn () => 42)):
+    \\entry const answer = func () => return do (@effect.provider Tick (func () => return 42)):
     \\  use Tick ()
     \\  break 42
     \\
     , .valid = true },
     // request_subject_upper
     .{ .source =
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case Request of
     \\      complete value =>
     \\        break value
@@ -241,8 +241,8 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // request_subject_qualified
     .{ .source =
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case ns.request of
     \\      complete value =>
     \\        break value
@@ -250,8 +250,8 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // request_subject_lower
     .{ .source =
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case request of
     \\      complete value =>
     \\        break value
@@ -259,7 +259,7 @@ const cases = [_]Case{
     , .valid = true },
     // rebind_root_upper
     .{ .source =
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let value = 42
     \\  Value := 0
     \\  break value
@@ -267,7 +267,7 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // rebind_root_lower
     .{ .source =
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let value = 0
     \\  value := 42
     \\  break value
@@ -275,7 +275,7 @@ const cases = [_]Case{
     , .valid = true },
     // update_field_upper
     .{ .source =
-    \\entry const answer = fn value => do:
+    \\entry const answer = func value => return do:
     \\  value.Upper := 42
     \\  break value
     \\
@@ -293,15 +293,15 @@ const cases = [_]Case{
     // effect_name_qualified_legal
     .{ .source =
     \\effect Namespace.Tick: Unit -> U32
-    \\entry const answer = fn () => do (@effect.provider Namespace.Tick (fn () => 42)):
+    \\entry const answer = func () => return do (@effect.provider Namespace.Tick (func () => return 42)):
     \\  break Namespace.Tick ()
     \\
     , .valid = true },
     // request_record_payload
     .{ .source =
     \\effect read: { first: U32 } -> U32
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case request of
     \\      effect read { first } =>
     \\        yield first
@@ -312,8 +312,8 @@ const cases = [_]Case{
     // request_grouped_record_payload
     .{ .source =
     \\type Read a is effect = ({ first: a } -> a)
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case request of
     \\      effect (Read U32) { first } =>
     \\        yield first
@@ -323,8 +323,8 @@ const cases = [_]Case{
     , .valid = true },
     // request_operation_selector
     .{ .source =
-    \\entry const answer = fn () => do:
-    \\  for request in @requests (@computation (fn () => 42)):
+    \\entry const answer = func () => return do:
+    \\  for request in @requests (@computation (func () => return 42)):
     \\    case request of
     \\      effect .operation () =>
     \\        yield 42
@@ -334,7 +334,7 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // standalone_record_pattern
     .{ .source =
-    \\const extract = fn value => do:
+    \\const extract = func value => return do:
     \\  let { first } = value
     \\  break first
     \\entry const answer = 42
@@ -343,7 +343,7 @@ const cases = [_]Case{
     // constructor_record_pattern
     .{ .source =
     \\type Box is data = #Box { first: U32 }
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let #Box { first } = #Box { first: 42 }
     \\  break first
     \\
@@ -351,24 +351,24 @@ const cases = [_]Case{
     // constructor_record_pattern_upper_field
     .{ .source =
     \\type Box is data = #Box { first: U32 }
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let #Box { First } = #Box { first: 42 }
     \\  break 42
     \\
     , .valid = false, .start = 39, .end = 44 },
     // row_tail_builtin_u32
     .{ .source =
-    \\const invoke = fn (callback: Unit -> U32 ! {| U32}) => callback ()
+    \\const invoke = func (callback: Unit -> U32 ! {| U32}) => return callback ()
     \\
     , .valid = false, .start = 0, .end = 5 },
     // row_tail_named_type
     .{ .source =
-    \\const invoke = fn (callback: Unit -> U32 ! {| Token}) => callback ()
+    \\const invoke = func (callback: Unit -> U32 ! {| Token}) => return callback ()
     \\
     , .valid = false, .start = 0, .end = 5 },
     // row_tail_builtin_bool
     .{ .source =
-    \\const invoke = fn (callback: Unit -> U32 ! {| Bool}) => callback ()
+    \\const invoke = func (callback: Unit -> U32 ! {| Bool}) => return callback ()
     \\
     , .valid = false, .start = 0, .end = 5 },
     // namespace_alias_upper
@@ -398,14 +398,14 @@ const cases = [_]Case{
     // named_constructor_upper_legal
     .{ .source =
     \\import { Box as Renamed } from "./library"
-    \\entry const answer = fn () => case #Renamed 42 of
+    \\entry const answer = func () => return case #Renamed 42 of
     \\  #Renamed value => value
     \\
     , .valid = true },
     // qualified_constructor_upper_legal
     .{ .source =
     \\import * as library from "./library"
-    \\entry const answer = fn () => case #library.Box 42 of
+    \\entry const answer = func () => return case #library.Box 42 of
     \\  #library.Box value => value
     \\
     , .valid = true },

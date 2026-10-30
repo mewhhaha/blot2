@@ -25,7 +25,7 @@ fn lower(source: []const u8) !core.Module {
 }
 
 test "source suspension creation and lookup remain outside completed specialization receipts" {
-    var module = try lower("const keep = fn ~(value: Unit -> U32) => value\nconst helper = fn () => 42\nconst pending = keep helper\nentry const answer = 42\n");
+    var module = try lower("const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return 42\nconst pending = keep helper\nentry const answer = 42\n");
     defer module.deinit(a);
     const units = [_]core.Module{module};
     var session = try eval.Session.init(a, &units);
@@ -56,7 +56,7 @@ test "source suspension creation and lookup remain outside completed specializat
 }
 
 test "full suspension inference and its same-session cache hit both invalidate a specialization tape" {
-    var module = try lower("const keep = fn ~(value: Unit -> U32) => value\nconst helper = fn () => 42\nconst pending = keep helper\nentry const answer = 42\n");
+    var module = try lower("const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return 42\nconst pending = keep helper\nentry const answer = 42\n");
     defer module.deinit(a);
     const units = [_]core.Module{module};
     var session = try eval.Session.init(a, &units);
@@ -123,7 +123,7 @@ fn checkedHeaderQuery(allocator: std.mem.Allocator, module: *const core.Module) 
 }
 
 test "checked suspension header refinement owns no producer execution and survives every allocation failure" {
-    var module = try lower("const call_lazy = fn (transform: ~U32 -> U32) => transform 21\n");
+    var module = try lower("const call_lazy = func (transform: ~U32 -> U32) => return transform 21\n");
     defer module.deinit(a);
     var found = false;
     for (module.nodes) |node| found = found or node.tag == .suspend_;

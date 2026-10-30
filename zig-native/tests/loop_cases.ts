@@ -4,7 +4,7 @@ export const loopCases = [
     expected: { range: 18, collection: 8, nested: 6, guarded: 7, folded: 18 },
     source: `
 type Maybe a is data = #Some a | #None
-entry const range = fn () => do:
+entry const range = func () => return do:
   let total = 0
   for index in 0..6:
     total := @u32.add self 1
@@ -12,14 +12,14 @@ entry const range = fn () => do:
       continue
     total := @u32.add self index
   break total
-entry const collection = fn () => do:
+entry const collection = func () => return do:
   let total = 0
   for value in #[1, 2, 3, 4]:
     if @u32.eq value 2:
       continue
     total := @u32.add self value
   break total
-entry const nested = fn () => do:
+entry const nested = func () => return do:
   let total = 0
   for outer in 0..3:
     for inner in 0..3:
@@ -27,7 +27,7 @@ entry const nested = fn () => do:
         continue
       total := @u32.add self 1
   break total
-entry const guarded = fn () => do:
+entry const guarded = func () => return do:
   let total = 0
   for candidate in #[#None, #Some 2, #Some 5]:
     let #Some value = candidate else:
@@ -41,7 +41,7 @@ entry const folded = range ()
     name: "continue_forever_and_simultaneous_carries",
     expected: { forever: 7, swap: 21, shadow: 99, snapshot: 3, row: 6 },
     source: `
-entry const forever = fn () => do:
+entry const forever = func () => return do:
   let total = 0
   for ever:
     total := @u32.add self 1
@@ -49,7 +49,7 @@ entry const forever = fn () => do:
       continue
     break
   break total
-entry const swap = fn () => do:
+entry const swap = func () => return do:
   let first = 1
   let second = 2
   for 0..3:
@@ -58,14 +58,14 @@ entry const swap = fn () => do:
     second := before
     continue
   break @u32.add (@u32.mul first 10) second
-entry const shadow = fn () => do:
+entry const shadow = func () => return do:
   let total = 0
   for 0..1:
     total := @u32.add self 1
     let total = 99
     continue
   break total
-entry const snapshot = fn () => do:
+entry const snapshot = func () => return do:
   let values = #[1, 2]
   let total = 0
   for value in values:
@@ -73,7 +73,7 @@ entry const snapshot = fn () => do:
     total := @u32.add self value
     continue
   break total
-entry const row = fn () => do:
+entry const row = func () => return do:
   let total = 0
   for (left, right) in #[(1, 2), (3, 4)]:
     if @u32.eq left 3:
@@ -87,19 +87,19 @@ entry const row = fn () => do:
     expected: { folded: 45, run: 45, reversed: 42, maximum: 1 },
     arguments: { run: 10 },
     source: `
-const sum = fn limit => do:
+const sum = func limit => return do:
   let total = 0
   for index in 0..limit:
     total := @u32.add self index
   break total
 entry const folded = sum 10
-entry const run = fn (limit: U32) => sum limit
-entry const reversed = fn () => do:
+entry const run = func (limit: U32) => return sum limit
+entry const reversed = func () => return do:
   let total = 42
   for index in 9..2:
     total := @u32.add self index
   break total
-entry const maximum = fn () => do:
+entry const maximum = func () => return do:
   let total = 0
   for index in 4294967294..4294967295:
     total := @u32.add self 1
@@ -110,8 +110,8 @@ entry const maximum = fn () => do:
     name: "ordinary_use_forever",
     expected: { run: 13 },
     source: `
-const identity = fn value => value
-entry const run = fn () => do:
+const identity = func value => return value
+entry const run = func () => return do:
   let total = 0
   for 0..5:
     total := @u32.add self 1
@@ -128,26 +128,26 @@ entry const run = fn () => do:
     name: "nested_scopes",
     expected: { nested: 138, shadowed: 42, shadow_after: 3, nested_do: 6 },
     source: `
-entry const nested = fn () => do:
+entry const nested = func () => return do:
   let total = 0
   for row in 0..3:
     for column in 0..4:
       total := @u32.add self (@u32.add (@u32.mul row 10) column)
   break total
-entry const shadowed = fn () => do:
+entry const shadowed = func () => return do:
   let total = 42
   for index in #[1, 2]:
     let total = index
     total := @u32.add self 1
   break total
-entry const shadow_after = fn () => do:
+entry const shadow_after = func () => return do:
   let total = 0
   for index in 0..3:
     total := @u32.add self 1
     let total = 99
     total := @u32.add self 1
   break total
-entry const nested_do = fn () => do:
+entry const nested_do = func () => return do:
   let total = 0
   for index in 0..3:
     let amount = do:
@@ -160,15 +160,15 @@ entry const nested_do = fn () => do:
     name: "array_pattern_return",
     expected: { folded: 42, run: 12, empty: 0, product: 42 },
     source: `
-const first = fn values => do:
+const first = func values => return do:
   for value in values:
     if @u32.lt 10 value:
       break value
   break 0
 entry const folded = first #[1, 42, 99]
-entry const run = fn () => first #[2, 12, 42]
-entry const empty = fn () => first #[]
-entry const product = fn () => do:
+entry const run = func () => return first #[2, 12, 42]
+entry const empty = func () => return first #[]
+entry const product = func () => return do:
   let total = 0
   for (left, right) in #[(10, 1), (30, 1)]:
     total := @u32.add self (@u32.add left right)
@@ -179,27 +179,27 @@ entry const product = fn () => do:
     name: "break_current_state",
     expected: { before: 1, after: 1, nested: 3, crossing_do: 42 },
     source: `
-entry const before = fn () => do:
+entry const before = func () => return do:
   let total = 0
   for index in 0..10:
     if @u32.eq index 2:
       break
     total := @u32.add self index
   break total
-entry const after = fn () => do:
+entry const after = func () => return do:
   let total = 0
   for ever:
     total := @u32.add self 1
     break
   break total
-entry const nested = fn () => do:
+entry const nested = func () => return do:
   let total = 0
   for outer in 0..3:
     for inner in 0..10:
       total := @u32.add self 1
       break
   break total
-entry const crossing_do = fn () => do:
+entry const crossing_do = func () => return do:
   let total = 42
   for ever:
     let ignored = do:
@@ -212,10 +212,10 @@ entry const crossing_do = fn () => do:
     name: "captured_iteration",
     expected: { run: 12 },
     source: `
-entry const run = fn () => do:
-  let callbacks = @array.fill 3 (fn () => 0)
+entry const run = func () => return do:
+  let callbacks = @array.fill 3 (func () => return 0)
   for index in 0..3:
-    callbacks := @array.set self index (fn () => index)
+    callbacks := @array.set self index (func () => return index)
   break @u32.add (@u32.mul ((@array.get callbacks 0) ()) 100) (@u32.add (@u32.mul ((@array.get callbacks 1) ()) 10) ((@array.get callbacks 2) ()))
 `,
   },
@@ -229,7 +229,7 @@ entry const run = fn () => do:
       floating: 4.5,
     },
     source: `
-entry const swap = fn () => do:
+entry const swap = func () => return do:
   let first = 1
   let second = 2
   for 0..3:
@@ -237,7 +237,7 @@ entry const swap = fn () => do:
     first := second
     second := before
   break @u32.add (@u32.mul first 10) second
-entry const branch = fn () => do:
+entry const branch = func () => return do:
   let total = 0
   for index in 0..4:
     if @u32.lt index 2:
@@ -245,21 +245,21 @@ entry const branch = fn () => do:
     else:
       total := @u32.add self 10
   break total
-entry const shadow_break = fn () => do:
+entry const shadow_break = func () => return do:
   let total = 0
   for ever:
     total := @u32.add self 1
     let total = 99
     break
   break total
-entry const snapshot = fn () => do:
+entry const snapshot = func () => return do:
   let values = #[1, 2]
   let total = 0
   for value in values:
     values := #[99]
     total := @u32.add self value
   break total
-entry const floating = fn () => do:
+entry const floating = func () => return do:
   let total = 0.0
   for value in #[1.0, 1.5, 2.0]:
     total := @f32.add self value
@@ -270,10 +270,10 @@ entry const floating = fn () => do:
     name: "conditional_successor_shadow",
     expected: { run: 3 },
     source: `
-entry const run = fn () => do:
+entry const run = func () => return do:
   let total = 0
   for index in 0..3:
-    if #True:
+    if true:
       total := @u32.add self 1
       let total = 99
       use total
@@ -284,64 +284,64 @@ entry const run = fn () => do:
     name: "unreachable_after_break",
     error: "unreachable_statement",
     source:
-      "entry const run = fn () => do:\n  for ever:\n    break\n    use ()\n  break 0\n",
+      "entry const run = func () => return do:\n  for ever:\n    break\n    use ()\n  break 0\n",
   },
   {
     name: "break_outside",
     error: "break_scope",
-    source: "entry const run = fn () => do:\n  break\n",
+    source: "entry const run = func () => return do:\n  break\n",
   },
   {
     name: "continue_outside",
     error: "continue_scope",
-    source: "entry const run = fn () => do:\n  continue\n",
+    source: "entry const run = func () => return do:\n  continue\n",
   },
   {
     name: "continue_lambda_boundary",
     error: "continue_scope",
     source:
-      "entry const run = fn () => do:\n  for ever:\n    let closure = fn () => do:\n      continue\n    break\n  break 0\n",
+      "entry const run = func () => return do:\n  for ever:\n    let closure = func () => return do:\n      continue\n    break\n  break 0\n",
   },
   {
     name: "unreachable_after_continue",
     error: "unreachable_statement",
     source:
-      "entry const run = fn () => do:\n  for ever:\n    continue\n    use ()\n",
+      "entry const run = func () => return do:\n  for ever:\n    continue\n    use ()\n",
   },
   {
     name: "break_lambda_boundary",
     error: "break_scope",
     source:
-      "entry const run = fn () => do:\n  for ever:\n    let closure = fn () => do:\n      break\n    break 42\n",
+      "entry const run = func () => return do:\n  for ever:\n    let closure = func () => return do:\n      break\n    break 42\n",
   },
   {
     name: "loop_local_escape",
     error: "unknown_value",
     source:
-      "entry const run = fn () => do:\n  for index in 0..3:\n    use ()\n  break index\n",
+      "entry const run = func () => return do:\n  for index in 0..3:\n    use ()\n  break index\n",
   },
   {
     name: "loop_carry_type_change",
     error: "type_mismatch",
     source:
-      "entry const run = fn () => do:\n  let total = 0\n  for index in 0..3:\n    total := #True\n  break total\n",
+      "entry const run = func () => return do:\n  let total = 0\n  for index in 0..3:\n    total := true\n  break total\n",
   },
   {
     name: "range_f32",
     error: "type_mismatch",
     source:
-      "entry const run = fn () => do:\n  for index in 0.0..3:\n    use ()\n  break 0\n",
+      "entry const run = func () => return do:\n  for index in 0.0..3:\n    use ()\n  break 0\n",
   },
   {
     name: "array_scalar",
     error: "missing_member",
     source:
-      "entry const run = fn () => do:\n  for value in 3:\n    use ()\n  break 0\n",
+      "entry const run = func () => return do:\n  for value in 3:\n    use ()\n  break 0\n",
   },
   {
     name: "array_refutable",
     error: "non_exhaustive_match",
     source:
-      "type Maybe a is data = #Some a | #None\nentry const run = fn () => do:\n  for #Some value in #[#Some 42, #None]:\n    use value\n  break 0\n",
+      "type Maybe a is data = #Some a | #None\nentry const run = func () => return do:\n  for #Some value in #[#Some 42, #None]:\n    use value\n  break 0\n",
   },
 ] as const;

@@ -9,8 +9,8 @@ const backend = @import("../backend/core_backend.zig");
 const a = std.testing.allocator;
 const definitions =
     \\type Box f is data = #Box f
-    \\const box = fn value => #Box value
-    \\const get = fn (#Box mapper) => mapper
+    \\const box = func value => return #Box value
+    \\const get = func (#Box mapper) => return mapper
     \\
 ;
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
@@ -31,14 +31,14 @@ fn initializer(m: *const core.Module) !core.Id {
     return error.MissingInitializer;
 }
 const captured = definitions ++
-    \\entry const run = fn (seed: U32) => do:
-    \\  let stored = box (fn value => {item: value})
-    \\  let read = fn (value: U32) => (get stored value).item
+    \\entry const run = func (seed: U32) => return do:
+    \\  let stored = box (func value => return {item: value})
+    \\  let read = func (value: U32) => return (get stored value).item
     \\  break read seed
 ;
 const mutable =
     \\type Maybe value is data = #Nothing | #Just value
-    \\entry const loop = fn (limit: U32) => do:
+    \\entry const loop = func (limit: U32) => return do:
     \\  let pending = (#Nothing, #[1])
     \\  let index = 0
     \\  for ever:
@@ -49,7 +49,7 @@ const mutable =
     \\        #Just value => @u32.add value request[0]
     \\    pending := (#Just index, #[@u32.add index 2])
     \\    index := @u32.add self 1
-    \\entry const branch = fn (value: U32) => do:
+    \\entry const branch = func (value: U32) => return do:
     \\  let pending = (#Nothing, #[1])
     \\  if @u32.lt 0 value:
     \\    pending := (#Just value, #[2])
@@ -111,11 +111,11 @@ test "closed local value proof keeps exact wrapper dependencies and rejects effe
         try std.testing.expect(closed.analyze(&.{good}, 1, try initializer(&good)) != null);
     }
     const cases = [_][]const u8{
-        definitions ++ "entry const run = fn (seed: U32) => do:\n  let stored = box (fn value => {item: @u32.add value seed})\n  let #Box mapper = stored\n  break (mapper 3).item\n",
-        definitions ++ "entry const run = fn (seed: U32) => do:\n  let stored = box (fn value => {item: @u32.div value 0})\n  let #Box mapper = stored\n  break (mapper seed).item\n",
-        definitions ++ "entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:\n  use stored <- box ((fn value => {item: value}), host ())\n  let #Box (mapper, stamp) = stored\n  break @u32.add stamp (mapper 3).item\n",
-        definitions ++ "const keep = fn ~value => fn () => @demand value\nentry const run = fn () => do:\n  let stored = box (keep 42)\n  let #Box waiting = stored\n  break waiting ()\n",
-        definitions ++ "entry const run = fn (seed: unique U32) => do:\n  let stored = box (fn (value: unique U32) -> once (Unit -> unique U32) => fn () => value)\n  let #Box mapper = stored\n  break (mapper seed) ()\n",
+        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.add value seed})\n  let #Box mapper = stored\n  break (mapper 3).item\n",
+        definitions ++ "entry const run = func (seed: U32) => return do:\n  let stored = box (func value => return {item: @u32.div value 0})\n  let #Box mapper = stored\n  break (mapper seed).item\n",
+        definitions ++ "entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:\n  use stored <- box ((func value => return {item: value}), host ())\n  let #Box (mapper, stamp) = stored\n  break @u32.add stamp (mapper 3).item\n",
+        definitions ++ "const keep = func ~value => return func () => return @demand value\nentry const run = func () => return do:\n  let stored = box (keep 42)\n  let #Box waiting = stored\n  break waiting ()\n",
+        definitions ++ "entry const run = func (seed: unique U32) => return do:\n  let stored = box (func (value: unique U32) : once (Unit -> unique U32) => return func () => return value)\n  let #Box mapper = stored\n  break (mapper seed) ()\n",
     };
     for (cases) |source| {
         var m = try lower(a, source);
@@ -139,7 +139,7 @@ test "closed local value proof rejects phantom authority recursively through eve
         .{ .tag = .rigid, .a = 17, .b = 0, .c = 0 },
     };
     for (fixtures) |fixture| {
-        const source = try a.print("type Phantom value is data = #Phantom\nentry const run = fn () => do:\n  let stored: {s}\n  break ()\n", .{fixture});
+        const source = try a.print("type Phantom value is data = #Phantom\nentry const run = func () => return do:\n  let stored: {s}\n  break ()\n", .{fixture});
         defer a.free(source);
         var m = try lower(a, source);
         defer m.deinit(a);

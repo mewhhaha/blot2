@@ -4,21 +4,21 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { readMemoryProfile } from "../../compiler/memory_profile.ts";
 
 const source = `import * as array from "std/array"
-entry const boxed = fn (count: U32) -> Array U32 => #[count, count + 1]
-entry const copied = fn (count: U32) => do:
-  let values = array.generate count (fn index => index + 1)
+entry const boxed = func (count: U32) : Array U32 => return #[count, count + 1]
+entry const copied = func (count: U32) => return do:
+  let values = array.generate count (func index => return index + 1)
   let old = values
   values[0] := 99
   break old[0] + values[0] + old.length
-entry const closures = fn (steps: U32) => do:
-  let saved = array.generate 8 (fn index => fn offset => index + offset)
+entry const closures = func (steps: U32) => return do:
+  let saved = array.generate 8 (func index => return func offset => return index + offset)
   let total = 0
   for step in 0..steps:
-    let copied = array.generate saved.length (fn i => saved[i])
+    let copied = array.generate saved.length (func i => return saved[i])
     total := self + copied[step % copied.length] step
   break total
-entry const trapped = fn (index: U32) => do:
-  let values = array.generate 8 (fn i => i + 1)
+entry const trapped = func (index: U32) => return do:
+  let values = array.generate 8 (func i => return i + 1)
   break values[index]
 `;
 
@@ -209,8 +209,8 @@ Deno.test("memory attribution survives JSPI suspension rejection and rejected ho
     prefix: "blot-memory-suspension-",
   });
   const entry = `${directory}/main.blot`;
-  const source = `entry const nested = fn (seed: U32) => (#[seed, seed + 1])[1]
-entry const run = fn (host: Unit -> U32 ! {Foreign}) => do:
+  const source = `entry const nested = func (seed: U32) => return (#[seed, seed + 1])[1]
+entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:
   let before = #[10, 20]
   use seed <- host ()
   let after = #[seed, seed + 1]
@@ -304,7 +304,7 @@ Deno.test("scalar-only programs publish a complete zero-source-allocation profil
   try {
     const built = await compiler.build({
       sources: {
-        [entry]: "entry const run = fn (value: U32) => @u32.add value 1\n",
+        [entry]: "entry const run = func (value: U32) => return @u32.add value 1\n",
       },
     });
     assert(built.success, JSON.stringify(built));

@@ -37,14 +37,14 @@ const Fixture = struct {
 pub const records_source =
     \\infixl 60 (+) = _fixity_add
     \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
-    \\const sum = fn point => do:
+    \\const sum = func point => return do:
     \\  let #Vec2 { x, y } = point
     \\  break x + y
     \\const origin = #Vec2 { y: 2.0, x: 20.0 }
-    \\entry const answer = fn () -> F32 => sum origin
-    \\entry const projected = fn () -> F32 => origin.x
-    \\entry const tuple = fn () -> U32 => @product.get (20, 22) 1
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\entry const answer = func () : F32 => return sum origin
+    \\entry const projected = func () : F32 => return origin.x
+    \\entry const tuple = func () : U32 => return @product.get (20, 22) 1
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 test "nominal record source has canonical field order and independently owned constructor schemes" {
     var f = try Fixture.init(records_source);
@@ -73,15 +73,15 @@ test "generic nominal payloads and shaped annotations retain principal variables
     var f = try Fixture.init(
         \\type Box a is data = #Box a
         \\type Pair [left, right] is data = #Pair (left, right)
-        \\const unbox = fn box => do:
+        \\const unbox = func box => return do:
         \\  let #Box value = box
         \\  break value
-        \\const first = fn (pair: Pair [U32, a]) => do:
+        \\const first = func (pair: Pair [U32, a]) => return do:
         \\  let #Pair (value, _) = pair
         \\  break value
-        \\entry const integer = fn () => unbox (#Box 42)
-        \\entry const floating = fn () => unbox (#Box 1.25)
-        \\entry const paired = fn () => first (#Pair (42, #True))
+        \\entry const integer = func () => return unbox (#Box 42)
+        \\entry const floating = func () => return unbox (#Box 1.25)
+        \\entry const paired = func () => return first (#Pair (42, true))
     );
     defer f.deinit();
     try f.valid();
@@ -118,14 +118,14 @@ test "deferred fields and associated operators remain principal across distinct 
         \\infixl 60 (+) = _fixity_add
         \\type Point is data = #Point {x:U32}
         \\type FloatPoint is data = #FloatPoint {x:F32}
-        \\const Point.add = fn left => fn right => #Point {x: @u32.add left.x right.x}
-        \\const coordinate = fn point => point.x
-        \\const plus = fn left => fn right => left + right
+        \\const Point.add = func left => return func right => return #Point {x: @u32.add left.x right.x}
+        \\const coordinate = func point => return point.x
+        \\const plus = func left => return func right => return left + right
         \\entry const integer = coordinate (#Point {x:42})
         \\entry const floating = coordinate (#FloatPoint {x:1.25})
         \\entry const aggregate = (plus (#Point {x:20}) (#Point {x:22})).x
         \\entry const scalar = plus 20 22
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer f.deinit();
     try f.valid();
@@ -148,10 +148,10 @@ test "associated binary admission checks ordered operands and does not backtrack
         \\infixl 60 (+) = _fixity_add
         \\type Left is data = #Left U32
         \\type Right is data = #Right U32
-        \\const Left.add = fn (left:Left) => fn (right:Left) => 1
-        \\const Right.add = fn (left:Left) => fn (right:Right) => 42
+        \\const Left.add = func (left:Left) => return func (right:Left) => return 1
+        \\const Right.add = func (left:Left) => return func (right:Right) => return 42
         \\entry const answer = #Left 1 + #Right 2
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer admitted.deinit();
     try admitted.valid();
@@ -174,10 +174,10 @@ test "associated binary admission checks ordered operands and does not backtrack
         \\infixl 60 (+) = _fixity_add
         \\type Left is data = #Left U32
         \\type Right is data = #Right U32
-        \\const Left.add = fn (left:Left) => fn (right:Right) => 1
-        \\const Right.add = fn (left:Left) => fn (right:Right) => 42.0
+        \\const Left.add = func (left:Left) => return func (right:Right) => return 1
+        \\const Right.add = func (left:Left) => return func (right:Right) => return 42.0
         \\entry const answer:F32 = #Left 1 + #Right 2
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer rejected.deinit();
     var mismatch = false;
@@ -203,8 +203,8 @@ test "authoritative binary primitive admits nominal evidence and rejects missing
 }
 test "panic literals type check in unused functions without executing and preserve branch result" {
     var f = try Fixture.init(
-        \\const unused = fn (value:U32) -> U32 => @panic "unused trap"
-        \\entry const answer = if #True then 42 else @panic "dead branch"
+        \\const unused = func (value:U32) : U32 => return @panic "unused trap"
+        \\entry const answer = if true then 42 else @panic "dead branch"
     );
     defer f.deinit();
     try f.valid();
@@ -218,9 +218,9 @@ test "panic literals type check in unused functions without executing and preser
 fn nominalAllocationScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Point a is data = #Point {x:a}
-        \\const Point.combine = fn left => fn right => #Point {x:@u32.add left.x right.x}
-        \\const combine = fn left => fn right => @type.call "combine" left right
-        \\const coordinate = fn point => point.x
+        \\const Point.combine = func left => return func right => return #Point {x:@u32.add left.x right.x}
+        \\const combine = func left => return func right => return @type.call "combine" left right
+        \\const coordinate = func point => return point.x
         \\entry const answer = do:
         \\  let point = combine (#Point {x:20}) (#Point {x:21})
         \\  point.x := @u32.add self 1
@@ -245,24 +245,24 @@ test "latent staged callback intermediates are fresh per scalar evidence use" {
     // from std/prelude, so admit it as a prelude catalog producer.
     var f = try Fixture.initWithOptions(
         \\infixl 60 (+) = _fixity_add
-        \\const U32.add = fn left => fn right => @u32.add left right
-        \\const F32.add = fn left => fn right => @f32.add left right
+        \\const U32.add = func left => return func right => return @u32.add left right
+        \\const F32.add = func left => return func right => return @f32.add left right
         \\type Builder callback is data = #Builder {run:callback}
-        \\const add_step = fn amount => fn builder => do:
+        \\const add_step = func amount => return func builder => return do:
         \\  let #Builder {run:previous} = builder
-        \\  break #Builder {run:fn value => previous value + amount}
-        \\const make = fn amount => do:
-        \\  let builder = #Builder {run:fn value => value}
+        \\  break #Builder {run:func value => return previous value + amount}
+        \\const make = func amount => return do:
+        \\  let builder = #Builder {run:func value => return value}
         \\  builder := add_step amount self
         \\  builder := add_step amount self
         \\  break builder
-        \\entry const integer = fn () => do:
+        \\entry const integer = func () => return do:
         \\  let #Builder {run} = make 10
         \\  break run 22
-        \\entry const floating = fn () => do:
+        \\entry const floating = func () => return do:
         \\  let #Builder {run} = make 1.5
         \\  break run 39.0
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
         \\entry const integer_result: U32 = integer ()
         \\entry const floating_result: F32 = floating ()
     , .{ .builtin_catalog = true });
@@ -321,7 +321,7 @@ test "latent staged callback intermediates are fresh per scalar evidence use" {
 }
 test "missing named dispatch remains an owned predicate in an unreachable typed function" {
     var f = try Fixture.init(
-        \\const unused = fn () -> U32 => @type.call "add" #True #False
+        \\const unused = func () : U32 => return @type.call "add" true false
         \\entry const answer = 42
     );
     defer f.deinit();
@@ -341,7 +341,7 @@ test "missing named dispatch remains an owned predicate in an unreachable typed 
 
 const indexed_update_source =
     \\type Box is data = #Box {x:U32}
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let values = #[#Box {x:20}, #Box {x:21}]
     \\  let original = values
     \\  values[@u32.sub (@array.length self) 1].x := @u32.add self 1

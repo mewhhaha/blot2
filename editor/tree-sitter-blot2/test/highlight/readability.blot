@@ -1,27 +1,27 @@
 import { Vec3 } from "std/vector.blot"
 //              ^ keyword.control.import
 
-const from = fn value => value
+const from = func value => return value
 //    ^ function
-entry const normalized = fn value => from value / 6555.0
-//                                   ^ variable
+entry const normalized = func value => return from value / 6555.0
+//                                            ^ variable
 
-const and = fn left => fn ~(right: Bool) => if left then @demand right else #False
-//                        ^ operator
-//                         ^ punctuation.bracket
-//                                                   ^ keyword.control.conditional
+const and = func left => return func ~(right: Bool) => return if left then @demand right else false
+//                                   ^ operator
+//                                    ^ punctuation.bracket
+//                                                                     ^ keyword.control.conditional
 
-const demand = fn ~value => @demand value
+const demand = func ~value => return @demand value
 //    ^^^^^^ function
-//                ^ operator
-//                 ^^^^^ variable.parameter
-//                          ^^^^^^^ function.builtin
+//                  ^ operator
+//                   ^^^^^ variable.parameter
+//                                   ^^^^^^^ function.builtin
 
-const compatible = fn ~value => @force value
-//                              ^^^^^^ function.builtin
+const compatible = func ~value => return @force value
+//                                       ^^^^^^ function.builtin
 
-const same = fn a => fn b => if :a == :b then #True else #False
+const same = func a => return func b => return if :a == :b then true else false
 const project = .x
-const choose = fn value => case value of
+const choose = func value => return case value of
   #Some a | #Some a if a > 0 => a
   _ => 0

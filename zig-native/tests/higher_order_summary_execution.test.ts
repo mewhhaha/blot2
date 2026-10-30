@@ -24,14 +24,14 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
     ]
   ) {
     lib.push(
-      `const ${kind}_0 = fn callback => fn value => do:`,
+      `const ${kind}_0 = func callback => return func value => return do:`,
       "  let compared = @type.same #Count #Other",
       `  use result <- ${invocation}`,
       "  break result",
     );
     for (let i = 1; i <= depth; i++) {
       lib.push(
-        `const ${kind}_${i} = fn callback => fn value => do:`,
+        `const ${kind}_${i} = func callback => return func value => return do:`,
         `  use first <- ${kind}_${i - 1} callback value`,
         `  use second <- ${kind}_${i - 1} callback first`,
         "  break second",
@@ -39,7 +39,7 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
     }
     lib.push(`const ${kind}_factory = do:`, `  break ${kind}_${depth}`);
   }
-  lib.push("const unused = fn callback => fn value => value");
+  lib.push("const unused = func callback => return func value => return value");
   const program = (
     provider: number,
     invalid: false | "row" | "result" | "body",
@@ -48,24 +48,24 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
       'import * as library from "./library"',
       "type Tick is effect = Unit -> U32",
       "type Other is effect = Unit -> U32",
-      "const tick: U32 -> U32 ! {Tick} = fn value => do:",
+      "const tick: U32 -> U32 ! {Tick} = func value => return do:",
       "  use extra <- Tick ()",
-      `  break @u32.add value ${invalid === "body" ? "#True" : "extra"}`,
-      "entry const pure = fn (delta: U32) =>",
-      "  library.apply_factory (fn current => @u32.add current delta) 7",
-      "entry const reducer = fn (delta: U32) =>",
-      "  library.reduce_factory (fn current => fn ignored => @u32.add current delta) 7",
-      "entry const returned = fn (delta: U32) =>",
-      "  library.returned_factory (fn () => fn current => @u32.add current delta) 7",
-      `entry const handled: U32 -> U32 ! {} = fn value => do (@effect.provider ${
+      `  break @u32.add value ${invalid === "body" ? "true" : "extra"}`,
+      "entry const pure = func (delta: U32) => return ",
+      "  library.apply_factory (func current => return @u32.add current delta) 7",
+      "entry const reducer = func (delta: U32) => return ",
+      "  library.reduce_factory (func current => return func ignored => return @u32.add current delta) 7",
+      "entry const returned = func (delta: U32) => return ",
+      "  library.returned_factory (func () => return func current => return @u32.add current delta) 7",
+      `entry const handled: U32 -> U32 ! {} = func value => return do (@effect.provider ${
         invalid === "row" ? "Other" : "Tick"
-      } (fn () => ${provider})):`,
+      } (func () => return ${provider})):`,
       "  use result <- library.apply_factory tick value",
       "  break result",
-      "entry const unused: U32 -> U32 ! {} = fn value => library.unused tick value",
+      "entry const unused: U32 -> U32 ! {} = func value => return library.unused tick value",
       invalid === "result"
-        ? "entry const incompatible: U32 -> U32 = fn value => library.apply_factory (fn current => #True) value"
-        : "entry const incompatible: U32 -> U32 = fn value => library.apply_factory (fn current => current) value",
+        ? "entry const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return true) value"
+        : "entry const incompatible: U32 -> U32 = func value => return library.apply_factory (func current => return current) value",
       "",
     ].join("\n");
   const options = { executable, entry, prelude: null };
@@ -167,23 +167,23 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
   const source = (invalid: boolean) =>
     [
       "type Count is data = #Count U32",
-      "const Count.add: Count -> Count -> Count = fn left => fn right => case left, right of\n  #Count a, #Count b => #Count (@u32.add a b)",
+      "const Count.add: Count -> Count -> Count = func left => return func right => return case left, right of\n  #Count a, #Count b => #Count (@u32.add a b)",
       `const callback: a -> a where { associated "${
         invalid ? "missing" : "add"
-      }" a Count a } = fn value => @type.call "add" value (#Count 1)`,
-      'const invoke_0 = fn callback => fn value => do:\n  use next <- callback value\n  break @type.call "add" next (#Count 1)',
+      }" a Count a } = func value => return @type.call "add" value (#Count 1)`,
+      'const invoke_0 = func callback => return func value => return do:\n  use next <- callback value\n  break @type.call "add" next (#Count 1)',
       ...Array.from({ length: 6 }, (_, i) =>
         `const invoke_${
           i + 1
-        } = fn callback => fn value => invoke_${i} callback (invoke_${i} callback value)`),
+        } = func callback => return func value => return invoke_${i} callback (invoke_${i} callback value)`),
       "const factory = do:\n  break invoke_6",
-      "const unused = fn callback => fn value => value",
+      "const unused = func callback => return func value => return value",
       "",
     ].join("\n");
   const program = (unused: boolean) =>
     [
       'import { Count, callback, factory, unused } from "./library"',
-      "entry const answer = fn (value: U32) => do:",
+      "entry const answer = func (value: U32) => return do:",
       "  let checked: Count -> Count = callback",
       `  let #Count result = ${
         unused ? "unused" : "factory"

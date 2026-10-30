@@ -9,3 +9,5 @@ __pycache__/
 /editor/tree-sitter-blot2/*.dll
 
 /.zig-cache/
+/zig-native/build/
+*.orig

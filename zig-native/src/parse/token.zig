@@ -49,7 +49,7 @@ pub const Tag = enum(u32) {
     kw_infixl,
     kw_infixr,
     kw_infix,
-    kw_fn,
+    kw_func,
     kw_if,
     kw_then,
     kw_else,
@@ -67,6 +67,8 @@ pub const Tag = enum(u32) {
     kw_complete,
     kw_true,
     kw_false,
+    kw_and,
+    kw_or,
     kw_from,
     kw_where,
     private_from,
@@ -97,7 +99,7 @@ pub fn keyword(text: []const u8) Tag {
         .{ "type", Tag.kw_type },         .{ "is", Tag.kw_is },
         .{ "data", Tag.kw_data },         .{ "effect", Tag.kw_effect },
         .{ "infixl", Tag.kw_infixl },     .{ "infixr", Tag.kw_infixr },
-        .{ "infix", Tag.kw_infix },       .{ "fn", Tag.kw_fn },
+        .{ "infix", Tag.kw_infix },       .{ "func", Tag.kw_func },
         .{ "if", Tag.kw_if },             .{ "then", Tag.kw_then },
         .{ "else", Tag.kw_else },         .{ "do", Tag.kw_do },
         .{ "case", Tag.kw_case },         .{ "of", Tag.kw_of },
@@ -105,8 +107,9 @@ pub fn keyword(text: []const u8) Tag {
         .{ "ever", Tag.kw_ever },         .{ "use", Tag.kw_use },
         .{ "return", Tag.kw_return },     .{ "yield", Tag.kw_yield },
         .{ "break", Tag.kw_break },       .{ "continue", Tag.kw_continue },
-        .{ "complete", Tag.kw_complete }, .{ "True", Tag.kw_true },
-        .{ "False", Tag.kw_false },
+        .{ "complete", Tag.kw_complete }, .{ "true", Tag.kw_true },
+        .{ "false", Tag.kw_false },       .{ "and", Tag.kw_and },
+        .{ "or", Tag.kw_or },
     };
     inline for (words) |entry| {
         if (std.mem.eql(u8, text, entry[0])) return entry[1];

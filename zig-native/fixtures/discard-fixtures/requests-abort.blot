@@ -1,21 +1,21 @@
 data Count value = #Count value
 type Stop is effect = { read: Unit -> U32 }
-const witness = fn () -> Count U32 => @panic "witness ran"
-const identity = fn value => value
-const mark = fn (digit: U32) => do:
+const witness = func () : Count U32 => return @panic "witness ran"
+const identity = func value => return value
+const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
   break digit
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Stop.read () =>
         break 40
       complete value =>
         break value
-entry const answer = fn () => do:
-  let (#Count count, value) = @state.run (#Count 0) (fn () => handled (@computation (fn () => do:
+entry const answer = func () => return do:
+  let (#Count count, value) = @state.run (#Count 0) (func () => return handled (@computation (func () => return do:
     use ignored <- (identity, (mark 1, Stop.read (), mark 2))
     break 0
   )))

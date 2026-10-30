@@ -22,10 +22,10 @@ function sections(bytes: Uint8Array): number[] {
 }
 
 const repeat = `
-const repeat = fn (count: U32) => fn ~(value: U32) => do:
-  let read = fn (extra: U32) => @u32.add (@demand value) extra
+const repeat = func (count: U32) => return func ~(value: U32) => return do:
+  let read = func (extra: U32) => return @u32.add (@demand value) extra
   let alias = read
-  let second = fn (extra: U32) => @u32.add (@demand value) extra
+  let second = func (extra: U32) => return @u32.add (@demand value) extra
   let total = 0
   for i in 0..count:
     use left <- alias i
@@ -37,8 +37,8 @@ const repeat = fn (count: U32) => fn ~(value: U32) => do:
 Deno.test("known lexical callbacks share a local memo without heap or table", async () => {
   await compileAndRun(
     `${repeat}
-entry const run = fn (count: U32) => repeat count 21
-entry const skipped = fn (divisor: U32) => repeat 0 (@u32.div 1 divisor)
+entry const run = func (count: U32) => return repeat count 21
+entry const skipped = func (divisor: U32) => return repeat 0 (@u32.div 1 divisor)
 `,
     (guest, bytes) => {
       for (const count of [0, 1, 3, 1000]) {
@@ -66,8 +66,8 @@ for (const asynchronous of [false, true]) {
   Deno.test(`known lexical callback memos preserve first force effects (${mode})`, async () => {
     await compileAndRun(
       `${repeat}
-entry const skipped = fn (host: U32 -> U32 ! {Foreign}) => repeat 0 (host 21)
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => repeat 3 (host 21)
+entry const skipped = func (host: U32 -> U32 ! {Foreign}) => return repeat 0 (host 21)
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return repeat 3 (host 21)
 `,
       async (guest) => {
         const trace: number[] = [];
@@ -107,18 +107,18 @@ entry const run = fn (host: U32 -> U32 ! {Foreign}) => repeat 3 (host 21)
 Deno.test("local callback specialization preserves polymorphism and immutable captures", async () => {
   await compileAndRun(
     `
-const read = fn ~(value: U32) => do:
-  let identity = fn item => item
+const read = func ~(value: U32) => return do:
+  let identity = func item => return item
   let offset = 2
-  let first = fn item => @u32.add (@demand value) (identity item)
-  let saved = fn () => @u32.add (@demand value) offset
+  let first = func item => return @u32.add (@demand value) (identity item)
+  let saved = func () => return @u32.add (@demand value) offset
   offset := 7
-  let second = fn () => @u32.add (@demand value) offset
+  let second = func () => return @u32.add (@demand value) offset
   use a <- first 1
   use b <- saved ()
   use c <- second ()
   break @u32.add a (@u32.add b c)
-entry const run = fn (value: U32) => read value
+entry const run = func (value: U32) => return read value
 `,
     (guest, bytes) => {
       equal(guest.call("run", 10), 40);
@@ -139,11 +139,11 @@ entry const run = fn (value: U32) => read value
 Deno.test("captured Array demands survive callback loops and real retirement", async () => {
   await compileAndRun(
     `
-const repeat = fn (count: U32) => fn ~(value: Array U32) => do:
+const repeat = func (count: U32) => return func ~(value: Array U32) => return do:
   let snapshot = #[17, 18]
-  let read = fn (index: U32) => @u32.add (@array.get (@demand value) index) snapshot[0]
+  let read = func (index: U32) => return @u32.add (@array.get (@demand value) index) snapshot[0]
   let alias = read
-  let second = fn (index: U32) => @array.get (@demand value) index
+  let second = func (index: U32) => return @array.get (@demand value) index
   let total = 0
   for i in 0..count:
     let pressure = @array.fill 1024 i
@@ -152,7 +152,7 @@ const repeat = fn (count: U32) => fn ~(value: Array U32) => do:
     use b <- second (@u32.rem i 3)
     total := @u32.add self (@u32.add (@u32.add a b) (@u32.add pressure[0] churn[0]))
   break total
-entry const run = fn (count: U32) => repeat count #[21, 22, 23]
+entry const run = func (count: U32) => return repeat count #[21, 22, 23]
 `,
     (guest, bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -182,8 +182,8 @@ entry const run = fn (count: U32) => repeat count #[21, 22, 23]
 Deno.test("returned and stored callbacks retain one shared fallback cell", async () => {
   await compileAndRun(
     `
-const keep = fn ~(value: U32) => { first: fn () => @demand value, second: fn () => @demand value }
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
+const keep = func ~(value: U32) => return { first: func () => return @demand value, second: func () => return @demand value }
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
   let callbacks = keep (host 21)
   use first <- callbacks.first ()
   use second <- callbacks.second ()
@@ -225,7 +225,7 @@ Deno.test("local callback imports, stable-type edits and checkpoints match fresh
   try {
     await Deno.writeTextFile(
       entry,
-      'import { repeat } from "./library"\nentry const run = fn (count: U32) => repeat count 21\n',
+      'import { repeat } from "./library"\nentry const run = func (count: U32) => return repeat count 21\n',
     );
     await Deno.writeTextFile(library, repeat);
     const packed = await new Deno.Command(executable, {
@@ -289,13 +289,13 @@ Deno.test("local callback imports, stable-type edits and checkpoints match fresh
 Deno.test("known callbacks can call bounded ordinary helpers without demand cells", async () => {
   await compileAndRun(
     `
-const add = fn (value: U32) => @u32.add value 1
-const read = fn ~(value: U32) => do:
-  let callback = fn () => add (@demand value)
+const add = func (value: U32) => return @u32.add value 1
+const read = func ~(value: U32) => return do:
+  let callback = func () => return add (@demand value)
   use first <- callback ()
   use second <- callback ()
   break @u32.add first second
-entry const run = fn (value: U32) => read value
+entry const run = func (value: U32) => return read value
 `,
     (guest, bytes) => {
       equal(guest.call("run", 20), 42);
@@ -309,14 +309,14 @@ entry const run = fn (value: U32) => read value
 Deno.test("generic callback captures preserve scalar machine types", async () => {
   await compileAndRun(
     `
-const read = fn ~value => do:
-  let identity = fn item => item
-  let callback = fn () => identity (@demand value)
+const read = func ~value => return do:
+  let identity = func item => return item
+  let callback = func () => return identity (@demand value)
   use first <- callback ()
   use callback ()
   break first
-entry const integer = fn (value: U32) => read value
-entry const floating = fn (value: F32) => read value
+entry const integer = func (value: U32) => return read value
+entry const floating = func (value: F32) => return read value
 `,
     (guest, bytes) => {
       for (const value of [0, 21, 0xffffffff]) {

@@ -38,25 +38,36 @@ comment. Values use `snake_case`; types/constructors use `PascalCase`. Names are
 lexically scoped and values immutable. `F32.sqrt` names a function, not a method
 on an implicit receiver.
 
-Scalars: `Unit` (`()`), `Bool` (`#True`, `#False`), `U32` (`42`, `0xFF`,
-`4_096`), and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32
-arithmetic wraps at 32 bits; F32 rounds to binary32 and can yield infinity or
-NaN. Prefix `-` negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
+Scalars: `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`),
+and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32 arithmetic wraps
+at 32 bits; F32 rounds to binary32 and can yield infinity or NaN. Prefix `-`
+negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
 
 Functions take one argument at a time. Calls associate left: `f a b` means
 `(f a) b`. Application binds tighter than infix operators. `f(x)` also calls a
 function; `f(a, b)` passes one tuple. Unit thunks defer work until called with
 `()`, without memoization. Recursion is supported.
 
-Write several parameters after one `fn` to abbreviate a curried chain:
-`fn first second => body` means `fn first => fn second => body`, and
-`fn (first: U32) (second: U32) -> U32 => body` places the result annotation on
-the final stage. A call still uses `f first second`; `f first` remains a partial
-application. The same rule applies to associated functions and callbacks.
-Parameter names in this positional form are local names, not part of the
-callable's public type. To run work **between** curried stages, write the
+Function bodies return explicitly: `func x => return x`, or `func x => do:` with
+`return x` inside. Every path through a function's bare `do:` body must return;
+`break value` only finishes a block. To return a block's result, write
+`func x => return do:` and finish that block with `break value`.
+
+Separate curried parameters with `->`: `func first -> second => return body`
+means `func first => return func second => return body`, and
+`func (first: U32) -> (second: U32) : U32 => return body` places the result
+annotation on the final stage. A call still uses `f first second`; `f first`
+remains a partial application. The same rule applies to associated functions and
+callbacks. Parameter names in this positional form are local names, not part of
+the callable's public type. To run work **between** curried stages, write the
 explicit nested lambdas; the short form introduces no such work or extra
 allocation beyond the equivalent chain.
+
+Write a result annotation with `:` before `=>`, for example
+`func (x: U32) -> (y: U32): U32 => return x + y`. Type arrows keep their usual
+meaning in a binding annotation: `const add: U32 -> U32 -> U32 = ...`.
+Whitespace-separated function parameters and implicit function results are
+rejected.
 
 For many same-typed arguments, use a parameter record as a named-call
 convention. The record type gives names a public interface, so renaming a field
@@ -65,12 +76,12 @@ even when that differs from the record type's order; unknown and duplicate
 supplied fields receive diagnostics at the supplied field.
 
 ```blot
-const rectangle = fn (left: U32) (top: U32) (width: U32) (height: U32) =>
+const rectangle = func (left: U32) -> (top: U32) -> (width: U32) -> (height: U32) => return
   @u32.add (@u32.add left top) (@u32.mul width height)
 const placed = rectangle 2 3
-const named_rectangle = fn (args: { left: U32, top: U32, width: U32, height: U32 }) =>
+const named_rectangle = func (args: { left: U32, top: U32, width: U32, height: U32 }) => return
   rectangle args.left args.top args.width args.height
-entry const area = fn () => named_rectangle { height: 4, width: 5, top: 3, left: 2 }
+entry const area = func () => return named_rectangle { height: 4, width: 5, top: 3, left: 2 }
 ```
 
 A record parameter gives callers named fields in any order. Small scalar-record
@@ -78,16 +89,16 @@ helpers can be inlined without a record allocation in optimized builds; the
 development tier may allocate a temporary record.
 
 ```blot
-const twice = fn value => value + value
-const apply_twice = fn transform => fn value => transform (transform value)
-entry const factorial = fn (value: U32) -> U32 => do:
+const twice = func value => return value + value
+const apply_twice = func transform => return func value => return transform (transform value)
+entry const factorial = func (value: U32) : U32 => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
 
-entry const offset = fn value => value + 1.0
-entry const answer = fn (value: F32) -> F32 => apply_twice offset (twice value)
-entry let delayed = fn () => (fn () => factorial 5) ()
+entry const offset = func value => return value + 1.0
+entry const answer = func (value: F32) : F32 => return apply_twice offset (twice value)
+entry let delayed = func () => return (func () => return factorial 5) ()
 ```
 
 Function inputs and results start as fresh unknown types. Uses constrain them;
@@ -119,7 +130,7 @@ suggestions from unsaved buffers. See the
 explained below.
 
 ```text
-const unfinished = fn (value: U32) -> F32 => @hole
+const unfinished = func (value: U32) : F32 => return @hole
 // Unfilled expression; expected: F32; in scope: value: U32
 ```
 
@@ -158,25 +169,25 @@ Keep `return value` where the intent is to leave the whole function, including
 from a nested match arm. A bare `break` still leaves only the nearest loop.
 
 ```blot
-entry const choose = fn (flag: Bool) -> U32 => do:
+entry const choose = func (flag: Bool) : U32 => return do:
   let inner = do:
     if flag:
       return 7
     break 3
   break inner + 1
 
-entry const from_case = fn (flag: Bool) -> U32 => do:
+entry const from_case = func (flag: Bool) : U32 => return do:
   case flag of
-    #True => do:
+    true => do:
       return 42
-    #False => do:
+    false => do:
       let ignored = ()
   break 0
 ```
 
 ```blot
 type Beat is data = #Up | #Down
-entry const count = fn (up: Bool) -> U32 => do:
+entry const count = func (up: Bool) : U32 => return do:
   let beat = if up then #Up else #Down
   let total = 0
   case beat of
@@ -189,9 +200,9 @@ entry const count = fn (up: Bool) -> U32 => do:
 
 ```blot
 type Builder is data = #Builder U32
-const add_step = fn amount => fn builder => case builder of
+const add_step = func amount => return func builder => return case builder of
   #Builder value => #Builder (value + amount)
-const plugin = fn builder => do:
+const plugin = func builder => return do:
   builder := add_step 10 self
   builder := add_step 20 self
   break builder
@@ -202,7 +213,7 @@ const application = do:
   builder := add_step 12 self
   break builder
 
-entry const answer = fn () => case application of
+entry const answer = func () => return case application of
   #Builder value => value
 ```
 
@@ -246,7 +257,7 @@ iteration.
 
 ```blot
 type Candidate is data = #Keep U32 | #Skip
-entry const kept_total = fn () => do:
+entry const kept_total = func () => return do:
   let total = 0
   for candidate in #[#Skip, #Keep 2, #Keep 5]:
     let #Keep value = candidate else:
@@ -258,19 +269,19 @@ entry const kept_total = fn () => do:
 ```
 
 ```blot
-entry const sum_to = fn (end: U32) => do:
+entry const sum_to = func (end: U32) => return do:
   let total = 0
   for index in 0..end:
     total := self + index
   break total
 
-entry const weighted = fn () => do:
+entry const weighted = func () => return do:
   let total = 0
   for (value, weight) in [(2, 3), (4, 5)]:
     total := self + value * weight
   break total
 
-entry const first_five = fn () => do:
+entry const first_five = func () => return do:
   let count = 0
   for 0..5:
     count := self + 1
@@ -286,6 +297,12 @@ values. Constructors themselves are values/functions. The prelude defines
 `Maybe a = #Some a | #Nothing` and
 `Result [value, error] = #Ok value | #Err error`.
 
+Constructors also accept the `$` spelling in declarations, expressions and
+patterns: `type Choice is data = $Some U32 | $None` and `$Some 42`. Booleans use
+plain `true` and `false`, without a constructor marker. Keep `$` adjacent to the
+constructor name. A spaced `f $ value` remains ordinary operator application.
+Arrays keep their `#[...]` spelling and lists use `[...]`.
+
 A type or effect constructor takes at most one argument pattern. Use a list,
 tuple, or record to bind several types. These shapes can nest; record arguments
 match by field name. Record constructor declarations also support field
@@ -295,13 +312,13 @@ shorthand.
 type Entry { head, tail } is data = #Entry { head, tail }
 type Pair [left, right] is data = #Pair (left, right)
 type Curried left => type right is data = #Curried (left, right)
-const first = fn (entry: Entry { head: U32, tail: a }) -> U32 => do:
+const first = func (entry: Entry { head: U32, tail: a }) : U32 => return do:
   let #Entry { head } = entry
   break head
-const number = fn (pair: (Curried U32) Bool) => do:
+const number = func (pair: (Curried U32) Bool) => return do:
   let #Curried (value, flag) = pair
   break value
-entry const answer = fn () => first (#Entry { head: 42, tail: #True })
+entry const answer = func () => return first (#Entry { head: 42, tail: true })
 ```
 
 Transparent aliases name an existing type without introducing a constructor or
@@ -323,7 +340,7 @@ type Coordinate = F32
 type Pair a = (a, a)
 type Position = Pair Coordinate
 const origin: Position = (0.0, 0.0)
-entry const horizontal = fn () => @product.get origin 0
+entry const horizontal = func () => return @product.get origin 0
 ```
 
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
@@ -361,10 +378,10 @@ a `merge Left Right Result` predicate:
 ```blot
 type Merge [a, b, c] is contract = { merge a b c }
 const extend: a -> b -> c where { Merge [a, b, c] } =
-  fn left => fn right => @record.merge left right
-const original = { x: 40, enabled: #False }
-const updated = extend original { enabled: #True, extra: 2 }
-entry const answer = fn () => @u32.add updated.x updated.extra
+  func left => return func right => return @record.merge left right
+const original = { x: 40, enabled: false }
+const updated = extend original { enabled: true, extra: 2 }
+entry const answer = func () => return @u32.add updated.x updated.extra
 ```
 
 Tuples use `(a, b)`; project with patterns or `@product.get tuple 0` with a
@@ -380,36 +397,36 @@ failure branch.
 ```blot
 type Vec2 is data = #Vec2 { x: F32, y: F32 }
 entry const selected = 7
-const length = fn position => do:
+const length = func position => return do:
   let #Vec2 { x, y } = position
   break F32.sqrt (x * x + y * y)
-const unpack = fn candidate => do:
+const unpack = func candidate => return do:
   let #Some value = candidate else:
     break 0
   break value
 
-entry const distance = fn () => length (#Vec2 { y: 4.0, x: 3.0 })
-entry const classify = fn (key: U32) => case key, #True of
-  ^selected, #True => unpack (#Some 42)
+entry const distance = func () => return length (#Vec2 { y: 4.0, x: 3.0 })
+entry const classify = func (key: U32) => return case key, true of
+  ^selected, true => unpack (#Some 42)
   _, _ => 0
-entry const conditional = fn () => do:
-  if let #Some (number, #True) = #Some (42, #True):
+entry const conditional = func () => return do:
+  if let #Some (number, true) = #Some (42, true):
     break number
   break 0
 ```
 
 ## Operators and compile-time associated dispatch
 
-Default precedence, weakest first: `$` (0), `|>` (5), `||` (20), `&&` (25),
+Default precedence, weakest first: `$` (0), `|>` (5), `or` (20), `and` (25),
 comparisons `== != < <= > >=` (30), bitwise `|` (40), `^` (45), `&` (50), shifts
-`<< >>` (55), `+ -` (60), `* / %` (70), then application. `$`, `&&`, and `||`
+`<< >>` (55), `+ -` (60), `* / %` (70), then application. `$`, `and`, and `or`
 associate right; comparisons are non-associative; the others associate left. The
 default `f $ g x` is application syntax for `f (g x)`, with identical
 evaluation, demand and scoped-callback checks. It works without the prelude,
-including `@task.scope $ fn group => do:` and
-`@task.spawn group $ fn () => ...`. An explicit fixity declaration for `$`
-overrides this default with an ordinary operator call. Backticks call ordinary
-functions infix. Declare custom fixities before other declarations:
+including `@task.scope $ func group => return do:` and
+`@task.spawn group $ func () => return ...`. An explicit fixity declaration for
+`$` overrides this default with an ordinary operator call. Backticks call
+ordinary functions infix. Declare custom fixities before other declarations:
 `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
 `infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
 
@@ -444,7 +461,7 @@ argument locations. These spans use UTF-8 byte offsets, like the primary
 diagnostic.
 
 ```text
-entry const answer = fn () => 1 + 2.5
+entry const answer = func () => return 1 + 2.5
 // missing_associated; `+` (add): left U32 incompatible, right F32 incompatible
 ```
 
@@ -473,12 +490,12 @@ checks their common source type and every composition boundary.
 
 ```blot
 import * as path from "std/path"
-const position = path.make (fn source => source.position)
-  (fn replacement => fn source => @record.merge source { position: replacement })
-const x = path.make (fn source => source.x)
-  (fn replacement => fn source => @record.merge source { x: replacement })
+const position = path.make (func source => return source.position)
+  (func replacement => return func source => return @record.merge source { position: replacement })
+const x = path.make (func source => return source.x)
+  (func replacement => return func source => return @record.merge source { x: replacement })
 const position_x = path.compose position x
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let original = { position: { x: 40, y: 7 }, health: 2 }
   let changed = path.set position_x 2.5 original
   break @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
@@ -517,7 +534,7 @@ entry const same_value = 1 == 2
 entry const same_type = #Type 1 == #Type 2
 entry const same_nominal = #Type #Count == #Type (#Count 42)
 entry const different = #Type #Count != #Type #Other
-entry const compare = fn () => do:
+entry const compare = func () => return do:
   let head = #Type #Count
   let witness = #Type (#Count 0)
   break head == witness
@@ -525,10 +542,10 @@ entry const compare = fn () => do:
 
 ```blot
 type Box a is data = #Box a
-const Box.add = fn left => fn right => case left, right of
+const Box.add = func left => return func right => return case left, right of
   #Box a, #Box b => #Box (a + b)
-const twice = fn value => value + value
-entry const answer = fn (value: F32) => case twice (#Box value) of
+const twice = func value => return value + value
+entry const answer = func (value: F32) => return case twice (#Box value) of
   #Box result => result
 ```
 
@@ -569,10 +586,10 @@ space (`f #[1]`), or write `f(#[1])`.
 Spreads append or prepend while preserving written evaluation order:
 
 ```blot
-const prepend = fn value => fn values => [value, ...values]
-const append = fn value => fn values => [...values, value]
-const surrounded = fn values => [0, ...values, 99]
-const append_array = fn value => fn values => #[...values, value]
+const prepend = func value => return func values => return [value, ...values]
+const append = func value => return func values => return [...values, value]
+const surrounded = func values => return [0, ...values, 99]
+const append_array = func value => return func values => return #[...values, value]
 ```
 
 The spread operand must have the same collection type as the result. One spread
@@ -605,13 +622,13 @@ optimization.
 
 ```blot
 type Countdown is data = #Countdown U32
-const Countdown.iter = fn (cursor: Countdown) => cursor
-const Countdown.next = fn (cursor: Countdown) => do:
+const Countdown.iter = func (cursor: Countdown) => return cursor
+const Countdown.next = func (cursor: Countdown) => return do:
   let #Countdown remaining = cursor
   break if remaining == 0 then #Nothing
     else #Some (remaining, #Countdown (remaining - 1))
 
-entry const sum = fn count => do:
+entry const sum = func count => return do:
   let total = 0
   for value in #Countdown count:
     total := self + value
@@ -635,10 +652,10 @@ do not add indexing to List.
 
 ```blot
 import * as iter from "std/iter"
-const selected = fn count =>
+const selected = func count => return
   iter.collect_list (iter.take count
-    (iter.map (fn value => value * 2)
-      (iter.filter (fn value => value > 2) [1, 2, 3, 4, 5])))
+    (iter.map (func value => return value * 2)
+      (iter.filter (func value => return value > 2) [1, 2, 3, 4, 5])))
 ```
 
 The module includes `range start end`, `map`, `filter`, `take`, `take_while`,
@@ -702,10 +719,10 @@ private, recursive and over-budget shapes use the ordinary layout. Array/List
 conversion and slicing use the same checked row plan.
 
 An optimized exact identity copy, such as
-`array.generate values.length (fn index => values[index])`, may share the
-existing immutable array. Both versions remain valid snapshots; later edits to
-either preserve the other's values. This avoids repeated per-element ownership
-work when the elements contain references.
+`array.generate values.length (func index => return values[index])`, may share
+the existing immutable array. Both versions remain valid snapshots; later edits
+to either preserve the other's values. This avoids repeated per-element
+ownership work when the elements contain references.
 
 Wasm reuses locally allocated storage when its last reference is consumed,
 including a single array carried through a loop. It copies when uniqueness
@@ -841,22 +858,24 @@ Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization. One plain source forwarding wrapper may reach the
 primitive through an alias and may reorder its parameters, provided it passes
 each parameter exactly once and does no other work. For example,
-`fn values index value => array.replace index value values` retains the same
-in-place opportunity as the direct call. Arguments still evaluate in their
-written order. Arbitrary higher-order wrappers remain conservative. If an old
-array version is still observed after the edit, replacement copies the whole
-array; doing so on every iteration of a growing loop can be quadratic. Keep an
-exclusive loop carry when only the final version is needed.
+`func values -> index -> value => return array.replace index value values`
+retains the same in-place opportunity as the direct call. Arguments still
+evaluate in their written order. Arbitrary higher-order wrappers remain
+conservative. If an old array version is still observed after the edit,
+replacement copies the whole array; doing so on every iteration of a growing
+loop can be quadratic. Keep an exclusive loop carry when only the final version
+is needed.
 
-For collection construction, `@array.generate count (fn index => value)`
-allocates one fixed-size contiguous result, and `@array.fill` does the same with
-one evaluated fill value. A List loop using an exclusive carry and
-`[...self, value]` grows through the List's bounded leaves, then
-`Array.from_list` copies the final contents once if an Array is needed. Avoid
-repeated Array append/prepend: each step copies the contiguous payload. If older
-List versions remain live, path copying preserves them, so the exclusive-growth
-cost bound no longer applies. A comprehension is another documented construction
-form when its result expression fits the generator syntax.
+For collection construction,
+`@array.generate count (func index => return value)` allocates one fixed-size
+contiguous result, and `@array.fill` does the same with one evaluated fill
+value. A List loop using an exclusive carry and `[...self, value]` grows through
+the List's bounded leaves, then `Array.from_list` copies the final contents once
+if an Array is needed. Avoid repeated Array append/prepend: each step copies the
+contiguous payload. If older List versions remain live, path copying preserves
+them, so the exclusive-growth cost bound no longer applies. A comprehension is
+another documented construction form when its result expression fits the
+generator syntax.
 
 Small pure structural helpers and locally named or inline callbacks can be
 allocation-free in optimized code. A generic callback whose callee cannot be
@@ -888,14 +907,14 @@ Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 ```blot
 import * as array from "std/array"
 
-const squares = array.generate 4 (fn index => index * index)
-entry const total = fn () => array.fold_left U32.add 0 squares
-entry const snapshot = fn () => do:
+const squares = array.generate 4 (func index => return index * index)
+entry const total = func () => return array.fold_left U32.add 0 squares
+entry const snapshot = func () => return do:
   let values = #[1, 2]
   let original = values
   values[0] := self + 40
   break original[0] + values[0]
-const checked = fn index => squares.get(index)
+const checked = func index => return squares.get(index)
 ```
 
 Import `std/list` for `generate`, `fill`, `from_array`, `to_array`, `length`,
@@ -911,8 +930,9 @@ The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 `clamp low high value`, `lerp left right weight`, `is_finite`, `sin/cos/tan`,
 `wrap period value`, and `lerp_angle left right weight`.
 
-Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `&&` and
-`||` call the source-defined `and` and `or`, whose right parameters use `~`.
+Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `and` and
+`or` are reserved primitive operators: both operands must be `Bool`, and the
+right operand runs only when needed. They cannot be rebound or given a fixity.
 `Maybe.unwrap_or_else fallback candidate` and
 `Result.unwrap_or_else fallback candidate` also defer their fallbacks. Local
 `let` initializers are eager too. The compiler may place single-use, total
@@ -932,7 +952,7 @@ operators and receiver members such as `dot`, `length`, and `normalized`.
 import * as array from "std/array"
 import { Vec2 } from "std/vector"
 
-entry const total_length = fn () =>
+entry const total_length = func () => return
   #[#Vec2 { x: 3.0, y: 4.0 }, #Vec2 { x: 0.0, y: 0.0 }]
   |> array.map .length
   |> array.fold_left .add 0.0
@@ -950,8 +970,8 @@ Text has no implicit IO.
 ```blot
 import * as text from "std/text"
 
-entry const greeting = fn () => text.join " " #["Hello,", "世界🙂"]
-entry const label = fn (count: U32) =>
+entry const greeting = func () => return text.join " " #["Hello,", "世界🙂"]
+entry const label = func (count: U32) => return
   text.join "" #["count=", text.format count]
 ```
 
@@ -982,8 +1002,8 @@ on the source functions:
 
 ```blot
 import * as simd from "std/simd"
-const translated = fn lanes => simd.u32_add lanes (1, 2, 3, 4)
-const scaled = fn lanes => simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
+const translated = func lanes => return simd.u32_add lanes (1, 2, 3, 4)
+const scaled = func lanes => return simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
 ```
 
 Every operation with a scalar counterpart gives the bits of that scalar kernel
@@ -1070,17 +1090,17 @@ effects unhandled. Closures retain their latent effects.
 
 ```blot
 type Reader a is effect = { ask: Unit -> a }
-const read_twice = fn () => do:
+const read_twice = func () => return do:
   use first <- Reader.ask U32 ()
   use second <- Reader.ask U32 ()
   break first + second
 
-const reader = @effect.provider (Reader.ask U32) (fn () => 21)
-entry const mocked = fn () => do reader:
+const reader = @effect.provider (Reader.ask U32) (func () => return 21)
+entry const mocked = func () => return do reader:
   use answer <- read_twice ()
   break answer
 
-entry const main = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider (Reader.ask U32) read):
+entry const main = func (read: Unit -> U32 ! {Foreign}) => return do (@effect.provider (Reader.ask U32) read):
   use answer <- read_twice ()
   break answer
 
@@ -1102,7 +1122,7 @@ is one `case request of`, with distinct `effect` clauses and exactly one
 ```blot
 type Validate is effect = { check: U32 -> U32 }
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -1112,7 +1132,7 @@ const checked = fn computation => do:
       complete value =>
         break value
 
-entry const answer = fn () => checked (@computation (fn () => do:
+entry const answer = func () => return checked (@computation (func () => return do:
   use first <- Validate.check 40
   use second <- Validate.check 2
   break first + second
@@ -1151,18 +1171,18 @@ type State a is effect = {
 }
 type Get a is effect = Unit -> a
 
-const increment = fn () => do:
+const increment = func () => return do:
   use count <- State.get U32 ()
   use State.set U32 (count + 1)
   break count
 
-entry const counted = fn () => do:
+entry const counted = func () => return do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) 41):
     break increment ()
   break next + previous
 
-const fixed = @effect.provider (Get U32) (fn () => 7)
-entry const read_fixed = fn () => do fixed:
+const fixed = @effect.provider (Get U32) (func () => return 7)
+entry const read_fixed = func () => return do fixed:
   break Get U32 ()
 ```
 
@@ -1186,15 +1206,15 @@ type State a is effect = {
 }
 type Counter is data = #Counter U32
 
-const get = fn (witness: p -> a) -> a => State.get ()
-const set = fn value => State.set value
+const get = func (witness: p -> a) : a => return State.get ()
+const set = func value => return State.set value
 
-const increment = fn () => do:
+const increment = func () => return do:
   use counter <- get #Counter
   let #Counter value = counter
   break set (#Counter (value + 1))
 
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) increment
   break next
 ```
@@ -1227,27 +1247,27 @@ arguments cannot become a closed reflected effect set.
 [Scoped effect identities](../zig-native/SCOPED_EFFECTS.md) specifies the
 checked representation: symbolic family arguments, distinct same-typed
 capabilities and checked scope/capture lifetimes. The direct annotated-family
-subset accepts `@effect.scope (fn (state: State U32) => body)`, with member
-operations such as `state.get ()`. Each entry creates fresh authority. Local
-aliases and providers preserve its identity; its operations must be handled
-before exit. Generic scope factories may use symbolic family payloads such as
-`State a`; returning the same inherited payload shape retains its original
-lifetime. A longer-lived outer capability may pass through an inner scope in
-structural data; only the exiting owner is forbidden in that result. Primitive
-and structural data may return; callable, demand, provider, nominal and
-unresolved results or transferred arguments conservatively reject. Direct source
-closures may return when a bounded capture proof excludes the exiting owner;
-unknown captures still reject. A direct anonymous adapter whose whole body
-invokes its callback may borrow a capturing callable with a structural result.
-Exact generic identity and Unit callback helpers own validated public flow
-contracts. A single annotated capability parameter may read a Unit operation
-through source or compiled helpers, for example
-`fn (state: State a) -> a ! {state.get} => state.get ()`; calls substitute the
-argument's exact identity in that row. Exact curried callback helpers also
-preserve it, for example
-`fn (state: State a) => fn (callback: Unit -> a ! {state.get | e}) => callback ()`.
+subset accepts `@effect.scope (func (state: State U32) => return body)`, with
+member operations such as `state.get ()`. Each entry creates fresh authority.
+Local aliases and providers preserve its identity; its operations must be
+handled before exit. Generic scope factories may use symbolic family payloads
+such as `State a`; returning the same inherited payload shape retains its
+original lifetime. A longer-lived outer capability may pass through an inner
+scope in structural data; only the exiting owner is forbidden in that result.
+Primitive and structural data may return; callable, demand, provider, nominal
+and unresolved results or transferred arguments conservatively reject. Direct
+source closures may return when a bounded capture proof excludes the exiting
+owner; unknown captures still reject. A direct anonymous adapter whose whole
+body invokes its callback may borrow a capturing callable with a structural
+result. Exact generic identity and Unit callback helpers own validated public
+flow contracts. A single annotated capability parameter may read a Unit
+operation through source or compiled helpers, for example
+`func (state: State a) : a ! {state.get} => return state.get ()`; calls
+substitute the argument's exact identity in that row. Exact curried callback
+helpers also preserve it, for example
+`func (state: State a) => return func (callback: Unit -> a ! {state.get | e}) => return callback ()`.
 Complete annotations may bind the same capability relationship:
-`const read: (state: State a) -> a ! {state.get} = fn input => input.get ()`.
+`const read: (state: State a) -> a ! {state.get} = func input => return input.get ()`.
 For curried invocation, group the resulting callable type:
 `(state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e})`.
 Binder names belong only to subsequent parts of that annotation; the
@@ -1259,8 +1279,8 @@ and unknown captures reject; a lambda does not inherit handlers from where it
 was constructed. Fully applied helpers with two capability inputs may read a
 Unit operation from either input; each argument retains its own identity, even
 when the inputs share a family or payload. For example,
-`fn (left: State a) => fn (right: State b) => right.get ()` preserves `right` in
-its result row. The complete header form is
+`func (left: State a) => return func (right: State b) => return right.get ()`
+preserves `right` in its result row. The complete header form is
 `(left: State a) -> ((right: State b) -> b ! {right.get})`.
 
 A local `if flag then left else right` may select capabilities with the same
@@ -1272,14 +1292,16 @@ scope's owner. A factory may resolve a symbolic payload while keeping that
 identity. Repeated callback/loop selection and public generic selection schemes
 still reject. Pure named helpers may construct nested products or records from
 up to 16 parameters and scalar constants, such as
-`fn first => fn second => {second, nested: (first, 42)}`. Their owned result
-footprint records every retained input; unused inputs add no result footprint. A
-named helper may also directly invoke one callback with Unit, such as
-`fn unused => fn run => fn other => run ()`. Its contract retains the selected
-callback's exact operation row. Exact helpers may pass ordered formal inputs to
-one callback, such as `fn run => fn left => fn right => run left right`. The
-actual literal or checked named callback must prove that it does not store those
-inputs; earlier captures keep their own lifetimes. Local callback aliases
+`func first => return func second => return {second, nested: (first, 42)}`.
+Their owned result footprint records every retained input; unused inputs add no
+result footprint. A named helper may also directly invoke one callback with
+Unit, such as
+`func unused => return func run => return func other => return run ()`. Its
+contract retains the selected callback's exact operation row. Exact helpers may
+pass ordered formal inputs to one callback, such as
+`func run => return func left => return func right => return run left right`.
+The actual literal or checked named callback must prove that it does not store
+those inputs; earlier captures keep their own lifetimes. Local callback aliases
 preserve their selected owners. Repeated effect labels still require separate
 handler occurrences, including when two inputs alias one owner. These contracts
 use the existing 16-parameter bound. Named forwarding helpers compose those
@@ -1296,10 +1318,10 @@ implementation when it supplies concrete arguments. You may write the same
 constraints explicitly after a complete binding annotation:
 
 ```blot
-const twice: a -> a where { associated "add" a a a } = fn value => value + value
-const first: a -> b where { field "first" a b } = fn value => value.first
-const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
-entry const answer = fn () => twice 21
+const twice: a -> a where { associated "add" a a a } = func value => return value + value
+const first: a -> b where { field "first" a b } = func value => return value.first
+const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
+entry const answer = func () => return twice 21
 ```
 
 The `where` clause is available on top-level `const`/`let` and local `let`;
@@ -1324,7 +1346,7 @@ conversion, share that row with the function annotation:
 
 ```blot
 const convert: a -> b ! {| e} where { result "from" a b ! {| e} } =
-  fn value => @type.result "from" value
+  func value => return @type.result "from" value
 ```
 
 This requirement can also appear in a named contract or a local binding's
@@ -1343,9 +1365,9 @@ type Add a is contract = { associated "add" a a a }
 type Arithmetic a is contract = { Add a, associated "mul" a a a }
 type Project [owner, value] is contract = { field "value" owner value }
 type Box a is data = #Box { value: a }
-const twice: a -> a where { Arithmetic a } = fn value => value + value
-const read: a -> b where { Project [a, b] } = fn box => box.value
-entry const answer = fn () => twice (read (#Box { value: 21 }))
+const twice: a -> a where { Arithmetic a } = func value => return value + value
+const read: a -> b where { Project [a, b] } = func box => return box.value
+entry const answer = func () => return twice (read (#Box { value: 21 }))
 ```
 
 Every use instantiates the contract's type and effect-row parameters separately.
@@ -1363,8 +1385,8 @@ scope over each member; members cannot introduce additional type or row binders.
 type Identity a is contract = { type Item = a }
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 type View a = Identity.Item a
-const keep: a -> (Identity.Item a) where { Identity a } = fn value => value
-entry const answer = fn () => keep 42
+const keep: a -> (Identity.Item a) where { Identity a } = func value => return value
+entry const answer = func () => return keep 42
 ```
 
 A projection such as `Identity.Item U32` supplies the contract's complete
@@ -1393,11 +1415,11 @@ extra binders. Defined equations cannot be overridden.
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
 impl ArraySource a : Source (Array a) = {
   type Item = a,
-  const first = fn values => @array.get values 0,
+  const first = func values => return @array.get values 0,
 }
 const read: s -> (Source.Item s) where { Source s } =
-  fn values => Source.first values
-entry const first = fn () => read #[42]
+  func values => return Source.first values
+entry const first = func () => return read #[42]
 ```
 
 Heads must be disjoint across the acquired public module graph, irrespective of
@@ -1414,7 +1436,7 @@ In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and
 checkpoint closures. Storage values remain runtime state. Its `get`, `previous`,
 column and query helpers require a unary constructor/function witness; wrap a
-nullary constructor as `(fn () => #Idle)`.
+nullary constructor as `(func () => return #Idle)`.
 
 ## Expression tags
 
@@ -1426,9 +1448,9 @@ With several tags, the nearest runs first: `@[f] @[g] const x = value` binds
 tags, including when the initializer is a function.
 
 ```blot
-const add = fn amount => fn value => value + amount
+const add = func amount => return func value => return value + amount
 @[add 1]
-@[fn value => value * 2] entry const answer: U32 = 20
+@[func value => return value * 2] entry const answer: U32 = 20
 @[add 1] entry let started: U32 = 41
 ```
 
@@ -1439,6 +1461,77 @@ own bound name receives `recursive_tag`; tags on types, effects, and fixities
 receive `unsupported_attribute`.
 
 ## Modules, constants, current limits
+
+`#run expression` requires compile-time evaluation of a pure expression using
+the same numeric semantics as the Wasm target. It can call functions and read
+compile-time values in the current scope; runtime-dependent inputs are rejected.
+Parentheses delimit it when it is part of a larger expression. Evaluation
+failures and exhausted evaluator budgets fail compilation without publishing a
+Wasm module.
+
+`#do:` is shorthand for `#run do:`. Its local statements execute at compile
+time, and `break` supplies the resulting value:
+
+```blot
+entry const answer = func () => return #do:
+  let base = 40
+  break base + 2
+```
+
+Both forms use the existing evaluator. They do not allow runtime host effects.
+`#if` is still pending. The initial scoped storage profile uses the same array
+literal for all length modes:
+
+```blot
+entry const answer = func () => return do:
+  let fixed: Array U32 = #[7]
+  let growing: GrowArray U32 = #[41]
+  let resizable: ResizeArray U32 = #[]
+  let first: &U32 = &growing[0]
+  let appended = @storage.push growing 9
+  let changed = @storage.write first 42
+  break @storage.load first
+```
+
+Without an expected type, `#[...]` means `Array`; `[...]` remains a list.
+Existing arrays do not coerce between modes. `&T` borrows one value, `&[T]`
+borrows a range (`&items[start..end]`), and `^T` links to an element of a stable
+pool (`^items[index]`). The named forms are `Ref T`, `View T`, and `Link T`.
+`@storage.load` reads a reference/link and `@storage.read` reads a view/array.
+Explicit writes are shared by aliases; `@storage.copy` makes an independent
+array. `@storage.freeze` consumes the growth capability across aliases.
+
+`@storage.reserve owner 1048576` requests a minimum planned capacity in elements
+for one `GrowArray` or `ResizeArray` owner. The count must be a U32 integer
+literal (parentheses are permitted); runtime values and constant-name aliases
+are rejected. `Ref`, `View`, `Link` and fixed `Array` values cannot reserve.
+This marker returns `Unit` and changes no data, logical length, identity or
+borrow epoch. It remains planning metadata even when its result is unused.
+
+An explicit request replaces that owner's fallback `growerBytes` requirement; it
+does not impose a logical-length limit or increase every pool of that type.
+Repeated requests for an owner take their maximum, including requests through
+aliases. Zero requests only the header and known initial literal contents. The
+planner preserves initial contents, checks row-size/header/alignment overflow,
+and sizes shared slots for every owner that can use them. Alignment or slot
+sharing can provide extra physical capacity, which is not promised. Owners
+without a request continue to use the configured default budget.
+
+These features select a data-stack backend with scalar and fixed-layout record
+array elements, single-constructor nominal records, generic helpers, known
+callbacks and lexical stack reuse. Literal global arrays persist per instance.
+Numeric arrays cross browser/Pen boundaries by copy; ordinary Foreign callbacks
+can suspend while the guest adapter excludes reentry. Inline records copy by
+value, while indexed updates write through array aliases. Use `@storage.copy`
+when an independent snapshot is needed. It checks borrowed results and permits
+shrinking after a local borrow’s final use. Language task execution is excluded
+from this model; host worker jobs and data queues remain in scope.
+
+The replacement does not yet cover the whole language; unsupported forms fail
+compilation. Ordinary programs still use the original storage path, and Ink and
+Gdev have not yet migrated their application storage. See the
+[scoped storage migration](../zig-native/SCOPED_STORAGE.md) for the exact
+supported operations, lifetime checks, capacity limits and remaining work.
 
 Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
@@ -1453,12 +1546,12 @@ selected public names while retaining their original producer and kind.
 
 `opaque type Token = U32` declares a nominal type with one private constructor,
 `#Token`. The producer can construct and match it, including
-`fn (#Token value) => value`, and inspect record representation fields. Callers
-use public factories, observers and associated declarations; aliases and type
-witnesses preserve opacity. Token remains distinct from U32 inside its producer.
-Public signatures cannot expose private nominal/effect identities or predicate
-implementations. Scalar and reference representations erase the opaque wrapper
-without adding a runtime allocation or tag. See
+`func (#Token value) => return value`, and inspect record representation fields.
+Callers use public factories, observers and associated declarations; aliases and
+type witnesses preserve opacity. Token remains distinct from U32 inside its
+producer. Public signatures cannot expose private nominal/effect identities or
+predicate implementations. Scalar and reference representations erase the opaque
+wrapper without adding a runtime allocation or tag. See
 [module abstraction](../zig-native/MODULE_ABSTRACTION.md) for import and
 artifact rules.
 
@@ -1479,11 +1572,11 @@ F32 or Bool values. A generic entry, an `Array` value or a function that leaves
 an effect unhandled is an error. Only the entry module reaches the host, so a
 module it imports cannot declare entries. `entry` is contextual: it is a
 modifier only before `const` or `let` at the start of a top-level declaration
-and an ordinary name everywhere else (`fn entry => entry` is fine).
+and an ordinary name everywhere else (`func entry => return entry` is fine).
 
 ```blot
-const helper = fn (value: U32) => value + 1
-entry const answer = fn () => helper 41
+const helper = func (value: U32) => return value + 1
+entry const answer = func () => return helper 41
 entry let started: U32 = helper 1
 ```
 
@@ -1491,18 +1584,19 @@ Compilation keeps only what the entries reach. Every declaration is type
 checked, but unreachable ones are never specialized, const-evaluated, run at
 startup or emitted: an unused constant that would panic or exhaust the step
 budget no longer fails the build. Associated dispatch is selected while
-specializing, so a missing implementation such as `#True + #False` is reported
+specializing, so a missing implementation such as `true + false` is reported
 only in reachable code.
 
-Functions are ordinary values: write `const name = fn argument => body` or
-`let name = fn argument => body` at the top level. `const name = expression`
-evaluates at compile time under a step budget. `let name = expression`
-initializes once at runtime when the module starts, if an entry reaches it.
-Compile-time expressions can build immutable values, closures, and builders, but
-cannot do foreign IO. `@panic "message"` fails const evaluation or traps in
-Wasm. String literals are also ordinary runtime text values; intrinsics that
-require a literal still read their argument as source syntax. There is no
-general type-valued/comptime reflection beyond the intrinsics.
+Functions are ordinary values: write `const name = func argument => return body`
+or `let name = func argument => return body` at the top level.
+`const name = expression` evaluates at compile time under a step budget.
+`let name = expression` initializes once at runtime when the module starts, if
+an entry reaches it. Compile-time expressions can build immutable values,
+closures, and builders, but cannot do foreign IO. `@panic "message"` fails const
+evaluation or traps in Wasm. String literals are also ordinary runtime text
+values; intrinsics that require a literal still read their argument as source
+syntax. There is no general type-valued/comptime reflection beyond the
+intrinsics.
 
 Startup orders `let` initializers by their dependencies and rejects cycles.
 Dependency analysis includes referenced function bodies, even when a function is
@@ -1510,8 +1604,8 @@ passed without being called. This conservative rule can reject a deferred cycle
 such as:
 
 ```text
-const read = fn () => value
-let value = (fn ignored => 42) read // rejected: initialization_cycle
+const read = func () => return value
+let value = (func ignored => return 42) read // rejected: initialization_cycle
 ```
 
 Compile-time initializers cannot read top-level `let` values or functions.
@@ -1522,10 +1616,10 @@ Monadic blocks use an ordinary prelude adapter:
 
 ```blot
 const try = monad Maybe
-const sequence = fn candidate => do try:
+const sequence = func candidate => return do try:
   use value <- candidate
   break value + 1
-entry const answer = fn () => Maybe.unwrap_or 0 (sequence (#Some 41))
+entry const answer = func () => return Maybe.unwrap_or 0 (sequence (#Some 41))
 ```
 
 `use` calls the selected type's `bind` with the remaining block as a function.
@@ -1544,9 +1638,9 @@ call stack; failure skips later steps, and `break value` still exits the nearest
 `do`. Custom monads need an `iterate` member only for blocks containing loops.
 
 ```blot
-const step = fn count =>
+const step = func count => return
   if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
-entry const answer = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+entry const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
 Not yet executable: collection patterns, general text, F64, general type-valued
@@ -1574,17 +1668,18 @@ returns its remaining curried function. It is useful in
 `array.fold_left .add 0 values`. Uppercase names are allowed when the owning
 type actually declares that member.
 
-`from` is defined in the prelude as `fn value => @type.result "from" value`. The
-expected result type chooses that type's ordinary `from` function. Primitive
-implementations use `to_f32`/`to_u32`; custom types can define their own
-conversions. There is no default target when the context leaves it ambiguous.
+`from` is defined in the prelude as
+`func value => return @type.result "from" value`. The expected result type
+chooses that type's ordinary `from` function. Primitive implementations use
+`to_f32`/`to_u32`; custom types can define their own conversions. There is no
+default target when the context leaves it ambiguous.
 
 ```blot
-entry const normalized = fn (first: U32) => from first / 6555.0
-entry const explicit = fn (value: U32) => do:
+entry const normalized = func (first: U32) => return from first / 6555.0
+entry const explicit = func (value: U32) => return do:
   let converted: F32 = from value
   break converted
-entry const different = if :1 == :2.0 then #False else #True
+entry const different = if :1 == :2.0 then false else true
 ```
 
 `:value` abbreviates `#Type value`; `:(expression)` groups a larger expression.
@@ -1592,8 +1687,9 @@ The existing witness rules apply: a constructor/function witness describes its
 final result type. Its body is not called; an ordinary witness expression is
 evaluated once. Type names belong in annotations, constructors in expressions
 and patterns. Constructors require `#` in declarations, expressions and
-patterns, including qualified names (`#time.Clock`) and Boolean constructors
-(`#True`, `#False`). Type names and explicit type arguments stay unmarked.
+patterns, including qualified names (`#time.Clock`). Boolean literals and
+patterns are the bare words `true` and `false`; they have primitive type `Bool`.
+Type names and explicit type arguments stay unmarked.
 
 `value |> transform` calls `transform value`. Both `pipe` and its fixity are
 ordinary prelude declarations. For longer builder sequences, `:=` keeps each
@@ -1601,17 +1697,17 @@ step on its own line.
 
 ## Demand parameters
 
-`fn ~value => body` captures an argument without evaluating it. A typed
-parameter is `fn ~(value: U32) => body`. `@demand value` evaluates the captured
-expression once; later demands share its result. `@force` remains a compatible
-alias. Returning a closure that captures a demand is supported. Merely
-referencing a demand does not force it.
+`func ~value => return body` captures an argument without evaluating it. A typed
+parameter is `func ~(value: U32) => return body`. `@demand value` evaluates the
+captured expression once; later demands share its result. `@force` remains a
+compatible alias. Returning a closure that captures a demand is supported.
+Merely referencing a demand does not force it.
 
 ```blot
-const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-const call_lazy = fn (callback: ~U32 -> U32) => callback (20 + 1)
-entry const answer = fn () => call_lazy twice
-entry const skipped = #False && (@panic "unreachable")
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+const call_lazy = func (callback: ~U32 -> U32) => return callback (20 + 1)
+entry const answer = func () => return call_lazy twice
+entry const skipped = false and (@panic "unreachable")
 ```
 
 Demand mode is part of the function type and survives aliases and partial
@@ -1638,17 +1734,17 @@ without running its expression again. Other entry calls remain usable.
 Known, fully applied small functions can use branches and local values without a
 heap cell. Admitted bodies include primitive scalar and collection operations,
 conditionals, local aliases and structured range, collection and forever loops.
-This includes the prelude's `&&` and `||`, aliases, custom operators and
-equivalent user functions, including acyclic forwarding through available
-imported or compiled bodies and immutable compile-time captures. Both codegen
-tiers use this proof. A memo created outside a callee loop survives all its
-iterations; a call inside a loop creates fresh state on each execution. Aliases
-share the first normally completed result. Known lexical callbacks and local
-aliases can share those same memo locals when the complete bounded proof
-establishes every use and capture. Zero iterations and unchosen branches perform
-no demand. Escaping demands, provider changes, arbitrary callbacks and bodies
-outside the bounded proof retain the shared runtime cell. Evaluation order,
-capture versions and first-demand providers are the same in both cases.
+This includes aliases, custom operators and equivalent user functions, including
+acyclic forwarding through available imported or compiled bodies and immutable
+compile-time captures. Both codegen tiers use this proof. A memo created outside
+a callee loop survives all its iterations; a call inside a loop creates fresh
+state on each execution. Aliases share the first normally completed result.
+Known lexical callbacks and local aliases can share those same memo locals when
+the complete bounded proof establishes every use and capture. Zero iterations
+and unchosen branches perform no demand. Escaping demands, provider changes,
+arbitrary callbacks and bodies outside the bounded proof retain the shared
+runtime cell. Evaluation order, capture versions and first-demand providers are
+the same in both cases.
 
 ## Pattern alternatives and layout
 
@@ -1662,7 +1758,7 @@ type Choice is data =
   | #Second U32
   | #Empty
 
-entry const answer = fn value => case #Second value of
+entry const answer = func value => return case #Second value of
   #First amount | #Second amount if amount >= 40 => amount
   #First amount | #Second amount => amount + 2
   #Empty => 0
@@ -1684,9 +1780,9 @@ its handle and waits for cleanup. Scope exit joins remaining children before
 releasing the group. Groups, handles and views cannot escape their region.
 
 ```blot
-entry const answer = fn () => @task.scope $ fn group => do:
-  let left = @task.spawn group $ fn () => 20
-  let right = @task.spawn group $ fn () => 22
+entry const answer = func () => return @task.scope $ func group => return do:
+  let left = @task.spawn group $ func () => return 20
+  let right = @task.spawn group $ func () => return 22
   break @u32.add (@task.join left) (@task.join right)
 ```
 
@@ -1703,8 +1799,8 @@ argument expressions are evaluated at the spark site; only the invocation runs
 in the child. Effectful arguments must be bound explicitly before sparking.
 
 ```blot
-const add22 = fn value => @u32.add value 22
-entry const answer = fn () => @task.scope $ fn group => do:
+const add22 = func value => return @u32.add value 22
+entry const answer = func () => return @task.scope $ func group => return do:
   let pending = *(add22 20)
   return |pending|
 ```
@@ -1712,9 +1808,9 @@ entry const answer = fn () => @task.scope $ fn group => do:
 An ordinary scope wrapper may expose the primitive without adding syntax:
 
 ```blot
-const scope = fn body => @task.scope body
-const add22 = fn value => @u32.add value 22
-entry const answer = fn () => scope $ fn group => do:
+const scope = func body => return @task.scope body
+const add22 = func value => return @u32.add value 22
+entry const answer = func () => return scope $ func group => return do:
   let pending = *(add22 20)
   return |pending|
 ```
@@ -1727,10 +1823,10 @@ depend on a particular helper name.
 An explicit spawn helper can forward the selected group and one action:
 
 ```blot
-const launch = fn group => fn action => @task.spawn group action
-entry const answer = fn () => scope $ fn group => do:
+const launch = func group => return func action => return @task.spawn group action
+entry const answer = func () => return scope $ func group => return do:
   let here = launch group
-  let pending = here $ fn () => 42
+  let pending = here $ func () => return 42
   return |pending|
 ```
 
@@ -1744,9 +1840,9 @@ A one-result receiver can pass through an ordinary helper, including an imported
 or renamed binding:
 
 ```blot
-const add22 = fn value => @u32.add value 22
-const await = fn source => |source|
-entry const answer = fn () => @task.scope $ fn group => do:
+const add22 = func value => return @u32.add value 22
+const await = func source => return |source|
+entry const answer = func () => return @task.scope $ func group => return do:
   let pending = *(add22 20)
   return await pending
 ```
@@ -1763,10 +1859,10 @@ single task returning a tuple returns that tuple as its payload; receiving does
 not recursively interpret payload values as more receivers.
 
 ```blot
-const await = fn source => |source|
-entry const answer = fn () => @task.scope $ fn group => do:
-  let first = @task.spawn group $ fn () => 20
-  let second = @task.spawn group $ fn () => 22
+const await = func source => return |source|
+entry const answer = func () => return @task.scope $ func group => return do:
+  let first = @task.spawn group $ func () => return 20
+  let second = @task.spawn group $ func () => return 22
   let receivers = (first, second)
   let (left, right) = await receivers
   return @u32.add left right

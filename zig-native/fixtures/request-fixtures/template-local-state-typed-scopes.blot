@@ -1,19 +1,19 @@
 data Cell value = #Cell value
-const witness32 = fn ignored -> Cell U32 => @panic "witness called"
-const witnessf = fn ignored -> Cell F32 => @panic "witness called"
-const handled = fn computation => do:
+const witness32 = func ignored : Cell U32 => return @panic "witness called"
+const witnessf = func ignored : Cell F32 => return @panic "witness called"
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       complete value =>
         break value
-entry const answer = fn () => do:
-  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
-    let make = fn (witness: Unit -> Cell U32) => @computation (fn () => @state.get witness)
+entry const answer = func () => return do:
+  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (func () => return do:
+    let make = func (witness: Unit -> Cell U32) => return @computation (func () => return @state.get witness)
     let computation = make witness32
     break handled computation
   )
-  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
-    let make = fn (witness: Unit -> Cell F32) => @computation (fn () => @state.get witness)
+  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (func () => return do:
+    let make = func (witness: Unit -> Cell F32) => return @computation (func () => return @state.get witness)
     let computation = make witnessf
     break handled computation
   )

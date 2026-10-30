@@ -12,17 +12,17 @@ const types = @import("../check/types.zig");
 const source =
     \\type Point = { x: U32, y: F32 }
     \\type Box a is data = #Box a
-    \\const identity = fn (point: Point) => point
-    \\const merge = fn left => fn right => @record.merge left right
-    \\const source = merge { y: 2.0, x: #False } { x: 40 }
+    \\const identity = func (point: Point) => return point
+    \\const merge = func left => return func right => return @record.merge left right
+    \\const source = merge { y: 2.0, x: false } { x: 40 }
     \\entry const answer = do:
     \\  let #Box point = #Box (identity source)
     \\  point.x := @u32.add self 2
     \\  let { x } = point
     \\  break x
-    \\entry const runtime = fn (value: U32) => do:
+    \\entry const runtime = func (value: U32) => return do:
     \\  let point = identity { y: 2.0, x: value }
-    \\  point.x := #True
+    \\  point.x := true
     \\  let { y, x } = point
     \\  break if x then y else 0.0
 ;
@@ -105,50 +105,50 @@ test "constant record merge interns shapes across repeated updates" {
 }
 
 const x_accessor =
-    \\const x = make (fn value => value.x)
-    \\  (fn replacement => fn value => @record.merge value { x: replacement })
+    \\const x = make (func value => return value.x)
+    \\  (func replacement => return func value => return @record.merge value { x: replacement })
 ;
 
 const path_accessors =
-    \\const position = make (fn value => value.position)
-    \\  (fn replacement => fn value => @record.merge value { position: replacement })
+    \\const position = make (func value => return value.position)
+    \\  (func replacement => return func value => return @record.merge value { position: replacement })
 ++ "\n" ++ x_accessor ++ "\n" ++
     \\const position_x = compose position x
 ;
 
 const deep_accessors =
-    \\const inner = make (fn source => source.inner)
-    \\  (fn replacement => fn source => @record.merge source { inner: replacement })
+    \\const inner = make (func source => return source.inner)
+    \\  (func replacement => return func source => return @record.merge source { inner: replacement })
     \\const deep_x = compose inner (compose inner (compose inner (compose inner x)))
 ;
 
 const path_source = path_accessors ++ "\n" ++
-    \\const original = { position: { x: 40, y: 7 }, kept: 2, callback: fn value => @u32.add value 40 }
+    \\const original = { position: { x: 40, y: 7 }, kept: 2, callback: func value => return @u32.add value 40 }
     \\const changed = set position_x 2.5 original
     \\entry const answer = @u32.add original.position.x changed.kept
-    \\entry const runtime = fn (value: U32) => get identity value
-    \\entry const composed = fn (value: U32) => do:
-    \\  let initial = { position: { x: value, y: 7 }, kept: 2, callback: fn argument => @u32.add argument value }
+    \\entry const runtime = func (value: U32) => return get identity value
+    \\entry const composed = func (value: U32) => return do:
+    \\  let initial = { position: { x: value, y: 7 }, kept: 2, callback: func argument => return @u32.add argument value }
     \\  let changed = set position_x 2.5 initial
     \\  break get position_x changed
-    \\entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
-    \\  let initial = { position: { x: 40, y: 7 }, callback: fn value => send value }
+    \\entry const effects = func (send: U32 -> U32 ! {Foreign}) => return do:
+    \\  let initial = { position: { x: 40, y: 7 }, callback: func value => return send value }
     \\  let changed = set position_x 2.5 initial
     \\  let focus = get position_x changed
     \\  break @f32.add focus (@u32.to_f32 (changed.callback 2))
-    \\entry const callback = fn () => changed.callback 2
+    \\entry const callback = func () => return changed.callback 2
 ++ "\n" ++ deep_accessors ++ "\n" ++
-    \\entry const deep = fn (value: U32) => do:
-    \\  let callback = fn argument => @u32.add argument value
+    \\entry const deep = func (value: U32) => return do:
+    \\  let callback = func argument => return @u32.add argument value
     \\  let initial = { inner: { inner: { inner: { inner: { x: value, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
     \\  break get deep_x changed
-    \\entry const deep_effects = fn (send: U32 -> U32 ! {Foreign}) => do:
-    \\  let callback = fn argument => send argument
+    \\entry const deep_effects = func (send: U32 -> U32 ! {Foreign}) => return do:
+    \\  let callback = func argument => return send argument
     \\  let initial = { inner: { inner: { inner: { inner: { x: 40, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
     \\  break @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
-    \\entry const deep_closed = fn (value: U32) => get deep_x { inner: { inner: { inner: { inner: { x: value, callback: #False }, callback: #False }, callback: #False }, callback: #False }, callback: #False }
+    \\entry const deep_closed = func (value: U32) => return get deep_x { inner: { inner: { inner: { inner: { x: value, callback: false }, callback: false }, callback: false }, callback: false }, callback: false }
 ;
 
 // Fault sweeps retain interacting ownership paths, without repeating each
@@ -156,27 +156,27 @@ const path_source = path_accessors ++ "\n" ++
 // above still runs normally. Shallow paths retain constant and captured generic
 // callbacks; deep paths retain the private-function boundary and effect row.
 const shallow_path_fault_source = path_accessors ++ "\n" ++
-    \\const original = { position: { x: 40, y: 7 }, kept: 2, callback: fn value => @u32.add value 40 }
+    \\const original = { position: { x: 40, y: 7 }, kept: 2, callback: func value => return @u32.add value 40 }
     \\const changed = set position_x 2.5 original
     \\entry const answer = @u32.add original.position.x changed.kept
-    \\entry const callback = fn () => changed.callback 2
-    \\entry const composed = fn (value: U32) => do:
-    \\  let initial = { position: { x: value, y: 7 }, callback: fn argument => @u32.add argument value }
+    \\entry const callback = func () => return changed.callback 2
+    \\entry const composed = func (value: U32) => return do:
+    \\  let initial = { position: { x: value, y: 7 }, callback: func argument => return @u32.add argument value }
     \\  let changed = set position_x 2.5 initial
     \\  break get position_x changed
 ;
 
 const deep_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\n" ++
-    \\entry const deep = fn (value: U32) => do:
-    \\  let callback = fn argument => @u32.add argument value
+    \\entry const deep = func (value: U32) => return do:
+    \\  let callback = func argument => return @u32.add argument value
     \\  let initial = { inner: { inner: { inner: { inner: { x: value, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
     \\  break get deep_x changed
 ;
 
 const deep_effect_path_fault_source = x_accessor ++ "\n" ++ deep_accessors ++ "\n" ++
-    \\entry const deep_effects = fn (send: U32 -> U32 ! {Foreign}) => do:
-    \\  let callback = fn argument => send argument
+    \\entry const deep_effects = func (send: U32 -> U32 ! {Foreign}) => return do:
+    \\  let callback = func argument => return send argument
     \\  let initial = { inner: { inner: { inner: { inner: { x: 40, callback }, callback }, callback }, callback }, callback }
     \\  let changed = set deep_x 2.5 initial
     \\  break @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))

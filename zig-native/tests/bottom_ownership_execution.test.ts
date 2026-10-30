@@ -7,8 +7,8 @@ const executable = Deno.args[0] ??
 const program = (answer: number) => `
 type Outer is effect = { check: U32 -> U32 }
 type Inner is effect = { read: Unit -> U32 }
-const make = fn action => @computation action
-const inner = fn computation => do:
+const make = func action => return @computation action
+const inner = func computation => return do:
   for request in @requests computation:
     case request of
       effect Inner.read () =>
@@ -16,15 +16,15 @@ const inner = fn computation => do:
         yield value
       complete value =>
         break value
-const outer = fn computation => do:
+const outer = func computation => return do:
   for request in @requests computation:
     case request of
       effect Outer.check value =>
         break ${answer}
       complete value =>
         break value
-entry const answer = fn () => outer (@computation (fn () => do:
-  use inner (make (fn () => do:
+entry const answer = func () => return outer (@computation (func () => return do:
+  use inner (make (func () => return do:
     use Inner.read ()
     break @panic "inner suffix"
   ))

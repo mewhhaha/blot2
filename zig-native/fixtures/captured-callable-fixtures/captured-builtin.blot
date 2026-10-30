@@ -1,8 +1,8 @@
-const make_adder = fn value => fn other => @u32.add value other
-const compose = fn first => fn second => fn value => first (second value)
+const make_adder = func value => return func other => return @u32.add value other
+const compose = func first => return func second => return func value => return first (second value)
 entry const add_forty = make_adder 40
 entry const expected = add_forty 2
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let value = 999
   let increment = make_adder 1
   let result = compose increment add_forty

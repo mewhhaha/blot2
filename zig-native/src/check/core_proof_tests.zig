@@ -7,8 +7,8 @@ const core = @import("core.zig");
 const terms = @import("numeric_proof_terms.zig");
 
 const source =
-    \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-    \\const inspect = fn (values: Array U32) => fn (index: U32) => do:
+    \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+    \\const inspect = func (values: Array U32) => return func (index: U32) => return do:
     \\  let valid = @proof.index values index
     \\  let impossible = @proof.lt 1 0
     \\  let repeated = @proof.index values index
@@ -89,13 +89,13 @@ test "numeric proof Core contracts own copied and portable operands after produc
 }
 
 const universal_proof_source =
-    \\const witness: forall [a] => (values: Array a) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-    \\const at: forall [a] => (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = fn values => fn index => fn proof => @array.get values index
-    \\entry const whole = fn (index: U32) => do:
+    \\const witness: forall [a] => (values: Array a) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+    \\const at: forall [a] => (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = func values => return func index => return func proof => return @array.get values index
+    \\entry const whole = func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  let proof = witness values index
     \\  break at values index proof
-    \\entry const fraction = fn (index: U32) => do:
+    \\entry const fraction = func (index: U32) => return do:
     \\  let values = #[1.25, 3.5]
     \\  let proof = witness values index
     \\  break at values index proof
@@ -208,7 +208,7 @@ fn importedUniversalProofAliases(allocator: std.mem.Allocator) !void {
         .{ .name = producer.bindings[2].name, .target = .{ .unit = 2, .binding = 2 }, .origin = 0, .interface = catalog.interface(2) },
     };
     const prefix =
-        \\entry const run = fn (index: U32) => do:
+        \\entry const run = func (index: U32) => return do:
         \\  let values = #[8, 13]
         \\  let other = #[8, 13]
         \\  let proof = witness values index
@@ -245,12 +245,12 @@ test "numeric proof universal imported aliases retain exact operands without loc
 test "numeric proof guards lower to executable checks with erased named inputs" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-        \\entry const lookup = fn (index: U32) => do:
+        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+        \\entry const lookup = func (index: U32) => return do:
         \\  let values = #[8, 13]
         \\  let valid = @proof.index values index
         \\  break at values index valid
-        \\entry const invalid = fn (value: U32) => do:
+        \\entry const invalid = func (value: U32) => return do:
         \\  let impossible = @proof.lt value 0
         \\  break 1
     );
@@ -290,7 +290,7 @@ test "numeric proof semantic and physical kinds never bridge through Unit or dat
 test "numeric proof portable admission rejects coordinated result claims guard erasure and hidden feature markers" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\const positive: (x: U32) -> @proof.U32Le 0 x = fn x => @proof.le 0 x
+        \\const positive: (x: U32) -> @proof.U32Le 0 x = func x => return @proof.le 0 x
     );
     defer module.deinit(allocator);
     const validation = @import("frozen_core_validation.zig");
@@ -316,10 +316,10 @@ test "numeric proof portable admission rejects coordinated result claims guard e
 fn portableLengthProofs(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
         \\data Holder = #Holder { index: U32 }
-        \\const unwrap = fn (holder: Holder) => case holder of
+        \\const unwrap = func (holder: Holder) => return case holder of
         \\  #Holder { index: i } => i
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.U32Lt index (@array.length values)) -> U32 = fn values => fn index => fn proof => @array.get values index
-        \\const inspect = fn (values: Array U32) => fn (index: U32) => do:
+        \\const at: (values: Array U32) -> (index: U32) -> (@proof.U32Lt index (@array.length values)) -> U32 = func values => return func index => return func proof => return @array.get values index
+        \\const inspect = func (values: Array U32) => return func (index: U32) => return do:
         \\  let count = @array.length values
         \\  let valid = @proof.lt index count
         \\  break at values index valid
@@ -334,13 +334,13 @@ test "numeric proof portable length recipes preserve their exact collection thro
 
 fn portableWeakening(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\const le: (x: U32) -> (y: U32) -> (@proof.U32Le x y) -> U32 = fn x => fn y => fn proof => x
-        \\const index: (values: Array U32) -> (i: U32) -> (@proof.Index values i) -> U32 = fn values => fn i => fn proof => @array.get values i
-        \\const inspect = fn (values: Array U32) => fn (i: U32) => do:
+        \\const le: (x: U32) -> (y: U32) -> (@proof.U32Le x y) -> U32 = func x => return func y => return func proof => return x
+        \\const index: (values: Array U32) -> (i: U32) -> (@proof.Index values i) -> U32 = func values => return func i => return func proof => return @array.get values i
+        \\const inspect = func (values: Array U32) => return func (i: U32) => return do:
         \\  let proof = @proof.lt i (@array.length values)
         \\  let same = le i (@array.length values) proof
         \\  break index values i proof
-        \\const result: (x: U32) -> (y: U32) -> @proof.U32Le x y = fn x => fn y => @proof.lt x y
+        \\const result: (x: U32) -> (y: U32) -> @proof.U32Le x y = func x => return func y => return @proof.lt x y
     );
     defer module.deinit(allocator);
     try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
@@ -363,10 +363,10 @@ fn checkPlan(allocator: std.mem.Allocator, input: []const u8, expected: bool, li
     }
     try std.testing.expectEqual(@as(usize, 1), checks);
 }
-const guarded = "entry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get values index else 0";
+const guarded = "entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values index else 0";
 const guarded_helper =
-    \\const within = fn (index: U32) => fn (values: Array U32) => @u32.lt index (@array.length values)
-    \\entry const run = fn (values: Array U32) => fn (index: U32) => if within index values then @array.get values index else 0
+    \\const within = func (index: U32) => return func (values: Array U32) => return @u32.lt index (@array.length values)
+    \\entry const run = func (values: Array U32) => return func (index: U32) => return if within index values then @array.get values index else 0
 ;
 fn helperCheckPlan(allocator: std.mem.Allocator) !void {
     try checkPlan(allocator, guarded_helper, true, .{});
@@ -378,33 +378,33 @@ test "numeric proof selected named comparison bodies preserve parameter order an
 test "numeric proof selected comparisons decline changed operands reversed conditions and unproved helper bodies" {
     const allocator = std.testing.allocator;
     try checkPlan(allocator,
-        \\const within = fn (values: Array U32) => fn (index: U32) => @u32.lt index (@array.length values)
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if within values index then @array.get values (@u32.add index 1) else 0
+        \\const within = func (values: Array U32) => return func (index: U32) => return @u32.lt index (@array.length values)
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if within values index then @array.get values (@u32.add index 1) else 0
     , false, .{});
     try checkPlan(allocator,
-        \\const within = fn (values: Array U32) => fn (index: U32) => @u32.lt (@array.length values) index
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if within values index then @array.get values index else 0
+        \\const within = func (values: Array U32) => return func (index: U32) => return @u32.lt (@array.length values) index
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if within values index then @array.get values index else 0
     , false, .{});
     try checkPlan(allocator,
-        \\const within = fn (values: Array U32) => fn (index: U32) => @u32.lt (@u32.add index 1) (@array.length values)
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if within values index then @array.get values index else 0
+        \\const within = func (values: Array U32) => return func (index: U32) => return @u32.lt (@u32.add index 1) (@array.length values)
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if within values index then @array.get values index else 0
     , false, .{});
     try checkPlan(allocator, guarded_helper, false, .{ .visits = 2 });
 }
 fn demandComparisonPlans(allocator: std.mem.Allocator) !void {
     const helpers =
-        \\const both = fn (left: Bool) => fn ~(right: Bool) => if left then @demand right else #False
-        \\const either = fn (left: Bool) => fn ~(right: Bool) => if left then #True else @demand right
-        \\const inverted = fn (left: Bool) => fn ~(right: Bool) => if left then #False else @demand right
-        \\const ignore = fn (left: Bool) => fn ~(right: Bool) => #True
+        \\const both = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
+        \\const either = func (left: Bool) => return func ~(right: Bool) => return if left then true else @demand right
+        \\const inverted = func (left: Bool) => return func ~(right: Bool) => return if left then false else @demand right
+        \\const ignore = func (left: Bool) => return func ~(right: Bool) => return true
         \\
     ;
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if both (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", true, .{});
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if both (@u32.eq index 0) (@u32.lt index (@array.length values)) then @array.get values index else 0", true, .{});
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if either (@u32.lt (@array.length values) index) (@u32.eq index (@array.length values)) then 0 else @array.get values index", true, .{});
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if inverted (@u32.lt (@array.length values) index) (@u32.lt index (@array.length values)) then @array.get values index else 0", true, .{});
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if ignore (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", false, .{});
-    try checkPlan(allocator, helpers ++ "entry const run = fn (values: Array U32) => fn (index: U32) => if either (@u32.lt index (@array.length values)) (@u32.eq index 9) then @array.get values index else 0", false, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if both (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", true, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if both (@u32.eq index 0) (@u32.lt index (@array.length values)) then @array.get values index else 0", true, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if either (@u32.lt (@array.length values) index) (@u32.eq index (@array.length values)) then 0 else @array.get values index", true, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if inverted (@u32.lt (@array.length values) index) (@u32.lt index (@array.length values)) then @array.get values index else 0", true, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if ignore (@u32.lt index (@array.length values)) (@u32.eq index 0) then @array.get values index else 0", false, .{});
+    try checkPlan(allocator, helpers ++ "entry const run = func (values: Array U32) => return func (index: U32) => return if either (@u32.lt index (@array.length values)) (@u32.eq index 9) then @array.get values index else 0", false, .{});
 }
 test "numeric proof selected demand bodies establish only their actual Boolean edges through OOM" {
     try demandComparisonPlans(std.testing.allocator);
@@ -413,31 +413,31 @@ test "numeric proof selected demand bodies establish only their actual Boolean e
 fn forwardedComparisonPlans(allocator: std.mem.Allocator) !void {
     const common =
         \\infixl 50 (<) = lt
-        \\const lt = fn left => fn right => compare left right
-        \\const within = fn index => fn length => lt index length
-        \\const choose = fn (left: Bool) => fn ~(right: Bool) => if left then @demand right else #False
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if choose (within index (@array.length values)) (index < 2) then @array.get values index else 0
+        \\const lt = func left => return func right => return compare left right
+        \\const within = func index => return func length => return lt index length
+        \\const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if choose (within index (@array.length values)) (index < 2) then @array.get values index else 0
         \\
     ;
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => @u32.lt left right", true, .{});
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => @u32.lt right left", false, .{});
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => #True", false, .{});
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => @u32.lt (@u32.add left 1) right", false, .{});
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => @u32.lt left right", false, .{ .visits = 2 });
-    try checkPlan(allocator, common ++ "const compare = fn left => fn right => @type.call \"lt\" left right\nconst U32.lt = fn left => fn right => @u32.lt left right", false, .{});
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return @u32.lt left right", true, .{});
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return @u32.lt right left", false, .{});
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return true", false, .{});
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return @u32.lt (@u32.add left 1) right", false, .{});
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return @u32.lt left right", false, .{ .visits = 2 });
+    try checkPlan(allocator, common ++ "const compare = func left => return func right => return @type.call \"lt\" left right\nconst U32.lt = func left => return func right => return @u32.lt left right", false, .{});
 }
 test "numeric proof selected comparison forwarding preserves exact arguments through OOM" {
     try forwardedComparisonPlans(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, forwardedComparisonPlans, .{});
 }
 const aliased_comparison =
-    \\const within = fn (index: U32) => fn (values: Array U32) => do:
+    \\const within = func (index: U32) => return func (values: Array U32) => return do:
     \\  let copied = index
     \\  let selected = values
     \\  let length = @array.length selected
     \\  let valid = @u32.lt copied length
     \\  break valid
-    \\entry const run = fn (values: Array U32) => fn (index: U32) => if within index values then @array.get values index else 0
+    \\entry const run = func (values: Array U32) => return func (index: U32) => return if within index values then @array.get values index else 0
 ;
 fn localComparisonPlan(allocator: std.mem.Allocator) !void {
     try checkPlan(allocator, aliased_comparison, true, .{});
@@ -448,19 +448,19 @@ test "numeric proof selected comparison blocks retain exact local aliases throug
 }
 test "numeric proof selected comparison blocks retain checks after wrapping rebinding or unknown prefixes" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (values: Array U32) => fn (index: U32) => if within index values then @array.get values index else 0";
+    const caller = "\nentry const run = func (values: Array U32) => return func (index: U32) => return if within index values then @array.get values index else 0";
     try checkPlan(allocator,
-        \\const within = fn (index: U32) => fn (values: Array U32) => do:
+        \\const within = func (index: U32) => return func (values: Array U32) => return do:
         \\  let copied = @u32.add index 1
         \\  break @u32.lt copied (@array.length values)
     ++ caller, false, .{});
     try checkPlan(allocator,
-        \\const within = fn (index: U32) => fn (values: Array U32) => do:
+        \\const within = func (index: U32) => return func (values: Array U32) => return do:
         \\  index := 0
         \\  break @u32.lt index (@array.length values)
     ++ caller, false, .{});
     try checkPlan(allocator,
-        \\const within = fn (index: U32) => fn (values: Array U32) => do:
+        \\const within = func (index: U32) => return func (values: Array U32) => return do:
         \\  let unknown = @u32.div 1 index
         \\  break @u32.lt index (@array.length values)
     ++ caller, false, .{});
@@ -469,7 +469,7 @@ test "numeric proof selected comparison blocks retain checks after wrapping rebi
 fn ownedCheckPlan(allocator: std.mem.Allocator) !void {
     try checkPlan(allocator, guarded, true, .{});
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  let first = @proof.index values index
         \\  let repeated = @proof.index values index
         \\  break @array.get values index
@@ -481,26 +481,26 @@ test "numeric proof check plans own exact dominated facts and repeated guards th
 }
 test "numeric proof check plans traverse suspended demands without closure-only metadata assumptions" {
     try checkPlan(std.testing.allocator,
-        \\const force = fn ~(value: U32) => @demand value
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => force (if @u32.lt index (@array.length values) then @array.get values index else 0)
+        \\const force = func ~(value: U32) => return @demand value
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return force (if @u32.lt index (@array.length values) then @array.get values index else 0)
     , true, .{});
 }
 test "numeric proof check plans retain invalidated joins unrelated collections wrap and false edges" {
     const allocator = std.testing.allocator;
-    try checkPlan(allocator, "entry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then 0 else @array.get values index", false, .{});
-    try checkPlan(allocator, "entry const run = fn (values: Array U32) => fn (other: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get other index else 0", false, .{});
+    try checkPlan(allocator, "entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then 0 else @array.get values index", false, .{});
+    try checkPlan(allocator, "entry const run = func (values: Array U32) => return func (other: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get other index else 0", false, .{});
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  if @u32.lt index (@array.length values):
         \\    index := @u32.add self 1
         \\    break @array.get values index
         \\  break 0
     , false, .{});
-    try checkPlan(allocator, "entry const run = fn (flag: Bool) => fn (values: Array U32) => fn (index: U32) => if (if flag then @u32.lt index (@array.length values) else @u32.eq 0 0) then @array.get values index else 0", false, .{});
+    try checkPlan(allocator, "entry const run = func (flag: Bool) => return func (values: Array U32) => return func (index: U32) => return if (if flag then @u32.lt index (@array.length values) else @u32.eq 0 0) then @array.get values index else 0", false, .{});
     try checkPlan(allocator, guarded, false, .{ .visits = 8 });
     try checkPlan(allocator,
         \\data Maybe = #Some U32 | #None
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  let #Some selected = #Some 1 else:
         \\    let valid = @proof.index values index
         \\    break 0
@@ -510,21 +510,21 @@ test "numeric proof check plans retain invalidated joins unrelated collections w
 test "numeric proof check plans preserve range limits and only directed nonwrapping arithmetic" {
     const allocator = std.testing.allocator;
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => do:
+        \\entry const run = func (values: Array U32) => return do:
         \\  let result = 0
         \\  for index in 0..@array.length values:
         \\    result := @array.get values index
         \\  break result
     , true, .{});
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  let bounded = @proof.index values index
         \\  let fits = @proof.sub_fits index 1
         \\  let previous = @u32.sub index 1
         \\  break @array.get values previous
     , true, .{});
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  let bounded = @proof.index values index
         \\  let previous = @u32.sub index 1
         \\  break @array.get values previous
@@ -533,7 +533,7 @@ test "numeric proof check plans preserve range limits and only directed nonwrapp
 test "numeric proof check plans refine false equality and short circuit edges without reevaluation" {
     const allocator = std.testing.allocator;
     try checkPlan(allocator,
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => do:
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
         \\  let length = @array.length values
         \\  if @u32.lt length index:
         \\    break 0
@@ -541,7 +541,7 @@ test "numeric proof check plans refine false equality and short circuit edges wi
         \\    break 0
         \\  break @array.get values index
     , true, .{});
-    var module = try lowerSource(allocator, "entry const run = fn (values: Array U32) => fn (index: U32) => if (if @u32.lt index (@array.length values) then @u32.eq 0 0 else @u32.eq 0 1) then @array.get values index else 0");
+    var module = try lowerSource(allocator, "entry const run = func (values: Array U32) => return func (index: U32) => return if (if @u32.lt index (@array.length values) then @u32.eq 0 0 else @u32.eq 0 1) then @array.get values index else 0");
     defer module.deinit(allocator);
     // Exercise the resolved short-circuit node directly. User-defined lazy
     // operators need separate admission of their selected implementation.
@@ -560,10 +560,10 @@ test "numeric proof preserves exact collection identity through opaque reference
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
         \\opaque type Token = Array U32
-        \\const make: Array U32 -> Token = fn value => #Token value
-        \\const read: Token -> Array U32 = fn (#Token value) => value
-        \\entry const exact = fn () => (read (make #[42]))[0]
-        \\entry const checked = fn (index: U32) => @array.get (read (make #[42])) index
+        \\const make: Array U32 -> Token = func value => return #Token value
+        \\const read: Token -> Array U32 = func (#Token value) => return value
+        \\entry const exact = func () => return (read (make #[42]))[0]
+        \\entry const checked = func (index: U32) => return @array.get (read (make #[42])) index
     );
     defer module.deinit(allocator);
     var plan = try @import("numeric_proof_core.zig").analyze(allocator, &module, &.{}, .{});
@@ -599,47 +599,47 @@ fn emittedChecks(allocator: std.mem.Allocator, input: []const u8) !usize {
 }
 test "numeric proof lowering removes only the admitted bounds comparison in development IR" {
     const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = fn (index: U32) => @array.get #[8, 13] index"));
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "entry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] index else 0"));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@u32.add index 1) else 0"));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = func (index: U32) => return @array.get #[8, 13] index"));
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] index else 0"));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@u32.add index 1) else 0"));
 }
 test "numeric proof selected demand bodies remove the outer check and retain required checks" {
     const allocator = std.testing.allocator;
-    const body = "\nentry const run = fn (index: U32) => if choose (@u32.lt index 2) (@u32.eq index 0) then @array.get #[8, 13] index else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const choose = fn (left: Bool) => fn ~(right: Bool) => if left then @demand right else #False" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = fn (left: Bool) => fn ~(right: Bool) => #True" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = fn (left: Bool) => fn ~(right: Bool) => if left then #True else @demand right" ++ body));
+    const body = "\nentry const run = func (index: U32) => return if choose (@u32.lt index 2) (@u32.eq index 0) then @array.get #[8, 13] index else 0";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false" ++ body));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return true" ++ body));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func ~(right: Bool) => return if left then true else @demand right" ++ body));
     try checkPlan(allocator,
-        \\const opposite = fn (value: Bool) => if value then #False else #True
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if opposite (@u32.lt index (@array.length values)) then 0 else @array.get values index
+        \\const opposite = func (value: Bool) => return if value then false else true
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if opposite (@u32.lt index (@array.length values)) then 0 else @array.get values index
     , true, .{});
 }
 test "numeric proof selected local aliases remove only the exact access check in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (index: U32) => if within index 2 then @array.get #[8, 13] index else 0";
+    const caller = "\nentry const run = func (index: U32) => return if within index 2 then @array.get #[8, 13] index else 0";
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator,
-        \\const within = fn (index: U32) => fn (length: U32) => do:
+        \\const within = func (index: U32) => return func (length: U32) => return do:
         \\  let copied = index
         \\  let valid = @u32.lt copied length
         \\  break valid
     ++ caller));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\const within = fn (index: U32) => fn (length: U32) => do:
+        \\const within = func (index: U32) => return func (length: U32) => return do:
         \\  let copied = @u32.add index 1
         \\  let valid = @u32.lt copied length
         \\  break valid
     ++ caller));
 }
 const list_runtime_inputs = [_][]const u8{
-    \\entry const run = fn (index: U32) => @array.get #[8, 13] index
+    \\entry const run = func (index: U32) => return @array.get #[8, 13] index
     ,
-    \\entry const run = fn (index: U32) => do:
+    \\entry const run = func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @u32.lt index (@array.length values):
     \\    break @array.get values index
     \\  break 0
     ,
-    \\entry const run = fn (index: U32) => do:
+    \\entry const run = func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @u32.lt index (@array.length values):
     \\    let changed = @array.set values index 21
@@ -688,10 +688,10 @@ test "numeric proof List checks remain required unless exact accesses admit unch
 test "numeric proof lowering erases result signatures argument words and witness locals" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-        \\const stop: (index: U32) -> @proof.U32Le 0 index = fn index => @panic "stop"
-        \\entry const run = fn (index: U32) => do:
+        \\const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+        \\const stop: (index: U32) -> @proof.U32Le 0 index = func index => return @panic "stop"
+        \\entry const run = func (index: U32) => return do:
         \\  let values = #[8, 13]
         \\  let valid = witness values index
         \\  let repeated = @proof.index values index
@@ -727,14 +727,14 @@ test "numeric proof lowering erases result signatures argument words and witness
 }
 
 const selected_operand =
-    \\const selected = fn (unused: U32) => fn (index: U32) => do:
+    \\const selected = func (unused: U32) => return func (index: U32) => return do:
     \\  let copied = index
     \\  break copied
-    \\const forwarded = fn (index: U32) => selected 42 index
-    \\const count = fn (values: Array U32) => do:
+    \\const forwarded = func (index: U32) => return selected 42 index
+    \\const count = func (values: Array U32) => return do:
     \\  let copied = values
     \\  break @array.length copied
-    \\entry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (count values) then @array.get values (forwarded index) else 0
+    \\entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (count values) then @array.get values (forwarded index) else 0
 ;
 fn expectOperandPlan(allocator: std.mem.Allocator, module: *const core.Module, expected: bool, limits: terms.Limits) !void {
     var plan = try @import("numeric_proof_core.zig").analyze(allocator, module, &.{}, limits);
@@ -791,49 +791,49 @@ test "numeric proof selected result operands decline forged owners substitutions
     try expectOperandPlan(allocator, &module, false, .{ .visits = 2 });
     try expectOperandPlan(allocator, &module, false, .{ .terms = 1 });
     try checkPlan(allocator,
-        \\const selected = fn (index: U32) => selected index
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get values (selected index) else 0
+        \\const selected = func (index: U32) => return selected index
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (selected index) else 0
     , false, .{});
     try checkPlan(allocator,
-        \\const selected = fn (index: U32) => @u32.add index 1
-        \\entry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get values (selected index) else 0
+        \\const selected = func (index: U32) => return @u32.add index 1
+        \\entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (selected index) else 0
     , false, .{});
 }
 test "numeric proof selected result operands remove only their exact bounds comparison in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = fn (index: U32) => do:\n  let copied = index\n  break copied" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = fn (index: U32) => @u32.add index 1" ++ caller));
+    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = func (index: U32) => return do:\n  let copied = index\n  break copied" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = func (index: U32) => return @u32.add index 1" ++ caller));
 }
 
 test "numeric proof selected conditional results preserve only identities common to both paths" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get values (selected index) else 0";
-    try checkPlan(allocator, "const selected = fn (index: U32) => if @u32.lt index 4 then index else index" ++ caller, true, .{});
-    try checkPlan(allocator, "const selected = fn (index: U32) => if @u32.lt index 4 then index else @u32.add index 1" ++ caller, false, .{});
-    try checkPlan(allocator, "const selected = fn (index: U32) => if @u32.lt index 4 then @u32.add index 1 else index" ++ caller, false, .{});
-    try checkPlan(allocator, "const selected = fn (index: U32) => if @u32.lt index 4 then index else index" ++ caller, false, .{ .visits = 2 });
+    const caller = "\nentry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (selected index) else 0";
+    try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then index else index" ++ caller, true, .{});
+    try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then index else @u32.add index 1" ++ caller, false, .{});
+    try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then @u32.add index 1 else index" ++ caller, false, .{});
+    try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then index else index" ++ caller, false, .{ .visits = 2 });
 }
 
 test "numeric proof selected conditional identity removes one check and preserves wrapping alternatives" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = fn (index: U32) => if @u32.eq index 0 then index else index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = fn (index: U32) => if @u32.eq index 0 then index else @u32.add index 1" ++ caller));
+    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = func (index: U32) => return if @u32.eq index 0 then index else index" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = func (index: U32) => return if @u32.eq index 0 then index else @u32.add index 1" ++ caller));
 }
 
 const prepared_associated_operand =
     \\type Probe is data = #Probe U32
-    \\const Probe.choose = fn (unused: Probe) => fn (index: U32) => do:
+    \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
     \\  let copied = index
     \\  break copied
-    \\const Probe.within = fn (unused: Probe) => fn (index: U32) => @u32.lt index 2
-    \\const lookup = fn probe => fn (index: U32) => do:
+    \\const Probe.within = func (unused: Probe) => return func (index: U32) => return @u32.lt index 2
+    \\const lookup = func probe => return func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @type.call "within" probe index:
     \\    break @array.get values (@type.call "choose" probe index)
     \\  break 0
-    \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
 ;
 fn preparedSelections(module: *const core.Module, storage: []@import("numeric_proof_core.zig").Selected) ![]const @import("numeric_proof_core.zig").Selected {
     var count: usize = 0;
@@ -901,9 +901,9 @@ test "numeric proof prepared selected targets decline forged body owners and for
 }
 test "numeric proof prepared selected operand removes only its exact bounds comparison in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = fn (index: U32) => lookup (#Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => fn (index: U32) => index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => fn (index: U32) => @u32.add index 1" ++ caller));
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return index" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return @u32.add index 1" ++ caller));
 }
 
 fn emittedPreparedOperand(allocator: std.mem.Allocator) !void {
@@ -923,13 +923,13 @@ test "numeric proof prepared associated bodies retain reusable code when ordinar
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
         \\type Probe is data = #Probe U32
-        \\const Probe.bump = fn (unused: Probe) => fn (index: U32) => @u32.add index 1
-        \\const lookup = fn probe => fn (index: U32) => do:
+        \\const Probe.bump = func (unused: Probe) => return func (index: U32) => return @u32.add index 1
+        \\const lookup = func probe => return func (index: U32) => return do:
         \\  let unused = @type.call "bump" probe index
         \\  if @u32.lt index 2:
         \\    break @array.get #[8, 13] index
         \\  break 0
-        \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+        \\entry const run = func (index: U32) => return lookup (#Probe 42) index
     );
     defer module.deinit(allocator);
     const lookup = for (module.bodies[1..]) |body| {
@@ -949,12 +949,12 @@ test "numeric proof prepared associated bodies retain reusable code when ordinar
 }
 
 const identity_operand_helpers =
-    \\const identity = fn (index: U32) => do:
+    \\const identity = func (index: U32) => return do:
     \\  let zero = @u32.sub index index
     \\  let copied = @u32.add 0 index
     \\  break @u32.sub (@u32.add copied zero) zero
-    \\const within = fn (index: U32) => fn (values: Array U32) => @u32.lt (identity index) (@u32.add (@array.length values) 0)
-    \\entry const run = fn (values: Array U32) => fn (index: U32) => if within index values then @array.get values (identity index) else 0
+    \\const within = func (index: U32) => return func (values: Array U32) => return @u32.lt (identity index) (@u32.add (@array.length values) 0)
+    \\entry const run = func (values: Array U32) => return func (index: U32) => return if within index values then @array.get values (identity index) else 0
 ;
 fn ownedIdentityOperands(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, identity_operand_helpers);
@@ -973,8 +973,8 @@ test "numeric proof selected arithmetic identities preserve exact operands lengt
 }
 test "numeric proof selected arithmetic identities decline forged primitives types and changed bodies" {
     const allocator = std.testing.allocator;
-    const caller = "\nentry const run = fn (values: Array U32) => fn (index: U32) => if @u32.lt index (@array.length values) then @array.get values (identity index) else 0";
-    const helper = "const identity = fn (index: U32) => @u32.add index 0";
+    const caller = "\nentry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (identity index) else 0";
+    const helper = "const identity = func (index: U32) => return @u32.add index 0";
     var module = try lowerSource(allocator, helper ++ caller);
     defer module.deinit(allocator);
     const scalar = for (module.nodes) |*node| {
@@ -992,14 +992,14 @@ test "numeric proof selected arithmetic identities decline forged primitives typ
     try expectOperandPlan(allocator, &module, false, .{});
     module.nodes[scalar.b].a = 0;
     try expectOperandPlan(allocator, &module, true, .{});
-    try checkPlan(allocator, "const identity = fn (index: U32) => @u32.sub 0 index" ++ caller, false, .{});
-    try checkPlan(allocator, "const identity = fn (index: U32) => @u32.add index 1" ++ caller, false, .{});
-    try checkPlan(allocator, "const identity = fn (index: U32) => @u32.sub index 1" ++ caller, false, .{});
+    try checkPlan(allocator, "const identity = func (index: U32) => return @u32.sub 0 index" ++ caller, false, .{});
+    try checkPlan(allocator, "const identity = func (index: U32) => return @u32.add index 1" ++ caller, false, .{});
+    try checkPlan(allocator, "const identity = func (index: U32) => return @u32.sub index 1" ++ caller, false, .{});
 }
 test "numeric proof selected arithmetic identities remove only the exact access comparison in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = fn (index: U32) => lookup (#Probe 42) index";
-    const head = "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => fn (index: U32) => ";
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
+    const head = "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return ";
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add index 0" ++ caller));
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add 0 index" ++ caller));
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.sub index 0" ++ caller));
@@ -1007,11 +1007,11 @@ test "numeric proof selected arithmetic identities remove only the exact access 
 }
 fn emittedIdentityOperands(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\const identity = fn (index: U32) => do:
+        \\const identity = func (index: U32) => return do:
         \\  let zero = @u32.sub index index
         \\  let copied = @u32.add 0 index
         \\  break @u32.sub (@u32.add copied zero) zero
-        \\entry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
+        \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
     );
     defer module.deinit(allocator);
     var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
@@ -1027,25 +1027,25 @@ test "numeric proof selected arithmetic identity emission releases every allocat
 test "numeric proof prepared curried methods preserve caller identities through owned returned closures" {
     const allocator = std.testing.allocator;
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, curried_associated_operand));
-    const caller = "\nconst lookup = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = fn (index: U32) => lookup (#Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => do:\n  let copied = 0\n  break fn (index: U32) => @u32.add index copied" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => do:\n  let copied = 1\n  break fn (index: U32) => @u32.add index copied" ++ caller));
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 0\n  break func (index: U32) => return @u32.add index copied" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 1\n  break func (index: U32) => return @u32.add index copied" ++ caller));
 }
 
 const curried_associated_operand =
     \\type Probe is data = #Probe U32
-    \\const Probe.choose = fn (unused: Probe) => do:
+    \\const Probe.choose = func (unused: Probe) => return do:
     \\  let copied = 0
-    \\  break fn (index: U32) => @u32.add index copied
-    \\const Probe.within = fn (unused: Probe) => do:
+    \\  break func (index: U32) => return @u32.add index copied
+    \\const Probe.within = func (unused: Probe) => return do:
     \\  let limit = 2
-    \\  break fn (index: U32) => @u32.lt index limit
-    \\const lookup = fn probe => fn (index: U32) => do:
+    \\  break func (index: U32) => return @u32.lt index limit
+    \\const lookup = func probe => return func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @type.call "within" probe index:
     \\    break @array.get values (@type.call "choose" probe index)
     \\  break 0
-    \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
 ;
 fn ownedCurriedOperand(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, curried_associated_operand);
@@ -1079,13 +1079,13 @@ test "numeric proof prepared returned closure emission preserves replay and comp
 }
 
 const bit_identity_helpers =
-    \\const identity = fn (index: U32) => do:
+    \\const identity = func (index: U32) => return do:
     \\  let multiplied = @u32.mul index 1
     \\  let masked = @u32.bit_and 0xffffffff multiplied
     \\  let shifted = @u32.shl masked 32
     \\  let zero = @u32.bit_xor index index
     \\  break @u32.div (@u32.bit_or shifted zero) 1
-    \\entry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
+    \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
 ;
 fn ownedBitIdentities(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, bit_identity_helpers);
@@ -1108,8 +1108,8 @@ test "numeric proof exact U32 bit identities survive owned copies budgets replay
 }
 test "numeric proof exact U32 identities remove bounds checks but preserve changed bit operands" {
     const allocator = std.testing.allocator;
-    const head = "const identity = fn (index: U32) => ";
-    const caller = "\nentry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0";
+    const head = "const identity = func (index: U32) => return ";
+    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0";
     for ([_][]const u8{
         "@u32.mul index 1",              "@u32.mul 1 index",              "@u32.div index 1",
         "@u32.bit_and index 0xffffffff", "@u32.bit_and 0xffffffff index", "@u32.bit_and index index",
@@ -1134,20 +1134,20 @@ test "numeric proof exact U32 identities remove bounds checks but preserve chang
 
 const remaining_associated_arguments =
     \\type Probe is data = #Probe U32
-    \\const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn (last: Unit) => index
-    \\const lookup = fn probe => fn (index: U32) => do:
+    \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (last: Unit) => return index
+    \\const lookup = func probe => return func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @u32.lt index 2:
     \\    break @array.get values ((@type.call "choose" probe index) ())
     \\  break 0
-    \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
 ;
 test "numeric proof prepared methods preserve operands through remaining application arguments" {
     const allocator = std.testing.allocator;
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, remaining_associated_arguments));
-    const method = "type Probe is data = #Probe U32\nconst Probe.choose = fn (unused: Probe) => fn (index: U32) => fn (delta: U32) => @u32.add index delta\n";
-    const prefix = "const lookup = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call \"choose\" probe index) ";
-    const suffix = ") else 0\nentry const run = fn (index: U32) => lookup (#Probe 42) index";
+    const method = "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta\n";
+    const prefix = "const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call \"choose\" probe index) ";
+    const suffix = ") else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, method ++ prefix ++ "0" ++ suffix));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, method ++ prefix ++ "1" ++ suffix));
 }
@@ -1185,8 +1185,8 @@ test "numeric proof remaining method arguments preserve emission replay through 
 
 const literal_associated_operand =
     \\type Probe is data = #Probe U32
-    \\const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn (delta: U32) => @u32.add index delta
-    \\entry const run = fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) 0) else 0
+    \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta
+    \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) 0) else 0
 ;
 test "numeric literal selected dispatch preserves remaining applications" {
     const allocator = std.testing.allocator;
@@ -1210,18 +1210,18 @@ test "numeric literal selected partial applications preserve replay through comp
 
 const nested_finite_selected =
     \\type Probe is data = #Probe U32
-    \\const copy = fn (value: U32) => value
-    \\const advance = fn (value: U32) => fn (delta: U32) => @u32.add (copy value) (copy delta)
-    \\const forwarded = fn (value: U32) => advance (copy value) 0
-    \\const Probe.choose = fn (unused: Probe) => do:
+    \\const copy = func (value: U32) => return value
+    \\const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)
+    \\const forwarded = func (value: U32) => return advance (copy value) 0
+    \\const Probe.choose = func (unused: Probe) => return do:
     \\  let copied = forwarded 0
-    \\  break fn (index: U32) => fn (delta: U32) => advance (forwarded index) (advance copied delta)
-    \\const lookup = fn probe => fn (index: U32) => do:
+    \\  break func (index: U32) => return func (delta: U32) => return advance (forwarded index) (advance copied delta)
+    \\const lookup = func probe => return func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @u32.lt index 2:
     \\    break @array.get values ((@type.call "choose" probe index) 0)
     \\  break 0
-    \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
 ;
 fn ownedNestedFiniteSelected(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, nested_finite_selected);
@@ -1259,17 +1259,17 @@ test "numeric finite nested helper checks distinguish exact identity changed ope
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, changed));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
         \\type Probe is data = #Probe U32
-        \\const invoke = fn callback => fn (index: U32) => callback index
-        \\const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn callback => invoke callback index
-        \\const lookup = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) (fn (value: U32) => value)) else 0
-        \\entry const run = fn (index: U32) => lookup (#Probe 42) index
+        \\const invoke = func callback => return func (index: U32) => return callback index
+        \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
+        \\const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) (func (value: U32) => return value)) else 0
+        \\entry const run = func (index: U32) => return lookup (#Probe 42) index
     ));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
         \\type Probe is data = #Probe U32
-        \\const invoke = fn (callback: U32 -> U32 ! {Foreign}) => fn (index: U32) => callback index
-        \\const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn callback => invoke callback index
-        \\const lookup = fn probe => fn (index: U32) => fn callback => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) callback) else 0
-        \\entry const run = fn (callback: U32 -> U32 ! {Foreign}) => lookup (#Probe 42) 1 callback
+        \\const invoke = func (callback: U32 -> U32 ! {Foreign}) => return func (index: U32) => return callback index
+        \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
+        \\const lookup = func probe => return func (index: U32) => return func callback => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) callback) else 0
+        \\entry const run = func (callback: U32 -> U32 ! {Foreign}) => return lookup (#Probe 42) 1 callback
     ));
 }
 
@@ -1314,7 +1314,7 @@ fn finitePlanMeasurement(allocator: std.mem.Allocator, label: []const u8, input:
 }
 test "numeric finite work stays bounded and inactive no feature bodies allocate no proof storage" {
     const allocator = std.testing.allocator;
-    try finitePlanMeasurement(allocator, "no_feature", "entry const run = fn (index: U32) => @u32.add index 1", .{}, false, false);
+    try finitePlanMeasurement(allocator, "no_feature", "entry const run = func (index: U32) => return @u32.add index 1", .{}, false, false);
     try finitePlanMeasurement(allocator, "nested_selected", nested_finite_selected, .{}, true, true);
     const joined = try std.mem.replaceOwned(u8, allocator, nested_finite_selected, "advance (copy value) 0", "if @u32.lt value 3 then advance (copy value) 0 else advance (copy value) 0");
     defer allocator.free(joined);
@@ -1365,14 +1365,14 @@ fn iteratorCarryOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
         \\type Maybe a is data = #Some a | #Nothing
         \\type Counter is data = #Counter U32
-        \\const Counter.iter = fn (cursor: Counter) => cursor
-        \\const Counter.next = fn (#Counter value) => if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
-        \\const iterate = fn (first: U32) => do:
+        \\const Counter.iter = func (cursor: Counter) => return cursor
+        \\const Counter.next = func (#Counter value) => return if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
+        \\const iterate = func (first: U32) => return do:
         \\  let result = 1
         \\  for value in #Counter first:
         \\    result := @u32.add self value
         \\  break result
-        \\const bounded = fn (value: U32) => do:
+        \\const bounded = func (value: U32) => return do:
         \\  let checked = @proof.lt value 10
         \\  break iterate value
     );
@@ -1412,7 +1412,7 @@ test "numeric proof statement suites publish actual iterator carries while block
 fn patternFallbackOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
         \\type Maybe a is data = #Some a | #Nothing
-        \\const pick = fn (input: Maybe U32) => do:
+        \\const pick = func (input: Maybe U32) => return do:
         \\  let #Some value = input else:
         \\    break 3
         \\  let bounded = @proof.lt value 10
@@ -1472,7 +1472,7 @@ test "numeric proof pattern fallback owns only outer bindings and must exit thro
 fn foreverFallbackOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
         \\type Maybe a is data = #Some a | #Nothing
-        \\const pick = fn (input: Maybe U32) => do:
+        \\const pick = func (input: Maybe U32) => return do:
         \\  let #Some value = input else:
         \\    for ever:
         \\      break 3

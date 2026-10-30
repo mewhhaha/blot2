@@ -9,48 +9,48 @@ import * as summary from "std/summary"
 import * as iter from "std/iter"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-const cycle = fn () => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+const cycle = func () => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use ready <- delayed ()
     use State.set #End
     break ready
   )
   break result
-const combine = fn (left: {sum: U32, node: Node}) => fn (right: {sum: U32, node: Node}) => {sum: @u32.add left.sum right.sum, node: left.node}
-const inverse = fn (value: {sum: U32, node: Node}) => {sum: @u32.sub 0 value.sum, node: value.node}
-const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-const validate = fn (node: Node) => case node of
+const combine = func (left: {sum: U32, node: Node}) => return func (right: {sum: U32, node: Node}) => return {sum: @u32.add left.sum right.sum, node: left.node}
+const inverse = func (value: {sum: U32, node: Node}) => return {sum: @u32.sub 0 value.sum, node: value.node}
+const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+const validate = func (node: Node) => return case node of
   #End => @panic "summary lost its cycle"
   #Next delayed => do:
-    let (_, value) = @effect.run State.get State.set #End (fn () => delayed ())
+    let (_, value) = @effect.run State.get State.set #End (func () => return delayed ())
     break case value of
       #End => @panic "summary lost its ready memo"
       #Next _ => 0
-entry const monoid = fn (count: U32) => do:
+entry const monoid = func (count: U32) => return do:
   let node = cycle ()
-  let values = iter.map (fn index => {sum: index, node}) (iter.range 0 count)
-  let total = iter.fold_left (fn total => fn value => @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
+  let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
+  let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.monoid combine {sum: 0, node} 31 values)
   break @u32.add total (validate node)
-entry const group = fn (count: U32) => do:
+entry const group = func (count: U32) => return do:
   let node = cycle ()
-  let values = iter.map (fn index => {sum: index, node}) (iter.range 0 count)
-  let total = iter.fold_left (fn total => fn value => @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
+  let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)
+  let total = iter.fold_left (func total => return func value => return @u32.add total value.sum) 0 (rolling.group combine inverse {sum: 0, node} 31 values)
   break @u32.add total (validate node)
-entry const update = fn (count: U32) => do:
+entry const update = func (count: U32) => return do:
   let node = cycle ()
   let initial = {sum: 0, node}
-  let original = summary.build combine initial (iter.map (fn index => {sum: index, node}) (iter.range 0 31))
+  let original = summary.build combine initial (iter.map (func index => return {sum: index, node}) (iter.range 0 31))
   let tree = original
   for index in 0..count:
     tree := summary.set combine (@u32.rem index 31) {sum: 1, node} self
   let old = summary.query combine initial 0 31 original
   let current = summary.query combine initial 0 31 tree
   break @u32.add (@u32.add old.sum current.sum) (validate current.node)
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const module = new WebAssembly.Module(bytes);

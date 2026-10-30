@@ -7,9 +7,9 @@ const probe = @import("completion_probe.zig");
 
 fn expressionLaw(a: std.mem.Allocator) !void {
     const source =
-        \\const unfinished = fn (value: U32) -> F32 => do:
+        \\const unfinished = func (value: U32) : F32 => return do:
         \\  let original = value
-        \\  value := #True
+        \\  value := true
         \\  break fi
     ;
     const cursor = (try probe.capture(a, source, @intCast(source.len))).?;
@@ -40,7 +40,7 @@ test "completion private expression keeps contextual types shadowing and allocat
 test "completion private members and selectors retain receiver and expected arrow" {
     const a = std.testing.allocator;
     for ([_][]const u8{
-        "type Point = { x: U32, y: F32 }\nconst work = fn (point: Point) -> F32 => point.y\n",
+        "type Point = { x: U32, y: F32 }\nconst work = func (point: Point) : F32 => return point.y\n",
         "type Point = { x: U32, y: F32 }\nconst work: Point -> F32 = .y\n",
     }) |source| {
         const position = std.mem.findLast(u8, source, "y").? + 1;
@@ -72,7 +72,7 @@ test "completion private fitting follows actual declared generic requirements" {
     const a = std.testing.allocator;
     const source =
         \\type Add a is contract = { associated "add" a a a }
-        \\const twice: a -> a where { Add a } = fn value => value
+        \\const twice: a -> a where { Add a } = func value => return value
         \\const work: a -> a where { Add a } = tw
     ;
     const cursor = (try probe.capture(a, source, @intCast(source.len))).?;
@@ -101,13 +101,13 @@ test "completion private item scope exceeds the display graph and keeps the late
     const a = std.testing.allocator;
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
-    try source.appendSlice(a, "const work = fn () -> Bool => do:\n");
+    try source.appendSlice(a, "const work = func () : Bool => return do:\n");
     for (0..100) |index| {
         const line = try a.print("  let match_{d} = {d}\n", .{ index, index });
         defer a.free(line);
         try source.appendSlice(a, line);
     }
-    try source.appendSlice(a, "  match_0 := #True\n  break mat");
+    try source.appendSlice(a, "  match_0 := true\n  break mat");
     const cursor = (try probe.capture(a, source.items, @intCast(source.items.len))).?;
     defer cursor.deinit(a);
     var tokens = try lexer.lex(a, cursor.source);
@@ -139,7 +139,7 @@ test "completion private project shares inference budget without evaluating init
     const project = @import("project.zig");
     const inputs = @import("revision_inputs.zig");
     const project_check = @import("project_check.zig");
-    const text = "import { value } from \"./library\"\nconst work = fn () -> F32 => va\n";
+    const text = "import { value } from \"./library\"\nconst work = func () : F32 => return va\n";
     const position: u32 = @intCast(std.mem.findLast(u8, text, "va").? + 2);
     const cursor = (try probe.capture(a, text, position)).?;
     defer cursor.deinit(a);

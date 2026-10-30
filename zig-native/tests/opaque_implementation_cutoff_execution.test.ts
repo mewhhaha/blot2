@@ -5,13 +5,13 @@ const executable = Deno.args[0];
 assert(executable);
 const header =
   "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\n" +
-  "impl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = fn value => @u32.add value 1,\n}\n";
+  "impl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\n";
 const hidden =
   "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\n";
 for (const selected of [false, true]) {
   const initial = header +
-    "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\n" +
-    `const read: Token -> U32 = fn (#Token value) => ${
+    "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\n" +
+    `const read: Token -> U32 = func (#Token value) => return ${
       selected ? "Source.first value" : "value"
     }\n`;
   const variants = [
@@ -34,11 +34,11 @@ for (const selected of [false, true]) {
         await Deno.writeTextFile(producer, initial);
         await Deno.writeTextFile(
           directory + "/bridge.blot",
-          'export {Source, ScalarSource} from "./tokens"\nimport {make, read} from "./tokens"\nconst consume: U32 -> U32 = fn value => read (make value)\n',
+          'export {Source, ScalarSource} from "./tokens"\nimport {make, read} from "./tokens"\nconst consume: U32 -> U32 = func value => return read (make value)\n',
         );
         await Deno.writeTextFile(
           entry,
-          'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = fn value => consume value\n',
+          'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = func value => return consume value\n',
         );
         const packed = await new Deno.Command(executable, {
           args: ["dependencies", entry, archive, "--prelude", "none"],
@@ -140,7 +140,7 @@ for (const selected of [false, true]) {
               "ScalarSource : Source F32",
             ).replace("@u32.add value 1", "@u32.add (@f32.to_u32 value) 1");
             const addedCandidate = initial +
-              "impl FloatSource : Source F32 = { type Item = F32, const first = fn value => value }\n";
+              "impl FloatSource : Source F32 = { type Item = F32, const first = func value => return value }\n";
             for (
               const [text, success] of [
                 [changedType, !selected],

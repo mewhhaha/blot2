@@ -7,16 +7,16 @@ import {
 Deno.test("repacked dictionaries follow exact runtime witnesses", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
 type Item = exists [a] where { Render a } => a
-const make = fn (flag: Bool) => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-const reseal = fn (item: Item) => unpack item as [a] value in pack [a] value as Item
-const choose = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in pack [b] y as Item
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-entry const answer = fn (flag: Bool) => @u32.add (read (reseal (make flag))) (read (reseal (make flag)))
-entry const selected = fn (flag: Bool) => read (choose (make flag) (make #False))
-entry const snapshot = fn (value: U32) => #[value]
+const make = func (flag: Bool) => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+const reseal = func (item: Item) => return unpack item as [a] value in pack [a] value as Item
+const choose = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in pack [b] y as Item
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+entry const answer = func (flag: Bool) => return @u32.add (read (reseal (make flag))) (read (reseal (make flag)))
+entry const selected = func (flag: Bool) => return read (choose (make flag) (make false))
+entry const snapshot = func (value: U32) => return #[value]
 `,
     (guest, bytes) => {
       equal(guest.call("answer", true), 84);
@@ -51,12 +51,12 @@ entry const snapshot = fn (value: U32) => #[value]
 Deno.test("universal givens can seal existential dictionaries", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
 type Item = exists [a] where { Render a } => a
-const seal: forall [a] where { Render a } => a -> Item = fn value => pack [a] value as Item
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-entry const answer = fn () => @u32.add (read (seal 42)) (read (seal #True))
+const seal: forall [a] where { Render a } => a -> Item = func value => return pack [a] value as Item
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+entry const answer = func () => return @u32.add (read (seal 42)) (read (seal true))
 `,
     (guest) => equal(guest.call("answer", null), 49),
     { prelude: "none" },
@@ -65,11 +65,11 @@ entry const answer = fn () => @u32.add (read (seal 42)) (read (seal #True))
 
 Deno.test("dictionary resealing rejects changed witnesses and unsealed method captures", async () => {
   const source = `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
+impl Number : Render U32 = { const show = func value => return value }
 type Item = exists [a] where { Render a } => a
-const make = fn (value: U32) => pack [U32] value as Item
-const bad = fn (item: Item) => unpack item as [a] value in pack [U32] value as Item
-entry const answer = fn () => bad (make 42)
+const make = func (value: U32) => return pack [U32] value as Item
+const bad = func (item: Item) => return unpack item as [a] value in pack [U32] value as Item
+entry const answer = func () => return bad (make 42)
 `;
   await compileExpectedFailure(source, "type_mismatch", undefined, {
     prelude: "none",

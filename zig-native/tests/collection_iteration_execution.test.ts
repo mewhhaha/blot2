@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const preludePath = new URL("../../std/prelude.blot", import.meta.url).pathname;
-const fold = `const fold = fn reduce => fn initial => fn values => do:
+const fold = `const fold = func reduce => return func initial => return func values => return do:
   let state = initial
   for value in values:
     use next <- reduce state value
@@ -12,12 +12,12 @@ const fold = `const fold = fn reduce => fn initial => fn values => do:
   break state
 `;
 const program = `${fold}
-entry const run = fn (count: U32) => fold add 0 (@list.generate count identity)
-entry const arrays = fn (count: U32) => fold add 0 (@array.generate count identity)
-entry const references = fn (count: U32) => fold (fn total => fn row => total + row[0]) 0 (@list.generate count (fn index => #[index]))
-entry const nested = fn (count: U32) => fold (fn total => fn row => total + fold add 0 row) 0 (@list.generate count (fn index => [index, index + 1, index + 2]))
-entry const floating = fn () => fold (fn before => fn value => value) 1.5 [-0.0]
-const bounded = fn values => do:
+entry const run = func (count: U32) => return fold add 0 (@list.generate count identity)
+entry const arrays = func (count: U32) => return fold add 0 (@array.generate count identity)
+entry const references = func (count: U32) => return fold (func total => return func row => return total + row[0]) 0 (@list.generate count (func index => return #[index]))
+entry const nested = func (count: U32) => return fold (func total => return func row => return total + fold add 0 row) 0 (@list.generate count (func index => return [index, index + 1, index + 2]))
+entry const floating = func () => return fold (func before => return func value => return value) 1.5 [-0.0]
+const bounded = func values => return do:
   let total = 0
   for value in values:
     if value % 2 == 0:
@@ -27,13 +27,13 @@ const bounded = fn values => do:
     if value >= 3:
       break
   break total
-entry const joined = fn (count: U32) => bounded (@list.generate count identity)
-const first = fn values => do:
+entry const joined = func (count: U32) => return bounded (@list.generate count identity)
+const first = func values => return do:
   for value in values:
     break value
   break 0
-entry const early = fn () => first [7, 8, 9]
-entry const forks = fn () => do:
+entry const early = func () => return first [7, 8, 9]
+entry const forks = func () => return do:
   let values = [0, 1, 2, 3]
   let cursor = values.iter
   let saved = cursor
@@ -131,7 +131,7 @@ Deno.test("resolved collection iteration rechecks exact cursor producers through
             `#Some (@u32.add (@cursor.value cursor) ${offset}, @cursor.advance cursor)`,
           );
           const sources = {
-            [entry]: `${fold}entry const run = fn () => fold add 0 [0, 1, 2]\n`,
+            [entry]: `${fold}entry const run = func () => return fold add 0 [0, 1, 2]\n`,
             [preludePath]: changed,
           };
           const result = await compiler.build({ sources });
@@ -162,15 +162,15 @@ Deno.test("effectful collection iter and next retain written pulls and early exi
   const original = await Deno.readTextFile(preludePath);
   const changed = original
     .replace(
-      "const List.iter = fn values => @list.cursor values",
-      "const List.iter = fn values => do:\n  use Audit.pull 1\n  break @list.cursor values",
+      "const List.iter = func values => return @list.cursor values",
+      "const List.iter = func values => return do:\n  use Audit.pull 1\n  break @list.cursor values",
     )
     .replace(
-      "const Cursor.next = fn cursor =>\n  if @cursor.has cursor\n  then #Some (@cursor.value cursor, @cursor.advance cursor)\n  else #Nothing",
-      "const Cursor.next = fn cursor => do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break #Some (@cursor.value cursor, @cursor.advance cursor)\n  break #Nothing",
+      "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then #Some (@cursor.value cursor, @cursor.advance cursor)\n  else #Nothing",
+      "const Cursor.next = func cursor => return do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break #Some (@cursor.value cursor, @cursor.advance cursor)\n  break #Nothing",
     ) + "\ntype Audit is effect = { pull: U32 -> Unit }\n";
   const source = `${fold}
-const measured = fn action => do:
+const measured = func action => return do:
   let pulls = 0
   for request in @requests action:
     case request of
@@ -179,12 +179,12 @@ const measured = fn action => do:
         yield ()
       complete value =>
         break #[value, pulls]
-entry const run = fn (count: U32) => measured (@computation (fn () => fold add 0 (@list.generate count identity)))
-const first = fn values => do:
+entry const run = func (count: U32) => return measured (@computation (func () => return fold add 0 (@list.generate count identity)))
+const first = func values => return do:
   for value in values:
     break value
   break 0
-entry const early = fn () => measured (@computation (fn () => first [3, 4, 5]))
+entry const early = func () => return measured (@computation (func () => return first [3, 4, 5]))
 `;
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
@@ -234,16 +234,16 @@ entry const early = fn () => measured (@computation (fn () => first [3, 4, 5]))
 // that size, and its loops, including one that matches optional entries as
 // src/robots.blot's `pick_along` does, still take the physical form.
 Deno.test("resolved collection iteration applies in units above 4,096 Core nodes", async () => {
-  const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = fn (x: U32) => @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
+  const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = func (x: U32) => return @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
   await session(`${program}${padding}
-const smallest = fn entries => do:
+const smallest = func entries => return do:
   let closest = 1000000
   for entry in entries:
     if let #Some value = entry:
       if value < closest:
         closest := value
   break closest
-entry const optional = fn (count: U32) => smallest (@array.generate count (fn index => if index % 3 == 0 then #Nothing else #Some (count - index)))
+entry const optional = func (count: U32) => return smallest (@array.generate count (func index => return if index % 3 == 0 then #Nothing else #Some (count - index)))
 `, (guest) => {
     for (const count of [0, 1, 2, 3, 4, 245, 4096]) {
       const sum = (count * (count - 1) / 2) >>> 0;

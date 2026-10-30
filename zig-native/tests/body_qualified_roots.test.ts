@@ -6,7 +6,7 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 
 function spine(value: string) {
-  for (let step = 0; step < 12; step++) value = `(fn item => item) (${value})`;
+  for (let step = 0; step < 12; step++) value = `(func item => return item) (${value})`;
   return value;
 }
 
@@ -29,7 +29,7 @@ Deno.test("body checker reuse owns qualified generic dotted roots through reject
           let producer = "";
           if (form === "declared") {
             producer =
-              'const first: a -> b where {field "first" a b} = fn value => value.first\n';
+              'const first: a -> b where {field "first" a b} = func value => return value.first\n';
             root = "first value";
           }
           const field = missing ? "absent" : "count";
@@ -42,11 +42,11 @@ Deno.test("body checker reuse owns qualified generic dotted roots through reject
           const prefix = inserted
             ? "const earlier_spelling = {first:3.0}\n"
             : "";
-          return `${prefix}${producer}const extract = fn value => do:
+          return `${prefix}${producer}const extract = func value => return do:
   let root = ${root}
   break ${spine(path)}
-entry const run = fn (value: U32) => extract ${scalar}
-entry const packed = fn (value: U32) => extract ${owning}
+entry const run = func (value: U32) => return extract ${scalar}
+entry const packed = func (value: U32) => return extract ${owning}
 `;
         };
         await Deno.writeTextFile(entry, source());

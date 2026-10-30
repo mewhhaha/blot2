@@ -9,10 +9,10 @@ type Save a is effect = {keep: (Unit -> a) -> Unit}
 `;
 const escaping = `
 import {State, Save} from "./library"
-entry const bad = fn () => do:
-  let (saved, result) = @state.run (fn () => 0) (fn () => do (@effect.provider (Save.keep U32) (fn value => @state.set value)):
-    break @effect.scope (fn (s: State U32) => do:
-      use Save.keep U32 (fn () => do:
+entry const bad = func () => return do:
+  let (saved, result) = @state.run (func () => return 0) (func () => return do (@effect.provider (Save.keep U32) (func value => return @state.set value)):
+    break @effect.scope (func (s: State U32) => return do:
+      use Save.keep U32 (func () => return do:
         let (state, result) = do (@effect.state s.get s.set 0):
           break 42
         break result
@@ -24,7 +24,7 @@ entry const bad = fn () => do:
 `;
 const valid = `
 import {State, Save} from "./library"
-entry const answer = fn () => @effect.scope (fn (s: State U32) => 42)
+entry const answer = func () => return @effect.scope (func (s: State U32) => return 42)
 `;
 
 Deno.test("explicit generic operations reject shorter authority at source and compiled storage sinks", async () => {
@@ -68,7 +68,7 @@ Deno.test("explicit generic operations reject shorter authority at source and co
         assert.equal(diagnostic.filename, entry);
         assert(
           escaping.slice(diagnostic.start, diagnostic.end).includes(
-            "fn () => do:",
+            "func () => return do:",
           ),
         );
         assert.deepEqual(await compiler.exportCheckpoint(), checkpoint);

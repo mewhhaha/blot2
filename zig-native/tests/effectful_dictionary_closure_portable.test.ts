@@ -4,7 +4,7 @@ import { execute, variant } from "./effectful_dictionary_closure_helpers.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 
-for (const helper of ["fn value => Render.show value", "Render.show"]) {
+for (const helper of ["func value => return Render.show value", "Render.show"]) {
   Deno.test(`effectful ${helper} preserves ordered closures through archives checkpoints and recovery`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-effectful-dictionary-",

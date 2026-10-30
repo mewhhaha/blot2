@@ -36,14 +36,14 @@ fn lowerCatalogIdentity(allocator: std.mem.Allocator, source: []const u8, builti
 const provider_source =
     \\effect Read: Unit -> F32
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\const reader = @effect.provider Read (fn () => 1.75)
+    \\const reader = @effect.provider Read (func () => return 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
     \\  break Read ()
-    \\entry const callback = fn () => do reader:
+    \\entry const callback = func () => return do reader:
     \\  break Read ()
-    \\entry const answer = fn (value: F32) => do:
-    \\  let dynamic = @effect.provider Read (fn () => value)
+    \\entry const answer = func (value: F32) => return do:
+    \\  let dynamic = @effect.provider Read (func () => return value)
     \\  let local = @effect.state (State.get F32) (State.set F32) value
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
@@ -120,10 +120,10 @@ test "runtime operation instruction and constant-provider relocation release eve
 
 test "runtime operation separation preserves opaque effect reflection as a compile-only capability" {
     const source =
-        \\const read = fn () => 42
+        \\const read = func () => return 42
         \\const requirements = @effect.of read
-        \\const count = fn effects => @effect.count effects
-        \\entry const run = fn () => count requirements
+        \\const count = func effects => return @effect.count effects
+        \\entry const run = func () => return count requirements
     ;
     var module = try lower(a, source);
     defer module.deinit(a);
@@ -140,7 +140,7 @@ test "runtime operation separation preserves opaque effect reflection as a compi
 test "runtime operation relocation preserves supported semantic reflection membership and descriptor equality" {
     const source =
         \\type Signal a is effect = { ping: Unit -> U32 }
-        \\const read = fn () => do:
+        \\const read = func () => return do:
         \\  use Signal.ping U32 ()
         \\  use Signal.ping U32 ()
         \\  break Signal.ping F32 ()
@@ -203,10 +203,10 @@ test "project emission requires complete actual owners and independently solves 
 
 test "resolved bodies prepare calls fields evidence closures and exits without mutating frozen Core" {
     const source =
-        \\const bump = fn (value: U32) => @u32.add value 1
-        \\entry const answer = fn (value: U32) => do:
-        \\  let row = { value, flag: #True }
-        \\  let read = fn () => bump row.value
+        \\const bump = func (value: U32) => return @u32.add value 1
+        \\entry const answer = func (value: U32) => return do:
+        \\  let row = { value, flag: true }
+        \\  let read = func () => return bump row.value
         \\  let count = 0
         \\  for index in 0..value:
         \\    count := @u32.add self 1
@@ -236,7 +236,7 @@ fn emitResolvedBody(allocator: std.mem.Allocator, module: *const core.Module) !v
 
 test "shared RC source collection construction and publication preserve frozen Core through every allocation failure" {
     const source =
-        \\entry const answer = fn (value: U32) => do:
+        \\entry const answer = func (value: U32) => return do:
         \\  let child = #[value, @u32.add value 1]
         \\  let values = @list.fill 500 child
         \\  let before = values
@@ -269,7 +269,7 @@ fn emitTypedCollections(allocator: std.mem.Allocator, module: *const core.Module
 test "packed List directory emission preserves frozen Core through every allocation failure" {
     const source =
         \\const static = [{ a: 1, b: 2, c: 3 }, { a: 4, b: 5, c: 6 }]
-        \\entry const answer = fn (value: U32) => do:
+        \\entry const answer = func (value: U32) => return do:
         \\  let rows = @list.fill 600 { a: value, b: value, c: value }
         \\  let saved = rows
         \\  rows := [ { a: value, b: value, c: value }, ...self ]
@@ -281,7 +281,7 @@ test "packed List directory emission preserves frozen Core through every allocat
         \\  for row in rows:
         \\    total := @u32.add (@u32.add (@u32.add self row.a) row.b) row.c
         \\  break total
-        \\entry const float_answer = fn (value: F32) => do:
+        \\entry const float_answer = func (value: F32) => return do:
         \\  let rows = @list.fill 601 { a: value, b: value, c: value, d: value }
         \\  let total = 0.0
         \\  for row in rows:
@@ -300,10 +300,10 @@ test "packed List directory emission preserves frozen Core through every allocat
 }
 
 const constant_getter_source =
-    \\const make = fn (seed: Array U32) => fn (value: U32) => @array.get seed value
+    \\const make = func (seed: Array U32) => return func (value: U32) => return @array.get seed value
     \\const saved = make #[7, 42]
-    \\entry const run = fn (value: U32) => saved value
-    \\entry const pressure = fn (count: U32) => @array.fill count 0
+    \\entry const run = func (value: U32) => return saved value
+    \\entry const pressure = func (count: U32) => return @array.fill count 0
 ;
 fn constantGetter(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .inline_named = false, .retain_artifacts = true });
@@ -342,8 +342,8 @@ test "checked constant callable adapters preserve exact source callee roles and 
 }
 
 const retained_demand_source =
-    \\const keep = fn ~value => fn () => @demand value
-    \\entry const run = fn (host: U32 -> Array U32 ! {Foreign}) => do:
+    \\const keep = func ~value => return func () => return @demand value
+    \\entry const run = func (host: U32 -> Array U32 ! {Foreign}) => return do:
     \\  let delayed = keep (host 41)
     \\  use first <- delayed ()
     \\  use second <- delayed ()
@@ -522,7 +522,7 @@ test "symbolic provider constructors rederive physical State callback and Reques
 test "private State provider heads stay outside source Array graphs across direct and checked table callees" {
     var module = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\entry const run = fn (seed: U32) => do:
+        \\entry const run = func (seed: U32) => return do:
         \\  let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[seed]
         \\  let (_, result) = do local:
         \\    break State.get (Array U32) ()
@@ -1394,12 +1394,12 @@ fn emitUniversalDictionary(allocator: std.mem.Allocator, module: *const core.Mod
 test "universal dictionary forwarding keeps exact lexical evidence through every backend allocation failure" {
     var module = try lower(a,
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
-        \\const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
-        \\const forward: forall [a] where { Render a } => a -> U32 = fn value => render value
-        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-        \\entry const answer: Unit -> U32 = fn () => both forward
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
+        \\const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
+        \\const forward: forall [a] where { Render a } => a -> U32 = func value => return render value
+        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+        \\entry const answer: Unit -> U32 = func () => return both forward
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1421,11 +1421,11 @@ fn emitStaticPackages(allocator: std.mem.Allocator, module: *const core.Module) 
 test "static package carriers and stored methods preserve owned emission replay through every allocation failure" {
     var module = try lower(a,
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
+        \\impl Number : Render U32 = { const show = func value => return value }
         \\type Item = exists [a] where { Render a } => (Array a, a)
         \\const item: Item = pack [U32] (#[20, 22], 42) as Item
-        \\const read = fn (value: Item) => unpack value as [a] payload in Render.show (@product.get payload 1)
-        \\entry const answer = fn () => read item
+        \\const read = func (value: Item) => return unpack value as [a] payload in Render.show (@product.get payload 1)
+        \\entry const answer = func () => return read item
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1524,13 +1524,13 @@ test "provider activation storage requires live borrowers and tracks owned outer
 test "runtime associated dictionary carriers preserve exact owner emission replay through complete OOM" {
     var module = try lower(a,
         \\type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
-        \\impl Flag : Source Bool = { type Item = Bool, const get = fn value => value, const show = fn owner => fn value => if value then 7 else 9 }
+        \\impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
+        \\impl Flag : Source Bool = { type Item = Bool, const get = func value => return value, const show = func owner => return func value => return if value then 7 else 9 }
         \\type Package = exists [a] where { Source a } => a
-        \\const make = fn (flag: Bool) => if flag then pack [U32] 42 as Package else pack [Bool] #True as Package
-        \\const seal: forall [a] where { Source a } => a -> Package = fn value => pack [a] value as Package
-        \\const read = fn (item: Package) => unpack item as [a] value in Source.show value (Source.get value)
-        \\entry const answer = fn (flag: Bool) => read (seal flag)
+        \\const make = func (flag: Bool) => return if flag then pack [U32] 42 as Package else pack [Bool] true as Package
+        \\const seal: forall [a] where { Source a } => a -> Package = func value => return pack [a] value as Package
+        \\const read = func (item: Package) => return unpack item as [a] value in Source.show value (Source.get value)
+        \\entry const answer = func (flag: Bool) => return read (seal flag)
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1541,13 +1541,13 @@ test "runtime associated dictionary carriers preserve exact owner emission repla
 test "static associated dictionary carriers preserve exact owner emission replay through complete OOM" {
     var module = try lower(a,
         \\type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
-        \\impl Flag : Source Bool = { type Item = Bool, const get = fn value => value, const show = fn owner => fn value => if value then 7 else 9 }
+        \\impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
+        \\impl Flag : Source Bool = { type Item = Bool, const get = func value => return value, const show = func owner => return func value => return if value then 7 else 9 }
         \\type Package = exists [a] where { Source a } => a
-        \\const make = fn (flag: Bool) => if flag then pack [U32] 42 as Package else pack [Bool] #True as Package
-        \\const read = fn (item: Package) => unpack item as [a] value in Source.show value (Source.get value)
+        \\const make = func (flag: Bool) => return if flag then pack [U32] 42 as Package else pack [Bool] true as Package
+        \\const read = func (item: Package) => return unpack item as [a] value in Source.show value (Source.get value)
         \\const item: Package = pack [U32] 42 as Package
-        \\entry const answer = fn () => read item
+        \\entry const answer = func () => return read item
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1562,14 +1562,14 @@ fn emitInferredDictionary(allocator: std.mem.Allocator, module: *const core.Modu
 test "inferred dictionary principals retain stored member ownership through backend replay and complete OOM" {
     var module = try lower(a,
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
-        \\const helper = fn value => Render.show value
-        \\const apply = fn callback => fn value => callback value
-        \\const sum = fn left => fn right => @u32.add (helper left) (helper right)
-        \\const render: forall [a] where { Render a } => a -> a -> U32 = fn left => fn right => apply (sum left) right
-        \\const both: (forall [a] where { Render a } => a -> a -> U32) -> U32 = fn callback => @u32.add (callback 20 22) (callback #True #False)
-        \\entry const answer: Unit -> U32 = fn () => both render
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
+        \\const helper = func value => return Render.show value
+        \\const apply = func callback => return func value => return callback value
+        \\const sum = func left => return func right => return @u32.add (helper left) (helper right)
+        \\const render: forall [a] where { Render a } => a -> a -> U32 = func left => return func right => return apply (sum left) right
+        \\const both: (forall [a] where { Render a } => a -> a -> U32) -> U32 = func callback => return @u32.add (callback 20 22) (callback true false)
+        \\entry const answer: Unit -> U32 = func () => return both render
     );
     defer module.deinit(a);
     try emitInferredDictionary(a, &module);
@@ -1615,12 +1615,12 @@ test "inferred dictionary principals retain stored member ownership through back
 test "inferred dictionary associated helper retains immutable scheme authority" {
     var module = try lower(a,
         \\type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
-        \\impl Flag : Source Bool = { type Item = Bool, const get = fn value => value, const show = fn owner => fn value => if value then 7 else 9 }
-        \\const helper = fn value => Source.show value (Source.get value)
-        \\const render: forall [a] where { Source a } => a -> U32 = fn value => helper value
-        \\const both: (forall [a] where { Source a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-        \\entry const answer: Unit -> U32 = fn () => both render
+        \\impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
+        \\impl Flag : Source Bool = { type Item = Bool, const get = func value => return value, const show = func owner => return func value => return if value then 7 else 9 }
+        \\const helper = func value => return Source.show value (Source.get value)
+        \\const render: forall [a] where { Source a } => a -> U32 = func value => return helper value
+        \\const both: (forall [a] where { Source a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+        \\entry const answer: Unit -> U32 = func () => return both render
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1636,8 +1636,8 @@ test "inferred dictionary associated helper retains immutable scheme authority" 
 fn phantomDictionaryHeader(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
         \\type Tag a is contract = { const read: Unit -> U32 }
-        \\const helper: forall [a] where { Tag a } => Unit -> U32 = fn unit => Tag.read unit
-        \\entry const answer: Unit -> U32 = fn unit => 42
+        \\const helper: forall [a] where { Tag a } => Unit -> U32 = func unit => return Tag.read unit
+        \\entry const answer: Unit -> U32 = func unit => return 42
     );
     defer module.deinit(allocator);
     try @import("../check/frozen_core_validation.zig").validate(allocator, &module, .{});
@@ -1664,12 +1664,12 @@ test "dictionary forwarding rejects header-free phantom witnesses through comple
 test "interface member aliases preserve immutable unary dictionary abstractions through complete OOM" {
     var module = try lower(a,
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
         \\const helper = Render.show
-        \\const render: forall [a] where { Render a } => a -> U32 = fn value => helper value
-        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-        \\entry const answer: Unit -> U32 = fn () => both render
+        \\const render: forall [a] where { Render a } => a -> U32 = func value => return helper value
+        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+        \\entry const answer: Unit -> U32 = func () => return both render
     );
     defer module.deinit(a);
     try emitInferredDictionary(a, &module);
@@ -1694,7 +1694,7 @@ test "interface alias lowering preserves action boundaries and ordinary operatio
         \\type Render a is contract = { const show: a -> (Unit -> U32) ! {Read} }
         \\const helper = Render.show
         \\const operation = Read
-        \\entry const answer: Unit -> U32 = fn unit => 42
+        \\entry const answer: Unit -> U32 = func unit => return 42
     );
     defer module.deinit(a);
     try @import("../check/frozen_core_validation.zig").validate(a, &module, .{});
@@ -1746,7 +1746,7 @@ test "unrestricted associated equations reject direct and hidden lifetime author
         "type Hidden is data = #Hidden (unique U32)\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
         "opaque type Hidden = shared U32\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
         "type Hidden is data = #Hidden (shared U32)\ntype Source a is contract = { type Item = Hidden }\n",
-        "type Source a is contract = { type Item }\nimpl All a : Source a = { type Item = a }\nconst keep: unique U32 -> (Source.Item (unique U32)) = fn value => value\n",
+        "type Source a is contract = { type Item }\nimpl All a : Source a = { type Item = a }\nconst keep: unique U32 -> (Source.Item (unique U32)) = func value => return value\n",
     };
     for (sources) |source| try rejectsAssociatedUsage(a, source);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejectsAssociatedUsage, .{sources[5]});
@@ -1768,8 +1768,8 @@ fn associatedUsageReader(allocator: std.mem.Allocator) !void {
         \\type Source a is contract = { type Item }
         \\impl Number : Source U32 = { type Item = U32 }
         \\type Fixed a is contract = { type Item = U32 }
-        \\const keep = fn (owner: unique U32) => owner
-        \\entry const answer: Unit -> U32 = fn unit => 42
+        \\const keep = func (owner: unique U32) => return owner
+        \\entry const answer: Unit -> U32 = func unit => return 42
     );
     defer module.deinit(allocator);
     const validation = @import("../check/frozen_core_validation.zig");
@@ -1831,8 +1831,8 @@ fn associatedUsageSelection(allocator: std.mem.Allocator) !void {
         \\type Source a is contract = { type Item }
         \\impl All a : Source a = { type Item = a }
         \\type Fixed a is contract = { type Item = a }
-        \\const keep = fn (owner: unique U32) => owner
-        \\entry const answer: Unit -> U32 = fn unit => 42
+        \\const keep = func (owner: unique U32) => return owner
+        \\entry const answer: Unit -> U32 = func unit => return 42
     );
     defer module.deinit(allocator);
     try @import("../check/frozen_core_validation.zig").validate(allocator, &module, .{});
@@ -1876,12 +1876,12 @@ test "instantiated associated equations cannot erase generic or nominal lifetime
 test "associated member aliases retain exact goal and member authority through emission and complete OOM" {
     var module = try lower(a,
         \\type Source a is contract = { type Item, type Other, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, type Other = Bool, const get = fn value => value, const show = fn owner => fn value => value }
-        \\impl Flag : Source Bool = { type Item = Bool, type Other = U32, const get = fn value => value, const show = fn owner => fn value => if value then 7 else 9 }
+        \\impl Number : Source U32 = { type Item = U32, type Other = Bool, const get = func value => return value, const show = func owner => return func value => return value }
+        \\impl Flag : Source Bool = { type Item = Bool, type Other = U32, const get = func value => return value, const show = func owner => return func value => return if value then 7 else 9 }
         \\const helper = Source.get
-        \\const render: forall [a] where { Source a } => a -> U32 = fn value => Source.show value (helper value)
-        \\const both: (forall [a] where { Source a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-        \\entry const answer: Unit -> U32 = fn () => both render
+        \\const render: forall [a] where { Source a } => a -> U32 = func value => return Source.show value (helper value)
+        \\const both: (forall [a] where { Source a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+        \\entry const answer: Unit -> U32 = func () => return both render
     );
     defer module.deinit(a);
     try emitInferredDictionary(a, &module);
@@ -1945,7 +1945,7 @@ test "effectful dictionary methods return owned closures under conservative resu
 }
 
 test "effectful member aliases retain owned returned closures through complete OOM" {
-    const source = try std.mem.replaceOwned(u8, a, @import("fixtures").source("request-fixtures/effectful-dictionary-closure.blot"), "const helper = fn value => Render.show value", "const helper = Render.show");
+    const source = try std.mem.replaceOwned(u8, a, @import("fixtures").source("request-fixtures/effectful-dictionary-closure.blot"), "const helper = func value => return Render.show value", "const helper = Render.show");
     defer a.free(source);
     var module = try lower(a, source);
     defer module.deinit(a);
@@ -1957,9 +1957,9 @@ fn nestedCallableReuse(allocator: std.mem.Allocator) !void {
     var names: ?@import("runtime_identity.zig").Metadata = null;
     defer if (names) |*owned| owned.deinit(allocator);
     var module = try lowerCatalogIdentity(allocator,
-        \\const apply = fn (callback: U32 -> U32) => fn (value: U32) => callback value
-        \\const increment = fn (value: U32) => @u32.add value 2
-        \\entry const answer = fn (value: U32) => apply increment value
+        \\const apply = func (callback: U32 -> U32) => return func (value: U32) => return callback value
+        \\const increment = func (value: U32) => return @u32.add value 2
+        \\entry const answer = func (value: U32) => return apply increment value
     , false, &names);
     defer module.deinit(allocator);
     var first = try backend.compileWithOptions(allocator, &.{module}, 1, .{ .inline_named = false, .retain_artifacts = true, .identity = names.?.view() });
@@ -2114,7 +2114,7 @@ fn activationIntersectionMutants(module: *@import("wasm.zig").Module, model: @im
     }
     try std.testing.expect(field_mutant);
     const full = @import("fixtures").source("provider-fixtures/lifetime-cost.blot");
-    const changed = try std.mem.replaceOwned(u8, a, full, "get (fn () => #End)", "#End");
+    const changed = try std.mem.replaceOwned(u8, a, full, "get (func () => return #End)", "#End");
     defer a.free(changed);
     var changed_source = try lowerCatalog(a, changed, true);
     defer changed_source.deinit(a);
@@ -2487,8 +2487,8 @@ test "single region pipeline owns exact optimizer context and invalidates missin
 test "selected associated callback annotation retains current concrete method result" {
     var module = try lower(a,
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-        \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
-        \\entry const answer = fn (value: U32) => do:
+        \\impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
+        \\entry const answer = func (value: U32) => return do:
         \\  let selected: (Array U32) -> U32 = Source.first
         \\  break selected #[value]
     );
@@ -2497,7 +2497,7 @@ test "selected associated callback annotation retains current concrete method re
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitInferredDictionary, .{&module});
     var changed = false;
     for (module.nodes, 0..) |node, id| {
-        if (node.tag != .reference or module.span(@intCast(id)).start != 264) continue;
+        if (node.tag != .reference or module.span(@intCast(id)).start != 282) continue;
         const arrow = &module.types.nodes[node.ty];
         try std.testing.expect(arrow.tag == .function);
         const saved = arrow.b;

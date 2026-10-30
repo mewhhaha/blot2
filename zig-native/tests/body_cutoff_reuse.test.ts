@@ -24,22 +24,22 @@ Deno.test("body edits with unchanged interfaces update executable callers", asyn
     const v = { ...variants, ...edit };
     return `type State a is effect = { get: Unit -> a, set: a -> Unit }
 const state = @effect.state (State.get U32) (State.set U32) 0
-const helper = fn (x: U32) -> U32 => ${v.helper}
-const pick = fn (flag: Bool) => fn ~(value: U32) => ${v.pick}
-const bump = fn () => do:
+const helper = func (x: U32) : U32 => return ${v.helper}
+const pick = func (flag: Bool) => return func ~(value: U32) => return ${v.pick}
+const bump = func () => return do:
   use old <- State.get U32 ()
   ${v.bump}
   break old
-entry const via_helper = fn (x: U32) -> U32 => helper (helper x)
-entry const lazy = fn (n: U32) -> U32 => pick (n == 0) (40 + 2)
-entry const effects = fn () -> U32 => do:
+entry const via_helper = func (x: U32) : U32 => return helper (helper x)
+entry const lazy = func (n: U32) : U32 => return pick (n == 0) (40 + 2)
+entry const effects = func () : U32 => return do:
   let (final, first) = do state:
     use a <- bump ()
     use b <- bump ()
     break a + b
   break final + first
-entry const unrelated = fn (x: U32) -> U32 => do:
-  let add = fn (y: U32) => y + x
+entry const unrelated = func (x: U32) : U32 => return do:
+  let add = func (y: U32) => return y + x
   break add 3
 `;
   };
@@ -109,8 +109,8 @@ const edits: [string, string, string][] = [
   ["lists", "[1, 2, 3]", "[1, 2, 3, 4]"],
   [
     "syntax",
-    "if left then @demand right else #False",
-    "if left then (@demand right) && left else #False",
+    "if left then @demand right else false",
+    "if left then (@demand right) && left else false",
   ],
   ["monads", "#Some 40", "#Some (40 + 0)"],
 ];

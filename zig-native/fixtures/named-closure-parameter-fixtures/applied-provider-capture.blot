@@ -1,8 +1,8 @@
 effect Read: Unit -> U32
-const reader = @effect.provider Read (fn () => 7)
-const make = fn () => do:
+const reader = @effect.provider Read (func () => return 7)
+const make = func () => return do:
   let selected = reader
-  break fn (value: U32) => do selected:
+  break func (value: U32) => return do selected:
     break @u32.add value (Read ())
 const saved = make ()
 entry const answer: U32 -> U32 = saved

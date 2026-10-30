@@ -3,17 +3,17 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const source = `
-entry const snapshots = fn (seed: U32) => do:
+entry const snapshots = func (seed: U32) => return do:
   let value = seed
-  let callback = fn (index: U32) => do:
+  let callback = func (index: U32) => return do:
     let total = value
     for i in 0..index:
       total := @u32.add self i
     break total
   value := @u32.add self 1
-  let other = fn (index: U32) => @u32.add value index
+  let other = func (index: U32) => return @u32.add value index
   let saved = #[callback, other]
-  let nested = fn () => (saved[0]) 3
+  let nested = func () => return (saved[0]) 3
   for i in 0..64:
     let pressure = @array.fill 8192 i
     if @u32.eq (@array.get pressure 8191) i:
@@ -21,22 +21,22 @@ entry const snapshots = fn (seed: U32) => do:
     else:
       @panic "pressure"
   break #[nested (), (saved[1]) 3, value]
-const bounce = fn action => @computation action
-const completed = fn computation => do:
+const bounce = func action => return @computation action
+const completed = func computation => return do:
   for request in @requests computation:
     case request of
       complete value =>
         break value
-entry const factory = fn (seed: U32) => completed (bounce (fn () => @u32.add seed 1))
-entry const borrowed = fn (seed: U32) => do:
+entry const factory = func (seed: U32) => return completed (bounce (func () => return @u32.add seed 1))
+entry const borrowed = func (seed: U32) => return do:
   let values = #[seed, 8192]
-  let callback = fn index => @array.get values index
+  let callback = func index => return @array.get values index
   break callback 0
-entry const floating = fn (seed: F32) => do:
-  let callback = fn value => @f32.add seed value
+entry const floating = func (seed: F32) => return do:
+  let callback = func value => return @f32.add seed value
   let saved = #[callback]
   break (saved[0]) 1.0
-entry const task = fn (seed: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => seed)))
+entry const task = func (seed: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return seed)))
 `;
 Deno.test("scalar closure words preserve pointer-looking snapshots nested captures factories and task moves", async () => {
   const directory = await Deno.makeTempDir({

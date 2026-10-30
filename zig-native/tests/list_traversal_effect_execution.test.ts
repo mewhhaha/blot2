@@ -3,14 +3,14 @@ import { compileAndRun } from "./compile_helpers.ts";
 
 const source = `
 type Tick is effect = { read: U32 -> U32 }
-let rows = @list.generate 257 (fn i => {a: i, b: i + 1, c: i + 2})
-const work = @computation (fn () => do:
+let rows = @list.generate 257 (func i => return {a: i, b: i + 1, c: i + 2})
+const work = @computation (func () => return do:
   let total = 0
   for row in rows:
     use value <- Tick.read row.a
     total := self + row.b + value + row.c
   break total)
-entry const resumed = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const resumed = func (host: U32 -> U32 ! {Foreign}) => return do:
   for request in @requests work:
     case request of
       effect Tick.read value =>
@@ -19,7 +19,7 @@ entry const resumed = fn (host: U32 -> U32 ! {Foreign}) => do:
       complete value =>
         break value
   break 0
-entry const returned = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const returned = func (host: U32 -> U32 ! {Foreign}) => return do:
   for request in @requests work:
     case request of
       effect Tick.read value =>
@@ -30,7 +30,7 @@ entry const returned = fn (host: U32 -> U32 ! {Foreign}) => do:
       complete value =>
         break value
   break 7
-entry const broken = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const broken = func (host: U32 -> U32 ! {Foreign}) => return do:
   for request in @requests work:
     case request of
       effect Tick.read value =>

@@ -10,11 +10,11 @@ const archive = @import("backend_checkpoint.zig");
 const a = std.testing.allocator;
 const source =
     \\type Tick is effect = { read: Array U32 -> Array U32 }
-    \\const work = @computation (fn () => do:
+    \\const work = @computation (func () => return do:
     \\  use value <- Tick.read #[41, 42]
     \\  break value
     \\)
-    \\entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+    \\entry const run = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
     \\  let saved = #[90, 91]
     \\  for request in @requests work:
     \\    case request of

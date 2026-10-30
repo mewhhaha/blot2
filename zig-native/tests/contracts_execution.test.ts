@@ -15,10 +15,10 @@ type Arithmetic a is contract = { Add a, associated "mul" a a a }
 type Project [owner, value] is contract = { field "value" owner value }
 type Box a is data = #Box { value: a }
 const contract = 1
-const twice: a -> a where { Arithmetic a } = fn value => value + value
-const read: a -> b where { Project [a, b] } = fn box => box.value
-entry const answer = fn () => twice (read (#Box { value: 21 }))
-entry const fraction = fn () => twice (read (#Box { value: 1.5 }))
+const twice: a -> a where { Arithmetic a } = func value => return value + value
+const read: a -> b where { Project [a, b] } = func box => return box.value
+entry const answer = func () => return twice (read (#Box { value: 21 }))
+entry const fraction = func () => return twice (read (#Box { value: 1.5 }))
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -28,7 +28,7 @@ entry const fraction = fn () => twice (read (#Box { value: 1.5 }))
   await compileExpectedFailure(
     `
 type Project [a, b] is contract = { field "value" a b }
-const bad: a -> U32 where { Project [a, U32] } = fn value => value.missing
+const bad: a -> U32 where { Project [a, U32] } = func value => return value.missing
 entry const answer = 42
 `,
     "missing_predicate",
@@ -44,18 +44,18 @@ Deno.test("imported and qualified contracts survive retained edits, errors and s
 type Project [owner, value] is contract = { field "value" owner value }
 type Read a is contract = { Project [a, U32] }
 type Action a = Unit -> a ! {| e}
-const read: a -> U32 where { Read a } = fn box => box.value
-const invoke = fn (action: Action a) => action ()
+const read: a -> U32 where { Read a } = func box => return box.value
+const invoke = func (action: Action a) => return action ()
 `;
   const source = `
 import { Read, Action, invoke } from "./contracts"
 import * as contracts from "./contracts"
 type Box is data = #Box { value: U32 }
-const local: a -> U32 where { Read a } = fn box => box.value
-const qualified: a -> U32 where { contracts.Project [a, U32] } = fn box => box.value
-const call = fn (action: Action U32) => invoke action
-entry const answer = fn () => call (fn () => qualified (#Box { value: local (#Box { value: 42 }) }))
-entry const effectful = fn (send: U32 -> U32 ! {Foreign}) => call (fn () => send 41)
+const local: a -> U32 where { Read a } = func box => return box.value
+const qualified: a -> U32 where { contracts.Project [a, U32] } = func box => return box.value
+const call = func (action: Action U32) => return invoke action
+entry const answer = func () => return call (func () => return qualified (#Box { value: local (#Box { value: 42 }) }))
+entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func () => return send 41)
 `;
   await Deno.writeTextFile(library, librarySource);
   await Deno.writeTextFile(entry, source);
@@ -123,13 +123,13 @@ Deno.test("a contract's invocation effects remain distinct at each use", async (
 type Run [owner, result] is contract = { receiver "run" owner Unit (Unit -> result ! {| e}) }
 type Pure is data = #Pure U32
 type Sending is data = #Sending (U32 -> U32 ! {Foreign})
-const Pure.run = fn value => fn () => case value of
+const Pure.run = func value => return func () => return case value of
   #Pure number => number
-const Sending.run = fn value => fn () => case value of
+const Sending.run = func value => return func () => return case value of
   #Sending send => send 41
-const run: a -> b ! {| e} where { Run [a, b] } = fn value => value.run ()
-entry const answer = fn () => run (#Pure 42)
-entry const effectful = fn (send: U32 -> U32 ! {Foreign}) => run (#Sending send)
+const run: a -> b ! {| e} where { Run [a, b] } = func value => return value.run ()
+entry const answer = func () => return run (#Pure 42)
+entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return run (#Sending send)
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);

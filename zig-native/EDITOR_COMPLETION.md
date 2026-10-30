@@ -374,19 +374,19 @@ tokens.
 
 | Query source / action                                                                                              | Required reply/assertion                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `const work = fn (value: U32) -> U32 => va<cursor>` followed by `entry const answer = 42`                          | replace covers `va`; sole prefix match value, kind value, insertText value, match exact; expected u32                 |
-| `const take = fn (value: U32) => value` then `const work = fn (value: U32) => take (<cursor>` at EOF               | close one scratch parenthesis; expected u32; value precedes take as a candidate; no scratch edit persists             |
-| `type Point = { x: U32, y: F32 }` then `const work = fn (point: Point) -> F32 => point.<cursor>`                   | items y exact then x incompatible; both kind field; insertText has no dot                                             |
-| `const work = fn (value: U32) -> U32 => do:` then `let original = value`, `value := #True`, `return @ho<cursor>le` | replace entire @hole; original exact precedes value incompatible; graph scope has value Bool, never earlier value U32 |
-| `const work = fn (value: U32) => do:` then `value := @hole<cursor>`                                                | old value and self are U32 in RHS; no successor binding yet                                                           |
-| `const work = fn (value: U32) -> U32 => @hole<cursor>`                                                             | whole-hole edit; expected u32; owned graph remains readable after another query and disposal                          |
+| `const work = func (value: U32) : U32 => return va<cursor>` followed by `entry const answer = 42`                          | replace covers `va`; sole prefix match value, kind value, insertText value, match exact; expected u32                 |
+| `const take = func (value: U32) => return value` then `const work = func (value: U32) => return take (<cursor>` at EOF               | close one scratch parenthesis; expected u32; value precedes take as a candidate; no scratch edit persists             |
+| `type Point = { x: U32, y: F32 }` then `const work = func (point: Point) : F32 => return point.<cursor>`                   | items y exact then x incompatible; both kind field; insertText has no dot                                             |
+| `const work = func (value: U32) : U32 => return do:` then `let original = value`, `value := true`, `return @ho<cursor>le` | replace entire @hole; original exact precedes value incompatible; graph scope has value Bool, never earlier value U32 |
+| `const work = func (value: U32) => return do:` then `value := @hole<cursor>`                                                | old value and self are U32 in RHS; no successor binding yet                                                           |
+| `const work = func (value: U32) : U32 => return @hole<cursor>`                                                             | whole-hole edit; expected u32; owned graph remains readable after another query and disposal                          |
 
 Selector fixture, with no prelude:
 
 ```blot
 type Point = { x: U32, y: F32 }
-const select = fn (get: Point -> F32) => fn (point: Point) => get point
-const work = fn (point: Point) -> F32 => select .<cursor> point
+const select = func (get: Point -> F32) => return func (point: Point) => return get point
+const work = func (point: Point) : F32 => return select .<cursor> point
 entry const answer = 42
 ```
 
@@ -396,7 +396,7 @@ no invented receiver members and context/matches stay unknown.
 
 Import fixture `/p/library.blot` contains `const visible = 7`,
 `type Choice is data = #Picked U32 | #Empty`, and
-`const helper = fn value => value`. All are public under current language rules:
+`const helper = func value => return value`. All are public under current language rules:
 
 | Query                                                                                    | Required visibility                                                                    |
 | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -410,8 +410,8 @@ Generic fixture:
 
 ```blot
 type Add a is contract = { associated "add" a a a }
-const twice: a -> a where { Add a } = fn value => value
-const work: a -> a where { Add a } = fn value => tw<cursor>
+const twice: a -> a where { Add a } = func value => return value
+const work: a -> a where { Add a } = func value => return tw<cursor>
 entry const answer = 42
 ```
 

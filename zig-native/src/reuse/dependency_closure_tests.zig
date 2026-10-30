@@ -179,7 +179,7 @@ test "closure keys exclude new entry bytes and reject changed dependencies paths
     const original = try key(&f.source);
     const entry = &f.source.units.items[f.source.entry - 1];
     const saved_entry = entry.source;
-    entry.source = "entry const newly_named: Unit -> F32=fn()=>42.5\n";
+    entry.source = "entry const newly_named: Unit -> F32=func()=> return 42.5\n";
     try std.testing.expectEqualDeep(original, try key(&f.source));
     try closure.validateSources(&value, &f.source);
     entry.source = saved_entry;
@@ -233,9 +233,9 @@ test "decoded closure rejects dependency cycles excluded entry producers and for
 test "prelude bootstrap imports remain directed dependencies without an implicit reverse edge" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "entry const answer: Unit -> U32=fn()=>prelude_value 42\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "import {identity} from \"./bootstrap\"\nconst prelude_value=fn value=>identity value\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "bootstrap.blot", .data = "const identity=fn value=>value\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "entry const answer: Unit -> U32=func()=> return prelude_value 42\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "import {identity} from \"./bootstrap\"\nconst prelude_value=func value=> return identity value\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "bootstrap.blot", .data = "const identity=func value=> return value\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     const prelude = try dir.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);
@@ -262,9 +262,9 @@ test "unpublished named function returned across modules keeps a controlled-flow
     // from deriving one), so the frozen-Core reader must treat it as a closed global value.
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "infix 30 (<) = lt\nconst lt = fn left => fn right => @type.call \"lt\" left right\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "font.blot", .data = "const glyph = fn (code: U32) => if code < 127 then 1.0 else 2.0\nconst pick = fn (material: U32) => glyph\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import * as f from \"./font\"\nentry const main = fn (c: U32) -> F32 => (f.pick 0) c\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "infix 30 (<) = lt\nconst lt = func left => return func right => return @type.call \"lt\" left right\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "font.blot", .data = "const glyph = func (code: U32) => return if code < 127 then 1.0 else 2.0\nconst pick = func (material: U32) => return glyph\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import * as f from \"./font\"\nentry const main = func (c: U32) : F32 => return (f.pick 0) c\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     const prelude = try dir.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);
@@ -284,7 +284,7 @@ test "source record payload declaration order survives prior symbol identities a
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {Pair} from \"./data\"\nentry const answer=42\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "const second=fn value=>value\ndata Pair=#Pair {first:U32,second:U32}\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "const second=func value=> return value\ndata Pair=#Pair {first:U32,second:U32}\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var source = try project.load(a, std.testing.io, path, .{});
@@ -313,8 +313,8 @@ test "source record payload declaration order survives prior symbol identities a
 test "principal publication keeps reusable globals and Core retains later-constrained local array facts" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {make} from \"./data\"\nentry const answer: Unit -> U32=fn()=>@array.length (make ())\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "data Item=#Item U32\nconst make=fn()=>do:\n  let found=#[]\n  for item in #[#Item 42]:\n    found := #[item]\n  break found\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {make} from \"./data\"\nentry const answer: Unit -> U32=func()=> return @array.length (make ())\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "data Item=#Item U32\nconst make=func()=> return do:\n  let found=#[]\n  for item in #[#Item 42]:\n    found := #[item]\n  break found\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var source = try project.load(a, std.testing.io, path, .{});

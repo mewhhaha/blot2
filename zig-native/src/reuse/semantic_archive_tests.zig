@@ -22,7 +22,7 @@ fn originArchive(allocator: std.mem.Allocator, bytes: []const u8) !void {
 
 test "persisted generated origins own exact source nodes and reject forged catalogs through OOM" {
     const staged =
-        \\const make = fn (value: U32) => @code.quote (@code.lift value)
+        \\const make = func (value: U32) => return @code.quote (@code.lift value)
         \\const first = make 41
         \\const second = make 42
         \\const choices = {first: first, second: second}
@@ -61,13 +61,13 @@ test "persisted generated origins own exact source nodes and reject forged catal
 // recursive helper: the selected receipt replays the closure graph.
 const source =
     \\type Box is data = #Box U32
-    \\const open = fn (box: Box) -> U32 => case box of
+    \\const open = func (box: Box) : U32 => return case box of
     \\  #Box value => value
-    \\const factory = fn number => fn extra => @u32.add number (open (#Box extra))
+    \\const factory = func number => return func extra => return @u32.add number (open (#Box extra))
     \\const callback = factory 42
-    \\const count = fn (n: U32) -> U32 => if @u32.eq n 0 then 0 else @u32.add 1 (count (@u32.sub n 1))
+    \\const count = func (n: U32) : U32 => return if @u32.eq n 0 then 0 else @u32.add 1 (count (@u32.sub n 1))
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (extra: U32) -> U32 => callback (@u32.add extra (count 3))
+    \\entry const answer = func (extra: U32) : U32 => return callback (@u32.add extra (count 3))
 ;
 const Fixture = struct {
     units: []core.Module,
@@ -154,10 +154,10 @@ test "inlined callbacks preserve checkpoint restart without a semantic owner thr
 
 test "portable identity rank checkpoints admit canonical ordinal evidence after frontend teardown" {
     const rank_source =
-        \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = fn identity => fn value => (identity value, identity (@u32.to_f32 value))
-        \\const id: forall [a] => a -> a = fn value => value
-        \\entry const whole = fn (value: U32) => @product.get (two id value) 0
-        \\entry const fraction = fn (value: U32) => @product.get (two id value) 1
+        \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = func identity => return func value => return (identity value, identity (@u32.to_f32 value))
+        \\const id: forall [a] => a -> a = func value => return value
+        \\entry const whole = func (value: U32) => return @product.get (two id value) 0
+        \\entry const fraction = func (value: U32) => return @product.get (two id value) 1
     ;
     var fixture = try Fixture.init(rank_source);
     defer fixture.deinit();
@@ -180,10 +180,10 @@ test "persisted typed staging validates code owners replacements descriptors and
         \\effect Read: Unit -> U32
         \\const delayed = @code.quote (Read ())
         \\const delayed_shape = @code.describe delayed
-        \\const other = @code.quote #True
-        \\const pair = @code.quote (@code.lift (0, #True))
+        \\const other = @code.quote true
+        \\const pair = @code.quote (@code.lift (0, true))
         \\const pair_value = @code.run pair
-        \\const make = fn (step: U32) => @code.quote (@code.lift step)
+        \\const make = func (step: U32) => return @code.quote (@code.lift step)
         \\const generated = make 42
         \\const composed = @code.quote (@code.splice generated)
         \\const shape = @code.describe generated
@@ -343,14 +343,14 @@ test "persisted typed staging preserves ordinary snapshot allocation cost" {
 test "persisted typed staging seals package recipes and never exposes cached bound descriptors through OOM" {
     const text =
         \\type Item = exists [a] => (a, a -> U32)
-        \\const generated = @code.quote (fn (flag: Bool) -> Item ! {} => if flag then pack [U32] (42, fn number => number) as Item else pack [Bool] (flag, fn truth => if truth then 9 else 7) as Item)
-        \\const sealed = @code.quote (pack [U32] (42, fn number => number) as Item)
+        \\const generated = @code.quote (func (flag: Bool) : Item ! {} => return if flag then pack [U32] (42, func number => return number) as Item else pack [Bool] (flag, func truth => return if truth then 9 else 7) as Item)
+        \\const sealed = @code.quote (pack [U32] (42, func number => return number) as Item)
         \\const shape = (@code.describe sealed).result
         \\const same = @descriptor.same shape shape
-        \\const read: Item -> U32 = fn item => unpack item as [a] value in (@product.get value 1) (@product.get value 0)
-        \\const factory = fn (number: U32) => fn (extra: U32) => @u32.add number extra
+        \\const read: Item -> U32 = func item => return unpack item as [a] value in (@product.get value 1) (@product.get value 0)
+        \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\const callback = factory (if same then read (@code.run sealed) else 0)
-        \\entry const answer = fn (flag: Bool) => @u32.add (read ((@code.emit generated) flag)) (callback 0)
+        \\entry const answer = func (flag: Bool) => return @u32.add (read ((@code.emit generated) flag)) (callback 0)
     ;
     const bytes = try produce(text);
     defer a.free(bytes);
@@ -388,7 +388,7 @@ test "persisted typed staging reconstructs nominal constructor substitutions and
     const staged_source =
         \\type Packet a is data = #Packet {item: a}
         \\type Option a is data = #Absent | #Present a
-        \\const make = fn (value: Option (Packet U32)) => @code.quote (@code.lift value)
+        \\const make = func (value: Option (Packet U32)) => return @code.quote (@code.lift value)
         \\const generated = make (#Present (#Packet {item: 42}))
         \\const empty = make #Absent
         \\const floating = @code.quote (@code.lift (#Packet {item: 2.0}))
@@ -469,14 +469,14 @@ test "persisted typed staging reconstructs nominal constructor substitutions and
 test "persisted typed staging opaque record lifts preserve whole producer payloads through OOM" {
     const text =
         \\opaque type Token = {item: U32}
-        \\private const make = fn (number: U32) => #Token {item: number}
-        \\private const open = fn (token: Token) => case token of
+        \\private const make = func (number: U32) => return #Token {item: number}
+        \\private const open = func (token: Token) => return case token of
         \\  #Token payload => payload.item
         \\const generated = @code.quote (@code.lift (make 42))
         \\const restored = @code.run generated
-        \\const factory = fn (number: U32) => fn (extra: U32) => @u32.add number extra
+        \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\const callback = factory (open restored)
-        \\entry const answer = fn (extra: U32) => callback extra
+        \\entry const answer = func (extra: U32) => return callback extra
     ;
     const bytes = try produce(text);
     defer a.free(bytes);
@@ -688,7 +688,7 @@ test "semantic archives omit owners without a complete project namespace or a re
     defer anonymous.deinit(a);
     try successful(&anonymous);
     try std.testing.expect((try archive.encode(a, compiler, &anonymous.capture.?)) == null);
-    var plain = try Fixture.init("entry const answer = fn (x: U32) -> U32 => @u32.add x 1");
+    var plain = try Fixture.init("entry const answer = func (x: U32) : U32 => return @u32.add x 1");
     defer plain.deinit();
     var compiled = try plain.compile(a, null);
     defer compiled.deinit(a);
@@ -710,7 +710,7 @@ fn memberArchiveText() ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const Array.count = fn values => {s}\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\n", .{expression});
+    return a.print("const Array.count = func values => return {s}\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\n", .{expression});
 }
 fn memberArchiveScenario(allocator: std.mem.Allocator, fixture: *const Fixture, captured: *const @import("artifact_capture.zig").Capture, expected: []const u8, portable_count: usize) !void {
     const bytes = (try archive.encode(allocator, compiler, captured)).?;
@@ -759,15 +759,15 @@ test "persisted semantic owners omit member authority while retaining old valid 
 
 test "persisted typed staging statement if helper restarts through OOM" {
     const text =
-        \\const choose = fn (value: U32) => do:
+        \\const choose = func (value: U32) => return do:
         \\  if @u32.eq value 0:
         \\    let value = 40
         \\    break value
         \\  break @u32.add value 40
         \\const generated = @code.quote (choose 2)
-        \\const factory = fn number => fn extra => @u32.add number extra
+        \\const factory = func number => return func extra => return @u32.add number extra
         \\const callback = factory (@code.run generated)
-        \\entry const answer = fn (extra: U32) => callback extra
+        \\entry const answer = func (extra: U32) => return callback extra
     ;
     const bytes = try produce(text);
     defer a.free(bytes);
@@ -782,15 +782,15 @@ test "persisted typed staging statement if helper restarts through OOM" {
 
 test "persisted typed staging Boolean case helper restarts through OOM" {
     const text =
-        \\const choose = fn (flag: Bool) => case flag of
-        \\  #False => 42
-        \\  #True => do:
+        \\const choose = func (flag: Bool) => return case flag of
+        \\  false => 42
+        \\  true => do:
         \\    let flag = 40
         \\    break flag
-        \\const generated = @code.quote (choose #False)
-        \\const factory = fn number => fn extra => @u32.add number extra
+        \\const generated = @code.quote (choose false)
+        \\const factory = func number => return func extra => return @u32.add number extra
         \\const callback = factory (@code.run generated)
-        \\entry const answer = fn (extra: U32) => callback extra
+        \\entry const answer = func (extra: U32) => return callback extra
     ;
     const bytes = try produce(text);
     defer a.free(bytes);

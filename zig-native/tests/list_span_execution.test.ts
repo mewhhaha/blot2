@@ -12,8 +12,8 @@ Deno.test("packed List loop spans survive every row width, leaf crossings and ne
     const sum = Array.from({ length: width }, (_, field) => `row.f${field}`)
       .join(" + ");
     return `
-entry const width_${width} = fn count => do:
-  let values = @list.generate count (fn i => {${row}})
+entry const width_${width} = func count => return do:
+  let values = @list.generate count (func i => return {${row}})
   let saved = values
   values := [{${zero}}, ...self, {${zero}}]
   let rows = @list.slice values 1 count
@@ -64,8 +64,8 @@ Deno.test("packed List rows assembled from many short leaves match flat values a
     const sum = Array.from({ length: width }, (_, field) => `row.f${field}`)
       .join(" + ");
     return `
-entry const width_${width} = fn count => do:
-  let values = @list.generate count (fn i => {${row}})
+entry const width_${width} = func count => return do:
+  let values = @list.generate count (func i => return {${row}})
   let mixed = @list.slice values 0 0
   for a in 0..6:
     for b in 0..8:

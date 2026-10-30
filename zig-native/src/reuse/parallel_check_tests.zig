@@ -10,7 +10,7 @@ const Fixture = struct {
     dir: std.testing.TmpDir,
     source: project.Project,
     fn init(a: A, rejected: bool) !Fixture {
-        return initTexts(a, "const identity = fn value => value\n", if (rejected) "const first: U32 = 1.5\n" else "import {identity} from \"./shared\"\nconst first = fn value => identity value\n", "import {identity} from \"./shared\"\nconst second = fn value => identity value\n", "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer: U32 = first (second 42)\n");
+        return initTexts(a, "const identity = func value => return value\n", if (rejected) "const first: U32 = 1.5\n" else "import {identity} from \"./shared\"\nconst first = func value => return identity value\n", "import {identity} from \"./shared\"\nconst second = func value => return identity value\n", "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer: U32 = first (second 42)\n");
     }
     fn initTexts(a: A, shared: []const u8, left: []const u8, right: []const u8, main: []const u8) !Fixture {
         var dir = std.testing.tmpDir(.{});
@@ -101,7 +101,7 @@ test "parallel module workers release joined results and solver allocators acros
 }
 
 fn summaryScenario(a: A) !void {
-    var fixture = try Fixture.initTexts(a, "const read = fn value => value.field\nconst apply = fn callback => fn value => callback value\n", "import {read, apply} from \"./shared\"\nconst first = fn value => apply read value\n", "import {read, apply} from \"./shared\"\nconst second = fn value => apply read value\n", "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer: U32 = first {field: 42}\nentry const fraction: F32 = second {field: 1.5}\n");
+    var fixture = try Fixture.initTexts(a, "const read = func value => return value.field\nconst apply = func callback => return func value => return callback value\n", "import {read, apply} from \"./shared\"\nconst first = func value => return apply read value\n", "import {read, apply} from \"./shared\"\nconst second = func value => return apply read value\n", "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer: U32 = first {field: 42}\nentry const fraction: F32 = second {field: 1.5}\n");
     defer fixture.deinit(a);
     var expected = try checker.checkProjectWithPrivateExecution(a, &fixture.source, .{ .imported_summary_reuse = false });
     defer expected.deinit(a);

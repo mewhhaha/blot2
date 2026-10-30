@@ -59,27 +59,27 @@ type Ping [] is effect = #Unit -> U32
 //         ^ punctuation.bracket
 //              ^ keyword.storage.type
 
-const first = fn (entry: (Curried U32) [Bool, a]) => entry
-//                        ^ type
-//                                ^ type
-//                                      ^ type
-//                                                ^ operator
+const first = func (entry: (Curried U32) [Bool, a]) => return entry
+//                          ^ type
+//                                  ^ type
+//                                        ^ type
+//                                                  ^ operator
 
-const get = fn (witness: input -> a) -> a => State.get ()
+const get = func (witness: input -> a) : a => return State.get ()
 //    ^ function
 //          ^ keyword.function
-//              ^ variable.parameter
-//                                           ^ type
-//                                           ^ !function.builtin
-//                                                 ^ function.method
+//                ^ variable.parameter
+//                                                   ^ type
+//                                                   ^ !function.builtin
+//                                                         ^ function.method
 
-const set = fn value => State.set value
+const set = func value => return State.set value
 //    ^ function
 //          ^ keyword.function
-//             ^ variable.parameter
-//                      ^ type
-//                      ^ !function.builtin
-//                            ^ variable.other.member
+//               ^ variable.parameter
+//                               ^ type
+//                               ^ !function.builtin
+//                                     ^ variable.other.member
 
 export
 // <- variable
@@ -103,27 +103,26 @@ pub
 // <- variable
 // <- !keyword.storage.modifier
 
-let project = fn (value: U32) => value
+let project = func (value: U32) => return value
 // <- keyword.storage.type
 //  ^ function
 //            ^ keyword.function
-//                ^ variable.parameter
+//                  ^ variable.parameter
 
-let Vec2.project = fn value => value
+let Vec2.project = func value => return value
 // <- keyword.storage.type
 //  ^ type
 //       ^ function
 //                 ^ keyword.function
-//                    ^ variable.parameter
+//                      ^ variable.parameter
 
-fn obsolete value => value
+func curried -> value => return value
 // <- keyword.function
-// ^ variable.parameter
-// ^ !function
-//          ^ variable
-//          ^ !variable.parameter
+//   ^ variable.parameter
+//   ^ !function
+//              ^ variable.parameter
 
-const increment: U32 -> U32 = fn value => value
+const increment: U32 -> U32 = func value => return value
 // <- keyword.storage.type
 //    ^ function
 //             ^ punctuation.delimiter
@@ -131,36 +130,36 @@ const increment: U32 -> U32 = fn value => value
 //                   ^ operator
 //                      ^ type
 //                            ^ keyword.function
-//                               ^ variable.parameter
+//                                 ^ variable.parameter
 
-let Counter.increment: Counter -> Counter = fn value => value
+let Counter.increment: Counter -> Counter = func value => return value
 // <- keyword.storage.type
 //  ^ type
 //          ^ function
 //                   ^ punctuation.delimiter
 //                     ^ type
 //                                          ^ keyword.function
-//                                             ^ variable.parameter
+//                                               ^ variable.parameter
 
-const grouped = (fn value => value)
+const grouped = (func value => return value)
 //    ^ function
 //               ^ keyword.function
-//                  ^ variable.parameter
+//                    ^ variable.parameter
 //              ^ punctuation.bracket
-//                                ^ punctuation.bracket
+//                                         ^ punctuation.bracket
 
-let nested: U32 -> U32 = ((fn value => value))
+let nested: U32 -> U32 = ((func value => return value))
 //  ^ function
 //                         ^ keyword.function
-//                            ^ variable.parameter
+//                              ^ variable.parameter
 //                       ^ punctuation.bracket
 //                        ^ punctuation.bracket
-//                                          ^ punctuation.bracket
-//                                           ^ punctuation.bracket
+//                                                   ^ punctuation.bracket
+//                                                    ^ punctuation.bracket
 
-const Counter.project = (fn value => value)
+const Counter.project = (func value => return value)
 //            ^ function
 //                       ^ keyword.function
-//                          ^ variable.parameter
+//                            ^ variable.parameter
 //                      ^ punctuation.bracket
-//                                        ^ punctuation.bracket
+//                                                 ^ punctuation.bracket

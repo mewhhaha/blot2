@@ -4,7 +4,7 @@ Deno.test("closed existential witnesses survive constant opening and resealing b
   await compileAndRun(
     `type Item = exists [a] => a
 const number = pack [U32] 42 as Item
-const flag = pack [Bool] #True as Item
+const flag = pack [Bool] true as Item
 const resealed = unpack number as [a] first in unpack flag as [b] second in pack [b] second as Item
 entry const answer = unpack resealed as [a] value in 42
 `,

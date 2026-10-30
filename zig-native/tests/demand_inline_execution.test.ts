@@ -33,19 +33,19 @@ Deno.test("known demand combinators compile to control flow without heap or thun
       ],
       ["", "(x < 100) || (x % 2 == 0)", (x: number) => x < 100 || x % 2 === 0],
       [
-        "const choose = fn (a: Bool) => fn ~(b: Bool) => if a then @demand b else #False",
+        "const choose = func (a: Bool) => return func ~(b: Bool) => return if a then @demand b else false",
         "choose (x < 100) (x % 2 == 0)",
         (x: number) => x < 100 && x % 2 === 0,
       ],
       [
-        "const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)",
+        "const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)",
         "twice x",
         (x: number) => (x * 2) >>> 0,
       ],
     ] as const
   ) {
     await compileAndRun(
-      `${declarations}\nentry const run = fn (x: U32) => ${expression}\n`,
+      `${declarations}\nentry const run = func (x: U32) => return ${expression}\n`,
       (guest, bytes) => {
         for (const x of [0, 1, 2, 3, 98, 99, 100, 101, 200, 0xFFFFFFFF]) {
           equal(guest.call("run", x), expected(x));
@@ -62,26 +62,26 @@ Deno.test("known demand combinators compile to control flow without heap or thun
 Deno.test("local demand sharing preserves effect order, branches, lexical versions and repeated calls", async () => {
   await compileAndRun(
     `
-const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-const conditional = fn (condition: Bool) => fn ~(value: U32) =>
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+const conditional = func (condition: Bool) => return func ~(value: U32) => return
   @u32.add (if condition then @demand value else 0) (@demand value)
-const choose = fn (first: U32) => fn ~(second: U32) => fn (last: U32) =>
+const choose = func (first: U32) => return func ~(second: U32) => return func (last: U32) => return
   @u32.add (@u32.add first last) (@demand second)
-const ignore = fn ~(value: U32) => 42
-entry const skipped = fn (x: U32) => ignore (1 / x)
-entry const guarded = fn (x: U32) => (x != 0) && (100 / x == 10)
-entry const order = fn (host: U32 -> U32 ! {Foreign}) => choose (host 1) (host 2) (host 3)
-entry const mixed = fn (host: U32 -> U32 ! {Foreign}) => do:
-  use first <- conditional #False (host 20)
-  use second <- conditional #True (host 1)
+const ignore = func ~(value: U32) => return 42
+entry const skipped = func (x: U32) => return ignore (1 / x)
+entry const guarded = func (x: U32) => return (x != 0) and (100 / x == 10)
+entry const order = func (host: U32 -> U32 ! {Foreign}) => return choose (host 1) (host 2) (host 3)
+entry const mixed = func (host: U32 -> U32 ! {Foreign}) => return do:
+  use first <- conditional false (host 20)
+  use second <- conditional true (host 1)
   break first + second
-entry const repeated = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const repeated = func (host: U32 -> U32 ! {Foreign}) => return do:
   let total = 0
   for i in 0..20:
     use value <- twice (host i)
     total := total + value
   break total
-entry const captured = fn (x: U32) => do:
+entry const captured = func (x: U32) => return do:
   let before = x
   let value = twice before
   before := 99
@@ -116,9 +116,9 @@ entry const captured = fn (x: U32) => do:
 Deno.test("demand spelling retains force compatibility and demand-only typing", async () => {
   await compileAndRun(
     `
-const twice = fn ~(value: U32) => @u32.add (@force value) (@demand value)
+const twice = func ~(value: U32) => return @u32.add (@force value) (@demand value)
 entry const constant = twice 21
-entry const run = fn (x: U32) => twice x
+entry const run = func (x: U32) => return twice x
 `,
     (guest) => {
       equal(guest.read("constant"), 42);
@@ -134,7 +134,7 @@ entry const run = fn (x: U32) => twice x
     "call_arity",
   );
   await compileExpectedFailure(
-    "const ignore = fn ~(value: U32) => 42\nentry const wrong = ignore #True\n",
+    "const ignore = func ~(value: U32) => return 42\nentry const wrong = ignore true\n",
     "type_mismatch",
   );
 });
@@ -147,9 +147,9 @@ Deno.test("retained code tracks inlined demand bodies through edits, reuse, fail
   const options = { entry, executable };
   const compiler = await createCompiler(options);
   const declaration =
-    "const choose = fn (a: Bool) => fn ~(b: Bool) => if a then @demand b else #False\nconst wrapped = fn (x: U32) => choose (x < 100) (x % 2 == 0)\n";
+    "const choose = func (a: Bool) => return func ~(b: Bool) => return if a then @demand b else false\nconst wrapped = func (x: U32) => return choose (x < 100) (x % 2 == 0)\n";
   const main =
-    'import * as lib from "./lib"\nentry const run = fn (x: U32) => lib.wrapped (x + OFFSET)\n';
+    'import * as lib from "./lib"\nentry const run = func (x: U32) => return lib.wrapped (x + OFFSET)\n';
   try {
     for (
       const [source, offset, answer] of [
@@ -157,7 +157,7 @@ Deno.test("retained code tracks inlined demand bodies through edits, reuse, fail
         [declaration, 1, true],
         [declaration, 2, false],
         [
-          declaration.replace("@demand b else #False", "#True else @demand b"),
+          declaration.replace("@demand b else false", "true else @demand b"),
           0,
           true,
         ],

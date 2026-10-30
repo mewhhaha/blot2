@@ -3,18 +3,18 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("predicate package methods follow each runtime witness", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
 type Item = exists [a] where { Render a } => a
-const make: Bool -> Item = fn flag => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-const both = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
-entry const answer = fn (flag: Bool) => read (make flag)
-entry const combined = fn (flag: Bool) => both (make flag) (make #False)
-entry const collection = fn (flag: Bool) => do:
-  let items = #[make flag, make #False]
+const make: Bool -> Item = func flag => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+const both = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
+entry const answer = func (flag: Bool) => return read (make flag)
+entry const combined = func (flag: Bool) => return both (make flag) (make false)
+entry const collection = func (flag: Bool) => return do:
+  let items = #[make flag, make false]
   break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
-entry const snapshot = fn (value: U32) => #[value]
+entry const snapshot = func (value: U32) => return #[value]
 `,
     (guest, bytes) => {
       equal(guest.call("answer", true), 42);
@@ -49,11 +49,11 @@ entry const snapshot = fn (value: U32) => #[value]
 Deno.test("stored dictionary traps preserve later invocations", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Flag : Render Bool = { const show = fn value => if value then 42 else @panic "dictionary failure" }
+impl Flag : Render Bool = { const show = func value => return if value then 42 else @panic "dictionary failure" }
 type Item = exists [a] where { Render a } => a
-const make: Bool -> Item = fn flag => pack [Bool] flag as Item
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-entry const answer = fn (flag: Bool) => read (make flag)
+const make: Bool -> Item = func flag => return pack [Bool] flag as Item
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+entry const answer = func (flag: Bool) => return read (make flag)
 `,
     (guest) => {
       equal(guest.call("answer", true), 42);
@@ -73,12 +73,12 @@ entry const answer = fn (flag: Bool) => read (make flag)
 Deno.test("stored dictionary goals retain compound witness types", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Numbers : Render (Array U32) = { const show = fn values => @array.get values 0 }
-impl Flags : Render (Array Bool) = { const show = fn values => if @array.get values 0 then 7 else 9 }
+impl Numbers : Render (Array U32) = { const show = func values => return @array.get values 0 }
+impl Flags : Render (Array Bool) = { const show = func values => return if @array.get values 0 then 7 else 9 }
 type Item = exists [a] where { Render (Array a) } => Array a
-const make: Bool -> Item = fn flag => if flag then pack [U32] #[42, 9] as Item else pack [Bool] #[#True, #False] as Item
-const read = fn (item: Item) => unpack item as [a] values in Render.show values
-entry const answer = fn (flag: Bool) => read (make flag)
+const make: Bool -> Item = func flag => return if flag then pack [U32] #[42, 9] as Item else pack [Bool] #[true, false] as Item
+const read = func (item: Item) => return unpack item as [a] values in Render.show values
+entry const answer = func (flag: Bool) => return read (make flag)
 `,
     (guest) => {
       equal(guest.call("answer", true), 42);

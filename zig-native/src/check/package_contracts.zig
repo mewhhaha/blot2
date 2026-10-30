@@ -73,6 +73,14 @@ pub const Context = struct {
     owners: [limit]T.Id = @splat(0),
     pure_rows: @import("package_row_facts.zig").Facts = .{},
     closed_rows: @import("package_row_facts.zig").Facts = .{},
+    /// Exact ordinary inference leaves supplied by a checked source scheme
+    /// instance. These confer no row, predicate, binder or package authority.
+    source_instances: bool = false,
+    instance_variables: @import("package_row_facts.zig").Facts = .{},
+    /// Exact tail variables supplied by a successful ordinary source scheme
+    /// instance. Ownership permits latent rows; it proves neither purity nor
+    /// any permission to execute them in a narrower ambient row.
+    instance_rows: @import("package_row_facts.zig").Facts = .{},
     formal: ?T.Id = null,
     generic_variables: T.List = .{},
     generic_rows: T.List = .{},
@@ -80,6 +88,9 @@ pub const Context = struct {
     source_obligations: []const T.Obligation = &.{},
     schemes: [128]T.Scheme = undefined,
     scheme_count: usize = 0,
+    scheme_variables: @import("package_row_facts.zig").Facts = .{},
+    scheme_rows: @import("package_row_facts.zig").Facts = .{},
+    scheme_membership_valid: bool = false,
     formals: [128]T.Id = undefined,
     formal_count: usize = 0,
     introductions: [128]core.Id = @splat(0),
@@ -114,34 +125,52 @@ pub const Context = struct {
         }
     }
     pub fn generic(self: *Context, scheme: T.Scheme) Error!void {
+        self.instance_variables = .{};
+        self.instance_rows = .{};
         self.generic_variables = .{};
         self.generic_rows = .{};
         self.scheme_count = 0;
+        self.scheme_membership_valid = false;
         try self.pushGeneric(scheme);
     }
     pub fn pushGeneric(self: *Context, scheme: T.Scheme) Error!void {
         try require(self.scheme_count < self.schemes.len);
-        self.schemes[self.scheme_count] = scheme;
-        self.scheme_count += 1;
-        if (self.types.node(scheme.root).tag == .forall) return;
+        if (self.types.node(scheme.root).tag == .forall) {
+            self.schemes[self.scheme_count] = scheme;
+            self.scheme_count += 1;
+            self.scheme_membership_valid = false;
+            return;
+        }
         const variables = try span(self.types, scheme.variables);
         const rows = try span(self.types, scheme.row_variables);
-        try require(variables.len <= 128 and rows.len <= 128);
-        for (variables, 0..) |variable, ordinal| {
+        // Ordinary source schemes borrow validated lists rather than the
+        // package reader's fixed quantifier slots. Sparse bounded facts prove
+        // uniqueness without quadratic scans; every leaf consumes proof work.
+        // Portable packages and explicit lexical binders keep their own bounds.
+        try require((self.large_plain_graph and self.source_instances) or (variables.len <= 128 and rows.len <= 128));
+        var seen_variables: @import("package_row_facts.zig").Facts = .{};
+        var seen_rows: @import("package_row_facts.zig").Facts = .{};
+        for (variables) |variable| {
             try self.step(0);
             try require(variable < self.types.nodes.len and self.types.node(variable).tag == .variable);
-            for (variables[0..ordinal]) |prior| try require(prior != variable);
+            try require(!seen_variables.contains(variable));
+            try seen_variables.set(variable);
         }
-        for (rows, 0..) |row, ordinal| {
+        for (rows) |row| {
             try self.step(0);
             try require(row < self.types.effects.variable_count);
-            for (rows[0..ordinal]) |prior| try require(prior != row);
+            try require(!seen_rows.contains(row));
+            try seen_rows.set(row);
         }
+        self.schemes[self.scheme_count] = scheme;
+        self.scheme_count += 1;
+        self.scheme_membership_valid = false;
         self.generic_variables = scheme.variables;
         self.generic_rows = scheme.row_variables;
     }
     pub fn popGeneric(self: *Context) void {
         self.scheme_count -= 1;
+        self.scheme_membership_valid = false;
         self.generic_variables = .{};
         self.generic_rows = .{};
         if (self.scheme_count != 0) {
@@ -153,6 +182,12 @@ pub const Context = struct {
         }
     }
     pub fn ownsVariable(self: *Context, id: T.Id) Error!bool {
+        if (self.source_instances and self.instance_variables.contains(id)) return true;
+        if (self.large_plain_graph and self.source_instances) {
+            try self.schemeMembership();
+            try self.step(0);
+            return self.scheme_variables.contains(id);
+        }
         for (self.schemes[0..self.scheme_count]) |scheme| {
             if (self.types.node(scheme.root).tag == .forall) continue;
             for (try span(self.types, scheme.variables)) |variable| {
@@ -162,7 +197,31 @@ pub const Context = struct {
         }
         return false;
     }
+    pub fn sourceInstance(self: *Context, root: T.Id, depth: usize) Error!void {
+        try require(self.source_instances);
+        try self.step(depth);
+        const node = self.types.node(root);
+        switch (node.tag) {
+            .variable => try self.instance_variables.set(root),
+            .array, .list, .cursor, .demand, .resolver => try self.sourceInstance(node.a, depth + 1),
+            .function => {
+                try self.sourceInstance(node.a, depth + 1);
+                try self.sourceInstance(node.b, depth + 1);
+            },
+            .product => for (try span(self.types, .{ .start = node.a, .len = node.b })) |child| try self.sourceInstance(child, depth + 1),
+            .record => for (0..node.b) |index| try self.sourceInstance(self.types.recordField(node, index).ty, depth + 1),
+            .nominal => for (self.types.nominalArguments(node)) |child| try self.sourceInstance(child, depth + 1),
+            .usage => try self.sourceInstance(node.a, depth + 1),
+            else => {},
+        }
+    }
     pub fn ownsRow(self: *Context, id: u32) Error!bool {
+        if (self.source_instances and self.instance_rows.contains(id)) return true;
+        if (self.large_plain_graph and self.source_instances) {
+            try self.schemeMembership();
+            try self.step(0);
+            return self.scheme_rows.contains(id);
+        }
         for (self.schemes[0..self.scheme_count]) |scheme| {
             for (try span(self.types, scheme.row_variables)) |variable| {
                 try self.step(0);
@@ -170,6 +229,29 @@ pub const Context = struct {
             }
         }
         return false;
+    }
+    /// Membership follows the current lexical scheme stack. Value copies keep
+    /// rollback local; push/pop invalidate it. No instance or pure-row fact is
+    /// imported, and saturation/work exhaustion publishes no partial index.
+    fn schemeMembership(self: *Context) Error!void {
+        if (self.scheme_membership_valid) return;
+        var variables: @import("package_row_facts.zig").Facts = .{};
+        var rows: @import("package_row_facts.zig").Facts = .{};
+        for (self.schemes[0..self.scheme_count]) |scheme| {
+            if (self.types.node(scheme.root).tag != .forall) {
+                for (try span(self.types, scheme.variables)) |variable| {
+                    try self.step(0);
+                    try variables.set(variable);
+                }
+            }
+            for (try span(self.types, scheme.row_variables)) |row| {
+                try self.step(0);
+                try rows.set(row);
+            }
+        }
+        self.scheme_variables = variables;
+        self.scheme_rows = rows;
+        self.scheme_membership_valid = true;
     }
     pub fn schemeGoals(self: *Context, scheme: T.Scheme) Error![]const core.Obligation {
         try require(scheme.obligations.start <= self.obligations.len and scheme.obligations.len <= self.obligations.len - scheme.obligations.start);
@@ -654,6 +736,7 @@ pub const Substitution = struct {
 
 /// Both consumers first reconstruct their lexical context. This comparison
 /// only alpha-renames the two explicit quantifier owners currently compared.
+pub const ordinary_source_type_limit: usize = 256;
 pub const Principal = struct {
     left: *const core.Types,
     right: *const core.Types,
@@ -661,10 +744,10 @@ pub const Principal = struct {
     formals: [128]struct { left: T.List, right: T.List } = undefined,
     formal_count: usize = 0,
     instance: T.List = .{},
-    witnesses: [128]T.Id = @splat(0),
+    witnesses: [ordinary_source_type_limit]T.Id = @splat(0),
     row_witnesses: [128]?RowWitness = @splat(null),
     secondary: T.List = .{},
-    secondary_witnesses: [128]T.Id = @splat(0),
+    secondary_witnesses: [ordinary_source_type_limit]T.Id = @splat(0),
     views: ?*Context = null,
     pending: [128]T.Effects.Id = undefined,
     pending_count: usize = 0,
@@ -722,7 +805,7 @@ pub const Principal = struct {
         try require(pairs.seen_left.count() == pairs.seen_right.count());
     }
     pub fn substituted(self: *Principal, formals: T.List, replacements: []const T.Id, expected: T.Id, actual: T.Id) Error!void {
-        try require(formals.len == replacements.len and formals.len <= self.witnesses.len);
+        try require(formals.len == replacements.len and formals.len <= 128);
         self.instance = formals;
         @memcpy(self.witnesses[0..replacements.len], replacements);
         defer self.instance = .{};
@@ -731,7 +814,7 @@ pub const Principal = struct {
     /// The first replacements live in the right graph. Apply the second,
     /// independently owned formal map there before comparing an endpoint.
     pub fn composed(self: *Principal, formals: T.List, replacements: []const T.Id, secondary: T.List, secondary_replacements: []const T.Id, expected: T.Id, actual: T.Id) Error!void {
-        try require(secondary.len == secondary_replacements.len and secondary.len <= self.secondary_witnesses.len);
+        try require(secondary.len == secondary_replacements.len and secondary.len <= 128);
         self.secondary = secondary;
         @memcpy(self.secondary_witnesses[0..secondary_replacements.len], secondary_replacements);
         defer self.secondary = .{};
@@ -757,7 +840,7 @@ pub const Principal = struct {
         defer {
             if (paired_scope) self.formal_count -= 1;
         }
-        try require(expected.variables.len <= self.witnesses.len and expected.row_variables.len <= self.scheme_row_witnesses.len);
+        try require(expected.variables.len <= self.typeLimit(expected.root) and expected.row_variables.len <= 128);
         self.instance = expected.variables;
         self.instance_rows = expected.row_variables;
         defer self.instance = .{};
@@ -772,7 +855,7 @@ pub const Principal = struct {
             }
         }
         if (paired_scope) return;
-        var variables: std.bit_set.Static(128) = .empty;
+        var variables: std.bit_set.Static(ordinary_source_type_limit) = .empty;
         for (self.witnesses[0..expected.variables.len]) |witness| {
             if (witness == 0) continue; // An unused phantom has no observable endpoint.
             var found = false;
@@ -801,11 +884,44 @@ pub const Principal = struct {
             try require(found);
         }
     }
+    fn sourceTypes(self: *const Principal) bool {
+        return if (self.views) |views| views.source_instances and views.large_plain_graph else false;
+    }
+    fn typeLimit(self: *const Principal, root: T.Id) usize {
+        if (root >= self.left.nodes.len) return 128;
+        const tag = self.left.node(root).tag;
+        return if (tag != .forall and tag != .existential and self.sourceTypes()) ordinary_source_type_limit else 128;
+    }
+    /// Compare the observable dictionary arguments with this already checked
+    /// declaration instance. Private prerequisite-only binders are not public
+    /// arguments and are never independently unified here.
+    pub fn publicArguments(self: *Principal, variables: T.List, rows_: T.List, arguments: []const T.Id) Error!void {
+        try require(arguments.len == variables.len + rows_.len);
+        try require(self.instance.len <= (if (self.sourceTypes()) ordinary_source_type_limit else 128) and self.instance_rows.len <= 128);
+        var proof: Principal = .{ .left = self.right, .right = self.right, .remaining = self.remaining, .views = self.views };
+        for (try span(self.left, variables), arguments[0..variables.len]) |formal, actual| {
+            const ordinal = std.mem.findScalar(T.Id, try span(self.left, self.instance), formal) orelse return error.InvalidArtifact;
+            try require(ordinal < self.witnesses.len and self.witnesses[ordinal] != 0);
+            try proof.match(self.witnesses[ordinal], actual, 0);
+        }
+        for (try span(self.left, rows_), arguments[variables.len..]) |formal, actual| {
+            const ordinal = std.mem.findScalar(T.Id, try span(self.left, self.instance_rows), formal) orelse return error.InvalidArtifact;
+            try require(ordinal < self.scheme_row_witnesses.len and actual < self.right.nodes.len);
+            const witness = self.scheme_row_witnesses[ordinal] orelse return error.InvalidArtifact;
+            const carrier = self.right.node(actual);
+            try require(carrier.tag == .function and carrier.a == T.unit and carrier.b == T.unit);
+            try proof.structuredRow(witness.row, carrier.c, witness.excluded, .empty, false, 0);
+        }
+        if (self.views) |views| for (proof.pending[0..proof.pending_count]) |row| {
+            try views.closed_rows.set(row);
+            if (views.types.row(row).labels.len == 0) try views.pure_rows.set(row);
+        };
+    }
     pub fn rows(self: *Principal, left: T.Effects.Id, right: T.Effects.Id) Error!void {
         try self.matchRow(left, right, 0);
     }
     pub fn instantiateScheme(self: *Principal, scheme: T.Scheme, actual: T.Id) Error!void {
-        try require(scheme.variables.len <= self.witnesses.len and scheme.row_variables.len <= self.scheme_row_witnesses.len);
+        try require(scheme.variables.len <= self.typeLimit(scheme.root) and scheme.row_variables.len <= 128);
         self.instance = scheme.variables;
         self.instance_rows = scheme.row_variables;
         self.witnesses = @splat(0);
@@ -816,7 +932,7 @@ pub const Principal = struct {
         const quantified_actual = self.right.node(actual).tag == .forall;
         if (quantified_actual) {
             const views = self.views orelse return error.InvalidArtifact;
-            try require(views.types == self.right);
+            try require(views.types == self.right and self.right.node(actual).c <= 128);
             try views.enter(actual);
             endpoint = self.right.node(actual).a;
         }
@@ -832,7 +948,7 @@ pub const Principal = struct {
     pub fn instantiateTypes(self: *Principal, owner: T.Id, actual: T.Id) Error!void {
         try require(owner < self.left.nodes.len);
         const quantifier = self.left.node(owner);
-        try require(quantifier.tag == .forall and quantifier.c != 0 and quantifier.c <= self.witnesses.len);
+        try require(quantifier.tag == .forall and quantifier.c != 0 and quantifier.c <= 128);
         self.instance = .{ .start = quantifier.b, .len = quantifier.c };
         self.witnesses = @splat(0);
         self.row_witnesses = @splat(null);
@@ -954,7 +1070,7 @@ pub const Principal = struct {
         if (a.tail == .formal and self.instance.len != 0 and !subset) {
             for (try span(self.left, self.instance), 0..) |binder, ordinal| {
                 if (binder != a.tail.formal) continue;
-                try require(self.left.node(binder).tag == .bound and self.left.node(binder).b == 1);
+                try require(self.left.node(binder).tag == .bound and self.left.node(binder).b == 1 and ordinal < self.row_witnesses.len);
                 if (self.row_witnesses[ordinal]) |prior| {
                     var proof: Principal = .{ .left = self.right, .right = self.right, .remaining = self.remaining, .views = self.views };
                     try proof.structuredRow(prior.row, right, prior.excluded, used, false, depth + 1);
@@ -1000,9 +1116,39 @@ pub const Principal = struct {
             }
         };
         try self.certificateRow(left, right);
+        if (left < self.left.effects.rows.len) {
+            const source = self.left.row(left);
+            if (source.tail == .variable and std.mem.findScalar(u32, self.left.list(self.instance_rows), source.tail.variable) != null) {
+                // A generalized declaration tail is a substitution parameter,
+                // even when a body recipe closed that carrier before the
+                // resulting alias was generalized. Preserve its exact witness
+                // before considering covariant closed implementation views.
+                return self.structuredRow(left, right, .empty, .empty, false, depth + 1);
+            }
+        }
         if (left < self.left.effects.rows.len and right < self.right.effects.rows.len) {
             const a = self.left.row(left);
             const b = self.right.row(right);
+            // Distinct immutable row entries can name the same inference tail.
+            // A proved empty view closes that exact tail, including its aliases;
+            // matching does not equate unrelated tails or erase effect labels.
+            if (self.left == self.right and a.labels.len == 0 and b.labels.len == 0 and a.tail == .variable and std.meta.eql(a.tail, b.tail) and a.cursor == b.cursor) {
+                try require(a.tail.variable < self.left.effects.variable_count);
+                if (self.views) |views| {
+                    if (views.types == self.left and views.isPure(right)) {
+                        if (views.isPure(left)) return;
+                        try require(self.pending_count < self.pending.len);
+                        self.pending[self.pending_count] = left;
+                        self.pending_count += 1;
+                        return;
+                    }
+                }
+                // These are immutable views of one exact inference identity.
+                // Equality does not close that identity or authorize its row.
+                // A known pure source still follows the existing certificate
+                // path below, which publishes the destination's closing fact.
+                if (!self.rowPure(self.left, left)) return;
+            }
             if (self.foreign_views and self.rowPure(self.left, left) and b.tail == .formal) {
                 const views = self.views orelse return error.InvalidArtifact;
                 try require(views.types == self.right);
@@ -1091,6 +1237,7 @@ pub const Principal = struct {
         if ((a.tag == .variable or (a.tag == .bound and a.c == 0)) and self.instance.len != 0) {
             for (try span(self.left, self.instance), 0..) |binder, ordinal| {
                 if (binder != left) continue;
+                try require(ordinal < (if (a.tag == .bound or !self.sourceTypes()) @as(usize, 128) else ordinary_source_type_limit));
                 if (a.tag == .bound) {
                     if (a.b == 0) {
                         var work: @import("usage_check.zig").Work = .{ .remaining = self.remaining.* };
@@ -1140,7 +1287,7 @@ pub const Principal = struct {
                 } else try require(self.left == self.right and left == right and a.c != 0 and b.c != 0);
             },
             .forall, .existential => {
-                try require(a.c == b.c and self.formal_count < self.formals.len);
+                try require(a.c == b.c and a.c <= 128 and self.formal_count < self.formals.len);
                 const left_binders = try span(self.left, .{ .start = a.b, .len = a.c });
                 const right_binders = try span(self.right, .{ .start = b.b, .len = b.c });
                 for (left_binders, right_binders) |x, y| try require(self.left.node(x).b == self.right.node(y).b);

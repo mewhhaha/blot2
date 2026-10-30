@@ -8,15 +8,15 @@ const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 Deno.test("production million-step budget rejects adversarial stage chains", async () => {
   const fields = Array.from(
     { length: 64 },
-    (_, index) => `f${index}: fn x => x * 2.0 + x / 3.0`,
+    (_, index) => `f${index}: func x => return x * 2.0 + x / 3.0`,
   );
-  const stages = ["const s0 = fn () => (holder ()).g"];
+  const stages = ["const s0 = func () => return (holder ()).g"];
   for (let index = 1; index < 101; index++) {
-    stages.push(`const s${index} = fn () => (holder ()).g + s${index - 1} ()`);
+    stages.push(`const s${index} = func () => return (holder ()).g + s${index - 1} ()`);
   }
   const source =
-    `const holder = fn () => #{\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
-    stages.join("\n") + "\nentry const e = fn () => s100 ()\n";
+    `const holder = func () => return #{\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
+    stages.join("\n") + "\nentry const e = func () => return s100 ()\n";
   const directory = await Deno.makeTempDir({ prefix: "blot-stage-stress-" });
   const entry = `${directory}/main.blot`;
   const output = `${directory}/main.wasm`;

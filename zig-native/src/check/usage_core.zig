@@ -175,7 +175,7 @@ const Walker = struct {
             },
             .bind, .construct => return self.capturedLoan(node.b, excluded, depth + 1),
             .if_value, .if_stmt => return try self.capturedLoan(node.a, excluded, depth + 1) or try self.capturedLoan(node.b, excluded, depth + 1) or try self.capturedLoan(node.c, excluded, depth + 1),
-            .task, .block, .suite, .product, .record, .array, .array_op => for (self.module.extra[node.a..][0..node.b]) |child| {
+            .task, .block, .suite, .product, .record, .array, .array_op, .storage => for (self.module.extra[node.a..][0..node.b]) |child| {
                 if (try self.capturedLoan(child, excluded, depth + 1)) return true;
             },
             .call => {
@@ -232,7 +232,7 @@ const Walker = struct {
             .project, .return_, .package_pack => return self.carriesLoan(node.a, excluded, depth + 1),
             .bind, .construct => return self.carriesLoan(node.b, excluded, depth + 1),
             .if_value, .if_stmt => return try self.carriesLoan(node.b, excluded, depth + 1) or try self.carriesLoan(node.c, excluded, depth + 1),
-            .task, .block, .suite, .product, .record, .array, .array_op => for (self.module.extra[node.a..][0..node.b]) |child| {
+            .task, .block, .suite, .product, .record, .array, .array_op, .storage => for (self.module.extra[node.a..][0..node.b]) |child| {
                 if (try self.carriesLoan(child, excluded, depth + 1)) return true;
             },
             // Storage, patterns, recursive aliases and unsupported result
@@ -819,7 +819,7 @@ const Walker = struct {
                     for (operands[1..]) |child| if (try self.expression(child, depth + 1) == .exit) return .exit;
                 } else for (operands) |child| if (try self.expression(child, depth + 1) == .exit) return .exit;
             },
-            .suite, .product, .record, .array, .array_op => for (self.module.extra[node.a..][0..node.b]) |child| {
+            .suite, .product, .record, .array, .array_op, .storage => for (self.module.extra[node.a..][0..node.b]) |child| {
                 if (try self.expression(child, depth + 1) == .exit) return .exit;
             },
             .match => return self.cases(node.a, depth + 1),

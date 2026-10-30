@@ -14,7 +14,7 @@ const io = std.testing.io;
 const sources = [_][]const u8{
     "// 雪🙂\nentry const answer=;\n",
     "// 雪🙂\nentry const answer=\"bad\\q\"\n",
-    "// 雪🙂\nentry const answer=fn()=>do:\n  use\n  break 0\n",
+    "// 雪🙂\nentry const answer=func()=> return do:\n  use\n  break 0\n",
     "// 雪🙂\nentry const answer=(42]\n",
     "// 雪🙂\nentry const answer=4294967296\n",
     "// 雪🙂\nentry const answer=1e100\n",

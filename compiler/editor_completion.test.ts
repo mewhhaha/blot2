@@ -98,7 +98,7 @@ Deno.test("completion has no entry or build dependency and never publishes its r
       });
     };
     const initial = await query(
-      "// 雪\nconst work = fn (value: U32) -> U32 => va<cursor>\n",
+      "// 雪\nconst work = func (value: U32) : U32 => return va<cursor>\n",
     );
     ok(initial.success, JSON.stringify(initial));
     equal(initial.revision, 0);
@@ -111,13 +111,13 @@ Deno.test("completion has no entry or build dependency and never publishes its r
     ok(built.success);
     equal(built.revision, 1);
     const argument = await query(
-      "const take = fn (value: U32) => value\nconst work = fn (value: U32) => take (<cursor>",
+      "const take = func (value: U32) => return value\nconst work = func (value: U32) => return take (<cursor>",
     );
     ok(argument.success, JSON.stringify(argument));
     equal(argument.items[0].insertText, "value");
     equal(argument.items[0].match, "exact");
     const rebinding = await query(
-      "const work = fn (value: U32) => do:\n  value := @hole<cursor>",
+      "const work = func (value: U32) => return do:\n  value := @hole<cursor>",
     );
     ok(rebinding.success, JSON.stringify(rebinding));
     const context = rebinding.context;
@@ -130,12 +130,12 @@ Deno.test("completion has no entry or build dependency and never publishes its r
       equal(context.nodes[context.scope[index].type].kind, "u32");
     }
     const generic = await query(
-      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = fn value => value\nconst work: a -> a where { Add a } = tw<cursor>',
+      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a where { Add a } = tw<cursor>',
     );
     ok(generic.success, JSON.stringify(generic));
     equal(generic.items[0].match, "compatible");
     const conflicting = await query(
-      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = fn value => value\nconst work: a -> a = tw<cursor>',
+      'type Add a is contract = { associated "add" a a a }\nconst twice: a -> a where { Add a } = func value => return value\nconst work: a -> a = tw<cursor>',
     );
     ok(conflicting.success, JSON.stringify(conflicting));
     equal(conflicting.items[0].match, "unknown");
@@ -238,7 +238,7 @@ Deno.test("completion retains the deterministic best prefix in an oversized sema
     (_, index) => "candidate" + String(index).padStart(4, "0"),
   );
   const text = names.map((name) => `const ${name}: U32 = 0`).join("\n") +
-    "\nconst work = fn () -> U32 => candidate";
+    "\nconst work = func () : U32 => return candidate";
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

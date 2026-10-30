@@ -4,21 +4,21 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library =
-  `const inspect = fn (value: U32) => @resource.scope (fn () => {left: value, right: #[#[value, 7], #[9]]}) (fn owner => ()) (fn loan => 42)
-const tuple = fn (value: U32) => do:
-  use owner <- @resource.acquire (fn () => (value, #[value, 8])) (fn owned => ())
-  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
+  `const inspect = func (value: U32) => return @resource.scope (func () => return {left: value, right: #[#[value, 7], #[9]]}) (func owner => return ()) (func loan => return 42)
+const tuple = func (value: U32) => return do:
+  use owner <- @resource.acquire (func () => return (value, #[value, 8])) (func owned => return ())
+  let transfer: once (Unit -> Unit ! {Foreign}) = func () => return @resource.release owner
   use transfer ()
   break 42
-const nested = fn (value: U32) => @resource.scope (fn () => #[#[value, 7], #[9]]) (fn owner => ()) (fn loan => @usage.length loan)
-const failing = fn (value: U32) => @resource.scope (fn () => {left: value, right: #[#[value, 7], #[9]]}) (fn owner => do:
+const nested = func (value: U32) => return @resource.scope (func () => return #[#[value, 7], #[9]]) (func owner => return ()) (func loan => return @usage.length loan)
+const failing = func (value: U32) => return @resource.scope (func () => return {left: value, right: #[#[value, 7], #[9]]}) (func owner => return do:
   let ignored = @u32.div 1 value
-  break ()) (fn loan => 42)
+  break ()) (func loan => return 42)
 `;
 const source = `import {inspect, tuple, nested, failing} from "./cleanup"
-entry const answer = fn (value: U32) => @u32.add (inspect value) (tuple value)
-entry const length = fn (value: U32) => nested value
-entry const failure = fn (value: U32) => failing value
+entry const answer = func (value: U32) => return @u32.add (inspect value) (tuple value)
+entry const length = func (value: U32) => return nested value
+entry const failure = func (value: U32) => return failing value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`closed aggregate resources retain exact children and portable cleanup (${codegenTier})`, async () => {
@@ -88,8 +88,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
             sources: {
               [entry]: source,
               [dependency]: library.replace(
-                "(fn owner => ())",
-                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    break ())",
+                "(func owner => return ())",
+                "(func owner => return do:\n    for ever:\n      let ignored = 7\n    break ())",
               ),
             },
           });

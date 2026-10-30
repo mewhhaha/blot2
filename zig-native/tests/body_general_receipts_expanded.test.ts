@@ -9,41 +9,41 @@ const library = (seed: string, delta: number, prefix = "") =>
 infixl 60 (??) = ignore
 ${prefix}const seed = ${seed}
 type Number is data = #Number U32
-const Number.next = fn (#Number value) => @u32.add value ${delta}
+const Number.next = func (#Number value) => return @u32.add value ${delta}
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 effect Read: U32 -> U32
-const state = fn (initial: U32) => @effect.run State.get State.set initial (fn () => do:
+const state = func (initial: U32) => return @effect.run State.get State.set initial (func () => return do:
   use State.set 40
   break State.get ()
 )
-const scoped = fn () => @effect.scope (fn (state: State U32) => do:
+const scoped = func () => return @effect.scope (func (state: State U32) => return do:
   let capability = state
   let read = capability.get
   let write = capability.set
-  let local = fn () => read ()
+  let local = func () => return read ()
   let (successor, result) = do (@effect.state read write seed):
     break local ()
   break result
 )
-const borrow = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-const resource = fn () => @resource.scope (fn () => #[seed, 40]) (fn owner => ()) (fn loan => @usage.length loan)
-const request = fn (host: U32 -> U32 ! {Foreign}) => do:
+const borrow = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+const resource = func () => return @resource.scope (func () => return #[seed, 40]) (func owner => return ()) (func loan => return @usage.length loan)
+const request = func (host: U32 -> U32 ! {Foreign}) => return do:
   let count = 0
-  for request in @requests (@computation (fn () => Read seed)):
+  for request in @requests (@computation (func () => return Read seed)):
     case request of
       effect Read value =>
         count := @u32.add count 1
         yield host value
       complete value =>
         break @u32.add count value
-const effect_count = fn () => @effect.count (@effect.of scoped)
+const effect_count = func () => return @effect.count (@effect.of scoped)
 const count = effect_count ()
-const rich = fn (host: U32 -> U32 ! {Foreign}) => @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
-const both = fn ~(left: U32) => fn ~(right: U32) => @u32.add (@u32.add (@force left) (@force left)) (@force right)
-const ignore = fn ~(left: U32) => fn ~(right: U32) => 7
-const operate = fn (host: U32 -> U32 ! {Foreign}) => @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
-const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-  let choose = fn () => if flag then left else right
+const rich = func (host: U32 -> U32 ! {Foreign}) => return @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
+const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@force left) (@force left)) (@force right)
+const ignore = func ~(left: U32) => return func ~(right: U32) => return 7
+const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
+const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+  let choose = func () => return if flag then left else right
   let chosen = choose ()
   let alias = chosen
   let (state, result) = do (@effect.state chosen.get chosen.set seed):
@@ -51,46 +51,46 @@ const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effe
     break alias.get ()
   break result
 ))
-const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-const lookup = fn (index: U32) => do:
+const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+const lookup = func (index: U32) => return do:
   let values = #[seed, 13]
   let valid = witness values index
   break at values index valid
 type Render a is contract = {const show: a -> U32}
-impl RenderU32 : Render U32 = {const show = fn value => value}
+impl RenderU32 : Render U32 = {const show = func value => return value}
 type Item = exists [a] where {Render a} => a
 const item: Item = pack [U32] seed as Item
-const package_read = fn (item: Item) => unpack item as [a] value in Render.show value
-const decorate = fn (value: U32) => fn () => @u32.add value seed
-@[fn (callback: Unit -> U32) => fn () => @u32.add (callback ()) 1] @[decorate] const tagged: Unit -> U32 = 40
+const package_read = func (item: Item) => return unpack item as [a] value in Render.show value
+const decorate = func (value: U32) => return func () => return @u32.add value seed
+@[func (callback: Unit -> U32) => return func () => return @u32.add (callback ()) 1] @[decorate] const tagged: Unit -> U32 = 40
 type Maybe a is data = #Some a | #Nothing
 type Counter is data = #Counter U32
-const Counter.iter = fn (cursor: Counter) => cursor
-const Counter.next = fn (#Counter value) => if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
-const iterator_total = fn (first: U32) => do:
+const Counter.iter = func (cursor: Counter) => return cursor
+const Counter.next = func (#Counter value) => return if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
+const iterator_total = func (first: U32) => return do:
   let result = seed
   for value in #Counter first:
     result := @u32.add self value
   break result
-const describe = fn (value: U32) => do:
+const describe = func (value: U32) => return do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
   break @record.merge record {next: (#Number value).next}
 `;
 const main =
   `import {operate, describe, rich, selected, lookup, item, package_read, tagged, iterator_total} from "./logic"
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => operate host
-entry const method = fn (value: U32) => do:
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return operate host
+entry const method = func (value: U32) => return do:
   let record = describe value
   break @u32.add record.value record.next
-entry const deep = fn (host: U32 -> U32 ! {Foreign}) => rich host
-entry const owned = fn (value: U32) => (describe value).values
-entry const proof = fn (index: U32) => lookup index
-entry const package = fn () => package_read item
-entry const tag = fn () => tagged ()
-entry const iteration = fn (first: U32) => iterator_total first
-entry const chosen = fn (flag: Bool) => selected flag
+entry const deep = func (host: U32 -> U32 ! {Foreign}) => return rich host
+entry const owned = func (value: U32) => return (describe value).values
+entry const proof = func (index: U32) => return lookup index
+entry const package = func () => return package_read item
+entry const tag = func () => return tagged ()
+entry const iteration = func (first: U32) => return iterator_total first
+entry const chosen = func (flag: Bool) => return selected flag
 `;
 async function observe(
   bytes: Uint8Array<ArrayBuffer>,
@@ -204,7 +204,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       ...options,
       dependencies: archive,
     });
-    const prefix = "const earlier = fn (value: F32) => @f32.add value 1.0\n";
+    const prefix = "const earlier = func (value: F32) => return @f32.add value 1.0\n";
     try {
       for (
         const [seed, delta, inserted] of [

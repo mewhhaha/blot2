@@ -57,6 +57,12 @@ Deno.test("guest dependencies select every runtime fixture and directories retai
     [],
   );
   assert.deepEqual(
+    fixturesForGuestFiles([
+      "zig-native/tests/data_stacks_execution.test.ts",
+    ]),
+    ["data-stacks-fixture"],
+  );
+  assert.deepEqual(
     fixturesForGuestFiles(["zig-native/tests/"]),
     compilerFixtures,
   );

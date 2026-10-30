@@ -19,9 +19,9 @@ async function generationRecipeLaw(
   const source =
     `import {generated, generated_task, evaluated} from "./producer"
 entry const checked: U32 = evaluated
-entry const task_probe = fn (value: U32) => (@code.emit generated_task) value
-entry const probe = fn (value: U32) => (@code.emit generated) value
-entry const answer = fn () => do:
+entry const task_probe = func (value: U32) => return (@code.emit generated_task) value
+entry const probe = func (value: U32) => return (@code.emit generated) value
+entry const answer = func () => return do:
   let value = 100
   use first <- (@code.emit generated) 0
   use second <- (@code.emit generated) 1
@@ -29,22 +29,22 @@ entry const answer = fn () => do:
 `;
   const library = (base: number) => {
     if (recipe === "resolver iteration") {
-      return `const helper = fn (value: U32) => Maybe.unwrap_or 0 (do (monad Maybe):
+      return `const helper = func (value: U32) => return Maybe.unwrap_or 0 (do (monad Maybe):
   let total = ${base}
   for index in 0..value:
     use item <- #Some 1
     total := @u32.add self item
   break total)
-const generated = @code.quote (fn (value: U32) => helper value)
-const generated_task = @code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))
+const generated = @code.quote (func (value: U32) => return helper value)
+const generated_task = @code.quote (func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value))))
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "stateful requests") {
       return `effect Read: U32 -> U32
-const helper = fn (value: U32) => do:
+const helper = func (value: U32) => return do:
   let count = ${base}
-  let calculation = @computation (fn () => Read value)
+  let calculation = @computation (func () => return Read value)
   for request in @requests calculation:
     case request of
       effect Read value =>
@@ -52,8 +52,8 @@ const helper = fn (value: U32) => do:
         yield value
       complete value =>
         break count
-const generated = @code.quote (fn (value: U32) => helper value)
-const generated_task = @code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))
+const generated = @code.quote (func (value: U32) => return helper value)
+const generated_task = @code.quote (func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value))))
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
@@ -61,30 +61,30 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
     if (recipe === "resolver forwarding") {
       finish = "break $ #Box (@u32.add number " + base + ")";
     }
-    let pure = "const Box.pure = fn value => #Box value";
+    let pure = "const Box.pure = func value => return #Box value";
     if (recipe === "resolver effects") {
-      pure = `const Box.pure = fn value => do:
-  use owner <- @resource.acquire (fn () => 1) (fn value => ())
+      pure = `const Box.pure = func value => return do:
+  use owner <- @resource.acquire (func () => return 1) (func value => return ())
   use @resource.release owner
   break #Box value`;
     }
     let generatedTask =
-      "@code.quote (fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value))))";
+      "@code.quote (func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value))))";
     if (recipe === "resolver effects") generatedTask = "generated";
     let evaluated = "@code.run (@code.quote (helper 2))";
     if (recipe === "resolver effects") evaluated = String(base + 2);
     return `type Box a is data = #Box a
 ${pure}
-const Box.bind = fn candidate => fn next => case candidate of
+const Box.bind = func candidate => return func next => return case candidate of
   #Box value => next value
-const identity = fn value => value
+const identity = func value => return value
 const selected = identity (@do.monad (identity Box))
-const sequence = fn (value: U32) => do selected:
+const sequence = func (value: U32) => return do selected:
   use number <- #Box value
   ${finish}
-const helper = fn (value: U32) => case sequence value of
+const helper = func (value: U32) => return case sequence value of
   #Box result => result
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const generated_task = ${generatedTask}
 const evaluated: U32 = ${evaluated}
 `;

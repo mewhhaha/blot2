@@ -14,14 +14,14 @@ const prelude = `${repo}std/prelude.blot`;
 const registry = (size: number, wanted: number) => {
   const items = Array.from({ length: size }, (_, index) => index).join(", ");
   return `const registry = #[${items}]
-const contains = fn (index: U32) => fn (wanted: U32) -> Bool => if index == registry.length then #False else if registry[index] == wanted then #True else contains (index + 1) wanted
+const contains = func (index: U32) => return func (wanted: U32) : Bool => return if index == registry.length then false else if registry[index] == wanted then true else contains (index + 1) wanted
 const present: Bool = contains 0 ${wanted}
-entry const found = fn () -> Bool => present
+entry const found = func () : Bool => return present
 `;
 };
-const runaway = `const forever = fn (n: U32) -> U32 => forever (n + 1)
+const runaway = `const forever = func (n: U32) : U32 => return forever (n + 1)
 const value: U32 = forever 0
-entry const found = fn () -> U32 => value
+entry const found = func () : U32 => return value
 `;
 Deno.test("compile-time recursion walks long tables and bounds runaway calls", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-depth-" });

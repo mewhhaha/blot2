@@ -17,12 +17,12 @@ const program = (offset: number) => `
 type Shape is data = #Circle U32 | #Square U32
 type Validate is effect = { check: U32 -> U32 }
 
-const area = fn (shape: Shape) -> U32 => case shape of
+const area = func (shape: Shape) : U32 => return case shape of
   #Circle r if r > 10 => r * 3
   #Circle r => r
   #Square s => s * s
 
-entry const joins = fn (v: U32) -> U32 => do:
+entry const joins = func (v: U32) : U32 => return do:
   let total = if v > 5 then v else 5
   let bonus = ${offset}
   if v > 20:
@@ -36,7 +36,7 @@ entry const joins = fn (v: U32) -> U32 => do:
     bonus := self + 1
   break total + bonus + area (#Circle v) + area (#Square 2)
 
-entry const loops = fn (end: U32) -> U32 => do:
+entry const loops = func (end: U32) : U32 => return do:
   let total = 0
   let steps = 0
   for index in 0..end:
@@ -47,7 +47,7 @@ entry const loops = fn (end: U32) -> U32 => do:
       steps := self + 2
   break total * 1000 + steps
 
-entry const early = fn (end: U32) -> U32 => do:
+entry const early = func (end: U32) : U32 => return do:
   let total = 0
   for index in 0..end:
     if total > 50:
@@ -55,7 +55,7 @@ entry const early = fn (end: U32) -> U32 => do:
     total := self + index
   break total
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -65,7 +65,7 @@ const checked = fn computation => do:
       complete value =>
         break value
 
-const count_until_zero = fn computation => do:
+const count_until_zero = func computation => return do:
   let count = 0
   for request in @requests computation:
     case request of
@@ -78,13 +78,13 @@ const count_until_zero = fn computation => do:
         break
   break count
 
-entry const requested = fn (v: U32) -> U32 => checked (@computation (fn () => do:
+entry const requested = func (v: U32) : U32 => return checked (@computation (func () => return do:
   use left <- Validate.check v
   use right <- Validate.check 2
   break left + right
 ))
 
-entry const counted = fn (v: U32) -> U32 => count_until_zero (@computation (fn () => do:
+entry const counted = func (v: U32) : U32 => return count_until_zero (@computation (func () => return do:
   use Validate.check v
   use Validate.check 2
   use Validate.check 0

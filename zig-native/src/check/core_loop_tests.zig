@@ -8,15 +8,15 @@ const core = @import("core.zig");
 const a = std.testing.allocator;
 
 const source =
-    \\const make = fn (start: U32) => do:
+    \\const make = func (start: U32) => return do:
     \\  let total = start
-    \\  break fn (limit: U32) => do:
+    \\  break func (limit: U32) => return do:
     \\    for index in 0..limit:
     \\      total := @u32.add self index
     \\      if @u32.lt 2 index:
     \\        break
     \\    break total
-    \\entry const run = fn (limit: U32) -> U32 => (make 40) limit
+    \\entry const run = func (limit: U32) : U32 => return (make 40) limit
 ;
 
 const Fixture = struct {

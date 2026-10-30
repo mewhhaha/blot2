@@ -1,66 +1,76 @@
-const generate = fn count => fn generator => @list.generate count generator
-const fill = fn count => fn value => @list.fill count value
-const from_array = fn values => @list.from_array values
-const to_array = fn values => @array.from_list values
-const length = fn values => @list.length values
-const is_empty = fn values => List.is_empty values
-const append = fn value => fn values => @list.append values value
-const prepend = fn value => fn values => @list.prepend values value
-const map = fn transform => fn (values: List a) => [transform value | value <- values]
-const filter = fn predicate => fn (values: List a) => [value | value <- values, predicate value]
-const fold_left = fn reduce => fn initial => fn (values: List a) => do:
+const generate = func count -> generator => return @list.generate count generator
+const fill = func count -> value => return @list.fill count value
+const from_array = func values => return @list.from_array values
+const to_array = func values => return @array.from_list values
+const length = func values => return @list.length values
+const is_empty = func values => return List.is_empty values
+const append = func value -> values => return @list.append values value
+const prepend = func value -> values => return @list.prepend values value
+const map = func transform -> (values: List a) => return [transform value | value <- values]
+const filter = func predicate -> (values: List a) => return [value | value <- values, predicate value]
+const fold_left = func reduce -> initial -> (values: List a) => return do:
   let state = initial
   for value in values:
     use next <- reduce state value
     state := next
   break state
 
-const any = fn predicate => fn (values: List a) => do:
+const any = func predicate -> (values: List a) => return do:
   for value in values:
     use found <- predicate value
     if found:
-      break #True
-  break #False
+      break true
+  break false
 
-const all = fn predicate => fn (values: List a) => do:
+const all = func predicate -> (values: List a) => return do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
-      break #False
-  break #True
+      break false
+  break true
 
-// Whole subtrees are shared; partial boundary leaves are copied.
-const concat = fn left => fn right => @list.concat left right
-const slice = fn start => fn count => fn values => @list.slice values start count
-const split_at = fn index => fn values =>
+// Flat immutable sequences copy elements into independent result storage.
+const concat = func left -> right => return @list.concat left right
+const slice = func start -> count -> values => return @list.slice values start count
+const split_at = func index -> values => return
   (slice 0 index values, slice index (values.length - index) values)
-const take = fn count => fn values => slice 0 (min count values.length) values
-const drop = fn count => fn values => do:
+const take = func count -> values => return slice 0 (min count values.length) values
+const drop = func count -> values => return do:
   let start = min count values.length
   break slice start (values.length - start) values
 
-// Positions refer to the original list; unchanged subtrees remain shared.
-const splice = fn start => fn delete_count => fn replacement => fn values => do:
-  if start > values.length || delete_count > values.length - start:
+// Positions refer to the original list; replacement results preserve inputs.
+const splice = func start -> delete_count -> replacement -> values => return do:
+  if start > values.length or delete_count > values.length - start:
     break @panic "list splice range is out of bounds"
-  if delete_count == 0 && replacement.is_empty:
+  if delete_count == 0 and replacement.is_empty:
     break values
   let end = start + delete_count
   break concat (concat (slice 0 start values) replacement) (slice end (values.length - end) values)
 
-// Validate sorted, nonoverlapping edits before constructing the result. Multiple
-// insertions at the same position keep their written order. Empty edits share xs.
-const splice_many = fn (edits: List { start: U32, delete_count: U32, replacement: List a }) => fn (values: List a) => do:
+// Edit rows are flat. Replacement ranges refer to one independent immutable
+// sequence, and edit positions always refer to the original source sequence.
+// Validate every source/replacement span before allocating the result.
+const splice_many = func (edits: List {start: U32, delete_count: U32, replacement: {start: U32, count: U32}}) -> (replacements: List a) -> (values: List a) => return do:
   let end = 0
   for edit in edits:
-    if edit.start < end || edit.start > values.length || edit.delete_count > values.length - edit.start:
-      break @panic "list splice edits must be ordered, nonoverlapping and in bounds"
+    if edit.start < end or edit.start > values.length or edit.delete_count > values.length - edit.start:
+      return @panic "list splice edits must be ordered, nonoverlapping and in bounds"
+    if edit.replacement.start > replacements.length or edit.replacement.count > replacements.length - edit.replacement.start:
+      return @panic "list splice replacement span is out of bounds"
     end := edit.start + edit.delete_count
   if edits.is_empty:
-    break values
-  let result = []
+    return values
+  let source: Array a = @array.from_list values
+  let replacement_values: Array a = @array.from_list replacements
+  let result: GrowArray a = #[]
   let cursor = 0
   for edit in edits:
-    result := concat (concat self (slice cursor (edit.start - cursor) values)) edit.replacement
+    for index in cursor .. edit.start:
+      result.push source[index]
+    for offset in 0 .. edit.replacement.count:
+      result.push replacement_values[edit.replacement.start + offset]
     cursor := edit.start + edit.delete_count
-  break concat result (slice cursor (values.length - cursor) values)
+  for index in cursor .. source.length:
+    result.push source[index]
+  return @list.from_array (@storage.freeze result)

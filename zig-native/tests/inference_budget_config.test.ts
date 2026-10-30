@@ -10,7 +10,7 @@ Deno.test("runtime inference configuration binds identity and preserves the prod
   const entry = `${directory}/main.blot`;
   const cacheDirectory = `${directory}/cache`;
   const options = { executable, entry, prelude: null, cacheDirectory };
-  const sources = { [entry]: "entry const answer = fn () => 42\n" };
+  const sources = { [entry]: "entry const answer = func () => return 42\n" };
   const production = await createZigProjectCompiler(options);
   const explicit = await createZigProjectCompiler({
     ...options,
@@ -53,18 +53,18 @@ Deno.test("explicit associated work limits span modules and rejection recovers",
   const entry = `${directory}/main.blot`;
   const library =
     `type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
+impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
 type Package = exists [a] where { Source a } => a
-const read = fn (item: Package) => unpack item as [a] value in Source.show value (Source.get value)
+const read = func (item: Package) => return unpack item as [a] value in Source.show value (Source.get value)
 const number: Package = pack [U32] 42 as Package
-const answer = fn () => read number
+const answer = func () => return read number
 `;
   const sources = {
     [`${directory}/first.blot`]: library,
     [`${directory}/second.blot`]: library,
     [entry]: `import * as first from "./first"
 import * as second from "./second"
-entry const answer = fn () => @u32.add (first.answer ()) (second.answer ())
+entry const answer = func () => return @u32.add (first.answer ()) (second.answer ())
 `,
   };
   const options = {
@@ -99,7 +99,7 @@ entry const answer = fn () => @u32.add (first.answer ()) (second.answer ())
       sources: {
         ...sources,
         [entry]:
-          'import * as first from "./first"\nentry const answer = fn () => first.answer ()\n',
+          'import * as first from "./first"\nentry const answer = func () => return first.answer ()\n',
       },
     });
     assert(recovered.success, JSON.stringify(recovered));

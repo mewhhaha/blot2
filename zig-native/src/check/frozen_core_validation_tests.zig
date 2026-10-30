@@ -11,15 +11,15 @@ const a = std.testing.allocator;
 const mixed_source =
     \\type Point is data = #Point { x: U32 }
     \\type Bucket is data = #Bucket { points: Array Point }
-    \\const make = fn (initial: Bucket) => do:
+    \\const make = func (initial: Bucket) => return do:
     \\  let bucket = initial
-    \\  break fn (index: U32) => do:
+    \\  break func (index: U32) => return do:
     \\    bucket.points[index].x := do:
     \\      let other = #[40]
     \\      other[0] := @u32.add self 2
     \\      break other[0]
     \\    break bucket.points[index].x
-    \\entry const run = fn () -> U32 => (make (#Bucket { points: #[#Point { x: 1 }] })) 0
+    \\entry const run = func () : U32 => return (make (#Bucket { points: #[#Point { x: 1 }] })) 0
 ;
 
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
@@ -62,14 +62,44 @@ fn verified(allocator: std.mem.Allocator, module: *const core.Module) !void {
     try std.testing.expectEqual(before, digest(module));
 }
 
+fn runSurfaceAdmission(allocator: std.mem.Allocator) !void {
+    var m = try lower(allocator,
+        \\effect Read: Unit -> U32
+        \\const effectful = func () => return Read ()
+        \\entry const answer = func () : U32 => return #run @u32.add 40 2
+    );
+    defer m.deinit(allocator);
+    try verified(allocator, &m);
+    var found = false;
+    for (m.nodes) |*node| {
+        if (node.tag != .staging) continue;
+        found = true;
+        const saved = node.*;
+        node.ty = T.boolean;
+        try rejectedNamedComposition(allocator, &m);
+        node.* = saved;
+        // Both results are U32. Matching the shape must not permit effects
+        // merely because another body in the module can perform them.
+        node.a = m.bodies[0].root;
+        try rejectedNamedComposition(allocator, &m);
+        node.* = saved;
+    }
+    try std.testing.expect(found);
+}
+
+test "run surface validates result shape and isolated purity through allocation failures" {
+    try runSurfaceAdmission(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, runSurfaceAdmission, .{});
+}
+
 test "portable typed staging validates complete shapes and rejects forged operands and stage references" {
     var m = try lower(a,
-        \\const make = fn (step: U32) => @code.quote (fn (value: U32) => @u32.add value (@code.lift step))
+        \\const make = func (step: U32) => return @code.quote (func (value: U32) => return @u32.add value (@code.lift step))
         \\const generated = make 2
         \\const inspected = @code.describe generated
         \\const fields = @descriptor.fields (@code.describe (@code.quote {number: 1})).result
         \\const same = @descriptor.same fields.number inspected.result
-        \\entry const answer = fn (value: U32) => (@code.emit generated) value
+        \\entry const answer = func (value: U32) => return (@code.emit generated) value
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -119,7 +149,7 @@ test "portable typed staging reconstructs named loop carries after producer tear
     var answer: u32 = 0;
     {
         var m = try lower(a,
-            \\const sum = fn (values: Array U32) => do:
+            \\const sum = func (values: Array U32) => return do:
             \\  let total = 0
             \\  for value in values:
             \\    if @u32.eq value 0:
@@ -144,7 +174,7 @@ test "portable typed staging reconstructs named loop carries after producer tear
 
 test "portable typed staging rejects loop carry and merge ownership forgeries" {
     var m = try lower(a,
-        \\const sum = fn (values: Array U32) => do:
+        \\const sum = func (values: Array U32) => return do:
         \\  let total = 0
         \\  for value in values:
         \\    if @u32.eq value 20:
@@ -182,7 +212,7 @@ test "portable typed staging owns future local scope graphs after producer teard
     {
         var m = try lower(a,
             \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-            \\const local = fn (value: U32) => @effect.scope (fn (state: State U32) => value)
+            \\const local = func (value: U32) => return @effect.scope (func (state: State U32) => return value)
             \\const generated = @code.quote (local 42)
             \\const answer = 42
         );
@@ -205,9 +235,9 @@ test "portable typed staging owns handled future effects and fresh scope provide
         var m = try lower(a,
             \\effect Read: Unit -> U32
             \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-            \\const plain = @code.quote (do (@effect.provider Read (fn () => 42)):
+            \\const plain = @code.quote (do (@effect.provider Read (func () => return 42)):
             \\  break Read ())
-            \\const local = fn (initial: U32) => @effect.scope (fn (state: State U32) => do:
+            \\const local = func (initial: U32) => return @effect.scope (func (state: State U32) => return do:
             \\  let pair = do (@effect.state state.get state.set initial):
             \\    use previous <- state.get ()
             \\    use state.set (@u32.add previous 2)
@@ -244,12 +274,12 @@ fn namedProviderRoundtrip(allocator: std.mem.Allocator, consumer_bytes: []const 
 test "portable typed staging named provider callbacks retain local and foreign producer principals through OOM" {
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var producer = try lower(a, "const callback = fn () => 42\n");
+    var producer = try lower(a, "const callback = func () => return 42\n");
     defer producer.deinit(a);
     producer.unit = 2;
     var consumer = try lower(a,
         \\effect Read: Unit -> U32
-        \\const callback = fn () => 42
+        \\const callback = func () => return 42
         \\const generated = @code.quote (do (@effect.provider Read callback):
         \\  break Read ())
         \\const answer: U32 = @code.run generated
@@ -281,24 +311,24 @@ test "portable typed staging earlier lift operands retain their actual affine st
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     const sources = [_][]const u8{
-        \\const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-        \\const make = fn (value: unique U32) => @code.quote (@code.lift (consume value))
+        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const make = func (value: unique U32) => return @code.quote (@code.lift (consume value))
         \\const generated = make 42
         \\const answer: U32 = @code.run generated
         ,
-        \\const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-        \\const make = fn (value: unique U32) => @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
+        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const make = func (value: unique U32) => return @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
         \\const generated = @code.run (make 42)
         \\const answer: U32 = @code.run generated
         ,
-        \\const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-        \\const make = fn (value: unique U32) => @code.quote (@code.lift (consume value))
-        \\const spliced = fn (value: unique U32) => @code.quote (@code.splice (make value))
+        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const make = func (value: unique U32) => return @code.quote (@code.lift (consume value))
+        \\const spliced = func (value: unique U32) => return @code.quote (@code.splice (make value))
         \\const answer: U32 = @code.run (spliced 42)
         ,
-        \\const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-        \\const make = fn (value: unique U32) => do:
-        \\  let build: once (Unit -> code [U32, row {}]) = fn () => @code.quote (@code.lift (consume value))
+        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const make = func (value: unique U32) => return do:
+        \\  let build: once (Unit -> code [U32, row {}]) = func () => return @code.quote (@code.lift (consume value))
         \\  break build ()
         \\const answer: U32 = @code.run (make 42)
         ,
@@ -317,8 +347,8 @@ test "portable typed staging earlier lift operands retain their actual affine st
 
 test "portable typed staging rejects a forged repeated earlier affine move across lifts" {
     var m = try lower(a,
-        \\const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-        \\const make = fn () => do:
+        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const make = func () => return do:
         \\  let left: unique U32 = 20
         \\  let right: unique U32 = 22
         \\  break @code.quote (@u32.add (@code.lift (consume left)) (@code.lift (consume right)))
@@ -345,7 +375,7 @@ test "portable typed staging future affine parameters keep independent usage own
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
-        \\const generated = @code.quote (fn (value: unique U32) => do:
+        \\const generated = @code.quote (func (value: unique U32) => return do:
         \\  let first = value
         \\  break first)
         \\const emitted = @code.emit generated
@@ -374,17 +404,17 @@ test "portable typed staging future loans retain their lexical callback owner" {
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     const sources = [_][]const u8{
-        \\const generated = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan))
+        \\const generated = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan))
         \\const emitted = @code.emit generated
         \\const answer = 42
         ,
-        \\const read: unique U32 -> U32 = fn value => @usage.borrow value (fn loan => @usage.read loan)
-        \\const generated = @code.quote (fn (value: unique U32) => read value)
+        \\const read: unique U32 -> U32 = func value => return @usage.borrow value (func loan => return @usage.read loan)
+        \\const generated = @code.quote (func (value: unique U32) => return read value)
         \\const emitted = @code.emit generated
         \\const answer = 42
         ,
-        \\const generated = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => do:
-        \\  let read = fn () => @usage.read loan
+        \\const generated = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return do:
+        \\  let read = func () => return @usage.read loan
         \\  break read ()))
         \\const emitted = @code.emit generated
         \\const answer = 42
@@ -413,8 +443,8 @@ test "portable typed staging future loans retain their lexical callback owner" {
 
 test "portable typed staging loan captures reject phantom missing and escaping executable owners" {
     var m = try lower(a,
-        \\const generated = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => do:
-        \\  let read = fn () => @usage.read loan
+        \\const generated = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return do:
+        \\  let read = func () => return @usage.read loan
         \\  break read ()))
         \\const answer = 42
     );
@@ -443,12 +473,12 @@ test "portable typed staging resource bodies retain cleanup loan and effect owne
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     const sources = [_][]const u8{
-        \\const generated = @code.quote (fn () => @resource.scope (fn () => 42) (fn owner => ()) (fn loan => @usage.read loan))
+        \\const generated = @code.quote (func () => return @resource.scope (func () => return 42) (func owner => return ()) (func loan => return @usage.read loan))
         \\const emitted = @code.emit generated
         \\const answer = 42
         ,
-        \\const generated = @code.quote (fn () => do:
-        \\  use owner <- @resource.acquire (fn () => 42) (fn value => ())
+        \\const generated = @code.quote (func () => return do:
+        \\  use owner <- @resource.acquire (func () => return 42) (func value => return ())
         \\  use @resource.release owner
         \\  break 42)
         \\const emitted = @code.emit generated
@@ -533,7 +563,7 @@ test "portable typed staging request handlers retain independent declared operat
     var m = try lower(a,
         \\effect Read: Unit -> U32
         \\const generated = @code.quote (do:
-        \\  let calculation = @computation (fn () => Read ())
+        \\  let calculation = @computation (func () => return Read ())
         \\  for request in @requests calculation:
         \\    case request of
         \\      effect Read () =>
@@ -567,8 +597,8 @@ test "portable typed staging request clauses retain foreign callback effects thr
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const generated = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
-        \\  let calculation = @computation (fn () => @u32.add (Read ()) 40)
+        \\const generated = @code.quote (func (host: Unit -> U32 ! {Foreign}) => return do:
+        \\  let calculation = @computation (func () => return @u32.add (Read ()) 40)
         \\  for request in @requests calculation:
         \\    case request of
         \\      effect Read () =>
@@ -598,7 +628,7 @@ test "portable typed staging unused request handlers preserve actual computation
     var m = try lower(a,
         \\effect Read: Unit -> U32
         \\const generated = @code.quote (do:
-        \\  let calculation = @computation (fn () => 42)
+        \\  let calculation = @computation (func () => return 42)
         \\  for request in @requests calculation:
         \\    case request of
         \\      effect Read () =>
@@ -620,7 +650,7 @@ test "portable typed staging reconstructs handled callback effects despite coord
     var m = try lower(a,
         \\effect Read: Unit -> U32
         \\effect Other: Unit -> U32
-        \\const generated = @code.quote (do (@effect.provider Read (fn () => Other ())):
+        \\const generated = @code.quote (do (@effect.provider Read (func () => return Other ())):
         \\  break Read ())
     );
     defer m.deinit(a);
@@ -641,7 +671,7 @@ test "portable typed staging reconstructs handled callback effects despite coord
 test "portable typed staging reconstructs uncalled future closure effects despite coordinated pure headers" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const generated = @code.quote (fn () => Read ())
+        \\const generated = @code.quote (func () => return Read ())
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -656,9 +686,9 @@ test "portable typed staging proves fresh same stage capability captures through
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const generated = @code.quote (@effect.scope (fn (state: State U32) => do:
+        \\const generated = @code.quote (@effect.scope (func (state: State U32) => return do:
         \\  let unused = state
-        \\  let read = fn () => state.get ()
+        \\  let read = func () => return state.get ()
         \\  let pair = do (@effect.state state.get state.set 42):
         \\    break read ()
         \\  let (_, result) = pair
@@ -694,15 +724,15 @@ test "portable typed staging named scope helpers retain future local capture row
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const helper = fn (value: U32) => @effect.scope (fn (state: State U32) => do:
-        \\  let read = fn () => state.get ()
+        \\const helper = func (value: U32) => return @effect.scope (func (state: State U32) => return do:
+        \\  let read = func () => return state.get ()
         \\  let pair = do (@effect.state state.get state.set 40):
         \\    use previous <- read ()
         \\    use state.set (@u32.add previous value)
         \\    break read ()
         \\  let (_, result) = pair
         \\  break result)
-        \\const generated = @code.quote (fn (value: U32) => helper value)
+        \\const generated = @code.quote (func (value: U32) => return helper value)
         \\const evaluated: U32 = @code.run (@code.quote (helper 2))
     );
     defer m.deinit(a);
@@ -739,7 +769,7 @@ test "portable typed staging reconstructs future local scope effects despite coo
     var m = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
         \\effect Tick: Unit -> U32
-        \\const generated = @code.quote (@effect.scope (fn (state: State U32) => Tick ()))
+        \\const generated = @code.quote (@effect.scope (func (state: State U32) => return Tick ()))
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -766,7 +796,7 @@ test "portable typed staging owns roundtrip graphs after producer release throug
     var answer: u32 = 0;
     {
         var m = try lower(a,
-            \\const make = fn (step: U32) => @code.quote (do:
+            \\const make = func (step: U32) => return @code.quote (do:
             \\  let value = 40
             \\  break @u32.add value (@code.lift step))
             \\const generated = make 2
@@ -784,7 +814,7 @@ test "portable typed staging owns roundtrip graphs after producer release throug
 
 test "typed staging declaration projection retains exact inputs and invalidates same-type quoted edits" {
     const source =
-        \\const make = fn (step: U32) => @code.quote (do:
+        \\const make = func (step: U32) => return @code.quote (do:
         \\  let value = 40
         \\  break @u32.add value (@code.lift step))
         \\const generated = make 2
@@ -814,7 +844,7 @@ test "typed staging declaration projection retains exact inputs and invalidates 
 test "portable typed staging rejects forged pure rows on quoted operations and forced demands" {
     const sources = [_][]const u8{
         "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\n",
-        "effect Read: Unit -> U32\nconst generated = @code.quote ((fn ~value => @demand value) (Read ()))\n",
+        "effect Read: Unit -> U32\nconst generated = @code.quote ((func ~value => return @demand value) (Read ()))\n",
     };
     for (sources) |source| {
         var m = try lower(a, source);
@@ -842,7 +872,7 @@ test "portable typed staging rejects forged pure rows on quoted operations and f
 }
 
 test "portable typed staging admits named operation calls and rejects forged pure claims" {
-    var m = try lower(a, "effect Read: Unit -> U32\nconst invoke = fn () => Read ()\nconst generated = @code.quote (invoke ())\n");
+    var m = try lower(a, "effect Read: Unit -> U32\nconst invoke = func () => return Read ()\nconst generated = @code.quote (invoke ())\n");
     defer m.deinit(a);
     try V.validateBounds(&m, .{});
     try verified(a, &m);
@@ -854,8 +884,8 @@ test "portable typed staging admits named operation calls and rejects forged pur
 
 test "portable typed staging named calls retain unused declared effects without inventing pure authority" {
     const sources = [_][]const u8{
-        "effect Read: Unit -> U32\nconst invoke: Unit -> U32 ! {Read} = fn () => 42\nconst generated = @code.quote (invoke ())\n",
-        "effect Read: Unit -> U32\neffect Write: Unit -> Unit\nconst invoke: Unit -> U32 ! {Read, Write} = fn () => Read ()\nconst generated = @code.quote (invoke ())\n",
+        "effect Read: Unit -> U32\nconst invoke: Unit -> U32 ! {Read} = func () => return 42\nconst generated = @code.quote (invoke ())\n",
+        "effect Read: Unit -> U32\neffect Write: Unit -> Unit\nconst invoke: Unit -> U32 ! {Read, Write} = func () => return Read ()\nconst generated = @code.quote (invoke ())\n",
     };
     for (sources) |source| {
         var m = try lower(a, source);
@@ -879,10 +909,10 @@ test "portable typed staging named operation bodies survive producer release and
     {
         var m = try lower(a,
             \\effect Read: Unit -> U32
-            \\const invoke = fn () => Read ()
-            \\const helper = fn () => @u32.add (invoke ()) 2
+            \\const invoke = func () => return Read ()
+            \\const helper = func () => return @u32.add (invoke ()) 2
             \\const generated = @code.quote (helper ())
-            \\const provider = @effect.provider Read (fn () => 40)
+            \\const provider = @effect.provider Read (func () => return 40)
             \\const answer: U32 = do provider:
             \\  break @code.emit generated
         );
@@ -900,7 +930,7 @@ test "portable typed staging named operation bodies reject identity result and s
     var m = try lower(a,
         \\effect Read: Unit -> U32
         \\effect Other: Unit -> U32
-        \\const helper = fn () => Read ()
+        \\const helper = func () => return Read ()
         \\const generated = @code.quote (helper ())
     );
     defer m.deinit(a);
@@ -925,10 +955,10 @@ test "portable typed staging named operation bodies reject identity result and s
 }
 
 test "portable typed staging foreign generic helpers retain exact producer body authority" {
-    var producer = try lower(a, "const helper = fn value => value\n");
+    var producer = try lower(a, "const helper = func value => return value\n");
     defer producer.deinit(a);
     producer.unit = 2;
-    var consumer = try lower(a, "const helper = fn value => value\nconst generated = @code.quote (helper 42)\n");
+    var consumer = try lower(a, "const helper = func value => return value\nconst generated = @code.quote (helper 42)\n");
     defer consumer.deinit(a);
     const quote = consumer.node(consumer.bodies[consumer.bodies.len - 1].root);
     const call = &consumer.calls[consumer.node(quote.a).a];
@@ -949,7 +979,7 @@ test "portable typed staging foreign generic helpers retain exact producer body 
 
 test "portable typed staging never closes splice rows using an unrelated body certificate" {
     var m = try lower(a,
-        \\const decoy = fn (value: U32) => @u32.add value 1
+        \\const decoy = func (value: U32) => return @u32.add value 1
         \\const generated = @code.quote (@u32.eq (@code.splice (@code.quote 42)) 42)
     );
     defer m.deinit(a);
@@ -978,8 +1008,8 @@ test "portable typed staging never closes splice rows using an unrelated body ce
 test "portable typed staging refuses scoped authority hidden in quoted closure capture tables" {
     var m = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const generated = @code.quote (fn (value: U32) => value)
-        \\entry const region = fn () => @effect.scope (fn (s: State U32) => 42)
+        \\const generated = @code.quote (func (value: U32) => return value)
+        \\entry const region = func () => return @effect.scope (func (s: State U32) => return 42)
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -1009,8 +1039,8 @@ test "portable typed staging refuses scoped authority hidden in quoted closure c
 
 test "portable typed staging refuses earlier-stage plain callable capture tables" {
     var m = try lower(a,
-        \\const earlier: Unit -> U32 = fn () => 42
-        \\const generated = @code.quote (fn (value: U32) => value)
+        \\const earlier: Unit -> U32 = func () => return 42
+        \\const generated = @code.quote (func (value: U32) => return value)
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -1036,10 +1066,10 @@ test "portable typed staging refuses earlier-stage plain callable capture tables
 
 test "normal frozen Core admits generic recursion, record payloads, loops, State and Requests" {
     const sources = [_][]const u8{
-        "entry const identity = fn value => value\nentry const answer = fn () => identity 42\n",
-        "const even = fn (n: U32) -> U32 => if @u32.eq n 0 then 42 else odd (@u32.sub n 1)\nconst odd = fn (n: U32) -> U32 => if @u32.eq n 0 then 42 else even (@u32.sub n 1)\nentry const answer = fn () => even 42\n",
-        "data Pair = #Pair {left: U32, right: U32}\nentry const answer = fn () => do:\n  let #Pair payload = #Pair {left: 40, right: 2}\n  break @u32.add (@product.get payload 0) (@product.get payload 1)\n",
-        "entry const answer = fn () => do:\n  let count = 0\n  for index in 0..10:\n    count := @u32.add self index\n  for ever:\n    if @u32.eq count 45:\n      break\n    count := 45\n  break count\n",
+        "entry const identity = func value => return value\nentry const answer = func () => return identity 42\n",
+        "const even = func (n: U32) : U32 => return if @u32.eq n 0 then 42 else odd (@u32.sub n 1)\nconst odd = func (n: U32) : U32 => return if @u32.eq n 0 then 42 else even (@u32.sub n 1)\nentry const answer = func () => return even 42\n",
+        "data Pair = #Pair {left: U32, right: U32}\nentry const answer = func () => return do:\n  let #Pair payload = #Pair {left: 40, right: 2}\n  break @u32.add (@product.get payload 0) (@product.get payload 1)\n",
+        "entry const answer = func () => return do:\n  let count = 0\n  for index in 0..10:\n    count := @u32.add self index\n  for ever:\n    if @u32.eq count 45:\n      break\n    count := 45\n  break count\n",
         @import("fixtures").source("request-fixtures/shadow-completion_payload_shadow.blot"),
         @import("fixtures").source("request-fixtures/template-local-effects.blot"),
         mixed_source,
@@ -1059,9 +1089,9 @@ test "every allocation failure releases validation workspace and retains immutab
 
 test "shared scheme public slots and row carriers reject malformed frozen metadata" {
     var m = try lower(a,
-        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
         \\const alias = twice
-        \\entry const generic = fn value => alias value
+        \\entry const generic = func value => return alias value
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -1108,9 +1138,9 @@ test "shared scheme public slots and row carriers reject malformed frozen metada
 
 test "retained header cycles reject without rejecting ordinary recursive bodies" {
     var m = try lower(a,
-        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
         \\const alias = twice
-        \\entry const generic = fn value => alias value
+        \\entry const generic = func value => return alias value
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -1133,7 +1163,7 @@ test "retained header cycles reject without rejecting ordinary recursive bodies"
 }
 
 test "bounds reject overflow and every Core tag's interpreted reference before indexed reads" {
-    var m = try lower(a, "entry const answer = fn () => do:\n  let values = #[40, 2]\n  break @u32.add (@array.get values 0) (@array.get values 1)\n");
+    var m = try lower(a, "entry const answer = func () => return do:\n  let values = #[40, 2]\n  break @u32.add (@array.get values 0) (@array.get values 1)\n");
     defer m.deinit(a);
     const id: usize = 1;
     const saved = m.nodes[id];
@@ -1154,9 +1184,18 @@ test "bounds reject overflow and every Core tag's interpreted reference before i
 }
 
 test "frozen demanded diagnostic display ranges reject stale and overflowing names" {
-    var m = try lower(a, "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n");
+    var m = try lower(a, "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n");
     defer m.deinit(a);
     try V.validateBounds(&m, .{});
+    for (m.projections) |projection| {
+        if (projection.field != 0) try std.testing.expect(m.fieldSpelling(projection.field) != null);
+    }
+    {
+        const spellings = m.field_names;
+        defer m.field_names = spellings;
+        m.field_names = &.{};
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+    }
     var nominal_names: usize = 0;
     for (m.nominals) |*nominal| {
         const saved = nominal.diagnostic_name;
@@ -1185,7 +1224,7 @@ test "frozen demanded diagnostic display ranges reject stale and overflowing nam
 }
 
 test "structural cycles reject while recursive BindingRef and control targets remain legal" {
-    var m = try lower(a, "entry const answer = fn (n: U32) -> U32 => if @u32.eq n 0 then 42 else answer (@u32.sub n 1)\n");
+    var m = try lower(a, "entry const answer = func (n: U32) : U32 => return if @u32.eq n 0 then 42 else answer (@u32.sub n 1)\n");
     defer m.deinit(a);
     try V.validate(a, &m, .{});
     const root = m.bodies[1].root;
@@ -1234,9 +1273,9 @@ test "caller scratch handles deep forward structural DAG without a fixed depth p
 }
 
 test "external owner context proves producer binding bounds and symbol dictionary bounds" {
-    var m = try lower(a, "const identity = fn value => value\nentry const answer = identity 42\n");
+    var m = try lower(a, "const identity = func value => return value\nentry const answer = identity 42\n");
     defer m.deinit(a);
-    var producer = try lower(a, "const identity = fn value => value\nentry const answer = 42\n");
+    var producer = try lower(a, "const identity = func value => return value\nentry const answer = 42\n");
     defer producer.deinit(a);
     producer.unit = 7;
     m.calls[0].target = .{ .unit = 7, .binding = 1 };
@@ -1340,7 +1379,7 @@ test "decoded catalogs reject malformed lists, references and contradictory loca
     try badField(&requests, "request_arms", "operation");
     try badField(&requests, "operation_values", "signature");
     try badField(&requests, "loop_carries", "iteration");
-    var matched = try lower(a, "data Pair = #Pair {left: U32, right: U32}\nentry const answer = fn () => case #Pair {left: 40, right: 2} of\n  #Pair payload => @product.get payload 0\n");
+    var matched = try lower(a, "data Pair = #Pair {left: U32, right: U32}\nentry const answer = func () => return case #Pair {left: 40, right: 2} of\n  #Pair payload => @product.get payload 0\n");
     defer matched.deinit(a);
     try badSpan(&matched, "match_arms", "rows");
     try badSpan(&matched, "pattern_rows", "patterns");
@@ -1399,7 +1438,7 @@ test "structural cycles through closure and loop catalogs reject without treatin
     m.closures[catalog].body = old;
     try V.validate(a, &m, .{});
 
-    var loop = try lower(a, "entry const answer = fn () => do:\n  for ever:\n    break 42\n");
+    var loop = try lower(a, "entry const answer = func () => return do:\n  for ever:\n    break 42\n");
     defer loop.deinit(a);
     try V.validate(a, &loop, .{});
     var loop_id: ?core.Id = null;
@@ -1421,7 +1460,7 @@ test "context symbol and source bounds reject while historical principal identit
     defer m.deinit(a);
     try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{ .symbol_count = 1 }));
     try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{ .source_length = 1 }));
-    var principal = try lower(a, "entry const identity = fn value => value\n");
+    var principal = try lower(a, "entry const identity = func value => return value\n");
     defer principal.deinit(a);
     var variable: ?usize = null;
     for (principal.types.nodes, 0..) |n, i| if (n.tag == .variable) {
@@ -1450,8 +1489,8 @@ test "fully invalid bounds reject before requesting allocation" {
 }
 
 const named_future_source =
-    \\const add = fn (value: U32) => @u32.add value 2
-    \\const twice = fn (value: U32) => add (add value)
+    \\const add = func (value: U32) => return @u32.add value 2
+    \\const twice = func (value: U32) => return add (add value)
     \\const generated = @code.quote (twice 38)
     \\const answer: U32 = @code.run generated
 ;
@@ -1473,8 +1512,8 @@ test "portable typed staging admits exact owned monomorphic named future calls a
 }
 test "portable typed staging named calls reject forged signatures foreign parameters and unrelated row certificates" {
     var m = try lower(a,
-        \\const decoy = fn (value: U32) => value
-        \\const helper = fn (value: U32) => @u32.add value 2
+        \\const decoy = func (value: U32) => return value
+        \\const helper = func (value: U32) => return @u32.add value 2
         \\const generated = @code.quote (helper 40)
     );
     defer m.deinit(a);
@@ -1511,8 +1550,8 @@ test "portable typed staging named calls reject forged signatures foreign parame
 test "portable typed staging named calls reconstruct effects despite coordinated pure target claims" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const effectful = fn (value: U32) => Read ()
-        \\const helper = fn (value: U32) => @u32.add value 2
+        \\const effectful = func (value: U32) => return Read ()
+        \\const helper = func (value: U32) => return @u32.add value 2
         \\const generated = @code.quote (helper 40)
     );
     defer m.deinit(a);
@@ -1530,18 +1569,18 @@ test "portable typed staging row polymorphic calls reconstruct owned principals 
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     const cases = [_][]const u8{
-        "const apply = fn (callback: U32 -> U32) => callback 42\nconst generated = @code.quote (apply (fn (value: U32) => value))\nconst answer: U32 = @code.run generated\n",
-        "const apply = fn callback => callback 42\nconst generated = @code.quote (apply (fn (value: U32) => value))\nconst answer: U32 = @code.run generated\n",
+        "const apply = func (callback: U32 -> U32) => return callback 42\nconst generated = @code.quote (apply (func (value: U32) => return value))\nconst answer: U32 = @code.run generated\n",
+        "const apply = func callback => return callback 42\nconst generated = @code.quote (apply (func (value: U32) => return value))\nconst answer: U32 = @code.run generated\n",
         \\effect Read: Unit -> U32
-        \\const apply = fn callback => callback ()
-        \\const generated = @code.quote (do (@effect.provider Read (fn () => 42)):
-        \\  break apply (fn () => Read ()))
+        \\const apply = func callback => return callback ()
+        \\const generated = @code.quote (do (@effect.provider Read (func () => return 42)):
+        \\  break apply (func () => return Read ()))
         \\const answer: U32 = @code.run generated
         ,
         \\effect Read: Unit -> U32
-        \\const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = fn callback => callback ()
-        \\const generated = @code.quote (do (@effect.provider Read (fn () => 42)):
-        \\  break apply (fn () => Read ()))
+        \\const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = func callback => return callback ()
+        \\const generated = @code.quote (do (@effect.provider Read (func () => return 42)):
+        \\  break apply (func () => return Read ()))
         \\const answer: U32 = @code.run generated
         ,
     };
@@ -1560,10 +1599,10 @@ test "portable typed staging row polymorphic calls reconstruct owned principals 
 test "portable typed staging row polymorphic calls reject erased effects and foreign row owners" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = fn callback => callback ()
-        \\const other: (Unit -> U32 ! {| f}) -> U32 ! {| f} = fn callback => callback ()
-        \\const generated = @code.quote (do (@effect.provider Read (fn () => 42)):
-        \\  break apply (fn () => Read ()))
+        \\const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = func callback => return callback ()
+        \\const other: (Unit -> U32 ! {| f}) -> U32 ! {| f} = func callback => return callback ()
+        \\const generated = @code.quote (do (@effect.provider Read (func () => return 42)):
+        \\  break apply (func () => return Read ()))
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -1594,8 +1633,8 @@ test "portable typed staging explicitly typed higher order helpers keep future c
     const format = @import("../reuse/dependency_format.zig");
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
-        \\const apply: (U32 -> U32 ! {}) -> U32 ! {} = fn callback => callback 42
-        \\const generated = @code.quote (apply (fn (value: U32) -> U32 => value))
+        \\const apply: (U32 -> U32 ! {}) -> U32 ! {} = func callback => return callback 42
+        \\const generated = @code.quote (apply (func (value: U32) : U32 => return value))
         \\const answer: U32 = @code.run generated
     );
     defer m.deinit(a);
@@ -1612,9 +1651,9 @@ test "portable typed staging retains sealed package identities and stored operat
     const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
     var m = try lower(a,
         \\type Item = exists [a] => (a, a -> U32)
-        \\const make: Unit -> Item = fn () => pack [U32] (42, fn value => value) as Item
+        \\const make: Unit -> Item = func () => return pack [U32] (42, func value => return value) as Item
         \\const generated = @code.quote (make ())
-        \\const read: Item -> U32 = fn item => unpack item as [a] value in (@product.get value 1) (@product.get value 0)
+        \\const read: Item -> U32 = func item => return unpack item as [a] value in (@product.get value 1) (@product.get value 0)
         \\const answer: U32 = read (@code.run generated)
     );
     defer m.deinit(a);
@@ -1628,8 +1667,8 @@ test "portable typed staging retains sealed package identities and stored operat
 
 test "portable typed staging higher order global arguments prove their actual producer bodies" {
     var m = try lower(a,
-        \\const identity: U32 -> U32 ! {} = fn value => value
-        \\const apply: (U32 -> U32 ! {}) -> U32 ! {} = fn callback => callback 42
+        \\const identity: U32 -> U32 ! {} = func value => return value
+        \\const apply: (U32 -> U32 ! {}) -> U32 ! {} = func callback => return callback 42
         \\const generated = @code.quote (apply identity)
     );
     defer m.deinit(a);
@@ -1653,8 +1692,8 @@ test "portable typed staging generic helpers own repeated and nested substitutio
     var answer: u32 = 0;
     {
         var m = try lower(a,
-            \\const identity = fn value => value
-            \\const pair = fn value => (identity value, identity value)
+            \\const identity = func value => return value
+            \\const pair = func value => return (identity value, identity value)
             \\const generated = @code.quote (@u32.add (@product.get (pair 40) 0) (@f32.to_u32 (identity 2.0)))
             \\const answer: U32 = @code.run generated
         );
@@ -1670,8 +1709,8 @@ test "portable typed staging generic helpers own repeated and nested substitutio
 
 test "portable typed staging generic helpers reject inconsistent and unowned substitutions" {
     var m = try lower(a,
-        \\const identity = fn value => value
-        \\const unrelated = fn value => value
+        \\const identity = func value => return value
+        \\const unrelated = func value => return value
         \\const generated = @code.quote (identity 42)
     );
     defer m.deinit(a);
@@ -1721,10 +1760,10 @@ test "portable typed staging named helpers reconstruct pure producer data throug
     var answer: u32 = 0;
     {
         var m = try lower(a,
-            \\const identity = fn value => value
+            \\const identity = func value => return value
             \\const original = {amount: identity 40}
             \\const config = original
-            \\const helper = fn (value: U32) => @u32.add config.amount value
+            \\const helper = func (value: U32) => return @u32.add config.amount value
             \\const generated = @code.quote (helper 2)
             \\const answer: U32 = @code.run generated
         );
@@ -1741,7 +1780,7 @@ test "portable typed staging named helpers reconstruct pure producer data throug
 test "portable typed staging producer data rejects runtime foreign and cyclic owners" {
     var m = try lower(a,
         \\const seed = @u32.add 39 1
-        \\const helper = fn (value: U32) => @u32.add seed value
+        \\const helper = func (value: U32) => return @u32.add seed value
         \\const generated = @code.quote (helper 2)
     );
     defer m.deinit(a);
@@ -1776,8 +1815,8 @@ test "portable typed staging producer data rejects runtime foreign and cyclic ow
 const nominal_descriptor_source =
     \\data Packet a = #Packet {payload: a, flag: Bool}
     \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
-    \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: #True})).result
-    \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: #True})).result
+    \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: true})).result
+    \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: true})).result
     \\const scalar = (@code.describe (@code.quote 1)).result
     \\const answer = if @descriptor.same packet.payload scalar then if @descriptor.same choice.shared scalar then 42 else 0 else 0
 ;
@@ -1844,13 +1883,13 @@ test "portable typed staging helper blocks own nested locals and generic calls t
     var answer: u32 = 0;
     {
         var m = try lower(a,
-            \\const identity = fn value => do:
+            \\const identity = func value => return do:
             \\  let kept = value
             \\  let nested = do:
             \\    let value = kept
             \\    break value
             \\  break nested
-            \\const pair = fn value => do:
+            \\const pair = func value => return do:
             \\  let left = identity value
             \\  let right = identity value
             \\  break (left, right)
@@ -1869,12 +1908,12 @@ test "portable typed staging helper blocks own nested locals and generic calls t
 
 test "portable typed staging helper locals reject future reads caller capture duplicate owners and foreign returns" {
     var m = try lower(a,
-        \\const leaf = fn (value: U32) => value
-        \\const helper = fn (value: U32) => do:
+        \\const leaf = func (value: U32) => return value
+        \\const helper = func (value: U32) => return do:
         \\  let first = value
         \\  let second = leaf first
         \\  break second
-        \\const unrelated = fn (value: U32) => do:
+        \\const unrelated = func (value: U32) => return do:
         \\  let foreign = value
         \\  break foreign
         \\const generated = @code.quote (helper 42)
@@ -1928,7 +1967,7 @@ test "portable typed staging helper locals reject future reads caller capture du
 }
 
 fn invocationContextLaw(allocator: std.mem.Allocator) !void {
-    var producer = try lower(allocator, "const identity = fn value => value\n");
+    var producer = try lower(allocator, "const identity = func value => return value\n");
     defer producer.deinit(allocator);
     const context: V.Context = .{ .units = &.{&producer} };
     var image = try V.ContextImage.capture(allocator, context, context.units);
@@ -1958,9 +1997,9 @@ test "foreign invocation authority declines validation context reuse under alloc
 }
 
 fn unrelatedContextLaw(allocator: std.mem.Allocator) !void {
-    var caller = try lower(allocator, "entry const identity = fn (value: U32) => value\n");
+    var caller = try lower(allocator, "entry const identity = func (value: U32) => return value\n");
     defer caller.deinit(allocator);
-    var sibling = try lower(allocator, "data Token = #Token U32\nconst identity = fn (value: U32) => value\n");
+    var sibling = try lower(allocator, "data Token = #Token U32\nconst identity = func (value: U32) => return value\n");
     defer sibling.deinit(allocator);
     sibling.unit = 2;
     const context: V.Context = .{ .units = &.{ &caller, &sibling } };
@@ -2007,15 +2046,15 @@ const nominal_helper_source =
     \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
     \\data Single a = #Single {item: a}
     \\data Option a = #Absent | #Present a
-    \\const make = fn value => #Packet {payload: value, flag: #True}
-    \\const positional = fn value => #Packet (value, #True)
-    \\const single = fn value => #Single value
-    \\const present = fn value => #Present value
-    \\const marker = fn () => #Marker {}
-    \\const choose = fn (flag: Bool) => fn value => if flag then #Left {shared: value, left: flag} else #Right {shared: value, right: 0}
+    \\const make = func value => return #Packet {payload: value, flag: true}
+    \\const positional = func value => return #Packet (value, true)
+    \\const single = func value => return #Single value
+    \\const present = func value => return #Present value
+    \\const marker = func () => return #Marker {}
+    \\const choose = func (flag: Bool) => return func value => return if flag then #Left {shared: value, left: flag} else #Right {shared: value, right: 0}
     \\const generated = @code.quote (make 42)
     \\const marked = @code.quote (marker ())
-    \\const chosen = @code.quote (choose #True 42)
+    \\const chosen = @code.quote (choose true 42)
     \\const constructors = @code.quote {packet: positional 42, single: single 42, option: present 42}
     \\const answer: U32 = (@code.run chosen).shared
 ;
@@ -2086,8 +2125,8 @@ test "portable typed staging nominal helpers retain private producer rights and 
 test "portable typed staging nominal helpers admit closed callable payloads and reject unowned rows and forged payload types" {
     var m = try lower(a,
         \\data Hidden = #Hidden {read: Unit -> U32}
-        \\const relay = fn value => value
-        \\const generated = @code.quote (relay (#Hidden {read: fn () => 42}))
+        \\const relay = func value => return value
+        \\const generated = @code.quote (relay (#Hidden {read: func () => return 42}))
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -2149,7 +2188,7 @@ test "portable typed staging nominal helpers admit closed callable payloads and 
 fn malformedApplyCaptureLaw(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
         \\type Application is data = #Application {reset: Unit -> U32}
-        \\const reset_scoped = fn application => fn () => do:
+        \\const reset_scoped = func application => return func () => return do:
         \\  let #Application {reset} = application
         \\  break reset ()
     );
@@ -2180,9 +2219,9 @@ test "captured nominal patterns reject malformed application chains before graph
 }
 
 const collection_helper_source =
-    \\const first = fn items => @array.get items 0
-    \\const count = fn items => @list.length (@list.from_array items)
-    \\const select = fn (value: U32) => do:
+    \\const first = func items => return @array.get items 0
+    \\const count = func items => return @list.length (@list.from_array items)
+    \\const select = func (value: U32) => return do:
     \\  let joined = @array.concat #[value] #[2]
     \\  let window = @array.slice joined 0 (count joined)
     \\  let restored = @array.from_list (@list.from_array window)
@@ -2251,9 +2290,9 @@ test "portable typed staging collection helpers reject forged inputs outputs and
 const nominal_read_source =
     \\type Packet a is data = #Packet {item: a, shadow: a}
     \\type Choice a is data = #Left {item: a, flag: Bool} | #Right {padding: U32, item: a}
-    \\const read = fn (packet: Packet a) => packet.item
-    \\const shared = fn (choice: Choice a) => choice.item
-    \\const add = fn (value: U32) => @u32.add (read (#Packet {shadow: 9, item: value})) (shared (#Right {padding: 9, item: 2}))
+    \\const read = func (packet: Packet a) => return packet.item
+    \\const shared = func (choice: Choice a) => return choice.item
+    \\const add = func (value: U32) => return @u32.add (read (#Packet {shadow: 9, item: value})) (shared (#Right {padding: 9, item: 2}))
     \\const floating = @code.quote (read (#Packet {item: 1.5, shadow: 9.5}))
     \\const generated = @code.quote (add 40)
     \\const answer: U32 = @code.run generated
@@ -2310,7 +2349,7 @@ test "portable typed staging nominal readers reject wrong physical fields varian
 }
 
 const statement_if_source =
-    \\const helper = fn (value: U32) => do:
+    \\const helper = func (value: U32) => return do:
     \\  let kept = @u32.add value 40
     \\  if @u32.eq value 0:
     \\    let value = kept
@@ -2322,10 +2361,10 @@ const statement_if_source =
     \\      break 0
     \\  break @u32.add value 40
     \\const generated = @code.quote (helper 2)
-    \\const unit_helper = fn (flag: Bool) => do:
+    \\const unit_helper = func (flag: Bool) => return do:
     \\  if flag:
     \\    let value = 42
-    \\const unit_generated = @code.quote (unit_helper #False)
+    \\const unit_generated = @code.quote (unit_helper false)
     \\const unit_value = @code.run unit_generated
     \\const answer: U32 = @code.run generated
 ;
@@ -2387,11 +2426,11 @@ test "portable typed staging statement if rejects foreign return owners branch l
 test "portable typed staging statement if proves unselected effectful branches" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const helper = fn (flag: Bool) => do:
+        \\const helper = func (flag: Bool) => return do:
         \\  if flag:
         \\    break Read ()
         \\  break 42
-        \\const generated = @code.quote (helper #False)
+        \\const generated = @code.quote (helper false)
     );
     defer m.deinit(a);
     const quote = m.node(m.bodies[m.bodies.len - 1].root);
@@ -2411,14 +2450,14 @@ test "portable typed staging statement if proves unselected effectful branches" 
 }
 
 const boolean_case_source =
-    \\const helper = fn (flag: Bool) => fn (value: U32) => case flag of
-    \\  #True => do:
+    \\const helper = func (flag: Bool) => return func (value: U32) => return case flag of
+    \\  true => do:
     \\    let flag = value
     \\    break @u32.add flag 40
-    \\  #False => do:
+    \\  false => do:
     \\    let value = @u32.add value 41
     \\    break value
-    \\const generated = @code.quote (helper #False 1)
+    \\const generated = @code.quote (helper false 1)
     \\const answer: U32 = @code.run generated
 ;
 test "portable typed staging Boolean case reconstructs arm owners after producer teardown through OOM" {
@@ -2486,10 +2525,10 @@ test "portable typed staging Boolean case rejects missing overlapping forged and
 test "portable typed staging Boolean case reconstructs unselected effects despite forged pure rows" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
-        \\const helper = fn (flag: Bool) => case flag of
-        \\  #True => Read ()
-        \\  #False => 42
-        \\const generated = @code.quote (helper #False)
+        \\const helper = func (flag: Bool) => return case flag of
+        \\  true => Read ()
+        \\  false => 42
+        \\const generated = @code.quote (helper false)
     );
     defer m.deinit(a);
     const quote = m.node(m.bodies[m.bodies.len - 1].root);
@@ -2557,8 +2596,8 @@ test "portable typed staging lifts preserve nominal usage authority before execu
 
 fn returnedRankCapability(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
-        \\const keep: forall [a] => a -> (forall [b] => b -> a) = fn first => fn second => first
-        \\const held = fn (value: U32) => (keep value) #True
+        \\const keep: forall [a] => a -> (forall [b] => b -> a) = func first => return func second => return first
+        \\const held = func (value: U32) => return (keep value) true
     );
     defer module.deinit(allocator);
     const body = for (module.bodies) |candidate| {
@@ -2594,13 +2633,13 @@ test "returned annotated universal calls retain exact source Core capability rel
 }
 
 const data_case_sources = [_][]const u8{
-    \\const helper = fn (value: U32) => case value of
+    \\const helper = func (value: U32) => return case value of
     \\  0 => 40
     \\  value => @u32.add value 40
     \\const generated = @code.quote (helper 2)
     \\const answer: U32 = @code.run generated
     ,
-    \\const helper = fn (pair: (U32, U32)) => case pair of
+    \\const helper = func (pair: (U32, U32)) => return case pair of
     \\  (left, right) => @u32.add left right
     \\const generated = @code.quote (helper (20, 22))
     \\const answer: U32 = @code.run generated
@@ -2675,8 +2714,8 @@ test "portable typed staging scalar and product cases reject missing coverage fo
 
 test "portable typed staging named calls reconstruct higher order and scoped bodies after replay" {
     const cases = [_][]const u8{
-        "const apply = fn (callback: U32 -> U32) => callback 42\nconst generated = @code.quote (apply (fn (value: U32) => value))\n",
-        "type State a is effect = {get: Unit -> a, set: a -> Unit}\nconst hidden = fn (value: U32) => @effect.scope (fn (state: State U32) => value)\nconst generated = @code.quote (hidden 42)\n",
+        "const apply = func (callback: U32 -> U32) => return callback 42\nconst generated = @code.quote (apply (func (value: U32) => return value))\n",
+        "type State a is effect = {get: Unit -> a, set: a -> Unit}\nconst hidden = func (value: U32) => return @effect.scope (func (state: State U32) => return value)\nconst generated = @code.quote (hidden 42)\n",
     };
     for (cases) |source| {
         var m = try lower(a, source);
@@ -2695,7 +2734,7 @@ test "portable typed staging named calls reconstruct higher order and scoped bod
 
 const named_composition_sources = [_][]const u8{
     \\effect Read: U32 -> U32
-    \\const checked = fn computation => do:
+    \\const checked = func computation => return do:
     \\  let count = 0
     \\  for request in @requests computation:
     \\    case request of
@@ -2704,24 +2743,24 @@ const named_composition_sources = [_][]const u8{
     \\        yield value
     \\      complete value =>
     \\        break @u32.add count value
-    \\const generated = @code.quote (checked (@computation (fn () => Read 41)))
+    \\const generated = @code.quote (checked (@computation (func () => return Read 41)))
     \\const answer = @code.run generated
     ,
     \\type Box a is data = #Box a
-    \\const Box.pure = fn value => #Box value
-    \\const Box.bind = fn candidate => fn next => case candidate of
+    \\const Box.pure = func value => return #Box value
+    \\const Box.bind = func candidate => return func next => return case candidate of
     \\  #Box value => next value
     \\const try = @do.monad Box
-    \\const sequence = fn (value: Box U32) => do try:
+    \\const sequence = func (value: Box U32) => return do try:
     \\  use number <- value
     \\  break @u32.add number 1
-    \\const unwrap = fn value => case value of
+    \\const unwrap = func value => return case value of
     \\  #Box number => number
     \\const generated = @code.quote (unwrap (sequence (#Box 41)))
     \\const answer = @code.run generated
     ,
     \\effect Read: U32 -> U32
-    \\const checked = fn computation => do:
+    \\const checked = func computation => return do:
     \\  let count = 40
     \\  for request in @requests computation:
     \\    case request of
@@ -2731,11 +2770,11 @@ const named_composition_sources = [_][]const u8{
     \\      complete value =>
     \\        break
     \\  break count
-    \\const generated = @code.quote (checked (@computation (fn () => Read 2)))
+    \\const generated = @code.quote (checked (@computation (func () => return Read 2)))
     \\const answer = @code.run generated
     ,
     \\effect Read: U32 -> U32
-    \\const checked = fn computation => do:
+    \\const checked = func computation => return do:
     \\  let count = 39
     \\  let calls = 0
     \\  for request in @requests computation:
@@ -2746,18 +2785,18 @@ const named_composition_sources = [_][]const u8{
     \\        yield value
     \\      complete value =>
     \\        break @u32.add count calls
-    \\const generated = @code.quote (checked (@computation (fn () => Read 2)))
+    \\const generated = @code.quote (checked (@computation (func () => return Read 2)))
     \\const answer = @code.run generated
     ,
     \\effect Read: U32 -> U32
-    \\const checked = fn computation => do:
+    \\const checked = func computation => return do:
     \\  for request in @requests computation:
     \\    case request of
     \\      effect Read value =>
     \\        break value
     \\      complete value =>
     \\        break value
-    \\const generated = @code.quote (checked (@computation (fn () => Read 42)))
+    \\const generated = @code.quote (checked (@computation (func () => return Read 42)))
     \\const answer = @code.run generated
 };
 test "portable named request and resolver composition survives producer teardown and complete OOM" {
@@ -2847,14 +2886,14 @@ test "portable named resolver composition rejects forged selected methods and re
 test "portable named resolver composition proves actual Foreign execution beneath pure selected headers" {
     var m = try lower(a,
         \\type Box a is data = #Box a
-        \\const Box.pure = fn value => do:
-        \\  use owner <- @resource.acquire (fn () => 1) (fn value => ())
+        \\const Box.pure = func value => return do:
+        \\  use owner <- @resource.acquire (func () => return 1) (func value => return ())
         \\  use @resource.release owner
         \\  break #Box value
         \\const selected = @do.monad Box
-        \\const helper = fn () => do selected:
+        \\const helper = func () => return do selected:
         \\  break 42
-        \\const generated = @code.quote (fn () => helper ())
+        \\const generated = @code.quote (func () => return helper ())
         \\const answer = 42
     );
     defer m.deinit(a);
@@ -2878,20 +2917,20 @@ test "portable named resolver composition proves actual Foreign execution beneat
 test "portable named resolver composition carries effectful continuations" {
     var m = try lower(a,
         \\type Box a is data = #Box a
-        \\const Box.pure = fn value => do:
-        \\  use owner <- @resource.acquire (fn () => 1) (fn value => ())
+        \\const Box.pure = func value => return do:
+        \\  use owner <- @resource.acquire (func () => return 1) (func value => return ())
         \\  use @resource.release owner
         \\  break #Box value
-        \\const Box.bind = fn candidate => fn next => case candidate of
+        \\const Box.bind = func candidate => return func next => return case candidate of
         \\  #Box value => next value
-        \\const identity = fn value => value
+        \\const identity = func value => return value
         \\const selected = identity (@do.monad (identity Box))
-        \\const sequence = fn (value: U32) => do selected:
+        \\const sequence = func (value: U32) => return do selected:
         \\  use number <- #Box value
         \\  break @u32.add number 40
-        \\const helper = fn (value: U32) => case sequence value of
+        \\const helper = func (value: U32) => return case sequence value of
         \\  #Box result => result
-        \\const generated = @code.quote (fn (value: U32) => helper value)
+        \\const generated = @code.quote (func (value: U32) => return helper value)
         \\const generated_task = generated
         \\const evaluated: U32 = 42
     );
@@ -2921,18 +2960,18 @@ test "portable named resolver composition rejects same shaped foreign method sub
 test "portable named qualified resolver composition owns actual predicates in task helpers" {
     var m = try lower(a,
         \\type Box a is data = #Box a
-        \\const Box.pure = fn value => #Box value
-        \\const Box.bind = fn candidate => fn next => case candidate of
+        \\const Box.pure = func value => return #Box value
+        \\const Box.bind = func candidate => return func next => return case candidate of
         \\  #Box value => next value
-        \\const monad = fn constructor => @do.monad constructor
+        \\const monad = func constructor => return @do.monad constructor
         \\const selected = monad Box
-        \\const sequence = fn selected => fn candidate => do selected:
+        \\const sequence = func selected => return func candidate => return do selected:
         \\  use value <- candidate
         \\  break @u32.add value 2
-        \\const helper = fn (value: U32) => case sequence selected (#Box value) of
+        \\const helper = func (value: U32) => return case sequence selected (#Box value) of
         \\  #Box number => number
-        \\const generated = @code.quote (fn (value: U32) => helper value)
-        \\entry const run = fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value)))
+        \\const generated = @code.quote (func (value: U32) => return helper value)
+        \\entry const run = func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value)))
         \\const answer = 42
     );
     defer m.deinit(a);

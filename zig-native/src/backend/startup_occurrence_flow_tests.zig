@@ -30,59 +30,59 @@ fn compile(allocator: std.mem.Allocator, source: []const u8) !backend.Result {
 }
 const waiting_array =
     \\type Box is data = #Box U32
-    \\const Box.read = fn value => 42
-    \\const keep = fn ~(value: Unit -> U32) => value
-    \\const helper = fn () => (#Box 1).read
+    \\const Box.read = func value => return 42
+    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const helper = func () => return (#Box 1).read
     \\const pending = keep helper
     \\let first: U32 = @array.length #[pending]
-    \\entry const answer: Unit -> U32 = fn () => first
+    \\entry const answer: Unit -> U32 = func () => return first
 ;
 const ready_self =
     \\type Box is data = #Box U32
-    \\const Box.read = fn value => first
-    \\const keep = fn ~(value: Unit -> U32) => value
-    \\const helper = fn () => (#Box 1).read
+    \\const Box.read = func value => return first
+    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const helper = func () => return (#Box 1).read
     \\const pending = keep helper
     \\const cached = @force pending
     \\let first: U32 = cached ()
-    \\entry const answer: Unit -> U32 = fn () => first
+    \\entry const answer: Unit -> U32 = func () => return first
 ;
 const mixed_waiting =
     \\type Box is data = #Box U32
-    \\const Box.read = fn value => second
-    \\const keep = fn ~(value: Unit -> U32) => value
-    \\const helper = fn () => (#Box 1).read
+    \\const Box.read = func value => return second
+    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const helper = func () => return (#Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_pending = keep helper
     \\const cached = @force ready_pending
     \\let first: U32 = cached ()
     \\let second: U32 = (@force waiting_pending) ()
-    \\entry const answer: Unit -> U32 = fn () => @u32.add first second
+    \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 const returned_waiting =
     \\type Box is data = #Box U32
-    \\const Box.read = fn value => second
-    \\const keep = fn ~(value: Unit -> U32) => value
-    \\const helper = fn () => (#Box 1).read
+    \\const Box.read = func value => return second
+    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const helper = func () => return (#Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_pending = keep helper
-    \\const provide = fn () => waiting_pending
+    \\const provide = func () => return waiting_pending
     \\const cached = @force ready_pending
     \\let first: U32 = cached ()
     \\let second: U32 = (@force (provide ())) ()
-    \\entry const answer: Unit -> U32 = fn () => @u32.add first second
+    \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 const array_waiting =
     \\type Box is data = #Box U32
-    \\const Box.read = fn value => second
-    \\const keep = fn ~(value: Unit -> U32) => value
-    \\const helper = fn () => (#Box 1).read
+    \\const Box.read = func value => return second
+    \\const keep = func ~(value: Unit -> U32) => return value
+    \\const helper = func () => return (#Box 1).read
     \\const ready_pending = keep helper
     \\const waiting_store = #[keep helper]
     \\const cached = @force ready_pending
     \\let first: U32 = cached ()
     \\let second: U32 = (@force (@array.get waiting_store 0)) ()
-    \\entry const answer: Unit -> U32 = fn () => @u32.add first second
+    \\entry const answer: Unit -> U32 = func () => return @u32.add first second
 ;
 fn succeeds(allocator: std.mem.Allocator) !void {
     var result = try compile(allocator, ready_self);
@@ -140,10 +140,10 @@ test "full waiting demand inference and emission release every failed allocation
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, waitingProof, .{});
 }
 test "fresh waiting region preserves an independently cached returned operand without weakening its own calls" {
-    const prefix = "type Box is data = #Box U32\nconst Box.read = fn value => second\nconst keep = fn ~(value: Unit -> U32) => value\nconst helper = fn () => (#Box 1).read\nconst ready_pending = keep helper\nconst cached = @force ready_pending\nconst make = fn (action: Unit -> U32) => fn () => keep action\nconst fetch = make cached\n";
+    const prefix = "type Box is data = #Box U32\nconst Box.read = func value => return second\nconst keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return (#Box 1).read\nconst ready_pending = keep helper\nconst cached = @force ready_pending\nconst make = func (action: Unit -> U32) => return func () => return keep action\nconst fetch = make cached\n";
     for ([_][]const u8{
-        prefix ++ "let second: U32 = (@force (fetch ())) ()\nentry const answer: Unit -> U32 = fn () => second\n",
-        prefix ++ "let second: U32 = @array.length #[fetch ()]\nentry const answer: Unit -> U32 = fn () => second\n",
+        prefix ++ "let second: U32 = (@force (fetch ())) ()\nentry const answer: Unit -> U32 = func () => return second\n",
+        prefix ++ "let second: U32 = @array.length #[fetch ()]\nentry const answer: Unit -> U32 = func () => return second\n",
     }) |source| {
         var result = try compile(a, source);
         defer result.deinit(a);
@@ -152,14 +152,14 @@ test "fresh waiting region preserves an independently cached returned operand wi
     }
 }
 test "tagged startup wrappers cover calls through exact bound retained closures" {
-    const source = "infixl 60 (+) = plus\nconst plus = fn left => fn right => @u32.add left right\nconst decorate = fn (function: U32 -> U32) => fn (value: U32) => function value + 1\n@[decorate] let next: U32 -> U32 = fn(value: U32) => value\nentry const answer: U32 -> U32 = fn(value: U32) => next value\n";
+    const source = "infixl 60 (+) = plus\nconst plus = func left => return func right => return @u32.add left right\nconst decorate = func (function: U32 -> U32) => return func (value: U32) => return function value + 1\n@[decorate] let next: U32 -> U32 = func(value: U32) => return value\nentry const answer: U32 -> U32 = func(value: U32) => return next value\n";
     var result = try compile(a, source);
     defer result.deinit(a);
     if (result.diagnostic) |diagnostic| std.debug.print("tagged startup {s} {d}..{d}\n", .{ @tagName(diagnostic.code), diagnostic.span.start, diagnostic.span.end });
     try std.testing.expect(result.diagnostic == null);
 }
 fn genericTaggedProof(allocator: std.mem.Allocator) !void {
-    const source = "const decorate=fn function=>fn value=>@u32.add (function value) 1\n@[decorate] let next:U32->U32=fn(value:U32)=>value\nentry const answer=fn(value:U32)=>next value\n";
+    const source = "const decorate=func function=> return func value=> return @u32.add (function value) 1\n@[decorate] let next:U32->U32=func(value:U32)=> return value\nentry const answer=func(value:U32)=> return next value\n";
     var result = try compile(allocator, source);
     defer result.deinit(allocator);
     if (result.diagnostic) |diagnostic| std.debug.print("generic tagged startup {s} {d}..{d}\n", .{ @tagName(diagnostic.code), diagnostic.span.start, diagnostic.span.end });
@@ -169,7 +169,7 @@ test "generic tagged startup wrappers retain the concrete scalar occurrence para
     try genericTaggedProof(a);
 }
 test "generic retained scalar context declines an uncovered runtime callable cycle" {
-    const source = "const decorate=fn function=>fn value=>@u32.add (function value) bias\n@[decorate] let next:U32->U32=fn(value:U32)=>value\nlet bias:U32=next 0\nentry const answer=fn(value:U32)=>next value\n";
+    const source = "const decorate=func function=> return func value=> return @u32.add (function value) bias\n@[decorate] let next:U32->U32=func(value:U32)=> return value\nlet bias:U32=next 0\nentry const answer=func(value:U32)=> return next value\n";
     var result = try compile(a, source);
     defer result.deinit(a);
     const diagnostic = result.diagnostic orelse return error.MissingDecline;
@@ -179,7 +179,7 @@ test "generic retained scalar context releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, genericTaggedProof, .{});
 }
 fn nestedDemandProof(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data = #Box U32\nconst Box.read=fn value=>42\nconst keep=fn ~(value:Unit->U32)=>value\nconst helper=fn ()=>(#Box 1).read\nconst unforced=keep helper\nconst ready_pending=keep helper\nconst cached=@force ready_pending\nconst make=fn (action:Unit->U32)=>fn ()=>keep action\nentry const fetch=make cached\n";
+    const source = "type Box is data = #Box U32\nconst Box.read=func value=> return 42\nconst keep=func ~(value:Unit->U32)=> return value\nconst helper=func ()=> return (#Box 1).read\nconst unforced=keep helper\nconst ready_pending=keep helper\nconst cached=@force ready_pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nentry const fetch=make cached\n";
     var module = try lower(allocator, source);
     defer module.deinit(allocator);
     for ([_]bool{ true, false }) |recipes| {
@@ -231,7 +231,7 @@ test "completed source demand body inference releases every failed allocation" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nestedDemandProof, .{});
 }
 test "completed demand body cannot erase the returned callback latent effect" {
-    const source = "effect Read:Unit->U32\nconst keep=fn ~value=>value\nconst action=fn ()=>do:\n  use value<-Read ()\n  break value\nconst make=fn action=>fn ()=>keep action\nentry const fetch=make action\n";
+    const source = "effect Read:Unit->U32\nconst keep=func ~value=> return value\nconst action=func ()=> return do:\n  use value<-Read ()\n  break value\nconst make=func action=> return func ()=> return keep action\nentry const fetch=make action\n";
     var module = try lower(a, source);
     defer module.deinit(a);
     var session = try core_eval.Session.init(a, &.{module});
@@ -252,7 +252,7 @@ test "completed demand body cannot erase the returned callback latent effect" {
     try std.testing.expectEqual(core_eval.Code.effect_mismatch, session.diagnostic.?.code);
 }
 fn nestedArrayEmission(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data=#Box U32\nconst Box.read=fn value=>second\nconst keep=fn ~(value:Unit->U32)=>value\nconst helper=fn ()=>(#Box 1).read\nconst pending=keep helper\nconst cached=@force pending\nconst make=fn (action:Unit->U32)=>fn ()=>keep action\nconst fetch=make cached\nlet second:U32=@array.length #[fetch ()]\nentry const answer:Unit->U32=fn ()=>second\n";
+    const source = "type Box is data=#Box U32\nconst Box.read=func value=> return second\nconst keep=func ~(value:Unit->U32)=> return value\nconst helper=func ()=> return (#Box 1).read\nconst pending=keep helper\nconst cached=@force pending\nconst make=func (action:Unit->U32)=> return func ()=> return keep action\nconst fetch=make cached\nlet second:U32=@array.length #[fetch ()]\nentry const answer:Unit->U32=func ()=> return second\n";
     var result = try compile(allocator, source);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);

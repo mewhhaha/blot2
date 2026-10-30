@@ -18,15 +18,18 @@ Deno.test("real array library retains generic empty chunks alongside ordinary fi
       `
 import * as array from "./array"
 const numbers = #[1, 2, 3, 4, 5]
-const even = fn value => value % 2 == 0
-const choose = fn value => if even value then #Some (value * 10) else #Nothing
-entry const answer = fn () => do:
+const even = func value => return value % 2 == 0
+const choose = func value => return if even value then #Some (value * 10) else #Nothing
+entry const answer = func () => return do:
   let selected = array.filter even numbers
   let mapped = array.filter_map choose numbers
-  let flat = array.flatten #[#[], selected, #[], #[6]]
+  let payload = array.concat selected #[6]
+  let flat = array.flatten #[{start: 0, count: 0}, {start: 0, count: selected.length},
+    {start: selected.length, count: 0}, {start: selected.length, count: 1}] payload
   let (left, right) = array.unzip (array.zip flat mapped)
   break left[0] + right[1]
-entry const empties = array.length (array.flatten #[#[], #[]])
+const no_payload: Array U32 = #[]
+entry const empties = array.length (array.flatten #[{start: 0, count: 0}, {start: 0, count: 0}] no_payload)
 entry const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers))
 `,
     );
@@ -78,18 +81,18 @@ Deno.test("partial Array methods keep result evidence without constraining share
     await Deno.writeTextFile(
       `${dir}/prelude.blot`,
       prelude +
-        '\nconst Array.convert = fn values => @type.result "from" (@array.length values)\n',
+        '\nconst Array.convert = func values => return @type.result "from" (@array.length values)\n',
     );
     await compileAndRun(
       `
 const values = #[]
-const map = fn transform => fn items => @array.generate items.length (fn index => transform items[index])
+const map = func transform => return func items => return @array.generate items.length (func index => return transform items[index])
 entry const zero: F32 = values.convert
 entry const nested: F32 = #[#[], #[]].convert
 entry const concrete: F32 = #[1, 2].convert
 entry const length = values.length
 entry const mapped = (map .length #[#[], #[]])[1]
-entry const runtime = fn () -> F32 => #[].convert
+entry const runtime = func () : F32 => return #[].convert
 `,
       (guest) => {
         equal(guest.read("zero"), 0);

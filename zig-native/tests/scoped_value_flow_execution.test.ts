@@ -5,45 +5,45 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const identity = fn value => value
-const fields = fn (discarded: State a) => fn (retained: State b) => do:
-  let dropped = fn () => do:
+const identity = func value => return value
+const fields = func (discarded: State a) => return func (retained: State b) => return do:
+  let dropped = func () => return do:
     let alias = discarded
     break alias.get ()
-  let kept = fn () => do:
+  let kept = func () => return do:
     let alias = retained
     break case (alias, 1) of
       (cell, number) => cell.get ()
   break {discarded: dropped, retained: kept}
-const provider = fn unused => fn (state: State a) => fn implementation => @effect.provider state.get implementation
-const state = fn unused => fn (state: State a) => fn initial => @effect.state state.get state.set initial
-const computation = fn unused => fn action => @computation action
-const select = fn value => value.retained
-const select_pure: {discarded: a, retained: a} -> a = fn value => value.retained
-const take_array = fn values => @array.get values 1
-const take_second = fn (values: (a, b)) => @product.get values 1
-const keep = fn unused => fn (state: State a) => {callbacks: #[(fn () => state.get ())]}
-const aliases = fn unused => fn retained => do:
+const provider = func unused => return func (state: State a) => return func implementation => return @effect.provider state.get implementation
+const state = func unused => return func (state: State a) => return func initial => return @effect.state state.get state.set initial
+const computation = func unused => return func action => return @computation action
+const select = func value => return value.retained
+const select_pure: {discarded: a, retained: a} -> a = func value => return value.retained
+const take_array = func values => return @array.get values 1
+const take_second = func (values: (a, b)) => return @product.get values 1
+const keep = func unused => return func (state: State a) => return {callbacks: #[(func () => return state.get ())]}
+const aliases = func unused => return func retained => return do:
   let version = retained
   break {nested: #[version]}
 opaque type Wrapper a = a
-const wrap = fn unused => fn retained => #Wrapper retained
-const unwrap = fn unused => fn wrapped => case wrapped of
+const wrap = func unused => return func retained => return #Wrapper retained
+const unwrap = func unused => return func wrapped => return case wrapped of
   #Wrapper retained => retained
 `;
 const main =
   `import {State, identity, keep, aliases, wrap, unwrap, fields, select, select_pure, take_array, take_second, provider, state, computation} from "./values"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (older: State U32) => do:
-  let bundle = @effect.scope (fn (younger: State F32) => do:
-    let alias = fn () => older.get ()
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (older: State U32) => return do:
+  let bundle = @effect.scope (func (younger: State F32) => return do:
+    let alias = func () => return older.get ()
     let version = identity alias
-    let discarded = fn () => do:
+    let discarded = func () => return do:
       let ignored = younger
       break 1
-    let retained = fn () => do:
+    let retained = func () => return do:
       let ignored = older
       break 7
-    break {provider: provider younger older (fn () => 11), state: state younger older 7, computation: computation younger (fn () => older.get ()), retained: keep younger older, nested: (version, #[version]), aliased: aliases younger version, wrapped: wrap younger version, selected: select (unwrap older (wrap younger (fields younger older))), array: take_array #[discarded, retained], product: take_second (discarded, retained), pure: select_pure {discarded: discarded, retained: retained}}
+    break {provider: provider younger older (func () => return 11), state: state younger older 7, computation: computation younger (func () => return older.get ()), retained: keep younger older, nested: (version, #[version]), aliased: aliases younger version, wrapped: wrap younger version, selected: select (unwrap older (wrap younger (fields younger older))), array: take_array #[discarded, retained], product: take_second (discarded, retained), pure: select_pure {discarded: discarded, retained: retained}}
   )
   use provided <- do bundle.provider:
     break older.get ()
@@ -164,8 +164,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
             sources: {
               ...sources,
               [entry]: main +
-                `entry const bad = fn () => @effect.scope (fn (state: State U32) => do:
-  let hidden = fn () => state.get ()
+                `entry const bad = func () => return @effect.scope (func (state: State U32) => return do:
+  let hidden = func () => return state.get ()
   break {nested: #[(hidden, 42)]}
 )
 `,
@@ -180,17 +180,17 @@ for (const codegenTier of ["optimized", "development"] as const) {
           assert.deepEqual(await compiler.exportCheckpoint(), checkpoint);
           for (
             const result of [
-              "provider 0 cell (fn () => 7)",
+              "provider 0 cell (func () => return 7)",
               "state 0 cell 7",
-              "computation 0 (fn () => cell.get ())",
-              "computation 0 (fn () => do:\n    let ignored = cell\n    break 7\n  )",
+              "computation 0 (func () => return cell.get ())",
+              "computation 0 (func () => return do:\n    let ignored = cell\n    break 7\n  )",
             ]
           ) {
             const escaped = await compiler.build({
               sources: {
                 ...sources,
                 [entry]: main +
-                  `entry const escaped = fn () => @effect.scope (fn (cell: State U32) => ${result})\n`,
+                  `entry const escaped = func () => return @effect.scope (func (cell: State U32) => return ${result})\n`,
               },
             });
             assert(!escaped.success, JSON.stringify(escaped));

@@ -14,28 +14,28 @@ Deno.test("packed array layouts follow dependency edits and failed revision reco
     prelude: `${stdRoot}/prelude.blot`,
   };
   const main = `import { make, score, generated } from "./rows"
-entry const answer = fn value => score (make value)
-entry const listed = fn value => score (@array.from_list (@list.from_array (make value)))
-entry const callback = fn count => (generated count)[count - 1].y
+entry const answer = func value => return score (make value)
+entry const listed = func value => return score (@array.from_list (@list.from_array (make value)))
+entry const callback = func count => return (generated count)[count - 1].y
 `;
   const scalar = `const saved = #[{z: 7, a: 3}]
-const make = fn value => #[{a: value, z: value + 1}, ...saved]
-const score = fn rows => rows[0].a + rows[0].z + rows[1].z
+const make = func value => return #[{a: value, z: value + 1}, ...saved]
+const score = func rows => return rows[0].a + rows[0].z + rows[1].z
 `;
   const cases = [
     { source: scalar, answer: 48 },
     { source: scalar.replace("z: 7", "z: 9"), answer: 50 },
     { source: "const broken = absent\n", answer: null },
     {
-      source: `const make = fn value => #[{a: value, z: #[value + 2]}]
-const score = fn rows => rows[0].a + rows[0].z[0]
+      source: `const make = func value => return #[{a: value, z: #[value + 2]}]
+const score = func rows => return rows[0].a + rows[0].z[0]
 `,
       answer: 42,
     },
     {
       source:
-        `const make = fn value => #[{z: value + 2, b: value + 1, a: value}]
-const score = fn rows => rows[0].a + rows[0].b + rows[0].z
+        `const make = func value => return #[{z: value + 2, b: value + 1, a: value}]
+const score = func rows => return rows[0].a + rows[0].b + rows[0].z
 `,
       answer: 63,
     },
@@ -47,7 +47,7 @@ const score = fn rows => rows[0].a + rows[0].b + rows[0].z
       const sources = {
         [entry]: main,
         [dependency]: source +
-          `\nconst generated = fn count => @array.generate count (fn i => {x: i, y: i + ${
+          `\nconst generated = func count => return @array.generate count (func i => return {x: i, y: i + ${
             answer ?? 0
           }})\n`,
       };

@@ -9,7 +9,7 @@ export const program = await Deno.readTextFile(
 );
 export function variant(helper: string) {
   return program.replace(
-    "const helper = fn value => Render.show value",
+    "const helper = func value => return Render.show value",
     `const helper = ${helper}`,
   );
 }

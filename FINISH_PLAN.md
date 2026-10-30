@@ -1,5 +1,12 @@
 # Finish the current Blot program
 
+**Current memory migration:** the owner subsequently chose a greenfield
+data-stack model. Follow the [rewrite review](zig-native/STORAGE_REWRITE_REVIEW.md)
+and [tasks 110–121](tasks/STORAGE_REWRITE.md). The counted-runtime/cancellation
+direction and compatibility requirements below are historical; the new program
+keeps isolated host workers and explicit copies and removes language tasks.
+This does not mark unrelated compiler/performance work complete.
+
 Prepared 23 October 2026 from current main `93bc8d4`, the preserved candidate in
 `/workspace/blot2`, the task index, and GitHub issues #25–#27. This is an
 execution plan; no implementation or qualification is claimed by its creation.

@@ -12,8 +12,8 @@ const fixtures = [
     count: 1,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-let rows = @array.generate 100000 (fn i => {c: i * 2, a: i, b: i + 1})
-entry const run = fn factor => do:
+let rows = @array.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
+entry const run = func factor => return do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
@@ -25,8 +25,8 @@ entry const run = fn factor => do:
     count: 1,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-let rows = @list.generate 100000 (fn i => {c: i * 2, a: i, b: i + 1})
-entry const run = fn factor => do:
+let rows = @list.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
+entry const run = func factor => return do:
   let result = 0
   for row in rows:
     result := self + row.a + row.b + row.c
@@ -38,8 +38,8 @@ entry const run = fn factor => do:
     count: 100000,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-let rows = @list.generate 100000 (fn i => {c: i * 2, a: i, b: i + 1})
-entry const run = fn count => do:
+let rows = @list.generate 100000 (func i => return {c: i * 2, a: i, b: i + 1})
+entry const run = func count => return do:
   let cursor = rows.iter
   let result = 0
   for i in 0..count:
@@ -54,13 +54,13 @@ entry const run = fn count => do:
     count: 100000,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-const build = fn count => @array.generate count (fn i => {c: i * 2, a: i, b: i + 1})
-const sum = fn values => do:
+const build = func count => return @array.generate count (func i => return {c: i * 2, a: i, b: i + 1})
+const sum = func values => return do:
   let result = 0
   for row in values:
     result := self + row.a + row.b + row.c
   break result
-entry const run = fn count => sum (build count)
+entry const run = func count => return sum (build count)
 `,
   },
   {
@@ -68,13 +68,13 @@ entry const run = fn count => sum (build count)
     count: 100000,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-const build = fn count => #[(i, i + 1, i * 2) | i <- @array.generate count identity]
-const sum = fn values => do:
+const build = func count => return #[(i, i + 1, i * 2) | i <- @array.generate count identity]
+const sum = func values => return do:
   let result = 0
   for (a, b, c) in values:
     result := self + a + b + c
   break result
-entry const run = fn count => sum (build count)
+entry const run = func count => return sum (build count)
 `,
   },
   {
@@ -82,8 +82,8 @@ entry const run = fn count => sum (build count)
     count: 100000,
     expected: (100000 * (2 * 100000 - 1)) >>> 0,
     source: `
-const build = fn count => @array.generate count (fn i => {c: i * 2, a: i, b: i + 1})
-entry const run = fn count => do:
+const build = func count => return @array.generate count (func i => return {c: i * 2, a: i, b: i + 1})
+entry const run = func count => return do:
   let rows = build count
   let result = 0
   for i in 0..count:
@@ -96,13 +96,13 @@ entry const run = fn count => do:
     count: 100000,
     expected: (100000 * 100000) >>> 0,
     source: `
-const build = fn count => @array.generate count (fn i => {a: i, b: i + 1})
-const sum = fn values => do:
+const build = func count => return @array.generate count (func i => return {a: i, b: i + 1})
+const sum = func values => return do:
   let result = 0
   for row in values:
     result := self + row.a + row.b
   break result
-entry const run = fn count => sum (@array.from_list (@list.from_array (build count)))
+entry const run = func count => return sum (@array.from_list (@list.from_array (build count)))
 `,
   },
   {
@@ -110,8 +110,8 @@ entry const run = fn count => sum (@array.from_list (@list.from_array (build cou
     count: 100000,
     expected: (100000 * 100000) >>> 0,
     source: `
-const build = fn count => @array.generate count (fn i => {a: #[i], b: i + 1})
-entry const run = fn count => do:
+const build = func count => return @array.generate count (func i => return {a: #[i], b: i + 1})
+entry const run = func count => return do:
   let result = 0
   for row in build count:
     result := self + row.a[0] + row.b
@@ -128,7 +128,8 @@ for (const fixture of fixtures) {
   const path = `${output}/${fixture.name}.blot`;
   await Deno.writeTextFile(
     path,
-    fixture.source + "\nentry const probe = fn (seed: U32) => #[seed]\n",
+    fixture.source +
+      "\nentry const probe = func (seed: U32) => return #[seed]\n",
   );
   const guests: Awaited<ReturnType<typeof instantiateGuest>>[] = [];
   for (const variant of variants) {

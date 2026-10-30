@@ -6,17 +6,17 @@ Deno.test("paired State frames keep aliases and nearer states beside forwarding 
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Inspect is effect = { read: Unit -> U32 }
-const read = fn () => State.get ()
-const write = fn value => State.set value
-entry const run = fn (seed: U32) => do:
-  let (final, result) = @effect.run State.get State.set #[seed, seed + 1] (fn () => do:
+const read = func () => return State.get ()
+const write = func value => return State.set value
+entry const run = func (seed: U32) => return do:
+  let (final, result) = @effect.run State.get State.set #[seed, seed + 1] (func () => return do:
     use before <- read ()
-    let inspect = @effect.provider Inspect.read (fn () => do:
+    let inspect = @effect.provider Inspect.read (func () => return do:
       use outer <- read ()
       break outer[0]
     )
     let (inner_final, inner_result) = do inspect:
-      break @effect.run State.get State.set #[77, 78] (fn () => do:
+      break @effect.run State.get State.set #[77, 78] (func () => return do:
         use inspected <- Inspect.read ()
         use inner <- read ()
         use write #[79, 80]
@@ -68,15 +68,15 @@ Deno.test("paired State scalar slots preserve pointer-looking words and F32 snap
   await compileAndRun(
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const integer = fn (seed: U32) => do:
-  let (final, before) = @effect.run State.get State.set seed (fn () => do:
+entry const integer = func (seed: U32) => return do:
+  let (final, before) = @effect.run State.get State.set seed (func () => return do:
     use before <- State.get ()
     use State.set (seed + 1)
     break before
   )
   break #[before, final]
-entry const fraction = fn (seed: F32) => do:
-  let (final, before) = @effect.run State.get State.set seed (fn () => do:
+entry const fraction = func (seed: F32) => return do:
+  let (final, before) = @effect.run State.get State.set seed (func () => return do:
     use before <- State.get ()
     use State.set (seed + 0.5)
     break before

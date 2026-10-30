@@ -5,26 +5,32 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Probe is data = #Probe U32
-const Probe.choose = fn (unused: Probe) => do:
+const Probe.choose = func (unused: Probe) => return do:
   let copied = 0
-  break fn (index: U32) => @u32.add index copied
-const Probe.within = fn (unused: Probe) => do:
+  break func (index: U32) => return @u32.add index copied
+const Probe.within = func (unused: Probe) => return do:
   let limit = 2
-  break fn (index: U32) => @u32.lt index limit
-const lookup = fn probe => fn (index: U32) => do:
+  break func (index: U32) => return @u32.lt index limit
+const lookup = func probe => return func (index: U32) => return do:
   let values = #[8, 13]
   if @type.call "within" probe index:
     break @array.get values (@type.call "choose" probe index)
   break 0
-const run = fn index => lookup (#Probe 42) index
+const run = func index => return lookup (#Probe 42) index
 `;
 const source = `import {run} from "./logic"
-entry const answer = fn (index: U32) => run index
-entry const snapshot = fn (value: U32) => #[value]
+entry const answer = func (index: U32) => return run index
+entry const snapshot = func (value: U32) => return #[value]
 `;
 const remainingArgumentsLibrary = library
-  .replace("(index: U32) => @u32.add", "(index: U32) => fn () => @u32.add")
-  .replace("(index: U32) => @u32.lt", "(index: U32) => fn () => @u32.lt")
+  .replace(
+    "(index: U32) => return @u32.add",
+    "(index: U32) => return func () => return @u32.add",
+  )
+  .replace(
+    "(index: U32) => return @u32.lt",
+    "(index: U32) => return func () => return @u32.lt",
+  )
   .replace(
     'if @type.call "within" probe index:',
     'if (@type.call "within" probe index) ():',
@@ -35,8 +41,8 @@ const remainingArgumentsLibrary = library
   );
 
 const literalReceiverLibrary = `type Probe is data = #Probe U32
-const Probe.choose = fn (unused: Probe) => fn (index: U32) => fn (delta: U32) => @u32.add index delta
-const run = fn (index: U32) => do:
+const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta
+const run = func (index: U32) => return do:
   let copied = 0
   if @u32.lt index 2:
     break @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) copied)
@@ -121,7 +127,7 @@ for (
           expected = first.bytes;
           await observe(expected);
           checkpoint = await archive.exportCheckpoint();
-          const broken = source.replace("run index", "run #True");
+          const broken = source.replace("run index", "run true");
           const failed = await archive.build({ sources: { [entry]: broken } });
           assert(!failed.success);
           assert.deepEqual(await archive.exportCheckpoint(), checkpoint);

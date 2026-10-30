@@ -16,30 +16,30 @@ const io = std.testing.io;
 const shapes =
     \\data Box a = #Box a
     \\type Pair is data = #Pair { left: F32, right: F32 }
-    \\const pair = fn (left: F32) => fn (right: F32) => #Pair { left, right }
-    \\const swap = fn (value: Pair) => #Pair { left: value.right, right: value.left }
-    \\const boxed = fn value => #Box value
+    \\const pair = func (left: F32) => return func (right: F32) => return #Pair { left, right }
+    \\const swap = func (value: Pair) => return #Pair { left: value.right, right: value.left }
+    \\const boxed = func value => return #Box value
 ;
 const dep =
     \\import {Pair, pair, swap, boxed} from "./shapes"
     \\const value: U32 = 42
-    \\const read: Unit -> U32 = fn () => value
-    \\const choose = fn (value: Pair) => swap (swap value)
-    \\const keep = fn (value: F32) => boxed (pair value 1.0)
+    \\const read: Unit -> U32 = func () => return value
+    \\const choose = func (value: Pair) => return swap (swap value)
+    \\const keep = func (value: F32) => return boxed (pair value 1.0)
 ;
 const mid =
     \\import * as dep from "./dep"
     \\import {Pair, pair} from "./shapes"
-    \\const read_twice = fn () => @u32.add (dep.read ()) (dep.read ())
-    \\const chosen = fn (value: F32) => dep.choose (pair value 3.0)
+    \\const read_twice = func () => return @u32.add (dep.read ()) (dep.read ())
+    \\const chosen = func (value: F32) => return dep.choose (pair value 3.0)
 ;
 const extra =
     \\import {Pair, pair, swap} from "./shapes"
-    \\const flipped = fn (value: F32) => swap (pair value 5.0)
+    \\const flipped = func (value: F32) => return swap (pair value 5.0)
     \\const count: U32 = 7
 ;
 const solo =
-    \\const twice = fn (value: U32) => @u32.add value value
+    \\const twice = func (value: U32) => return @u32.add value value
 ;
 const broken =
     \\import {Pair} from "./shapes"
@@ -51,11 +51,11 @@ const entries = [_][]const u8{
     // mid, dep, shapes
     \\import * as mid from "./mid"
     \\entry const answer: U32 = mid.read_twice ()
-    \\entry const right = fn (value: F32) -> F32 => (mid.chosen value).right
+    \\entry const right = func (value: F32) : F32 => return (mid.chosen value).right
     ,
     // extra, shapes: a library subset with one new module
     \\import * as extra from "./extra"
-    \\entry const flipped = fn (value: F32) -> F32 => (extra.flipped value).left
+    \\entry const flipped = func (value: F32) : F32 => return (extra.flipped value).left
     \\entry const count: U32 = extra.count
     ,
     // every module so far and one more, discovered in another order
@@ -63,13 +63,13 @@ const entries = [_][]const u8{
     \\import * as extra from "./extra"
     \\import * as mid from "./mid"
     \\entry const answer: U32 = twice (mid.read_twice ())
-    \\entry const flipped = fn (value: F32) -> F32 => (extra.flipped value).right
+    \\entry const flipped = func (value: F32) : F32 => return (extra.flipped value).right
     ,
     // a strict subset
     \\import * as dep from "./dep"
     \\import {Box} from "./shapes"
     \\entry const answer: U32 = dep.read ()
-    \\entry const kept = fn (value: F32) -> F32 => do:
+    \\entry const kept = func (value: F32) : F32 => return do:
     \\  let #Box held = dep.keep value
     \\  break held.left
     ,
@@ -89,7 +89,7 @@ const entries = [_][]const u8{
     // shapes first: the fresh numbering differs from the first entry's
     \\import {pair} from "./shapes"
     \\import * as mid from "./mid"
-    \\entry const left = fn (value: F32) -> F32 => (mid.chosen (pair value 1.0).left).left
+    \\entry const left = func (value: F32) : F32 => return (mid.chosen (pair value 1.0).left).left
     ,
     // a rejection every lane publishes alike (partial.portableRejection)
     \\import * as extra from "./extra"
@@ -326,7 +326,7 @@ test "entry switch: a changed library module the entry reaches is replaced and t
     try fixture.write("main.blot", entries[1]);
     try std.testing.expect(try step(&session, &fixture));
     // Only the entry imports solo.
-    try fixture.write("solo.blot", "const twice = fn (value: U32) => @u32.add value (@u32.add value 1)\n");
+    try fixture.write("solo.blot", "const twice = func (value: U32) => return @u32.add value (@u32.add value 1)\n");
     try fixture.write("main.blot", entries[2]);
     try std.testing.expect(try step(&session, &fixture));
     try std.testing.expectEqual(@as(usize, 4), session.last.fallback.relocated_modules);

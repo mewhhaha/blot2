@@ -8,11 +8,11 @@ assert.equal(Deno.args.length, 4);
 const [baseline, current, std, output] = Deno.args.map((path) => resolve(path));
 await Deno.mkdir(output, { recursive: true });
 const source = `import * as iter from "std/iter"
-let retained = @list.generate 1000000 (fn index => index)
-entry const storage_probe = fn (value: U32) => #[value]
-entry const cursor = fn count => iter.fold_left add 0 (iter.take count retained.iter)
-entry const range = fn count => iter.fold_left add 0 (iter.range 0 count)
-entry const records = fn (count: U32) => do:
+let retained = @list.generate 1000000 (func index => return index)
+entry const storage_probe = func (value: U32) => return #[value]
+entry const cursor = func count => return iter.fold_left add 0 (iter.take count retained.iter)
+entry const range = func count => return iter.fold_left add 0 (iter.range 0 count)
+entry const records = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -21,13 +21,13 @@ entry const records = fn (count: U32) => do:
     let alias = record
     sum := self + alias.a + record.r
   break sum
-const make_record = fn value => { a: value, b: value, c: value, d: value, e: value, f: value,
+const make_record = func value => return { a: value, b: value, c: value, d: value, e: value, f: value,
   g: value, h: value, i: value, j: value, k: value, l: value,
   m: value, n: value, o: value, p: value, q: value, r: value + 1 }
-const read_record = fn record => record.a + record.b + record.c + record.d + record.e + record.f +
+const read_record = func record => return record.a + record.b + record.c + record.d + record.e + record.f +
   record.g + record.h + record.i + record.j + record.k + record.l + record.m + record.n +
   record.o + record.p + record.q + record.r
-entry const branches = fn (count: U32) => do:
+entry const branches = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = make_record value
@@ -36,7 +36,7 @@ entry const branches = fn (count: U32) => do:
     else:
       sum := self + read_record record + 1
   break sum
-entry const shared = fn (count: U32) => do:
+entry const shared = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let child = { a: value, b: value, c: value, d: value, e: value, f: value,

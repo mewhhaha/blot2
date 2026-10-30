@@ -137,21 +137,21 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const source = `${opaque ? "opaque " : ""}type Token${
           record ? " a" : ""
         } = ${record ? "{value: a}" : "Array U32"}
-const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = fn value => ${
+const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
           opaque ? "#Token " : ""
         }${record ? "{value}" : "value"}
-const read: ${record ? "Token a -> a" : "Token -> Array U32"} = fn ${
+const read: ${record ? "Token a -> a" : "Token -> Array U32"} = func ${
           opaque ? "(#Token value)" : "value"
-        } => ${record ? "value.value" : "value"}
-const capture = fn value => do:
+        } => return ${record ? "value.value" : "value"}
+const capture = func value => return do:
   let saved = make value
-  break fn () => read saved
-entry const run = fn (value: U32) => do:
+  break func () => return read saved
+entry const run = func (value: U32) => return do:
   let original = #[value, 7]
   let alias = read (make original)
   original[0] := 0
   break @u32.add alias[0] 2
-entry const captured = fn (value: U32) => do:
+entry const captured = func (value: U32) => return do:
   let original = #[value, 7]
   let saved = capture original
   original[0] := 0
@@ -184,11 +184,11 @@ entry const captured = fn (value: U32) => do:
     await inspectBuild(
       `opaque type Token = U32
 opaque type Pair = (U32, U32)
-entry const guarded = fn (value: U32) => do:
+entry const guarded = func (value: U32) => return do:
   let #Token 7 = #Token value else:
     break 99
   break 42
-entry const pair = fn (value: U32) => do:
+entry const pair = func (value: U32) => return do:
   let #Pair (left, right) = #Pair (value, 2)
   break @u32.add left right
 `,
@@ -217,11 +217,11 @@ for (const type of ["U32", "F32"]) {
       try {
         for (const opaque of [false, true]) {
           const source = `${opaque ? "opaque " : ""}type Token = ${type}
-const make: ${type} -> Token = fn value => ${opaque ? "#Token " : ""}value
-const read: Token -> ${type} = fn ${
+const make: ${type} -> Token = func value => return ${opaque ? "#Token " : ""}value
+const read: Token -> ${type} = func ${
             opaque ? "(#Token value)" : "value"
-          } => value
-entry const run = fn (value: ${type}) => read (make value)
+          } => return value
+entry const run = func (value: ${type}) => return read (make value)
 `;
           await Deno.writeTextFile(entry, source);
           const compiler = await createZigProjectCompiler({

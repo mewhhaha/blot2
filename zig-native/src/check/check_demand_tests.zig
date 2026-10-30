@@ -33,13 +33,13 @@ const Fixture = struct {
     }
 };
 const demand_source =
-    \\const twice=fn ~(value:U32)=>@u32.add (@force value) (@force value)
+    \\const twice=func ~(value:U32)=> return @u32.add (@force value) (@force value)
     \\const alias=twice
-    \\const call=fn (callback:~U32->U32)=>callback (@u32.add 20 1)
-    \\const delay=fn ~value=>value
-    \\const capture=fn ~value=>fn ()=>@force value
+    \\const call=func (callback:~U32->U32)=> return callback (@u32.add 20 1)
+    \\const delay=func ~value=> return value
+    \\const capture=func ~value=> return func ()=> return @force value
     \\entry const folded=call alias
-    \\entry const run=fn(value:U32)=>do:
+    \\entry const run=func(value:U32)=> return do:
     \\  let pending=delay value
     \\  let thunk=capture (@force pending)
     \\  break thunk ()
@@ -73,9 +73,9 @@ test "declared ordinary fixities preserve demanded left and right operands" {
     var f = try Fixture.init(a,
         \\infixl 30 (&&) = both
         \\infixl 10 `choose`
-        \\const both=fn left=>fn ~(right:Bool)=>if left then @force right else #False
-        \\const choose=fn ~(left:U32)=>fn ~(right:U32)=>@force left
-        \\entry const skipped=#False && (@panic "unreachable")
+        \\const both=func left=> return func ~(right:Bool)=> return if left then @force right else false
+        \\const choose=func ~(left:U32)=> return func ~(right:U32)=> return @force left
+        \\entry const skipped=false && (@panic "unreachable")
         \\entry const selected=42 `choose` (@panic "unreachable")
     );
     defer f.deinit(a);
@@ -100,12 +100,12 @@ test "declared ordinary fixities preserve demanded left and right operands" {
 test "demand checking rejects eager force bad argument modes and escaping suspended control" {
     const cases = [_]struct { text: []const u8, code: check.Code }{
         .{ .text = "entry const answer=@force 42\n", .code = .type_mismatch },
-        .{ .text = "const eager=fn(value:U32)=>value\nconst pass=fn(callback:~U32->U32)=>callback 42\nentry const answer=pass eager\n", .code = .type_mismatch },
-        .{ .text = "const ignore=fn ~(value:U32)=>42\nentry const answer=ignore #True\n", .code = .type_mismatch },
+        .{ .text = "const eager=func(value:U32)=> return value\nconst pass=func(callback:~U32->U32)=> return callback 42\nentry const answer=pass eager\n", .code = .type_mismatch },
+        .{ .text = "const ignore=func ~(value:U32)=> return 42\nentry const answer=ignore true\n", .code = .type_mismatch },
         .{ .text = "const force=@force\n", .code = .call_arity },
-        .{ .text = "const lazy=fn ~(value:U32)=>@force value\nconst call=fn callback=>callback 42\nentry const answer=call lazy\n", .code = .type_mismatch },
-        .{ .text = "const lazy=fn ~(value:U32)=>@force value\nconst forward=fn ~(value:U32)=>lazy value\nentry const answer=forward 42\n", .code = .type_mismatch },
-        .{ .text = "const ignore=fn ~value=>42\nentry const answer=fn()=>do:\n  for index in 0..1:\n    use ignore (do:\n      break\n    )\n  break 42\n", .code = .invalid_return },
+        .{ .text = "const lazy=func ~(value:U32)=> return @force value\nconst call=func callback=> return callback 42\nentry const answer=call lazy\n", .code = .type_mismatch },
+        .{ .text = "const lazy=func ~(value:U32)=> return @force value\nconst forward=func ~(value:U32)=> return lazy value\nentry const answer=forward 42\n", .code = .type_mismatch },
+        .{ .text = "const ignore=func ~value=> return 42\nentry const answer=func()=> return do:\n  for index in 0..1:\n    use ignore (do:\n      break\n    )\n  break 42\n", .code = .invalid_return },
     };
     for (cases) |item| {
         var f = try Fixture.init(a, item.text);

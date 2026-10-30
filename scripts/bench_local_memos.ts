@@ -28,7 +28,8 @@ pins[new URL(import.meta.url).pathname] = await hash(
 );
 const load = async () => (await Deno.readTextFile("/proc/loadavg")).trim();
 const loadStart = await load();
-let body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
+let body =
+  `const sum = func (count: U32) => return func ~(value: U32) => return do:
   let first = value
   let second = first
   let total = 0
@@ -38,10 +39,11 @@ let body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
   break total
 `;
 if (Deno.args[3] === "--callbacks") {
-  body = `const sum = fn (count: U32) => fn ~(value: U32) => do:
-  let first = fn () => @demand value
+  body =
+    `const sum = func (count: U32) => return func ~(value: U32) => return do:
+  let first = func () => return @demand value
   let alias = first
-  let second = fn () => @demand value
+  let second = func () => return @demand value
   let total = 0
   for i in 0..count:
     use current <- alias ()
@@ -50,8 +52,9 @@ if (Deno.args[3] === "--callbacks") {
   break total
 `;
 }
-const source = body + `entry const outside = fn (count: U32) => sum count 21
-entry const inside = fn (count: U32) => do:
+const source = body +
+  `entry const outside = func (count: U32) => return sum count 21
+entry const inside = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
     use current <- sum 4 i
@@ -273,7 +276,7 @@ const compilation: Record<string, unknown>[] = [];
 const main = `${output}/main.blot`, library = `${output}/library.blot`;
 await Deno.writeTextFile(
   main,
-  'import { sum } from "./library"\nentry const run = fn (count: U32) => sum count 21\n',
+  'import { sum } from "./library"\nentry const run = func (count: U32) => return sum count 21\n',
 );
 await Deno.writeTextFile(library, body);
 pins[main] = await hash(main);

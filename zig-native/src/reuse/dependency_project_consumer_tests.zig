@@ -99,7 +99,7 @@ test "changed entry dependency set declines without exposing an unused cached ca
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     try relink.relink(a, &loaded, &pool, &.{ 1, 2, 3 });
-    try std.testing.expectError(error.DependencySetChanged, consumer.compile(a, std.testing.io, path, "entry const answer:Unit->U32=fn()=>42\n", .{}, &pool, &loaded));
+    try std.testing.expectError(error.DependencySetChanged, consumer.compile(a, std.testing.io, path, "entry const answer:Unit->U32=func()=> return 42\n", .{}, &pool, &loaded));
 }
 
 test "fresh entry nominal State operation and record order match ordinary conceptual owners" {
@@ -107,12 +107,12 @@ test "fresh entry nominal State operation and record order match ordinary concep
         \\data EntryCell = #EntryCell U32
         \\data EntryRecord = #EntryRecord { zebra: U32, alpha: F32 }
         \\effect Ask: Unit -> F32
-        \\const evaluate = fn () => do (@effect.provider Ask (fn () => 0.5)):
-        \\  let (_, #EntryCell count) = @state.run (#EntryCell 42) (fn () => @state.get #EntryCell)
+        \\const evaluate = func () => return do (@effect.provider Ask (func () => return 0.5)):
+        \\  let (_, #EntryCell count) = @state.run (#EntryCell 42) (func () => return @state.get #EntryCell)
         \\  use fraction <- Ask ()
         \\  let record = #EntryRecord { zebra: count, alpha: fraction }
         \\  break @f32.add (@u32.to_f32 record.zebra) record.alpha
-        \\entry const owned: Unit -> F32 = fn () => evaluate ()
+        \\entry const owned: Unit -> F32 = func () => return evaluate ()
         \\entry const folded = evaluate ()
         \\
     ;
@@ -148,7 +148,7 @@ fn compileFailing(allocator: std.mem.Allocator, bytes: []const u8, path: []const
     try relink.relink(allocator, &loaded, &pool, &.{1});
     const before = try format.encode(allocator, key, loaded);
     defer allocator.free(before);
-    var result = try consumer.compile(allocator, std.testing.io, path, "import {identity} from \"./shared\"\nentry const answer:Unit->U32=fn()=>identity 42\n", .{}, &pool, &loaded);
+    var result = try consumer.compile(allocator, std.testing.io, path, "import {identity} from \"./shared\"\nentry const answer:Unit->U32=func()=> return identity 42\n", .{}, &pool, &loaded);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null and result.compiled.diagnostic == null);
     const after = try format.encode(allocator, key, loaded);
@@ -158,8 +158,8 @@ fn compileFailing(allocator: std.mem.Allocator, bytes: []const u8, path: []const
 test "project cache complete fresh consumer releases every failed allocation and preserves frozen evidence" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=fn value=>value\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=fn()=>identity 42\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=func value=> return value\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=func()=> return identity 42\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var owned = try freezeEntry(path);
@@ -184,7 +184,7 @@ test "project cache admission rejects current producer edits before symbol publi
     var admitted = try loader.load(a, std.testing.io, bytes, key.compiler, key.settings, .{}, &stats);
     defer format.deinit(a, &admitted);
     try std.testing.expect(stats.source_bytes > 0);
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=fn value=>@u32.add value 1\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=func value=> return @u32.add value 1\n" });
     stats = .{};
     try std.testing.expectError(error.InvalidArtifact, loader.load(a, std.testing.io, bytes, key.compiler, key.settings, .{}, &stats));
 }
@@ -198,8 +198,8 @@ fn loadFailing(allocator: std.mem.Allocator, bytes: []const u8) !void {
 test "project cache decoded current-source admission releases partial owners at every allocation" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=fn value=>value\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=fn()=>identity 42\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=func value=> return value\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=func()=> return identity 42\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var owned = try freezeEntry(path);
@@ -218,7 +218,7 @@ fn compileOwnedFailing(allocator: std.mem.Allocator, bytes: []const u8, expected
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     try relink.relink(allocator, &loaded, &pool, &.{1});
-    var result = try consumer.compileOwned(allocator, std.testing.io, path, "import {identity} from \"./shared\"\nentry const answer:Unit->U32=fn()=>identity 42\n", .{}, &pool, &loaded);
+    var result = try consumer.compileOwned(allocator, std.testing.io, path, "import {identity} from \"./shared\"\nentry const answer:Unit->U32=func()=> return identity 42\n", .{}, &pool, &loaded);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null and result.compiled.diagnostic == null);
     try std.testing.expectEqualSlices(u8, expected, result.compiled.bytes);
@@ -227,8 +227,8 @@ fn compileOwnedFailing(allocator: std.mem.Allocator, bytes: []const u8, expected
 test "consuming project cache emits after principal teardown and cleans every failed allocation" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=fn value=>value\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=fn()=>identity 42\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const identity=func value=> return value\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./shared\"\nentry const answer:Unit->U32=func()=> return identity 42\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var owned = try freezeEntry(path);
@@ -342,7 +342,7 @@ fn retainedEntryWitness(allocator: std.mem.Allocator, bytes: []const u8, path: [
 test "entry witnesses preserve imported source owners after borrowed and consuming cache teardown at every allocation" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const compare = fn left => fn right => @type.same left right\nconst alias = compare\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "shared.blot", .data = "const compare = func left => return func right => return @type.same left right\nconst alias = compare\n" });
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {compare, alias} from \"./shared\"\nentry const answer = 42\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
@@ -350,7 +350,7 @@ test "entry witnesses preserve imported source owners after borrowed and consumi
     defer frozen.deinit();
     const cases = .{
         .{ "import {compare} from \"./shared\"\nentry const failure = compare (@panic \"left witness\") (@panic \"right witness\")\n", backend.Code.invalid_annotation, @as(u32, 2), @as(u32, 45), "Never is an internal control-flow type" },
-        .{ "import {alias} from \"./shared\"\nentry const failure = alias (@panic \"left witness\") (@panic \"right witness\")\n", backend.Code.ambiguous_associated, @as(u32, 1), @as(u32, 39), "cannot select @type.same until operand types can be inferred; annotate the exported parameter or call the generic function with concrete types" },
+        .{ "import {alias} from \"./shared\"\nentry const failure = alias (@panic \"left witness\") (@panic \"right witness\")\n", backend.Code.ambiguous_associated, @as(u32, 1), @as(u32, 57), "cannot select @type.same until operand types can be inferred; annotate the exported parameter or call the generic function with concrete types" },
     };
     inline for (cases) |case| {
         try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = case[0] });
@@ -403,7 +403,7 @@ fn retainedStartup(allocator: std.mem.Allocator, bytes: []const u8, path: []cons
 test "startup source edges and project component order survive borrowed and consuming cache teardown under OOM" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    const library = "let first: U32 = second\nlet second = first\nconst read: Unit -> U32 = fn () => first\nconst metadata = @effect.count (@effect.of read)\n";
+    const library = "let first: U32 = second\nlet second = first\nconst read: Unit -> U32 = func () => return first\nconst metadata = @effect.count (@effect.of read)\n";
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "left.blot", .data = library });
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "right.blot", .data = library });
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {read, metadata} from \"./left\"\nimport {read as other} from \"./right\"\nentry const answer = 42\n" });
@@ -416,9 +416,9 @@ test "startup source edges and project component order survive borrowed and cons
     var frozen = try freezeEntry(path);
     defer frozen.deinit();
     const cases = .{
-        .{ "import {read} from \"./left\"\nimport {read as unused} from \"./right\"\nentry const answer = if #True then 42 else read ()\n", left },
+        .{ "import {read} from \"./left\"\nimport {read as unused} from \"./right\"\nentry const answer = if true then 42 else read ()\n", left },
         .{ "import {metadata} from \"./left\"\nimport {read as unused} from \"./right\"\nentry const answer = metadata\n", left },
-        .{ "import {read as first} from \"./left\"\nimport {read as second} from \"./right\"\nentry const answer = fn () => @u32.add (first ()) (second ())\n", right },
+        .{ "import {read as first} from \"./left\"\nimport {read as second} from \"./right\"\nentry const answer = func () => return @u32.add (first ()) (second ())\n", right },
     };
     inline for (cases) |case| {
         try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = case[0] });
@@ -433,18 +433,18 @@ test "implementation and associated members preserve compiled forwarding opaque 
     const entry =
         \\import {Same, Store, Source, make, read, keep} from "./facade"
         \\type Alias a = Same.Item a
-        \\const passthrough: (Alias U32) -> (Same.Item U32) = fn value => keep value
-        \\entry const answer: Unit -> U32 = fn () => Source.first #[passthrough (read (make 42))]
+        \\const passthrough: (Alias U32) -> (Same.Item U32) = func value => return keep value
+        \\entry const answer: Unit -> U32 = func () => return Source.first #[passthrough (read (make 42))]
     ;
     const producer =
         \\opaque type Token = U32
         \\type Identity a is contract = { type Item = a }
         \\type Tokens is contract = { type Item = Token }
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-        \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
-        \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
-        \\const make: U32 -> Tokens.Item = fn value => #Token value
-        \\const read: Tokens.Item -> U32 = fn (#Token value) => value
+        \\impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
+        \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
+        \\const make: U32 -> Tokens.Item = func value => return #Token value
+        \\const read: Tokens.Item -> U32 = func (#Token value) => return value
     ;
     const facade = "export {Identity as Same, Tokens as Store, Source, ArraySource, make, read, keep} from \"./producer\"\n";
     var dir = std.testing.tmpDir(.{});

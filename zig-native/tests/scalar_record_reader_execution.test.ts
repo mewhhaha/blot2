@@ -9,18 +9,18 @@ Deno.test("a direct scalar record reader can shed its short-lived caller allocat
   const executable = Deno.args[0] ??
     new URL("../zig-out/bin/blotc", import.meta.url);
   const source = `
-const score = fn (fields: { a: U32, b: U32, c: U32, d: U32 }) =>
+const score = func (fields: { a: U32, b: U32, c: U32, d: U32 }) => return
   @u32.add (@u32.mul fields.a fields.b) (@u32.mul fields.c fields.d)
-const divide = fn (fields: { numerator: U32, denominator: U32 }) =>
+const divide = func (fields: { numerator: U32, denominator: U32 }) => return
   @u32.div fields.numerator fields.denominator
-entry const answer = fn (input: U32) => score { d: 4, c: 3, b: 2, a: input }
-entry const snapshot = fn (input: U32) => do:
+entry const answer = func (input: U32) => return score { d: 4, c: 3, b: 2, a: input }
+entry const snapshot = func (input: U32) => return do:
   let row = { a: input, b: 2, c: 3, d: 4 }
   let retained = row
   row.a := 0
   return score retained
-entry const trap = fn (input: U32) => divide { denominator: input, numerator: 7 }
-entry const order = fn (host: U32 -> U32 ! {Foreign}) =>
+entry const trap = func (input: U32) => return divide { denominator: input, numerator: 7 }
+entry const order = func (host: U32 -> U32 ! {Foreign}) => return
   score { d: 4, c: 3, b: host 2, a: host 1 }
 `;
   try {

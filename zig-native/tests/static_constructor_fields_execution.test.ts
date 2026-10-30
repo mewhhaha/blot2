@@ -8,10 +8,10 @@ Deno.test("private tagged steps preserve forks saved results reference fields an
   await compileAndRun(
     `
 import * as iter from "std/iter"
-const first = fn step => case step of
+const first = func step => return case step of
   #Some (value, _) => value
   #Nothing => 999
-entry const forks = fn count => do:
+entry const forks = func count => return do:
   let cursor = iter.range 0 count
   let saved = cursor.next
   let alias = cursor
@@ -19,10 +19,10 @@ entry const forks = fn count => do:
     break 999
   let total = 0
   for index in 0..count:
-    let discarded = @array.generate 4096 (fn value => value + index)
+    let discarded = @array.generate 4096 (func value => return value + index)
     total := self + first rest.next
   break first saved + first alias.next + total
-entry const references = fn count => do:
+entry const references = func count => return do:
   let values = #[#[7, 8], #[9], #[10, 11, 12]]
   let total = 0
   for value in iter.take count (iter.map identity values):
@@ -30,7 +30,7 @@ entry const references = fn count => do:
     total := self + value.length + value[0]
   break total
 type Choice is data = #Present (Array U32, U32) | #Absent
-entry const old_alias = fn seed => do:
+entry const old_alias = func seed => return do:
   let saved = #Present (#[seed], seed + 1)
   let result = do:
     if seed == 0:
@@ -42,7 +42,7 @@ entry const old_alias = fn seed => do:
   break case result of
     #Present (_, value) => values[0] + value
     #Absent => values[0] + 100
-entry const empty = fn count => do:
+entry const empty = func count => return do:
   let source = iter.range 0 count
   let stored = #[source.next, (iter.range 0 0).next]
   break first stored[0] + first stored[1]
@@ -68,7 +68,7 @@ Deno.test("static constructor facts survive retained edits and portable replay i
   const entry = `${directory}/main.blot`;
   const helper = `${directory}/cursor.blot`;
   const program = `import * as cursor from "./cursor"
-entry const run = fn count => do:
+entry const run = func count => return do:
   let total = 0
   for value in cursor.make count:
     total := self + value
@@ -96,9 +96,9 @@ entry const run = fn count => do:
         return {
           [entry]: program,
           [helper]: declarations + `
-const make = fn end => #Running (0, end)
-const Sequence.iter = fn (cursor: Sequence) => cursor
-const Sequence.next = fn (cursor: Sequence) => case cursor of
+const make = func end => return #Running (0, end)
+const Sequence.iter = func (cursor: Sequence) => return cursor
+const Sequence.next = func (cursor: Sequence) => return case cursor of
   #Finished => #Nothing
   #Running (value, end) => if value >= end then #Nothing
     else #Some (value, #Running (value + 1, end))
@@ -169,10 +169,10 @@ Deno.test("private child state keeps chained forks saved values and window snaps
   await compileAndRun(
     `
 import * as iter from "std/iter"
-const head = fn values => @cursor.value (@list.cursor values)
-const third = fn values => @cursor.value (@cursor.advance (@cursor.advance (@list.cursor values)))
-entry const chained = fn count => do:
-  let cursor = iter.enumerate (iter.take (count / 2) (iter.map (fn value => value + 7) (iter.filter (fn value => value % 2 == 0) (iter.range 0 count))))
+const head = func values => return @cursor.value (@list.cursor values)
+const third = func values => return @cursor.value (@cursor.advance (@cursor.advance (@list.cursor values)))
+entry const chained = func count => return do:
+  let cursor = iter.enumerate (iter.take (count / 2) (iter.map (func value => return value + 7) (iter.filter (func value => return value % 2 == 0) (iter.range 0 count))))
   let saved = cursor.next
   let #Some ((index, first), rest) = saved else:
     break 999
@@ -183,9 +183,9 @@ entry const chained = fn count => do:
   let #Some ((_, again), _) = cursor.next else:
     break 999
   break index + first + again + total
-entry const references = fn (seed: U32) => do:
-  let values = @array.generate 4 (fn index => #[seed + index, index])
-  let cursor = iter.take 3 (iter.filter (fn (value: Array U32) => value.length == 2) (iter.map identity values))
+entry const references = func (seed: U32) => return do:
+  let values = @array.generate 4 (func index => return #[seed + index, index])
+  let cursor = iter.take 3 (iter.filter (func (value: Array U32) => return value.length == 2) (iter.map identity values))
   let saved = cursor.next
   let #Some (first, rest) = saved else:
     break 999
@@ -196,7 +196,7 @@ entry const references = fn (seed: U32) => do:
   let #Some (again, _) = cursor.next else:
     break 999
   break total + first[0] + first.length + again[0] + again.length
-entry const windows = fn count => do:
+entry const windows = func count => return do:
   let cursor = iter.windows 3 (iter.range 0 count)
   let saved = cursor.next
   let #Some (first, rest) = saved else:
@@ -232,13 +232,13 @@ Deno.test("private scalar callbacks retain conditional values reference pairs an
   await compileAndRun(
     `
 import * as iter from "std/iter"
-const sum_pair = fn total => fn pair => do:
+const sum_pair = func total => return func pair => return do:
   let (index, value) = pair
   if index % 2 == 0:
     break total + value * 3 + index
   break total + value
-entry const conditional = fn count => iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
-entry const replay = fn count => do:
+entry const conditional = func count => return iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
+entry const replay = func count => return do:
   let cursor = iter.enumerate (iter.range 0 count)
   let saved = cursor.next
   let total = 0
@@ -250,20 +250,20 @@ entry const replay = fn count => do:
   let #Some ((again, second), _) = rest.next else:
     break total + index + value + 100
   break total + index + value + again + second
-entry const references = fn (seed: U32) => do:
-  let values = @array.generate 4 (fn index => #[seed + index, index])
+entry const references = func (seed: U32) => return do:
+  let values = @array.generate 4 (func index => return #[seed + index, index])
   let cursor = iter.zip values (iter.range 0 4)
   let saved = cursor.next
   let total = 0
   for repeat in 0..3:
-    total := self + iter.fold_left (fn accumulator => fn pair => do:
+    total := self + iter.fold_left (func accumulator => return func pair => return do:
       let (values, index) = pair
       break accumulator + values.length + values[0] + index) 0 cursor
     let garbage = @array.generate 8192 identity
   let #Some ((first, index), _) = saved else:
     break 999
   break total + first.length + first[0] + index
-entry const floats = fn seed => iter.fold_left (fn total => fn pair => do:
+entry const floats = func seed => return iter.fold_left (func total => return func pair => return do:
   let (index, value) = pair
   if index % 2 == 0:
     break total + value
@@ -300,11 +300,11 @@ Deno.test("private scalar callback edits and restored checkpoints match fresh bo
   const helper = `${directory}/consumer.blot`;
   const program = `import * as iter from "std/iter"
 import * as consumer from "./consumer"
-entry const run = fn count => iter.fold_left consumer.sum 0 (iter.enumerate (iter.range 0 count))
+entry const run = func count => return iter.fold_left consumer.sum 0 (iter.enumerate (iter.range 0 count))
 `;
   const sources = (factor: number) => ({
     [entry]: program,
-    [helper]: `const sum = fn total => fn pair => do:
+    [helper]: `const sum = func total => return func pair => return do:
   let (index, value) = pair
   if index % 2 == 0:
     break total + value * ${factor} + index

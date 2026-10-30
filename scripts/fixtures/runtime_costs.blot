@@ -4,13 +4,13 @@ import { Vec3 } from "std/vector"
 
 type Columns is data = #Columns { values: Array U32 }
 
-entry const replace = fn (count: U32) => do:
+entry const replace = func (count: U32) => return do:
   let values = array.fill count 0
   for i in 0..count:
     values := array.replace i (i + 1) values
   break values
 
-entry const checked = fn (count: U32) => do:
+entry const checked = func (count: U32) => return do:
   let values = array.fill count 0
   for i in 0..count:
     let #Some next = values.set(i)(i + 1) else:
@@ -18,19 +18,19 @@ entry const checked = fn (count: U32) => do:
     values := next
   break values
 
-entry const nested = fn (count: U32) => do:
+entry const nested = func (count: U32) => return do:
   let world = #Columns { values: array.fill count 0 }
   for i in 0..count:
     world.values[i] := i + 1
   break world.values
 
-entry const append = fn (count: U32) => do:
+entry const append = func (count: U32) => return do:
   let values: List U32 = []
   for i in 0..count:
     values := list.append i values
   break Array.from_list values
 
-entry const append_break = fn (count: U32) => do:
+entry const append_break = func (count: U32) => return do:
   let values: List U32 = []
   for i in 0..count:
     if i == 1025:
@@ -38,7 +38,7 @@ entry const append_break = fn (count: U32) => do:
     values := list.append i values
   break Array.from_list values
 
-entry const append_shared = fn (count: U32) => do:
+entry const append_shared = func (count: U32) => return do:
   let versions: List (List U32) = []
   let values: List U32 = []
   for i in 0..count:
@@ -49,21 +49,21 @@ entry const append_shared = fn (count: U32) => do:
     result := self + old.length
   break result
 
-entry const singleton_lists = fn (count: U32) => do:
-  let items = array.generate count (fn i => [i])
+entry const singleton_lists = func (count: U32) => return do:
+  let items = array.generate count (func i => return [i])
   break items.length
 
-entry const singleton_arrays = fn (count: U32) => do:
-  let items = array.generate count (fn i => #[i])
+entry const singleton_arrays = func (count: U32) => return do:
+  let items = array.generate count (func i => return #[i])
   break items.length
 
-entry const maybe_demand = fn (count: U32) => do:
+entry const maybe_demand = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
     total := self + Maybe.unwrap_or_else (i + 1) (#Some i)
   break total
 
-entry const maybe_match = fn (count: U32) => do:
+entry const maybe_match = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
     let value = #Some i
@@ -72,14 +72,14 @@ entry const maybe_match = fn (count: U32) => do:
       #Nothing => i + 1)
   break total
 
-entry const mapped = fn (values: Array U32) => array.map (fn x => x + 1) values
-entry const mapped_loop = fn (values: Array U32) => do:
+entry const mapped = func (values: Array U32) => return array.map (func x => return x + 1) values
+entry const mapped_loop = func (values: Array U32) => return do:
   let result = array.fill values.length 0
   for i in 0..values.length:
     result[i] := values[i] + 1
   break result
 
-entry const vector_loop = fn (count: U32) => do:
+entry const vector_loop = func (count: U32) => return do:
   let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }
   for i in 0..count:
     v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5

@@ -1,24 +1,24 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
-const scalar = `entry const run = fn (count: U32) => do:
-  let values = @array.generate count (fn i => @u32.add i 1)
+const scalar = `entry const run = func (count: U32) => return do:
+  let values = @array.generate count (func i => return @u32.add i 1)
   let sum = 0
   for value in values:
     sum := @u32.add self value
   break sum
 `;
-const unknown = `entry const run = fn (count: U32) => do:
-  let values = @array.generate count (fn i => fn n => @u32.add i n)
+const unknown = `entry const run = func (count: U32) => return do:
+  let values = @array.generate count (func i => return func n => return @u32.add i n)
   break values[0] count
 `;
 const cyclic = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-entry const run = fn (seed: U32) => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+entry const run = func (seed: U32) => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use first <- delayed ()
     use State.set #End

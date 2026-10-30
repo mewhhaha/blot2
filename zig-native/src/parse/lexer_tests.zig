@@ -17,6 +17,7 @@ fn expectTags(source: []const u8, expected: []const Tag) !void {
 }
 
 test "flat tokens preserve longest matches and source byte spans" {
+    try expectTags("func fn function funcify", &.{ .kw_func, .identifier, .identifier, .identifier, .newline, .eof });
     try expectTags("const x = @u32.add 0xFF_FF 1.25e-2 // note\n", &.{
         .kw_const, .identifier, .equal, .intrinsic, .integer, .float, .newline, .eof,
     });
@@ -48,7 +49,7 @@ test "numeric proof intrinsic type names retain complete capitalized segments" {
 }
 
 test "nested do layout, continuations, delimiter closures and final comments" {
-    const source = "const answer = fn () => do:\n  let value = do:\n    break (\n      @u32.add 20\n      22)\n  break value // trailing";
+    const source = "const answer = func () => return do:\n  let value = do:\n    break (\n      @u32.add 20\n      22)\n  break value // trailing";
     var result = try lex(std.testing.allocator, source);
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
@@ -73,7 +74,7 @@ test "nested do layout, continuations, delimiter closures and final comments" {
 }
 
 test "request clause suites and effect operation line boundaries" {
-    const source = "const h = fn c => do:\n  for let r in c:\n    case r of\n      effect State.get unit =>\n        yield 1\n      complete value =>\n        break value\n";
+    const source = "const h = func c => return do:\n  for let r in c:\n    case r of\n      effect State.get unit =>\n        yield 1\n      complete value =>\n        break value\n";
     var result = try lex(std.testing.allocator, source);
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
@@ -91,7 +92,7 @@ test "request clause suites and effect operation line boundaries" {
 }
 
 test "contextual from, annotation where and leading selectors" {
-    const source = "import { where } from \"./where\"\nconst from = fn x => x\nconst f: a -> a where {has \"member\" a} = fn x => x\nconst r = {where: from}\nconst s = .field\nconst v = r.field\n";
+    const source = "import { where } from \"./where\"\nconst from = func x => return x\nconst f: a -> a where {has \"member\" a} = func x => return x\nconst r = {where: from}\nconst s = .field\nconst v = r.field\n";
     var result = try lex(std.testing.allocator, source);
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
@@ -120,11 +121,11 @@ fn expectDiagnostic(source: []const u8, code: Code) !void {
 }
 
 test "invalid layout, private markers, strings and Unicode report diagnostics" {
-    try expectDiagnostic("const f = fn () => do:\n\treturn 1", .layout_tab);
+    try expectDiagnostic("const f = func () => return do:\n\treturn 1", .layout_tab);
     try expectDiagnostic("  const f = 1", .layout_indent);
-    try expectDiagnostic("const f = fn () => do:\n  let a = 1\n break a", .layout_dedent);
-    try expectDiagnostic("const f = fn () => do:\nbreak 1", .layout_suite);
-    try expectDiagnostic("const f = fn () =>\n  do:\n  break 1", .layout_suite);
+    try expectDiagnostic("const f = func () => return do:\n  let a = 1\n break a", .layout_dedent);
+    try expectDiagnostic("const f = func () => return do:\nbreak 1", .layout_suite);
+    try expectDiagnostic("const f = func () => return \n  do:\n  break 1", .layout_suite);
     try expectDiagnostic("// \u{e000}", .reserved_layout);
     try expectDiagnostic("const s = ·name", .reserved_selector_marker);
     try expectDiagnostic("import { a } froM \"a\"", .reserved_import_marker);
@@ -158,11 +159,11 @@ test "numeric validation preserves U32 and exact F32 rounding" {
 }
 
 fn allocationScenario(allocator: Allocator) !void {
-    const source = "// π\nimport { value } from \"mod\"\nconst result: U32 = fn () => do:\n  let x = 1_0.0e-1\n  break value\n";
+    const source = "// π\nimport { value } from \"mod\"\nconst result: U32 = func () => return do:\n  let x = 1_0.0e-1\n  break value\n";
     var result = try lex(allocator, source);
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.items.len);
-    var invalid = try lex(allocator, "const f = fn () => do:\n break \"\\q\"");
+    var invalid = try lex(allocator, "const f = func () => return do:\n break \"\\q\"");
     defer invalid.deinit(allocator);
     try std.testing.expect(invalid.diagnostics.items.len != 0);
 }
@@ -173,7 +174,7 @@ test "all lexer allocation failures release tokens, trivia and scratch" {
 
 test "mixed line endings preserve layout tags and original byte spans" {
     const lines = [_][]const u8{
-        "// leading comment", "const before = 1", "const answer = fn () => do:",
+        "// leading comment", "const before = 1", "const answer = func () => return do:",
         "  let value = do:",  "    break 41",     "  break @u32.add value 1",
         "",
     };

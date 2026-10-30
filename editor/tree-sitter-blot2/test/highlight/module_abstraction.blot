@@ -8,7 +8,7 @@ private const hidden = 42
 // <- keyword.storage.modifier
 //      ^ keyword.storage.type
 
-private entry const run = fn value => value
+private entry const run = func value => return value
 // <- keyword.storage.modifier
 //      ^ keyword.storage.modifier
 
@@ -20,13 +20,13 @@ export { Token as Ticket } from "./tokens"
 // <- keyword.control.import
 //                         ^ keyword.control.import
 
-const private = fn opaque => opaque
+const private = func opaque => return opaque
 //    ^ function
 //    ^ !keyword.storage.modifier
-//                 ^ variable.parameter
-//                 ^ !keyword.storage.modifier
-const opaque = fn export => export
+//                   ^ variable.parameter
+//                   ^ !keyword.storage.modifier
+const opaque = func export => return export
 //    ^ function
 //    ^ !keyword.storage.modifier
-//                ^ variable.parameter
-//                ^ !keyword.control.import
+//                  ^ variable.parameter
+//                  ^ !keyword.control.import

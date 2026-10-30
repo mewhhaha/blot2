@@ -1,0 +1,12 @@
+const selected = $Some 42
+//               ^ constructor
+const answer = #run 21 + 21
+//             ^ keyword.directive
+const apply = func f -> x => return f $ x
+//                                    ^ operator
+const qualified = $choice.Some 42
+//                ^ constructor
+const block = #do:
+//            ^ keyword.directive
+  let value = 40
+  break value + 2

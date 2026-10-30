@@ -27,7 +27,7 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
   try {
     await Deno.writeTextFile(
       `${dir}/lib.blot`,
-      "const inc=fn value=>value+1\nconst add=fn amount=>fn value=>value+amount\n",
+      "const inc=func value=> return value+1\nconst add=func amount=> return func value=> return value+amount\n",
     );
     await Deno.writeTextFile(
       `${dir}/main.blot`,
@@ -75,17 +75,17 @@ Deno.test("tags resolve aliases and both imported name forms", async () => {
 });
 Deno.test("undemanded tagged declarations and uncalled tagged function bodies stay unevaluated", async () => {
   await compileAndRun(
-    '@[fn value=>@panic "unused const"] const unused:U32=1\n@[fn value=>@panic "unused let"] let unused_let:U32=1\n@[fn function=>function] const uncalled=fn ()=>@panic "uncalled"\nentry const answer=42\n',
+    '@[func value=> return @panic "unused const"] const unused:U32=1\n@[func value=> return @panic "unused let"] let unused_let:U32=1\n@[func function=> return function] const uncalled=func ()=> return @panic "uncalled"\nentry const answer=42\n',
     (guest) => equal(guest.read("answer"), 42),
   );
   await compileExpectedFailure(
-    "@[fn ~value=>@force value] entry const answer:U32=42\n",
+    "@[func ~value=> return @force value] entry const answer:U32=42\n",
     "type_mismatch",
   );
 });
 Deno.test("tag startup closures wrap the original initializer without flattening its parameters", async () => {
   await compileAndRun(
-    "const decorate=fn function=>fn value=>@u32.add (function value) 1\n@[decorate] let next:U32->U32=fn(value:U32)=>value\nentry const answer=fn(value:U32)=>next value\n",
+    "const decorate=func function=> return func value=> return @u32.add (function value) 1\n@[decorate] let next:U32->U32=func(value:U32)=> return value\nentry const answer=func(value:U32)=> return next value\n",
     (guest) => {
       for (const value of [0, 1, 41, 100]) {
         equal(guest.call("answer", value), value + 1);
@@ -96,9 +96,9 @@ Deno.test("tag startup closures wrap the original initializer without flattening
 Deno.test("named and inline tag panics retain the exact tag invocation location", async () => {
   for (
     const source of [
-      '@[fn value=>@panic "tag"] entry const answer:U32=42\n',
-      'const decorator=fn value=>@panic "tag"\n@[decorator] entry const answer:U32=42\n',
-      'const decorator=fn value=>@panic "tag"\n@[fn value=>value]\n@[decorator] entry const answer:U32=42\n',
+      '@[func value=> return @panic "tag"] entry const answer:U32=42\n',
+      'const decorator=func value=> return @panic "tag"\n@[decorator] entry const answer:U32=42\n',
+      'const decorator=func value=> return @panic "tag"\n@[func value=> return value]\n@[decorator] entry const answer:U32=42\n',
     ]
   ) {
     const dir = await Deno.makeTempDir({

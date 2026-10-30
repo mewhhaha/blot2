@@ -1,29 +1,29 @@
 data Maybe a = #Some a | #None
-entry const matching = fn () => do:
+entry const matching = func () => return do:
   let #Some value = #Some 42 else:
     @panic "unreachable"
   break value
-entry const choose = fn (flag: Bool) => do:
+entry const choose = func (flag: Bool) => return do:
   let #Some value = if flag then #Some 42 else #None else:
     @panic "missing"
   break value
-entry const floating = fn (flag: Bool) => do:
+entry const floating = func (flag: Bool) => return do:
   let #Some value = if flag then #Some 42.5 else #None else:
     @panic "missing float"
   break value
-entry const branches = fn (flag: Bool) => do:
+entry const branches = func (flag: Bool) => return do:
   let #Some value = if flag then #Some 42 else #None else:
     if flag:
       @panic "first branch"
     else:
       @panic "second branch"
   break value
-entry const nested = fn (flag: Bool) => do:
+entry const nested = func (flag: Bool) => return do:
   let #Some value = if flag then #Some 42 else #None else:
     do:
       @panic "nested"
   break value
-entry const merged = fn (flag: Bool) => do:
+entry const merged = func (flag: Bool) => return do:
   let total = 40
   if flag:
     @panic "branch"
@@ -31,7 +31,7 @@ entry const merged = fn (flag: Bool) => do:
     total := @u32.add self 2
   break total
 entry const folded = matching ()
-entry const observed = fn (host: Unit -> U32 ! {Foreign}) => do:
+entry const observed = func (host: Unit -> U32 ! {Foreign}) => return do:
   use flag <- host ()
   let #Some value = if @u32.eq flag 0 then #None else #Some 42 else:
     host ()

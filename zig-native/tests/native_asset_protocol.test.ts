@@ -396,7 +396,7 @@ Deno.test("native asset wire: mixed source/asset partitions, rejected edits, del
     );
     const compilerFailure = await peer.build([[
       peer.entry,
-      "entry const answer: U32 = #True\n",
+      "entry const answer: U32 = true\n",
     ]], [[path, '{"answer":44}']]);
     equal(compilerFailure.metadata.success, false);
     ok(compilerFailure.metadata.diagnostics[0].stage !== "asset");

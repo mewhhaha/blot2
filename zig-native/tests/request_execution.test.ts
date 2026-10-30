@@ -35,19 +35,19 @@ const programs: readonly Program[] = [
     name: "replies resume the computation and completion sees its result",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield @u32.add value 1
       complete value =>
         break value
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   use first <- Validate.check 19
   use second <- Validate.check 21
   break @u32.add first second
 )
-entry const answer = fn () => checked calculation
+entry const answer = func () => return checked calculation
 `,
     expected: 42,
   },
@@ -55,12 +55,12 @@ entry const answer = fn () => checked calculation
     name: "return cancels helper calls, later loop iterations and the suffix",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const helper = fn value => do:
+const helper = func value => return do:
   use reply <- Validate.check value
   if @u32.eq value 2:
     break @panic "helper continued after cancellation"
   break reply
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -69,14 +69,14 @@ const checked = fn computation => do:
         yield value
       complete value =>
         break value
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   for index in 0 .. 4:
     use helper index
     if @u32.eq index 2:
       @panic "loop continued after cancellation"
   break @panic "computation suffix ran after cancellation"
 )
-entry const answer = fn () => checked calculation
+entry const answer = func () => return checked calculation
 `,
     expected: 42,
   },
@@ -84,21 +84,21 @@ entry const answer = fn () => checked calculation
     name: "cancellation skips array allocation and generator construction",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         break 21
       complete value =>
         break value
-const make_generator = fn () => do:
+const make_generator = func () => return do:
   use Validate.check 0
   break @panic "generator construction continued"
-entry const answer = fn () => do:
-  let count = checked (@computation (fn () =>
+entry const answer = func () => return do:
+  let count = checked (@computation (func () => return
     @array.length (@array.generate (Validate.check 0) (@panic "generator evaluated"))
   ))
-  let generator = checked (@computation (fn () =>
+  let generator = checked (@computation (func () => return
     @array.length (@array.generate 2 (make_generator ()))
   ))
   break @u32.add count generator
@@ -109,8 +109,8 @@ entry const answer = fn () => do:
     name: "cancelled demand forcing remains suspended for a later handler",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const keep = fn ~value => fn () => @force value
-const checked = fn stop => fn computation => do:
+const keep = func ~value => return func () => return @force value
+const checked = func stop => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -119,9 +119,9 @@ const checked = fn stop => fn computation => do:
         yield 42
       complete value =>
         break value
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let delayed = keep (Validate.check 0)
-  let calculation = @computation (fn () => delayed ())
+  let calculation = @computation (func () => return delayed ())
   let cancelled = checked 1 calculation
   let completed = checked 0 calculation
   break @u32.add cancelled completed
@@ -133,16 +133,16 @@ entry const answer = fn () => do:
       "first-class operation values keep their identity through helper calls",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const invoke = fn operation => operation 40
+const invoke = func operation => return operation 40
 const selected = Validate.check
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield @u32.add value 2
       complete value =>
         break value
-entry const answer = fn () => checked (@computation (fn () => invoke selected))
+entry const answer = func () => return checked (@computation (func () => return invoke selected))
 `,
     expected: 42,
   },
@@ -151,7 +151,7 @@ entry const answer = fn () => checked (@computation (fn () => invoke selected))
       "break cancels the computation and exposes successor state to the suffix",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let count = 10
   for request in @requests computation:
     case request of
@@ -163,12 +163,12 @@ const checked = fn computation => do:
       complete value =>
         break value
   break @u32.add count 30
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   use Validate.check 40
   use Validate.check 0
   break @panic "break resumed the computation"
 )
-entry const answer = fn () => checked calculation
+entry const answer = func () => return checked calculation
 `,
     expected: 42,
   },
@@ -176,7 +176,7 @@ entry const answer = fn () => checked calculation
     name: "successive replies and completion share the handler's carried state",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let count = 0
   for request in @requests computation:
     case request of
@@ -185,12 +185,12 @@ const checked = fn computation => do:
         yield @u32.add value count
       complete value =>
         break @u32.add value count
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   use first <- Validate.check 20
   use second <- Validate.check 20
   break @u32.add first second
 )
-entry const answer = fn () => checked calculation
+entry const answer = func () => return checked calculation
 `,
     expected: 45,
   },
@@ -198,7 +198,7 @@ entry const answer = fn () => checked calculation
     name: "a completion clause can break and retain its final state update",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let total = 1
   for request in @requests computation:
     case request of
@@ -209,7 +209,7 @@ const checked = fn computation => do:
         total := @u32.add self value
         break
   break total
-entry const answer = fn () => checked (@computation (fn () => do:
+entry const answer = func () => return checked (@computation (func () => return do:
   use value <- Validate.check 20
   break @u32.add value 1
 ))
@@ -221,7 +221,7 @@ entry const answer = fn () => checked (@computation (fn () => do:
       "reply, computation result and early handler result have independent types",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -230,11 +230,11 @@ const checked = fn computation => do:
         yield value
       complete () =>
         break 41.0
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   use Validate.check 0
   break ()
 )
-entry const answer = fn () => @f32.to_u32 (checked calculation)
+entry const answer = func () => return @f32.to_u32 (checked calculation)
 `,
     expected: 42,
   },
@@ -242,8 +242,8 @@ entry const answer = fn () => @f32.to_u32 (checked calculation)
     name: "a lazy captured computation can be reused with fresh handler state",
     source: `
 type Counter is effect = { next: Unit -> U32 }
-const calculation = @computation (fn () => Counter.next ())
-const count = fn computation => do:
+const calculation = @computation (func () => return Counter.next ())
+const count = func computation => return do:
   let current = 39
   for request in @requests computation:
     case request of
@@ -252,7 +252,7 @@ const count = fn computation => do:
         yield current
       complete value =>
         break value
-entry const answer = fn () => @u32.add (count calculation) (count calculation)
+entry const answer = func () => return @u32.add (count calculation) (count calculation)
 `,
     expected: 80,
   },
@@ -260,7 +260,7 @@ entry const answer = fn () => @u32.add (count calculation) (count calculation)
     name: "operation identities distinguish clauses with identical signatures",
     source: `
 type Inputs is effect = { left: Unit -> U32, right: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Inputs.left () =>
@@ -269,7 +269,7 @@ const handled = fn computation => do:
         yield 2
       complete value =>
         break value
-entry const answer = fn () => handled (@computation (fn () => do:
+entry const answer = func () => return handled (@computation (func () => return do:
   use left <- Inputs.left ()
   use right <- Inputs.right ()
   break @u32.add left right
@@ -282,8 +282,8 @@ entry const answer = fn () => handled (@computation (fn () => do:
       "effect clauses run outside the entire installation and can forward their operation",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const outer = @effect.provider Validate.check (fn value => @u32.add value 2)
-const checked = fn computation => do:
+const outer = @effect.provider Validate.check (func value => return @u32.add value 2)
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -291,8 +291,8 @@ const checked = fn computation => do:
         yield reply
       complete value =>
         break value
-entry const answer = fn () => do outer:
-  break checked (@computation (fn () => Validate.check 40))
+entry const answer = func () => return do outer:
+  break checked (@computation (func () => return Validate.check 40))
 `,
     expected: 42,
   },
@@ -301,15 +301,15 @@ entry const answer = fn () => do outer:
     source: `
 type Validate is effect = { check: U32 -> U32 }
 type Input is effect = { read: Unit -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield value
       complete value =>
         break value
-entry const answer = fn () => do (@effect.provider Input.read (fn () => 2)):
-  break checked (@computation (fn () => do:
+entry const answer = func () => return do (@effect.provider Input.read (func () => return 2)):
+  break checked (@computation (func () => return do:
     use left <- Validate.check 40
     use right <- Input.read ()
     break @u32.add left right
@@ -323,7 +323,7 @@ entry const answer = fn () => do (@effect.provider Input.read (fn () => 2)):
     source: `
 type Outer is effect = { check: U32 -> U32 }
 type Inner is effect = { read: Unit -> U32 }
-const inner = fn computation => do:
+const inner = func computation => return do:
   for request in @requests computation:
     case request of
       effect Inner.read () =>
@@ -331,15 +331,15 @@ const inner = fn computation => do:
         yield value
       complete value =>
         break value
-const outer = fn computation => do:
+const outer = func computation => return do:
   for request in @requests computation:
     case request of
       effect Outer.check value =>
         break 42
       complete value =>
         break value
-entry const answer = fn () => outer (@computation (fn () => do:
-  use inner (@computation (fn () => do:
+entry const answer = func () => return outer (@computation (func () => return do:
+  use inner (@computation (func () => return do:
     use Inner.read ()
     break @panic "inner computation continued"
   ))
@@ -352,7 +352,7 @@ entry const answer = fn () => outer (@computation (fn () => do:
     name: "a nested plain do return stays local to that block",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -361,7 +361,7 @@ const checked = fn computation => do:
         yield local
       complete value =>
         break @u32.add value 1
-entry const answer = fn () => checked (@computation (fn () => Validate.check 40))
+entry const answer = func () => return checked (@computation (func () => return Validate.check 40))
 `,
     expected: 42,
   },
@@ -369,7 +369,7 @@ entry const answer = fn () => checked (@computation (fn () => Validate.check 40)
     name: "break in an ordinary loop inside a clause exits that nearest loop",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let count = 0
   for request in @requests computation:
     case request of
@@ -381,7 +381,7 @@ const checked = fn computation => do:
         yield @u32.add value count
       complete value =>
         break value
-entry const answer = fn () => checked (@computation (fn () => Validate.check 40))
+entry const answer = func () => return checked (@computation (func () => return Validate.check 40))
 `,
     expected: 42,
   },
@@ -389,7 +389,7 @@ entry const answer = fn () => checked (@computation (fn () => Validate.check 40)
     name: "multiple carried locals survive conditional and nested loop updates",
     source: `
 type Counter is effect = { next: U32 -> U32 }
-const count = fn computation => do:
+const count = func computation => return do:
   let first = 0
   let second = 0
   for request in @requests computation:
@@ -404,7 +404,7 @@ const count = fn computation => do:
         yield @u32.add first second
       complete value =>
         break @u32.add (@u32.add first second) value
-entry const answer = fn () => count (@computation (fn () => do:
+entry const answer = func () => return count (@computation (func () => return do:
   use Counter.next 0
   use value <- Counter.next 1
   break value
@@ -416,7 +416,7 @@ entry const answer = fn () => count (@computation (fn () => do:
     name:
       "nested do cannot intercept an ordinary loop break at colliding offsets",
     source: collidingDo(
-      "entry const answer = fn () => do:\n  for index in 0 .. 1:\n",
+      "entry const answer = func () => return do:\n  for index in 0 .. 1:\n",
       14,
       '      break\n    @panic "inner do intercepted the loop break"\n  break 42\n',
     ),
@@ -425,9 +425,9 @@ entry const answer = fn () => count (@computation (fn () => do:
   {
     name: "nested do cannot intercept a completion break at colliding offsets",
     source: collidingDo(
-      `entry const answer = fn () => do:
+      `entry const answer = func () => return do:
   let result = 0
-  for request in @requests (@computation (fn () => 42)):
+  for request in @requests (@computation (func () => return 42)):
     case request of
       complete value =>
         result := value
@@ -442,26 +442,26 @@ entry const answer = fn () => count (@computation (fn () => do:
     name: "unused operation clauses can handle a pure computation",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield value
       complete value =>
         break value
-entry const answer = fn () => checked (@computation (fn () => 42))
+entry const answer = func () => return checked (@computation (func () => return 42))
 `,
     expected: 42,
   },
   {
     name: "a request loop may contain only its completion clause",
     source: `
-const finished = fn computation => do:
+const finished = func computation => return do:
   for request in @requests computation:
     case request of
       complete value =>
         break value
-entry const answer = fn () => finished (@computation (fn () => 42))
+entry const answer = func () => return finished (@computation (func () => return 42))
 `,
     expected: 42,
   },
@@ -470,14 +470,14 @@ entry const answer = fn () => finished (@computation (fn () => 42))
       "grouping the entire request input preserves its request-loop meaning",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in (@requests computation):
     case request of
       effect Validate.check value =>
         yield @u32.add value 2
       complete value =>
         break value
-entry const answer = fn () => checked (@computation (fn () => Validate.check 40))
+entry const answer = func () => return checked (@computation (func () => return Validate.check 40))
 `,
     expected: 42,
   },
@@ -486,14 +486,14 @@ entry const answer = fn () => checked (@computation (fn () => Validate.check 40)
       "explicit generic operation clauses retain their specialized identity",
     source: `
 type Inspect a is effect = a -> a
-const inspected = fn computation => do:
+const inspected = func computation => return do:
   for request in @requests computation:
     case request of
       effect (Inspect U32) value =>
         yield @u32.add value 2
       complete value =>
         break value
-entry const answer = fn () => inspected (@computation (fn () => Inspect U32 40))
+entry const answer = func () => return inspected (@computation (func () => return Inspect U32 40))
 `,
     expected: 42,
   },
@@ -502,7 +502,7 @@ entry const answer = fn () => inspected (@computation (fn () => Inspect U32 40))
       "many requests in a loop use bounded call stack and fresh carried state",
     source: `
 type Counter is effect = { next: Unit -> U32 }
-const count = fn computation => do:
+const count = func computation => return do:
   let current = 0
   for request in @requests computation:
     case request of
@@ -511,7 +511,7 @@ const count = fn computation => do:
         yield current
       complete () =>
         break current
-entry const answer = fn limit => count (@computation (fn () => do:
+entry const answer = func limit => return count (@computation (func () => return do:
   for index in 0 .. limit:
     use Counter.next ()
   break ()
@@ -547,7 +547,7 @@ for (const program of programs) {
 Deno.test("request runtime: F32 reply and carried scalar state", async () => {
   await compileAndRun(
     `type Float is effect = { ask: F32 -> F32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let sum = 0.5
   for request in @requests computation:
     case request of
@@ -556,7 +556,7 @@ const checked = fn computation => do:
         yield @f32.add sum 1.0
       complete value =>
         break @f32.add sum value
-entry const answer = fn (value: F32) => checked (@computation (fn () => Float.ask value))
+entry const answer = func (value: F32) => return checked (@computation (func () => return Float.ask value))
 entry const folded = answer 20.0
 `,
     (guest) => {
@@ -572,15 +572,15 @@ entry const folded = answer 20.0
 Deno.test("request runtime: F32 helper cancellation retains independent U32 exit", async () => {
   await compileAndRun(
     `type Float is effect = { ask: F32 -> F32 }
-const helper = fn value => @f32.add (Float.ask value) (@panic "cancelled F32 operand suffix ran")
-const checked = fn computation => do:
+const helper = func value => return @f32.add (Float.ask value) (@panic "cancelled F32 operand suffix ran")
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Float.ask value =>
         break @f32.to_u32 value
       complete value =>
         break @panic "cancelled F32 helper completed"
-entry const answer = fn (value: F32) => checked (@computation (fn () => helper value))
+entry const answer = func (value: F32) => return checked (@computation (func () => return helper value))
 entry const folded = answer 42.5
 `,
     (guest) => {
@@ -596,7 +596,7 @@ entry const folded = answer 42.5
 Deno.test("request runtime: mixed F32 and U32 carried state", async () => {
   await compileAndRun(
     `type Float is effect = { ask: F32 -> F32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let sum = 0.5
   let count = 0
   for request in @requests computation:
@@ -607,7 +607,7 @@ const checked = fn computation => do:
         yield @f32.add sum (@u32.to_f32 count)
       complete value =>
         break @f32.add (@f32.add sum value) (@u32.to_f32 count)
-entry const answer = fn (value: F32) => checked (@computation (fn () => do:
+entry const answer = func (value: F32) => return checked (@computation (func () => return do:
   use Float.ask value
   break Float.ask value
 ))
@@ -627,16 +627,16 @@ Deno.test("request runtime: captured callable carried state", async () => {
   await compileAndRun(
     `
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
-  let choose = fn value => @u32.add value 1
+const checked = func computation => return do:
+  let choose = func value => return @u32.add value 1
   for request in @requests computation:
     case request of
       effect Validate.check value =>
-        choose := fn argument => @u32.add value argument
+        choose := func argument => return @u32.add value argument
         yield choose 2
       complete value =>
         break @u32.add value (choose 0)
-entry const answer = fn () => checked (@computation (fn () => Validate.check 40))
+entry const answer = func () => return checked (@computation (func () => return Validate.check 40))
 `,
     (guest) => {
       const abi = guest.abi.functions.find((fn) => fn.name === "answer");
@@ -650,9 +650,9 @@ Deno.test("request runtime: payload shadow carried elsewhere", async () => {
   await compileAndRun(
     `
 type Counter is effect = { first: U32 -> U32, next: Unit -> U32 }
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 40
-  for request in @requests (@computation (fn () => do:
+  for request in @requests (@computation (func () => return do:
     use Counter.first 5
     use Counter.next ()
     break ()
@@ -678,9 +678,9 @@ Deno.test("request runtime: local shadow after outer update", async () => {
   await compileAndRun(
     `
 type Tick is effect = Unit -> U32
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 40
-  for request in @requests (@computation (fn () => do:
+  for request in @requests (@computation (func () => return do:
     use Tick ()
     break ()
   )):
@@ -703,9 +703,9 @@ Deno.test("request runtime: payload shadows every update", async () => {
   await compileAndRun(
     `
 type Tick is effect = U32 -> U32
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 42
-  for request in @requests (@computation (fn () => do:
+  for request in @requests (@computation (func () => return do:
     use Tick 5
     break ()
   )):
@@ -728,9 +728,9 @@ Deno.test("request runtime: completion payload shadow", async () => {
   await compileAndRun(
     `
 type Tick is effect = Unit -> U32
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 40
-  for request in @requests (@computation (fn () => Tick ())):
+  for request in @requests (@computation (func () => return Tick ())):
     case request of
       effect Tick () =>
         count := @u32.add self 1
@@ -751,10 +751,10 @@ Deno.test("request runtime: monadic block surrounds a plain request runner", asy
   await compileAndRun(
     `type Validate is effect = { check: U32 -> U32 }
 type Box value is data = #Box value
-const Box.pure = fn value => #Box value
-const Box.bind = fn candidate => fn next => case candidate of
+const Box.pure = func value => return #Box value
+const Box.bind = func candidate => return func next => return case candidate of
   #Box value => next value
-const checked = fn computation => do (@do.monad Box):
+const checked = func computation => return do (@do.monad Box):
   let selected = do:
     for request in @requests computation:
       case request of
@@ -765,8 +765,8 @@ const checked = fn computation => do (@do.monad Box):
         complete () =>
           break 41.0
   break selected
-entry const answer = fn (index: U32) => do:
-  let #Box value = checked (@computation (fn () => do:
+entry const answer = func (index: U32) => return do:
+  let #Box value = checked (@computation (func () => return do:
     use Validate.check index
     break ()
   ))
@@ -785,7 +785,7 @@ entry const folded = answer 0
 
 Deno.test("request runtime: one retained action specializes independently at U32 and F32 consumers", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst make = fn action => @computation action\nconst whole = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 20\n      complete value =>\n        break value\nconst floating = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 22.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let value = 41\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  let alias = computation\n  value := 99\n  let left = whole computation\n  let right = floating alias\n  break @f32.add (@u32.to_f32 left) right\nentry const folded = answer ()\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst make = func action => return @computation action\nconst whole = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 20\n      complete value =>\n        break value\nconst floating = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 22.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let value = 41\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  let alias = computation\n  value := 99\n  let left = whole computation\n  let right = floating alias\n  break @f32.add (@u32.to_f32 left) right\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -797,7 +797,7 @@ Deno.test("request runtime: one retained action specializes independently at U32
 
 Deno.test("request runtime: wrapped action specializes independently at U32 and F32 consumers", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst make = fn action => @computation (fn () => action ())\nconst whole = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 20\n      complete value =>\n        break value\nconst floating = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 22.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let value = 41\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  let alias = computation\n  value := 99\n  let left = whole computation\n  let right = floating alias\n  break @f32.add (@u32.to_f32 left) right\nentry const folded = answer ()\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst make = func action => return @computation (func () => return action ())\nconst whole = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 20\n      complete value =>\n        break value\nconst floating = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 22.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let value = 41\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  let alias = computation\n  value := 99\n  let left = whole computation\n  let right = floating alias\n  break @f32.add (@u32.to_f32 left) right\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -809,7 +809,7 @@ Deno.test("request runtime: wrapped action specializes independently at U32 and 
 
 Deno.test("request runtime: factory capture snapshots survive later rebinding and another closure", async () => {
   await compileAndRun(
-    "type Tick is effect = { read: U32 -> U32 }\nconst make = fn action => @computation action\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield value\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let value = 41\n  let computation = make (fn () => Tick.read value)\n  value := 99\n  let read = fn () => handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
+    "type Tick is effect = { read: U32 -> U32 }\nconst make = func action => return @computation action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield value\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let value = 41\n  let computation = make (func () => return Tick.read value)\n  value := 99\n  let read = func () => return handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42);
@@ -821,7 +821,7 @@ Deno.test("request runtime: factory capture snapshots survive later rebinding an
 
 Deno.test("request runtime: effectful action factory runs exactly once across repeated handlers", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = fn () -> Count U32 => @panic "type witness executed"\nconst counted = fn action => do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation action\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 20\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let (#Count count, value) = @state.run (#Count 0) (fn () => do:\n    use computation <- counted (fn () => Tick.read ())\n    let first = handled computation\n    let second = handled computation\n    break @u32.add first second\n  )\n  break @u32.add count value\nentry const folded = answer ()\n',
+    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst counted = func action => return do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 20\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    use computation <- counted (func () => return Tick.read ())\n    let first = handled computation\n    let second = handled computation\n    break @u32.add first second\n  )\n  break @u32.add count value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 41);
@@ -833,7 +833,7 @@ Deno.test("request runtime: effectful action factory runs exactly once across re
 
 Deno.test("request runtime: effectful factory creates its own unconstrained action once", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = fn () -> Count U32 => @panic "type witness executed"\nconst make = fn () => do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled unconstrained computation continued"\n  )\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let (#Count count, value) = @state.run (#Count 0) (fn () => do:\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
+    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst make = func () => return do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled unconstrained computation continued"\n  )\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 86);
@@ -845,7 +845,7 @@ Deno.test("request runtime: effectful factory creates its own unconstrained acti
 
 Deno.test("request runtime: pure factory wraps a retained action without fixing its result ABI", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst make = fn action => @computation (fn () => action ())\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst make = func action => return @computation (func () => return action ())\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -856,7 +856,7 @@ Deno.test("request runtime: pure factory wraps a retained action without fixing 
 
 Deno.test("request runtime: factory body executes its statements before returning a retained action", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst make = fn action => do:\n  let token = @u32.add 1 1\n  break @computation action\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst make = func action => return do:\n  let token = @u32.add 1 1\n  break @computation action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -867,7 +867,7 @@ Deno.test("request runtime: factory body executes its statements before returnin
 
 Deno.test("request runtime: nested factory calls preserve local action and computation aliases", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst build = fn action => do:\n  let wrapped = fn () => action ()\n  let value = @computation wrapped\n  break value\nconst make = fn action => build action\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\nentry const folded = answer ()\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst build = func action => return do:\n  let wrapped = func () => return action ()\n  let value = @computation wrapped\n  break value\nconst make = func action => return build action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -879,7 +879,7 @@ Deno.test("request runtime: nested factory calls preserve local action and compu
 
 Deno.test("request runtime: retained Foreign F32 factory captures unwind nested owners and recover after host failure", async () => {
   await compileAndRun(
-    'type Outer is effect = { check: F32 -> F32 }\ntype Inner is effect = { read: Unit -> F32 }\nconst make = fn action => @computation action\nconst inner = fn selected => fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Inner.read () =>\n        use value <- Outer.check selected\n        yield value\n      complete value =>\n        break value\nconst outer = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Outer.check value =>\n        break @f32.add value 1.0\n      complete value =>\n        break value\nconst invoke = fn action => fn value => action value\nconst retain = fn action => fn value => invoke action value\nconst calculation = make (fn () => Outer.check 41.5)\nconst calculation_alias = calculation\nentry const constant_alias = fn () => outer calculation_alias\nentry const folded = constant_alias ()\nentry const answer = fn (host: F32 -> F32 ! {Foreign}) => do:\n  let callback = retain host\n  let computation = make (fn () => do:\n    use selected <- callback 40.5\n    use inner selected (make (fn () => do:\n      use Inner.read ()\n      break @panic "inner suffix executed after outer cancellation"\n    ))\n    break @panic "outer suffix executed after nested cancellation"\n  )\n  break outer computation\nentry const pure = fn () => 7\n',
+    'type Outer is effect = { check: F32 -> F32 }\ntype Inner is effect = { read: Unit -> F32 }\nconst make = func action => return @computation action\nconst inner = func selected => return func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Inner.read () =>\n        use value <- Outer.check selected\n        yield value\n      complete value =>\n        break value\nconst outer = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Outer.check value =>\n        break @f32.add value 1.0\n      complete value =>\n        break value\nconst invoke = func action => return func value => return action value\nconst retain = func action => return func value => return invoke action value\nconst calculation = make (func () => return Outer.check 41.5)\nconst calculation_alias = calculation\nentry const constant_alias = func () => return outer calculation_alias\nentry const folded = constant_alias ()\nentry const answer = func (host: F32 -> F32 ! {Foreign}) => return do:\n  let callback = retain host\n  let computation = make (func () => return do:\n    use selected <- callback 40.5\n    use inner selected (make (func () => return do:\n      use Inner.read ()\n      break @panic "inner suffix executed after outer cancellation"\n    ))\n    break @panic "outer suffix executed after nested cancellation"\n  )\n  break outer computation\nentry const pure = func () => return 7\n',
     async (synchronousGuest, bytes) => {
       const modes = [false];
       if (
@@ -975,7 +975,7 @@ Deno.test("request runtime: retained Foreign F32 factory captures unwind nested 
 
 Deno.test("request runtime: local retained factory selects the checked F32 action result", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let make = fn action => @computation (fn () => action ())\n  let computation = make (fn () => do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let make = func action => return @computation (func () => return action ())\n  let computation = make (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled generic computation continued"\n  )\n  break handled computation\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -986,7 +986,7 @@ Deno.test("request runtime: local retained factory selects the checked F32 actio
 
 Deno.test("request runtime: effectful local action factory executes once before repeated handlers", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = fn () -> Count U32 => @panic "type witness executed"\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let (#Count count, value) = @state.run (#Count 0) (fn () => do:\n    let make = fn () => do:\n      use previous <- @state.get witness\n      let #Count old = previous\n      use @state.set (#Count (@u32.add old 1))\n      break @computation (fn () => do:\n        use Tick.read ()\n        break @panic "cancelled unconstrained computation continued"\n      )\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
+    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    let make = func () => return do:\n      use previous <- @state.get witness\n      let #Count old = previous\n      use @state.set (#Count (@u32.add old 1))\n      break @computation (func () => return do:\n        use Tick.read ()\n        break @panic "cancelled unconstrained computation continued"\n      )\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 86);
@@ -998,7 +998,7 @@ Deno.test("request runtime: effectful local action factory executes once before 
 
 Deno.test("request runtime: local factory snapshots its capture before later rebinding", async () => {
   await compileAndRun(
-    "type Tick is effect = { read: U32 -> U32 }\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield value\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let value = 41\n  let make = fn action => @computation (fn () => do:\n    use action ()\n    break value\n  )\n  value := 99\n  let computation = make (fn () => Tick.read 0)\n  value := 199\n  let read = fn () => handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
+    "type Tick is effect = { read: U32 -> U32 }\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield value\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let value = 41\n  let make = func action => return @computation (func () => return do:\n    use action ()\n    break value\n  )\n  value := 99\n  let computation = make (func () => return Tick.read 0)\n  value := 199\n  let read = func () => return handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42);
@@ -1010,7 +1010,7 @@ Deno.test("request runtime: local factory snapshots its capture before later reb
 
 Deno.test("request runtime: local factory retains exact F32 action signature when its result is discarded", async () => {
   await compileAndRun(
-    "type Tick is effect = { read: U32 -> F32 }\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield @u32.to_f32 value\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let value = 41\n  let make = fn action => @computation (fn () => do:\n    use action ()\n    break value\n  )\n  value := 99\n  let computation = make (fn () => Tick.read 0)\n  value := 199\n  let read = fn () => handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
+    "type Tick is effect = { read: U32 -> F32 }\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value =>\n        yield @u32.to_f32 value\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let value = 41\n  let make = func action => return @computation (func () => return do:\n    use action ()\n    break value\n  )\n  value := 99\n  let computation = make (func () => return Tick.read 0)\n  value := 199\n  let read = func () => return handled computation\n  break @u32.add (read ()) 1\nentry const folded = answer ()\n",
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42);
@@ -1022,7 +1022,7 @@ Deno.test("request runtime: local factory retains exact F32 action signature whe
 
 Deno.test("request runtime: nested captured local factories retain source certificates", async () => {
   await compileAndRun(
-    'type Tick is effect = { read: Unit -> U32 }\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nconst create = fn action => do:\n  let factory = fn callback => @computation (fn () => callback ())\n  break @computation (fn () => do:\n    let computation = factory action\n    break handled computation\n  )\nentry const answer = fn () => handled (create (fn () => do:\n  use Tick.read ()\n  break @panic "cancelled action continued"\n))\nentry const folded = answer ()\n',
+    'type Tick is effect = { read: Unit -> U32 }\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nconst create = func action => return do:\n  let factory = func callback => return @computation (func () => return callback ())\n  break @computation (func () => return do:\n    let computation = factory action\n    break handled computation\n  )\nentry const answer = func () => return handled (create (func () => return do:\n  use Tick.read ()\n  break @panic "cancelled action continued"\n))\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -1034,7 +1034,7 @@ Deno.test("request runtime: nested captured local factories retain source certif
 
 Deno.test("request runtime: factory-created demanded action retains source row and memo state", async () => {
   await compileAndRun(
-    "type Tick is effect = { read: Unit -> F32 }\nconst keep = fn ~value => fn () => @force value\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 42.5\n      complete value =>\n        break value\nconst create = fn action => do:\n  let delayed = keep (action ())\n  break @computation (fn () => delayed ())\nentry const answer = fn () => do:\n  let computation = create (fn () => Tick.read ())\n  break handled computation\nentry const folded = answer ()\n",
+    "type Tick is effect = { read: Unit -> F32 }\nconst keep = func ~value => return func () => return @force value\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 42.5\n      complete value =>\n        break value\nconst create = func action => return do:\n  let delayed = keep (action ())\n  break @computation (func () => return delayed ())\nentry const answer = func () => return do:\n  let computation = create (func () => return Tick.read ())\n  break handled computation\nentry const folded = answer ()\n",
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -1046,7 +1046,7 @@ Deno.test("request runtime: factory-created demanded action retains source row a
 
 Deno.test("request runtime: local factory bindings in distinct State scopes preserve nominal instances", async () => {
   await compileAndRun(
-    'data Cell value = #Cell value\nconst witness32 = fn ignored -> Cell U32 => @panic "witness called"\nconst witnessf = fn ignored -> Cell F32 => @panic "witness called"\nconst handled = fn computation => do:\n  for request in @requests computation:\n    case request of\n      complete value =>\n        break value\nentry const answer = fn () => do:\n  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:\n    let make = fn (witness: Unit -> Cell U32) => @computation (fn () => @state.get witness)\n    let computation = make witness32\n    break handled computation\n  )\n  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:\n    let make = fn (witness: Unit -> Cell F32) => @computation (fn () => @state.get witness)\n    let computation = make witnessf\n    break handled computation\n  )\n  break @f32.add (@u32.to_f32 value32) valuef\nentry const folded = answer ()\n',
+    'data Cell value = #Cell value\nconst witness32 = func ignored : Cell U32 => return @panic "witness called"\nconst witnessf = func ignored : Cell F32 => return @panic "witness called"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (func () => return do:\n    let make = func (witness: Unit -> Cell U32) => return @computation (func () => return @state.get witness)\n    let computation = make witness32\n    break handled computation\n  )\n  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (func () => return do:\n    let make = func (witness: Unit -> Cell F32) => return @computation (func () => return @state.get witness)\n    let computation = make witnessf\n    break handled computation\n  )\n  break @f32.add (@u32.to_f32 value32) valuef\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);

@@ -68,9 +68,9 @@ codecs. A custom field codec can enforce domain validation:
 ```blot
 type Positive is data = #Positive U32
 impl PositiveCodec : codec.Codec Positive = {
-  const encode = fn (#Positive value) => #[value],
-  const decode = fn words =>
-    if words.length == 1 && words[0] > 0 then #Some (#Positive words[0])
+  const encode = func (#Positive value) => return #[value],
+  const decode = func words => return
+    if words.length == 1 and words[0] > 0 then #Some (#Positive words[0])
     else #Nothing,
 }
 ```

@@ -45,7 +45,7 @@ const PrimitiveFacts = struct {
     }
 };
 const triangle_source =
-    \\entry const run = fn (count: U32) => do:
+    \\entry const run = func (count: U32) => return do:
     \\  let result: List U32 = []
     \\  for x in 0..count:
     \\    for y in 0..x:
@@ -55,8 +55,8 @@ const triangle_source =
 test "ragged proof admits dependent bounds and ordered guard qualifier merges" {
     const sources = [_][]const u8{
         triangle_source,
-        "entry const run = fn (values: Array U32) => #[square | x <- values, @u32.lt 1 x, let square = @u32.mul x x, @u32.lt square 10]\n",
-        "entry const run = fn (values: Array U32) => [y | x <- values, @u32.lt 1 x, y <- values, @u32.lt y x]\n",
+        "entry const run = func (values: Array U32) => return #[square | x <- values, @u32.lt 1 x, let square = @u32.mul x x, @u32.lt square 10]\n",
+        "entry const run = func (values: Array U32) => return [y | x <- values, @u32.lt 1 x, y <- values, @u32.lt y x]\n",
     };
     for (sources) |source| {
         var module = try lower(a, source);
@@ -67,10 +67,10 @@ test "ragged proof admits dependent bounds and ordered guard qualifier merges" {
 }
 test "ragged proof declines trapping controls payloads and intermediate observations" {
     const sources = [_][]const u8{
-        "entry const run = fn (values: Array U32) => #[x | x <- values, @u32.lt 0 (@u32.div 1 x)]\n",
-        "entry const run = fn (values: Array U32) => #[@u32.div 1 x | x <- values, @u32.lt 0 x]\n",
-        "entry const run = fn (values: Array U32) => #[#[x] | x <- values, @u32.lt 0 x]\n",
-        "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result (@list.length result)\n  break result\n",
+        "entry const run = func (values: Array U32) => return #[x | x <- values, @u32.lt 0 (@u32.div 1 x)]\n",
+        "entry const run = func (values: Array U32) => return #[@u32.div 1 x | x <- values, @u32.lt 0 x]\n",
+        "entry const run = func (values: Array U32) => return #[#[x] | x <- values, @u32.lt 0 x]\n",
+        "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result (@list.length result)\n  break result\n",
     };
     for (sources) |source| {
         var module = try lower(a, source);
@@ -107,7 +107,7 @@ fn target(module: *const core.Module, name: []const u8) core.BindingRef {
     unreachable;
 }
 const staged_source =
-    \\const triangle = fn (count: U32) => do:
+    \\const triangle = func (count: U32) => return do:
     \\  let result: List U32 = []
     \\  for x in 0..count:
     \\    for y in 0..x:
@@ -178,17 +178,17 @@ const wrappers =
     \\infix 30 (>) = gt
     \\infix 30 (<) = lt
     \\infixl 70 (*) = mul
-    \\const gt = fn left => fn right => @type.call "gt" left right
-    \\const lt = fn left => fn right => @type.call "lt" left right
-    \\const mul = fn left => fn right => @type.call "mul" left right
-    \\const U32.lt = fn left => fn right => @u32.lt left right
-    \\const U32.gt = fn left => fn right => U32.lt right left
-    \\const U32.mul = fn left => fn right => @u32.mul left right
+    \\const gt = func left => return func right => return @type.call "gt" left right
+    \\const lt = func left => return func right => return @type.call "lt" left right
+    \\const mul = func left => return func right => return @type.call "mul" left right
+    \\const U32.lt = func left => return func right => return @u32.lt left right
+    \\const U32.gt = func left => return func right => return U32.lt right left
+    \\const U32.mul = func left => return func right => return @u32.mul left right
 ;
-const selected_region = "\nentry const run = fn (values: Array U32) => #[square | x <- values, x > 1, let square = x * x, square < 10]\n";
+const selected_region = "\nentry const run = func (values: Array U32) => return #[square | x <- values, x > 1, let square = x * x, square < 10]\n";
 test "ragged staged fill preserves source fuel including primitive wrapper applications" {
     try fuelBoundaries(staged_source);
-    var module = try lower(a, wrappers ++ "\nconst selected = fn (values: Array U32) => #[square | x <- values, x > 1, let square = x * x, square < 10]\nentry const values = selected #[0,1,2,3,4]\n");
+    var module = try lower(a, wrappers ++ "\nconst selected = func (values: Array U32) => return #[square | x <- values, x > 1, let square = x * x, square < 10]\nentry const values = selected #[0,1,2,3,4]\n");
     defer module.deinit(a);
     var ordinary = try evaluator.Session.init(a, &.{module});
     defer ordinary.deinit();
@@ -258,8 +258,8 @@ test "ragged sizing uses exact ceilings and checked header row arithmetic" {
 test "ragged staged zero and selected outputs preserve successful ordinary value child and depth limits" {
     const sources = [_][]const u8{
         staged_source,
-        "entry const values = [x | x <- #[], #False]\n",
-        "entry const values = #[x | x <- #[1,2,3], #False]\n",
+        "entry const values = [x | x <- #[], false]\n",
+        "entry const values = #[x | x <- #[1,2,3], false]\n",
         "entry const values = [x | x <- #[1,2,3], @u32.lt 1 x]\n",
     };
     for (sources) |source| {
@@ -299,7 +299,7 @@ test "ragged staged zero and selected outputs preserve successful ordinary value
 }
 test "ragged staged construction publishes only selected children across growth" {
     for ([_]usize{ 0, 1, 8, 32, 128 }) |count| {
-        const source = try a.print("const build = fn count => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append self (@u32.add (@u32.mul x 10) y)\n  break @array.from_list result\nentry const values = build {d}\n", .{count});
+        const source = try a.print("const build = func count => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append self (@u32.add (@u32.mul x 10) y)\n  break @array.from_list result\nentry const values = build {d}\n", .{count});
         defer a.free(source);
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -327,10 +327,10 @@ fn retainedRecovery(allocator: std.mem.Allocator, module: *const core.Module, id
 }
 test "ragged runtime preparation admits packed copies four dimensions and established global inputs" {
     const sources = [_][]const u8{
-        "const copied = fn (rows: Array {a: U32, b: U32, z: U32}) => #[row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @array.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @array.length (copied rows)\n",
-        "const copied = fn (rows: List {a: U32, b: U32, z: U32}) => [row | row <- rows, @u32.lt row.a 249]\nentry const run = fn count => do:\n  let rows = @list.generate count (fn i => {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @list.length (copied rows)\n",
-        "entry const run = fn count => do:\n  let values: List U32 = []\n  for a in 0..count:\n    for b in 0..a:\n      for c in 0..b:\n        for d in 0..c:\n          values := @list.append self d\n  break @array.from_list values\n",
-        "let inputs = @array.fill 4 7\nentry const run = fn threshold => #[x | x <- inputs, @u32.lt threshold x]\n",
+        "const copied = func (rows: Array {a: U32, b: U32, z: U32}) => return #[row | row <- rows, @u32.lt row.a 249]\nentry const run = func count => return do:\n  let rows = @array.generate count (func i => return {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @array.length (copied rows)\n",
+        "const copied = func (rows: List {a: U32, b: U32, z: U32}) => return [row | row <- rows, @u32.lt row.a 249]\nentry const run = func count => return do:\n  let rows = @list.generate count (func i => return {a: i, b: @u32.add i 1, z: @u32.mul i 3})\n  break @list.length (copied rows)\n",
+        "entry const run = func count => return do:\n  let values: List U32 = []\n  for a in 0..count:\n    for b in 0..a:\n      for c in 0..b:\n        for d in 0..c:\n          values := @list.append self d\n  break @array.from_list values\n",
+        "let inputs = @array.fill 4 7\nentry const run = func threshold => return #[x | x <- inputs, @u32.lt threshold x]\n",
     };
     for (sources) |source| {
         var module = try lower(a, source);
@@ -345,7 +345,7 @@ test "ragged speculative facts preserve unreached payloads at the real evidence 
     try source.writer.writeAll("type Deep0 = U32\n");
     for (1..20) |depth| try source.writer.print("type Deep{d} = (Deep{d}, Deep{d})\n", .{ depth, depth - 1, depth - 1 });
     try source.writer.writeAll(
-        \\const ignored = fn left => fn right => 0
+        \\const ignored = func left => return func right => return 0
         \\entry const values = do:
         \\  let values: List U32 = []
         \\  for x in 0..0:
@@ -355,7 +355,7 @@ test "ragged speculative facts preserve unreached payloads at the real evidence 
         \\entry const filtered = do:
         \\  let values: List U32 = []
         \\  for x in 0..1:
-        \\    if #False:
+        \\    if false:
         \\      let left: Array Deep19 = #[]
         \\      values := @list.append self (ignored left left)
         \\  break @array.from_list values
@@ -406,14 +406,14 @@ test "ragged imported controls cannot alias local bindings with the same numeric
     defer dir.cleanup();
     const source =
         \\import { limit } from "./limits"
-        \\entry const run = fn () => do:
+        \\entry const run = func () => return do:
         \\  let result: List U32 = []
         \\  for x in 0..3:
         \\    if @u32.lt x limit:
         \\      result := [...self, x]
         \\  break @array.from_list result
         \\const folded = run ()
-        \\entry const staged = fn () => folded
+        \\entry const staged = func () => return folded
     ;
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = source });
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "" });

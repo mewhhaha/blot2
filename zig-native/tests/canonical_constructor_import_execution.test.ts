@@ -5,10 +5,10 @@ data Box a = #Box { value:a }
 data Pair = #Pair { x:U32,y:F32 }
 const box = #Box
 const pair = #Pair
-const retain = fn constructor => fn value => constructor value
+const retain = func constructor => return func value => return constructor value
 const ready = retain #Box
-const witness = fn () -> Box U32 => @panic "type witness executed"
-const advance = fn witness => do:
+const witness = func () : Box U32 => return @panic "type witness executed"
+const advance = func witness => return do:
   use previous <- @state.get witness
   let #Box old = previous
   use @state.set (#Box (@u32.add old 1))
@@ -16,18 +16,18 @@ const advance = fn witness => do:
 `;
 export const consumerSource = `
 import * as model from "./model"
-const unwrap = fn box => case box of
+const unwrap = func box => return case box of
   #model.Box value => value
-const retain = fn () => do:
+const retain = func () => return do:
   let constructor = #model.Box
-  break fn value => unwrap (constructor value)
-entry const unsigned = fn (value:U32) => unwrap (model.box value)
-entry const floating = fn (value:F32) => unwrap (model.ready value)
-entry const captured = fn (value:F32) => (retain ()) value
-entry const tuple = fn (value:U32) => case model.pair (value,2.5) of
+  break func value => return unwrap (constructor value)
+entry const unsigned = func (value:U32) => return unwrap (model.box value)
+entry const floating = func (value:F32) => return unwrap (model.ready value)
+entry const captured = func (value:F32) => return (retain ()) value
+entry const tuple = func (value:U32) => return case model.pair (value,2.5) of
   #model.Pair (x,y) => @f32.add (@u32.to_f32 x) y
-entry const ordered = fn () => do:
-  let (#model.Box count,selected) = @state.run (#model.Box 0) (fn () => do:
+entry const ordered = func () => return do:
+  let (#model.Box count,selected) = @state.run (#model.Box 0) (func () => return do:
     use pair <- model.pair (model.advance model.witness,@u32.to_f32 (model.advance model.witness))
     break pair
   )

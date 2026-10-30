@@ -18,8 +18,8 @@ Deno.test("complete journals bound discarded Arrays inside nested collecting loo
     const result = await compiler.build({
       sources: {
         [entry]: `
-entry const run = fn (count: U32) => do:
-  let rows = @array.generate 90 (fn index => #[index, index + 1])
+entry const run = func (count: U32) => return do:
+  let rows = @array.generate 90 (func index => return #[index, index + 1])
   let checksum = 0
   for row in rows:
     let round = 0
@@ -95,9 +95,9 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
     const result = await compiler.build({
       sources: {
         [entry]: `
-const change = fn candidate => Result.map (fn value => value + 1) candidate
-entry const scalar = fn (value: U32) => Result.unwrap_or 42 (change (#Ok value))
-entry const alias = fn (value: U32) => do:
+const change = func candidate => return Result.map (func value => return value + 1) candidate
+entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change (#Ok value))
+entry const alias = func (value: U32) => return do:
   let child = #[value, value + 1]
   let candidate = #Err child
   let mapped = change candidate
@@ -109,10 +109,10 @@ entry const alias = fn (value: U32) => do:
     #Ok _ => @panic "changed the variant"
     #Err same => #[same[0], child[1]]
 const adapter = monad Maybe
-const resolve = fn () => do adapter:
+const resolve = func () => return do adapter:
   use value <- #Some 42
   break value
-entry const resolver = fn () => Maybe.unwrap_or 0 (resolve ())
+entry const resolver = func () => return Maybe.unwrap_or 0 (resolve ())
 `,
       },
     });
@@ -161,11 +161,11 @@ Deno.test("borrowed reference returns preserve field aliases when their parent r
     const result = await compiler.build({
       sources: {
         [entry]: `
-const identity = fn value => value
-entry const run = fn (count: U32) => do:
+const identity = func value => return value
+entry const run = func (count: U32) => return do:
   let fresh = #[7, 42]
   let direct = identity fresh
-  let rows = @array.generate 2 (fn index => #[index, index + 1])
+  let rows = @array.generate 2 (func index => return #[index, index + 1])
   let field = identity rows[0]
   rows := @array.set rows 0 #[90, 91]
   for index in 0..count:
@@ -230,20 +230,20 @@ Deno.test("checked field updates preserve variant layouts aliases captures and r
           const sources = {
             [entry]: `
 type Shape is data = #Small {child: Array U32, value: U32} | #Large {alpha: F32, child: Array U32, value: U32, tail: U32}
-const replace = fn (shape: Shape) => do:
+const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1 + ${offset}]
   shape.value := self + 2
   break shape
-entry const run = fn (mode: U32) => do:
+entry const run = func (mode: U32) => return do:
   let original = if mode == 0 then #Small {child: #[40], value: 7} else #Large {alpha: -0.0, child: #[40], value: 7, tail: 3}
-  let captured = fn () => original.child[0]
+  let captured = func () => return original.child[0]
   let changed = replace original
   for index in 0..32:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       break #[0]
   break #[original.child[0], changed.child[0], captured (), original.value, changed.value]
-entry const packed = fn (value: U32) => do:
+entry const packed = func (value: U32) => return do:
   let rows = [{x: value, y: value + 1}]
   let original = rows
   rows := [{x: value + 40, y: value + 1}, ...self]
@@ -251,7 +251,7 @@ entry const packed = fn (value: U32) => do:
   let before = items
   items[0] := {x: self.x + 1, y: self.y + 2}
   break #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
-entry const floating = fn (value: F32) => do:
+entry const floating = func (value: F32) => return do:
   let original = #Large {alpha: value, child: #[40], value: 7, tail: 3}
   let changed = replace original
   let #Large {alpha, child: _, value: _, tail: _} = changed else:
@@ -318,14 +318,14 @@ Deno.test("complete allocation leaves legacy trace metadata untouched with ordin
         const result = await compiler.build({
           sources: {
             [entry]: `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let kept = #[7, 11]
   let total = 0
   for index in 0..count:
     let pressure = @array.fill 8192 index
     total := self + pressure[8191]
   break total + kept[0] + kept[1]
-entry const memory = fn (value: U32) => #[value]
+entry const memory = func (value: U32) => return #[value]
 `,
           },
         });
@@ -391,12 +391,12 @@ Deno.test("List literal publication counts actual leaves and preserves shared ch
         const result = await compiler.build({
           sources: {
             [entry]: `
-entry const run = fn (value: U32) => do:
+entry const run = func (value: U32) => return do:
   let child = #[value, value + 1]
   let rows = [${elements}]
   let before = @array.from_list rows
   let changed = @array.from_list rows
-  let read = fn () => before[259][1]
+  let read = func () => return before[259][1]
   changed[243] := #[self[0] + 40, self[1] + 40]
   changed[244] := #[self[0] + 41, self[1] + 41]
   for index in 0..32:
@@ -404,7 +404,7 @@ entry const run = fn (value: U32) => do:
     if pressure[8191] != index:
       break #[0]
   break #[before[243][0], changed[243][0], before[244][0], changed[244][0], read (), child[0]]
-entry const floating = fn (value: F32) => @array.from_list [value, -0.0]
+entry const floating = func (value: F32) => return @array.from_list [value, -0.0]
 `,
           },
         });

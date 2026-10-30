@@ -31,7 +31,7 @@ function firstFunctionBody(bytes: Uint8Array): Uint8Array {
 
 Deno.test("safe scalar work is emitted after its consuming branch without a temporary or thunk", async () => {
   await compileAndRun(`
-entry const heavy = fn (input: U32) => do:
+entry const heavy = func (input: U32) => return do:
   let work = @u32.add (@u32.mul (@u32.add (@u32.mul input 1664525) 1013904223) 22695477) 1
   if @u32.eq input 0:
     return 0
@@ -50,17 +50,17 @@ entry const heavy = fn (input: U32) => do:
 
 Deno.test("safe single-use locals can move into a branch without changing aliases or loops", async () => {
   await compileAndRun(`
-entry const branch = fn (input: U32) => do:
+entry const branch = func (input: U32) => return do:
   let computed = @u32.add input 40
   if @u32.eq input 0:
     return 0
   return computed
-entry const alias = fn (input: U32) => do:
+entry const alias = func (input: U32) => return do:
   let before = input
   let computed = @u32.add before 1
   before := @u32.add self 10
   return @u32.add computed before
-entry const repeated = fn (input: U32) => do:
+entry const repeated = func (input: U32) => return do:
   let computed = @u32.add input 1
   let total = 0
   for 0..3:
@@ -78,14 +78,14 @@ entry const repeated = fn (input: U32) => do:
 
 Deno.test("trapping and effectful initializers remain eager", async () => {
   await compileAndRun(`
-entry const trap = fn (input: U32) => do:
+entry const trap = func (input: U32) => return do:
   let quotient = @u32.div 7 input
   if @u32.eq input 0:
     return 0
   return quotient
-entry const effectful = fn (callback: U32 -> U32 ! {Foreign}) => do:
+entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return do:
   use result <- callback 42
-  if #True:
+  if true:
     return 7
   return result
 `, guest => {
@@ -100,12 +100,12 @@ entry const effectful = fn (callback: U32 -> U32 ! {Foreign}) => do:
 
 Deno.test("an immediately consumed opaque call or trap keeps eager order without a temporary", async () => {
   await compileAndRun(`
-const divide = fn (input: U32) => @u32.div 7 input
-const predicate = fn (input: U32) => @u32.eq input 0
-entry const direct = fn (input: U32) => do:
+const divide = func (input: U32) => return @u32.div 7 input
+const predicate = func (input: U32) => return @u32.eq input 0
+entry const direct = func (input: U32) => return do:
   let value = divide input
   return value
-entry const choice = fn (input: U32) => do:
+entry const choice = func (input: U32) => return do:
   let condition = predicate input
   if condition:
     return 5
@@ -124,34 +124,34 @@ Deno.test("safe sinks and eager traps preserve behavior in both codegen tiers", 
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url);
   const source = `
-const helper = fn (value: U32) => @u32.div 7 value
-entry const branch = fn (input: U32) => do:
+const helper = func (value: U32) => return @u32.div 7 value
+entry const branch = func (input: U32) => return do:
   let work = @u32.mul (@u32.add input 2) 17
   if @u32.eq input 0:
     return 0
   return work
-entry const snapshot = fn (input: U32) => do:
+entry const snapshot = func (input: U32) => return do:
   let before = input
   let work = @u32.add before 1
   before := @u32.add self 10
   return @u32.add work before
-entry const repeated = fn (input: U32) => do:
+entry const repeated = func (input: U32) => return do:
   let work = @u32.add input 1
   let total = 0
   for 0..3:
     total := @u32.add self work
   return total
-entry const trap = fn (input: U32) => do:
+entry const trap = func (input: U32) => return do:
   let quotient = @u32.div 7 input
   if @u32.eq input 0:
     return 0
   return quotient
-entry const opaque = fn (input: U32) => do:
+entry const opaque = func (input: U32) => return do:
   let quotient = helper input
   if @u32.eq input 0:
     return 0
   return quotient
-entry const direct = fn (input: U32) => do:
+entry const direct = func (input: U32) => return do:
   let quotient = helper input
   return quotient
 `;

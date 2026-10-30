@@ -26,38 +26,38 @@ Deno.test("specialization uses survive fresh CLI, retained project rejection and
   try {
     const good = {
       [entry]:
-        'import { plus } from "./library"\nentry const answer=fn()=>plus 20 22\n',
-      [library]: "const plus=fn a=>fn b=>a + b\n",
+        'import { plus } from "./library"\nentry const answer=func()=> return plus 20 22\n',
+      [library]: "const plus=func a=> return func b=> return a + b\n",
     };
     const baseline = await compiler.build({ sources: good });
     ok(baseline.success, JSON.stringify(baseline));
     const cases = [
       {
         source:
-          "type Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=#Box 1 + #Box 2\n  break 7\n",
+          "type Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=#Box 1 + #Box 2\n  break 7\n",
         use: "#Box 1 + #Box 2",
       },
       {
         source:
-          'import { plus } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=plus (#Box 1) (#Box 2)\n  break 7\n',
+          'import { plus } from "./library"\ntype Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=plus (#Box 1) (#Box 2)\n  break 7\n',
         use: "plus (#Box 1) (#Box 2)",
       },
       {
         source:
-          'import { nested } from "./library"\ntype Box is data=#Box U32\nentry const answer=fn()=>do:\n  let result=nested (#Box 1) (#Box 2)\n  break 7\n',
+          'import { nested } from "./library"\ntype Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=nested (#Box 1) (#Box 2)\n  break 7\n',
         use: "nested (#Box 1) (#Box 2)",
       },
       {
         source:
-          "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let result=twice (fn v=>v + v) #True\n  break 7\n",
-        use: "twice (fn v=>v + v) #True",
+          "const twice=func f=> return func x=> return f (f x)\nentry const answer=func()=> return do:\n  let result=twice (func v=> return v + v) true\n  break 7\n",
+        use: "twice (func v=> return v + v) true",
       },
     ];
     for (const item of cases) {
       const sources = {
         [entry]: item.source,
         [library]:
-          "const plus=fn a=>fn b=>a + b\nconst nested=fn a=>fn b=>plus a b\n",
+          "const plus=func a=> return func b=> return a + b\nconst nested=func a=> return func b=> return plus a b\n",
       };
       const retained = await compiler.build({ sources });
       ok(!retained.success, JSON.stringify(retained));
@@ -125,11 +125,11 @@ Deno.test("a concrete invalid operation in a library stays in that library", asy
     cacheDirectory: false,
   });
   try {
-    const source = "const broken=fn ignored=>#True + #False\n";
+    const source = "const broken=func ignored=> return true + false\n";
     const result = await compiler.build({
       sources: {
         [entry]:
-          'import { broken } from "./library"\nentry const answer=fn()=>do:\n  let result=broken 42\n  break 7\n',
+          'import { broken } from "./library"\nentry const answer=func()=> return do:\n  let result=broken 42\n  break 7\n',
         [library]: source,
       },
     });
@@ -138,7 +138,7 @@ Deno.test("a concrete invalid operation in a library stays in that library", asy
     equal({
       start: result.diagnostics[0].start,
       end: result.diagnostics[0].end,
-    }, range(source, "#True + #False"));
+    }, range(source, "true + false"));
   } finally {
     await compiler.dispose();
     await Deno.remove(directory, { recursive: true });
@@ -153,7 +153,7 @@ Deno.test("compiled callback definitions preserve source origins", async () => {
   try {
     await Deno.writeTextFile(
       library,
-      "const plus=fn a=>fn b=>a + b\nconst twice=fn f=>fn x=>f (f x)\nconst callback=fn v=>v + v\n",
+      "const plus=func a=> return func b=> return a + b\nconst twice=func f=> return func x=> return f (f x)\nconst callback=func v=> return v + v\n",
     );
     await Deno.writeTextFile(
       entry,
@@ -166,7 +166,7 @@ Deno.test("compiled callback definitions preserve source origins", async () => {
     }).output();
     ok(packed.success, new TextDecoder().decode(packed.stdout));
     const source =
-      'import { twice, callback } from "./library"\nentry const answer=fn()=>do:\n  let result=twice callback #True\n  break 7\n';
+      'import { twice, callback } from "./library"\nentry const answer=func()=> return do:\n  let result=twice callback true\n  break 7\n';
     await Deno.writeTextFile(entry, source);
     const compiler = await createZigProjectCompiler({
       executable,
@@ -182,7 +182,7 @@ Deno.test("compiled callback definitions preserve source origins", async () => {
       equal(diagnostic.filename, entry);
       equal(
         { start: diagnostic.start, end: diagnostic.end },
-        range(source, "twice callback #True"),
+        range(source, "twice callback true"),
       );
       ok(diagnostic.related?.filename.endsWith("prelude.blot"));
       equal(diagnostic.code, "missing_associated");

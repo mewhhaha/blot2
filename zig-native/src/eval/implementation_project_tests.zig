@@ -50,7 +50,7 @@ fn files(sources: []const Source, expected: ?[]const u8, sweep: bool) !void {
     try scenario(a, path, expected);
     if (sweep) try @import("../allocation_failures.zig").checkAllAllocationFailures(a, scenario, .{ path, expected });
 }
-const producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }\n";
+const producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }\n";
 test "implementation imported forwarding aliases deduplicate original evidence and execute producer methods" {
     try files(&.{
         .{ .name = "main.blot", .text = "import { Source } from \"./source\"\nimport * as public from \"./forward\"\nentry const answer: U32 = @u32.add (Source.first #[20]) (public.Protocol.first #[22])\n" },
@@ -67,16 +67,16 @@ test "implementation orphan anchor ownership and graph coherence use original pr
     try files(&.{
         .{ .name = "main.blot", .text = "import { Source } from \"./source\"\nimport { read } from \"./token\"\nentry const answer: U32 = read ()\n" },
         .{ .name = "source.blot", .text = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\n" },
-        .{ .name = "token.blot", .text = "import { Source } from \"./source\"\nopaque type Token = U32\nimpl TokenSource : Source Token = { type Item = U32, const first = fn value => do:\n  let #Token number = value\n  break number }\nconst read: Unit -> U32 = fn () => Source.first (#Token 42)\n" },
+        .{ .name = "token.blot", .text = "import { Source } from \"./source\"\nopaque type Token = U32\nimpl TokenSource : Source Token = { type Item = U32, const first = func value => return do:\n  let #Token number = value\n  break number }\nconst read: Unit -> U32 = func () => return Source.first (#Token 42)\n" },
     }, null, false);
     try files(&.{
         .{ .name = "main.blot", .text = "import { Source } from \"./left\"\nimport { marker } from \"./right\"\nentry const answer: U32 = Source.first #[42]\n" },
         .{ .name = "left.blot", .text = producer },
-        .{ .name = "right.blot", .text = "import { Source } from \"./left\"\nimpl Everything a : Source a = { type Item = a, const first = fn value => value }\nconst marker = 0\n" },
+        .{ .name = "right.blot", .text = "import { Source } from \"./left\"\nimpl Everything a : Source a = { type Item = a, const first = func value => return value }\nconst marker = 0\n" },
     }, "overlapping_implementation", false);
 }
 test "implementation private helpers retain lexical evidence while public generics need caller witnesses" {
-    const hidden = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nprivate impl Hidden : Source U32 = { type Item = U32, const first = fn value => value }\nconst read: U32 -> U32 = fn value => Source.first value\nconst generic: s -> (Source.Item s) where { Source s } = fn value => Source.first value\n";
+    const hidden = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nprivate impl Hidden : Source U32 = { type Item = U32, const first = func value => return value }\nconst read: U32 -> U32 = func value => return Source.first value\nconst generic: s -> (Source.Item s) where { Source s } = func value => return Source.first value\n";
     try files(&.{
         .{ .name = "main.blot", .text = "import { read } from \"./hidden\"\nentry const answer: U32 = read 42\n" },
         .{ .name = "hidden.blot", .text = hidden },
@@ -88,8 +88,8 @@ test "implementation private helpers retain lexical evidence while public generi
 }
 
 const revision_sources = [_]Source{
-    .{ .name = "main.blot", .text = "import { Source } from \"./dep\"\nentry const answer: Unit -> U32 = fn () => Source.first 42\n" },
-    .{ .name = "dep.blot", .text = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = fn value => value }\n" },
+    .{ .name = "main.blot", .text = "import { Source } from \"./dep\"\nentry const answer: Unit -> U32 = func () => return Source.first 42\n" },
+    .{ .name = "dep.blot", .text = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = func value => return value }\n" },
 };
 fn canonicalOverlap(allocator: std.mem.Allocator, path: []const u8) !void {
     var source = try project.load(allocator, io, path, .{});
@@ -125,7 +125,7 @@ test "implementation overlap diagnostics keep canonical producer source origins 
         if (index == 0) try @import("../allocation_failures.zig").checkAllAllocationFailures(a, canonicalOverlap, .{path});
     }
 }
-const revision_edit = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = fn value => @u32.add value 1 }\n";
+const revision_edit = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = func value => return @u32.add value 1 }\n";
 fn sameRevision(actual: *const @import("../reuse/partial_dependency.zig").Result, expected: *const @import("../reuse/partial_dependency.zig").Result) !void {
     try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
@@ -163,9 +163,9 @@ test "implementation retained body equation and reference edits preserve failed 
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
     const edits = [_]struct { consumer: []const u8, producer: []const u8 }{
         .{ .consumer = revision_sources[0].text, .producer = revision_edit },
-        .{ .consumer = "import { Source } from \"./dep\"\nentry const answer: Unit -> F32 = fn () => Source.first 42\n", .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = F32, const first = fn value => @u32.to_f32 value }\n" },
-        .{ .consumer = "import { Source } from \"./dep\"\nentry const answer: Unit -> Array U32 = fn () => Source.first 42\n", .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = Array U32, const first = fn value => #[value] }\n" },
-        .{ .consumer = revision_sources[0].text, .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 where { type_eq U32 F32 } = { type Item = U32, const first = fn value => value }\n" },
+        .{ .consumer = "import { Source } from \"./dep\"\nentry const answer: Unit -> F32 = func () => return Source.first 42\n", .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = F32, const first = func value => return @u32.to_f32 value }\n" },
+        .{ .consumer = "import { Source } from \"./dep\"\nentry const answer: Unit -> Array U32 = func () => return Source.first 42\n", .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = Array U32, const first = func value => return #[value] }\n" },
+        .{ .consumer = revision_sources[0].text, .producer = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 where { type_eq U32 F32 } = { type Item = U32, const first = func value => return value }\n" },
         .{ .consumer = revision_sources[0].text, .producer = revision_sources[1].text },
     };
     for (edits, 0..) |edit, index| {

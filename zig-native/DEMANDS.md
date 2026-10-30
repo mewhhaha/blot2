@@ -44,12 +44,12 @@ a deferred argument has a runtime object. Preserve the existing
 
 | Construct             | Meaning                                                                                   |
 | --------------------- | ----------------------------------------------------------------------------------------- |
-| `fn value => body`    | Evaluate the argument before entering the body.                                           |
-| `fn ~value => body`   | Capture the argument expression and its lexical bindings; evaluate it when demanded.      |
+| `func value => return body`    | Evaluate the argument before entering the body.                                           |
+| `func ~value => return body`   | Capture the argument expression and its lexical bindings; evaluate it when demanded.      |
 | `@demand value`       | Evaluate the pending expression at this point, or return its previously completed result. |
 | Repeated demands      | Share one result for this particular deferred argument, including through aliases.        |
 | No demand             | Do not run the expression, its effects, or its traps. Still check its types and names.    |
-| `fn () => expression` | An ordinary callback; each invocation runs its body.                                      |
+| `func () => return expression` | An ordinary callback; each invocation runs its body.                                      |
 
 These rules must hold for effectful and pure arguments, in every optimization
 mode. The compiler must never switch between evaluating once and evaluating
@@ -71,14 +71,14 @@ can retain their names during this source spelling change.
 The following ordinary function should need no demand object:
 
 ```blot
-const and = fn (a: Bool) => fn ~(b: Bool) =>
-  if a then @demand b else #False
+const and = func (a: Bool) => return func ~(b: Bool) => return
+  if a then @demand b else false
 ```
 
 For a known, fully applied call, the resulting control flow is:
 
 ```blot
-if a then b else #False
+if a then b else false
 ```
 
 Evaluate `a` once and evaluate `b` only in the selected branch. Preserve the
@@ -89,7 +89,7 @@ with the same behavior should receive the same optimization.
 Repeated demands also need not allocate:
 
 ```blot
-const twice = fn ~(value: U32) =>
+const twice = func ~(value: U32) => return
   @u32.add (@demand value) (@demand value)
 ```
 
@@ -102,7 +102,7 @@ can execute repeatedly, so counting syntax occurrences is insufficient.
 This function can require persistent storage when its returned callback escapes:
 
 ```blot
-const remember = fn ~value => fn () => @demand value
+const remember = func ~value => return func () => return @demand value
 ```
 
 All invocations of that callback must share the result of its captured demand.
@@ -117,8 +117,8 @@ application. Later `:=` rebinding must not change the captured expression's
 inputs:
 
 ```blot
-const delay = fn ~value => value
-entry const answer = fn () => do:
+const delay = func ~value => return value
+entry const answer = func () => return do:
   let amount = 20
   let pending = delay (@u32.add amount 1)
   amount := 99
@@ -200,8 +200,8 @@ At commit `775d3707d27c5c5d64504206c6b3824a458d8929`, release compiler identity
 predicate was compared with its explicit `if` equivalent:
 
 ```blot
-entry const probe = fn (x: U32) -> Bool =>
-  (@u32.lt x 100) && (@u32.eq (@u32.rem x 2) 0)
+entry const probe = func (x: U32) : Bool => return
+  (@u32.lt x 100) and (@u32.eq (@u32.rem x 2) 0)
 ```
 
 | Form            | Complete Wasm bytes | Emitted functions | Demand storage                                             |
@@ -230,7 +230,7 @@ wasm2wat probe.wasm
 ```
 
 The equivalent RHS is
-`if @u32.lt x 100 then @u32.eq (@u32.rem x 2) 0 else #False`. Keep the exported
+`if @u32.lt x 100 then @u32.eq (@u32.rem x 2) 0 else false`. Keep the exported
 name and signature identical. Regression gates should inspect demand overhead,
 not require these exact byte counts forever.
 
@@ -310,8 +310,8 @@ callee's body while preserving its type can change its demand behavior and must
 invalidate inlined callers. An unchanged type interface alone cannot authorize
 code reuse.
 
-For example, changing `if a then @demand b else #False` to
-`if a then #False else @demand b` leaves its type unchanged but changes caller
+For example, changing `if a then @demand b else false` to
+`if a then false else @demand b` leaves its type unchanged but changes caller
 code. Test that edit through retained sessions and dependency bundles. Preserve
 early cutoff for semantic outputs that are unchanged, while tracking the body
 dependency required by emission.

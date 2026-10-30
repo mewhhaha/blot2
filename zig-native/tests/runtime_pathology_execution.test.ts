@@ -3,8 +3,8 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("two large records share their child until the whole private group dies", async () => {
   await compileAndRun(`
-entry const memory = fn () -> Array U32 => #[]
-entry const fold = fn (count: U32) => do:
+entry const memory = func () : Array U32 => return #[]
+entry const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let child = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -32,14 +32,14 @@ entry const fold = fn (count: U32) => do:
 
 Deno.test("record ownership crosses ordinary factories, borrowed calls and branches in finite loops", async () => {
   await compileAndRun(`
-const make = fn value => { a: value, b: value, c: value, d: value, e: value, f: value,
+const make = func value => return { a: value, b: value, c: value, d: value, e: value, f: value,
   g: value, h: value, i: value, j: value, k: value, l: value,
   m: value, n: value, o: value, p: value, q: value, r: value + 1 }
-const read = fn record => record.a + record.b + record.c + record.d + record.e + record.f +
+const read = func record => return record.a + record.b + record.c + record.d + record.e + record.f +
   record.g + record.h + record.i + record.j + record.k + record.l + record.m + record.n +
   record.o + record.p + record.q + record.r
-entry const storage_probe = fn (value: U32) => #[value]
-entry const fold = fn (count: U32) => do:
+entry const storage_probe = func (value: U32) => return #[value]
+entry const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = make value
@@ -58,8 +58,8 @@ entry const fold = fn (count: U32) => do:
 
 Deno.test("large local records release storage after their final borrowed field read", async () => {
   await compileAndRun(`
-entry const storage_probe = fn (value: U32) => #[value]
-entry const fold = fn (count: U32) => do:
+entry const storage_probe = func (value: U32) => return #[value]
+entry const fold = func (count: U32) => return do:
   let sum = 0
   for value in 0..count:
     let record = { a: value, b: value, c: value, d: value, e: value, f: value,
@@ -81,23 +81,23 @@ Deno.test("direct and wrapped array replacement use linear storage while retaini
     `
 import * as array from "../../std/array"
 const replace = array.replace
-entry const wrapped = fn (count: U32) => do:
+entry const wrapped = func (count: U32) => return do:
   let values = array.fill count 0
   for i in 0..count:
     values := replace i (i + 1) values
   break values
-entry const direct = fn (count: U32) => do:
+entry const direct = func (count: U32) => return do:
   let values = array.fill count 0.0
   for i in 0..count:
     values := @array.set values i (F32.from i)
   break values
-entry const snapshots = fn () => do:
+entry const snapshots = func () => return do:
   let original = #[1, 2, 3]
   let values = original
-  let saved = fn () => values[0]
+  let saved = func () => return values[0]
   values := replace 0 99 values
   break #[original[0], saved (), values[0]]
-entry const nested = fn () => do:
+entry const nested = func () => return do:
   let original = #[#[1], #[2]]
   let changed = replace 0 99 original[0]
   break #[original[0][0], changed[0]]
@@ -129,15 +129,15 @@ Deno.test("array replacement evaluates written arguments before bounds checks an
   await compileAndRun(
     `
 import * as array from "../../std/array"
-entry const order = fn (host: U32 -> U32 ! {Foreign}) =>
+entry const order = func (host: U32 -> U32 ! {Foreign}) => return
   array.replace (host 0) (host 1) (do:
     use value <- host 2
     break #[value])
-entry const bounds = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const bounds = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = #[1]
   use changed <- array.replace 1 (host 42) values
   break changed
-entry const borrowed = fn () => do:
+entry const borrowed = func () => return do:
   let values = #[1, 2, 3]
   let sum = 0
   for item in values:
@@ -170,7 +170,7 @@ Deno.test("staged appends comprehensions and alternating builders preserve immut
     `
 import * as array from "../../std/array"
 import * as list from "../../std/list"
-const build = fn count => do:
+const build = func count => return do:
   let forward: List U32 = []
   let backward: List U32 = []
   let packed: Array U32 = #[]
@@ -183,11 +183,11 @@ const grown = build 8193
 entry const ends = do:
   let (forward, backward, packed) = grown
   break forward[8192] + backward[0] + packed[8192]
-const selected = array.filter_map (fn x => if x % 2 == 0 then #Some x else #Nothing) (array.generate 4097 identity)
+const selected = array.filter_map (func x => return if x % 2 == 0 then #Some x else #Nothing) (array.generate 4097 identity)
 entry const selected_last = selected[2048]
 const branches = do:
   let values = [20]
-  let saved = fn () => values
+  let saved = func () => return values
   let old = values
   values := [...self, 22]
   let other = [10, ...old]
@@ -205,10 +205,10 @@ entry const branching = branches[0][1] + branches[1][0] + branches[2][0]
 Deno.test("Result iteration stops on errors and allows distinct state result and error types without loop scaffolding", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => Result.unwrap_or 0 (Result.iterate 0 (fn i =>
+entry const run = func (count: U32) => return Result.unwrap_or 0 (Result.iterate 0 (func i => return
   #Ok (if i < count then #Continue (i + 1) else #Done i)))
-entry const stop = fn (host: U32 -> Bool ! {Foreign}) => do:
-  use outcome <- Result.iterate 0 (fn i => do:
+entry const stop = func (host: U32 -> Bool ! {Foreign}) => return do:
+  use outcome <- Result.iterate 0 (func i => return do:
     use failed <- host i
     if failed:
       break #Err i
@@ -218,12 +218,12 @@ entry const stop = fn (host: U32 -> Bool ! {Foreign}) => do:
   break case outcome of
     #Ok value => value[0]
     #Err error => F32.from error
-const keep = fn host => fn candidate => case candidate of
+const keep = func host => return func candidate => return case candidate of
   #Ok value => do:
     use observed <- host value
     break #Ok value
   #Err error => #Err error
-entry const prefix = fn (host: U32 -> Bool ! {Foreign}) => do:
+entry const prefix = func (host: U32 -> Bool ! {Foreign}) => return do:
   use candidate <- keep host (#Ok 7)
   break Result.unwrap_or 0 candidate
 `,

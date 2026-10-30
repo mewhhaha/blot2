@@ -702,18 +702,18 @@ const switchEntries: readonly { name: string; source: string }[] = [
   {
     name: "robots",
     source: 'import * as robots from "./robots"\n' +
-      "entry const walked = fn (x: F32) => robots.walk x\n",
+      "entry const walked = func (x: F32) => return robots.walk x\n",
   },
   {
     name: "hud",
     source: 'import * as hud from "./hud"\nimport * as math from "./math"\n' +
-      "entry const width = fn (x: F32) => hud.width (math.scale x math.unit)\n",
+      "entry const width = func (x: F32) => return hud.width (math.scale x math.unit)\n",
   },
   { name: "all", source: editSuite.files[editSuite.entry] },
   {
     name: "robots_again",
     source: 'import * as robots from "./robots"\n' +
-      "entry const walked = fn (x: F32) => robots.walk x\n",
+      "entry const walked = func (x: F32) => return robots.walk x\n",
   },
 ];
 const switchToday: Record<

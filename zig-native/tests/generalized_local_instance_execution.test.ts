@@ -4,9 +4,9 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 // checked storage at that instance instead of an erased payload.
 const builder = `
 type B [w, s] is data = #B { initial: w, s: w -> s }
-const base = fn world => fn action => (world, action ())
-const empty = fn () => #B { initial: (), s: base }
-const run = fn b => fn action => do:
+const base = func world => return func action => return (world, action ())
+const empty = func () => return #B { initial: (), s: base }
+const run = func b => return func action => return do:
   let #B { initial, s } = b
   break s initial action
 `;
@@ -23,41 +23,41 @@ async function returnsArgument(source: string): Promise<void> {
 
 Deno.test("generalized local aliases take the concrete instance of the alias use", async () => {
   await returnsArgument(`${builder}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
-  let (_, result) = run c (fn () => x)
+  let (_, result) = run c (func () => return x)
   break result
 `);
 });
 
 Deno.test("generalized locals ignore an unused alias of themselves", async () => {
   await returnsArgument(`${builder}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
-  let (_, result) = run b (fn () => x)
+  let (_, result) = run b (func () => return x)
   break result
 `);
 });
 
 Deno.test("generalized locals used repeatedly at one layout share that instance", async () => {
   await returnsArgument(`${builder}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, first) = run b (fn () => x)
-  let (_, second) = run b (fn () => x)
+  let (_, first) = run b (func () => return x)
+  let (_, second) = run b (func () => return x)
   break second
 `);
 });
 
 Deno.test("generalized partial applications take the concrete instance of their use", async () => {
   await returnsArgument(`
-const pair = fn a => fn b => (a, b)
-const wrap = fn scope => fn value => scope value
-entry const main = fn (x: U32) => do:
+const pair = func a => return func b => return (a, b)
+const wrap = func scope => return func value => return scope value
+entry const main = func (x: U32) => return do:
   let left = pair 1
-  let twice = wrap (fn p => (p, p))
+  let twice = wrap (func p => return (p, p))
   let (_, value) = left x
   let (_, same) = twice value
   break same
@@ -71,38 +71,38 @@ type State a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-const empty_scope = fn world => fn action => do:
+const empty_scope = func world => return func action => return do:
   use result <- action ()
   break (world, result)
-const empty = fn () => #Builder { initial: (), scope: empty_scope, schema: #End }
-const insert_cell = fn initial => fn builder => do:
+const empty = func () => return #Builder { initial: (), scope: empty_scope, schema: #End }
+const insert_cell = func initial => return func builder => return do:
   let #Builder { initial: previous_initial, scope: previous_scope, schema } = builder
-  let scope = fn world => fn action => do:
+  let scope = func world => return func action => return do:
     let (current, previous) = world
-    use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
+    use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
     let (next, (previous_next, result)) = outcome
     break ((next, previous_next), result)
   break #Builder { initial: (initial, previous_initial), scope, schema }
-const create = fn builder => fn action => do:
+const create = func builder => return func action => return do:
   let #Builder { initial, scope } = builder
   break scope initial action
 `;
 
 Deno.test("rebound generalized builders close every link of the chain", async () => {
   await returnsArgument(`${cells}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let builder = empty ()
   builder := insert_cell 1 self
-  let (_, result) = create builder (fn () => x)
+  let (_, result) = create builder (func () => return x)
   break result
 `);
 });
 
 Deno.test("unobserved generalized locals choose storage for their holes", async () => {
   await returnsArgument(`${builder}
-const pair = fn a => fn b => (a, b)
-const choose = fn () => pair
-entry const main = fn (x: U32) => do:
+const pair = func a => return func b => return (a, b)
+const choose = func () => return pair
+entry const main = func (x: U32) => return do:
   let unused = choose ()
   let builder = empty ()
   break x
@@ -111,12 +111,12 @@ entry const main = fn (x: U32) => do:
 
 Deno.test("closed generalized locals used at different layouts keep their evaluator value", async () => {
   await returnsArgument(`${builder}
-const twice = fn f => fn value => f (f value)
-entry const main = fn (x: U32) => do:
+const twice = func f => return func value => return f (f value)
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, first) = run b (fn () => x)
-  let (_, second) = run b (fn () => (x, 1.5))
-  let same = twice (fn v => v)
+  let (_, first) = run b (func () => return x)
+  let (_, second) = run b (func () => return (x, 1.5))
+  let same = twice (func v => return v)
   let fraction = same 2.5
   break same first
 `);
@@ -127,13 +127,13 @@ entry const main = fn (x: U32) => do:
 // promotions fail; the retry owns the reported diagnostic.
 Deno.test("a compilation that fails after promoting a generalized local reports the ordinary diagnostic", async () => {
   await compileExpectedFailure(`${builder}
-const pair = fn a => fn b => (a, b)
-entry const main = fn (x: U32) => do:
+const pair = func a => return func b => return (a, b)
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, first) = run b (fn () => x)
-  let (_, second) = run b (fn () => (x, 1.5))
+  let (_, first) = run b (func () => return x)
+  let (_, second) = run b (func () => return (x, 1.5))
   let k = pair x
-  let later = fn (y: U32) => k y
+  let later = func (y: U32) => return k y
   let (a, _) = later first
   let (c, _) = k 1.0
   break a
@@ -143,12 +143,12 @@ entry const main = fn (x: U32) => do:
 // Uses at different layouts share no physical value: closure ABI and field
 // words depend on the layout. A pure runtime producer instead runs once per
 // distinct use layout, and each use reads its own instance.
-const pair = "const pair = fn a => fn b => (a, b)";
+const pair = "const pair = func a => return func b => return (a, b)";
 
 Deno.test("runtime-dependent generalized locals used at different layouts evaluate one instance per layout", async () => {
   await returnsArgument(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
@@ -159,12 +159,12 @@ entry const main = fn (x: U32) => do:
 Deno.test("each instance of a runtime-dependent generalized local keeps its own field layout", async () => {
   await compileAndRun(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k x
   let (b, _) = k 1.5
   break a
-entry const fraction = fn (x: F32) => do:
+entry const fraction = func (x: F32) => return do:
   let k = pair x
   let (_, count) = k 3
   let (_, b) = k (x * 2.0)
@@ -185,12 +185,12 @@ entry const fraction = fn (x: F32) => do:
 Deno.test("allocating runtime producers release every instance", async () => {
   await compileAndRun(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair (@array.fill 64 x)
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[3] + second.length - 64
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `, (guest) => {
     equal(guest.call("main", 7), 7);
     for (let index = 0; index < 16; index++) guest.call("main", index);
@@ -205,7 +205,7 @@ entry const memory = fn () -> Array U32 => #[]
 Deno.test("producers with a proven in-place collection edit still decline", async () => {
   await compileExpectedFailure(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let values = @array.fill 4 x
   let k = pair (@array.set values 0 (values[0] + 1))
   let (first, _) = k x
@@ -217,7 +217,7 @@ entry const main = fn (x: U32) => do:
 Deno.test("repeated uses at one layout share their instance", async () => {
   await returnsArgument(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair x
   let (_, whole) = k (x + 1)
   let (_, half) = k 1.5
@@ -229,7 +229,7 @@ entry const main = fn (x: U32) => do:
 Deno.test("uses in loops and early-returning branches read their own instance", async () => {
   await compileAndRun(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair x
   let total = 0
   for index in 0..3:
@@ -252,7 +252,7 @@ entry const main = fn (x: U32) => do:
 Deno.test("an alias of a runtime-dependent generalized local instances both links", async () => {
   await returnsArgument(`
 ${pair}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let k = pair x
   let g = k
   let (a, _) = g x
@@ -263,11 +263,11 @@ entry const main = fn (x: U32) => do:
 
 Deno.test("rebound runtime builders used at different layouts instance every link", async () => {
   await returnsArgument(`${cells}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let builder = empty ()
   builder := insert_cell x self
-  let (_, first) = create builder (fn () => x)
-  let (_, (_, fraction)) = create builder (fn () => (x, 1.5))
+  let (_, first) = create builder (func () => return x)
+  let (_, (_, fraction)) = create builder (func () => return (x, 1.5))
   break first
 `);
 });
@@ -285,25 +285,25 @@ type State a is effect = {
 }
 type App [world, scope, render] is data = #App { initial: world, scope: world -> scope, render: render }
 type Trace is data = #Trace (Array U32)
-const empty = fn () => do:
-  let scope = fn world => fn action => do:
+const empty = func () => return do:
+  let scope = func world => return func action => return do:
     use outcome <- @effect.run State.get State.set world action
     break outcome
-  break #App { initial: #Trace #[], scope, render: fn (frame: U32) => frame }
-const note = fn (value: U32) => do:
+  break #App { initial: #Trace #[], scope, render: func (frame: U32) => return frame }
+const note = func (value: U32) => return do:
   use current <- State.get ()
   let #Trace values = current
   break State.set (#Trace #[...values, value])
-const with_render = fn render => fn app => do:
+const with_render = func render => return func app => return do:
   let #App { initial, scope } = app
   break #App { initial, scope, render }
-const initial = fn app => do:
+const initial = func app => return do:
   let #App { initial } = app
   break initial
-const run = fn app => fn world => fn action => do:
+const run = func app => return func world => return func action => return do:
   let #App { scope } = app
   break scope world action
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 async function returnsArgumentWithMemory(source: string): Promise<void> {
@@ -319,14 +319,14 @@ async function returnsArgumentWithMemory(source: string): Promise<void> {
 
 Deno.test("promoted builders serialize curried callbacks whose rows a use leaves open", async () => {
   await returnsArgumentWithMemory(`${app}
-const render = fn app => fn frame => do:
+const render = func app => return func frame => return do:
   let #App { render } = app
   break render 2 frame
-entry const main = fn (x: U32) => do:
-  let app = with_render (fn (scale: U32) => fn (frame: U32) => do:
+entry const main = func (x: U32) => return do:
+  let app = with_render (func (scale: U32) => return func (frame: U32) => return do:
     use note frame
     break frame * scale) (empty ())
-  let (trace, doubled) = run app (initial app) (fn () => render app x)
+  let (trace, doubled) = run app (initial app) (func () => return render app x)
   let #Trace values = trace
   break doubled - x + values.length - 1
 `);
@@ -337,15 +337,15 @@ entry const main = fn (x: U32) => do:
 // promoted builder at a layout its own open uses leave unresolved.
 Deno.test("rebinding links that read a promoted builder are promoted with it", async () => {
   await returnsArgumentWithMemory(`${app}
-const render = fn app => fn frame => do:
+const render = func app => return func frame => return do:
   let #App { render } = app
   break render frame
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let app = empty ()
-  app := with_render (fn (frame: U32) => do:
+  app := with_render (func (frame: U32) => return do:
     use note frame
     break frame + 1) self
-  let (trace, next) = run app (initial app) (fn () => render app x)
+  let (trace, next) = run app (initial app) (func () => return render app x)
   let #Trace values = trace
   break next + values.length - 2
 `);
@@ -358,22 +358,22 @@ entry const main = fn (x: U32) => do:
 // result and reported `ownership_unproved`.
 const scoped = `
 type B [w, s] is data = #B { initial: w, s: w -> s }
-const empty = fn () => do:
-  let scope = fn world => fn action => do:
+const empty = func () => return do:
+  let scope = func world => return func action => return do:
     use result <- action ()
     break (world, result)
   break #B { initial: (), s: scope }
-const run = fn b => fn action => do:
+const run = func b => return func action => return do:
   let #B { initial, s } = b
   break s initial action
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 Deno.test("a generalized local read only for its length stores its ambiguous hole as a word", async () => {
   await returnsArgumentWithMemory(`${scoped}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, r) = run b (fn () => x)
+  let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
   break r + boxed.length - 2
 `);
@@ -385,12 +385,12 @@ entry const main = fn (x: U32) => do:
 // ambiguous, so `boxed` keeps one instance per layout.
 Deno.test("a quantified hole read later at a heap type keeps one instance per layout", async () => {
   await returnsArgumentWithMemory(`${scoped}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, r) = run b (fn () => x)
+  let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
-  let (_, fraction) = run boxed[0] (fn () => 1.5)
-  let (_, values) = run boxed[1] (fn () => #[x, x + 1])
+  let (_, fraction) = run boxed[0] (func () => return 1.5)
+  let (_, values) = run boxed[1] (func () => return #[x, x + 1])
   break r + values[1] - values[0] + boxed.length - 3
 `);
 });
@@ -401,8 +401,8 @@ entry const main = fn (x: U32) => do:
 Deno.test("a runtime producer read at an ambiguous hole retries with one instance per layout", async () => {
   await returnsArgumentWithMemory(`
 ${pair}
-entry const memory = fn () -> Array U32 => #[]
-entry const main = fn (x: U32) => do:
+entry const memory = func () : Array U32 => return #[]
+entry const main = func (x: U32) => return do:
   let k = pair x
   let (a, _) = k 1.5
   let n = #[k, k].length
@@ -415,12 +415,12 @@ entry const main = fn (x: U32) => do:
 // it still reports `ownership_unproved` instead of taking word storage.
 Deno.test("a captured local whose quantified hole stays open still declines", async () => {
   await compileExpectedFailure(`${scoped}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, r) = run b (fn () => x)
+  let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
-  let later = fn (y: U32) => do:
-    let (_, values) = run boxed[1] (fn () => #[y, y])
+  let later = func (y: U32) => return do:
+    let (_, values) = run boxed[1] (func () => return #[y, y])
     break values.length
   break r + boxed.length + later x - 4
 `, "ownership_unproved");
@@ -433,21 +433,21 @@ Deno.test("promoted builders serialize a polymorphic callback no use applies", a
   await returnsArgumentWithMemory(`${scoped}
 type System [route, start] is data = #Route route | #Start start
 type App [engine, system] is data = #App { engine: engine, systems: Array system }
-const new_with = fn route => #App { engine: empty (), systems: #[#Route route, #Start (fn () => ())] }
-const finish = fn app => do:
+const new_with = func route => return #App { engine: empty (), systems: #[#Route route, #Start (func () => return ())] }
+const finish = func app => return do:
   let #App { engine, systems } = app
   break #App { engine, systems }
-const run_start = fn systems => fn () => do:
+const run_start = func systems => return func () => return do:
   for system in systems:
     use case system of
       #Start start => start ()
       _ => ()
-const create = fn app => fn () => do:
+const create = func app => return func () => return do:
   let #App { engine, systems } = app
   let (world, _) = run engine (run_start systems)
   break world
-entry const main = fn (x: U32) => do:
-  let builder = new_with (fn (e: u) => e)
+entry const main = func (x: U32) => return do:
+  let builder = new_with (func (e: u) => return e)
   let application = finish builder
   let world = create application ()
   break x
@@ -464,9 +464,9 @@ Deno.test("a large unit still stores the ambiguous holes of its generalized loca
   const locals = Array.from({ length: 20 }, (_, index) => `  let boxed${index} = #[b, b]`).join("\n");
   const lengths = Array.from({ length: 20 }, (_, index) => `boxed${index}.length`).join(" + ");
   await returnsArgumentWithMemory(`${scoped}${padding}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, r) = run b (fn () => x)
+  let (_, r) = run b (func () => return x)
 ${locals}
   break r + ${lengths} - 40
 `);
@@ -475,23 +475,23 @@ ${locals}
 // Local storage decisions read a per-unit def-use index, so they no longer
 // stop at 4,096 Core nodes. A thousand padding functions put each program
 // above that size; both used to report `ownership_unproved`.
-const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = fn (x: U32) => @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
+const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = func (x: U32) => return @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
 
 Deno.test("generalized local aliases in a unit above 4,096 nodes take the instance of their use", async () => {
   await returnsArgument(`${builder}${padding}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
   let c = b
-  let (_, result) = run c (fn () => x)
+  let (_, result) = run c (func () => return x)
   break result
 `);
 });
 
 Deno.test("ambiguous holes in a unit above 4,096 nodes take word storage", async () => {
   await returnsArgumentWithMemory(`${scoped}${padding}
-entry const main = fn (x: U32) => do:
+entry const main = func (x: U32) => return do:
   let b = empty ()
-  let (_, r) = run b (fn () => x)
+  let (_, r) = run b (func () => return x)
   let boxed = #[b, b]
   break r + boxed.length - 2
 `);

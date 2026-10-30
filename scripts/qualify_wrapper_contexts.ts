@@ -154,41 +154,41 @@ for (const shape of cases) {
   const representation = scalar ? type : generic ? "{value:a}" : "Array U32";
   const lib = (opaque: boolean, bonus: number) =>
     `${opaque ? "opaque " : ""}type ${nominal} = ${representation}
-const make: ${input} -> ${nominal} = fn value => ${opaque ? "#Token " : ""}${
-      generic ? "{value}" : "value"
-    }
-const read: ${nominal} -> ${input} = fn ${
+const make: ${input} -> ${nominal} = func value => return ${
+      opaque ? "#Token " : ""
+    }${generic ? "{value}" : "value"}
+const read: ${nominal} -> ${input} = func ${
       opaque ? "(#Token value)" : "value"
     } => ${generic ? "value.value" : "value"}
-const capture = fn value => do:
+const capture = func value => return do:
   let saved = make value
-  break fn () => read saved
+  break func () => return read saved
 const bonus: ${type} = ${bonus}${shape === "f32" ? ".0" : ""}
 `;
   const main = `import {make, read, capture, bonus} from "./library"
-entry const run = fn (value: ${type}) => ${
+entry const run = func (value: ${type}) => return ${
     scalar ? `${add} (read (make value)) bonus` : `do:
   let original = #[value, 7]
   let alias = read (make original)
   original[0] := 0
   break @u32.add alias[0] bonus`
   }
-entry const captured = fn (value: ${type}) => ${
+entry const captured = func (value: ${type}) => return ${
     scalar ? `${add} ((capture value) ()) bonus` : `do:
   let original = #[value, 7]
   let saved = capture original
   original[0] := 0
   break @u32.add (saved ())[0] bonus`
   }
-entry const identity = fn (value: ${type}) => ${
+entry const identity = func (value: ${type}) => return ${
     scalar ? "read (make value)" : "(read (make #[value]))[0]"
   }
-entry const trap = fn (index: U32) => @array.get ${
+entry const trap = func (index: U32) => return @array.get ${
     scalar
       ? `#[read (make 42${shape === "f32" ? ".0" : ""})]`
       : "(read (make #[42]))"
   } index
-entry const effects = fn (host: ${type} -> ${type} ! {Foreign}) => do:
+entry const effects = func (host: ${type} -> ${type} ! {Foreign}) => return do:
   use first <- host 40${shape === "f32" ? ".0" : ""}
   let wrapped = make ${scalar ? "first" : "#[first]"}
   use second <- host ${scalar ? "(read wrapped)" : "(read wrapped)[0]"}

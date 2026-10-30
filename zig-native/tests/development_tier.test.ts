@@ -17,7 +17,7 @@ const stdRoot = `${repo}std`;
 
 type Guest = Awaited<ReturnType<typeof instantiateGuest>>;
 const loops = (factor: number) =>
-  `entry const scaled_sum = fn (input: Array U32) => do:
+  `entry const scaled_sum = func (input: Array U32) => return do:
   let total = input[0]
   for index in 1..input.length:
     total := self + input[index] * ${factor}

@@ -4,16 +4,16 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const declarations = `
 type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
-const identity = fn value => value
-const packed = #Pack { unused: identity, selected: fn (value: U32) => value + 1 }
-const invoke = fn callback => callback 1
-const sum = fn packed => fn (left: U32) => fn (right: U32) => do:
+const identity = func value => return value
+const packed = #Pack { unused: identity, selected: func (value: U32) => return value + 1 }
+const invoke = func callback => return callback 1
+const sum = func packed => return func (left: U32) => return func (right: U32) => return do:
   let #Pack { selected } = packed
   break selected (left + right)
-const run = fn packed => fn (value: U32) => do:
+const run = func packed => return func (value: U32) => return do:
   let #Pack { selected } = packed
   break selected value
-const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
+const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
   let #Pack { selected } = packed
   break selected (value + extra))
 `;
@@ -21,14 +21,14 @@ const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
 Deno.test("constant records retain unused generic fields across calls and mixed static/dynamic captures", async () => {
   await compileAndRun(
     declarations + `
-entry const answer = fn (value: U32) => run packed value
-entry const captured = fn (value: U32) => capture packed value
-entry const partial = fn (value: U32) => invoke (run packed)
-entry const partial_pair = fn (value: U32) => invoke (sum packed value)
-entry const partial_chain = fn (value: U32) => do:
+entry const answer = func (value: U32) => return run packed value
+entry const captured = func (value: U32) => return capture packed value
+entry const partial = func (value: U32) => return invoke (run packed)
+entry const partial_pair = func (value: U32) => return invoke (sum packed value)
+entry const partial_chain = func (value: U32) => return do:
   let callback = sum packed
   break invoke (callback value)
-entry const effectful = fn (host: U32 -> U32 ! {Foreign}) => capture packed (host 40)
+entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return capture packed (host 40)
 `,
     (guest) => {
       for (let i = 0; i < 100; i++) {
@@ -58,19 +58,19 @@ Deno.test("stored curried callbacks close their own effect rows and still use th
     `
 type Clock is effect = { tick: Unit -> U32 }
 type Pack callback is data = #Pack { callback: callback, marker: U32 }
-const prepare = fn (amount: U32) => fn (value: U32) => do:
+const prepare = func (amount: U32) => return func (value: U32) => return do:
   use current <- Clock.tick ()
   break current + value + amount
 const packed = #Pack { callback: prepare, marker: 42 }
-const read = fn pack => do:
+const read = func pack => return do:
   let #Pack { marker } = pack
   break marker
-const invoke = fn pack => do:
+const invoke = func pack => return do:
   let #Pack { callback } = pack
   break callback 1 2
-entry const marker = fn () => read packed
-entry const answer = fn (value: U32) => do:
-  let clock = @effect.provider Clock.tick (fn () => value)
+entry const marker = func () => return read packed
+entry const answer = func (value: U32) => return do:
+  let clock = @effect.provider Clock.tick (func () => return value)
   break do clock:
     break invoke packed
 `,
@@ -86,11 +86,11 @@ Deno.test("constant collections infer concrete callbacks in variants the consume
   await compileAndRun(
     `
 type Action value is data = #Ignored (value -> Unit) | #Chosen (Unit -> U32)
-const unused = fn value => do:
+const unused = func value => return do:
   let next = value * 0.25
   break ()
-const actions = #[#Ignored unused, #Chosen (fn () => 42)]
-entry const answer = fn () => do:
+const actions = #[#Ignored unused, #Chosen (func () => return 42)]
+entry const answer = func () => return do:
   let total = 0
   for action in actions:
     total := total + (case action of
@@ -110,7 +110,7 @@ Deno.test("retained generic records invalidate constant values and inlined bodie
   const options = { entry, executable };
   const compiler = await createCompiler(options);
   const main = `import * as lib from "./lib"
-entry const answer = fn (value: U32) => lib.capture lib.packed value
+entry const answer = func (value: U32) => return lib.capture lib.packed value
 `;
   let original: Uint8Array | undefined;
   try {

@@ -161,6 +161,7 @@ pub const Code = enum {
     table_limit,
     private_marker,
     GPU_FRONTEND_SYNTAX_ERROR,
+    function_return_required,
 };
 pub const Diagnostic = struct {
     code: Code,
@@ -177,6 +178,7 @@ pub const Diagnostic = struct {
             .GPU_FRONTEND_SYNTAX_ERROR => "This syntax is not allowed in this position",
             .expected_token => "Expected a syntax token",
             .expected_expression => "Expected an expression",
+            .function_return_required => "A function body requires return or a do block with explicit returns",
             .expected_type => "Expected a type",
             .expected_pattern => "Expected a pattern",
             .unexpected_token => "Unexpected syntax token",
@@ -212,6 +214,8 @@ pub const Parameter = struct {
     demanded: bool,
     demand: bool,
     is_unit: bool,
+    requires_return: bool,
+    pattern_bound: bool,
     where: List,
     where_node: Id,
 };
@@ -342,12 +346,14 @@ pub const Tree = struct {
         const members = self.node(n.b);
         return .{ .name = n.a, .parameters = .{ .start = x[0], .len = x[1] }, .head = x[2], .members = .{ .start = members.a, .len = members.b }, .where = .{ .start = x[3], .len = x[4] }, .where_node = x[5] };
     }
-    // parameter c points to [flags,where start,len,node]; flags bit0=demand,bit1=unit.
+    // parameter c points to [flags,where start,len,node]; flags bit0=demand,
+    // bit1=unit, bit2=the final curried body requires explicit function exits,
+    // bit3=a synthesized block binds a constructor parameter before the body.
     pub fn parameter(self: *const Tree, id: Id) Parameter {
         const n = self.node(id);
         std.debug.assert(n.tag == .parameter);
         const x = self.extra.items[n.c..][0..4];
-        return .{ .name = n.a, .annotation = n.b, .demanded = x[0] & 1 != 0, .demand = x[0] & 1 != 0, .is_unit = x[0] & 2 != 0, .where = .{ .start = x[1], .len = x[2] }, .where_node = x[3] };
+        return .{ .name = n.a, .annotation = n.b, .demanded = x[0] & 1 != 0, .demand = x[0] & 1 != 0, .is_unit = x[0] & 2 != 0, .requires_return = x[0] & 4 != 0, .pattern_bound = x[0] & 8 != 0, .where = .{ .start = x[1], .len = x[2] }, .where_node = x[3] };
     }
     // let_stmt c points to [annotation,where start,len,fallback block,where node].
     pub fn binding(self: *const Tree, id: Id) Binding {

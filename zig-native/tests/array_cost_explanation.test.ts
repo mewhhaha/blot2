@@ -4,19 +4,19 @@ import { observeGuestAllocations } from "../../scripts/bench/guest_heap_observer
 const source = `
 import * as array from "std/array"
 type Box is data = #Box { a: U32, b: U32 }
-const boxed = fn value => #Box { a: value, b: value + 1 }
-const read_box = fn (row: Box) => row.a + row.b
-entry const nominal = fn value => read_box (boxed value)
-const choose = fn x => if x > 0 then (fn y => y + x) else (fn y => y + 1)
-entry const selected = fn x => do:
+const boxed = func value => return #Box { a: value, b: value + 1 }
+const read_box = func (row: Box) => return row.a + row.b
+entry const nominal = func value => return read_box (boxed value)
+const choose = func x => return if x > 0 then (func y => return y + x) else (func y => return y + 1)
+entry const selected = func x => return do:
   let f = choose x
   break f 2
-entry const direct = fn count => do:
+entry const direct = func count => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := array.replace index (index + 1) values
   break values[count - 1]
-entry const snapshot = fn count => do:
+entry const snapshot = func count => return do:
   let values = array.fill count 0
   let previous = values
   for index in 0..count:
@@ -100,11 +100,11 @@ Deno.test("allocation remarks locate array edits, nominal storage and closure ca
       ) => [site.kind, site.requested_bytes, site.emissions]),
       [["aggregate_storage", 8, 1], ["constructor_storage", 8, 1]],
     );
-    const closure = source.indexOf("fn y => y + x");
+    const closure = source.indexOf("func y => return y + x");
     assert(
       (emissions[0].sites as EmissionSite[]).some((site) =>
         site.filename === entry && site.start === closure &&
-        site.end === closure + "fn y => y + x".length &&
+        site.end === closure + "func y => return y + x".length &&
         site.kind === "closure_storage"
       ),
     );

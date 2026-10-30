@@ -16,17 +16,17 @@ Deno.test("collection proofs follow imported body edits, failed revisions and fr
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
   };
-  const before = `const pair = fn value => [value, value + 1]
-const consume = fn (values: List U32) => do:
+  const before = `const pair = func value => return [value, value + 1]
+const consume = func (values: List U32) => return do:
   let total = 0
   for value in values:
     total := self + value
   break total
-const build = fn (values: Array U32) => #[x + y | x <- values, y <- values]
+const build = func (values: Array U32) => return #[x + y | x <- values, y <- values]
 `;
   const main = `import { pair, consume, build } from "./helpers"
-entry const answer = fn seed => consume (pair seed)
-entry const product = fn values => build values
+entry const answer = func seed => return consume (pair seed)
+entry const product = func values => return build values
 `;
   const retained = await createZigProjectCompiler(options);
   let successes = 0;

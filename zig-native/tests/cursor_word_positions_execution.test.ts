@@ -5,8 +5,8 @@ const stdRoot = new URL("../../std", import.meta.url).pathname;
 Deno.test("private word cursors preserve has empty exhausted advance and cross-leaf snapshots", async () => {
   await compileAndRun(
     `
-entry const status = fn count => do:
-  let cursor = @list.generate count (fn i => {x: i, y: i + 1, z: i + 2})
+entry const status = func count => return do:
+  let cursor = @list.generate count (func i => return {x: i, y: i + 1, z: i + 2})
   let cursor = @list.cursor cursor
   let old = cursor
   let total = 0
@@ -21,13 +21,13 @@ entry const status = fn count => do:
   if @cursor.has old:
     break total + (@cursor.value old).z
   break total
-entry const exhausted = fn count => do:
+entry const exhausted = func count => return do:
   let cursor = @list.cursor (@list.fill count (1,2,3))
   for 0..count:
     cursor := @cursor.advance self
   let (value, _, _) = @cursor.value cursor
   break value
-entry const beyond = fn count => do:
+entry const beyond = func count => return do:
   let cursor = @list.cursor (@list.fill count (1,2,3))
   for 0..count:
     cursor := @cursor.advance self
@@ -50,9 +50,9 @@ entry const beyond = fn count => do:
 Deno.test("private word cursors keep ordinary owned extraction through calls and pressure", async () => {
   await compileAndRun(
     `
-const hold = fn row => fn () => row
-entry const run = fn count => do:
-  let cursor = @list.cursor (@list.generate 1001 (fn i => {x: i, y: i + 1, z: i + 2}))
+const hold = func row => return func () => return row
+entry const run = func count => return do:
+  let cursor = @list.cursor (@list.generate 1001 (func i => return {x: i, y: i + 1, z: i + 2}))
   let saved = hold (@cursor.value cursor)
   for 0..count:
     cursor := @cursor.advance self

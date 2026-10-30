@@ -5,26 +5,26 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
-const integer = fn (index: U32) => do:
+const integer = func (index: U32) => return do:
   let shifted = @u32.add index 17
   let wrapped = @u32.mul shifted 4294967295
   break @u32.add wrapped 1
-const floating = fn (index: U32) => do:
+const floating = func (index: U32) => return do:
   let value = @u32.to_f32 index
   let scaled = @f32.mul value 16777216.0
   let rounded = @f32.add scaled 1.0
   break @f32.sub rounded scaled
-entry const integers = fn (count: U32) => @array.generate count integer
-entry const floats = fn (count: U32) => @array.generate count floating
-entry const divide = fn (count: U32) => @array.generate count (fn index => do:
+entry const integers = func (count: U32) => return @array.generate count integer
+entry const floats = func (count: U32) => return @array.generate count floating
+entry const divide = func (count: U32) => return @array.generate count (func index => return do:
   let divisor = @u32.sub 4 index
   break @u32.div 12 divisor)
-entry const shared = fn (count: U32) => do:
+entry const shared = func (count: U32) => return do:
   let original = @array.generate count integer
   let saved = original
   original[0] := 99
   break #[saved[0], original[0], saved[@u32.sub count 1]]
-entry const effectful = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = @array.fill 9 0
   for index in 0..9:
     use value <- host index

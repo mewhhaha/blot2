@@ -31,11 +31,11 @@ Deno.test("operator failures explain prelude dispatch through the CLI", async ()
   const directory = await Deno.makeTempDir();
   try {
     const cases: [string, unknown][] = [
-      ["entry const answer = fn () => 1 + 2.5\n", [
+      ["entry const answer = func () => return 1 + 2.5\n", [
         { side: "left", operand: "U32", outcome: "incompatible" },
         { side: "right", operand: "F32", outcome: "incompatible" },
       ]],
-      ["entry const answer = fn () => #True + #False\n", [
+      ["entry const answer = func () => return true + false\n", [
         { side: "left", operand: "Bool", outcome: "no_member" },
       ]],
     ];
@@ -69,9 +69,9 @@ Deno.test("operator failures explain prelude dispatch through the CLI", async ()
 Deno.test("callable subtraction reports source operands and recovers after correction", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
-  const invalid = `entry const good = fn (value: F32) -> F32 => value - 1.0
-entry const broken = fn (value: F32) -> F32 => do:
-  let transform: F32 -> F32 = fn (x: F32) => x + 1.0
+  const invalid = `entry const good = func (value: F32) : F32 => return value - 1.0
+entry const broken = func (value: F32) : F32 => return do:
+  let transform: F32 -> F32 = func (x: F32) => return x + 1.0
   break transform - value
 `;
   const corrected = invalid.replace(
@@ -143,10 +143,10 @@ Deno.test("imported generic subtraction points to the mismatched call", async ()
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const helper = `${directory}/helper.blot`;
-  const generic = "const difference = fn left => fn right => left - right\n";
+  const generic = "const difference = func left => return func right => return left - right\n";
   const invalid = `import { difference } from "./helper"
-entry const broken = fn (value: F32) -> F32 => do:
-  let transform: F32 -> F32 = fn (x: F32) => x + 1.0
+entry const broken = func (value: F32) : F32 => return do:
+  let transform: F32 -> F32 = func (x: F32) => return x + 1.0
   break difference transform value
 `;
   const corrected = invalid.replace(
@@ -216,10 +216,10 @@ Deno.test("mixed-type associated subtraction remains valid in both tiers", async
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `type Meters is data = #Meters F32
-const Meters.sub = fn (left: Meters) => fn (right: F32) => do:
+const Meters.sub = func (left: Meters) => return func (right: F32) => return do:
   let #Meters amount = left
   break amount - right
-entry const distance = fn (value: F32) -> F32 => (#Meters value) - 1.0
+entry const distance = func (value: F32) : F32 => return (#Meters value) - 1.0
 `;
   try {
     for (const codegenTier of ["development", "optimized"] as const) {
@@ -248,13 +248,13 @@ entry const distance = fn (value: F32) -> F32 => (#Meters value) - 1.0
 });
 
 const library = "type Meters is data=#Meters F32\n" +
-  "const meters = fn (value: F32) => #Meters value\n";
-const method = "const Meters.add = fn left => fn right => do:\n" +
+  "const meters = func (value: F32) => return #Meters value\n";
+const method = "const Meters.add = func left => return func right => return do:\n" +
   "  let #Meters a = left\n  let #Meters b = right\n" +
   "  break #Meters (@f32.add a b)\n";
 const main = (annotation: string) =>
   'import { meters } from "./library"\n' +
-  "entry const answer = fn () => do:\n" +
+  "entry const answer = func () => return do:\n" +
   `  let total${annotation} = meters 1.0 + meters 2.0\n  break 7\n`;
 
 Deno.test("project diagnostics carry dispatch explanations and recover after correction", async () => {
@@ -324,7 +324,7 @@ Deno.test("dispatch over a compiled dependency's type is explained", async () =>
     await Deno.writeTextFile(`${directory}/library.blot`, library);
     await Deno.writeTextFile(
       entry,
-      'import { meters } from "./library"\nentry const answer = fn () => 7\n',
+      'import { meters } from "./library"\nentry const answer = func () => return 7\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", prelude],

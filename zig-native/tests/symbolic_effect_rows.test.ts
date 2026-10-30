@@ -7,16 +7,16 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 
 const library = `type State a is effect = { get: Unit -> a, set: a -> Unit }
-const read: Unit -> a ! {State.get a} = fn () => State.get ()
-const apply = fn (callback: Unit -> a ! {State.get a | e}) => callback ()
-const capture = fn (callback: Unit -> a ! {State.get a}) => fn () => callback ()
+const read: Unit -> a ! {State.get a} = func () => return State.get ()
+const apply = func (callback: Unit -> a ! {State.get a | e}) => return callback ()
+const capture = func (callback: Unit -> a ! {State.get a}) => return func () => return callback ()
 `;
 
 Deno.test("symbolic operation rows specialize generic callbacks and captured aliases", async () => {
   await compileAndRun(
     library +
-      `entry const integer = fn () => @product.get (@effect.run State.get State.set 42 (fn () => apply (capture read))) 1
-entry const floating = fn () => @product.get (@effect.run State.get State.set 1.5 (fn () => read ())) 1
+      `entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
+entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
 `,
     (guest) => {
       assert.equal(guest.call("integer", null), 42);
@@ -41,8 +41,8 @@ Deno.test("symbolic operation rows survive compiled dependencies and retained sp
   const dependency = `${directory}/state.blot`;
   const archive = `${directory}/state.blotdep`;
   const main = `import { State, read, apply, capture } from "./state"
-entry const integer = fn () => @product.get (@effect.run State.get State.set 42 (fn () => apply (capture read))) 1
-entry const floating = fn () => @product.get (@effect.run State.get State.set 1.5 (fn () => read ())) 1
+entry const integer = func () => return @product.get (@effect.run State.get State.set 42 (func () => return apply (capture read))) 1
+entry const floating = func () => return @product.get (@effect.run State.get State.set 1.5 (func () => return read ())) 1
 `;
   try {
     await Deno.writeTextFile(entry, main);
@@ -130,14 +130,14 @@ type Number = U32
 type Identity a = a
 type Signal a is effect = { get: Unit -> a }
 type Read a is contract = { operation Signal.get a, type_rep a, effect_rep ! {} }
-const read: Unit -> a ! {| e} where { Read a } = fn () => Signal.get a ()
-const number: Unit -> Number ! {Signal.get Number} = fn () => Signal.get Number ()
+const read: Unit -> a ! {| e} where { Read a } = func () => return Signal.get a ()
+const number: Unit -> Number ! {Signal.get Number} = func () => return Signal.get Number ()
 `;
   const main = `
 import {Number, Identity, Signal, Read, read, number} from "./read"
-entry const answer = fn () -> U32 => do (@effect.provider (Signal.get (Identity Number)) (fn () => 21)):
+entry const answer = func () : U32 => return do (@effect.provider (Signal.get (Identity Number)) (func () => return 21)):
   break @u32.add (read ()) (number ())
-entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identity F32)) (fn () => 1.5)):
+entry const fraction = func () : F32 => return do (@effect.provider (Signal.get (Identity F32)) (func () => return 1.5)):
   break read ()
 `;
   try {
@@ -164,7 +164,7 @@ entry const fraction = fn () -> F32 => do (@effect.provider (Signal.get (Identit
       try {
         for (const value of [21, 22, 21]) {
           const sources = {
-            [entry]: main.replace("fn () => 21", `fn () => ${value}`),
+            [entry]: main.replace("func () => return 21", `func () => return ${value}`),
           };
           const built = await compiler.build({ sources });
           assert(built.success, JSON.stringify(built));

@@ -344,14 +344,14 @@ results together in written order. Stored tuples work through the same receive
 helper, while one task returning a tuple keeps that payload intact.
 
 ```blot
-const scope = fn body => @task.scope body
-const spawn = fn group => fn action => @task.spawn group action
-const await = fn receivers => |receivers|
+const scope = func body => return @task.scope body
+const spawn = func group => return func action => return @task.spawn group action
+const await = func receivers => return |receivers|
 
-entry const answer = fn () => scope (fn group => do:
+entry const answer = func () => return scope (func group => return do:
   let here = spawn group
-  let left = here (fn () => 20)
-  let right = here (fn () => 22)
+  let left = here (func () => return 20)
+  let right = here (func () => return 22)
   let (first, second) = await (left, right)
   break @u32.add first second)
 ```

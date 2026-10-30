@@ -2,10 +2,25 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "./syntax.ts";
 const syntaxChildren = (children: readonly Cst[]) => children;
 
+Deno.test("func replaces the function keyword without reserving identifier prefixes", async () => {
+  const frontend = await createFrontend();
+  try {
+    frontend.parse(
+      "const fn = 40\nconst funcify = func x -> y => return x + y\n",
+    );
+    throws(
+      () => frontend.parse("const identity = fn x => return x\n"),
+      SourceError,
+    );
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("typed staging CST owns result rows and descriptor boundaries", async () => {
   const frontend = await createFrontend();
   const source = `const code = 1
-const descriptor = fn code => code
+const descriptor = func code => return code
 const left: code [U32, row {}] = @code.quote 40
 const shape: descriptor (code [U32, row {Foreign}]) = @code.describe left
 type Generator = forall [row e] => code [U32, row e]
@@ -47,9 +62,9 @@ Deno.test("numeric proof syntax preserves bounded operands and rejects arbitrary
   ];
   const source =
     names.map((name, index) =>
-      `const proof_${index}: (values: Array U32) -> (index: U32) -> @proof.${name} values index = fn values => fn index => @proof.index values index\n`
+      `const proof_${index}: (values: Array U32) -> (index: U32) -> @proof.${name} values index = func values => return func index => return @proof.index values index\n`
     ).join("") +
-    "const bounded: (values: List U32) -> @proof.U32Lt (0) (@list.length values) = fn values => @proof.lt 0 (@list.length values)\n";
+    "const bounded: (values: List U32) -> @proof.U32Lt (0) (@list.length values) = func values => return @proof.lt 0 (@list.length values)\n";
   try {
     for (const input of [source, source.replaceAll("\n", "\r\n")]) {
       const rows = normalizedNodes(frontend.parse(input).root, input);
@@ -85,7 +100,7 @@ Deno.test("numeric proof syntax preserves bounded operands and rejects arbitrary
 Deno.test("dependent arrow binders remain distinct from type groups", async () => {
   const frontend = await createFrontend();
   const source = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = func input => return func callback => return callback ()
 `;
   try {
     for (const input of [source, source.replaceAll("\n", "\r\n")]) {
@@ -105,7 +120,9 @@ const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.ge
 Deno.test("selector markers remain ordinary text inside comments and strings", async () => {
   const frontend = await createFrontend();
   try {
-    frontend.parse('// a · b\nconst failure = fn () => @panic "a · b"\n');
+    frontend.parse(
+      '// a · b\nconst failure = func () => return @panic "a · b"\n',
+    );
     throws(() => frontend.parse("const field = ·name\n"), (error) => {
       ok(error instanceof SourceError);
       equal(error.code, "reserved_selector_marker");
@@ -120,7 +137,7 @@ Deno.test("from is contextual to imports and the internal marker cannot bypass i
   const frontend = await createFrontend();
   try {
     frontend.parse(
-      'import { value } from "./value"\nconst from = fn value => value\nconst converted = from 1\n',
+      'import { value } from "./value"\nconst from = func value => return value\nconst converted = from 1\n',
     );
     const source = '// before\nimport { value } froM "./value"\n';
     throws(() => frontend.parse(source), (error) => {
@@ -164,11 +181,11 @@ private type Choice is data = #Choice U32
 private type Read a is contract = {type_rep a}
 private effect Hidden: Unit -> U32
 private type HiddenFamily is effect = {ask: Unit -> U32}
-private const private = fn opaque => opaque
-private entry const exported = fn export => private export
-const unwrap = fn (#Box value) => value.value
-const typed = fn (value: U32) => value
-const ordinary = fn opaque => fn private => fn export => (opaque, private, export)
+private const private = func opaque => return opaque
+private entry const exported = func export => return private export
+const unwrap = func (#Box value) => return value.value
+const typed = func (value: U32) => return value
+const ordinary = func opaque => return func private => return func export => return (opaque, private, export)
 export {Box} from "./tokens"
 `;
     const rows = normalizedNodes(frontend.parse(source).root, source);
@@ -243,7 +260,7 @@ type Store a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-const use_state = fn (unit: Unit) -> U32 ! {State U32, Reader.ask} => 1
+const use_state = func (unit: Unit) : U32 ! {State U32, Reader.ask} => return 1
 `).root;
     const pending = [root];
     const nodes: Cst[] = [];
@@ -281,8 +298,8 @@ Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mi
   const frontend = await createFrontend();
   const lines = [
     "// leading comment",
-    "const before = fn () => 1",
-    "const answer = fn (condition: Bool) => do:",
+    "const before = func () => return 1",
+    "const answer = func (condition: Bool) => return do:",
     "  let value = do:",
     "    if condition:",
     "      break 40",
@@ -333,10 +350,10 @@ Deno.test("implementation headers are contextual and retain explicit row and typ
   try {
     for (
       const source of [
-        "impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }\n",
+        "impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }\n",
         "private impl Arrow (a,b,e) : Callable (a -> b ! {| e}) where { type_eq a U32 } = { type Run = a -> b ! {| e} }\n",
         "impl Curried a => type b : Pair (a,b) = { type Item = a }\n",
-        "const impl = fn impl => impl\nentry const answer = impl 42\n",
+        "const impl = func impl => return impl\nentry const answer = impl 42\n",
       ]
     ) frontend.parse(source);
     throws(() => frontend.parse("impL Name : Source U32 = {}\n"), SourceError);
@@ -348,9 +365,9 @@ Deno.test("implementation headers are contextual and retain explicit row and typ
 Deno.test("usage and quantified package CST retains semantic syntax boundaries", async () => {
   const frontend = await createFrontend();
   const source = `type Item=exists [a] where {Render a}=>a
-const f:once (borrow r U32->shared U32)=fn x=>x
+const f:once (borrow r U32->shared U32)=func x=> return x
 const make=pack [U32] 42 as Item
-const read=fn item=>unpack item as [a] value in Render.show value
+const read=func item=> return unpack item as [a] value in Render.show value
 `;
   try {
     const rows = normalizedNodes(frontend.parse(source).root, source);

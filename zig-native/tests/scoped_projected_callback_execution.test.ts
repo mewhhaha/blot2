@@ -4,19 +4,19 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const helper =
-  `const apply2 = fn callback => fn left => fn right => callback left right\n`;
+  `const apply2 = func callback => return func left => return func right => return callback left right\n`;
 const library = `import {apply2} from "./helper"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const forward2 = fn callback => fn left => fn right => apply2 callback left right
-const read2 = fn (left: State U32) => fn (right: State U32) => do:
+const forward2 = func callback => return func left => return func right => return apply2 callback left right
+const read2 = func (left: State U32) => return func (right: State U32) => return do:
   use x <- left.get ()
   use y <- right.get ()
   break @u32.sub x y
-const keep = fn callback => {callback}
-const make = fn () => keep read2
+const keep = func callback => return {callback}
+const make = func () => return keep read2
 `;
 const main = `import {State, forward2, read2, make} from "./library"
-entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 9):
       let holder = {callback: read2}
@@ -57,7 +57,7 @@ const completeMain = main +
       "entry const literal",
     ).replace(
       "forward2 holder.callback left right",
-      "forward2 (fn (first: State U32) => fn (second: State U32) => first.get ()) left right",
+      "forward2 (func (first: State U32) => return func (second: State U32) => return first.get ()) left right",
     ) +
   main.replace('import {State, forward2, read2, make} from "./library"\n', "")
     .replace(
@@ -170,14 +170,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
               ),
               main.replace(
                 "forward2 holder.callback left right",
-                "forward2 (fn first => fn second => fn () => first.get ()) left right",
+                "forward2 (func first => return func second => return func () => return first.get ()) left right",
               ),
               main.replace(
-                "fn () => @effect.scope",
-                "fn (host: (Unit -> U32 ! {| e}) -> U32 ! {Foreign}) => @effect.scope",
+                "func () => return @effect.scope",
+                "func (host: (Unit -> U32 ! {| e}) -> U32 ! {Foreign}) => return @effect.scope",
               ).replace(
                 "forward2 holder.callback left right",
-                "forward2 (fn first => fn second => host (fn () => first.get ())) left right",
+                "forward2 (func first => return func second => return host (func () => return first.get ())) left right",
               ),
             ]
           ) {

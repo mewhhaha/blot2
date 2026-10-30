@@ -742,7 +742,7 @@ const Checker = struct {
         const module = self.module;
         const n = module.node(id);
         switch (n.tag) {
-            .task => {
+            .task, .storage => {
                 for (module.children(id)) |child| try ordinary(try self.walk(child, depth + 1));
                 return .{};
             },

@@ -1,33 +1,33 @@
 type Tick is effect = { read: Unit -> F32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         yield 1.0
       complete value =>
         break value
-const cancelled = fn computation => do:
+const cancelled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         break 86.0
       complete value =>
         break value
-entry const answer = fn (host: Unit -> F32 ! {Foreign}) => do:
+entry const answer = func (host: Unit -> F32 ! {Foreign}) => return do:
   let bias = 0.0
-  let make = fn action => do:
+  let make = func action => return do:
     let remembered = bias
-    break @computation (fn () => @f32.add (action ()) remembered)
-  let computation = make (fn () => do:
+    break @computation (func () => return @f32.add (action ()) remembered)
+  let computation = make (func () => return do:
     use value <- host ()
     use increment <- Tick.read ()
     break @f32.add value increment
   )
   bias := 99.0
   break handled computation
-entry const cancel = fn (host: Unit -> F32 ! {Foreign}) => do:
-  let make = fn action => @computation (fn () => action ())
-  let computation = make (fn () => do:
+entry const cancel = func (host: Unit -> F32 ! {Foreign}) => return do:
+  let make = func action => return @computation (func () => return action ())
+  let computation = make (func () => return do:
     use value <- host ()
     use increment <- Tick.read ()
     break @panic "cancelled action resumed"

@@ -6,12 +6,12 @@ import { ResourceJournal } from "../../compiler/resource_journal.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `type Ask is effect = {ask: Unit -> U32}
-entry const cancel = fn () => do:
-  let computation = @computation (fn () => do:
-    use outer <- @resource.acquire (fn () => 9) (fn resource => ())
-    use inner <- @resource.acquire (fn () => 7) (fn resource => ())
+entry const cancel = func () => return do:
+  let computation = @computation (func () => return do:
+    use outer <- @resource.acquire (func () => return 9) (func resource => return ())
+    use inner <- @resource.acquire (func () => return 7) (func resource => return ())
     use value <- Ask.ask ()
-    break @usage.borrow outer (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow outer (func loan => return @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of
@@ -19,8 +19,8 @@ entry const cancel = fn () => do:
         break 42
       complete value =>
         break value
-entry const scope_cancel = fn () => do:
-  let computation = @computation (fn () => @resource.scope (fn () => 11) (fn resource => ()) (fn loan => do:
+entry const scope_cancel = func () => return do:
+  let computation = @computation (func () => return @resource.scope (func () => return 11) (func resource => return ()) (func loan => return do:
     use value <- Ask.ask ()
     break @u32.add value (@usage.read loan)
   ))
@@ -30,11 +30,11 @@ entry const scope_cancel = fn () => do:
         break 42
       complete value =>
         break value
-entry const resume = fn () => do:
-  let computation = @computation (fn () => do:
-    use owner <- @resource.acquire (fn () => 9) (fn resource => ())
+entry const resume = func () => return do:
+  let computation = @computation (func () => return do:
+    use owner <- @resource.acquire (func () => return 9) (func resource => return ())
     use value <- Ask.ask ()
-    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of
@@ -42,14 +42,14 @@ entry const resume = fn () => do:
         yield 33
       complete value =>
         break value
-const keep = fn ~value => fn () => @force value
-entry const retry = fn () => do:
+const keep = func ~value => return func () => return @force value
+entry const retry = func () => return do:
   let delayed = keep (do:
-    use owner <- @resource.acquire (fn () => 9) (fn resource => ())
+    use owner <- @resource.acquire (func () => return 9) (func resource => return ())
     use value <- Ask.ask ()
-    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
   )
-  let computation = @computation (fn () => delayed ())
+  let computation = @computation (func () => return delayed ())
   use first <- do:
     for request in @requests computation:
       case request of
@@ -65,11 +65,11 @@ entry const retry = fn () => do:
         complete value =>
           break value
   break @u32.add first second
-entry const suspend_cancel = fn (host: Unit -> U32 ! {Foreign}) => do:
-  let computation = @computation (fn () => do:
-    use owner <- @resource.acquire (fn () => 13) (fn resource => ())
+entry const suspend_cancel = func (host: Unit -> U32 ! {Foreign}) => return do:
+  let computation = @computation (func () => return do:
+    use owner <- @resource.acquire (func () => return 13) (func resource => return ())
     use value <- Ask.ask ()
-    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
   )
   for request in @requests computation:
     case request of

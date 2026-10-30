@@ -20,8 +20,8 @@ additional directory aliases through `imports` or `--alias`. General module
 re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
-types and constructors use `PascalCase`. Functions are curried: `fn left right
-=> ...` abbreviates `fn left => fn right => ...`, and both are called
+types and constructors use `PascalCase`. Functions are curried: `func left -> right
+=> return ...` abbreviates `func left => return func right => return ...`, and both are called
 `function left right`.
 
 See the [API and performance audit](PERFORMANCE.md) for measured costs,
@@ -37,18 +37,18 @@ optimization guarantees and remaining work.
 | `compose outer inner value` | `outer (inner value)`                     |
 | `flip combine right left`   | `combine left right`                      |
 | `on combine project a b`    | `combine (project a) (project b)`         |
-| `Bool.not value`            | Exchanges `#True` and `#False`            |
+| `Bool.not value`            | Exchanges `true` and `false`            |
 
 ```blot
-const increment = fn value => value + 1
+const increment = func value => return value + 1
 const double = U32.mul 2
 const transform = compose double increment
 
-entry const answer = fn () => transform 20
+entry const answer = func () => return transform 20
 
-entry const inferred = fn () => do:
-  let same = fn value => value
-  if same #True:
+entry const inferred = func () => return do:
+  let same = func value => return value
+  if same true:
     break same 42
   break 0
 ```
@@ -63,26 +63,26 @@ are evaluated explicitly with `@demand` (`@force` remains an alias). See
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `break ()` is needed, and their last expression statement is discarded. A
 non-unit result needs an explicit `break value` on every reachable path.
-Expression bodies such as `const answer = fn () => 42` still return their
+Expression bodies such as `const answer = func () => return 42` still return their
 expression.
 
 ## Type equality
 
-Wrap a value or constructor/function witness with `#Type` (or prefix it with
+Wrap a value or constructor/function witness with `$Type` (or prefix it with
 `:`) to compare its concrete type using ordinary `==` and `!=`:
 
 ```blot
-type Count is data = #Count U32
-type Other is data = #Other U32
+type Count is data = $Count U32
+type Other is data = $Other U32
 
 entry const same_value = 1 == 2                         // False
-entry const same_type = #Type 1 == #Type 2                // True
-entry const same_nominal = #Type #Count == #Type (#Count 42) // True
-entry const different = #Type #Count != #Type #Other       // True
+entry const same_type = $Type 1 == $Type 2                // True
+entry const same_nominal = $Type $Count == $Type ($Count 42) // True
+entry const different = $Type $Count != $Type $Other       // True
 
-entry const compare = fn () => do:
-  let head = #Type #Count
-  let witness = #Type (#Count 0)
+entry const compare = func () => return do:
+  let head = $Type $Count
+  let witness = $Type ($Count 0)
   break head == witness
 ```
 
@@ -93,57 +93,57 @@ and structural element types. Constructor/function witnesses describe their
 final result type and are never called by the comparison. Witness expressions
 still evaluate once, left to right.
 
-`#Type` takes a value expression: use `#Type 0` for U32 or a constructor witness
-such as `#Type #Count`; bare type names such as `U32` are only valid in type
+`$Type` takes a value expression: use `$Type 0` for U32 or a constructor witness
+such as `$Type $Count`; bare type names such as `U32` are only valid in type
 positions. Ordinary value equality continues to use the value type's own `eq`
 implementation.
 
 ## Maybe and Result
 
 ```blot
-type Maybe a is data = #Some a | #Nothing
-type Result [value, error] is data = #Ok value | #Err error
-type Iteration [state, result] is data = #Continue state | #Done result
+type Maybe a is data = $Some a | $Nothing
+type Result [value, error] is data = $Ok value | $Err error
+type Iteration [state, result] is data = $Continue state | $Done result
 ```
 
 Those declarations describe the prelude's types; do not redeclare them unless
-you intend a new nominal type. Constructors are ordinary values. `#Some value`
-and `#Some(value)` are equivalent in expressions and patterns.
+you intend a new nominal type. Constructors are ordinary values. `$Some value`
+and `$Some(value)` are equivalent in expressions and patterns.
 
 | Function                               | Behavior                                                             |
 | -------------------------------------- | -------------------------------------------------------------------- |
-| `Maybe.pure value`                     | `#Some value`                                                        |
+| `Maybe.pure value`                     | `$Some value`                                                        |
 | `Maybe.map transform candidate`        | Transforms a present value                                           |
 | `Maybe.bind candidate next`            | Calls `next` on a present value; `next` returns a `Maybe`            |
-| `Maybe.iterate initial step`           | Iterates with constant call stack; `#Nothing` stops immediately      |
-| `Maybe.unwrap_or fallback candidate`   | Extracts `#Some`, otherwise returns `fallback`                       |
+| `Maybe.iterate initial step`           | Iterates with constant call stack; `$Nothing` stops immediately      |
+| `Maybe.unwrap_or fallback candidate`   | Extracts `$Some`, otherwise returns `fallback`                       |
 | `Maybe.is_some candidate`              | Returns a Bool                                                       |
-| `Maybe.to_result error candidate`      | Converts `#Some value` to `#Ok value`, or `#Nothing` to `#Err error` |
-| `Result.pure value`                    | `#Ok value`                                                          |
-| `Result.map transform candidate`       | Transforms only `#Ok`                                                |
-| `Result.map_error transform candidate` | Transforms only `#Err`                                               |
-| `Result.bind candidate next`           | Calls `next` on `#Ok`; `next` returns a `Result`                     |
-| `Result.iterate initial step`          | Iterates with constant call stack; preserves the first `#Err`        |
-| `Result.unwrap_or fallback candidate`  | Extracts `#Ok`, otherwise returns `fallback`                         |
-| `Result.to_maybe candidate`            | Keeps `#Ok` as `#Some`, discards `#Err` as `#Nothing`                |
+| `Maybe.to_result error candidate`      | Converts `$Some value` to `$Ok value`, or `$Nothing` to `$Err error` |
+| `Result.pure value`                    | `$Ok value`                                                          |
+| `Result.map transform candidate`       | Transforms only `$Ok`                                                |
+| `Result.map_error transform candidate` | Transforms only `$Err`                                               |
+| `Result.bind candidate next`           | Calls `next` on `$Ok`; `next` returns a `Result`                     |
+| `Result.iterate initial step`          | Iterates with constant call stack; preserves the first `$Err`        |
+| `Result.unwrap_or fallback candidate`  | Extracts `$Ok`, otherwise returns `fallback`                         |
+| `Result.to_maybe candidate`            | Keeps `$Ok` as `$Some`, discards `$Err` as `$Nothing`                |
 
 ```blot
-const nonzero = fn value => do:
+const nonzero = func value => return do:
   if value == 0:
-    break #Nothing
-  break #Some value
+    break $Nothing
+  break $Some value
 
-const candidate = Maybe.bind (#Some 40) nonzero
+const candidate = Maybe.bind ($Some 40) nonzero
 
-entry const answer = fn () => do:
-  let #Some value = Maybe.map (U32.add 2) candidate else:
+entry const answer = func () => return do:
+  let $Some value = Maybe.map (U32.add 2) candidate else:
     break 0
-  break Result.unwrap_or 0 (Maybe.to_result #False (#Some value))
+  break Result.unwrap_or 0 (Maybe.to_result false ($Some value))
 
-entry const inspect = fn () => case #Some (#Some 42) of
-  #Some (#Some value) => value
-  #Some #Nothing => 0
-  #Nothing => 0
+entry const inspect = func () => return case $Some ($Some 42) of
+  $Some ($Some value) => value
+  $Some $Nothing => 0
+  $Nothing => 0
 ```
 
 Matches must be exhaustive. `if let` binds only in its successful branch;
@@ -153,13 +153,13 @@ functions:
 
 ```blot
 const try = monad Maybe
-const add_present = fn left => fn right => do try:
+const add_present = func left -> right => return do try:
   use first <- left
   use second <- right
   break first + second
 ```
 
-`#Nothing` skips the rest of the block. `monad Result` propagates `#Err` in the
+`$Nothing` skips the rest of the block. `monad Result` propagates `$Err` in the
 same way. `break value` lifts with `pure`; `break $ candidate` forwards an
 already wrapped result. `use candidate` binds and discards its successful
 payload, so it still short-circuits. Falling through lifts Unit. Ordinary `let`
@@ -172,29 +172,29 @@ monads supply their own associated `pure` and `bind` functions.
 
 Loops inside a monadic block also use its `iterate initial step` member. The
 callback receives a state and returns a wrapped `Iteration state result`:
-`#Continue next` advances with the next state; `#Done result` finishes with a
-result, which can have a different type. `#Nothing` or `#Err error` propagates
+`$Continue next` advances with the next state; `$Done result` finishes with a
+result, which can have a different type. `$Nothing` or `$Err error` propagates
 immediately. Callback effects remain visible to callers. These functions also
 work as ordinary calls:
 
 ```blot
-const step = fn count =>
-  if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
-entry const answer = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+const step = func count => return
+  if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
+entry const answer = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
 `Maybe.iterate` and `Result.iterate` finish each callback before starting the
 next, using constant call stack. For a custom monad `M`, `iterate` must
 implement the same result and sequencing as repeatedly binding `step state`:
-`#Continue` repeats and `#Done value` finishes with `M.pure value`. Its
+`$Continue` repeats and `$Done value` finishes with `M.pure value`. Its
 implementation is responsible for stack safety and any branching behavior of the
 monad. This does not make arbitrary recursion stack safe. Blocks without loops
 do not require an `iterate` member.
 
 `unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` and
 `Result.unwrap_or_else fallback candidate` have a demand parameter: they
-evaluate `fallback` only for `#Nothing` or `#Err`, once per captured argument.
-`Maybe.filter predicate candidate` keeps a matching `#Some`, and `Maybe.flatten`
+evaluate `fallback` only for `$Nothing` or `$Err`, once per captured argument.
+`Maybe.filter predicate candidate` keeps a matching `$Some`, and `Maybe.flatten`
 removes one nested `Maybe`.
 
 ## U32 and operators
@@ -225,14 +225,14 @@ not a reason to switch to the right implementation.
 Nominal types can define associated functions in their owning module:
 
 ```blot
-type Vec2 is data = #Vec2 { x: F32, y: F32 }
-const Vec2.add = fn (a: Vec2) => fn (b: Vec2) => do:
-  let #Vec2 { x: ax, y: ay } = a
-  let #Vec2 { x: bx, y: by } = b
-  break #Vec2 { x: ax + bx, y: ay + by }
+type Vec2 is data = $Vec2 { x: F32, y: F32 }
+const Vec2.add = func (a: Vec2) -> (b: Vec2) => return do:
+  let $Vec2 { x: ax, y: ay } = a
+  let $Vec2 { x: bx, y: by } = b
+  break $Vec2 { x: ax + bx, y: ay + by }
 
-const twice = fn value => value + value
-entry const answer = fn (value: F32) => twice value
+const twice = func value => return value + value
+entry const answer = func (value: F32) => return twice value
 ```
 
 Generic functions that depend on associated dispatch are specialized for their
@@ -243,7 +243,7 @@ also works through closures, local function aliases, and recursive functions. No
 runtime member lookup is emitted. An entry function must have enough type
 information to select a concrete implementation; annotate an otherwise
 unconstrained entry parameter. Dispatch is selected while specializing reachable
-code, so a call with no implementation (`#True + #False`) in a declaration no
+code, so a call with no implementation (`true + false`) in a declaration no
 entry reaches is type checked but not reported. `@type.call` also accepts other
 literal member names, such as `"distance"`.
 
@@ -251,15 +251,15 @@ Operators are source-defined aliases for functions, not compiler arithmetic
 special cases. Backticks also call a named function infix:
 
 ```blot
-const plus = fn left => fn right => U32.add left right
-entry const answer = fn () => 20 `plus` 22
+const plus = func left -> right => return U32.add left right
+entry const answer = func () => return 20 `plus` 22
 ```
 
 Custom fixity declarations belong before other declarations. Application binds
 tighter than operators. See the
 [compiler syntax reference](../compiler/README.md#prelude-and-operators) for
-precedence/associativity. `&&` and `||` short-circuit through source-defined
-`and` and `or` functions with a demand parameter on the right.
+precedence/associativity. `and` and `or` are reserved Boolean operators. They short-circuit: the right
+operand runs only when the left operand does not determine the result.
 
 The prelude also defines `infixr 0 ($) = apply`. Like Haskell's application
 spelling, `f $ g $ x` groups as `f (g x)` and binds below arithmetic and default
@@ -267,12 +267,12 @@ backtick operators. Unlike Haskell, Blot still evaluates ordinary arguments
 eagerly; `$` neither defers work nor handles effects.
 
 ```blot
-entry const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
-entry const discarded = fn () => do:
+entry const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
+entry const discarded = func () => return do:
   use identity $ 42
 
-const invoke = fn callback => callback 41
-entry const callback_example = fn () => invoke $ fn value => value + 1
+const invoke = func callback => return callback 41
+entry const callback_example = func () => return invoke $ func value => return value + 1
 ```
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
@@ -306,10 +306,10 @@ arguments: `F32.mul speed (-2.5)`.
 entry const negative_zero = -0.0
 entry const rounded = F32.add 16_777_216.0 1.0
 
-entry const vector_length = fn () => F32.length3 2.0 3.0 6.0
-entry const bounded_speed = fn (value: F32) => F32.clamp 0.0 12.0 value
-entry const halfway = fn (value: F32) => F32.lerp value 10.0 0.5
-entry const integer_part = fn (value: F32) => F32.to_u32 value
+entry const vector_length = func () => return F32.length3 2.0 3.0 6.0
+entry const bounded_speed = func (value: F32) => return F32.clamp 0.0 12.0 value
+entry const halfway = func (value: F32) => return F32.lerp value 10.0 0.5
+entry const integer_part = func (value: F32) => return F32.to_u32 value
 ```
 
 `rounded` is 16,777,216, and `vector_length ()` is 7. Arithmetic rounds each
@@ -345,7 +345,9 @@ JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 ## Lists and arrays
 
 In the Zig compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
-`Array U32`. They are separate types, with `List.from_array` and
+`Array U32` by default. A type annotation selects fixed-length `Array a`,
+append-only `GrowArray a`, or `ResizeArray a` with push and truncate capabilities;
+all three use `#[...]` literals. Lists and arrays are separate types, with `List.from_array` and
 `Array.from_list` for explicit conversion. Both expose `length` and `is_empty`.
 Only arrays support indexing, indexed updates, `get`, and `set`. Numeric arrays
 remain the collection type accepted by the host ABI.
@@ -391,7 +393,7 @@ append/prepend copies the contents. See
 ### Iterators and SIMD
 
 Lists and arrays expose immutable snapshot cursors through `values.iter`.
-`cursor.next` returns the ordinary `#Some (value, next_cursor)` or `#Nothing`.
+`cursor.next` returns the ordinary `$Some (value, next_cursor)` or `$Nothing`.
 User-defined types can provide the same associated `iter`/`next` functions and
 work in `for` and comprehensions, including effectful traversal and early exit.
 Independent cursor copies retain their own positions.
@@ -459,7 +461,7 @@ Import [array.blot](array.blot) for additional collection functions:
 import * as array from "std/array"
 
 const values: Array U32 = #[10, 20, 12]
-entry const answer = fn () => array.fold_left U32.add 0 values
+entry const answer = func () => return array.fold_left U32.add 0 values
 ```
 
 - `length values` and `is_empty values` inspect length without visiting elements
@@ -472,13 +474,13 @@ entry const answer = fn () => array.fold_left U32.add 0 values
   `generate count generator` calls a pure generator for each index in order.
 - `fold_left reduce initial values` visits elements left-to-right.
 - `any predicate values` and `all predicate values` stop as soon as the result
-  is known. Empty arrays return `#False` for `any` and `#True` for `all`.
+  is known. Empty arrays return `false` for `any` and `true` for `all`.
 
 `fold_left`, `any`, and `all` propagate callback effects. Array construction
 through `generate`, `map`, `filter`, and `filter_map` requires pure callbacks.
 Array elements are homogeneous, including tuples, nested arrays, constructors
 and closures. Empty arrays infer their element type from use. Tuples use
-`(42, #True)` and `(U32, Bool)` syntax; `@product.get pair 0` requires a
+`(42, true)` and `(U32, Bool)` syntax; `@product.get pair 0` requires a
 statically known tuple shape.
 
 Wasm stores arrays in contiguous lanes and preserves old aliases. Updates reuse
@@ -520,16 +522,16 @@ For a complete small program, see
 | `value \|> transform`                | Applies `transform` to `value`                                 |
 | `.name`                              | Selects a field or receiver member as a function               |
 | `:value`, `:(expression)`            | Creates an ordinary `Type` witness                             |
-| `left && right`, `left \|\| right`   | Short-circuits using source-defined demand parameters          |
+| `left and right`, `left or right`   | Short-circuits primitive Boolean operands          |
 | `value / divisor`, `value % divisor` | U32 quotient and remainder; zero divisor fails/traps           |
 | `a & b`, `a \| b`, `a ^ b`           | U32 bitwise operations                                         |
 | `value << bits`, `value >> bits`     | U32 shifts, masking the count to its low five bits             |
 | `bit_not value`                      | U32 complement                                                 |
 
-From low to high, infix precedences are `$` (0), `|>` (5), `||` (20), `&&` (25),
+From low to high, infix precedences are `$` (0), `|>` (5), `or` (20), `and` (25),
 comparisons (30), `|` (40), `^` (45), `&` (50), shifts (55), addition and
-subtraction (60), and multiplication, division, remainder (70). `$`, `&&`, and
-`||` associate right; comparisons are non-associative; the other listed
+subtraction (60), and multiplication, division, remainder (70). `$`, `and`, and
+`or` associate right; comparisons are non-associative; the other listed
 operators associate left.
 
 `from` is ordinary source. Its body uses the general result-directed intrinsic
@@ -556,37 +558,36 @@ Additional functions in `std/array`:
 | ------------------------------------- | ---------------------------------------------- |
 | `map transform values`                | Transforms elements in order                   |
 | `filter predicate values`             | Keeps matching elements in order               |
-| `filter_map transform values`         | Keeps the payloads of `#Some` results          |
-| `indices flags`                       | Indices of `#True` values, in order            |
+| `filter_map transform values`         | Keeps the payloads of `$Some` results          |
+| `indices flags`                       | Indices of `true` values, in order            |
 | `prefix_sums values`                  | Inclusive U32 prefix sums, wrapping at 32 bits |
 | `slice start count values`            | Copies a checked contiguous range              |
-| `concat left right`, `flatten chunks` | Concatenates arrays in order                   |
+| `concat left right`, `flatten ranges payload` | Concatenates arrays or payload ranges in order                   |
 | `push value values`                   | Appends one value                              |
 | `zip left right`                      | Pairs elements up to the shorter length        |
 | `unzip pairs`, `unzip3 triples`       | Separates tuple columns                        |
 
 Filtering evaluates its predicate/transform once per element. These helpers
 handle empty arrays. An invalid slice traps or fails constant evaluation.
-Runtime filtering collects values in a private chunked list and copies once into
-the result array. `prefix_sums` sums pairs recursively, then reconstructs the
-prefixes: work and intermediate array storage are linear in both Wasm and
-constant evaluation. Constant filtering uses the evaluator's growth buffers,
-avoiding repeated copies of the selected prefix. Evaluator operation and storage
-limits still apply.
+Filtering and `indices` append selected values into a private `GrowArray`, then
+freeze it into the result array. `prefix_sums` traverses the input in order,
+writing each inclusive sum into one independent fixed-length destination.
+Evaluator operation and storage limits still apply.
 
 ## Constructor spelling
 
-Data constructors require `#` in declarations, expressions and patterns:
+Data constructors use `$` in declarations, expressions and patterns (`#` is
+also accepted):
 
 ```blot
-type Optional x is data = #Present x | #Absent
-const value: Optional U32 = #Present 42
+type Optional x is data = $Present x | $Absent
+const value: Optional U32 = $Present 42
 const answer = case value of
-  #Present number => number
-  #Absent => 0
+  $Present number => number
+  $Absent => 0
 ```
 
-Boolean constructors are `#True` and `#False`. A type annotation uses the type
-name without `#`; qualified construction puts the marker before the namespace,
-such as `#vector.Vec3 { x: 0.0, y: 0.0, z: 0.0 }`. `:value` is shorthand for the
-source-defined witness `#Type value`.
+Primitive Boolean values are `true` and `false`. A type annotation uses the type
+name without `$`; qualified construction puts the marker before the namespace,
+such as `$vector.Vec3 { x: 0.0, y: 0.0, z: 0.0 }`. `:value` is shorthand for the
+source-defined witness `$Type value`.

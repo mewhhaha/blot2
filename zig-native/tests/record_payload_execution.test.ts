@@ -5,22 +5,22 @@ data Box a = #Box { value: a }
 data Wrapped = #Wrapped { value: (U32,F32) }
 data Action = #Action { action: Unit -> F32, offset: U32 }
 data Empty = #Empty {}
-const unbox = fn box => case box of
+const unbox = func box => return case box of
   #Box value => value
-entry const pair_value = fn (value:U32) => case #Pair {y:2.5,x:value} of
+entry const pair_value = func (value:U32) => return case #Pair {y:2.5,x:value} of
   #Pair payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-entry const tuple_value = fn (value:U32) => case #Pair {y:2.5,x:value} of
+entry const tuple_value = func (value:U32) => return case #Pair {y:2.5,x:value} of
   #Pair (x,y) => @f32.add (@u32.to_f32 x) y
-entry const named_value = fn (value:U32) => case #Pair {y:2.5,x:value} of
+entry const named_value = func (value:U32) => return case #Pair {y:2.5,x:value} of
   #Pair {y,x} => @f32.add (@u32.to_f32 x) y
-entry const local_value = fn (value:U32) => do:
+entry const local_value = func (value:U32) => return do:
   let #Pair payload = #Pair {y:2.5,x:value}
   break @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-entry const one_u32 = fn (value:U32) => unbox (#Box {value})
-entry const one_f32 = fn (value:F32) => unbox (#Box {value})
-entry const wrapped_value = fn (value:F32) => case #Wrapped {value:(40,value)} of
+entry const one_u32 = func (value:U32) => return unbox (#Box {value})
+entry const one_f32 = func (value:F32) => return unbox (#Box {value})
+entry const wrapped_value = func (value:F32) => return case #Wrapped {value:(40,value)} of
   #Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-entry const higher_value = fn (value:F32) => case #Action {offset:40,action:fn()=>value} of
+entry const higher_value = func (value:F32) => return case #Action {offset:40,action:func()=> return value} of
   #Action (action,offset) => @f32.add (action ()) (@u32.to_f32 offset)
 entry const folded = case #Pair {y:2.5,x:40} of
   #Pair payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
@@ -51,7 +51,7 @@ Deno.test('record constructor views preserve scalar/arity and coverage rejection
   ['data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair payload=>@u32.add payload 0\n','type_mismatch'],
   ['data Empty=#Empty {}\nentry const answer=case #Empty {} of\n  #Empty payload=>42\n','constructor_arity'],
   ['data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair=>42\n','constructor_arity'],
-  ['data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:#True,left:#False} of\n  #Pair (#True,_)=>0\n  #Pair {left:#False,right:#False}=>42\n','non_exhaustive_match'],
+  ['data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:true,left:false} of\n  #Pair (true,_)=>0\n  #Pair {left:false,right:false}=>42\n','non_exhaustive_match'],
  ]as const)await compileExpectedFailure(source,code);
 });
 export const recordPayloadSource=source;

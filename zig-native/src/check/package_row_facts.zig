@@ -43,6 +43,22 @@ pub const Facts = struct {
             position = (position + 1) % self.pages.len;
         }
     }
+    pub fn eql(self: *const Facts, other: *const Facts) bool {
+        var own_count: usize = 0;
+        var other_count: usize = 0;
+        for (self.pages) |page| {
+            if (page.bits == 0) continue;
+            own_count += 1;
+            const matched = for (other.pages) |candidate| {
+                if (candidate.key == page.key) break candidate.bits == page.bits;
+            } else false;
+            if (!matched) return false;
+        }
+        for (other.pages) |page| if (page.bits != 0) {
+            other_count += 1;
+        };
+        return own_count == other_count;
+    }
 };
 
 test "lexical row facts preserve sparse high identities collisions snapshots and saturation" {
@@ -65,4 +81,14 @@ test "lexical row facts preserve sparse high identities collisions snapshots and
     for (0..4096) |i| try facts.set(i);
     for (0..4096) |i| try std.testing.expect(facts.contains(i));
     try std.testing.expect(!facts.contains(4096));
+    var reversed: Facts = .{};
+    try reversed.set(8192);
+    try reversed.set(0);
+    try std.testing.expect(saved.eql(&reversed));
+    reversed.unset(0);
+    try std.testing.expect(!saved.eql(&reversed));
+    try reversed.set(0);
+    try reversed.set(16384);
+    reversed.unset(16384);
+    try std.testing.expect(saved.eql(&reversed));
 }

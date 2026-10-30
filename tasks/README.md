@@ -1,5 +1,13 @@
 # Finish the compiler, runtime and language program
 
+**Current memory-model work:** use the
+[owned-storage rewrite task index](STORAGE_REWRITE.md) and its
+[three-agent review](../zig-native/STORAGE_REWRITE_REVIEW.md). Tasks 110–121
+replace the guest counted-memory/application architecture. The old runtime and
+language-task directions below are historical; do not rebuild them as part of
+this migration. The new index defines code batches, exclusive file ownership
+and shared integration gates. Its creation does not complete implementation.
+
 This directory turns the approved scope into 109 implementation, design and
 qualification tasks, followed by the conditional cleanup task 999. Creating
 these planning files does not execute or complete their work.

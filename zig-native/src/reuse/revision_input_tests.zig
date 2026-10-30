@@ -11,9 +11,9 @@ const inputs = @import("revision_inputs.zig");
 const metadata = @import("code_artifacts.zig");
 const a = std.testing.allocator;
 const io = std.testing.io;
-const original = "const value:U32 = 42\nconst read:Unit->U32 = fn () => value\n";
-const edited = "const value:U32 = 43\nconst read:Unit->U32 = fn () => value\n";
-const main = "import * as dep from \"./dep\"\nentry const answer:Unit->U32 = fn () => dep.read ()\n";
+const original = "const value:U32 = 42\nconst read:Unit->U32 = func () => return value\n";
+const edited = "const value:U32 = 43\nconst read:Unit->U32 = func () => return value\n";
+const main = "import * as dep from \"./dep\"\nentry const answer:Unit->U32 = func () => return dep.read ()\n";
 const key: format.Key = .{ .compiler = @splat(1), .settings = @splat(2), .source = @splat(3), .dependencies = @splat(4) };
 
 fn seed(a_: std.mem.Allocator, path: []const u8, options: project.Options) !D.FrozenDependency {
@@ -96,7 +96,7 @@ fn currentBytes(session: *const retained.Session, expected: []const u8) !void {
     defer result.deinit(a);
     try std.testing.expect(result.result.diagnostic == null and result.result.compiled.diagnostic == null);
     try std.testing.expectEqualSlices(u8, expected, result.result.compiled.bytes);
-    var emission = try session.current.?.artifacts.emission.materialize(a);
+    var emission = try session.current.?.artifacts.?.emission.materialize(a);
     defer emission.deinit();
     const bytes = try emission.assembleCheckedWithOptions(.{});
     defer a.free(bytes);
@@ -126,7 +126,7 @@ test "revision input dependency scalar and body edits rebuild exact fresh closur
     defer repeated.deinit(a);
     try std.testing.expect(!session.last.rebuilt_seed);
     try std.testing.expectEqualSlices(u8, fixture.edited_bytes, repeated.result.compiled.bytes);
-    const changed_body = "const value:U32 = 43\nconst read:Unit->U32 = fn () => @u32.add value 1\n";
+    const changed_body = "const value:U32 = 43\nconst read:Unit->U32 = func () => return @u32.add value 1\n";
     try fixture.write(changed_body);
     var expected = try fresh(fixture.path, .{});
     defer expected.deinit(a);
@@ -146,9 +146,9 @@ test "revision input changed interface failure recovery and revert leave old see
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const old_core = metadata.stamp(session.current.?.prepared.units);
-    const old_emission = metadata.stamp(session.current.?.artifacts.emission.instructions);
+    const old_emission = metadata.stamp(session.current.?.artifacts.?.emission.instructions);
     const old_settings = session.seed_settings;
-    try fixture.write("const value:F32 = 42.0\nconst read:Unit->F32 = fn () => value\n");
+    try fixture.write("const value:F32 = 42.0\nconst read:Unit->F32 = func () => return value\n");
     var expected = try fresh(fixture.path, .{});
     defer expected.deinit(a);
     try std.testing.expect(expected.result.diagnostic != null);
@@ -157,7 +157,7 @@ test "revision input changed interface failure recovery and revert leave old see
     try std.testing.expectEqualStrings(expected.result.diagnostic.?.code, failed.result.diagnostic.?.code);
     try std.testing.expectEqual(@as(usize, 1), session.revisions);
     try std.testing.expectEqualSlices(u8, &old_core, &metadata.stamp(session.current.?.prepared.units));
-    try std.testing.expectEqualSlices(u8, &old_emission, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+    try std.testing.expectEqualSlices(u8, &old_emission, &metadata.stamp(session.current.?.artifacts.?.emission.instructions));
     try std.testing.expectEqualSlices(u8, &old_settings, &session.seed_settings);
     const encoded = try format.encode(a, key, session.seed);
     defer a.free(encoded);
@@ -195,7 +195,7 @@ test "revision input import resolution settings and closure membership changes r
     defer session.deinit();
     var first = try session.revise(io, fixture.path, null, .{});
     defer first.deinit(a);
-    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import * as dep from \"./other\"\nentry const answer:Unit->U32 = fn () => dep.read ()\n" });
+    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import * as dep from \"./other\"\nentry const answer:Unit->U32 = func () => return dep.read ()\n" });
     var expected = try fresh(fixture.path, .{});
     defer expected.deinit(a);
     var moved = try session.revise(io, fixture.path, null, .{});
@@ -218,7 +218,7 @@ test "revision input import resolution settings and closure membership changes r
     try std.testing.expectEqualStrings("file_limit", rejected.result.diagnostic.?.code);
     try std.testing.expectEqual(@as(usize, 3), session.revisions);
     try currentBytes(&session, configured.result.compiled.bytes);
-    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import * as other from \"./other\"\nimport * as dep from \"./dep\"\nentry const answer:Unit->U32=fn () => @u32.add (other.read ()) (dep.read ())\n" });
+    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import * as other from \"./other\"\nimport * as dep from \"./dep\"\nentry const answer:Unit->U32=func () => return @u32.add (other.read ()) (dep.read ())\n" });
     var enlarged_expected = try fresh(fixture.path, options);
     defer enlarged_expected.deinit(a);
     var enlarged = try session.revise(io, fixture.path, null, options);
@@ -226,7 +226,7 @@ test "revision input import resolution settings and closure membership changes r
     try equal(&enlarged, &enlarged_expected);
     try std.testing.expect(session.last.rebuilt_seed);
     try std.testing.expectEqual(@as(usize, 2), session.seed.modules.len);
-    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:Unit->U32 = fn () => 42\n" });
+    try fixture.dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:Unit->U32 = func () => return 42\n" });
     var no_dep_expected = try fresh(fixture.path, options);
     defer no_dep_expected.deinit(a);
     var no_dep = try session.revise(io, fixture.path, null, options);
@@ -308,7 +308,7 @@ test "revision input backend staging failure after fresh dependency freeze retai
     defer first.deinit(a);
     const old_seed = try format.encode(a, key, session.seed);
     defer a.free(old_seed);
-    try fixture.write("const value:U32=42\nconst read:Unit->U32=fn () => read ()\n");
+    try fixture.write("const value:U32=42\nconst read:Unit->U32=func () => return read ()\n");
     var reference = try fresh(fixture.path, .{});
     defer reference.deinit(a);
     try std.testing.expect(reference.result.diagnostic == null and reference.result.compiled.diagnostic != null);
@@ -470,7 +470,7 @@ test "revision input removed dependencies use fresh byte limits before returning
     defer session.deinit();
     var first = try session.revise(io, fixture.path, null, options);
     defer first.deinit(a);
-    const prefix = "entry const answer:Unit->U32=fn () => 42\n//";
+    const prefix = "entry const answer:Unit->U32=func () => return 42\n//";
     const enlarged = try a.alloc(u8, options.max_total_source_bytes - 8);
     defer a.free(enlarged);
     @memcpy(enlarged[0..prefix.len], prefix);
@@ -490,16 +490,16 @@ test "trivia-only source changes keep tokens and adjacency; layout and adjacency
     const same = inputs.Snapshot.sameTokens;
     const base =
         \\// a leading comment
-        \\const helper = fn (x: U32) -> U32 => x
-        \\entry const answer = fn () => do:
+        \\const helper = func (x: U32) : U32 => return x
+        \\entry const answer = func () => return do:
         \\  let values: Array U32 = #[1, 2]
         \\  break helper values[0]
         \\
     ;
     const cases = [_]struct { from: []const u8, to: []const u8, trivia: bool }{
         .{ .from = "// a leading comment", .to = "// another comment, longer", .trivia = true },
-        .{ .from = "=> x\n", .to = "=> x // trailing note\n", .trivia = true },
-        .{ .from = "fn (x: U32)", .to = "fn (x:   U32)", .trivia = true },
+        .{ .from = "=> return x\n", .to = "=> return x // trailing note\n", .trivia = true },
+        .{ .from = "func (x: U32)", .to = "func (x:   U32)", .trivia = true },
         // A space between a value and `[` turns indexing into an argument.
         .{ .from = "values[0]", .to = "values [0]", .trivia = false },
         // Adjacent parentheses call; spaced ones group an argument.

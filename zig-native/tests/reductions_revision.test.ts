@@ -9,18 +9,18 @@ import * as rolling from "std/rolling"
 import * as summary from "std/summary"
 import * as iter from "std/iter"
 import * as algebra from "./algebra"
-const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-entry const run = fn (count: U32) => do:
+const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+entry const run = func (count: U32) => return do:
   let values = iter.map algebra.measure (iter.range 0 count)
   let width = 3
   let ordered = iter.fold_left add 0 (rolling.fold add 0 width values)
   let monoid = iter.fold_left add 0 (rolling.monoid add 0 width values)
-  let group = iter.fold_left add 0 (rolling.group add (fn value => @u32.sub 0 value) 0 width values)
+  let group = iter.fold_left add 0 (rolling.group add (func value => return @u32.sub 0 value) 0 width values)
   let tree = summary.build add 0 values
   break #[ordered, monoid, group, summary.query add 0 0 count tree]
 `;
 const dependency =
-  "const measure = fn (value: U32) -> U32 => @u32.add value 1\n";
+  "const measure = func (value: U32) : U32 => return @u32.add value 1\n";
 
 Deno.test("rolling and summary owners survive source dependency checkpoint failures and recovery", async () => {
   const directory = await Deno.makeTempDir({

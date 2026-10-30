@@ -1,11 +1,11 @@
-const size = fn values => values.length
+const size = func values => return values.length
 // <- keyword.storage.type
 //    ^^^^ function
-//           ^^ keyword.function
-//              ^^^^^^ variable.parameter
-//                              ^^^^^^ variable.other.member
+//           ^^^^ keyword.function
+//                ^^^^^^ variable.parameter
+//                                       ^^^^^^ variable.other.member
 
-const update = fn values => do:
+const update = func values => return do:
   values[0] := 6
 //^^^^^^ variable
 //      ^ punctuation.bracket
@@ -19,7 +19,7 @@ const update = fn values => do:
 //       ^^^^^^ variable
 //              ^^^ function.method
 
-const contains = fn tail => fn witness => tail.contains(witness)
-//                                            ^^^^^^^^ function.method
-const bound = fn tail => tail.contains
-//                           ^^^^^^^^ variable.other.member
+const contains = func tail => return func witness => return tail.contains(witness)
+//                                                              ^^^^^^^^ function.method
+const bound = func tail => return tail.contains
+//                                    ^^^^^^^^ variable.other.member

@@ -52,9 +52,9 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
 }
 
 const mixed_source =
-    \\const first = fn (value: (a,b)) => @product.get value 0
-    \\const capture = fn (value: (U32,Bool)) => fn () => @product.get value 0
-    \\entry const answer = fn () => @u32.add (first (20,#True)) ((capture (22,#False)) ())
+    \\const first = func (value: (a,b)) => return @product.get value 0
+    \\const capture = func (value: (U32,Bool)) => return func () => return @product.get value 0
+    \\entry const answer = func () => return @u32.add (first (20,true)) ((capture (22,false)) ())
     \\entry const folded = answer ()
 ;
 fn evaluate(allocator: std.mem.Allocator, module: *const core.Module) !void {
@@ -69,14 +69,14 @@ fn evaluate(allocator: std.mem.Allocator, module: *const core.Module) !void {
 
 test "known product shapes and literal projection indices keep distinct source diagnostics under every failed allocation" {
     for ([_]struct { source: []const u8, code: ?checker.Code }{
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) 0\n", .code = null },
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) 2\n", .code = .product_index },
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) 4294967295\n", .code = .product_index },
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) (0)\n", .code = .product_index_literal },
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) 0.0\n", .code = .product_index_literal },
-        .{ .source = "entry const answer = fn () => @product.get (42,#True) #False\n", .code = .product_index_literal },
-        .{ .source = "entry const answer = fn value => @product.get value 0\n", .code = .unknown_product_shape },
-        .{ .source = "entry const answer = fn () => @product.get () 0\n", .code = .type_mismatch },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) 0\n", .code = null },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) 2\n", .code = .product_index },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) 4294967295\n", .code = .product_index },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) (0)\n", .code = .product_index_literal },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) 0.0\n", .code = .product_index_literal },
+        .{ .source = "entry const answer = func () => return @product.get (42,true) false\n", .code = .product_index_literal },
+        .{ .source = "entry const answer = func value => return @product.get value 0\n", .code = .unknown_product_shape },
+        .{ .source = "entry const answer = func () => return @product.get () 0\n", .code = .type_mismatch },
     }) |case| {
         try checkSource(a, case.source, case.code);
         try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkSource, .{ case.source, case.code });
@@ -102,7 +102,7 @@ test "product projections preserve captured and generic value types across froze
 }
 
 test "a projected Never operand retains its panic without inventing a product layout" {
-    const source = "entry const answer: Unit -> U32 = fn () => @product.get (@panic \"projected\") 0\n";
+    const source = "entry const answer: Unit -> U32 = func () => return @product.get (@panic \"projected\") 0\n";
     try checkSource(a, source, null);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkSource, .{ source, @as(?checker.Code, null) });
     var module = try lower(a, source);

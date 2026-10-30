@@ -60,7 +60,7 @@ const Fixture = struct {
 };
 
 const positive_source =
-    \\const identity = fn value => value
+    \\const identity = func value => return value
     \\entry const schema: U32 = 7
     \\entry const builder: U32 where { type_rep U32 } = identity 42
 ;
@@ -133,7 +133,7 @@ test "principal cache imports closed row facts from a qualified local generic bu
     const source =
         \\entry const schema: U32 = 7
         \\entry const builder: U32 where { type_rep U32 } = do:
-        \\  let local = fn value => value
+        \\  let local = func value => return value
         \\  break local 42
     ;
     var before = try Fixture.init(source);
@@ -164,7 +164,7 @@ test "principal cache imports closed row facts from a qualified local generic bu
 
 test "principal cache replays projected inference but reevaluates changed transitive staged dependencies" {
     const source =
-        \\const identity = fn value => value
+        \\const identity = func value => return value
         \\entry const schema: U32 = 7
         \\entry const intermediate: U32 = schema
         \\entry const builder: U32 where { type_rep U32 } = identity intermediate
@@ -198,13 +198,13 @@ test "principal cache globally rejects type and associated catalog edits but kee
         \\entry const floating: F32 = 0.0
     ;
     const associated_prefix =
-        \\const add = fn value => value
-        \\const sub = fn value => value
+        \\const add = func value => return value
+        \\const sub = func value => return value
     ;
     const provider_prefix = "type State a is effect = { get: Unit -> a, set: a -> Unit }\n";
     const cases = [_]struct { label: []const u8, before: []const u8, after: []const u8, global: bool }{
         .{ .label = "type", .before = type_prefix ++ "\ntype Cell is data = #Cell U32\n" ++ positive_source, .after = type_prefix ++ "\ntype Cell is data = #Cell F32\n" ++ positive_source, .global = true },
-        .{ .label = "catalog", .before = associated_prefix ++ "\nconst U32.add = fn left => fn right => @u32.add left right\n" ++ positive_source, .after = associated_prefix ++ "\nconst U32.sub = fn left => fn right => @u32.add left right\n" ++ positive_source, .global = true },
+        .{ .label = "catalog", .before = associated_prefix ++ "\nconst U32.add = func left => return func right => return @u32.add left right\n" ++ positive_source, .after = associated_prefix ++ "\nconst U32.sub = func left => return func right => return @u32.add left right\n" ++ positive_source, .global = true },
         // The operation catalog is unchanged: only the provider declaration
         // differs, so the independent `builder` proof stays reusable.
         .{ .label = "provider", .before = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 1\n" ++ positive_source, .after = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 2\n" ++ positive_source, .global = false },
@@ -375,10 +375,10 @@ const LazyGenerator = struct {
 };
 const closed_row_source =
     \\effect Read: Unit -> U32
-    \\const read = fn () => Read ()
+    \\const read = func () => return Read ()
     \\entry const schema: U32 = 7
     \\entry const builder: U32 where { type_rep U32 } = do:
-    \\  let local = fn value => value
+    \\  let local = func value => return value
     \\  break local 42
 ;
 
@@ -619,12 +619,12 @@ test "lazy nonempty principal graphs remap owned type and effect IDs without car
 }
 
 const primitive_source =
-    \\const from = fn value => @type.result "from" value
-    \\const U32.from = fn value => @f32.to_u32 value
-    \\const F32.from = fn value => @u32.to_f32 value
-    \\const U32.add = fn left => fn right => @u32.add left right
-    \\const F32.add = fn left => fn right => @f32.add left right
-    \\const add = fn left => fn right => @type.call "add" left right
+    \\const from = func value => return @type.result "from" value
+    \\const U32.from = func value => return @f32.to_u32 value
+    \\const F32.from = func value => return @u32.to_f32 value
+    \\const U32.add = func left => return func right => return @u32.add left right
+    \\const F32.add = func left => return func right => return @f32.add left right
+    \\const add = func left => return func right => return @type.call "add" left right
     \\const count = 10000
     \\entry const schema: U32 = 7
     \\entry const builder = add (from (@f32.ceil (@f32.sqrt (from count)))) 2

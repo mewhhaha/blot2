@@ -19,15 +19,15 @@ for (const codegenTier of ["optimized", "development"] as const) {
     try {
       const source = `
 type Choice [a, b] is data = #Left a | #Right b
-const reconstruct = fn candidate => case candidate of
+const reconstruct = func candidate => return case candidate of
   #Left value => do:
     break #Left value
   #Right error => do:
     break #Right error
-entry const phantom = fn (value: U32) => case reconstruct (#Left value) of
+entry const phantom = func (value: U32) => return case reconstruct (#Left value) of
   #Left result => result
   #Right _ => 0
-entry const changed = fn (value: U32) => do:
+entry const changed = func (value: U32) => return do:
   let candidate = #Right #[value]
   let changed = case candidate of
     #Left missing => #Left missing
@@ -36,7 +36,7 @@ entry const changed = fn (value: U32) => do:
   break case changed of
     #Left _ => 0
     #Right values => values[0]
-entry const retagged = fn (value: U32) => do:
+entry const retagged = func (value: U32) => return do:
   let candidate = #Left value
   let changed = case candidate of
     #Left payload => do:
@@ -45,13 +45,13 @@ entry const retagged = fn (value: U32) => do:
   break case changed of
     #Left payload => payload
     #Right payload => @u32.add payload 100
-const holder = fn () => #{ identity: fn x => x, unseen: fn x => x, g: 4 }
-const forward = fn value => (holder ()).identity value
-entry const unobserved = fn () => (holder ()).g
-entry const integer = fn (value: U32) => forward value
-entry const fraction = fn (value: F32) => forward value
-entry const snapshot = fn (seed: U32) => forward (@array.fill 1024 seed)
-entry const alias = fn (seed: U32) => do:
+const holder = func () => return #{ identity: func x => return x, unseen: func x => return x, g: 4 }
+const forward = func value => return (holder ()).identity value
+entry const unobserved = func () => return (holder ()).g
+entry const integer = func (value: U32) => return forward value
+entry const fraction = func (value: F32) => return forward value
+entry const snapshot = func (seed: U32) => return forward (@array.fill 1024 seed)
+entry const alias = func (seed: U32) => return do:
   let kept = #[seed]
   for index in 0 .. 64:
     let original = @array.fill 1024 (@u32.add seed index)
@@ -59,10 +59,10 @@ entry const alias = fn (seed: U32) => do:
     kept := forward aliased
   let final = forward kept
   break @array.get final 1023
-entry const captured = fn (seed: U32) => do:
+entry const captured = func (seed: U32) => return do:
   let original = @array.fill 1024 seed
   let alias = forward original
-  let read = fn () => @array.get alias 1023
+  let read = func () => return @array.get alias 1023
   break read ()
 `;
       let original: Uint8Array<ArrayBuffer> | undefined;

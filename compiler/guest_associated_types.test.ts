@@ -9,12 +9,12 @@ type Identity a is contract = { type Item = a }
 type Record a is contract = { type Item = {value: Identity.Item a, items: Array (Identity.Item a)} }
 type Callable f is contract = { type Run = f }
 type Alias a = Record.Item a
-const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
-const relay: f -> (Callable.Run f) = fn value => value
-entry const count: U32 -> U32 = fn value => do:
+const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
+const relay: f -> (Callable.Run f) = func value => return value
+entry const count: U32 -> U32 = func value => return do:
   let record: Alias U32 = {value: keep value, items: #[value]}
   break @u32.add record.value (@array.length record.items)
-entry const run = fn (callback: Unit -> U32 ! {Foreign}) => do:
+entry const run = func (callback: Unit -> U32 ! {Foreign}) => return do:
   let selected = relay callback
   use value <- selected ()
   break keep value
@@ -40,11 +40,11 @@ entry const run = fn (callback: Unit -> U32 ! {Foreign}) => do:
 
 Deno.test("defined associated equations retain equality prerequisites at executable uses", async () => {
   const header = `type Required a is contract = { type Item = a, type_eq a U32 }
-const keep: a -> (Required.Item a) where { Required a } = fn value => value
-const chain: a -> U32 where { type_eq a b, type_eq b U32 } = fn value => value
+const keep: a -> (Required.Item a) where { Required a } = func value => return value
+const chain: a -> U32 where { type_eq a b, type_eq b U32 } = func value => return value
 `;
   const artifact = await compile(
-    header + "entry const answer = fn () => chain (keep 42)\n",
+    header + "entry const answer = func () => return chain (keep 42)\n",
   );
   const guest = await instantiateGuest(artifact.bytes);
   try {
@@ -53,13 +53,14 @@ const chain: a -> U32 where { type_eq a b, type_eq b U32 } = fn value => value
     guest.dispose();
   }
   await rejects(
-    () => compile(header + "entry const answer = fn () => keep 42.0\n"),
+    () =>
+      compile(header + "entry const answer = func () => return keep 42.0\n"),
     /type_mismatch/,
   );
   await rejects(
     () =>
       compile(`type Source s is contract = { type Item }
-entry const answer: U32 -> U32 where { Source U32 } = fn value => value
+entry const answer: U32 -> U32 where { Source U32 } = func value => return value
 `),
     /missing_implementation/,
   );
@@ -72,10 +73,10 @@ Deno.test("associated equation edits preserve last good revision and checkpoint 
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source = `import {Identity, make} from "./library"
-entry const answer: Unit -> (Identity.Item U32) = fn () => make 42
+entry const answer: Unit -> (Identity.Item U32) = func () => return make 42
 `;
   const producer = `type Identity a is contract = { type Item = a }
-const make: a -> (Identity.Item a) = fn value => value
+const make: a -> (Identity.Item a) = func value => return value
 `;
   await Deno.writeTextFile(entry, source);
   await Deno.writeTextFile(library, producer);

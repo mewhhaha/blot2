@@ -3,49 +3,49 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const extra = `
-const delayed = fn ~value => value
-entry const edit_source = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index + 1)
-  let copied = array.generate saved.length (fn index => saved[index])
+const delayed = func ~value => return value
+entry const edit_source = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index + 1)
+  let copied = array.generate saved.length (func index => return saved[index])
   saved[0] := 99
   break copied[0]
-entry const edit_copy = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index + 1)
-  let copied = array.generate saved.length (fn index => saved[index])
+entry const edit_copy = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index + 1)
+  let copied = array.generate saved.length (func index => return saved[index])
   copied[0] := 99
   break saved[0] + copied[0]
-entry const escaped_copy = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index + 1)
-  let copied = array.generate saved.length (fn index => saved[index])
+entry const escaped_copy = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index + 1)
+  let copied = array.generate saved.length (func index => return saved[index])
   saved[0] := 99
   break copied
-entry const captured_copy = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index + 1)
-  let copied = array.generate saved.length (fn index => saved[index])
-  let read = fn () => copied[0]
+entry const captured_copy = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index + 1)
+  let copied = array.generate saved.length (func index => return saved[index])
+  let read = func () => return copied[0]
   saved[0] := 99
   break read ()
-entry const suspended_copy = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index + 1)
-  let copied = array.generate saved.length (fn index => saved[index])
+entry const suspended_copy = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index + 1)
+  let copied = array.generate saved.length (func index => return saved[index])
   let before = delayed copied
   saved[0] := 99
   break (@force before)[0]
-entry const nested_copy = fn (size: U32) => do:
-  let saved = array.generate size (fn index => #[index + 1])
-  let copied = array.generate saved.length (fn index => saved[index])
+entry const nested_copy = func (size: U32) => return do:
+  let saved = array.generate size (func index => return #[index + 1])
+  let copied = array.generate saved.length (func index => return saved[index])
   saved[0][0] := 99
   copied[1][0] := 77
   break #[saved[0][0], saved[1][0], copied[0][0], copied[1][0]]
-entry const copied_bits = fn (values: Array F32) =>
-  array.generate values.length (fn index => values[index])
-entry const wrong_count = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index)
-  let copied = array.generate (saved.length + 1) (fn index => saved[index])
+entry const copied_bits = func (values: Array F32) => return
+  array.generate values.length (func index => return values[index])
+entry const wrong_count = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index)
+  let copied = array.generate (saved.length + 1) (func index => return saved[index])
   break copied.length
-entry const wrong_index = fn (size: U32) => do:
-  let saved = array.generate size (fn index => index)
-  let copied = array.generate saved.length (fn index => saved[index + 1])
+entry const wrong_index = func (size: U32) => return do:
+  let saved = array.generate size (func index => return index)
+  let copied = array.generate saved.length (func index => return saved[index + 1])
   break copied.length
 `;
 
@@ -162,15 +162,15 @@ Deno.test("identity array sharing rechecks imported wrapper bodies across retain
   const directory = await Deno.makeTempDir({ prefix: "blot-identity-edit-" });
   const entry = `${directory}/main.blot`, helper = `${directory}/helper.blot`;
   const main = `import {generate} from "./helper"
-entry const run = fn (seed: U32) => do:
+entry const run = func (seed: U32) => return do:
   let saved = #[seed]
-  let copied = generate saved.length (fn index => saved[index])
+  let copied = generate saved.length (func index => return saved[index])
   break copied[0]
 `;
   const before =
-    "const generate = fn count => fn callback => @array.generate count callback\n";
+    "const generate = func count => return func callback => return @array.generate count callback\n";
   const changed =
-    "const generate = fn count => fn callback => @array.generate count (fn index => callback index + 1)\n";
+    "const generate = func count => return func callback => return @array.generate count (func index => return callback index + 1)\n";
   const options = {
     executable: Deno.args[0],
     entry,

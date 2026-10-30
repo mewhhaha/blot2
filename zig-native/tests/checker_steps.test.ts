@@ -36,7 +36,7 @@ async function check(source: string): Promise<Checker> {
 Deno.test("open operator uses wait for their operand types", async () => {
   const late = (count: number) => {
     const indices = Array.from({ length: count }, (_, index) => index);
-    return `const late = ${indices.map((i) => `fn p${i} => `).join("")}do:
+    return `const late = ${indices.map((i) => `func p${i} => return `).join("")}do:
 ${indices.map((i) => `  let same_${i} = p${i} == p${i}`).join("\n")}
 ${indices.map((i) => `  let used_${i} = p${i} + 1`).join("\n")}
   break 0
@@ -57,10 +57,10 @@ Deno.test("pending effect operations wait for their types", async () => {
   const record = (count: number) => {
     const indices = Array.from({ length: count }, (_, index) => index);
     return `type Probe a is effect = { ask: Unit -> a }
-const app = { ${indices.map((i) => `f${i}: fn () => Probe.ask ()`).join(", ")} }
+const app = { ${indices.map((i) => `f${i}: func () => return Probe.ask ()`).join(", ")} }
 ${
       indices.map((i) =>
-        `const use_${i} = fn () => do:\n  let handlers = app\n  use value <- handlers.f${i} ()\n  break value`
+        `const use_${i} = func () => return do:\n  let handlers = app\n  use value <- handlers.f${i} ()\n  break value`
       ).join("\n")
     }
 `;

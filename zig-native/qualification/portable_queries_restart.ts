@@ -34,7 +34,7 @@ for (const entry of [...Deno.readDirSync(`${repo}/examples`)].sort((a, b) => a.n
 function principalFamily(count: number): string {
   const lines = ["type Box is data = #Box U32"];
   for (let i = 0; i < count; i++) {
-    lines.push(`const extract${i} = fn (box: Box) -> U32 => case box of\n  #Box value => @u32.add value ${i}`);
+    lines.push(`const extract${i} = func (box: Box) : U32 => return case box of\n  #Box value => @u32.add value ${i}`);
     lines.push(`entry const answer${i}: U32 where { type_rep U32 } = @u32.div 8 (extract${i} (#Box 2))`);
   }
   return lines.join("\n") + "\n";
@@ -42,12 +42,12 @@ function principalFamily(count: number): string {
 // Nonempty inferred type mappings through type-directed dispatch.
 function typesFamily(count: number): string {
   const lines = [
-    'const from = fn value => @type.result "from" value',
-    "const U32.from = fn value => @f32.to_u32 value",
-    "const F32.from = fn value => @u32.to_f32 value",
-    "const U32.add = fn left => fn right => @u32.add left right",
-    "const F32.add = fn left => fn right => @f32.add left right",
-    'const add = fn left => fn right => @type.call "add" left right',
+    'const from = func value => return @type.result "from" value',
+    "const U32.from = func value => return @f32.to_u32 value",
+    "const F32.from = func value => return @u32.to_f32 value",
+    "const U32.add = func left => return func right => return @u32.add left right",
+    "const F32.add = func left => return func right => return @f32.add left right",
+    'const add = func left => return func right => return @type.call "add" left right',
     "const count = 10000",
   ];
   for (let i = 0; i < count; i++) lines.push(`entry const builder${i} = add (from (@f32.ceil (@f32.sqrt (from count)))) ${i}`);
@@ -56,7 +56,7 @@ function typesFamily(count: number): string {
 function rowsFamily(count: number): string {
   const lines: string[] = [];
   for (let i = 0; i < count; i++) {
-    lines.push(`entry const builder${i}: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break local ${i}`);
+    lines.push(`entry const builder${i}: U32 where { type_rep U32 } = do:\n  let local = func value => return value\n  break local ${i}`);
   }
   return lines.join("\n") + "\n";
 }

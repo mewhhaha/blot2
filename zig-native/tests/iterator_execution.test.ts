@@ -8,14 +8,14 @@ Deno.test("source list splices preserve snapshots and apply batches in original 
   await compileAndRun(`
 import * as list from "std/list"
 const edits = [
-  {start: 1, delete_count: 1, replacement: [10, 11]},
-  {start: 4, delete_count: 0, replacement: [40]},
-  {start: 4, delete_count: 0, replacement: [41]}]
-const batch = fn values => list.splice_many edits values
+  {start: 1, delete_count: 1, replacement: {start: 0, count: 2}},
+  {start: 4, delete_count: 0, replacement: {start: 2, count: 1}},
+  {start: 4, delete_count: 0, replacement: {start: 3, count: 1}}]
+const batch = func values => return list.splice_many edits [10, 11, 40, 41] values
 const staged = batch [0, 1, 2, 3, 4]
-entry const staged_result = fn () => Array.from_list staged
-entry const run = fn size => Array.from_list (batch (@list.generate size identity))
-entry const changed = fn seed => do:
+entry const staged_result = func () => return Array.from_list staged
+entry const run = func size => return Array.from_list (batch (@list.generate size identity))
+entry const changed = func seed => return do:
   let original = [seed, seed + 1, seed + 2, seed + 3, seed + 4]
   let saved = original.iter
   let changed = list.splice 1 2 [10, 11, 12] original
@@ -24,12 +24,14 @@ entry const changed = fn seed => do:
   let before = Array.from_list original
   let after = Array.from_list changed
   break #[first, before[1], after[1], after.length, before.length]
-entry const single = fn seed => Array.from_list (list.splice 1 2 [10, 11, 12] [seed, seed + 1, seed + 2, seed + 3])
-entry const noop = fn start => Array.from_list (list.splice start 0 [] [1, 2])
-entry const empty_batch = fn (seed: U32) => Array.from_list (list.splice_many [] [seed])
-entry const overlap = fn start => Array.from_list (list.splice_many [
-  {start: 1, delete_count: 2, replacement: []},
-  {start: start, delete_count: 0, replacement: [9]}] [0, 1, 2, 3])
+entry const single = func seed => return Array.from_list (list.splice 1 2 [10, 11, 12] [seed, seed + 1, seed + 2, seed + 3])
+entry const noop = func start => return Array.from_list (list.splice start 0 [] [1, 2])
+entry const empty_batch = func (seed: U32) => return Array.from_list (list.splice_many [] [] [seed])
+entry const overlap = func start => return Array.from_list (list.splice_many [
+  {start: 1, delete_count: 2, replacement: {start: 0, count: 0}},
+  {start: start, delete_count: 0, replacement: {start: 0, count: 1}}] [9] [0, 1, 2, 3])
+entry const replacement_bounds = func start => return Array.from_list (list.splice_many [
+  {start: 1, delete_count: 0, replacement: {start, count: 2}}] [10, 11] [0, 1])
 `, guest => {
     deepStrictEqual(guest.call("staged_result", null), Uint32Array.of(0, 10, 11, 2, 3, 40, 41, 4));
     deepStrictEqual(guest.call("run", 5), Uint32Array.of(0, 10, 11, 2, 3, 40, 41, 4));
@@ -40,28 +42,31 @@ entry const overlap = fn start => Array.from_list (list.splice_many [
     throws(() => guest.call("noop", 3));
     throws(() => guest.call("overlap", 2));
     throws(() => guest.call("overlap", 5));
+    deepStrictEqual(guest.call("replacement_bounds", 0), Uint32Array.of(0, 10, 11, 1));
+    throws(() => guest.call("replacement_bounds", 1));
+    throws(() => guest.call("replacement_bounds", 0xffff_ffff));
   }, { stdRoot });
 });
 
 Deno.test("source iterators compose across imports, comprehensions and constant evaluation", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
-const values = fn count => iter.collect_array (iter.map (fn value => value * 2)
-  (iter.filter (fn value => value % 2 == 0) (iter.take count [1, 2, 3, 4, 5, 6])))
-entry const runtime = fn count => values count
+const values = func count => return iter.collect_array (iter.map (func value => return value * 2)
+  (iter.filter (func value => return value % 2 == 0) (iter.take count [1, 2, 3, 4, 5, 6])))
+entry const runtime = func count => return values count
 const staged_values = values 6
-entry const staged = fn () => staged_values
-entry const empty_chunks = iter.fold_left (fn sum => fn chunk => sum + chunk.length) 0 #[#[], #[]]
-entry const empty_wrapped = iter.fold_left (fn sum => fn chunk => sum + chunk.length) 0 (iter.take 2 #[#[], #[]])
-entry const comprehension = fn count => #[x + y | x <- iter.range 0 count, y <- iter.take 2 #[10, 20, 30], x != 1]
-entry const windows = fn width => iter.collect_array (iter.map (iter.fold_left add 0) (iter.windows width #[1, 2, 3, 4]))
-entry const zip = fn count => iter.collect_array (iter.map (fn pair => do:
+entry const staged = func () => return staged_values
+entry const empty_chunks = iter.fold_left (func sum => return func chunk => return sum + chunk.length) 0 #[#[], #[]]
+entry const empty_wrapped = iter.fold_left (func sum => return func chunk => return sum + chunk.length) 0 (iter.take 2 #[#[], #[]])
+entry const comprehension = func count => return #[x + y | x <- iter.range 0 count, y <- iter.take 2 #[10, 20, 30], x != 1]
+entry const windows = func width => return iter.collect_array (iter.map (iter.fold_left add 0) (iter.windows width #[1, 2, 3, 4]))
+entry const zip = func count => return iter.collect_array (iter.map (func pair => return do:
   let (index, value) = pair
   break index + value) (iter.enumerate (iter.take count #[10, 20, 30])))
-entry const paired = fn count => iter.collect_array (iter.map (fn pair => do:
+entry const paired = func count => return iter.collect_array (iter.map (func pair => return do:
   let (left, right) = pair
   break left + right) (iter.zip (iter.range 0 count) [10, 20, 30]))
-entry const strict = fn count => iter.collect_array (iter.map (fn pair => do:
+entry const strict = func count => return iter.collect_array (iter.map (func pair => return do:
   let (left, right) = pair
   break left + right) (iter.zip_strict (iter.range 0 count) [10, 20, 30]))
 `, guest => {
@@ -86,11 +91,11 @@ Deno.test("cursor positions and retained collections are immutable snapshots", a
   await compileAndRun(`
 import * as iter from "std/iter"
 import * as list from "std/list"
-const first = fn cursor => case cursor.next of
+const first = func cursor => return case cursor.next of
   #Some (value, _) => value
   #Nothing => 999
-const check = fn (size: U32) => do:
-  let values = @list.generate size (fn index => index)
+const check = func (size: U32) => return do:
+  let values = @list.generate size (func index => return index)
   let cursor = values.iter
   let #Some (_, second) = cursor.next else:
     break 0
@@ -98,9 +103,9 @@ const check = fn (size: U32) => do:
   let from_start = iter.collect_list cursor
   let from_second = iter.collect_list second
   break first cursor + first second + from_start.length + from_second.length + first values.iter
-entry const run = fn size => check size
+entry const run = func size => return check size
 entry const staged = check 500
-entry const array = fn seed => do:
+entry const array = func seed => return do:
   let values = #[seed, seed + 1, seed + 2]
   let cursor = values.iter
   values[0] := 1000
@@ -108,8 +113,8 @@ entry const array = fn seed => do:
     break 0
   break first cursor + first second + values[0]
 const frozen_cursor = @cursor.advance [40, 41, 42].iter
-entry const frozen = fn () => first frozen_cursor
-entry const empty = fn () => case [].iter.next of
+entry const frozen = func () => return first frozen_cursor
+entry const empty = func () => return case [].iter.next of
   #Nothing => 42
   #Some (_, _) => 0
 `, guest => {
@@ -126,23 +131,23 @@ Deno.test("iterator effects run in pull order and stop on take, break and return
 import * as iter from "std/iter"
 type Count is data = #Count U32
 type Counter is data = #Counter U32
-const Counter.iter = fn (cursor: Counter) => cursor
-const Counter.next = fn (cursor: Counter) => do:
+const Counter.iter = func (cursor: Counter) => return cursor
+const Counter.next = func (cursor: Counter) => return do:
   let #Counter value = cursor
   use count <- @state.get #Count
   let #Count before = count
   use @state.set (#Count (before + 1))
   break #Some (value, #Counter (value + 1))
-const sum = fn limit => do:
+const sum = func limit => return do:
   let result = 0
   for value in iter.take limit (#Counter 0):
     result := self + value
   break result
-entry const taken = fn limit => do:
-  let (#Count pulls, result) = @state.run (#Count 0) (fn () => sum limit)
+entry const taken = func limit => return do:
+  let (#Count pulls, result) = @state.run (#Count 0) (func () => return sum limit)
   break pulls * 100 + result
-entry const broken = fn limit => do:
-  let (#Count pulls, result) = @state.run (#Count 0) (fn () => do:
+entry const broken = func limit => return do:
+  let (#Count pulls, result) = @state.run (#Count 0) (func () => return do:
     let total = 0
     for value in #Counter 0:
       total := self + value
@@ -150,16 +155,16 @@ entry const broken = fn limit => do:
         break
     break total)
   break pulls * 100 + result
-entry const returned = fn limit => do:
-  let (#Count pulls, result) = @state.run (#Count 0) (fn () => do:
+entry const returned = func limit => return do:
+  let (#Count pulls, result) = @state.run (#Count 0) (func () => return do:
     for value in #Counter 0:
       if value == limit:
         break value
     break 999)
   break pulls * 100 + result
-entry const filtered = fn limit => do:
-  let (#Count pulls, result) = @state.run (#Count 0) (fn () =>
-    iter.fold_left add 0 (iter.take_while (fn value => value < limit) (iter.map (fn value => value * 2) (#Counter 0))))
+entry const filtered = func limit => return do:
+  let (#Count pulls, result) = @state.run (#Count 0) (func () => return
+    iter.fold_left add 0 (iter.take_while (func value => return value < limit) (iter.map (func value => return value * 2) (#Counter 0))))
   break pulls * 100 + result
 `, guest => {
     equal(guest.call("taken", 0), 0);
@@ -173,17 +178,17 @@ entry const filtered = fn limit => do:
 Deno.test("custom iteration preserves Maybe short circuit and nested loop carries", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
-const sequence = fn stop => do (monad Maybe):
+const sequence = func stop => return do (monad Maybe):
   let sum = 0
   for value in iter.range 0 5:
     if value == stop:
       use missing <- #Nothing
     sum := self + value
   break sum
-entry const run = fn stop => case sequence stop of
+entry const run = func stop => return case sequence stop of
   #Some value => value
   #Nothing => 999
-entry const nested = fn count => do:
+entry const nested = func count => return do:
   let result = 0
   for outer in iter.range 0 count:
     for inner in iter.range 0 5:
@@ -199,22 +204,22 @@ entry const nested = fn count => do:
 });
 
 Deno.test("opaque cursors do not add indexing to lists", async () => {
-  await compileExpectedFailure(`entry const run = fn () => [1, 2, 3][0]`, "type_mismatch");
+  await compileExpectedFailure(`entry const run = func () => return [1, 2, 3][0]`, "type_mismatch");
 });
 
 Deno.test("generic iteration retains the collection element type through source methods", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
-const valid = fn values => do:
+const valid = func values => return do:
   for value in values:
     if abs value > 3.402823466e38:
-      break #False
+      break false
     if value != value:
-      break #False
-  break #True
-entry const array = fn (values: Array F32) => valid values
-entry const list = fn (values: Array F32) => valid (@list.from_array values)
-entry const adapted = fn (values: Array F32) => valid (iter.take 2 values)
+      break false
+  break true
+entry const array = func (values: Array F32) => return valid values
+entry const list = func (values: Array F32) => return valid (@list.from_array values)
+entry const adapted = func (values: Array F32) => return valid (iter.take 2 values)
 `, guest => {
     for (const name of ["array", "list", "adapted"]) {
       equal(guest.call(name, new Float32Array([1, -2])), true);
@@ -229,9 +234,9 @@ entry const adapted = fn (values: Array F32) => valid (iter.take 2 values)
 Deno.test("ordinary local cursor wrappers and finite loop carries use scalar storage", async () => {
   await compileAndRun(`
 type Moved a is data = #Moved a
-const move = fn cursor => #Moved (@cursor.advance cursor)
-entry const run = fn count => do:
-  let values = @array.generate (count + 1) (fn index => index)
+const move = func cursor => return #Moved (@cursor.advance cursor)
+entry const run = func count => return do:
+  let values = @array.generate (count + 1) (func index => return index)
   let cursor = values.iter
   let total = 0
   for index in 0..count:
@@ -247,8 +252,8 @@ entry const run = fn count => do:
 
 Deno.test("leaf traversal survives nested cache changes and nested collection", async () => {
   await compileAndRun(`
-entry const nested = fn count => do:
-  let values = @list.generate count (fn index => index)
+entry const nested = func count => return do:
+  let values = @list.generate count (func index => return index)
   let total = 0
   for repeat in 0..2:
     for value in values:
@@ -259,8 +264,8 @@ entry const nested = fn count => do:
         prefix := self + probe
       total := self + value + prefix
   break total
-entry const collected = fn count => do:
-  let values = @list.generate count (fn index => index)
+entry const collected = func count => return do:
+  let values = @list.generate count (func index => return index)
   let total = 0
   for value in values:
     let round = 0
@@ -285,12 +290,12 @@ Deno.test("retained cursor, structural-list and SIMD bodies match fresh compilat
   const options = { executable, entry, stdRoot, prelude: `${stdRoot}/prelude.blot` };
   const before = `import * as list from "std/list"
 const cursor = (list.slice 1 3 [10, 20, 30, 40, 50]).iter
-const numbers = fn count => @array.generate count (fn index => index * 3 + 1)
+const numbers = func count => return @array.generate count (func index => return index * 3 + 1)
 `;
   const main = `import * as iter from "std/iter"
 import * as values from "./values"
-entry const answer = fn count => iter.fold_left add 0 (iter.take count values.cursor)
-entry const numbers = fn count => values.numbers count
+entry const answer = func count => return iter.fold_left add 0 (iter.take count values.cursor)
+entry const numbers = func count => return values.numbers count
 `;
   let retained: Awaited<ReturnType<typeof createZigProjectCompiler>> | undefined;
   try {

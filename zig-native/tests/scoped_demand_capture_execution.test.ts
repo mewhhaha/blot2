@@ -3,10 +3,10 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = "const delay = fn ~value => value\n";
+const library = "const delay = func ~value => return value\n";
 const source = `import {delay} from "./library"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
   let ignored = s
   let pending = delay (do:
     let local = 42

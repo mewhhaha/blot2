@@ -31,16 +31,16 @@ const constructor_source =
     \\data Phantom a=#Phantom {value:F32}
     \\const wrap=#Box
     \\const pair=#Pair
-    \\const unbox=fn box=>case box of
+    \\const unbox=func box=> return case box of
     \\  #Box value=>value
-    \\const total=fn selected=>case selected of
+    \\const total=func selected=> return case selected of
     \\  #Pair (x,y)=>@f32.add (@u32.to_f32 x) y
-    \\const capture=fn constructor=>fn value=>unbox (constructor value)
+    \\const capture=func constructor=> return func value=> return unbox (constructor value)
     \\const ready=capture #Box
     \\entry const generic=@f32.add (@u32.to_f32 (ready 40)) (ready 2.5)
     \\entry const scalar=unbox (wrap 42.5)
     \\entry const tuple=total (pair (40,2.5))
-    \\entry const old_version=(fn()=>do:
+    \\entry const old_version=(func()=> return do:
     \\  let original=(40,2.5)
     \\  let selected=pair original
     \\  selected.x:=99
@@ -49,7 +49,7 @@ const constructor_source =
     \\const phantom: F32 -> Phantom U32=#Phantom
     \\entry const phantom_value=case phantom 42.5 of
     \\  #Phantom value=>value
-    \\entry const runtime=fn (value:F32)=>unbox (wrap value)
+    \\entry const runtime=func (value:F32)=> return unbox (wrap value)
 ;
 
 fn target(module: *const core.Module, name: []const u8) core.BindingRef {
@@ -124,12 +124,12 @@ test "canonical scalar and product headers keep record storage names and frozen 
 }
 fn negativeScenario(allocator: std.mem.Allocator) !void {
     for ([_]struct { source: []const u8, code: checker.Code }{
-        .{ .source = "type Read is effect={read:Unit -> U32}\ndata Box=#Box {action:Unit -> U32}\nentry const answer=#Box (fn()=>Read.read ())\n", .code = .effect_mismatch },
+        .{ .source = "type Read is effect={read:Unit -> U32}\ndata Box=#Box {action:Unit -> U32}\nentry const answer=#Box (func()=> return Read.read ())\n", .code = .effect_mismatch },
         .{ .source = "data One=#One {value:F32}\nentry const answer=#One 42\n", .code = .type_mismatch },
         .{ .source = "data Pair=#Pair {x:U32,y:F32}\nentry const answer=#Pair 42\n", .code = .type_mismatch },
         .{ .source = "data Empty=#Empty {}\nentry const answer=case #Empty {} of\n  #Empty payload=>42\n", .code = .constructor_arity },
         .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:#True,left:#False} of\n  #Pair (#True,_)=>0\n  #Pair {left:#False,right:#False}=>42\n", .code = .non_exhaustive_match },
+        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:true,left:false} of\n  #Pair (true,_)=>0\n  #Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
     }) |case| {
         var lexed = try lexer.lex(allocator, case.source);
         defer lexed.deinit(allocator);
@@ -167,7 +167,7 @@ fn importedScenario(allocator: std.mem.Allocator) !void {
     producer_tree.deinit(allocator);
     tree_live = false;
     const consumer_source =
-        \\const unbox = fn box => case box of
+        \\const unbox = func box => return case box of
         \\  #Imported value => value
         \\entry const unsigned = unbox (#Imported 42)
         \\entry const floating = unbox (#Imported 42.5)

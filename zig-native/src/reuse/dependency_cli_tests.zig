@@ -13,7 +13,7 @@ fn canonicalFail(allocator: std.mem.Allocator, options: project.Options) !void {
 test "cache options preserve arbitrary alias order with owned canonical roots and OOM cleanup" {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
-    try dir.dir.writeFile(io, .{ .sub_path = "prelude.blot", .data = "const identity=fn value=>value\n" });
+    try dir.dir.writeFile(io, .{ .sub_path = "prelude.blot", .data = "const identity=func value=> return value\n" });
     const prelude = try dir.dir.realPathFileAlloc(io, "prelude.blot", a);
     defer a.free(prelude);
     const root = try dir.dir.realPathFileAlloc(io, ".", a);
@@ -40,8 +40,8 @@ const Fixture = struct {
     fn init() !Fixture {
         var dir = std.testing.tmpDir(.{});
         errdefer dir.cleanup();
-        try dir.dir.writeFile(io, .{ .sub_path = "library.blot", .data = "const identity=fn value=>value\n" });
-        try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./library\"\nentry const answer:Unit->U32=fn()=>identity 42\n" });
+        try dir.dir.writeFile(io, .{ .sub_path = "library.blot", .data = "const identity=func value=> return value\n" });
+        try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./library\"\nentry const answer:Unit->U32=func()=> return identity 42\n" });
         const entry = try dir.dir.realPathFileAlloc(io, "main.blot", a);
         errdefer a.free(entry);
         const root = try dir.dir.realPathFileAlloc(io, ".", a);
@@ -80,7 +80,7 @@ test "CLI declined admission preserves an existing destination and emits teardow
     defer f.deinit();
     try runWork(a, true, &f);
     try f.dir.dir.writeFile(io, .{ .sub_path = "output.wasm", .data = "previous complete output" });
-    try f.dir.dir.writeFile(io, .{ .sub_path = "library.blot", .data = "const identity=fn value=>@u32.add value 1\n" });
+    try f.dir.dir.writeFile(io, .{ .sub_path = "library.blot", .data = "const identity=func value=> return @u32.add value 1\n" });
     var output: std.Io.Writer.Allocating = .init(a);
     defer output.deinit();
     try std.testing.expect(!try cli.process(io, a, &output.writer, false, f.entry, f.output, f.artifact, .{}, compiler));

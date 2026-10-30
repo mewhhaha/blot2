@@ -8,11 +8,11 @@ Deno.test("rolling reductions preserve complete windows and U32 wrapping", async
     `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-const inverse = fn (value: U32) => @u32.sub 0 value
-entry const sequential = fn (input: Array U32) => iter.collect_array (rolling.fold add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
-entry const monoid = fn (input: Array U32) => iter.collect_array (rolling.monoid add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
-entry const group = fn (input: Array U32) => iter.collect_array (rolling.group add inverse 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
+const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+const inverse = func (value: U32) => return @u32.sub 0 value
+entry const sequential = func (input: Array U32) => return iter.collect_array (rolling.fold add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
+entry const monoid = func (input: Array U32) => return iter.collect_array (rolling.monoid add 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
+entry const group = func (input: Array U32) => return iter.collect_array (rolling.group add inverse 0 input[0] (@array.slice input 1 (@u32.sub (@array.length input) 1)))
 `,
     (guest) => {
       for (const count of [0, 1, 2, 3, 31, 63, 257, 4096]) {
@@ -69,13 +69,13 @@ Deno.test("rolling cursors preserve forks, reference summaries and noncommutativ
     `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-const image = fn (p: {a: U32, b: U32, c: U32}) => fn (index: U32) => case index of
+const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+const image = func (p: {a: U32, b: U32, c: U32}) => return func (index: U32) => return case index of
   0 => p.a
   1 => p.b
   _ => p.c
-const combine = fn (left: {a: U32, b: U32, c: U32}) => fn (right: {a: U32, b: U32, c: U32}) => {a: image left right.a, b: image left right.b, c: image left right.c}
-const inverse = fn (p: {a: U32, b: U32, c: U32}) => do:
+const combine = func (left: {a: U32, b: U32, c: U32}) => return func (right: {a: U32, b: U32, c: U32}) => return {a: image left right.a, b: image left right.b, c: image left right.c}
+const inverse = func (p: {a: U32, b: U32, c: U32}) => return do:
   let a = 0
   let b = 0
   let c = 0
@@ -88,18 +88,18 @@ const inverse = fn (p: {a: U32, b: U32, c: U32}) => do:
     if @u32.eq value 2:
       c := index
   break {a, b, c}
-const permutation = fn (index: U32) => case @u32.rem index 6 of
+const permutation = func (index: U32) => return case @u32.rem index 6 of
   0 => {a: 0, b: 1, c: 2}
   1 => {a: 1, b: 0, c: 2}
   2 => {a: 2, b: 1, c: 0}
   3 => {a: 0, b: 2, c: 1}
   4 => {a: 1, b: 2, c: 0}
   _ => {a: 2, b: 0, c: 1}
-const code = fn value => @u32.add (@u32.add (@u32.mul value.a 9) (@u32.mul value.b 3)) value.c
-entry const monoid = fn (width: U32) => #[code value | value <- rolling.monoid combine {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
-entry const group = fn (width: U32) => #[code value | value <- rolling.group combine inverse {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
-entry const forks = fn (width: U32) => do:
-  let original = rolling.monoid add 0 width (@array.generate 32 (fn index => index))
+const code = func value => return @u32.add (@u32.add (@u32.mul value.a 9) (@u32.mul value.b 3)) value.c
+entry const monoid = func (width: U32) => return #[code value | value <- rolling.monoid combine {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
+entry const group = func (width: U32) => return #[code value | value <- rolling.group combine inverse {a: 0, b: 1, c: 2} width (@array.generate 257 permutation)]
+entry const forks = func (width: U32) => return do:
+  let original = rolling.monoid add 0 width (@array.generate 32 (func index => return index))
   use first <- original.next
   let #Some (a, rest) = first else:
     break #[]
@@ -115,9 +115,9 @@ entry const forks = fn (width: U32) => do:
   let #Some (c, _) = third else:
     break #[]
   break #[a, b, again, c]
-entry const references = fn (count: U32) => do:
-  let values = @array.generate count (fn index => #[index])
-  let windows = rolling.monoid (fn (left: Array U32) => fn (right: Array U32) => @array.concat left right) #[] 3 values
+entry const references = func (count: U32) => return do:
+  let values = @array.generate count (func index => return #[index])
+  let windows = rolling.monoid (func (left: Array U32) => return func (right: Array U32) => return @array.concat left right) #[] 3 values
   break #[@u32.add (@u32.add window[0] window[1]) window[2] | window <- windows]
 `,
     (guest) => {
@@ -176,8 +176,8 @@ Deno.test("rolling ordered F32 windows keep scalar rounding and signed zero", as
     `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-const add = fn (left: F32) => fn (right: F32) => @f32.add left right
-entry const run = fn (input: Array F32) => iter.collect_array (rolling.fold add input[1] (@f32.to_u32 input[0]) (@array.slice input 2 (@u32.sub (@array.length input) 2)))
+const add = func (left: F32) => return func (right: F32) => return @f32.add left right
+entry const run = func (input: Array F32) => return iter.collect_array (rolling.fold add input[1] (@f32.to_u32 input[0]) (@array.slice input 2 (@u32.sub (@array.length input) 2)))
 `,
     (guest) => {
       for (
@@ -221,29 +221,29 @@ Deno.test("rolling input and reducer effects keep pull order and no prefetch", a
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
 type Input is data = #Input {index: U32, count: U32, pull: U32 -> U32 ! {Foreign}}
-const Input.iter = fn (cursor: Input) => do:
+const Input.iter = func (cursor: Input) => return do:
   use cursor.pull 777
   break cursor
-const Input.next = fn (cursor: Input) => do:
+const Input.next = func (cursor: Input) => return do:
   use value <- cursor.pull cursor.index
   if @u32.eq cursor.index cursor.count:
     break #Nothing
   break #Some (value, #Input {index: @u32.add cursor.index 1, count: cursor.count, pull: cursor.pull})
-const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-const inverse = fn (value: U32) => @u32.sub 0 value
-const sequential = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => do:
+const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+const inverse = func (value: U32) => return @u32.sub 0 value
+const sequential = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return do:
   let values = #Input {index: 0, count, pull: host}
-  let step = fn total => fn value => do:
+  let step = func total => return func value => return do:
     use observed <- host (@u32.add value 100)
     break @u32.add total (@u32.sub observed 100)
   break iter.collect_array (iter.take limit (rolling.fold step 0 width values))
-const monoid = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => iter.collect_array (iter.take limit (rolling.monoid add 0 width (#Input {index: 0, count, pull: host})))
-const group = fn (host: U32 -> U32 ! {Foreign}) => fn (width: U32) => fn (count: U32) => fn (limit: U32) => iter.collect_array (iter.take limit (rolling.group add inverse 0 width (#Input {index: 0, count, pull: host})))
+const monoid = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.monoid add 0 width (#Input {index: 0, count, pull: host})))
+const group = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.group add inverse 0 width (#Input {index: 0, count, pull: host})))
 ` + ["sequential", "monoid", "group"].flatMap((name) => [
-        `entry const ${name}_none = fn (host: U32 -> U32 ! {Foreign}) => ${name} host 3 9 0`,
-        `entry const ${name}_short = fn (host: U32 -> U32 ! {Foreign}) => ${name} host 3 2 9`,
-        `entry const ${name}_two = fn (host: U32 -> U32 ! {Foreign}) => ${name} host 3 9 2`,
-        `entry const ${name}_invalid = fn (host: U32 -> U32 ! {Foreign}) => ${name} host 0 9 0`,
+        `entry const ${name}_none = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 0`,
+        `entry const ${name}_short = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 2 9`,
+        `entry const ${name}_two = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 2`,
+        `entry const ${name}_invalid = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 0 9 0`,
       ]
       ).join("\n"),
     (guest) => {
@@ -307,14 +307,14 @@ const foreignSource = `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
 type Input is data = #Input {index: U32, pull: U32 -> U32 ! {Foreign}}
-const Input.iter = fn (cursor: Input) => cursor
-const Input.next = fn (cursor: Input) => do:
+const Input.iter = func (cursor: Input) => return cursor
+const Input.next = func (cursor: Input) => return do:
   use value <- cursor.pull cursor.index
   break #Some (#[value], #Input {index: @u32.add cursor.index 1, pull: cursor.pull})
-const combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
+const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
   let windows = rolling.monoid combine #[] 3 (#Input {index: 0, pull: host})
-  break iter.collect_array (iter.map (fn window => @u32.add (@u32.add window[0] window[1]) window[2]) (iter.take 2 windows))
+  break iter.collect_array (iter.map (func window => return @u32.add (@u32.add window[0] window[1]) window[2]) (iter.take 2 windows))
 `;
 
 for (const asynchronous of [false, true]) {
@@ -368,16 +368,16 @@ for (const asynchronous of [false, true]) {
 Deno.test("rolling fast callbacks require closed pure arrows", async () => {
   for (
     const operation of [
-      "rolling.monoid (fn left => fn right => host (@u32.add left right)) 0",
-      "rolling.group (fn left => fn right => host (@u32.add left right)) (fn value => @u32.sub 0 value) 0",
-      "rolling.group (fn left => fn right => @u32.add left right) (fn value => host value) 0",
+      "rolling.monoid (func left => return func right => return host (@u32.add left right)) 0",
+      "rolling.group (func left => return func right => return host (@u32.add left right)) (func value => return @u32.sub 0 value) 0",
+      "rolling.group (func left => return func right => return @u32.add left right) (func value => return host value) 0",
     ]
   ) {
     await compileExpectedFailure(
       `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => iter.collect_array (${operation} 3 (iter.range 0 9))
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return iter.collect_array (${operation} 3 (iter.range 0 9))
 `,
       "effect_mismatch",
       undefined,
@@ -392,12 +392,12 @@ import * as rolling from "std/rolling"
 import * as iter from "std/iter"
 type Tick is effect = { read: U32 -> U32 }
 type Input is data = #Input U32
-const Input.iter = fn cursor => cursor
-const Input.next = fn (#Input index) => do:
+const Input.iter = func cursor => return cursor
+const Input.next = func (#Input index) => return do:
   use value <- Tick.read index
   break #Some (#[value], #Input (@u32.add index 1))
-const combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-const cancel = fn computation => do:
+const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+const cancel = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -407,13 +407,13 @@ const cancel = fn computation => do:
       complete value =>
         break value
   break 7
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let total = 0
   for index in 0..count:
-    let work = @computation (fn () => iter.fold_left (fn sum => fn value => @u32.add sum value[0]) 0 (rolling.monoid combine #[] 3 (#Input 0)))
+    let work = @computation (func () => return iter.fold_left (func sum => return func value => return @u32.add sum value[0]) 0 (rolling.monoid combine #[] 3 (#Input 0)))
     total := @u32.add self (cancel work)
   break total
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
   await compileAndRun(definitions, (_, bytes) => {
     const module = new WebAssembly.Module(bytes);

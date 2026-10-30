@@ -4,12 +4,12 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("forked list cursors keep independent leaves across boundaries and collection", async () => {
   await compileAndRun(
     `
-const skip = fn count => fn cursor => do:
+const skip = func count => return func cursor => return do:
   for index in 0..count:
     cursor := @cursor.advance self
   break cursor
 const frozen = skip 243 (@list.generate 800 identity).iter
-entry const run = fn count => do:
+entry const run = func count => return do:
   let values = @list.generate 800 identity
   let original = values.iter
   let left = original
@@ -20,10 +20,10 @@ entry const run = fn count => do:
     left := @cursor.advance self
     right := @cursor.advance self
   break total
-entry const static_boundary = fn () => do:
+entry const static_boundary = func () => return do:
   let next = @cursor.advance frozen
   break #[@cursor.value frozen, @cursor.value next, @cursor.value (@cursor.advance next)]
-entry const collected = fn count => do:
+entry const collected = func count => return do:
   let left = (@list.generate 800 identity).iter
   let right = skip 300 left
   let total = 0
@@ -37,13 +37,13 @@ entry const collected = fn count => do:
     right := @cursor.advance self
     index := self + 1
   break total
-entry const float_array = fn (seed: F32) => do:
+entry const float_array = func (seed: F32) => return do:
   let first = #[seed, 0.0 - 0.0, 1.5].iter
   let second = @cursor.advance first
   break #[@cursor.value first, @cursor.value second, @cursor.value (@cursor.advance second)]
-entry const past_value = fn count => @cursor.value (skip count [10, 20].iter)
-entry const past_advance = fn count => @cursor.has (@cursor.advance (skip count [10, 20].iter))
-entry const empty = fn (count: U32) => @cursor.has (@list.generate count identity).iter
+entry const past_value = func count => return @cursor.value (skip count [10, 20].iter)
+entry const past_advance = func count => return @cursor.has (@cursor.advance (skip count [10, 20].iter))
+entry const empty = func (count: U32) => return @cursor.has (@list.generate count identity).iter
 `,
     (guest) => {
       for (const count of [0, 1, 243, 244, 245, 499, 500]) {

@@ -6,34 +6,34 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const selected = fn () => State.get (Array U32) ()
-const borrow = fn () => do:
+const selected = func () => return State.get (Array U32) ()
+const borrow = func () => return do:
   let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[7, 42]
   let (_, old) = do local:
     use value <- selected ()
     use State.set (Array U32) #[90, 91]
     break value
   break old
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   use old <- borrow ()
   for index in 0..count:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "lost pressure"
   break old
-entry const failed = fn (host: Array U32 -> Unit ! {Foreign}) => do:
+entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
   use old <- borrow ()
   use host old
   break old[1]
-entry const floating = fn () => do:
+entry const floating = func () => return do:
   let local = @effect.state (State.get F32) (State.set F32) (-0.0)
   let (_, value) = do local:
     break State.get F32 ()
   break value
 `;
 const callback = `
-entry const alternate = fn (seed: U32) => do:
-  let local = @effect.provider (State.get (Array U32)) (fn () => #[seed + 1, 42])
+entry const alternate = func (seed: U32) => return do:
+  let local = @effect.provider (State.get (Array U32)) (func () => return #[seed + 1, 42])
   let result = do local:
     break selected ()
   break result

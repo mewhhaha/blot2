@@ -7,9 +7,9 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
-const source = `const twice = fn x => x + x
-const quad = fn x => twice (twice x)
-entry const answer = fn (x: U32) -> U32 => quad x + quad 1
+const source = `const twice = func x => return x + x
+const quad = func x => return twice (twice x)
+entry const answer = func (x: U32) : U32 => return quad x + quad 1
 `;
 const counterNames = [
   "inference_regions",

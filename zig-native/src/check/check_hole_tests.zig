@@ -6,9 +6,9 @@ const check = @import("check.zig");
 
 fn law(allocator: std.mem.Allocator) !void {
     const source =
-        \\const unfinished = fn (value: U32) -> F32 => do:
+        \\const unfinished = func (value: U32) : F32 => return do:
         \\  let original = value
-        \\  value := #True
+        \\  value := true
         \\  break @hole
         \\entry const answer = 42
     ;
@@ -49,7 +49,7 @@ test "typed holes report contextual functions and effects after solving" {
     const allocator = std.testing.allocator;
     for ([_]struct { source: []const u8, expected: []const u8 }{
         .{ .source = "entry const answer: U32 -> Bool ! {Foreign} = @hole\n", .expected = "(U32 -> Bool ! {Foreign})" },
-        .{ .source = "entry const answer = fn () => @u32.add @hole 2\n", .expected = "U32" },
+        .{ .source = "entry const answer = func () => return @u32.add @hole 2\n", .expected = "U32" },
         .{ .source = "type Box a is data = #Box a\nconst unused: Box U32 = @hole\nentry const answer = 42\n", .expected = "Box U32" },
         .{ .source = "const unused: Array F32 = @hole\nentry const answer = 42\n", .expected = "Array F32" },
     }) |item| {
@@ -100,7 +100,7 @@ test "typed hole graphs preserve nominal arguments, effect identities and generi
         \\type Read a is effect = Unit -> a
         \\type Box a is data = #Box a
         \\type Add a is contract = { associated "add" a a a }
-        \\const unfinished: a -> a where { Add a } = fn value => do:
+        \\const unfinished: a -> a where { Add a } = func value => return do:
         \\  let other = value
         \\  break @hole
         \\const callback: Unit -> Box U32 ! {Read U32 | e} = @hole
@@ -139,13 +139,13 @@ test "typed holes bound lexical capture and prioritize the nearest unshadowed bi
     const allocator = std.testing.allocator;
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(allocator);
-    try source.appendSlice(allocator, "entry const answer = fn () -> U32 => do:\n");
+    try source.appendSlice(allocator, "entry const answer = func () : U32 => return do:\n");
     for (0..4096) |i| {
         const line = try allocator.print("  let local_{d} = {d}\n", .{ i, i });
         defer allocator.free(line);
         try source.appendSlice(allocator, line);
     }
-    try source.appendSlice(allocator, "  local_4095 := #True\n  break @hole\n");
+    try source.appendSlice(allocator, "  local_4095 := true\n  break @hole\n");
     var tokens = try lexer.lex(allocator, source.items);
     defer tokens.deinit(allocator);
     var pool: symbols.Pool = .{};

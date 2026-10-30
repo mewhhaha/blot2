@@ -7,9 +7,9 @@ const core = @import("../check/core.zig");
 const backend = @import("core_backend.zig");
 const a = std.testing.allocator;
 
-const unused_nested = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = fn value => first\nconst Left.read = fn value => fn () => (#Right 1).read\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => 42\n";
-const demanded_mismatch = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = fn value => first\nconst Left.read = fn value => fn () => (#Right 1).read\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => first ()\n";
-const distinct_methods = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = fn value => 42\nconst Right.read = fn value => 1.25\nconst pick = fn value => value.read\nentry const integer: Unit -> U32 = fn () => pick (#Left 1)\nentry const floating: Unit -> F32 = fn () => pick (#Right 2)\n";
+const unused_nested = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = func value => return first\nconst Left.read = func value => return func () => return (#Right 1).read\nconst pick = func value => return value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = func () => return 42\n";
+const demanded_mismatch = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = func value => return first\nconst Left.read = func value => return func () => return (#Right 1).read\nconst pick = func value => return value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = func () => return first ()\n";
+const distinct_methods = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = func value => return 42\nconst Right.read = func value => return 1.25\nconst pick = func value => return value.read\nentry const integer: Unit -> U32 = func () => return pick (#Left 1)\nentry const floating: Unit -> F32 = func () => return pick (#Right 2)\n";
 
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     var tokens = try lexer.lex(allocator, source);
@@ -64,9 +64,9 @@ test "deferred method concrete instances retain independent generic receiver evi
 
 test "deferred method reached returned closures preserve initializer cycle diagnostics" {
     for ([_]struct { source: []const u8, point: u32 }{
-        .{ .source = "type Left is data = #Left U32\nconst Left.read = fn value => fn () => first ()\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  break 42\n", .point = 118 },
-        .{ .source = "type Left is data = #Left U32\ndata Cell = #Cell {value: U32, action: Unit -> U32}\nconst Left.read = fn value => fn () => first.value\nconst pick = fn value => value.read\nlet first = #Cell {value: 42, action: pick (#Left 1)}\nentry const answer: Unit -> U32 = fn () => first.action ()\n", .point = 173 },
-        .{ .source = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = fn value => @array.length #[first]\nconst Left.read = fn value => fn () => (#Right 1).read\nconst pick = fn value => value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => do:\n  let unused = first\n  break 42\n", .point = 211 },
+        .{ .source = "type Left is data = #Left U32\nconst Left.read = func value => return func () => return first ()\nconst pick = func value => return value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = func () => return do:\n  let unused = first\n  break 42\n", .point = 145 },
+        .{ .source = "type Left is data = #Left U32\ndata Cell = #Cell {value: U32, action: Unit -> U32}\nconst Left.read = func value => return func () => return first.value\nconst pick = func value => return value.read\nlet first = #Cell {value: 42, action: pick (#Left 1)}\nentry const answer: Unit -> U32 = func () => return first.action ()\n", .point = 200 },
+        .{ .source = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Right.read = func value => return @array.length #[first]\nconst Left.read = func value => return func () => return (#Right 1).read\nconst pick = func value => return value.read\nlet first: Unit -> U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = func () => return do:\n  let unused = first\n  break 42\n", .point = 247 },
     }) |case_| {
         var module = try lower(a, case_.source);
         defer module.deinit(a);
@@ -94,12 +94,12 @@ fn initialDiagnostic(allocator: std.mem.Allocator, source: []const u8, expected:
 }
 
 const initial_errors = [_]struct { source: []const u8, expected: check.Code }{
-    .{ .source = "type Box is data = #Box U32\nconst Box.read = fn value => 1.25\nentry const answer: Unit -> U32 = fn () => (#Box 1).read\n", .expected = .type_mismatch },
-    .{ .source = "const unused: U32 = #True\nentry const answer = fn () => 42\n", .expected = .type_mismatch },
-    .{ .source = "const unused = fn value => value value\nentry const answer = fn () => 42\n", .expected = .infinite_type },
-    .{ .source = "type Box is data = #Box {value: F32}\nconst unused: U32 = (#Box {value: 1.25}).value\nentry const answer = fn () => 42\n", .expected = .type_mismatch },
-    .{ .source = "type Box is data = #Box U32\nconst unused = fn () => (#Box 1).absent\nentry const answer = fn () => 42\n", .expected = .missing_member },
-    .{ .source = "type Box is data = #Box {read: U32}\nconst Box.read = fn value => 42\nconst unused = fn () => (#Box {read: 1}).read\nentry const answer = fn () => 42\n", .expected = .ambiguous_member },
+    .{ .source = "type Box is data = #Box U32\nconst Box.read = func value => return 1.25\nentry const answer: Unit -> U32 = func () => return (#Box 1).read\n", .expected = .type_mismatch },
+    .{ .source = "const unused: U32 = true\nentry const answer = func () => return 42\n", .expected = .type_mismatch },
+    .{ .source = "const unused = func value => return value value\nentry const answer = func () => return 42\n", .expected = .infinite_type },
+    .{ .source = "type Box is data = #Box {value: F32}\nconst unused: U32 = (#Box {value: 1.25}).value\nentry const answer = func () => return 42\n", .expected = .type_mismatch },
+    .{ .source = "type Box is data = #Box U32\nconst unused = func () => return (#Box 1).absent\nentry const answer = func () => return 42\n", .expected = .missing_member },
+    .{ .source = "type Box is data = #Box {read: U32}\nconst Box.read = func value => return 42\nconst unused = func () => return (#Box {read: 1}).read\nentry const answer = func () => return 42\n", .expected = .ambiguous_member },
 };
 
 test "deferred method leaves plain infinite physical missing and ambiguous initial errors intact" {
@@ -122,11 +122,11 @@ test "deferred method source requirements and later evidence release every faile
 }
 
 const qualified_member_cases = [_][]const u8{
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn value => helper value\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = fn (value: Box) => do:\n  let result = helper value\n  break result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> a where {receiver \"read\" Box Unit a} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n",
-    "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = fn value => value.read\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = func (value: Box) => return do:\n  let result = (func other => return other.read) value\n  break result\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = func value => return helper value\nconst helper: Box -> a = func value => return value.read\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {field \"read\" Box a} = func (value: Box) => return do:\n  let result = helper value\n  break result\nconst helper: Box -> a = func value => return value.read\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> a where {receiver \"read\" Box Unit a} = func (value: Box) => return do:\n  let result = (func other => return other.read) value\n  break result\nentry const answer = 42\n",
+    "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = func value => return value.read\nentry const answer = 42\n",
 };
 
 test "method source qualification retains field coverage for active recursive selected projections" {
@@ -149,7 +149,7 @@ test "method source qualification preserves explicit field provenance after fron
 }
 
 fn missingMemberCoverage(allocator: std.mem.Allocator, clause: []const u8) !void {
-    const source = try allocator.print("type Box is data = #Box U32\nconst Box.read: Box -> a where {{{s}}} = fn (value: Box) => do:\n  let result = (fn other => other.read) value\n  break result\nentry const answer = 42\n", .{clause});
+    const source = try allocator.print("type Box is data = #Box U32\nconst Box.read: Box -> a where {{{s}}} = func (value: Box) => return do:\n  let result = (func other => return other.read) value\n  break result\nentry const answer = 42\n", .{clause});
     defer allocator.free(source);
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -183,9 +183,9 @@ test "method source qualification correction remains owned and atomic under ever
 
 fn forwardedMemberCoverage(allocator: std.mem.Allocator, delayed: bool) !void {
     const source = if (delayed)
-        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn (value: Box) => do:\n  let result = helper value\n  break result\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n"
+        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = func (value: Box) => return do:\n  let result = helper value\n  break result\nconst helper: Box -> a = func value => return value.read\nentry const answer = 42\n"
     else
-        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => helper value\nconst helper: Box -> a = fn value => value.read\nentry const answer = 42\n";
+        "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = func value => return helper value\nconst helper: Box -> a = func value => return value.read\nentry const answer = 42\n";
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
     var names: symbols.Pool = .{};
@@ -208,14 +208,14 @@ test "method source qualification keeps mutual and forwarded empty clause refere
 }
 
 test "method source qualification coverage keeps demanded field and receiver evidence distinct" {
-    const source = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
+    const source = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n";
     try lowerAndEmit(a, source, .missing_field);
-    const receiver = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {receiver \"read\" a Unit b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
+    const receiver = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {receiver \"read\" a Unit b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n";
     try lowerAndEmit(a, receiver, null);
 }
 
 fn explicitFieldEnvelope(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
+    const source = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n";
     // Public diagnostic display must outlive the owned Core too.
     var result = blk: {
         var module = try lower(allocator, source);
@@ -225,8 +225,8 @@ fn explicitFieldEnvelope(allocator: std.mem.Allocator) !void {
             try std.testing.expectEqual(@as(u32, 1), obligation.qualification_unit);
             try std.testing.expectEqualStrings("read", module.name(obligation.diagnostic_name));
             const qualification = obligation.qualification_span orelse return error.MissingQualificationOrigin;
-            try std.testing.expectEqual(@as(u32, 81), qualification.start);
-            if (obligation.span.start == 161 and obligation.span.end == 167) retained_use = true;
+            try std.testing.expectEqual(@as(u32, 90), qualification.start);
+            if (obligation.span.start == 188 and obligation.span.end == 194) retained_use = true;
         };
         try std.testing.expect(retained_use);
         break :blk try backend.compile(allocator, &.{module}, 1);
@@ -235,7 +235,7 @@ fn explicitFieldEnvelope(allocator: std.mem.Allocator) !void {
     const diagnostic = result.diagnostic orelse return error.MissingDiagnostic;
     try std.testing.expectEqual(backend.Code.missing_field, diagnostic.code);
     try std.testing.expectEqual(@as(u32, 1), diagnostic.unit);
-    try std.testing.expectEqual(core.Span{ .start = 81, .end = 81 }, diagnostic.span);
+    try std.testing.expectEqual(core.Span{ .start = 90, .end = 90 }, diagnostic.span);
     try std.testing.expectEqualStrings("no field read on main::Box", diagnostic.message());
     try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
 }
@@ -249,7 +249,7 @@ test "demanded physical field failure releases display and provenance owners on 
 }
 
 fn currentFieldContextEnvelope(allocator: std.mem.Allocator) !void {
-    const source = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
+    const source = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n";
     for ([_]enum { project, source, prelude }{ .project, .source, .prelude }) |mode| {
         var names: symbols.Pool = .{};
         defer names.deinit(allocator);
@@ -263,7 +263,7 @@ fn currentFieldContextEnvelope(allocator: std.mem.Allocator) !void {
         defer result.deinit(allocator);
         const diagnostic = result.diagnostic orelse return error.MissingDiagnostic;
         try std.testing.expectEqual(backend.Code.missing_field, diagnostic.code);
-        try std.testing.expectEqual(core.Span{ .start = 81, .end = 81 }, diagnostic.span);
+        try std.testing.expectEqual(core.Span{ .start = 90, .end = 90 }, diagnostic.span);
         try std.testing.expectEqualStrings(switch (mode) {
             .project => "no field read on renamed.blot::Box",
             .source => "no field read on main::Box",
@@ -280,10 +280,10 @@ test "demanded physical field current-context display releases every failed allo
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, currentFieldContextEnvelope, .{});
 }
 
-const self_open_empty = "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => value.read\nentry const answer = 42\n";
-const self_closed_typed = "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = fn (value: Box) => value.read\nentry const answer = 42\n";
-const self_unused_closed_nested = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.read\nentry const answer = 42\n";
-const self_demanded_closed_nested = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = fn (value: Box) => fn () => value.read\nentry const answer: Unit -> U32 = fn () => (#Box 1).read ()\n";
+const self_open_empty = "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = func value => return value.read\nentry const answer = 42\n";
+const self_closed_typed = "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = func (value: Box) => return value.read\nentry const answer = 42\n";
+const self_unused_closed_nested = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer = 42\n";
+const self_demanded_closed_nested = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer: Unit -> U32 = func () => return (#Box 1).read ()\n";
 
 fn selfMissingCoverage(allocator: std.mem.Allocator, source: []const u8, point: u32) !void {
     var tokens = try lexer.lex(allocator, source);
@@ -301,32 +301,32 @@ fn selfMissingCoverage(allocator: std.mem.Allocator, source: []const u8, point: 
 }
 
 test "self method source open result cannot prove its own empty clause from an unpublished scheme" {
-    try selfMissingCoverage(a, self_open_empty, 82);
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn (value: Box) => value.read\nentry const answer = 42\n", 89);
+    try selfMissingCoverage(a, self_open_empty, 91);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = func (value: Box) => return value.read\nentry const answer = 42\n", 98);
 }
 
 test "self method source aliases and nested open result rows retain exact empty clause points" {
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = fn value => do:\n  let alias = value\n  break alias.read\nentry const answer = 42\n", 114);
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32 ! {|e}) where {} = fn value => value.read\nentry const answer = 42\n", 101);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a where {} = func value => return do:\n  let alias = value\n  break alias.read\nentry const answer = 42\n", 123);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32 ! {|e}) where {} = func value => return value.read\nentry const answer = 42\n", 110);
 }
 
 test "self method source concrete typed declarations keep field receiver and invocation rows deferred" {
     for ([_][]const u8{
         self_closed_typed,
-        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {field \"read\" Box U32} = fn (value: Box) => value.read\nentry const answer = 42\n",
-        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {receiver \"read\" Box Unit U32} = fn (value: Box) => value.read\nentry const answer = 42\n",
-        "type Box is data = #Box U32\ntype Tick is effect = Unit -> Unit\nconst Box.read: Box -> U32 ! {Tick} where {} = fn (value: Box) => value.read\nentry const answer = 42\n",
-        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = fn (value: Box) => helper value\nconst helper: Box -> U32 = fn value => value.read\nentry const answer = 42\n",
+        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {field \"read\" Box U32} = func (value: Box) => return value.read\nentry const answer = 42\n",
+        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {receiver \"read\" Box Unit U32} = func (value: Box) => return value.read\nentry const answer = 42\n",
+        "type Box is data = #Box U32\ntype Tick is effect = Unit -> Unit\nconst Box.read: Box -> U32 ! {Tick} where {} = func (value: Box) => return value.read\nentry const answer = 42\n",
+        "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = func (value: Box) => return helper value\nconst helper: Box -> U32 = func value => return value.read\nentry const answer = 42\n",
     }) |source| try lowerAndEmit(a, source, null);
 }
 
 test "self method source projected uses and qualified function uses keep distinct missing clause origins" {
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = fn value => value.read\nconst empty: Box -> a where {} = fn value => value.read\nentry const answer = 42\n", 129);
-    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = fn value => value.read\nconst empty: Box -> a where {} = fn value => Box.read value\nentry const answer = 42\n", 123);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = func value => return value.read\nconst empty: Box -> a where {} = func value => return value.read\nentry const answer = 42\n", 147);
+    try selfMissingCoverage(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = func value => return value.read\nconst empty: Box -> a where {} = func value => return Box.read value\nentry const answer = 42\n", 141);
 }
 
 test "self method source unqualified open recursion retains owned receiver evidence after frontend teardown" {
-    var module = try lower(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = fn value => value.read\nentry const answer = 42\n");
+    var module = try lower(a, "type Box is data = #Box U32\nconst Box.read: Box -> a = func value => return value.read\nentry const answer = 42\n");
     defer module.deinit(a);
     var implicit: usize = 0;
     for (module.obligations) |obligation| if (!obligation.explicit and obligation.kind == .receiver) {
@@ -347,8 +347,8 @@ test "self method source closed latent evidence remains unused or fails when act
 
 test "self method source empty closed and demanded revisions release every failed allocation" {
     const failures = @import("../allocation_failures.zig");
-    try failures.checkAllAllocationFailures(a, selfMissingCoverage, .{ self_open_empty, @as(u32, 82) });
-    try failures.checkAllAllocationFailures(a, selfMissingCoverage, .{ "type Box is data = #Box U32\nconst Box.read: Box -> a = fn value => value.read\nconst empty: Box -> a where {} = fn value => value.read\nentry const answer = 42\n", @as(u32, 129) });
+    try failures.checkAllAllocationFailures(a, selfMissingCoverage, .{ self_open_empty, @as(u32, 91) });
+    try failures.checkAllAllocationFailures(a, selfMissingCoverage, .{ "type Box is data = #Box U32\nconst Box.read: Box -> a = func value => return value.read\nconst empty: Box -> a where {} = func value => return value.read\nentry const answer = 42\n", @as(u32, 147) });
     try failures.checkAllAllocationFailures(a, lowerAndEmit, .{ self_closed_typed, @as(?backend.Code, null) });
     try failures.checkAllAllocationFailures(a, lowerAndEmit, .{ self_demanded_closed_nested, @as(?backend.Code, .type_mismatch) });
 }

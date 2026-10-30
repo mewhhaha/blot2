@@ -353,24 +353,24 @@ fn rankSource(allocator: std.mem.Allocator, source: []const u8, valid: bool) !vo
 
 test "annotated higher rank callbacks use fresh rigid scopes and per-call instances" {
     try rankSource(a,
-        \\const id: forall [a] => a -> a = fn value => value
-        \\const two: (forall [a] => a -> a) -> (U32, F32) = fn identity => (identity 42, identity 3.0)
+        \\const id: forall [a] => a -> a = func value => return value
+        \\const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return (identity 42, identity 3.0)
         \\const answer = two id
     , true);
     try rankSource(a,
-        \\const wrong: forall [a] => a -> a = fn value => 42
+        \\const wrong: forall [a] => a -> a = func value => return 42
     , false);
     try rankSource(a,
-        \\const two: (forall [a] => a -> a) -> (U32, F32) = fn identity => (identity 42, identity 3.0)
-        \\const mono: U32 -> U32 = fn value => value
+        \\const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return (identity 42, identity 3.0)
+        \\const mono: U32 -> U32 = func value => return value
         \\const answer = two mono
     , false);
 }
 
 fn rankSourceAllocation(allocator: std.mem.Allocator) !void {
     try rankSource(allocator,
-        \\const id: forall [a] => a -> a = fn value => value
-        \\const two: (forall [a] => a -> a) -> (U32, F32) = fn identity => (identity 42, identity 3.0)
+        \\const id: forall [a] => a -> a = func value => return value
+        \\const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return (identity 42, identity 3.0)
         \\const answer = two id
     , true);
 }
@@ -378,30 +378,30 @@ fn rankSourceAllocation(allocator: std.mem.Allocator) !void {
 test "annotated higher rank callbacks preserve scope ownership under every allocation failure" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rankSourceAllocation, .{});
     try rankSourceExpected(a,
-        \\const two: (forall [a] => a -> a) -> (U32, F32) = fn identity => (identity 42, identity 3.0)
-        \\const leak = fn outside => two (fn value => outside)
+        \\const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return (identity 42, identity 3.0)
+        \\const leak = func outside => return two (func value => return outside)
     , false, .skolem_escape);
     try rankSource(a,
-        \\const make: Unit -> (forall [a] => a -> a) = fn () => fn value => value
+        \\const make: Unit -> (forall [a] => a -> a) = func () => return func value => return value
     , true);
 }
 
 test "annotated higher rank callbacks reject unsupported sorts and evidence with diagnostics" {
-    try rankSource(a, "const bad: forall [row e] => e -> e = fn value => value\n", false);
-    try rankSource(a, "const bad: forall [a] where {Render a} => a -> a = fn value => value\n", false);
-    try rankSource(a, "const bad: forall [a,a] => a -> a = fn value => value\n", false);
+    try rankSource(a, "const bad: forall [row e] => e -> e = func value => return value\n", false);
+    try rankSource(a, "const bad: forall [a] where {Render a} => a -> a = func value => return value\n", false);
+    try rankSource(a, "const bad: forall [a,a] => a -> a = func value => return value\n", false);
 }
 
 test "annotated higher rank region callbacks check introduction calls and loan escape" {
     try rankSource(a,
-        \\const read: forall [region r] => (borrow r U32) -> U32 = fn loan => @usage.read loan
-        \\const inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => read loan)
+        \\const read: forall [region r] => (borrow r U32) -> U32 = func loan => return @usage.read loan
+        \\const inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return read loan)
     , true);
-    try rankSource(a, "const bad: forall [region r] => r -> r = fn value => value\n", false);
+    try rankSource(a, "const bad: forall [region r] => r -> r = func value => return value\n", false);
     try rankSource(a, "type Bad = exists [region r] => borrow r U32\n", false);
     try rankSource(a,
-        \\const read: forall [region r] => (borrow r U32) -> U32 = fn loan => @usage.read loan
-        \\const escaped = fn (owner: unique U32) => @usage.borrow owner (fn loan => fn () => read loan)
+        \\const read: forall [region r] => (borrow r U32) -> U32 = func loan => return @usage.read loan
+        \\const escaped = func (owner: unique U32) => return @usage.borrow owner (func loan => return func () => return read loan)
     , false);
 }
 
@@ -409,10 +409,10 @@ fn packageSourceAllocation(allocator: std.mem.Allocator) !void {
     try rankSource(allocator,
         \\type Item = exists [a] => a
         \\const number = pack [U32] 42 as Item
-        \\const flag = pack [Bool] #True as Item
+        \\const flag = pack [Bool] true as Item
         \\const items = #[number, flag]
-        \\const inspect: Item -> U32 = fn item => unpack item as [a] value in 42
-        \\const repack: Item -> Item = fn item => unpack item as [a] value in pack [a] value as Item
+        \\const inspect: Item -> U32 = func item => return unpack item as [a] value in 42
+        \\const repack: Item -> Item = func item => return unpack item as [a] value in pack [a] value as Item
         \\const answer = inspect number
     , true);
 }
@@ -420,35 +420,35 @@ fn packageSourceAllocation(allocator: std.mem.Allocator) !void {
 test "existential package source checks seal witnesses open rigid identities and reject lexical escape" {
     try rankSourceExpected(a,
         \\type Item = exists [a] => a
-        \\const wrong: Item -> Bool = fn item => unpack item as [a] value in @type.same value 0
+        \\const wrong: Item -> Bool = func item => return unpack item as [a] value in @type.same value 0
     , false, .abstract_representation_access);
 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, packageSourceAllocation, .{});
     try rankSourceExpected(a,
         \\type Item = exists [a] => a
-        \\const wrong: Item -> U32 = fn item => unpack item as [a] value in value
+        \\const wrong: Item -> U32 = func item => return unpack item as [a] value in value
     , false, .package_escape);
     try rankSourceExpected(a,
         \\type Item = exists [a] => a
-        \\const wrong = pack [U32, Bool] (42, #True) as Item
+        \\const wrong = pack [U32, Bool] (42, true) as Item
     , false, .package_witness_mismatch);
     try rankSourceExpected(a,
         \\const wrong = pack [U32] 42 as U32
     , false, .package_expected);
     try rankSource(a,
         \\type Item = exists [a] => a
-        \\const wrong: Item -> (Unit -> U32) = fn item => unpack item as [a] value in fn () => value
+        \\const wrong: Item -> (Unit -> U32) = func item => return unpack item as [a] value in func () => return value
     , false);
     try rankSource(a,
         \\type Item = exists [a] => a
-        \\const wrong: Item -> Item -> Unit = fn left => fn right => unpack left as [a] x in unpack right as [b] y in (fn (other: a) => ()) y
+        \\const wrong: Item -> Item -> Unit = func left => return func right => return unpack left as [a] x in unpack right as [b] y in (func (other: a) => return ()) y
     , false);
 }
 
 fn rankImportedSource(allocator: std.mem.Allocator) !void {
     const producer_source =
-        \\const id: forall [a] => a -> a = fn value => value
-        \\const two: (forall [a] => a -> a) -> (U32, F32) = fn identity => (identity 42, identity 3.0)
+        \\const id: forall [a] => a -> a = func value => return value
+        \\const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return (identity 42, identity 3.0)
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
@@ -503,15 +503,15 @@ test "annotated higher rank callbacks import complete bound edges into independe
 
 fn rankRowsSource(allocator: std.mem.Allocator) !void {
     try rankSource(allocator,
-        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
-        \\const whole = apply ((fn (value: U32) => value), 42)
-        \\const fraction = apply ((fn (value: F32) => value), 1.25)
-        \\const pure: forall [row e] => Unit -> Unit ! {|e} = fn () => ()
+        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
+        \\const whole = apply ((func (value: U32) => return value), 42)
+        \\const fraction = apply ((func (value: F32) => return value), 1.25)
+        \\const pure: forall [row e] => Unit -> Unit ! {|e} = func () => return ()
     , true);
     try rankSource(allocator,
-        \\const wrong: forall [row e, row f] => (Unit -> Unit ! {|e}) -> Unit ! {|f} = fn callback => callback ()
+        \\const wrong: forall [row e, row f] => (Unit -> Unit ! {|e}) -> Unit ! {|f} = func callback => return callback ()
     , false);
-    try rankSource(allocator, "const wrong: forall [row e] => Array e -> Unit = fn values => ()\n", false);
+    try rankSource(allocator, "const wrong: forall [row e] => Array e -> Unit = func values => return ()\n", false);
     try rankSource(allocator, "type Wrong = exists [row e] => Unit -> Unit ! {|e}\n", false);
 }
 
@@ -521,7 +521,7 @@ test "annotated higher rank row callbacks retain fresh instances sorted scopes a
 }
 
 fn resourceResultSourceLaw(allocator: std.mem.Allocator) !void {
-    const source = "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: State U32) => do:\n  use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:\n    let cleanup_capture = younger\n    break ()\n  ) (fn loan => fn () => do:\n    let retained = older\n    break 42\n  ))\n  break escaped ()\n)\n";
+    const source = "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = func () => return @effect.scope (func (older: State U32) => return do:\n  use escaped <- @effect.scope (func (younger: State F32) => return @resource.scope (func () => return 9) (func owner => return do:\n    let cleanup_capture = younger\n    break ()\n  ) (func loan => return func () => return do:\n    let retained = older\n    break 42\n  ))\n  break escaped ()\n)\n";
     try rankSourceExpected(allocator, source, true, null);
     const younger = try std.mem.replaceOwned(u8, allocator, source, "let retained = older", "let retained = younger");
     defer allocator.free(younger);
@@ -532,8 +532,8 @@ fn resourceResultSourceLaw(allocator: std.mem.Allocator) !void {
     const cleanup_store = try std.mem.replaceOwned(u8, allocator, source, "let cleanup_capture = younger", "use younger.set 0.0");
     defer allocator.free(cleanup_store);
     try rankSourceExpected(allocator, cleanup_store, false, .cleanup_not_safe);
-    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\ntype Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}\nentry const answer = fn () => @effect.scope (fn (older: Box) => do:\n  let (state, result) = do (@effect.state older.get older.set (fn () => 0)):\n    break @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => do:\n      use older.set (fn () => do:\n        let retained = younger\n        break 42\n      )\n      break ()\n    ) (fn loan => 42))\n  break result\n)\n", false, .cleanup_not_safe);
-    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = fn (sink: (Unit -> U32) -> Unit ! {Foreign}) => @effect.scope (fn (younger: State U32) => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => do:\n  use sink (fn () => do:\n    let retained = younger\n    break 42\n  )\n  break 42\n))\n", false, .capability_escape);
+    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\ntype Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}\nentry const answer = func () => return @effect.scope (func (older: Box) => return do:\n  let (state, result) = do (@effect.state older.get older.set (func () => return 0)):\n    break @effect.scope (func (younger: State U32) => return @resource.scope (func () => return 9) (func owner => return do:\n      use older.set (func () => return do:\n        let retained = younger\n        break 42\n      )\n      break ()\n    ) (func loan => return 42))\n  break result\n)\n", false, .cleanup_not_safe);
+    try rankSourceExpected(allocator, "type State a is effect = {get: Unit -> a, set: a -> Unit}\nentry const answer = func (sink: (Unit -> U32) -> Unit ! {Foreign}) => return @effect.scope (func (younger: State U32) => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return do:\n  use sink (func () => return do:\n    let retained = younger\n    break 42\n  )\n  break 42\n))\n", false, .capability_escape);
 }
 test "resource callback result footprints preserve older captures and reject younger loan cleanup and sink escapes through OOM" {
     try resourceResultSourceLaw(a);

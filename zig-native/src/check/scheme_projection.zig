@@ -25,8 +25,13 @@ pub const Resolver = struct {
         const owner_mapping = self.applied orelse mapping;
         try require(owner_mapping.left == &self.producer.types and owner_mapping.right == &self.module.types and mapping.right == &self.module.types);
         try require(self.binding != 0 and self.binding < self.producer.bindings.len);
-        const scheme = self.producer.binding(self.binding).scheme;
-        try require(std.meta.eql(owner_mapping.instance, scheme.variables) and std.meta.eql(owner_mapping.instance_rows, scheme.row_variables));
+        const callee_declaration = self.producer.binding(self.binding);
+        const scheme = callee_declaration.scheme;
+        const source_public = if (mapping.views) |views| views.source_instances and views.large_plain_graph and
+            self.producer.types.node(scheme.root).tag != .forall and (scheme.variables.len > 128 or scheme.row_variables.len > 128) else false;
+        const endpoint_variables = if (source_public) callee_declaration.public_variables else scheme.variables;
+        const endpoint_rows = if (source_public) callee_declaration.public_rows else scheme.row_variables;
+        try require(std.meta.eql(owner_mapping.instance, endpoint_variables) and std.meta.eql(owner_mapping.instance_rows, endpoint_rows));
         const projection = mapping.left.node(expected);
         try require(projection.tag == .projection);
         const arguments = mapping.left.nominalArguments(projection);

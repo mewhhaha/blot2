@@ -50,11 +50,11 @@ test "initializer actual frozen runtime reason first operation and no typed Core
     try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use second <- alpha ()\n  use first <- zebra ()\n  break @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::alpha; sequence an operation with use inside a provider scope");
 }
 test "initializer successful type constraints precede purity and failed type checking refuses Core" {
-    try rejected(a, "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break #True\n", .type_mismatch, null, null);
+    try rejected(a, "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break true\n", .type_mismatch, null, null);
 }
 test "initializer all allocation failures release source row witness and rejection owners" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ source190, check.Code.initializer_effect, @as(?u32, 29), @as(?[]const u8, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope") });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break #True\n", check.Code.type_mismatch, @as(?u32, null), @as(?[]const u8, null) });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break true\n", check.Code.type_mismatch, @as(?u32, null), @as(?[]const u8, null) });
 }
 fn failedProject(allocator: std.mem.Allocator, path: []const u8) !void {
     var loaded = try project.load(allocator, std.testing.io, path, .{ .prelude_path = null });
@@ -116,7 +116,7 @@ test "canonical purity display source store and symbols teardown plus every fail
     const sources = [_][]const u8{
         "type Reader a is effect={read:Unit->a}\nlet value=Reader.read (Array (U32,F32)) ()\n",
         "type Reader {pair:(a,[b,c])} is effect={read:Unit->a}\nlet value=Reader.read {pair:(U32,[F32,Bool])} ()\n",
-        "type Reader a is effect={read:Unit->a}\nlet value=do:\n  let selected=1\n  if #True:\n    selected:=2\n  use answer<-Reader.read U32 ()\n  break @u32.add selected answer\n",
+        "type Reader a is effect={read:Unit->a}\nlet value=do:\n  let selected=1\n  if true:\n    selected:=2\n  use answer<-Reader.read U32 ()\n  break @u32.add selected answer\n",
     };
     for (sources) |source| {
         try retainedSnapshot(a, source);

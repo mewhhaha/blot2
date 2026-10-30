@@ -71,7 +71,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
       "// Unicode 🙂 café; numbers in comments: 4294967295",
       'import { value } from "./values.blot"',
       'const text = "🙂 where { 123 }"',
-      "const from = fn value => value",
+      "const from = func value => return value",
       "const selector = .add",
       "const selected = value |> .x",
       "const adjacent = value.field",
@@ -80,8 +80,8 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
       "const decimal = 2147483648",
       "const fraction = 1.25",
       "const bounded: U32 where { self < 100 } = 42",
-      "const same = fn (value: U32 where { self < 1000 }) => value",
-      "entry const result = fn () => do:",
+      "const same = func (value: U32 where { self < 1000 }) => return value",
+      "entry const result = func () => return do:",
       "  let value = 19",
       "  break @u32.add value 23",
       "",
@@ -108,7 +108,7 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
         "",
         "\n",
         "// 🙂 only a comment\n",
-        "const id = fn x => x\n",
+        "const id = func x => return x\n",
       ]
     ) {
       const prepared = frontend.prepare(source);

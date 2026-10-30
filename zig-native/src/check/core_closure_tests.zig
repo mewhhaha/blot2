@@ -46,15 +46,15 @@ const Fixture = struct {
 
 const snapshot_source =
     \\infixl 60 (+) = _fixity_add
-    \\const add = fn (left: U32) => fn (right: U32) => left + right
-    \\entry const snapshot = fn (input: U32) -> U32 => do:
+    \\const add = func (left: U32) => return func (right: U32) => return left + right
+    \\entry const snapshot = func (input: U32) : U32 => return do:
     \\  let saved = input
-    \\  let nested = fn (first: U32) => fn (second: U32) => saved + first + second
+    \\  let nested = func (first: U32) => return func (second: U32) => return saved + first + second
     \\  saved := 0
     \\  let partial = add input
     \\  let inner = nested 1
     \\  break inner (partial 1)
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 
 test "closures own transitive local snapshots and unary applications after frontend teardown" {
@@ -91,12 +91,12 @@ test "closures own transitive local snapshots and unary applications after front
 test "closure captures exclude own lexical patterns and include nested pinned references" {
     var fixture = try Fixture.init(
         \\infixl 60 (+) = _fixity_add
-        \\entry const inspect = fn (selected: U32) -> U32 => do:
-        \\  let choose = fn input -> U32 => case input of
+        \\entry const inspect = func (selected: U32) : U32 => return do:
+        \\  let choose = func input : U32 => return case input of
         \\    (^selected, value) => value
         \\    (_, value) => value + 1
         \\  break choose (selected, 41)
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);
@@ -112,7 +112,7 @@ test "closure captures exclude own lexical patterns and include nested pinned re
 test "unary constructor values retain catalog and instantiated function type" {
     var fixture = try Fixture.init(
         \\type Box value is data = #Box value
-        \\entry const boxed = fn () -> U32 => do:
+        \\entry const boxed = func () : U32 => return do:
         \\  let wrap = #Box
         \\  let result = wrap 42
         \\  break case result of

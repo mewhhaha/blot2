@@ -1,8 +1,8 @@
 
 type Tick is effect = Unit -> U32
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let count = 40
-  for request in @requests (@computation (fn () => Tick ())):
+  for request in @requests (@computation (func () => return Tick ())):
     case request of
       effect Tick () =>
         count := @u32.add self 1

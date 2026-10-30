@@ -17,15 +17,15 @@ const program = (offset: number) => `
 type Shape is data = #Circle U32 | #Square { side: U32, label: Shape }
 type Validate is effect = { check: U32 -> U32 }
 
-entry const callback_identity = fn (host: U32 -> U32 ! {Foreign}) => host (41 + ${offset})
+entry const callback_identity = func (host: U32 -> U32 ! {Foreign}) => return host (41 + ${offset})
 
-entry const templates = fn (v: U32) -> U32 => do:
-  let add = fn (x: U32) => x + v + ${offset}
-  let twice = fn (x: U32) => add (add x)
-  let thrice = fn (x: U32) => twice (add x)
+entry const templates = func (v: U32) : U32 => return do:
+  let add = func (x: U32) => return x + v + ${offset}
+  let twice = func (x: U32) => return add (add x)
+  let thrice = func (x: U32) => return twice (add x)
   break thrice 1
 
-entry const cells = fn (v: U32) -> U32 => do:
+entry const cells = func (v: U32) : U32 => return do:
   let shape = #Square { side: v, label: #Circle 2 }
   let pair = (shape, v)
   let (#Square { side, label }, extra) = pair else:
@@ -35,7 +35,7 @@ entry const cells = fn (v: U32) -> U32 => do:
     #Square _ => 0
   break side + inner + extra
 
-entry const arrays = fn (v: U32) -> U32 => do:
+entry const arrays = func (v: U32) : U32 => return do:
   let items = [#Circle v, #Circle 1, #Circle 2]
   let total = 0
   for item in items:
@@ -44,7 +44,7 @@ entry const arrays = fn (v: U32) -> U32 => do:
     total := self + r
   break total
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -54,7 +54,7 @@ const checked = fn computation => do:
       complete value =>
         break value
 
-entry const requested = fn (v: U32) -> U32 => checked (@computation (fn () => do:
+entry const requested = func (v: U32) : U32 => return checked (@computation (func () => return do:
   use left <- Validate.check v
   use right <- Validate.check 2
   break left + right

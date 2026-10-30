@@ -72,7 +72,7 @@ function annotationWhere(
       }
       if (nested > 0) continue;
       if (
-        text === "let" || text === "const" || text === "fn" || text === "impl"
+        text === "let" || text === "const" || text === "func" || text === "impl"
       ) return true;
       if (["\uE000", "=", "=>", "<-", ","].includes(text)) {
         return false;
@@ -271,7 +271,7 @@ export function layout(source: string, lexer: ParserInstance) {
         ) first--;
         requestClause = ["effect", "complete"].includes(tokens[first].text) &&
           !tokens.slice(first, index - 1).some((token) =>
-            ["=", "fn", "=>"].includes(token.text)
+            ["=", "func", "=>"].includes(token.text)
           );
       }
       const suite = previous.text === ":" || previous.text === "of" ||

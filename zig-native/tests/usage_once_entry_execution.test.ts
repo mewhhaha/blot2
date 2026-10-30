@@ -8,10 +8,10 @@ import {
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const source = `entry const answer: once (U32 -> U32) = fn value => value
-entry const failure: once (U32 -> U32) = fn value => @panic "once failure"
-entry const host: once ((U32 -> U32 ! {Foreign}) -> U32 ! {Foreign}) = fn callback => callback 7
-entry const ordinary = fn (value: U32) => value
+const source = `entry const answer: once (U32 -> U32) = func value => return value
+entry const failure: once (U32 -> U32) = func value => return @panic "once failure"
+entry const host: once ((U32 -> U32 ! {Foreign}) -> U32 ! {Foreign}) = func callback => return callback 7
+entry const ordinary = func (value: U32) => return value
 `;
 const onceError = (error: unknown) =>
   error instanceof GuestError && error.code === "once_reused";
@@ -175,7 +175,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const rejectedAliases = await compiler.build({
         sources: {
           [entry]:
-            "const value: once (U32 -> U32) = fn input => input\nentry const first = value\nentry const second = value\n",
+            "const value: once (U32 -> U32) = func input => return input\nentry const first = value\nentry const second = value\n",
         },
       });
       assert(!rejectedAliases.success);

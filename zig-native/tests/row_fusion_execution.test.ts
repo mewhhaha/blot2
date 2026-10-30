@@ -42,7 +42,7 @@ function pipelineSources() {
       }
       const consumer = `consume_${shape}_${width}`;
       helpers.push(
-        `const ${consumer} = fn (row: ${type}) -> F32 => ${reduction}\n`,
+        `const ${consumer} = func (row: ${type}) : F32 => return ${reduction}\n`,
       );
       for (const collection of ["array", "list"]) {
         const name = `${collection}_${shape}_${width}`;
@@ -51,8 +51,8 @@ function pipelineSources() {
           firstRow = "@cursor.value (@list.cursor saved)";
         }
         cases.push({ name, width });
-        functions.push(`entry const ${name} = fn (input: Array F32) => do:
-  let original = @${collection}.generate 600 (fn index => ${row})
+        functions.push(`entry const ${name} = func (input: Array F32) => return do:
+  let original = @${collection}.generate 600 (func index => return ${row})
   let saved = original
   let values = @${collection}.slice original 123 257
   let total = 0.0
@@ -70,10 +70,10 @@ function pipelineSources() {
 Deno.test("row producer composition preserves snapshots, wrapping and early exits", async () => {
   await compileAndRun(
     `
-const transform = fn row => {a: @u32.add row.a 1, b: @u32.mul row.b 2, c: row.c}
-const consume = fn row => @u32.add (@u32.add row.a row.b) row.c
-entry const run = fn (count: U32) => do:
-  let arrays = @array.generate count (fn index => {a: index, b: @u32.add index 1, c: 4294967295})
+const transform = func row => return {a: @u32.add row.a 1, b: @u32.mul row.b 2, c: row.c}
+const consume = func row => return @u32.add (@u32.add row.a row.b) row.c
+entry const run = func (count: U32) => return do:
+  let arrays = @array.generate count (func index => return {a: index, b: @u32.add index 1, c: 4294967295})
   let lists = @list.from_array arrays
   let saved = arrays
   let total = 0
@@ -83,16 +83,16 @@ entry const run = fn (count: U32) => do:
     total := @u32.add total (consume (transform row))
   arrays[0].a := 99
   break #[total, saved[0].a, arrays[0].a]
-entry const stopped = fn (count: U32) => do:
-  let rows = @list.generate count (fn index => {a: index, b: 1, c: 2})
+entry const stopped = func (count: U32) => return do:
+  let rows = @list.generate count (func index => return {a: index, b: 1, c: 2})
   let total = 0
   for row in rows:
     if @u32.eq row.a 83:
       break
     total := @u32.add total (consume row)
   break total
-entry const returned = fn (count: U32) => do:
-  let rows = @array.generate count (fn index => {a: index, b: 1, c: 2})
+entry const returned = func (count: U32) => return do:
+  let rows = @array.generate count (func index => return {a: index, b: 1, c: 2})
   for row in rows:
     if @u32.eq row.a 83:
       break consume (transform row)
@@ -121,26 +121,26 @@ entry const returned = fn (count: U32) => do:
 Deno.test("rows escaping through ordinary calls, closures and demands keep owned bases", async () => {
   await compileAndRun(
     `
-const consume = fn row => @u32.add row.a row.b
-const store = fn row => #[row]
-const capture = fn row => fn () => consume row
-const defer_row = fn ~row => fn () => consume (@force row)
-entry const stored = fn (count: U32) => do:
-  let rows = @list.generate count (fn index => {a: index, b: @u32.add index 1})
+const consume = func row => return @u32.add row.a row.b
+const store = func row => return #[row]
+const capture = func row => return func () => return consume row
+const defer_row = func ~row => return func () => return consume (@force row)
+entry const stored = func (count: U32) => return do:
+  let rows = @list.generate count (func index => return {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
     saved := #[...saved, (store row)[0]]
   let pressure = @array.fill 8192 99
   break #[consume row | row <- saved]
-entry const captured = fn (count: U32) => do:
-  let rows = @array.generate count (fn index => {a: index, b: @u32.add index 1})
+entry const captured = func (count: U32) => return do:
+  let rows = @array.generate count (func index => return {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
     saved := #[...saved, capture row]
   let pressure = @array.fill 8192 99
   break #[read () | read <- saved]
-entry const deferred = fn (count: U32) => do:
-  let rows = @list.generate count (fn index => {a: index, b: @u32.add index 1})
+entry const deferred = func (count: U32) => return do:
+  let rows = @list.generate count (func index => return {a: index, b: @u32.add index 1})
   let saved = #[]
   for row in rows:
     saved := #[...saved, defer_row row]
@@ -165,19 +165,19 @@ entry const deferred = fn (count: U32) => do:
 Deno.test("effectful row consumers preserve call and trap order", async () => {
   await compileAndRun(
     `
-const consume = fn host => fn row => do:
+const consume = func host => return func row => return do:
   use first <- host row.a
   use second <- host row.b
   break @u32.add first second
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
-  let rows = @list.generate 257 (fn index => {a: @u32.mul index 2, b: @u32.add (@u32.mul index 2) 1})
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
+  let rows = @list.generate 257 (func index => return {a: @u32.mul index 2, b: @u32.add (@u32.mul index 2) 1})
   let total = 0
   for row in rows:
     use value <- consume host row
     total := @u32.add total value
   break total
-entry const trap = fn (host: U32 -> U32 ! {Foreign}) => do:
-  let rows = @array.generate 257 (fn index => {a: index, b: @u32.rem index 83})
+entry const trap = func (host: U32 -> U32 ! {Foreign}) => return do:
+  let rows = @array.generate 257 (func index => return {a: index, b: @u32.rem index 83})
   let total = 0
   for row in rows:
     use value <- host row.a
@@ -212,15 +212,15 @@ Deno.test("fused row consumers revalidate source, compiled and checkpoint depend
   const library = `${directory}/rows.blot`;
   const archive = `${directory}/rows.blotdep`;
   const main = `import { transform, consume } from "./rows"
-entry const run = fn (count: U32) => do:
-  let rows = @list.generate count (fn index => {a: index, b: @u32.add index 1})
+entry const run = func (count: U32) => return do:
+  let rows = @list.generate count (func index => return {a: index, b: @u32.add index 1})
   let total = 0
   for row in rows:
     total := @u32.add total (consume (transform row))
   break total
 `;
-  const original = `const transform = fn row => {a: @u32.add row.a 1, b: row.b}
-const consume = fn row => @u32.add row.a row.b
+  const original = `const transform = func row => return {a: @u32.add row.a 1, b: row.b}
+const consume = func row => return @u32.add row.a row.b
 `;
   try {
     await Deno.writeTextFile(entry, main);

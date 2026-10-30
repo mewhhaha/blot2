@@ -264,7 +264,7 @@ const Reader = struct {
         return id;
     }
     fn identifier(self: *Reader, id: u32, name: []const u8) Error!void {
-        const keywords = " const let type data effect is fn do use return yield break for ever in case of if then else as import infix infixl infixr self where ";
+        const keywords = " const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where ";
         var valid = name.len > 0 and !std.mem.eql(u8, name, "_");
         if (valid) valid = std.ascii.isLower(name[0]) or name[0] == '_';
         for (name) |byte| if (!std.ascii.isAlphanumeric(byte) and byte != '_') {
@@ -636,6 +636,19 @@ const Reader = struct {
         if (node.tag != .number or !std.math.isFinite(single)) return self.problem(value_id, "asset_tunables", try self.a.print("{s} must be a finite number", .{key}));
         return node.number;
     }
+    fn shownSpan(self: *Reader, out: *Text, count: *u32, id: ?u32) Error![2]u32 {
+        const start = count.*;
+        if (id) |node| {
+            var iterator = std.unicode.Utf8View.initUnchecked(self.nodes.items[node].text).iterator();
+            while (iterator.nextCodepoint()) |point| {
+                try self.budget(1);
+                if (count.* != 0) try self.put(out, ", ");
+                try self.integer(out, if (inFont(point)) point else 63);
+                count.* += 1;
+            }
+        }
+        return .{ start, count.* - start };
+    }
     fn tunables(self: *Reader, root: u32) Error!void {
         const list_id = self.member(root, "tunables") orelse return self.problem(root, "asset_tunables", "tunables.json: expected { \"tunables\": [...] }");
         const list = self.nodes.items[list_id];
@@ -645,6 +658,9 @@ const Reader = struct {
         var ids: std.AutoHashMapUnmanaged(u32, void) = .empty;
         defer ids.deinit(self.a);
         var declarations: Text = .empty;
+        var text: Text = .empty;
+        var text_count: u32 = 0;
+        try self.put(&text, "const declaration_text: Array U32 = #[");
         try self.put(&declarations, "const declarations: (Array Declaration) = #[");
         try self.recordStart("Tunables", "tunables");
         for (list.members, 0..) |item, index| {
@@ -690,8 +706,12 @@ const Reader = struct {
             }
             try self.put(&self.body, ")");
             if (index > 0) try self.put(&declarations, ", ");
-            try self.put(&declarations, "(#Declaration { name: ");
-            try self.points(&declarations, name_id, "name", true);
+            const name_span = try self.shownSpan(&text, &text_count, name_id);
+            const doc_span = try self.shownSpan(&text, &text_count, doc_id);
+            try self.put(&declarations, "($Declaration { name_start: ");
+            try self.integer(&declarations, name_span[0]);
+            try self.put(&declarations, ", name_count: ");
+            try self.integer(&declarations, name_span[1]);
             try self.put(&declarations, ", id: ");
             try self.integer(&declarations, stable_id);
             try self.put(&declarations, ", initial: ");
@@ -700,14 +720,20 @@ const Reader = struct {
             try self.float32(&declarations, least);
             try self.put(&declarations, ", most: ");
             try self.float32(&declarations, most);
-            try self.put(&declarations, ", doc: ");
-            if (doc_id) |doc| try self.points(&declarations, doc, "doc", true) else try self.put(&declarations, "#[]");
+            try self.put(&declarations, ", doc_start: ");
+            try self.integer(&declarations, doc_span[0]);
+            try self.put(&declarations, ", doc_count: ");
+            try self.integer(&declarations, doc_span[1]);
             try self.put(&declarations, " })");
         }
         try self.recordEnd();
-        try self.put(&self.header, "type Declaration is data = #Declaration { name: (Array U32), id: U32, initial: F32, least: F32, most: F32, doc: (Array U32) }\n");
+        try self.put(&self.header, "type Declaration is data = $Declaration { name_start: U32, name_count: U32, id: U32, initial: F32, least: F32, most: F32, doc_start: U32, doc_count: U32 }\n");
+        try self.put(&text, "]\n");
         try self.put(&declarations, "]\n");
+        try self.put(&self.body, text.items);
         try self.put(&self.body, declarations.items);
+        try self.put(&self.body, "const name = func (row: Declaration) => return &declaration_text[row.name_start..row.name_start + row.name_count]\n");
+        try self.put(&self.body, "const doc = func (row: Declaration) => return &declaration_text[row.doc_start..row.doc_start + row.doc_count]\n");
     }
 };
 
@@ -776,7 +802,7 @@ test "native assets infer shared records and release success and issue allocatio
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, allocationLaw, .{});
 }
 test "native assets preserve last-wins JSON and exact tuples and float spelling" {
-    try sourceLaw(std.testing.allocator, .json, "{\"x\":false,\"x\":true,\"n\":0.1,\"items\":[1,false],\"empty\":[]}", "type Data is data = #Data { empty: (), items: (U32, Bool), n: F32, x: Bool }\nconst value: Data = (#Data { empty: (), items: (1, #False), n: 0.10000000149011612, x: #True })\n");
+    try sourceLaw(std.testing.allocator, .json, "{\"x\":false,\"x\":true,\"n\":0.1,\"items\":[1,false],\"empty\":[]}", "type Data is data = #Data { empty: (), items: (U32, Bool), n: F32, x: Bool }\nconst value: Data = (#Data { empty: (), items: (1, false), n: 0.10000000149011612, x: true })\n");
     try sourceLaw(std.testing.allocator, .json, "{\"x\":\"\\ud800\",\"x\":1}", "type Data is data = #Data { x: U32 }\nconst value: Data = (#Data { x: 1 })\n");
     try sourceLaw(std.testing.allocator, .json, "-0", "type Data = F32\nconst value: F32 = (-0.0)\n");
     try sourceLaw(std.testing.allocator, .json, "[[1]]", "type Data = (Array (Array U32))\nconst value: (Array (Array U32)) = #[#[1]]\n");
@@ -800,7 +826,9 @@ fn tunablesLaw(a: Allocator) !void {
     try std.testing.expect(result == .source);
     try std.testing.expect(std.mem.find(u8, result.source, "camera_zoom: (U32, F32, F32, F32)") != null);
     try std.testing.expect(std.mem.find(u8, result.source, "camera_zoom: (16562854, ") != null);
-    try std.testing.expect(std.mem.find(u8, result.source, "doc: #[229, 63, 63]") != null);
+    try std.testing.expect(std.mem.find(u8, result.source, "doc_start: 11, doc_count: 3") != null);
+    try std.testing.expect(std.mem.find(u8, result.source, "declaration_text: Array U32 = #[99, 97, 109, 101, 114, 97, 46, 122, 111, 111, 109, 229, 63, 63]") != null);
+    try std.testing.expect(std.mem.find(u8, result.source, "name_start: 0, name_count: 11") != null);
     try std.testing.expect(std.mem.find(u8, result.source, "0.10000000149011612, (-1.0), 2.0") != null);
     try std.testing.expect(std.mem.find(u8, result.source, "step") == null);
     try issueLaw(a, .tunables, "{\"tunables\":[{\"name\":\"x\",\"default\":0,\"min\":0,\"max\":1,\"step\":0}]}", "asset_tunables");

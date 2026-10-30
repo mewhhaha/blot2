@@ -11,7 +11,7 @@ binding, including when its spelling is shadowed. Ordinary scope callbacks
 have a once, universally quantified region contract. Aliases, renamed imports,
 curried wrappers and identity forwarding preserve that contract.
 
-An exact `fn group => fn action => @task.spawn group action` helper preserves
+An exact `func group => return func action => return @task.spawn group action` helper preserves
 its checked contract through aliases, imports and stored partial calls. The
 completed call checks the actual action's captures against its selected group.
 Its private partial-call representation is not a general indirect callable.

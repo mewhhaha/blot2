@@ -108,7 +108,7 @@ pub fn main(init: std.process.Init) !void {
     if (args.len != 5) return error.ExpectedEntryAndEditPath;
     const original = try std.Io.Dir.cwd().readFileAlloc(init.io, args[2], init.arena.allocator(), .limited(1024 * 1024));
     const edited = try init.arena.allocator().dupe(u8, original);
-    const prefix = if (std.mem.find(u8, edited, "const f0 = make 1\n") != null) "const f0 = make " else if (std.mem.find(u8, edited, "const f_0 = fn value => @u32.add value ") != null) "const f_0 = fn value => @u32.add value " else "const changed = ";
+    const prefix = if (std.mem.find(u8, edited, "const f0 = make 1\n") != null) "const f0 = make " else if (std.mem.find(u8, edited, "const f_0 = func value => return @u32.add value ") != null) "const f_0 = func value => return @u32.add value " else "const changed = ";
     const point = std.mem.find(u8, edited, prefix) orelse return error.MissingEditPoint;
     edited[point + prefix.len] = '3';
     const requested = try std.fmt.parseInt(u8, args[3], 10);

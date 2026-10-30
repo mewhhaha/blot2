@@ -5,10 +5,10 @@ const stdRoot = new URL("../../std", import.meta.url).pathname;
 Deno.test("linear cursor paths keep old versions across leaf changes pressure and repeated activations", async () => {
   await compileAndRun(
     `
-entry const run = fn (encoded: U32) => do:
+entry const run = func (encoded: U32) => return do:
   let count = encoded / 8192
   let steps = encoded % 8192
-  let rows = @list.generate count (fn i => {x: i, y: i + 1, z: i + 2})
+  let rows = @list.generate count (func i => return {x: i, y: i + 1, z: i + 2})
   let total = 0
   for pass in 0..3:
     let original = @list.cursor rows
@@ -25,8 +25,8 @@ entry const run = fn (encoded: U32) => do:
     if @cursor.has original:
       total := self + (@cursor.value original).z
   return total
-entry const uneven = fn (count: U32) => do:
-  let source = @list.generate (count + 19) (fn i => {x: i, y: i + 1, z: i + 2})
+entry const uneven = func (count: U32) => return do:
+  let source = @list.generate (count + 19) (func i => return {x: i, y: i + 1, z: i + 2})
   let rows = @list.slice source 7 count
   let original = @list.cursor rows
   let cursor = original
@@ -37,22 +37,22 @@ entry const uneven = fn (count: U32) => do:
   if @cursor.has original:
     total := self + (@cursor.value original).x
   return total
-const shifted = fn (steps: U32) => do:
-  let source = @list.generate 4096 (fn i => {x: i, y: i + 1, z: i + 2})
+const shifted = func (steps: U32) => return do:
+  let source = @list.generate 4096 (func i => return {x: i, y: i + 1, z: i + 2})
   let rows = @list.slice source 7 4080
   let cursor = @list.cursor rows
   for index in 0..steps:
     cursor := @cursor.advance self
   return cursor
-const early = fn (steps: U32) => do:
-  let rows = @list.generate 4096 (fn i => {x: i, y: i + 1, z: i + 2})
+const early = func (steps: U32) => return do:
+  let rows = @list.generate 4096 (func i => return {x: i, y: i + 1, z: i + 2})
   let cursor = @list.cursor rows
   for index in 0..4096:
     if index == steps:
       return cursor
     cursor := @cursor.advance self
   return cursor
-entry const read_early = fn (steps: U32) => do:
+entry const read_early = func (steps: U32) => return do:
   let cursor = early steps
   let pressure = @array.fill 512 99
   if pressure[511] != 99:
@@ -60,7 +60,7 @@ entry const read_early = fn (steps: U32) => do:
   if @cursor.has cursor:
     return (@cursor.value cursor).y
   return 0
-entry const read_shifted = fn (steps: U32) => do:
+entry const read_shifted = func (steps: U32) => return do:
   let cursor = shifted steps
   let pressure = @array.fill 512 99
   if pressure[511] != 99:
@@ -68,7 +68,7 @@ entry const read_shifted = fn (steps: U32) => do:
   if @cursor.has cursor:
     return (@cursor.value cursor).x
   return 0
-entry const probe = fn (seed: U32) => #[seed]
+entry const probe = func (seed: U32) => return #[seed]
 `,
     (guest) => {
       for (const steps of [0, 1, 80, 81, 82, 243, 999, 4095, 4096]) {

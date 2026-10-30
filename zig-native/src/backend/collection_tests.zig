@@ -34,7 +34,7 @@ fn lowerWithCatalog(a: std.mem.Allocator, source: []const u8, builtin_catalog: b
 test "collection builders consume a private accumulator across guarded loop carries" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const compact = fn (values: Array U32) =>
+        \\entry const compact = func (values: Array U32) => return
         \\  #[@u32.add i 1 | i <- values, @u32.lt 0 i]
     );
     defer module.deinit(a);
@@ -49,9 +49,9 @@ test "collection builders consume a private accumulator across guarded loop carr
 
 fn frontendFailures(a: std.mem.Allocator) !void {
     var module = try lower(a,
-        \\entry const build = fn (values: Array U32) =>
+        \\entry const build = func (values: Array U32) => return
         \\  #[@u32.add i offset | i <- values, @u32.lt 0 i, let offset = 2]
-        \\entry const append = fn (value: U32) => do:
+        \\entry const append = func (value: U32) => return do:
         \\  let xs = @array.from_list [value, ...[1, 2], 3]
         \\  xs[0] := 42
         \\  break xs[0]
@@ -88,14 +88,14 @@ test "numeric nominal adapters preserve frozen Core and types through emission a
     var module = try lower(a,
         \\type Row is data = #Row {p: F32, q: F32, r: F32, s: F32}
         \\type Matrix is data = #Matrix {a: Row, b: Row, c: Row, d: Row}
-        \\const row = fn (x: F32) => #Row {p: x, q: x, r: x, s: x}
-        \\const matrix = fn (x: F32) => #Matrix {a: row x, b: row x, c: row x, d: row x}
-        \\const read = fn (m: Matrix) =>
+        \\const row = func (x: F32) => return #Row {p: x, q: x, r: x, s: x}
+        \\const matrix = func (x: F32) => return #Matrix {a: row x, b: row x, c: row x, d: row x}
+        \\const read = func (m: Matrix) => return
         \\  @f32.add (@f32.add (@f32.add m.a.p m.a.q) (@f32.add m.a.r m.a.s))
         \\    (@f32.add (@f32.add (@f32.add m.b.p m.b.q) (@f32.add m.b.r m.b.s))
         \\      (@f32.add (@f32.add (@f32.add m.c.p m.c.q) (@f32.add m.c.r m.c.s))
         \\        (@f32.add (@f32.add m.d.p m.d.q) (@f32.add m.d.r m.d.s))))
-        \\entry const run = fn (x: F32) => read (matrix x)
+        \\entry const run = func (x: F32) => return read (matrix x)
     );
     defer module.deinit(a);
     const nodes = try a.dupe(core.Node, module.nodes);
@@ -116,10 +116,10 @@ test "nested numeric collection rows preserve frozen evidence through emission a
     var module = try lower(a,
         \\type Vector is data = #Vector {x: F32, y: F32}
         \\type Matrix is data = #Matrix {a: Vector, b: Vector}
-        \\const matrix = fn (x: F32) => #Matrix {a: #Vector {x: x, y: 2.0}, b: #Vector {x: 3.0, y: 4.0}}
-        \\const read = fn (value: Matrix) => value.a.x
+        \\const matrix = func (x: F32) => return #Matrix {a: #Vector {x: x, y: 2.0}, b: #Vector {x: 3.0, y: 4.0}}
+        \\const read = func (value: Matrix) => return value.a.x
         \\const saved = [matrix 1.0, matrix 5.0]
-        \\entry const run = fn (x: F32) => do:
+        \\entry const run = func (x: F32) => return do:
         \\  let rows = @array.fill 2 (matrix x)
         \\  let old = rows
         \\  rows[0].a.x := 9.0
@@ -140,7 +140,7 @@ test "packed array constants and runtime copies release every emission allocatio
     const a = std.testing.allocator;
     var module = try lower(a,
         \\const saved = [(3, 7)]
-        \\entry const run = fn (value: U32) => do:
+        \\entry const run = func (value: U32) => return do:
         \\  let rows = @array.fill 2 (value, value)
         \\  let copied = @array.from_list (@list.concat (@list.from_array rows) saved)
         \\  let row = @array.get copied 2
@@ -156,7 +156,7 @@ test "packed array constants and runtime copies release every emission allocatio
 test "collection ownership rejects an old value observed after an update and on either branch" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (flag: Bool) => do:
+        \\entry const run = func (flag: Bool) => return do:
         \\  let xs = [1, 2]
         \\  let old = xs
         \\  if flag:
@@ -177,8 +177,8 @@ test "collection ownership rejects an old value observed after an update and on 
 test "packed List span emission preserves immutable Core under allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (count: U32) => do:
-        \\  let values = @list.generate count (fn (i: U32) => (i, i, i))
+        \\entry const run = func (count: U32) => return do:
+        \\  let values = @list.generate count (func (i: U32) => return (i, i, i))
         \\  let total = 0
         \\  for pass in 0..2:
         \\    for (x, y, z) in values:
@@ -199,8 +199,8 @@ test "packed List span emission preserves immutable Core under allocation failur
 test "packed List borrowed row emission preserves immutable Core under allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (count: U32) => do:
-        \\  let values = @list.generate count (fn (i: U32) => {a: i, b: i, c: i})
+        \\entry const run = func (count: U32) => return do:
+        \\  let values = @list.generate count (func (i: U32) => return {a: i, b: i, c: i})
         \\  let total = 0
         \\  for pass in 0..2:
         \\    for row in values:
@@ -223,8 +223,8 @@ test "ordinary checked row consumers remove per-row scalar boxes" {
     for ([_][]const u8{ "array", "list" }) |collection| {
         const text = try a.print(
             \\const seed = {{a: 1, b: 2, c: 3}}
-            \\const consume = fn row => @u32.add (@u32.add row.a row.b) row.c
-            \\entry const run = fn (count: U32) => do:
+            \\const consume = func row => return @u32.add (@u32.add row.a row.b) row.c
+            \\entry const run = func (count: U32) => return do:
             \\  let values = @{s}.fill count seed
             \\  let total = 0
             \\  for row in values:
@@ -265,11 +265,11 @@ test "ordinary checked row consumers remove per-row scalar boxes" {
 test "ordinary numeric scope helpers lower to vector stores with immutable Core" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const calculate = fn (index: U32) => do:
+        \\const calculate = func (index: U32) => return do:
         \\  let shifted = @u32.add index 17
         \\  let wrapped = @u32.mul shifted 4294967295
         \\  break @u32.add wrapped 1
-        \\entry const run = fn (count: U32) => @array.generate count calculate
+        \\entry const run = func (count: U32) => return @array.generate count calculate
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -293,8 +293,8 @@ test "ordinary checked row products lower to SIMD without reordering scalar addi
     const a = std.testing.allocator;
     var module = try lower(a,
         \\const seed = {a: 1.0, b: 2.0, c: 3.0, d: 4.0}
-        \\const consume = fn row => @f32.add (@f32.add (@f32.add (@f32.mul row.a 1.25) (@f32.mul row.b 1.25)) (@f32.mul row.c 1.25)) (@f32.mul row.d 1.25)
-        \\entry const run = fn (count: U32) => do:
+        \\const consume = func row => return @f32.add (@f32.add (@f32.add (@f32.mul row.a 1.25) (@f32.mul row.b 1.25)) (@f32.mul row.c 1.25)) (@f32.mul row.d 1.25)
+        \\entry const run = func (count: U32) => return do:
         \\  let rows = @array.fill count seed
         \\  let total = 0.0
         \\  for row in rows:
@@ -328,8 +328,8 @@ fn privateCursorEmission(a: std.mem.Allocator, units: []const core.Module, previ
 test "private cursor versions keep immutable Core replay and emission OOM ownership" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const make = fn values => @list.cursor values
-        \\entry const run = fn (count: U32) => do:
+        \\const make = func values => return @list.cursor values
+        \\entry const run = func (count: U32) => return do:
         \\  let values = @list.fill count {x: 41, y: 8192}
         \\  let cursor = make values
         \\  let original = cursor
@@ -359,9 +359,9 @@ test "eager tuple reductions keep immutable Core fresh retained replay and emiss
     const a = std.testing.allocator;
     var module = try lower(a,
         \\infixl 60 (+) = add
-        \\const primitive = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const add = fn (left: U32) => fn (right: U32) => primitive left right
-        \\entry const run = fn (count: U32) => do:
+        \\const primitive = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\const add = func (left: U32) => return func (right: U32) => return primitive left right
+        \\entry const run = func (count: U32) => return do:
         \\  let values = @list.fill count (1, 2, 3, 4, 5, 6, 7, 8, 9)
         \\  let cursor = @list.cursor values
         \\  let total = 0
@@ -403,12 +403,12 @@ fn literalEmission(a: std.mem.Allocator, units: []const core.Module) !void {
 test "checked List literal publications retain exact leaf roles under every emission failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (value: U32) => do:
+        \\entry const run = func (value: U32) => return do:
         \\  let child = #[value, @u32.add value 1]
         \\  let rows = [child, child]
         \\  let copied = @array.from_list rows
         \\  break @array.get (@array.get copied 1) 0
-        \\entry const floating = fn (value: F32) => @array.from_list [value, -0.0]
+        \\entry const floating = func (value: F32) => return @array.from_list [value, -0.0]
     );
     defer module.deinit(a);
     const units = [_]core.Module{module};
@@ -429,8 +429,8 @@ test "bottom completion representations preserve cancellation fresh retained rep
     var module = try lower(a,
         \\type Outer is effect = { check: U32 -> U32 }
         \\type Inner is effect = { read: Unit -> U32 }
-        \\const make = fn action => @computation action
-        \\const inner = fn computation => do:
+        \\const make = func action => return @computation action
+        \\const inner = func computation => return do:
         \\  for request in @requests computation:
         \\    case request of
         \\      effect Inner.read () =>
@@ -438,15 +438,15 @@ test "bottom completion representations preserve cancellation fresh retained rep
         \\        yield value
         \\      complete value =>
         \\        break value
-        \\const outer = fn computation => do:
+        \\const outer = func computation => return do:
         \\  for request in @requests computation:
         \\    case request of
         \\      effect Outer.check value =>
         \\        break 42
         \\      complete value =>
         \\        break value
-        \\entry const answer = fn () => outer (@computation (fn () => do:
-        \\  use inner (make (fn () => do:
+        \\entry const answer = func () => return outer (@computation (func () => return do:
+        \\  use inner (make (func () => return do:
         \\    use Inner.read ()
         \\    break @panic "cancelled inner suffix"
         \\  ))
@@ -468,19 +468,19 @@ test "bottom completion representations preserve cancellation fresh retained rep
 test "bottom result proof declines normal returns outward branch and loop control" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const trapped = fn () => @panic "trap"
-        \\const bottom = fn () => do:
+        \\const trapped = func () => return @panic "trap"
+        \\const bottom = func () => return do:
         \\  let value = 7
         \\  break trapped ()
-        \\const ordinary = fn (flag: Bool) => do:
+        \\const ordinary = func (flag: Bool) => return do:
         \\  if flag:
         \\    break 7
         \\  break @panic "suffix"
-        \\const looping = fn () => do:
+        \\const looping = func () => return do:
         \\  for i in 0..1:
         \\    break 7
         \\  break @panic "suffix"
-        \\entry const answer = fn (flag: Bool) => ordinary flag
+        \\entry const answer = func (flag: Bool) => return ordinary flag
     );
     defer module.deinit(a);
     const proof = @import("bottom_result.zig");
@@ -502,18 +502,18 @@ test "resolved collection iteration preserves frozen Core retained replay and co
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
         \\data Maybe a = #Some a | #Nothing
-        \\const List.iter = fn (values: List a) => @list.cursor values
-        \\const Cursor.next = fn (cursor: Cursor collection) =>
+        \\const List.iter = func (values: List a) => return @list.cursor values
+        \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
         \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
         \\  else #Nothing
-        \\const fold = fn reduce => fn initial => fn values => do:
+        \\const fold = func reduce => return func initial => return func values => return do:
         \\  let state = initial
         \\  for value in values:
         \\    use next <- reduce state value
         \\    state := next
         \\  break state
-        \\entry const run = fn (count: U32) => fold (fn left => fn right => @u32.add left right) 0 (@list.generate count (fn index => index))
+        \\entry const run = func (count: U32) => return fold (func left => return func right => return @u32.add left right) 0 (@list.generate count (func index => return index))
     , true);
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -532,16 +532,16 @@ test "empty ordinary cursor producer preserves partial layout Core replay and co
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
         \\data Maybe a = #Some a | #Nothing
-        \\const List.iter = fn (values: List a) => @list.cursor values
-        \\const Array.iter = fn (values: Array a) => @array.cursor values
-        \\const Cursor.next = fn (cursor: Cursor collection) =>
+        \\const List.iter = func (values: List a) => return @list.cursor values
+        \\const Array.iter = func (values: Array a) => return @array.cursor values
+        \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
         \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
         \\  else #Nothing
-        \\entry const list = fn () => case [].iter.next of
+        \\entry const list = func () => return case [].iter.next of
         \\  #Nothing => 42
         \\  #Some (_, _) => 0
-        \\entry const array = fn () => case #[].iter.next of
+        \\entry const array = func () => return case #[].iter.next of
         \\  #Nothing => 42
         \\  #Some (_, _) => 0
     , true);
@@ -562,13 +562,13 @@ test "leaf List traversal keeps reference carries outside its private root scope
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
         \\data Maybe a = #Some a | #Nothing
-        \\const List.iter = fn (values: List a) => @list.cursor values
-        \\const Cursor.next = fn (cursor: Cursor collection) =>
+        \\const List.iter = func (values: List a) => return @list.cursor values
+        \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
         \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
         \\  else #Nothing
-        \\entry const run = fn (count: U32) => do:
-        \\  let values = @list.generate count (fn index => index)
+        \\entry const run = func (count: U32) => return do:
+        \\  let values = @list.generate count (func index => return index)
         \\  let carried = @array.fill 1 count
         \\  for value in values:
         \\    carried := @array.fill 1 value
@@ -588,14 +588,14 @@ test "leaf List traversal keeps reference carries outside its private root scope
 test "chunk scalar publications retain complete ownership through static chains" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const frozen = @list.generate 513 (fn index => index)
-        \\const first = fn values => (@array.from_list values)[0]
-        \\const read = fn (seed: U32) => do:
+        \\const frozen = @list.generate 513 (func index => return index)
+        \\const first = func values => return (@array.from_list values)[0]
+        \\const read = func (seed: U32) => return do:
         \\  let values = @array.from_list [seed, ...[2, 3], 4]
         \\  values[1] := (@array.from_list frozen)[512]
         \\  let array = @array.from_list [value | value <- values, @u32.lt 0 value]
         \\  break first (@list.from_array array)
-        \\entry const answer = fn () => @u32.add (read 40) 2
+        \\entry const answer = func () => return @u32.add (read 40) 2
     );
     defer module.deinit(a);
     var result = try @import("core_backend.zig").compile(a, &.{module}, 1);
@@ -606,7 +606,7 @@ test "chunk scalar publications retain complete ownership through static chains"
 test "checked scalar builder publications preserve Core replay and every emission allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (value: U32) => @array.from_list [@u32.add value index | index <- #[1, 2]]
+        \\entry const run = func (value: U32) => return @array.from_list [@u32.add value index | index <- #[1, 2]]
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -621,11 +621,11 @@ test "checked scalar builder publications preserve Core replay and every emissio
 
 const immediateStepSource =
     \\data Maybe a = #Some a | #Nothing
-    \\const Cursor.next = fn (cursor: Cursor collection) =>
+    \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
     \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
     \\  else #Nothing
-    \\entry const run = fn (values: Array U32) => do:
+    \\entry const run = func (values: Array U32) => return do:
     \\  use step <- (@array.cursor values).next
     \\  let #Some (value, rest) = step else:
     \\    break 0
@@ -663,7 +663,7 @@ test "immediate collection step requires exact producer constructor and a single
     module.nodes[sink.pattern] = pattern;
     for ([_][]const u8{
         "  let #Some (again, _) = step else:\n    break 0\n  break again\n",
-        "  let read = fn () => step\n  let #Some (again, _) = read () else:\n    break 0\n  break again\n",
+        "  let read = func () => return step\n  let #Some (again, _) = read () else:\n    break 0\n  break again\n",
     }) |tail| {
         const text = try std.mem.concat(a, u8, &.{ immediateStepSource[0..std.mem.find(u8, immediateStepSource, "  break @u32.add").?], tail });
         defer a.free(text);
@@ -715,11 +715,11 @@ test "immediate collection step releases every emission allocation failure" {
 
 const localCursorSource =
     \\data Maybe a = #Some a | #Nothing
-    \\const Cursor.next = fn (cursor: Cursor collection) =>
+    \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
     \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
     \\  else #Nothing
-    \\const progress = fn (values: Array U32) => do:
+    \\const progress = func (values: Array U32) => return do:
     \\  let original = @array.cursor values
     \\  let cursor = original
     \\  let total = 0
@@ -732,7 +732,7 @@ const localCursorSource =
     \\    total := @u32.add self value
     \\    cursor := rest
     \\  break cursor
-    \\entry const run = fn (values: Array U32) => @cursor.has (progress values)
+    \\entry const run = func (values: Array U32) => return @cursor.has (progress values)
 ;
 /// The step sink of a statement, over a fresh def-use index of `module`.
 fn stepSinkOf(module: *const core.Module, id: core.Id) !?@import("collection_iteration.zig").StepSink {
@@ -767,8 +767,8 @@ test "private cursor successors require a closed lexical family and reject calls
     try std.testing.expect(std.mem.findScalar(core.BindingId, family.bindings[0..family.len], step.rest) != null);
     const position = std.mem.find(u8, localCursorSource, "  break cursor").?;
     for ([_][]const u8{
-        "  let read = fn () => @cursor.has cursor\n  break cursor\n",
-        "  let read = fn cursor => @cursor.has cursor\n  use ignored <- read cursor\n  break cursor\n",
+        "  let read = func () => return @cursor.has cursor\n  break cursor\n",
+        "  let read = func cursor => return @cursor.has cursor\n  use ignored <- read cursor\n  break cursor\n",
         "  if @cursor.has cursor:\n    cursor := @array.cursor values\n  break cursor\n",
     }) |tail| {
         const text = try std.mem.concat(a, u8, &.{ localCursorSource[0..position], tail });
@@ -816,7 +816,7 @@ test "private cursor successors release all family and materialization allocatio
 
 test "finite cursor carry owners cover duplicate row publications and preserve replay" {
     const a = std.testing.allocator;
-    const text = try std.mem.replaceOwned(u8, a, localCursorSource, "  break cursor\nentry const run = fn (values: Array U32) => @cursor.has (progress values)", "  break total\nentry const run = fn (values: Array U32) => progress values");
+    const text = try std.mem.replaceOwned(u8, a, localCursorSource, "  break cursor\nentry const run = func (values: Array U32) => return @cursor.has (progress values)", "  break total\nentry const run = func (values: Array U32) => return progress values");
     defer a.free(text);
     const finite = try std.mem.replaceOwned(u8, a, text, "for ever:", "for unused in values:");
     defer a.free(finite);
@@ -862,7 +862,7 @@ test "finite cursor carry owners cover duplicate row publications and preserve r
 test "persistent List snapshots lazily freeze the descriptor and preserve complete replay through OOM" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\entry const run = fn (seed: U32) => do:
+        \\entry const run = func (seed: U32) => return do:
         \\  let values = [seed, @u32.add seed 1, @u32.add seed 2]
         \\  let left = @list.cursor values
         \\  let right = @list.cursor values
@@ -919,7 +919,7 @@ fn padded(a: std.mem.Allocator, text: []const u8) ![]u8 {
     var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(a);
     try result.appendSlice(a, text);
-    for (0..1000) |index| try result.print(a, "\nconst pad{d} = fn (x: U32) => @u32.add (@u32.mul x {d}) {d}", .{ index, index + 1, index });
+    for (0..1000) |index| try result.print(a, "\nconst pad{d} = func (x: U32) => return @u32.add (@u32.mul x {d}) {d}", .{ index, index + 1, index });
     return result.toOwnedSlice(a);
 }
 
@@ -972,18 +972,18 @@ test "collection steps, loops and private cursors keep their physical forms abov
     {
         const text = try padded(a,
             \\data Maybe a = #Some a | #Nothing
-            \\const List.iter = fn (values: List a) => @list.cursor values
-            \\const Cursor.next = fn (cursor: Cursor collection) =>
+            \\const List.iter = func (values: List a) => return @list.cursor values
+            \\const Cursor.next = func (cursor: Cursor collection) => return
             \\  if @cursor.has cursor
             \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
             \\  else #Nothing
-            \\const fold = fn reduce => fn initial => fn values => do:
+            \\const fold = func reduce => return func initial => return func values => return do:
             \\  let state = initial
             \\  for value in values:
             \\    use next <- reduce state value
             \\    state := next
             \\  break state
-            \\entry const run = fn (count: U32) => fold (fn left => fn right => @u32.add left right) 0 (@list.generate count (fn index => index))
+            \\entry const run = func (count: U32) => return fold (func left => return func right => return @u32.add left right) 0 (@list.generate count (func index => return index))
         );
         defer a.free(text);
         var module = try lowerWithCatalog(a, text, true);
@@ -1005,8 +1005,8 @@ test "collection steps, loops and private cursors keep their physical forms abov
 }
 
 const linearCursorSource =
-    \\entry const run = fn (count: U32) => do:
-    \\  let values = @list.generate count (fn i => {x: i, y: @u32.add i 1})
+    \\entry const run = func (count: U32) => return do:
+    \\  let values = @list.generate count (func i => return {x: i, y: @u32.add i 1})
     \\  let original = @list.cursor values
     \\  let cursor = original
     \\  let total = 0
@@ -1078,13 +1078,13 @@ test "linear cursor path storage preserves emission replay and complete OOM clea
 test "linear cursor directory reference exits preserve owners through every allocation failure" {
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
-        \\const shifted = fn (count: U32) => do:
-        \\  let values = @list.generate (@u32.add count 3) (fn i => {x: i, y: @u32.add i 1})
+        \\const shifted = func (count: U32) => return do:
+        \\  let values = @list.generate (@u32.add count 3) (func i => return {x: i, y: @u32.add i 1})
         \\  let cursor = @list.cursor values
         \\  for index in 0..count:
         \\    cursor := @cursor.advance self
         \\  return cursor
-        \\entry const run = fn (count: U32) => do:
+        \\entry const run = func (count: U32) => return do:
         \\  let cursor = shifted count
         \\  return (@cursor.value cursor).y
     , true);
@@ -1110,10 +1110,10 @@ fn identityArrayFailures(a: std.mem.Allocator, module: *const core.Module) !void
 test "identity generation shares immutable storage without granting either alias exclusive ownership" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const generate = fn count => fn callback => @array.generate count callback
-        \\entry const run = fn (count: U32) => do:
-        \\  let saved = generate count (fn index => index)
-        \\  let copied = generate (@array.length saved) (fn index => @array.get saved index)
+        \\const generate = func count => return func callback => return @array.generate count callback
+        \\entry const run = func (count: U32) => return do:
+        \\  let saved = generate count (func index => return index)
+        \\  let copied = generate (@array.length saved) (func index => return @array.get saved index)
         \\  saved[0] := 9
         \\  copied[1] := 8
         \\  break @u32.add saved[1] copied[0]
@@ -1134,12 +1134,12 @@ test "tagged numeric rows preserve frozen evidence and release every emission al
     const a = std.testing.allocator;
     var module = try lower(a,
         \\type Choice is data = #Empty | #One U32 | #Pair {x: U32, y: U32}
-        \\const make = fn (i: U32) -> Choice => if @u32.eq i 0 then #Empty else if @u32.eq i 1 then #One i else #Pair {x: i, y: 7}
-        \\const read = fn (v: Choice) -> U32 => case v of
+        \\const make = func (i: U32) : Choice => return if @u32.eq i 0 then #Empty else if @u32.eq i 1 then #One i else #Pair {x: i, y: 7}
+        \\const read = func (v: Choice) : U32 => return case v of
         \\  #Empty => 0
         \\  #One n => n
         \\  #Pair (x, y) => @u32.add x y
-        \\entry const run = fn (count: U32) => do:
+        \\entry const run = func (count: U32) => return do:
         \\  let rows = @array.generate count make
         \\  let total = 0
         \\  for row in rows:
@@ -1157,13 +1157,13 @@ test "tagged numeric rows preserve frozen evidence and release every emission al
 test "rectangular pipelines prove single use and preserve frozen evidence through OOM" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const generate = fn count => fn f => @array.generate count f
-        \\const map = fn f => fn values => generate (@array.length values) (fn i => f values[i])
-        \\const flatten = fn (chunks: Array (Array a)) => @array.flatten chunks
+        \\const generate = func count => return func f => return @array.generate count f
+        \\const map = func f => return func values => return generate (@array.length values) (func i => return f values[i])
+        \\const flatten = func (chunks: Array (Array a)) => return @array.flatten chunks
         \\type Command is data = #Command {lanes: Array U32}
-        \\entry const run = fn (count: U32) => do:
-        \\  let commands = generate count (fn i => #Command {lanes: generate 24 (fn j => @u32.add (@u32.mul i 24) j)})
-        \\  let chunks = map (fn c => c.lanes) commands
+        \\entry const run = func (count: U32) => return do:
+        \\  let commands = generate count (func i => return #Command {lanes: generate 24 (func j => return @u32.add (@u32.mul i 24) j)})
+        \\  let chunks = map (func c => return c.lanes) commands
         \\  let lanes = flatten chunks
         \\  break lanes
     );
@@ -1194,9 +1194,9 @@ test "executed memory profile owns detached origins metadata and instrumentation
     const a = std.testing.allocator;
     var module = try lower(a,
         \\type Pair is data = #Pair {a: U32, b: U32}
-        \\const make = fn (value: U32) => #Pair {a: value, b: @u32.add value 1}
-        \\const generate = fn count => fn make => @array.generate count make
-        \\entry const run = fn (count: U32) => do:
+        \\const make = func (value: U32) => return #Pair {a: value, b: @u32.add value 1}
+        \\const generate = func count => return func make => return @array.generate count make
+        \\entry const run = func (count: U32) => return do:
         \\  let values = generate count make
         \\  let old = values
         \\  values[0] := #Pair {a: count, b: count}
@@ -1225,8 +1225,8 @@ fn collectorContractFailures(a: std.mem.Allocator, units: []const core.Module, e
 test "collector-free certificate and rejection own their evidence through all allocation failures" {
     const a = std.testing.allocator;
     const sources = [_][]const u8{
-        "entry const run = fn (count: U32) => do:\n  let values = @array.generate count (fn i => @u32.add i 1)\n  let sum = 0\n  for value in values:\n    sum := @u32.add self value\n  break sum",
-        "entry const run = fn (count: U32) => do:\n  let values = @array.generate count (fn i => fn n => @u32.add i n)\n  break values[0] count",
+        "entry const run = func (count: U32) => return do:\n  let values = @array.generate count (func i => return @u32.add i 1)\n  let sum = 0\n  for value in values:\n    sum := @u32.add self value\n  break sum",
+        "entry const run = func (count: U32) => return do:\n  let values = @array.generate count (func i => return func n => return @u32.add i n)\n  break values[0] count",
     };
     for (sources, 0..) |source, index| {
         var module = try lower(a, source);

@@ -2,25 +2,25 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 const source = `
 type Pair is data = #Pair (U32,U32)
 type Fields is data = #Fields { first: U32, second: U32 }
-const first = fn actual => do:
+const first = func actual => return do:
   let expected = 7
   break case actual of
     #Pair (expected,^expected) => expected
     _ => 0
-const second = fn actual => do:
+const second = func actual => return do:
   let expected = 7
   break case actual of
     #Pair (^expected,expected) => expected
     _ => 0
-const fields = fn actual => do:
+const fields = func actual => return do:
   let expected = 7
   break case actual of
     #Fields { first: expected, second: ^expected } => expected
     _ => 0
-entry const first_value = fn value => first (#Pair (value,7))
-entry const second_value = fn value => second (#Pair (7,value))
-entry const fields_value = fn value => fields (#Fields { first: value, second: 7 })
-entry const miss = fn value => first (#Pair (42,value))
+entry const first_value = func value => return first (#Pair (value,7))
+entry const second_value = func value => return second (#Pair (7,value))
+entry const fields_value = func value => return fields (#Fields { first: value, second: 7 })
+entry const miss = func value => return first (#Pair (42,value))
 entry const folded = first (#Pair (42,7))
 entry const folded_miss = first (#Pair (7,42))
 `;

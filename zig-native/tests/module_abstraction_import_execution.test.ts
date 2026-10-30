@@ -7,19 +7,19 @@ const executable = Deno.args[0] ??
 const producer = (offset: number) =>
   `opaque type Token = F32
 private const offset = ${offset}.0
-const make: F32 -> Token = fn value => #Token (@f32.add value offset)
-const read: Token -> F32 = fn (#Token value) => value
+const make: F32 -> Token = func value => return #Token (@f32.add value offset)
+const read: Token -> F32 = func (#Token value) => return value
 const Token.observe = read
 private const Token.hidden = read
-private const Token.add = fn left => fn right => #Token (@f32.add (read left) (read right))
-const internal = fn value => read (@type.call "add" (make value) (make value))
+private const Token.add = func left => return func right => return #Token (@f32.add (read left) (read right))
+const internal = func value => return read (@type.call "add" (make value) (make value))
 `;
 const main = `import {Token, make} from "./tokens"
 import * as facade from "./outward"
 type Alias = facade.Ticket
-const pass: Token -> Alias = fn value => value
-entry const answer = fn (value: F32) => facade.read (pass (make value))
-entry const associated = fn (value: F32) => (make value).observe
+const pass: Token -> Alias = func value => return value
+entry const answer = func (value: F32) => return facade.read (pass (make value))
+entry const associated = func (value: F32) => return (make value).observe
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>, expected: number) {
   const guest = await instantiateGuest(bytes);
@@ -85,11 +85,11 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
           main.replace(
             "facade.read (pass (make value))",
             "facade.read (combine (make value))",
-          ) + 'const combine = fn value => @type.call "add" value value\n',
+          ) + 'const combine = func value => return @type.call "add" value value\n',
           main.replace(
             "facade.read (pass (make value))",
             "reveal (make value)",
-          ) + "const reveal = fn value => value.hidden\n",
+          ) + "const reveal = func value => return value.hidden\n",
           'import {Token} from "./tokens"\nentry const answer = #Token 42.0\n',
         ]
       ) {
@@ -162,11 +162,11 @@ Deno.test("opaque generic field requirements cannot derive hidden producer paylo
   try {
     await Deno.writeTextFile(
       `${directory}/library.blot`,
-      "opaque type Box = {value:U32}\nconst make = fn value => #Box {value:value}\n",
+      "opaque type Box = {value:U32}\nconst make = func value => return #Box {value:value}\n",
     );
     await Deno.writeTextFile(
       entry,
-      'import {make} from "./library"\nconst reveal = fn value => value.value\nentry const runtime = fn (value:U32) => reveal (make value)\nentry const staged = reveal (make 42)\n',
+      'import {make} from "./library"\nconst reveal = func value => return value.value\nentry const runtime = func (value:U32) => return reveal (make value)\nentry const staged = reveal (make 42)\n',
     );
     const compiler = await createZigProjectCompiler({
       executable,
@@ -192,11 +192,11 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
   try {
     await Deno.writeTextFile(
       entry,
-      'import {make, read} from "./library"\nentry const answer = fn (value:U32) => read (make value)\nentry const folded = read (make 42)\n',
+      'import {make, read} from "./library"\nentry const answer = func (value:U32) => return read (make value)\nentry const folded = read (make 42)\n',
     );
     await Deno.writeTextFile(
       library,
-      "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => value\n",
+      "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n",
     );
     const retained = await createZigProjectCompiler(options);
     try {
@@ -204,7 +204,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
       assert(scalar.success, JSON.stringify(scalar));
       await Deno.writeTextFile(
         library,
-        "opaque type Token = {word: U32}\nconst make: U32 -> Token = fn value => #Token {word: value}\nconst read: Token -> U32 = fn (#Token value) => value.word\n",
+        "opaque type Token = {word: U32}\nconst make: U32 -> Token = func value => return #Token {word: value}\nconst read: Token -> U32 = func (#Token value) => return value.word\n",
       );
       const reference = await retained.build();
       assert(reference.success, JSON.stringify(reference));

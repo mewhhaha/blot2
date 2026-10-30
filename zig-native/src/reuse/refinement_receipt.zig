@@ -218,7 +218,7 @@ fn localMemoScenario(a: Allocator) !void {
     };
     // Publication now validates its callable source owner. Keep this local
     // memo law rooted in checked Core instead of a fabricated absent body.
-    const source = "const memo = fn value => value";
+    const source = "const memo = func value => return value";
     var names: @import("../parse/symbols.zig").Pool = .{};
     defer names.deinit(a);
     var tokens = try @import("../parse/lexer.zig").lex(a, source);

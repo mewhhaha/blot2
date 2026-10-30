@@ -18,12 +18,12 @@ Deno.test("counted List rotations preserve borrowed pivots after original owners
     const result = await compiler.build({
       sources: {
         [entry]: `
-entry const forward = fn (count: U32) => do:
+entry const forward = func (count: U32) => return do:
   let values: List U32 = []
   for index in 0..count:
     values := [...self, index]
   break Array.from_list values
-entry const backward = fn (count: U32) => do:
+entry const backward = func (count: U32) => return do:
   let values: List U32 = []
   for index in 0..count:
     values := [index, ...self]
@@ -70,14 +70,14 @@ entry const backward = fn (count: U32) => do:
 });
 
 const source = `
-const make = fn (value: U32) => #[value, value + 1]
-const choose = fn (values: Array (Array U32)) => values[0]
-entry const run = fn (value: U32) => do:
+const make = func (value: U32) => return #[value, value + 1]
+const choose = func (values: Array (Array U32)) => return values[0]
+entry const run = func (value: U32) => return do:
   let child = make value
   let parent = #[child, child]
   let alias = choose parent
   break alias[0] + parent[1][1]
-entry const trapped = fn (value: U32) => do:
+entry const trapped = func (value: U32) => return do:
   let values = make value
   break values[value]
 `;
@@ -142,14 +142,14 @@ Deno.test("source loop carries preserve old aliases and retire discarded iterati
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const make = fn (value: U32) => #[value, value + 1]
-const first = fn (end: U32) => fn (value: U32) => do:
+const make = func (value: U32) => return #[value, value + 1]
+const first = func (end: U32) => return func (value: U32) => return do:
   for index in 0..end:
     let values = make (value + index)
     if index == 3:
       break values
   break make value
-entry const run = fn (end: U32) => do:
+entry const run = func (end: U32) => return do:
   let values = make 41
   let before = values
   let previous = make 99
@@ -160,7 +160,7 @@ entry const run = fn (end: U32) => do:
     if index == 6:
       break
   break before[0] + values[0] + previous[0] + (first end 100)[0]
-entry const trapped = fn (end: U32) => do:
+entry const trapped = func (end: U32) => return do:
   let values = make 41
   for index in 0..end:
     values := make (self[0] + 1)
@@ -228,17 +228,17 @@ Deno.test("startup reference globals retain captures and ready demand results un
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = fn ~value => value
+const delay = func ~value => return value
 let values = @array.fill 3 40
-let saved = (fn (capture: Array U32) => fn (index: U32) => capture[index]) values
+let saved = (func (capture: Array U32) => return func (index: U32) => return capture[index]) values
 let pending = delay (@array.fill 3 (saved 0))
 let alias = pending
-entry const run = fn (value: U32) => do:
+entry const run = func (value: U32) => return do:
   let before = @force pending
   let after = @force alias
   let changed = @array.set values 0 value
   break saved 2 + before[1] + after[2] + changed[0]
-entry const pressure = fn (count: U32) => do:
+entry const pressure = func (count: U32) => return do:
   let values = @array.fill count 99
   break values[count - 1]
 `;
@@ -299,11 +299,11 @@ Deno.test("source State preserves the old graph held by a strong ready demand me
   const entry = `${directory}/main.blot`;
   const source = `
 data Cell value = #Cell value
-const delay = fn ~value => value
-entry const run = fn (value: U32) => do:
-  let (_, result) = @state.run (#Cell #[value]) (fn () => do:
+const delay = func ~value => return value
+entry const run = func (value: U32) => return do:
+  let (_, result) = @state.run (#Cell #[value]) (func () => return do:
     let pending = delay (do:
-      use cell <- @state.get (fn () => #Cell #[0])
+      use cell <- @state.get (func () => return #Cell #[0])
       let #Cell values = cell
       break values)
     use before <- @force pending
@@ -355,11 +355,11 @@ Deno.test("public scalar Arrays own marshalled inputs and copy results before in
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-entry const make = fn (count: U32) => @array.generate count (fn index => index + 41)
-entry const copy = fn (values: Array U32) => @array.set values 0 99
-entry const first = fn (values: Array U32) => values[0]
-entry const floats = fn (values: Array F32) => @array.set values 0 2.5
-entry const trapped = fn (values: Array U32) => values[values[0]]
+entry const make = func (count: U32) => return @array.generate count (func index => return index + 41)
+entry const copy = func (values: Array U32) => return @array.set values 0 99
+entry const first = func (values: Array U32) => return values[0]
+entry const floats = func (values: Array F32) => return @array.set values 0 2.5
+entry const trapped = func (values: Array U32) => return values[values[0]]
 `;
   try {
     for (const tier of ["development", "optimized"] as const) {
@@ -444,18 +444,18 @@ Deno.test("static demands and List caches publish exact persistent reference roo
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = fn ~value => value
+const delay = func ~value => return value
 const pending = delay (@array.fill 3 40)
 const alias = pending
 const values = [#[10, 11], #[20, 21], #[30, 31]]
-entry const run = fn (index: U32) => do:
+entry const run = func (index: U32) => return do:
   let before = @force pending
   let after = @force alias
   let total = 0
   for selected in values:
     total := self + selected[1]
   break before[1] + after[2] + total + index
-entry const pressure = fn (count: U32) => do:
+entry const pressure = func (count: U32) => return do:
   let values = @array.fill count 99
   break values[count - 1]
 `;
@@ -512,17 +512,17 @@ Deno.test("persistent records in Lists and Arrays own closure captures and share
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const delay = fn ~value => value
-const build = fn () => do:
+const delay = func ~value => return value
+const build = func () => return do:
   let children = #[40, 41]
   let pending = delay children
-  let read = fn (index: U32) => children[index]
+  let read = func (index: U32) => return children[index]
   break @list.fill 3 {pending, read}
 let saved = build ()
-entry const run = fn (value: U32) => do:
+entry const run = func (value: U32) => return do:
   let values = @array.from_list saved
   let before = values
-  values[0] := {pending: delay #[value, value + 1], read: fn (index: U32) => value + index}
+  values[0] := {pending: delay #[value, value + 1], read: func (index: U32) => return value + index}
   let old = before[0]
   let changed = values[0]
   let cached = @force old.pending
@@ -593,13 +593,13 @@ Deno.test("counted reference loop roots plateau across repeated guest calls and 
     const result = await compiler.build({
       sources: {
         [entry]: `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let values = #[41, 42]
   let before = values
   for index in 0..count:
     values := #[self[0] + 1, self[1] + 1]
   break before[0] + values[0]
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
       },
     });
@@ -643,9 +643,9 @@ entry const memory = fn () -> Array U32 => #[]
 // Issue 9: in-place Array loops must not pay journal work per iteration, and
 // shared or replaced carries must keep their counted owners.
 const inPlaceLoopSource = `
-const sorted_ids = fn (count: U32) -> Array U32 => do:
-  let keys = @array.generate count (fn (i: U32) => (i * 7919 + 13) % 1009)
-  let ids = @array.generate count (fn (i: U32) => i)
+const sorted_ids = func (count: U32) : Array U32 => return do:
+  let keys = @array.generate count (func (i: U32) => return (i * 7919 + 13) % 1009)
+  let ids = @array.generate count (func (i: U32) => return i)
   for i in 1..count:
     let j = i
     for 0..i:
@@ -664,14 +664,14 @@ const sorted_ids = fn (count: U32) -> Array U32 => do:
       j := self - 1
   break ids
 entry const order = sorted_ids
-entry const order_checksum = fn (count: U32) => do:
+entry const order_checksum = func (count: U32) => return do:
   let ids = sorted_ids count
   let total = 0
   for i in 0..count:
     total := self + (i + 1) * ids[i]
   break total
-entry const paths = fn (count: U32) -> Array F32 => do:
-  let rows = @array.generate 8 (fn (r: U32) => @array.fill 4 r)
+entry const paths = func (count: U32) : Array F32 => return do:
+  let rows = @array.generate 8 (func (r: U32) => return @array.fill 4 r)
   let costs = @array.fill count 1.0
   let total = 0
   for step in 0..count:
@@ -684,7 +684,7 @@ entry const paths = fn (count: U32) -> Array F32 => do:
   for cost in costs:
     sum := self + cost
   break #[U32.to_f32 total, sum, U32.to_f32 rows[7][0], U32.to_f32 rows[3][3]]
-entry const snapshots = fn (count: U32) => do:
+entry const snapshots = func (count: U32) => return do:
   let values = @array.fill count 0
   let before = values
   let seen = 0
@@ -696,9 +696,9 @@ entry const snapshots = fn (count: U32) => do:
   for value in before:
     total := self + value
   break seen * 1000 + total
-entry const escapes = fn (count: U32) => do:
+entry const escapes = func (count: U32) => return do:
   let values = @array.fill 4 0
-  let holder = @array.generate count (fn (i: U32) => @array.fill 1 i)
+  let holder = @array.generate count (func (i: U32) => return @array.fill 1 i)
   for i in 0..count:
     values[i % 4] := i
     holder[i] := values
@@ -707,7 +707,7 @@ entry const escapes = fn (count: U32) => do:
     let row = holder[i]
     total := self + row[0] + row[1] * 3 + row[2] * 5 + row[3] * 7
   break total
-entry const swaps = fn (count: U32) => do:
+entry const swaps = func (count: U32) => return do:
   let a = @array.fill 8 1
   let b = @array.fill 8 2
   let total = 0

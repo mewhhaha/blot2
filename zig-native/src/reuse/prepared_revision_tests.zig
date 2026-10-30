@@ -14,16 +14,16 @@ const source = @import("fixtures").source("partial-runtime-fixtures/namespace-ab
 const second_source = blk: {
     @setEvalBranchQuota(10000);
     const at = std.mem.find(u8, replace_provider, "effect Local").?;
-    break :blk replace_provider[0..at] ++ "const unrelated=fn value=>identity value\ndata Before=#Before U32\n" ++ replace_provider[at..];
+    break :blk replace_provider[0..at] ++ "const unrelated=func value=> return identity value\ndata Before=#Before U32\n" ++ replace_provider[at..];
 };
 const replace_provider = blk: {
     @setEvalBranchQuota(10000);
-    const needle = "fn () => 0.75";
+    const needle = "func () => return 0.75";
     const at = std.mem.find(u8, source, needle).?;
-    break :blk source[0..at] ++ "fn () => 1.75" ++ source[at + needle.len ..];
+    break :blk source[0..at] ++ "func () => return 1.75" ++ source[at + needle.len ..];
 };
 const invalid_source = "entry const invalid=identity 4294967296\n";
-const prelude = "const identity=fn value=>value\n";
+const prelude = "const identity=func value=> return value\n";
 
 fn preparedContext(allocator: std.mem.Allocator, path: []const u8) !void {
     for ([_]project.InputMode{ .project, .source }) |mode| {
@@ -43,7 +43,7 @@ fn preparedContext(allocator: std.mem.Allocator, path: []const u8) !void {
         preparation_alive = false;
         const diagnostic = result.result.compiled.diagnostic orelse return error.MissingDiagnostic;
         try std.testing.expectEqual(backend.Code.missing_field, diagnostic.code);
-        try std.testing.expectEqual(core.Span{ .start = 81, .end = 81 }, diagnostic.span);
+        try std.testing.expectEqual(core.Span{ .start = 90, .end = 90 }, diagnostic.span);
         try std.testing.expectEqualStrings(if (mode == .source)
             "no field read on main::Box"
         else
@@ -55,7 +55,7 @@ fn preparedContext(allocator: std.mem.Allocator, path: []const u8) !void {
 fn contextFixture() !std.testing.TmpDir {
     var dir = std.testing.tmpDir(.{});
     errdefer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "renamed.blot", .data = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "renamed.blot", .data = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n" });
     return dir;
 }
 
@@ -142,7 +142,7 @@ const Fixture = struct {
     fn init() !Fixture {
         var dir = std.testing.tmpDir(.{});
         errdefer dir.cleanup();
-        inline for (.{ .{ "a.blot", @import("fixtures").source("partial-runtime-fixtures/a.blot") }, .{ "b.blot", @import("fixtures").source("partial-runtime-fixtures/b.blot") }, .{ "main.blot", source }, .{ "prelude.blot", prelude }, .{ "seed.blot", "entry const initial:Unit->U32=fn()=>0\n" } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
+        inline for (.{ .{ "a.blot", @import("fixtures").source("partial-runtime-fixtures/a.blot") }, .{ "b.blot", @import("fixtures").source("partial-runtime-fixtures/b.blot") }, .{ "main.blot", source }, .{ "prelude.blot", prelude }, .{ "seed.blot", "entry const initial:Unit->U32=func()=> return 0\n" } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
         const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
         errdefer a.free(path);
         const prelude_path = try dir.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);
@@ -425,11 +425,11 @@ fn deferredEmissionFailure(allocator: std.mem.Allocator, history: *PreparedHisto
 
 const retained = @import("retained_revision.zig");
 const metadata = @import("code_artifacts.zig");
-const retained_prelude = "const identity=fn value=>value\nconst factory=fn value=>fn more=>@f32.add value more\n";
+const retained_prelude = "const identity=func value=> return value\nconst factory=func value=> return func more=> return @f32.add value more\n";
 const retained_first =
     \\import * as alpha from "./a"
     \\import * as beta from "./b"
-    \\entry const answer: F32 -> F32 = fn value => do:
+    \\entry const answer: F32 -> F32 = func value => return do:
     \\  let add = factory value
     \\  break identity (add 1.25)
     \\entry const folded = identity 11
@@ -437,7 +437,7 @@ const retained_first =
 const retained_second =
     \\import * as alpha from "./a"
     \\import * as beta from "./b"
-    \\entry const answer: F32 -> F32 = fn value => do:
+    \\entry const answer: F32 -> F32 = func value => return do:
     \\  let add = factory value
     \\  break identity (add 2.25)
     \\entry const folded = identity 12
@@ -480,7 +480,7 @@ fn checkCurrent(session: *const retained.Session, fixture: *const Fixture, expec
     var emitted = try current.prepared.emit(a);
     defer emitted.deinit(a);
     try checkRetainedResult(&emitted, expected);
-    var replayed = try current.artifacts.emission.materialize(a);
+    var replayed = try current.artifacts.?.emission.materialize(a);
     defer replayed.deinit();
     const bytes = try replayed.assembleCheckedWithOptions(.{});
     defer a.free(bytes);
@@ -499,12 +499,12 @@ fn retainedRevisions(allocator: std.mem.Allocator, fixture: *Fixture) !void {
     defer first.deinit(allocator);
     try checkRetainedResult(&first, fixture.first_expected);
     const core_stamp = metadata.stamp(session.current.?.prepared.units);
-    const body_stamp = metadata.stamp(session.current.?.artifacts.emission.instructions);
+    const body_stamp = metadata.stamp(session.current.?.artifacts.?.emission.instructions);
     try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = retained_second });
     var second = session.revise(std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path }) catch |err| {
         if (err == error.OutOfMemory) {
             try std.testing.expectEqualSlices(u8, &core_stamp, &metadata.stamp(session.current.?.prepared.units));
-            try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+            try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.?.emission.instructions));
             try checkCurrent(&session, fixture, fixture.first_expected);
         }
         return err;
@@ -536,14 +536,14 @@ test "retained history keeps prior ownership through error correction revert and
         try checkRetainedResult(&result, if (std.mem.eql(u8, text, retained_first)) fixture.first_expected else fixture.second_expected);
     }
     const before_core = metadata.stamp(session.current.?.prepared.units);
-    const before_bodies = metadata.stamp(session.current.?.artifacts.emission.instructions);
+    const before_bodies = metadata.stamp(session.current.?.artifacts.?.emission.instructions);
     try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = invalid_source });
     var rejected = try session.revise(std.testing.io, fixture.path, null, .{ .prelude_path = fixture.prelude_path });
     defer rejected.deinit(a);
     try std.testing.expectEqualStrings("integer_range", rejected.result.diagnostic.?.code);
     try std.testing.expectEqual(@as(usize, 2), session.revisions);
     try std.testing.expectEqualSlices(u8, &before_core, &metadata.stamp(session.current.?.prepared.units));
-    try std.testing.expectEqualSlices(u8, &before_bodies, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+    try std.testing.expectEqualSlices(u8, &before_bodies, &metadata.stamp(session.current.?.artifacts.?.emission.instructions));
     try checkCurrent(&session, &fixture, fixture.second_expected);
     for ([_][]const u8{ retained_first, retained_second, retained_first }) |text| {
         try fixture.dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = text });
@@ -558,7 +558,7 @@ test "retained history keeps prior ownership through error correction revert and
         \\import * as beta from "./b"
         \\effect Added: Unit -> Unit
         \\data Extra = #Extra U32
-        \\entry const answer: F32 -> F32 = fn value => do:
+        \\entry const answer: F32 -> F32 = func value => return do:
         \\  let add = factory value
         \\  break identity (add 1.25)
         \\entry const folded = identity 11
@@ -613,7 +613,7 @@ fn retainedSetup(allocator: std.mem.Allocator, fixture: *Fixture) !void {
 fn retainedCandidateFailure(allocator: std.mem.Allocator, fixture: *Fixture, session: *retained.Session) !void {
     try restoreRetained(fixture, retained_second);
     const core_stamp = metadata.stamp(session.current.?.prepared.units);
-    const body_stamp = metadata.stamp(session.current.?.artifacts.emission.instructions);
+    const body_stamp = metadata.stamp(session.current.?.artifacts.?.emission.instructions);
     // Existing owners keep their original allocator. Only the candidate uses
     // the injector; discard releases it before restoring the Session allocator.
     // commit is allocation-free and the integrated law above exercises it.
@@ -623,7 +623,7 @@ fn retainedCandidateFailure(allocator: std.mem.Allocator, fixture: *Fixture, ses
         try fixture.removeSources();
         try std.testing.expectEqual(@as(usize, 1), session.revisions);
         try std.testing.expectEqualSlices(u8, &core_stamp, &metadata.stamp(session.current.?.prepared.units));
-        try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+        try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.?.emission.instructions));
         try checkCurrent(session, fixture, fixture.first_expected);
         return err;
     };
@@ -641,7 +641,7 @@ fn retainedCandidateFailure(allocator: std.mem.Allocator, fixture: *Fixture, ses
     try std.testing.expect(session.discard(ready));
     try std.testing.expectEqual(@as(usize, 1), session.revisions);
     try std.testing.expectEqualSlices(u8, &core_stamp, &metadata.stamp(session.current.?.prepared.units));
-    try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.emission.instructions));
+    try std.testing.expectEqualSlices(u8, &body_stamp, &metadata.stamp(session.current.?.artifacts.?.emission.instructions));
     try checkCurrent(session, fixture, fixture.first_expected);
     try checkRetainedResult(result, fixture.second_expected);
 }

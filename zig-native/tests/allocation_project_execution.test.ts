@@ -8,8 +8,8 @@ Deno.test("allocation explanations retain native asset spans and identical execu
   const entry = `${directory}/main.blot`;
   const asset = `${directory}/data.json`;
   const source = `import * as config from "./data.json"
-entry const values = fn (replacement: U32) => do:
-  let values = @array.generate (config.value).count $ fn index => index
+entry const values = func (replacement: U32) => return do:
+  let values = @array.generate (config.value).count $ func index => return index
   values[0] := replacement
   return values
 `;

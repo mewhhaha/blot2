@@ -42,11 +42,11 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module, valid: bool) !
 
 const nominal_source =
     \\type Box is data = #Box U32
-    \\const Box.add = fn left => fn right => do:
+    \\const Box.add = func left => return func right => return do:
     \\  let #Box a = left
     \\  let #Box b = right
     \\  break #Box (@u32.add a b)
-    \\entry const answer = fn () => case @type.call "add" (#Box 21) (#Box 21) of
+    \\entry const answer = func () => return case @type.call "add" (#Box 21) (#Box 21) of
     \\  #Box value => value
     \\entry const folded = answer ()
 ;
@@ -68,12 +68,12 @@ fn checkScenario(allocator: std.mem.Allocator, source: []const u8) !void {
 
 test "named primitive associated calls require a catalog in both constant evaluation and body specialization" {
     for ([_][]const u8{
-        "entry const answer = fn () => @type.call \"add\" 21 21\n",
+        "entry const answer = func () => return @type.call \"add\" 21 21\n",
         "entry const folded = @type.call \"add\" 21 21\n",
-        "entry const answer = fn () => @type.call \"eq\" #True #True\n",
-        "entry const folded = @type.call \"eq\" #True #True\n",
-        "const U32.add = fn left => fn right => @u32.add left right\nentry const answer = fn () => @type.call \"add\" 21 21\n",
-        "const U32.add = fn left => fn right => @u32.add left right\nentry const folded = @type.call \"add\" 21 21\n",
+        "entry const answer = func () => return @type.call \"eq\" true true\n",
+        "entry const folded = @type.call \"eq\" true true\n",
+        "const U32.add = func left => return func right => return @u32.add left right\nentry const answer = func () => return @type.call \"add\" 21 21\n",
+        "const U32.add = func left => return func right => return @u32.add left right\nentry const folded = @type.call \"add\" 21 21\n",
     }) |source| {
         try checkScenario(a, source);
         try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkScenario, .{source});
@@ -95,7 +95,7 @@ test "named primitive associated calls require a catalog in both constant evalua
 
 test "ordinary qualified primitive names and nominal catalogs remain callable without a prelude" {
     for ([_][]const u8{
-        "const U32.add = fn left => fn right => @u32.add left right\nentry const answer = fn () => U32.add 21 21\nentry const folded = answer ()\n",
+        "const U32.add = func left => return func right => return @u32.add left right\nentry const answer = func () => return U32.add 21 21\nentry const folded = answer ()\n",
         nominal_source,
     }) |source| {
         var module = try lower(a, source);

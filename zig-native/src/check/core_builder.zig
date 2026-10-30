@@ -397,8 +397,7 @@ const Builder = struct {
                 defer fields.deinit(allocator);
                 for (0..original.b) |index| {
                     const field = self.source.checked.types.recordField(original, index);
-                    const saved = try self.scratch.saved_fields.getOrPut(self.allocator, field.name);
-                    if (!saved.found_existing) try self.tables.field_names.append(self.allocator, .{ .symbol = field.name, .spelling = try self.saveName(self.source.names.get(field.name)) });
+                    try self.saveFieldName(field.name);
                     try fields.appendSlice(allocator, &.{ field.name, try self.projectType(field.ty, depth + 1) });
                 }
                 const span = try self.saveTypes(fields.items);
@@ -519,14 +518,26 @@ const Builder = struct {
         try self.tables.type_extra.appendSlice(self.allocator, values);
         return .{ .start = start, .len = @intCast(values.len) };
     }
-    fn projectScheme(self: *Builder, scheme: T.Scheme) Error!T.Scheme {
+    fn projectScheme(self: *Builder, scheme: T.Scheme, local: bool) Error!T.Scheme {
         var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const allocator = scratch.allocator();
         const root = try self.projectType(scheme.root, 0);
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(allocator);
-        for (self.source.checked.types.list(scheme.variables)) |id| try variables.append(allocator, try self.projectType(id, 0));
+        for (self.source.checked.types.list(scheme.variables)) |id| {
+            const projected = try self.projectType(id, 0);
+            // A local initializer can constrain an earlier inferred scheme
+            // after generalization (for example a comprehension index). Core
+            // owns the final resolved root and predicates: a solved ordinary
+            // binder is no longer quantified, and aliased binders are one
+            // variable. Exported and explicit quantifier owners stay intact.
+            if (local and self.tables.type_nodes.items[root].tag != .forall and self.tables.type_nodes.items[root].tag != .existential) {
+                if (self.tables.type_nodes.items[projected].tag != .variable) continue;
+                if (std.mem.findScalar(T.Id, variables.items, projected) != null) continue;
+            }
+            try variables.append(allocator, projected);
+        }
         var universal = root;
         var scopes: usize = 0;
         while (self.tables.type_nodes.items[universal].tag == .forall) {
@@ -645,8 +656,16 @@ const Builder = struct {
         try self.tables.references.append(self.allocator, self.target(binding));
         return self.make(source, .{ .tag = .reference, .ty = ty, .a = index });
     }
+    fn saveFieldName(self: *Builder, symbol: u32) Error!void {
+        if (symbol == 0) return;
+        const saved = try self.scratch.saved_fields.getOrPut(self.allocator, symbol);
+        if (!saved.found_existing) try self.tables.field_names.append(self.allocator, .{ .symbol = symbol, .spelling = try self.saveName(self.source.names.get(symbol)) });
+    }
     fn projectionIndex(self: *Builder, catalog: u32, source_type: T.Id, result_type: T.Id) Error!u32 {
         const metadata = self.source.checked.projection_catalog[catalog];
+        // A generic field constraint need not leave a concrete record type in
+        // this module. Its executable projection still owns the field spelling.
+        try self.saveFieldName(metadata.field);
         const start: u32 = @intCast(self.tables.projection_variants.items.len);
         const words = self.source.checked.types.list(metadata.variants);
         var offset: usize = 0;
@@ -984,7 +1003,7 @@ const Builder = struct {
                 try self.nodeCaptures(value.b, epoch, captures, depth + 1);
             },
             .return_, .result_associated, .force => try self.nodeCaptures(value.a, epoch, captures, depth + 1),
-            .block, .suite, .product, .record, .array, .array_op, .task => {
+            .block, .suite, .product, .record, .array, .array_op, .storage, .task => {
                 for (self.tables.extra.items[value.a..][0..value.b]) |child| try self.nodeCaptures(child, epoch, captures, depth + 1);
             },
             .call, .break_ => for (self.tables.extra.items[value.b..][0..value.c]) |child| try self.nodeCaptures(child, epoch, captures, depth + 1),
@@ -1870,6 +1889,11 @@ const Builder = struct {
             return self.make(source, .{ .tag = .construct, .ty = result, .a = catalog, .b = arguments.items[0], .c = @intFromBool(record) });
         }
         if (syntax.tag == .intrinsic) {
+            if (@import("storage_ops.zig").lookup(self.source.names.get(syntax.a))) |op| {
+                if (arguments.items.len != @import("storage_ops.zig").arity(op)) return error.CoreLimit;
+                const values = try self.save(arguments.items);
+                return self.make(source, .{ .tag = .storage, .ty = result, .a = values.start, .b = values.len, .c = @backingInt(op) });
+            }
             if (arrayIntrinsic(self.source.names.get(syntax.a))) |primitive| {
                 if (arguments.items.len < primitive.arity) return self.appliedValue(source, callee, arguments.items, backwards.items, depth);
                 if (arguments.items.len != primitive.arity) {
@@ -2769,7 +2793,7 @@ const Builder = struct {
             for (self.source.checked.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
                 has_explicit = has_explicit or requirement.explicit or (requirement.kind == .callee_use and self.source.checked.bindings[requirement.identity.decl].summary.has_explicit);
             }
-            try self.tables.bindings.append(self.allocator, .{ .capability_flow = if (value.kind == .global) value.capability_flow else .unknown, .capability_parameters = if (value.kind == .global) value.capability_parameters else .{}, .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.source.tree.span(value.declaration) });
+            try self.tables.bindings.append(self.allocator, .{ .capability_flow = if (value.kind == .global) value.capability_flow else .unknown, .capability_parameters = if (value.kind == .global) value.capability_parameters else .{}, .private = value.private, .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme, value.kind == .local), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.source.tree.span(value.declaration) });
             // Source parameters have no generalization scheme. Core owns their
             // exact monomorphic storage root, just like synthetic parameters.
             if (value.kind == .parameter and value.scheme.root == 0 and value.scheme.variables.len == 0 and value.scheme.row_variables.len == 0 and value.scheme.closed_rows.len == 0 and value.scheme.obligations.len == 0) {
@@ -2840,7 +2864,7 @@ const Builder = struct {
             for (self.source.checked.contract_predicates[contract.predicates.start..][0..contract.predicates.len]) |value| try self.tables.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.source.checked.diagnosticSpan(self.source.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = value.explicit, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit });
             try self.tables.contracts.append(self.allocator, .{ .private = contract.private, .identity = contract.identity, .name = contract.name, .parameters = try self.projectedTypeList(contract.parameters), .variables = try self.projectedTypeList(contract.variables), .row_variables = try self.projectedRowVariables(contract.row_variables), .predicates = .{ .start = predicate_start, .len = contract.predicates.len }, .members = .{ .start = start, .len = contract.members.len }, .requires_implementation = contract.requires_implementation, .row_parameter_names = try self.saveTypes(self.source.checked.types.list(contract.row_parameter_names)), .row_parameters = try self.projectedRows(contract.row_parameters) });
         }
-        for (self.source.checked.constructors) |metadata| try self.tables.constructors.append(self.allocator, .{ .identity = metadata.identity, .nominal = metadata.nominal, .tag = metadata.tag, .scheme = try self.projectScheme(metadata.scheme), .payload = try self.projectType(metadata.payload, 0) });
+        for (self.source.checked.constructors) |metadata| try self.tables.constructors.append(self.allocator, .{ .identity = metadata.identity, .nominal = metadata.nominal, .tag = metadata.tag, .scheme = try self.projectScheme(metadata.scheme, false), .payload = try self.projectType(metadata.payload, 0) });
         for (self.source.checked.associated) |metadata| try self.tables.associated.append(self.allocator, .{ .identity = metadata.identity, .member = metadata.member, .operator = metadata.operator, .target = self.target(metadata.binding) });
         try self.implementationCatalog();
     }
@@ -3084,7 +3108,7 @@ pub fn lowerWithOrigins(allocator: Allocator, tree: *const ast.Tree, names: *con
 }
 
 fn binaryOp(text: []const u8) ?core.Op {
-    const names = [_][]const u8{ "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&", "|", "^", "<<", ">>", "&&", "||" };
+    const names = [_][]const u8{ "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&", "|", "^", "<<", ">>", "and", "or" };
     const ops = [_]core.Op{ .add, .sub, .mul, .div, .rem, .equal, .not_equal, .less, .less_equal, .greater, .greater_equal, .bit_and, .bit_or, .bit_xor, .shift_left, .shift_right, .and_, .or_ };
     for (names, ops) |name, op| if (std.mem.eql(u8, text, name)) return op;
     return null;

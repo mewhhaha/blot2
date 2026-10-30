@@ -12,9 +12,9 @@ fn law(allocator: std.mem.Allocator) !void {
         \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
         \\type Action a = Unit -> a ! {| e}
         \\const position: Position = #Vec2 { x: 1.0, y: 2.0 }
-        \\const first = fn (pair: NumberPair) => @product.get pair 0
-        \\const apply = fn (action: Action U32) => action ()
-        \\entry const answer = fn () => first (42, 1)
+        \\const first = func (pair: NumberPair) => return @product.get pair 0
+        \\const apply = func (action: Action U32) => return action ()
+        \\entry const answer = func () => return first (42, 1)
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);

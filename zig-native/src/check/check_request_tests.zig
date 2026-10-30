@@ -102,9 +102,9 @@ test "request row subtraction shares the ambient tail and retains the operation 
 
 fn monadBoundary(allocator: std.mem.Allocator) !void {
     const cases = [_]struct { source: []const u8, code: check.Code, start: u32 }{
-        .{ .source = @import("fixtures").source("monad_cancel.blot"), .code = .invalid_return, .start = 462 },
-        .{ .source = @import("fixtures").source("monad_mixed_cancel.blot"), .code = .type_mismatch, .start = 420 },
-        .{ .source = @import("fixtures").source("monad_break.blot"), .code = .invalid_return, .start = 269 },
+        .{ .source = @import("fixtures").source("monad_cancel.blot"), .code = .invalid_return, .start = 498 },
+        .{ .source = @import("fixtures").source("monad_mixed_cancel.blot"), .code = .type_mismatch, .start = 456 },
+        .{ .source = @import("fixtures").source("monad_break.blot"), .code = .invalid_return, .start = 305 },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(allocator, item.source);

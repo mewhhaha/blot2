@@ -17,9 +17,9 @@ cannot change a retained guest value.
 
 Lists use persistent balanced trees with right-sized leaves of at most 244
 storage words. An exclusive end edit can reuse slack and tree nodes. A shared
-edit copies one path and leaf, preserving both snapshots. Arrays are contiguous;
-runtime append still copies. Repeated growth therefore has different costs from
-filling a known-size array or building a List and converting once.
+edit copies one path and leaf, preserving both snapshots. Arrays are contiguous.
+The persistent `array.push` helper copies into a new array; an explicit `GrowArray` owner supports append before freezing. Choose
+a fixed-length destination when the final size is known.
 
 Flat tuples and structural records with 1–16 checked scalar fields can occupy
 consecutive payload words in Lists and Arrays. Public lengths and cursor
@@ -78,9 +78,9 @@ measurement limits.
 | Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks. Numeric adapters with four to sixteen scalar leaves get eight nodes per leaf, up to 128; six nested expansions and the 4,096-instruction bound remain. |
 | SIMD and fusion     | Existing proofs apply to admitted typed loops. Private four-lane values use v128 locals. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.                        |
 
-`prefix_sums` uses recursive pair sums with linear work and intermediate
-storage, including constant evaluation. Array `indices`, `filter` and
-`filter_map` build a private chunked List in one traversal and convert once.
+`prefix_sums` scans in input order into one independent fixed-length destination.
+Array `indices`, `filter` and `filter_map` append into a private `GrowArray`
+in one traversal and freeze the result.
 `concat` avoids intermediate chunk arrays; `flatten` counts lengths before
 filling. Both retain length-overflow checks. Vec2/Vec3 interpolation preserves
 the documented F32 operation order; sine and cosine share angle reduction in

@@ -6,123 +6,123 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
-const identity = fn value => do:
+const identity = func value => return do:
   break value
-entry const ordinary = fn (value: U32) => identity value
-const make = fn () -> unique U32 ! {Foreign} => @resource.acquire (fn () => 9) (fn owner => ())
-const forward = fn (owner: unique U32) => owner
-entry const run = fn () => do:
+entry const ordinary = func (value: U32) => return identity value
+const make = func () : unique U32 ! {Foreign} => return @resource.acquire (func () => return 9) (func owner => return ())
+const forward = func (owner: unique U32) => return owner
+entry const run = func () => return do:
   use owner <- make ()
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use @resource.release (forward owner)
   break value
-entry const generic = fn () => do:
+entry const generic = func () => return do:
   use owner <- make ()
   let shared = @usage.share owner
   let moved = identity shared
   break @usage.read moved
-entry const shared = fn () => do:
+entry const shared = func () => return do:
   use owner <- make ()
   let value = @usage.share owner
   break @u32.add (@usage.read value) (@usage.read value)
-entry const captured = fn () => do:
+entry const captured = func () => return do:
   use owner <- make ()
-  let transfer: once (Unit -> unique U32) = fn () => owner
+  let transfer: once (Unit -> unique U32) = func () => return owner
   let moved = transfer ()
-  use value <- @usage.borrow moved (fn loan => @usage.read loan)
+  use value <- @usage.borrow moved (func loan => return @usage.read loan)
   use @resource.release moved
   break value
-entry const array = fn () => do:
-  use owner <- @resource.acquire (fn () => #[9, 10, 11]) (fn owner => ())
-  use value <- @usage.borrow owner (fn loan => @usage.length loan)
+entry const array = func () => return do:
+  use owner <- @resource.acquire (func () => return #[9, 10, 11]) (func owner => return ())
+  use value <- @usage.borrow owner (func loan => return @usage.length loan)
   use @resource.release owner
   break value
-entry const listed = fn () => do:
-  use owner <- @resource.acquire (fn () => [1.5, 2.5, 3.5]) (fn owner => ())
+entry const listed = func () => return do:
+  use owner <- @resource.acquire (func () => return [1.5, 2.5, 3.5]) (func owner => return ())
   let shared = @usage.share owner
   break @usage.length shared
-entry const unit = fn () => do:
-  use owner <- @resource.acquire (fn () => ()) (fn owner => ())
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+entry const unit = func () => return do:
+  use owner <- @resource.acquire (func () => return ()) (func owner => return ())
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use @resource.release owner
   break value
-entry const boolean = fn () => do:
-  use owner <- @resource.acquire (fn () => #True) (fn owner => ())
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+entry const boolean = func () => return do:
+  use owner <- @resource.acquire (func () => return true) (func owner => return ())
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use @resource.release owner
   break value
-entry const result = fn () => do:
-  use owner <- @resource.acquire (fn () => #[9, 10, 11]) (fn owner => ())
-  use value <- @usage.borrow owner (fn loan => #[@usage.length loan, 9])
+entry const result = func () => return do:
+  use owner <- @resource.acquire (func () => return #[9, 10, 11]) (func owner => return ())
+  use value <- @usage.borrow owner (func loan => return #[@usage.length loan, 9])
   use @resource.release owner
   break value
-entry const floating = fn () => do:
-  use owner <- @resource.acquire (fn () => 1.5) (fn owner => ())
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+entry const floating = func () => return do:
+  use owner <- @resource.acquire (func () => return 1.5) (func owner => return ())
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use @resource.release owner
   break value
-entry const failed = fn () => do:
-  use owner <- @resource.acquire (fn () => 9) (fn owner => @panic "cleanup")
+entry const failed = func () => return do:
+  use owner <- @resource.acquire (func () => return 9) (func owner => return @panic "cleanup")
   use @resource.release owner
   break 9
-entry const scalar_input = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-entry const array_input = fn (owner: unique (Array U32)) => @usage.borrow owner (fn loan => @usage.length loan)
-entry const float_input = fn (owner: shared F32) => @usage.read owner
-entry const surviving = fn () => do:
+entry const scalar_input = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+entry const array_input = func (owner: unique (Array U32)) => return @usage.borrow owner (func loan => return @usage.length loan)
+entry const float_input = func (owner: shared F32) => return @usage.read owner
+entry const surviving = func () => return do:
   use owner <- do:
     use nested <- make ()
     break nested
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use @resource.release owner
   break value
-entry const captured_obligation = fn () => do:
+entry const captured_obligation = func () => return do:
   use older <- make ()
   let shared = @usage.share older
-  use owner <- @resource.acquire (fn () => 10) (fn owner => do:
+  use owner <- @resource.acquire (func () => return 10) (func owner => return do:
     let observed = @usage.read shared
     break ())
   use @resource.release owner
   break 10
-entry const host = fn (callback: Unit -> U32 ! {Foreign}) => do:
+entry const host = func (callback: Unit -> U32 ! {Foreign}) => return do:
   use owner <- make ()
-  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+  use value <- @usage.borrow owner (func loan => return @usage.read loan)
   use answer <- callback ()
   use @resource.release owner
   break @u32.add value answer
-entry const acquired_twice = fn () => do:
-  use owner <- @resource.acquire (fn () => make ()) (fn owner => ())
+entry const acquired_twice = func () => return do:
+  use owner <- @resource.acquire (func () => return make ()) (func owner => return ())
   use @resource.release owner
   break 9
-entry const acquisition_failed = fn () => do:
-  use owner <- @resource.acquire (fn () -> unique U32 => @panic "acquire") (fn owner => @panic "should not clean")
+entry const acquisition_failed = func () => return do:
+  use owner <- @resource.acquire (func () : unique U32 => return @panic "acquire") (func owner => return @panic "should not clean")
   break 9
-entry const looped = fn () => do:
+entry const looped = func () => return do:
   for index in 0..5000:
     use owner <- make ()
   break 5000
-entry const broken = fn () => do:
+entry const broken = func () => return do:
   for ever:
     use owner <- make ()
     break
   break 9
-entry const branched = fn (host: Unit -> U32 ! {Foreign}) => do:
-  if #True:
-    use owner <- @resource.acquire (fn () => 9) (fn owner => @panic "cleanup")
+entry const branched = func (host: Unit -> U32 ! {Foreign}) => return do:
+  if true:
+    use owner <- @resource.acquire (func () => return 9) (func owner => return @panic "cleanup")
   break host ()
-entry const merged = fn (choose: Bool) => do:
+entry const merged = func (choose: Bool) => return do:
   let initial_left: unique (Array U32) = #[1]
   let initial_right: unique (Array U32) = #[1, 2]
   let left = @usage.share initial_left
   let right = @usage.share initial_right
   if choose:
-    use first <- @resource.acquire (fn () => #[1, 2]) (fn owner => ())
+    use first <- @resource.acquire (func () => return #[1, 2]) (func owner => return ())
     left := @usage.share first
-    use second <- @resource.acquire (fn () => #[1, 2, 3]) (fn owner => ())
+    use second <- @resource.acquire (func () => return #[1, 2, 3]) (func owner => return ())
     right := @usage.share second
   break @u32.add (@usage.length left) (@usage.length right)
-entry const unused = fn (host: Unit -> U32 ! {Foreign}) => do:
+entry const unused = func (host: Unit -> U32 ! {Foreign}) => return do:
   use value <- do:
-    use owner <- @resource.acquire (fn () => 9) (fn owner => @panic "cleanup")
+    use owner <- @resource.acquire (func () => return 9) (func owner => return @panic "cleanup")
     break 9
   break host ()
 `;
@@ -447,9 +447,9 @@ Deno.test("resource transfer preserves source archive checkpoint restart and fai
   const dependency = `${directory}/scope.blot`;
   const dependencies = `${directory}/scope.blotdep`;
   const producer =
-    `const make = fn (value: U32) => @resource.acquire (fn () => #[value, @u32.add value 1]) (fn owner => ())\n`;
+    `const make = func (value: U32) => return @resource.acquire (func () => return #[value, @u32.add value 1]) (func owner => return ())\n`;
   const consumer =
-    `import {make} from "./scope"\nentry const answer = fn (value: U32) => do:\n  use owner <- make value\n  use length <- @usage.borrow owner (fn loan => @usage.length loan)\n  use @resource.release owner\n  break length\n`;
+    `import {make} from "./scope"\nentry const answer = func (value: U32) => return do:\n  use owner <- make value\n  use length <- @usage.borrow owner (func loan => return @usage.length loan)\n  use @resource.release owner\n  break length\n`;
   try {
     await Deno.writeTextFile(entry, consumer);
     await Deno.writeTextFile(dependency, producer);
@@ -500,8 +500,8 @@ Deno.test("resource transfer preserves source archive checkpoint restart and fai
           sources: {
             [entry]: consumer,
             [dependency]: producer.replace(
-              "fn owner => ()",
-              "fn owner => @resource.release owner",
+              "func owner => return ()",
+              "func owner => return @resource.release owner",
             ),
           },
         });

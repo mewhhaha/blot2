@@ -759,7 +759,7 @@ fn scalarRoot(module: core.Module, id: core.Id) ?core.BindingId {
         .bind => if (value.b == id) return null,
         .return_, .force, .project, .computation, .result_associated => if (value.a == id) return null,
         .construct => if (value.b == id) return null,
-        .block, .suite, .product, .record, .array, .array_op => if (rangeHas(module.extra, core.List{ .start = value.a, .len = value.b }, id)) return null,
+        .block, .suite, .product, .record, .array, .array_op, .storage => if (rangeHas(module.extra, core.List{ .start = value.a, .len = value.b }, id)) return null,
         .call, .break_ => if (rangeHas(module.extra, core.List{ .start = value.b, .len = value.c }, id)) return null,
         .pattern_bind => if (value.b == id or value.c == id) return null,
         .request_decision => if (value.b == id or value.c == id) return null,

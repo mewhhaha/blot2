@@ -9,13 +9,13 @@ Deno.test("frozen publication preserves wide scalar captures and distinct factor
   );
   let sum = `c${width - 1}`;
   for (let i = width - 2; i >= 0; i--) sum = `(@u32.add c${i} ${sum})`;
-  const source = `const make: U32 -> (U32 -> U32 ! {}) = fn seed => do:
+  const source = `const make: U32 -> (U32 -> U32 ! {}) = func seed => return do:
 ${bindings.join("\n")}
-  break fn value => @u32.add value ${sum}
+  break func value => return @u32.add value ${sum}
 const first = make 1
 const second = make 2
-entry const one: U32 -> U32 = fn value => first value
-entry const two: U32 -> U32 = fn value => second value
+entry const one: U32 -> U32 = func value => return first value
+entry const two: U32 -> U32 = func value => return second value
 `;
   await compileAndRun(source, (guest) => {
     for (const value of [0, 42, 0xFFFF_FFFF]) {

@@ -5,13 +5,13 @@ Deno.test("annotation constructor saturation keeps primitive array curried and s
 type Shaped [a,b] is data = #Shaped (a,b)
 const curried: Curried U32 F32 = #Curried (20,1.5)
 const shaped: Shaped [U32,F32] = #Shaped (22,2.5)
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let #Curried (left,_) = curried
   let #Shaped (right,_) = shaped
   break @u32.add left right
 entry const folded = answer ()
-entry const scalar = fn (values: Array U32) => @array.get values 0
-entry const floating = fn (values: Array F32) => @array.get values 0
+entry const scalar = func (values: Array U32) => return @array.get values 0
+entry const floating = func (values: Array F32) => return @array.get values 0
 `, guest => {
     equal(guest.read("folded"), 42);
     for (let index = 0; index < 100; index++) {

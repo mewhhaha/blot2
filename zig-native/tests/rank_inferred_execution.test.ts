@@ -3,23 +3,23 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
-const producer = `const identity = fn value => value
-const apply = fn callback => fn value => callback value
-const forget = fn value => do:
-  break fn (unit: Unit) => @u32.add 40 2
+const producer = `const identity = func value => return value
+const apply = func callback => return func value => return callback value
+const forget = func value => return do:
+  break func (unit: Unit) => return @u32.add 40 2
 const annotated: forall [a] => a -> a = identity
-const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => apply (@product.get pair 0) (@product.get pair 1)
+const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return apply (@product.get pair 0) (@product.get pair 1)
 type Item = exists [a] => (a, a -> U32)
-const make = fn (value: U32) => pack [U32] (value, identity) as Item
-const read = fn (item: Item) => unpack item as [a] value in (@product.get value 1) (identity (@product.get value 0))
-const discard = fn (item: Item) => unpack item as [a] value in forget (@product.get value 0)
+const make = func (value: U32) => return pack [U32] (value, identity) as Item
+const read = func (item: Item) => return unpack item as [a] value in (@product.get value 1) (identity (@product.get value 0))
+const discard = func (item: Item) => return unpack item as [a] value in forget (@product.get value 0)
 `;
 const consumer =
   `import {identity, apply, annotated, through, make, read, discard} from "./identity"
-entry const forgotten = fn (value: U32) => (discard (make value)) ()
-entry const whole = fn (value: U32) => annotated (apply identity value)
-entry const fraction = fn (value: U32) => read (make value)
-entry const host = fn (callback: U32 -> U32 ! {Foreign}) => through (callback, 42)
+entry const forgotten = func (value: U32) => return (discard (make value)) ()
+entry const whole = func (value: U32) => return annotated (apply identity value)
+entry const fraction = func (value: U32) => return read (make value)
+entry const host = func (callback: U32 -> U32 ! {Foreign}) => return through (callback, 42)
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
   for (const asynchronous of [false, true]) {

@@ -14,7 +14,7 @@ for (let index = 0; index < 48; index++) {
     ? `@u32.mul (${expression}) 1664525`
     : `@u32.add (${expression}) 1013904223`;
 }
-const source = `entry const heavy = fn (input: U32) => do:
+const source = `entry const heavy = func (input: U32) => return do:
   let work = ${expression}
   if @u32.eq input 0:
     return 0

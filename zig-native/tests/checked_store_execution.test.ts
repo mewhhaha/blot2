@@ -4,10 +4,10 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
-entry const integers = fn (seed: U32) => @array.from_list [@u32.add value seed | value <- #[1, 2, 3]]
-entry const floating = fn (seed: F32) => @array.from_list [@f32.add seed 0.5 | value <- #[1, 2, 3]]
-entry const zero_width = fn (count: U32) => @list.length [() | value <- @array.fill count 9]
-entry const reference = fn (seed: U32) => do:
+entry const integers = func (seed: U32) => return @array.from_list [@u32.add value seed | value <- #[1, 2, 3]]
+entry const floating = func (seed: F32) => return @array.from_list [@f32.add seed 0.5 | value <- #[1, 2, 3]]
+entry const zero_width = func (count: U32) => return @list.length [() | value <- @array.fill count 9]
+entry const reference = func (seed: U32) => return do:
   let rows = #[@array.fill 256 seed, @array.fill 256 (@u32.add seed 1)]
   let kept = rows[1]
   rows[1] := @array.fill 256 99

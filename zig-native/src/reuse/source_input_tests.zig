@@ -139,7 +139,7 @@ test "entry syntax precedes prelude semantics and prelude syntax precedes readin
         defer checked.deinit(a);
         try std.testing.expectEqual(project_check.Code.source_validation, checked.diagnostics[0].code);
     }
-    try file(tmp.dir, "prelude.blot", "fn broken");
+    try file(tmp.dir, "prelude.blot", "func broken");
     var loaded = try project.load(a, std.testing.io, entry, .{ .input_mode = .source, .prelude_path = prelude });
     defer loaded.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), loaded.units.items.len);
@@ -185,25 +185,25 @@ test "source lowering validates static declarations and scopes without inferring
         .{ .source = "type Pair is data=#Pair(U32,U32)\nconst bad=#Pair 1\n", .expected = .module_loader_required },
         .{ .source = "type Wrapped is data=#Wrapped U32\nconst bad=#Wrapped 1.5\n", .expected = .module_loader_required },
         .{ .source = "const bad:Missing=42\n", .expected = .unsupported_type },
-        .{ .source = "const bad=fn(value:Missing)=>missing\n", .expected = .unsupported_type },
+        .{ .source = "const bad=func(value:Missing)=> return missing\n", .expected = .unsupported_type },
         .{ .source = "const bad=do:\n  let value:Missing=missing\n  break value\n", .expected = .unsupported_type },
         .{ .source = "const bad=do:\n  use value:Missing<-missing\n  break value\n", .expected = .unsupported_type },
         .{ .source = "const bad:U32 where{nope U32}=42\n", .expected = .invalid_constraint },
         .{ .source = "const bad=@u32.add 1\n", .expected = .call_arity },
-        .{ .source = "const bad=@requests(fn()=>42)\n", .expected = .requests_scope },
+        .{ .source = "const bad=@requests(func()=> return 42)\n", .expected = .requests_scope },
         .{ .source = "const bad=do:\n  yield 42\n", .expected = .yield_scope },
         .{ .source = "const bad=do:\n  break\n", .expected = .break_scope },
         .{ .source = "const bad=missing\ntype Bad is data=#Bad Missing\n", .expected = .unsupported_type },
         .{ .source = "type Bad is data=#Bad Missing\nconst bad=missing\n", .expected = .unknown_value },
         .{ .source = "effect ask:U32\n", .expected = .operation_signature },
         .{ .source = "const bad=do:\n  let value:Missing=42\n  break value\n  43\n", .expected = .unsupported_type },
-        .{ .source = "const bad=(fn(value:Missing)=>42) ^ 2\n", .expected = .unsupported_type },
-        .{ .source = "const bad=fn()=>do:\n  let invoke=fn(callback:Unit->U32!{|e})=>callback()\n  let identity=fn(value:e)=>value\n  break 42\n", .expected = .annotation_kind_mismatch },
-        .{ .source = "type Tick is effect={read:Unit->U32}\nconst handled=fn computation=>do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value=>\n        yield 42\n", .expected = .request_completion },
-        .{ .source = "const handled=fn computation=>do:\n  for request in @requests computation:\n    case request of\n      complete value=>\n        break value\n      complete other=>\n        break other\n", .expected = .request_completion },
-        .{ .source = "const handled=fn computation=>do:\n  for request in @requests computation:\n    case other of\n      complete value=>\n        break value\n", .expected = .request_binding },
-        .{ .source = "const handled=fn computation=>do:\n  for request in @requests computation .. 10:\n    case request of\n      complete value=>\n        break value\n", .expected = .request_loop_range },
-        .{ .source = "type Tick is effect={read:Unit->U32}\nconst handled=fn computation=>do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value=>\n        yield 1.5\n      complete value=>\n        break value\n", .expected = .module_loader_required },
+        .{ .source = "const bad=(func(value:Missing)=> return 42) ^ 2\n", .expected = .unsupported_type },
+        .{ .source = "const bad=func()=> return do:\n  let invoke=func(callback:Unit->U32!{|e})=> return callback()\n  let identity=func(value:e)=> return value\n  break 42\n", .expected = .annotation_kind_mismatch },
+        .{ .source = "type Tick is effect={read:Unit->U32}\nconst handled=func computation=> return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value=>\n        yield 42\n", .expected = .request_completion },
+        .{ .source = "const handled=func computation=> return do:\n  for request in @requests computation:\n    case request of\n      complete value=>\n        break value\n      complete other=>\n        break other\n", .expected = .request_completion },
+        .{ .source = "const handled=func computation=> return do:\n  for request in @requests computation:\n    case other of\n      complete value=>\n        break value\n", .expected = .request_binding },
+        .{ .source = "const handled=func computation=> return do:\n  for request in @requests computation .. 10:\n    case request of\n      complete value=>\n        break value\n", .expected = .request_loop_range },
+        .{ .source = "type Tick is effect={read:Unit->U32}\nconst handled=func computation=> return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read value=>\n        yield 1.5\n      complete value=>\n        break value\n", .expected = .module_loader_required },
         .{ .source = "const bad=do:\n  for value in 0 .. 2:\n    break\n  break 42\n", .expected = .module_loader_required },
     }) |case| {
         try file(tmp.dir, "prelude.blot", case.source);

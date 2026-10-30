@@ -21,7 +21,7 @@ gdev's `deno task fmt:blot` rejects every current gdev source with
 rejected syntax`. On 11 October 2026 `formatSource` from
 [compiler/format.ts](../compiler/format.ts) also rejected the public
 `examples/ecs.blot` and `examples/syntax.blot` (at curried declarations such as
-`const insert_cell = fn initial => fn builder => do:`), while it accepted
+`const insert_cell = func initial => return func builder => return do:`), while it accepted
 `std/prelude.blot` and a small `let … else:` block. The formatter predates the
 Zig compiler, and `compiler/format.test.ts` does not format the examples.
 

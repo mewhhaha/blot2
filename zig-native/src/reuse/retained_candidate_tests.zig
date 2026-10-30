@@ -8,14 +8,14 @@ const metadata = @import("code_artifacts.zig");
 const a = std.testing.allocator;
 const io = std.testing.io;
 const main = "import * as dep from \"./dep\"\nentry const answer:U32=dep.read ()\n";
-const original = "const value:U32=42\nconst read:Unit->U32=fn () => value\n";
-const edited = "const value:U32=43\nconst read:Unit->U32=fn () => value\n";
+const original = "const value:U32=42\nconst read:Unit->U32=func () => return value\n";
+const edited = "const value:U32=43\nconst read:Unit->U32=func () => return value\n";
 
 const refinement_source =
     \\const changed = 8
     \\const fixed = 41
-    \\const read = fn (value: U32) => @u32.add value fixed
-    \\entry const answer = fn (value: U32) => @u32.add (read value) changed
+    \\const read = func (value: U32) => return @u32.add value fixed
+    \\entry const answer = func (value: U32) => return @u32.add (read value) changed
 ;
 
 // These transaction laws need independently selected queries. Keep this
@@ -58,39 +58,39 @@ const query_identity_body =
     \\  let query_copy_32 = query_copy_31
     \\  return query_copy_32
 ;
-const query_factory_extra = "const factory = fn value => fn extra => " ++ query_identity_body;
-const query_factory_unit = "const factory = fn value => fn () => " ++ query_identity_body;
+const query_factory_extra = "const factory = func value => return func extra => return " ++ query_identity_body;
+const query_factory_unit = "const factory = func value => return func () => return " ++ query_identity_body;
 
 fn staticMaterializationLibrary() ![]u8 {
     const read = try std.mem.replaceOwned(u8, a, query_identity_body, "return query_copy_32", "return stored query_copy_32");
     defer a.free(read);
     const scalar = try std.mem.replaceOwned(u8, a, query_identity_body, "return query_copy_32", "return biased query_copy_32");
     defer a.free(scalar);
-    return a.print("const factory = fn values => fn (index: U32) => values[@u32.rem index 2]\n" ++
+    return a.print("const factory = func values => return func (index: U32) => return values[@u32.rem index 2]\n" ++
         "const stored = factory #[41, 7]\n" ++
-        "const add = fn amount => fn value => @u32.add amount value\n" ++
+        "const add = func amount => return func value => return @u32.add amount value\n" ++
         "const biased = add 8\n" ++
-        "const read = fn (value: U32) => {s}\n" ++
-        "const scalar = fn (value: U32) => {s}\n", .{ read, scalar });
+        "const read = func (value: U32) => return {s}\n" ++
+        "const scalar = func (value: U32) => return {s}\n", .{ read, scalar });
 }
 fn staticMaterializationSource(offset: u8) ![]u8 {
     return a.print("import {{read, stored, scalar}} from \"./dep\"\n" ++
-        "entry const left = fn (value: U32) => read value\n" ++
-        "entry const right = fn (value: U32) => stored (@u32.add value {d})\n" ++
-        "entry const stable = fn (value: U32) => scalar value\n", .{offset});
+        "entry const left = func (value: U32) => return read value\n" ++
+        "entry const right = func (value: U32) => return stored (@u32.add value {d})\n" ++
+        "entry const stable = func (value: U32) => return scalar value\n", .{offset});
 }
 fn staticMaterializationBeforeReplay() ![]u8 {
     const source = try staticMaterializationSource(2);
     defer a.free(source);
-    const left = try std.mem.replaceOwned(u8, a, source, "=> read value", "=> stored value");
+    const left = try std.mem.replaceOwned(u8, a, source, "=> return read value", "=> return stored value");
     defer a.free(left);
-    return std.mem.replaceOwned(u8, a, left, "=> stored (@u32.add", "=> read (@u32.add");
+    return std.mem.replaceOwned(u8, a, left, "=> return stored (@u32.add", "=> return read (@u32.add");
 }
 fn staticMaterializationAliasLibrary(merged: bool) ![]u8 {
     const base = try staticMaterializationLibrary();
     defer a.free(base);
     const declarations = try a.print("const first = #[41, 7]\nconst second = {s}\n" ++
-        "const other_factory = fn values => fn (index: U32) => values[@u32.rem index 2]\n" ++
+        "const other_factory = func values => return func (index: U32) => return values[@u32.rem index 2]\n" ++
         "const stored = factory first\nconst other = other_factory second\n", .{if (merged) "first" else "#[41, 7]"});
     defer a.free(declarations);
     const library = try std.mem.replaceOwned(u8, a, base, "const stored = factory #[41, 7]\n", declarations);
@@ -229,21 +229,21 @@ const unaffected_producer =
 const unaffected_query_main =
     \\import {marker, callback} from "./dep"
     \\entry const schema: U32 = marker
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
-    \\entry const changed = fn (value: U32) -> U32 => @u32.add value 7
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
+    \\entry const changed = func (value: U32) : U32 => return @u32.add value 7
     \\const run_value: U32 = callback 0
 ;
 const unaffected_query_edit =
     \\import {marker, callback} from "./dep"
     \\entry const schema: U32 = marker
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
-    \\entry const changed = fn (value: U32) -> U32 => @u32.add value 8
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
+    \\entry const changed = func (value: U32) : U32 => return @u32.add value 8
     \\const run_value: U32 = callback 0
 ;
 
 const catalog_producer =
     \\data Box a = #Box a
-    \\const changed = fn (value: U32) -> U32 => @u32.add value 7
+    \\const changed = func (value: U32) : U32 => return @u32.add value 7
 ;
 const catalog_consumer =
     \\import {Box, changed} from "./dep"
@@ -251,12 +251,12 @@ const catalog_consumer =
     \\const boxed = factory (#Box 42)
     \\const listed = factory [41]
     \\const arrayed = factory #[43]
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let #Box value = boxed ()
     \\  break value
-    \\entry const list_value = fn () => (@array.from_list (listed ()))[0]
-    \\entry const array_value = fn () => (arrayed ())[0]
-    \\entry const runtime = fn (value: U32) => changed value
+    \\entry const list_value = func () => return (@array.from_list (listed ()))[0]
+    \\entry const array_value = func () => return (arrayed ())[0]
+    \\entry const runtime = func (value: U32) => return changed value
     \\entry const staged = changed 1
 ;
 
@@ -298,7 +298,7 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     }
     try std.testing.expect(!std.mem.eql(u8, initial.result.compiled.bytes, session.current.?.output.?.bytes));
     const before = Stamp.read(&session);
-    try fixture.write("dep.blot", "data Box a = #Box a\nconst changed = fn (value: U32) -> U32 => false\n");
+    try fixture.write("dep.blot", "data Box a = #Box a\nconst changed = func (value: U32) : U32 => return false\n");
     var rejected = try session.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
@@ -328,15 +328,15 @@ fn catalogQueryFailure(allocator: std.mem.Allocator, session: *retained.Session,
 test "catalog queries decline unrepresented imported effect operations and preserve fresh staging" {
     const producer =
         \\type Payload is data = #Payload { value: U32 }
-        \\const changed = fn (value: U32) -> U32 => @u32.add value 7
+        \\const changed = func (value: U32) : U32 => return @u32.add value 7
     ;
     const consumer =
         \\import {Payload, changed} from "./dep"
         \\import {Read} from "./effects"
-        \\const factory = fn action => fn value => action value
-        \\const callback = factory (fn () => Read.get ())
-        \\entry const answer = fn () -> U32 => do:
-        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (fn () => #Payload { value: 42 }) callback
+        \\const factory = func action => return func value => return action value
+        \\const callback = factory (func () => return Read.get ())
+        \\entry const answer = func () : U32 => return do:
+        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (func () => return #Payload { value: 42 }) callback
         \\  break payload.value
         \\entry const staged = changed 1
         \\const evaluated: U32 = answer ()
@@ -476,11 +476,11 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     ;
     const consumer =
         \\import {listed, arrayed, boxed, Box} from "./dep"
-        \\const first_list = fn (values: List U32) => (@array.from_list values)[0]
-        \\const first_array = fn (values: Array U32) => values[0]
-        \\entry const list_value = fn () => first_list (listed ())
-        \\entry const array_value = fn () => first_array (arrayed ())
-        \\entry const nominal_value = fn () => do:
+        \\const first_list = func (values: List U32) => return (@array.from_list values)[0]
+        \\const first_array = func (values: Array U32) => return values[0]
+        \\entry const list_value = func () => return first_list (listed ())
+        \\entry const array_value = func () => return first_array (arrayed ())
+        \\entry const nominal_value = func () => return do:
         \\  let #Box value = boxed ()
         \\  break value
         \\entry const staged_list = first_list (listed ())
@@ -493,7 +493,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     defer session.deinit();
     var hits: usize = 0;
     for ([_]u32{ 7, 8, 7 }) |number| {
-        const source = try a.print("{s}\nentry const changed = fn (value: U32) => @u32.add value {d}\n", .{ consumer, number });
+        const source = try a.print("{s}\nentry const changed = func (value: U32) => return @u32.add value {d}\n", .{ consumer, number });
         defer a.free(source);
         try fixture.write("main.blot", source);
         var expected = try fresh(&fixture, .{});
@@ -532,20 +532,20 @@ test "refinement receipt preserves generic collection record State and captured 
     const generic =
         \\type Point is data = #Point { x: U32, y: U32 }
         \\const fixed = 41
-        \\const pair = fn value => (value, fixed)
-        \\entry const integer = fn (value: U32) => do:
+        \\const pair = func value => return (value, fixed)
+        \\entry const integer = func (value: U32) => return do:
         \\  let (x, n) = pair value
         \\  break @u32.add x n
-        \\entry const floating = fn (value: F32) => do:
+        \\entry const floating = func (value: F32) => return do:
         \\  let (x, n) = pair value
         \\  break @f32.add x (@u32.to_f32 n)
-        \\entry const listed = fn (value: U32) => do:
+        \\entry const listed = func (value: U32) => return do:
         \\  let (x, n) = pair [value]
         \\  break @u32.add (@array.from_list x)[0] n
-        \\entry const arrayed = fn (value: U32) => do:
+        \\entry const arrayed = func (value: U32) => return do:
         \\  let (x, n) = pair #[value]
         \\  break @u32.add x[0] n
-        \\entry const physical = fn (value: U32) => do:
+        \\entry const physical = func (value: U32) => return do:
         \\  let (x, n) = pair (#Point { y: 2, x: value })
         \\  break @u32.add (@u32.add x.x x.y) n
     ;
@@ -607,13 +607,13 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
         try std.testing.expect(result.result.compiled.reuse.fresh_named > 0);
     }
     const stamp = Stamp.read(&session);
-    const receipts = session.current.?.artifacts.metadata.refinement_queries.records.items.ptr;
+    const receipts = session.current.?.artifacts.?.metadata.refinement_queries.records.items.ptr;
     try fixture.write("main.blot", refinement_source ++ "\nentry const broken: U32 = false\n");
     var rejected = try session.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
     try stamp.unchanged(&session);
-    try std.testing.expect(receipts == session.current.?.artifacts.metadata.refinement_queries.records.items.ptr);
+    try std.testing.expect(receipts == session.current.?.artifacts.?.metadata.refinement_queries.records.items.ptr);
     try fixture.write("main.blot", refinement_source);
     var recovered = try session.revise(io, fixture.path, null, .{});
     defer recovered.deinit(a);
@@ -671,16 +671,16 @@ test "List and Array prelude members retain code across real entry edits and cat
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const prelude =
-        \\const List.first = fn (values: List U32) => (@array.from_list values)[0]
-        \\const Array.first = fn (values: Array U32) => values[0]
-        \\const fixed = fn (value: U32) => do:
+        \\const List.first = func (values: List U32) => return (@array.from_list values)[0]
+        \\const Array.first = func (values: Array U32) => return values[0]
+        \\const fixed = func (value: U32) => return do:
         \\  let result = 0
         \\  for i in 0..1:
         \\    result := @u32.add (List.first [value]) (Array.first #[value])
         \\  break result
     ;
-    const main_before = "entry const answer = fn (value: U32) => @u32.add (fixed value) 8\n";
-    const main_after = "entry const answer = fn (value: U32) => @u32.add (fixed value) 9\n";
+    const main_before = "entry const answer = func (value: U32) => return @u32.add (fixed value) 8\n";
+    const main_after = "entry const answer = func (value: U32) => return @u32.add (fixed value) 9\n";
     try fixture.write("prelude.blot", prelude);
     try fixture.write("main.blot", main_before);
     const options: project.Options = .{ .prelude_path = fixture.prelude };
@@ -700,7 +700,7 @@ test "List and Array prelude members retain code across real entry edits and cat
         try std.testing.expect(result.result.compiled.reuse.reused_named > 0);
         try std.testing.expect(result.result.compiled.reuse.refinement_regions < initial.result.compiled.reuse.refinement_regions);
     }
-    try fixture.write("prelude.blot", prelude ++ "\nconst List.second = fn (values: List U32) => (@array.from_list values)[1]\n");
+    try fixture.write("prelude.blot", prelude ++ "\nconst List.second = func (values: List U32) => return (@array.from_list values)[1]\n");
     var changed = try session.revise(io, fixture.path, null, options);
     defer changed.deinit(a);
     var expected = try fresh(&fixture, options);
@@ -713,8 +713,8 @@ test "List and Array prelude members retain code across real entry edits and cat
 test "collection replay gate still rejects unknown builtin identities and local method targets" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try fixture.write("prelude.blot", "const List.first = fn (values: List U32) => (@array.from_list values)[0]\n");
-    try fixture.write("main.blot", "entry const answer = fn (value: U32) => List.first [value]\n");
+    try fixture.write("prelude.blot", "const List.first = func (values: List U32) => return (@array.from_list values)[0]\n");
+    try fixture.write("main.blot", "entry const answer = func (value: U32) => return List.first [value]\n");
     const options: project.Options = .{ .prelude_path = fixture.prelude };
     var session = try retained.Session.initEmpty(a, options);
     defer session.deinit();
@@ -725,7 +725,7 @@ test "collection replay gate still rejects unknown builtin identities and local 
     }
     const current = &session.current.?;
     const units = current.prepared.units;
-    const capture = &current.artifacts;
+    const capture = &current.artifacts.?;
     const identity = current.prepared.identity.view();
     const cached = current.prepared.cached;
     try std.testing.expect(capture.selectionStable(units, identity, cached));
@@ -994,6 +994,27 @@ const Fixture = struct {
         self.dir.cleanup();
     }
 };
+fn scopedOutputAllocationLaw(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
+    var session = try retained.Session.initEmpty(allocator, .{});
+    defer session.deinit();
+    var first = try session.revise(io, fixture.path, null, .{});
+    defer first.deinit(allocator);
+    try std.testing.expect(first.result.compiled.diagnostic == null);
+    try std.testing.expect(first.result.compiled.whole_module_only);
+    try std.testing.expect(session.current.?.artifacts == null);
+    var repeated = try session.revise(io, fixture.path, null, .{});
+    defer repeated.deinit(allocator);
+    try std.testing.expect(session.last.reused_output);
+    try std.testing.expectEqualSlices(u8, first.result.compiled.bytes, repeated.result.compiled.bytes);
+    try std.testing.expect(first.result.compiled.bytes.ptr != repeated.result.compiled.bytes.ptr);
+}
+test "data stack project revisions own complete output without legacy fragments through allocation failure" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("main.blot", "const values: GrowArray U32 = #[42]\nentry const read = func () => return values[0]\n");
+    try scopedOutputAllocationLaw(a, &fixture);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, scopedOutputAllocationLaw, .{&fixture});
+}
 fn fresh(fixture: *const Fixture, options: project.Options) !partial.Result {
     var source = try project.load(a, io, fixture.path, options);
     defer source.deinit(a);
@@ -1070,7 +1091,7 @@ const Stamp = struct {
             .settings = session.seed_settings,
             .stats = metadata.stamp(session.last),
             .core = if (session.current) |current| metadata.stamp(current.prepared.units) else @splat(0),
-            .instructions = if (session.current) |current| metadata.stamp(current.artifacts.emission.instructions) else @splat(0),
+            .instructions = if (session.current) |current| metadata.stamp(current.artifacts.?.emission.instructions) else @splat(0),
             .cached_output = if (session.current) |current| metadata.stamp(current.output) else @splat(0),
             .snapshot = if (session.current) |current| snapshotStamp(current.snapshot) else @splat(0),
         };
@@ -1085,7 +1106,7 @@ const project_query_source =
 ++ "\n" ++ query_factory_extra ++ "\n" ++
     \\const callback = factory 42
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
     \\const run_value: U32 = callback 0
 ;
 const project_query_edit =
@@ -1093,7 +1114,7 @@ const project_query_edit =
 ++ "\n" ++ query_factory_extra ++ "\n" ++
     \\const callback = factory 42
     \\entry const schema: U32 = 8
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
     \\const run_value: U32 = callback 0
 ;
 fn initializeProjectQuery(fixture: *Fixture, session: *retained.Session) !void {
@@ -1365,7 +1386,7 @@ test "revision candidate source and backend rejections own attempt inputs and di
     try std.testing.expectEqual(@as(usize, 0), frontend.rejected.stats.fallback.body_lowerings);
     try old.unchanged(&session);
     try fixture.write("main.blot", main);
-    try fixture.write("dep.blot", "const read:Unit->U32=fn () => read ()\n");
+    try fixture.write("dep.blot", "const read:Unit->U32=func () => return read ()\n");
     var backend = try session.prepareRevision(io, fixture.path, null, .{});
     defer backend.deinit();
     try std.testing.expect(backend == .rejected);
@@ -1467,13 +1488,13 @@ test "fresh principal capture serves the first edit and the edit after a depende
         }
     }
     const last_good = Stamp.read(&candidate);
-    const proofs = metadata.stamp(candidate.current.?.artifacts.metadata.principal_queries.records.items);
+    const proofs = metadata.stamp(candidate.current.?.artifacts.?.metadata.principal_queries.records.items);
     try fixture.write("main.blot", "entry const wrong: U32 = false\n");
     var rejected = try candidate.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
     try last_good.unchanged(&candidate);
-    try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.metadata.principal_queries.records.items));
+    try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.?.metadata.principal_queries.records.items));
 }
 
 fn freshPrincipalFailure(allocator: std.mem.Allocator, fixture: *Fixture, expected: *const partial.Result) !void {
@@ -1496,7 +1517,7 @@ fn freshPrincipalFailure(allocator: std.mem.Allocator, fixture: *Fixture, expect
 test "fresh principal capture releases every failed first candidate and publication remains transactional" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    try fixture.write("dep.blot", "const identity = fn value => value\n");
+    try fixture.write("dep.blot", "const identity = func value => return value\n");
     try fixture.write("main.blot",
         \\import {identity} from "./dep"
         \\entry const answer: U32 where { type_rep U32 } = identity 42
@@ -1531,7 +1552,7 @@ test "failed leased revisions keep the published revision, its leases and its ch
     // An entry-only edit keeps the previous revision as the lease source.
     try fixture.write("main.blot", unaffected_query_edit);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, leasedRevisionScenario, .{ &session, &fixture });
-    const pools = &session.current.?.artifacts.metadata.pools.?;
+    const pools = &session.current.?.artifacts.?.metadata.pools.?;
     for (pools.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
     const after = try session.checkpointBytes(compiler);
     defer a.free(after);
@@ -1541,7 +1562,7 @@ test "failed leased revisions keep the published revision, its leases and its ch
     defer retry.deinit();
     try std.testing.expect(retry.result().?.result.compiled.counters.metadata_shared_fields > 0);
     try std.testing.expect(session.commit(retry));
-    for (session.current.?.artifacts.metadata.pools.?.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
+    for (session.current.?.artifacts.?.metadata.pools.?.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
 }
 
 fn bodyFactsAllocationScenario(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture, expected: *const partial.Result) !void {
@@ -1569,7 +1590,7 @@ fn bodyFactsSource(allocator: std.mem.Allocator) ![]u8 {
         allocator.free(argument);
         argument = next;
     }
-    return allocator.print("const changed = 8\nconst fixed = 41\nconst read = fn (value: U32) => @u32.add ({s}) fixed\nentry const answer = fn (value: U32) => @u32.add (read ({s})) changed\n", .{ argument, argument });
+    return allocator.print("const changed = 8\nconst fixed = 41\nconst read = func (value: U32) => return @u32.add ({s}) fixed\nentry const answer = func (value: U32) => return @u32.add (read ({s})) changed\n", .{ argument, argument });
 }
 
 test "body check cache revision allocation failures keep the successful checked owner" {
@@ -1624,13 +1645,13 @@ test "body check cache rebuilt seed replays portable qualified facts through all
     var argument = try a.dupe(u8, "value");
     defer a.free(argument);
     for (0..12) |_| {
-        const next = try a.print("(fn item => item) ({s})", .{argument});
+        const next = try a.print("(func item => return item) ({s})", .{argument});
         a.free(argument);
         argument = next;
     }
-    const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = fn value => twice ({s})\nentry const answer = fn (value: U32) => read (wrapper (make value))\n", .{argument});
+    const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = func value => return twice ({s})\nentry const answer = func (value: U32) => return read (wrapper (make value))\n", .{argument});
     defer a.free(entry);
-    const producer = "const earlier = fn value => value\ntype Number is data = #Number U32\nconst make = fn value => #Number value\nconst read = fn (#Number value) => value\nconst Number.add = fn (#Number left) => fn (#Number right) => #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = fn value => @type.call \"add\" value value\n";
+    const producer = "const earlier = func value => return value\ntype Number is data = #Number U32\nconst make = func value => return #Number value\nconst read = func (#Number value) => return value\nconst Number.add = func (#Number left) => return func (#Number right) => return #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
     try fixture.write("main.blot", entry);
     try fixture.write("dep.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});
@@ -1638,7 +1659,7 @@ test "body check cache rebuilt seed replays portable qualified facts through all
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try std.testing.expect(session.current.?.prepared.body_caches[session.current.?.prepared.entry - 1].find("wrapper") != null);
-    const changed_producer = try std.mem.replaceOwned(u8, a, producer, "fn value => value", "fn value => {fresh_spelling: value}");
+    const changed_producer = try std.mem.replaceOwned(u8, a, producer, "func value => return value", "func value => return {fresh_spelling: value}");
     defer a.free(changed_producer);
     try fixture.write("dep.blot", changed_producer);
     var expected = try fresh(&fixture, .{});
@@ -1656,13 +1677,13 @@ test "body check cache producer ordinal changes preserve publication through all
     var argument = try a.dupe(u8, "value");
     defer a.free(argument);
     for (0..12) |_| {
-        const next = try a.print("(fn item => item) ({s})", .{argument});
+        const next = try a.print("(func item => return item) ({s})", .{argument});
         a.free(argument);
         argument = next;
     }
-    const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = fn value => twice ({s})\nentry const answer = fn (value: U32) => read (wrapper (make value))\n", .{argument});
+    const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = func value => return twice ({s})\nentry const answer = func (value: U32) => return read (wrapper (make value))\n", .{argument});
     defer a.free(entry);
-    const producer = "type Number is data = #Number U32\nconst make = fn value => #Number value\nconst read = fn (#Number value) => value\nconst Number.add = fn (#Number left) => fn (#Number right) => #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = fn value => @type.call \"add\" value value\n";
+    const producer = "type Number is data = #Number U32\nconst make = func value => return #Number value\nconst read = func (#Number value) => return value\nconst Number.add = func (#Number left) => return func (#Number right) => return #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
     try fixture.write("main.blot", entry);
     try fixture.write("dep.blot", producer);
     try fixture.write("pad.blot", "const ignored = 7\n");
@@ -1700,7 +1721,7 @@ fn bootstrapBodyProducer() ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const changed = 8\nconst read = fn (value: U32) => @u32.add ({s}) changed\nconst stable = fn (value: U32) => @u32.add ({s}) 41\n", .{ expression, expression });
+    return a.print("const changed = 8\nconst read = func (value: U32) => return @u32.add ({s}) changed\nconst stable = func (value: U32) => return @u32.add ({s}) 41\n", .{ expression, expression });
 }
 fn bootstrapBodyFailure(allocator: std.mem.Allocator, fixture: *const Fixture, dep_path: []const u8) !void {
     var session = try retained.Session.initEmpty(allocator, .{});
@@ -1738,7 +1759,7 @@ test "body cache directory survives empty-session dependency bootstrap and alloc
     const source = try bootstrapBodyProducer();
     defer a.free(source);
     try fixture.write("dep.blot", source);
-    try fixture.write("main.blot", "import * as dep from \"./dep\"\nentry const answer = fn (value: U32) => @u32.add (dep.read value) (dep.stable value)\n");
+    try fixture.write("main.blot", "import * as dep from \"./dep\"\nentry const answer = func (value: U32) => return @u32.add (dep.read value) (dep.stable value)\n");
     const dep_path = try fixture.dir.dir.realPathFileAlloc(io, "dep.blot", a);
     defer a.free(dep_path);
     try bootstrapBodyFailure(a, &fixture, dep_path);
@@ -1750,7 +1771,7 @@ test "body cache directory relocates compiled modules and keeps first-edit repla
     defer fixture.deinit();
     const source = try bootstrapBodyProducer();
     defer a.free(source);
-    const entry = "import * as dep from \"./dep\"\nentry const answer = fn (value: U32) => @u32.add (dep.read value) (dep.stable value)\n";
+    const entry = "import * as dep from \"./dep\"\nentry const answer = func (value: U32) => return @u32.add (dep.read value) (dep.stable value)\n";
     try fixture.write("dep.blot", source);
     try fixture.write("main.blot", entry);
     const dep_path = try fixture.dir.dir.realPathFileAlloc(io, "dep.blot", a);
@@ -1773,7 +1794,7 @@ test "body cache directory relocates compiled modules and keeps first-edit repla
     try std.testing.expect(candidate.stats.fallback.body_elaborations < expected.result.stats.body_elaborations);
     try std.testing.expect(session.commit(candidate));
     try fixture.write("earlier.blot", "const value = 0\n");
-    try fixture.write("main.blot", "import {value} from \"./earlier\"\nimport * as dep from \"./dep\"\nentry const answer = fn (argument: U32) => @u32.add (dep.read argument) (@u32.add (dep.stable argument) value)\n");
+    try fixture.write("main.blot", "import {value} from \"./earlier\"\nimport * as dep from \"./dep\"\nentry const answer = func (argument: U32) => return @u32.add (dep.read argument) (@u32.add (dep.stable argument) value)\n");
     var reordered_expected = try fresh(&fixture, .{});
     defer reordered_expected.deinit(a);
     var reordered = try session.revise(io, fixture.path, null, .{});

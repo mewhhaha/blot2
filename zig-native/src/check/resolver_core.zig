@@ -80,7 +80,7 @@ pub fn method(m: *const core.Module, units: []const *const core.Module, identity
 }
 pub fn methodWorkspace(m: *const core.Module, units: []const *const core.Module, identity: T.NominalIdentity, member: u32, remaining: *usize, workspace: ?*@import("scheme_equations.zig").Workspace) Error!core.BindingRef {
     var nominal_owner = m;
-    if (identity.unit != 0 and identity.unit != m.unit) {
+    if (identity.unit != 0 and identity.unit != m.unit and @import("storage_types.zig").identity(identity.unit, identity.decl) == null) {
         var found: ?*const core.Module = null;
         for (units) |unit| if (unit.unit == identity.unit) {
             try require(found == null);

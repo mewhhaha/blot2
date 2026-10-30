@@ -5,16 +5,16 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const identity = fn value => value
-const invoke = fn callback => callback ()
-const read = fn unused => fn (state: State a) => fn () => state.get ()
-const typed_read: (unused: State b) -> ((state: State a) -> (Unit -> a ! {state.get})) = fn x => fn y => fn () => y.get ()
+const identity = func value => return value
+const invoke = func callback => return callback ()
+const read = func unused => return func (state: State a) => return func () => return state.get ()
+const typed_read: (unused: State b) -> ((state: State a) -> (Unit -> a ! {state.get})) = func x => return func y => return func () => return y.get ()
 `;
 const main = `import {State, identity, invoke, read, typed_read} from "./flow"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (s: State U32) => return do:
   let capability = identity s
   use nested <- do (@effect.state capability.get capability.set 7):
-    break invoke (identity (fn () => do:
+    break invoke (identity (func () => return do:
       use value <- capability.get ()
       use next <- host value
       use capability.set next
@@ -23,15 +23,15 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: 
   let (state, result) = nested
   break result
 )
-entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
+entry const floating = func () => return @effect.scope (func (s: State F32) => return do:
   let capability = identity s
   let (state, result) = do (@effect.state capability.get capability.set 1.5):
     break invoke (identity capability.get)
   break result
 )
-entry const borrowed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (older: State U32) => do:
-  let callback = @effect.scope (fn (younger: State F32) => read younger older)
-  let typed = @effect.scope (fn (younger: State U32) => typed_read younger older)
+entry const borrowed = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (older: State U32) => return do:
+  let callback = @effect.scope (func (younger: State F32) => return read younger older)
+  let typed = @effect.scope (func (younger: State U32) => return typed_read younger older)
   use handled <- do (@effect.state older.get older.set 7):
     use a <- callback ()
     use b <- typed ()
@@ -39,8 +39,8 @@ entry const borrowed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (o
   let (state, result) = handled
   break result
 )
-entry const borrowed_float = fn () => @effect.scope (fn (older: State F32) => do:
-  let callback = @effect.scope (fn (younger: State U32) => read younger older)
+entry const borrowed_float = func () => return @effect.scope (func (older: State F32) => return do:
+  let callback = @effect.scope (func (younger: State U32) => return read younger older)
   let (state, result) = do (@effect.state older.get older.set 1.5):
     break callback ()
   break result
@@ -158,7 +158,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
             sources: {
               ...sources,
               [entry]: main +
-                `entry const escaped = fn () => @effect.scope (fn (s: State U32) => identity s)\n`,
+                `entry const escaped = func () => return @effect.scope (func (s: State U32) => return identity s)\n`,
             },
           });
           assert(!escaped.success, JSON.stringify(escaped));
@@ -170,10 +170,10 @@ for (const codegenTier of ["optimized", "development"] as const) {
           assert.deepEqual(await compiler.exportCheckpoint(), checkpoint);
           for (
             const invalid of [
-              `entry const escaped_factory = fn () => @effect.scope (fn (s: State U32) => read s s)\n`,
-              `entry const escaped_selection = fn () => @effect.scope (fn (older: State U32) => @effect.scope (fn (younger: State U32) => read older (if #True then older else younger)))\n`,
-              `entry const escaped_deferred = fn () => @effect.scope (fn (older: State U32) => do:
-  let callback = @effect.scope (fn (younger: State U32) => read (fn () => younger.get ()) older)
+              `entry const escaped_factory = func () => return @effect.scope (func (s: State U32) => return read s s)\n`,
+              `entry const escaped_selection = func () => return @effect.scope (func (older: State U32) => return @effect.scope (func (younger: State U32) => return read older (if true then older else younger)))\n`,
+              `entry const escaped_deferred = func () => return @effect.scope (func (older: State U32) => return do:
+  let callback = @effect.scope (func (younger: State U32) => return read (func () => return younger.get ()) older)
   let (state, result) = do (@effect.state older.get older.set 7):
     break callback ()
   break result
@@ -194,8 +194,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
           const savedCaptureSources = {
             ...sources,
             [dependency]: library.replace(
-              "fn () => state.get ()",
-              "fn () => do:\n  let saved = state\n  break saved.get ()",
+              "func () => return state.get ()",
+              "func () => return do:\n  let saved = state\n  break saved.get ()",
             ),
           };
           const savedCapture = await compiler.build({
@@ -242,8 +242,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
             const aliases = {
               ...sources,
               [dependency]: library.replace(
-                "fn value => value",
-                `fn value => do:
+                "func value => return value",
+                `func value => return do:
   let same = value
   break same`,
               ),

@@ -78,20 +78,20 @@ Deno.test("state-provider and witness literal edits execute like fresh builds", 
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Reader a is effect = { ask: Unit -> a }
 const state = @effect.state (State.get U32) (State.set U32) ${initial}
-const reader = fn value => @effect.provider (Reader.ask U32) (fn () => value)
+const reader = func value => return @effect.provider (Reader.ask U32) (func () => return value)
 const forty = reader ${read}
 const other = ${other}
-entry const stateful = fn (step: U32) => do:
+entry const stateful = func (step: U32) => return do:
   let (next, old) = do state:
     use old <- State.get U32 ()
     use State.set U32 (@u32.add old step)
     break old
   break @u32.add next old
-entry const ask = fn () => do forty:
+entry const ask = func () => return do forty:
   use value <- Reader.ask U32 ()
   break @u32.add value 1
-entry const plain = fn (x: U32) => @u32.add x 2
-entry const unrelated = fn () => other
+entry const plain = func (x: U32) => return @u32.add x 2
+entry const unrelated = func () => return other
 `;
   const revisions: [number, number, number][] = [
     [1, 40, 0],

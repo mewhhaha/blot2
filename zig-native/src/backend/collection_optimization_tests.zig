@@ -34,17 +34,17 @@ fn factScenario(allocator: std.mem.Allocator, m: *const core.Module) !void {
 }
 test "source function facts distinguish primitive behavior, size, borrowing and unknown dispatch" {
     var m = try lower(
-        \\const total = fn (value: U32) => @u32.add value 1
-        \\const trapping = fn (value: U32) => @u32.div 1 value
-        \\const floating = fn (value: F32) => @f32.div 1.0 value
-        \\const pair = fn (value: U32) => [value, value]
-        \\const borrowed = fn (values: List U32) => do:
+        \\const total = func (value: U32) => return @u32.add value 1
+        \\const trapping = func (value: U32) => return @u32.div 1 value
+        \\const floating = func (value: F32) => return @f32.div 1.0 value
+        \\const pair = func (value: U32) => return [value, value]
+        \\const borrowed = func (values: List U32) => return do:
         \\  let sum = 0
         \\  for value in values:
         \\    sum := @u32.add sum value
         \\  break sum
-        \\const escaped = fn (values: List U32) => values
-        \\const opaque = fn (call: U32 -> U32) => call 1
+        \\const escaped = func (values: List U32) => return values
+        \\const opaque = func (call: U32 -> U32) => return call 1
     );
     defer m.deinit(a);
     var store: facts.Store = .{};
@@ -63,14 +63,14 @@ test "source function facts distinguish primitive behavior, size, borrowing and 
 }
 test "exact builder proof admits rectangular loops and rejects observations guards and ragged bounds" {
     const cases = [_]struct { source: []const u8, admitted: bool }{
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := [...self, @u32.add x y]\n  break @array.from_list result\n", .admitted = true },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := [...self, @list.length result]\n  break result\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := @list.append result (@u32.add x y)\n  break @array.from_list result\n", .admitted = true },
-        .{ .source = "entry const run = fn (values: Array U32) => #[@u32.add x y | x <- values, y <- values]\n", .admitted = true },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result y\n  break result\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := @list.append result (@list.length result)\n  break result\n", .admitted = false },
-        .{ .source = "entry const run = fn (values: Array U32) => [x | x <- values, @u32.lt x 3]\n", .admitted = false },
-        .{ .source = "entry const run = fn (count: U32) => do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..(@u32.div 1 count):\n      result := @list.append result y\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := [...self, @u32.add x y]\n  break @array.from_list result\n", .admitted = true },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := [...self, @list.length result]\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..count:\n      result := @list.append result (@u32.add x y)\n  break @array.from_list result\n", .admitted = true },
+        .{ .source = "entry const run = func (values: Array U32) => return #[@u32.add x y | x <- values, y <- values]\n", .admitted = true },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..x:\n      result := @list.append result y\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    result := @list.append result (@list.length result)\n  break result\n", .admitted = false },
+        .{ .source = "entry const run = func (values: Array U32) => return [x | x <- values, @u32.lt x 3]\n", .admitted = false },
+        .{ .source = "entry const run = func (count: U32) => return do:\n  let result: List U32 = []\n  for x in 0..count:\n    for y in 0..(@u32.div 1 count):\n      result := @list.append result y\n  break result\n", .admitted = false },
     };
     for (cases) |case| {
         var m = try lower(case.source);

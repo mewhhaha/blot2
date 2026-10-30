@@ -1,5 +1,5 @@
 import * as array from "std/array"
-const search = fn (needle: U32) (values: Array U32) -> U32 => do:
+const search = func (needle: U32) -> (values: Array U32) : U32 => return do:
   let low = 0
   let high = values.length
   for ever:
@@ -10,11 +10,11 @@ const search = fn (needle: U32) (values: Array U32) -> U32 => do:
       low := middle + 1
     else:
       high := middle
-  if low < values.length && values[low] == needle:
+  if low < values.length and values[low] == needle:
     break low + 1
   break 0
-entry const run = fn (seed: U32) -> U32 => do:
-  let values = array.generate 4096 (fn index => index * 3)
+entry const run = func (seed: U32) : U32 => return do:
+  let values = array.generate 4096 (func index => return index * 3)
   let total = 0
   for index in 0..4096:
     total := self + search ((seed + index * 7919) % 16384) values

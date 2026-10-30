@@ -41,8 +41,21 @@ to pass; failure revokes nested claims. This mode never establishes serialized
 package authority. Lexical row facts are bounded sparse pages copied by value
 for rollback; saturation declines the optional proof. Open substitutions remain
 private, and ordinary package admission retains its existing size limits.
+Successful checked source instantiation may retain lexical ownership of its
+exact generic row-tail witnesses. These facts are copied and restored with the
+source scope and are published only after every prerequisite succeeds. They do
+not assert purity, closure or Foreign authority, and invocation rows still have
+to match the body's ambient effects. Portable admission does not use them.
 
 ## Storage and ownership
+
+Guest storage migration is specified in [SCOPED_STORAGE.md](SCOPED_STORAGE.md).
+The data-stack backend owns a separate Wasm runtime with no counted-heap
+fallback. It independently validates immutable Core before assigning stacks,
+retains all possible roots through joins and captures, and releases scoped
+owners without walking their contents. This path is not yet the default for
+ordinary programs; the migration document lists the required remaining work.
+These guest rules do not change the host compiler allocation contracts below.
 
 Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
 `symbols.Symbol = u32`; zero is absent. `symbols.Pool` owns one byte buffer with
@@ -1074,11 +1087,11 @@ An ordinary scope wrapper requires a once callback universally quantified over
 its fresh region. That region cannot occur in the callback's result or effects.
 The primitive creates the region when the wrapper executes; forwarding uses
 ordinary calls and retains the callback's rank evidence. The exact
-`fn body => @task.scope body` marker is checked against its immutable Core body.
+`func body => return @task.scope body` marker is checked against its immutable Core body.
 Neither the marker nor a physical closure layout certifies arbitrary callbacks
 or permits a scoped result to escape.
 
-The exact `fn group => fn action => @task.spawn group action` body has a
+The exact `func group => return func action => return @task.spawn group action` body has a
 separate spawn contract. Its group parameter is symbolic; the action has once
 usage. Frozen admission validates both formal references and checks the actual
 action at every completed call, including aliases and partial applications.

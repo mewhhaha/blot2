@@ -15,9 +15,9 @@ for (const declared of ["observed", "superset", "unused"] as const) {
       new URL("../zig-out-dev/bin/blotc", import.meta.url).pathname;
     let source = `import {generated} from "./producer"
 import {Read, Write} from "./operations"
-const provider = @effect.provider Read (fn () => 40)
-const write = @effect.provider Write (fn () => ())
-entry const answer = fn () => do provider:
+const provider = @effect.provider Read (func () => return 40)
+const write = @effect.provider Write (func () => return ())
+entry const answer = func () => return do provider:
   use first <- @code.emit generated
   use second <- @code.emit generated
   break @u32.add first second
@@ -33,8 +33,8 @@ entry const answer = fn () => do provider:
     }
     let operationSource = `effect Read: Unit -> U32
 effect Write: Unit -> Unit
-const identity = fn value => value
-const invoke = fn () => identity (Read ())
+const identity = func value => return value
+const invoke = func () => return identity (Read ())
 `;
     let observed = 40;
     if (declared === "superset") {
@@ -45,14 +45,14 @@ const invoke = fn () => identity (Read ())
     }
     if (declared === "unused") {
       operationSource = operationSource.replace(
-        "const invoke = fn () => identity (Read ())",
-        "const invoke: Unit -> U32 ! {Read} = fn () => 42",
+        "const invoke = func () => return identity (Read ())",
+        "const invoke: Unit -> U32 ! {Read} = func () => return 42",
       );
       observed = 42;
     }
     const library = (step: number) =>
       `import {invoke} from "./operations"
-const helper = fn () => @u32.add (invoke ()) ${step}
+const helper = func () => return @u32.add (invoke ()) ${step}
 const generated = @code.quote (helper ())
 `;
     const observe = async (

@@ -80,12 +80,12 @@ An implementation has an explicit declaration name and explicit parameters:
 ```blot
 impl ArraySource a : Source (Array a) = {
   type Item = a,
-  const first = fn values => @array.get values 0,
+  const first = func values => return @array.get values 0,
 }
 
 const read: s -> (Source.Item s) where { Source s } =
-  fn values => Source.first values
-entry const answer = fn () => read #[42]
+  func values => return Source.first values
+entry const answer = func () => return read #[42]
 ```
 
 `impl` is contextual at a declaration start. Its grammar is
@@ -179,7 +179,7 @@ may include it without becoming nominal implementation-requiring contracts.
 
 ```blot
 const keep: a -> a where { Identity a, type_eq (Identity.Item a) a } =
-  fn value => value
+  func value => return value
 ```
 
 One contract/member identity and equal argument graphs denote equal projections

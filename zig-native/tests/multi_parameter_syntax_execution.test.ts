@@ -6,14 +6,14 @@ import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 Deno.test("curried parameter lists retain partial application, generic callbacks, and named record calls", async () => {
   await compileAndRun(
     `
-const combine = fn (first: U32) (second: U32) (third: U32) => @u32.add (@u32.add first second) third
+const combine = func (first: U32) -> (second: U32) -> (third: U32) => return @u32.add (@u32.add first second) third
 const partial = combine 40
-const apply = fn callback value => callback value
-const dimensions = fn (fields: { width: U32, height: U32, x: U32, y: U32 }) =>
+const apply = func callback -> value => return callback value
+const dimensions = func (fields: { width: U32, height: U32, x: U32, y: U32 }) => return
   @u32.add (@u32.mul fields.width fields.height) (@u32.add fields.x fields.y)
-entry const positional = fn (input: U32) => partial input 1
-entry const generic = fn (input: U32) => apply (fn number => @u32.add number 1) input
-entry const named = fn (input: U32) => dimensions { y: 4, height: 3, x: input, width: 5 }
+entry const positional = func (input: U32) => return partial input 1
+entry const generic = func (input: U32) => return apply (func number => return @u32.add number 1) input
+entry const named = func (input: U32) => return dimensions { y: 4, height: 3, x: input, width: 5 }
 `,
     (guest) => {
       assert.equal(guest.call("positional", 1), 42);
@@ -26,14 +26,14 @@ entry const named = fn (input: U32) => dimensions { y: 4, height: 3, x: input, w
 Deno.test("record fields and curried stages evaluate arguments once in written order", async () => {
   await compileAndRun(
     `
-const combine = fn first second => @u32.add first second
-const dimensions = fn (fields: { width: U32, height: U32 }) => @u32.mul fields.width fields.height
-const staged = fn (tick: U32 -> U32 ! {Foreign}) => do:
+const combine = func first -> second => return @u32.add first second
+const dimensions = func (fields: { width: U32, height: U32 }) => return @u32.mul fields.width fields.height
+const staged = func (tick: U32 -> U32 ! {Foreign}) => return do:
   use base <- tick 3
-  return fn (value: U32) => @u32.add base value
-entry const positional = fn (tick: U32 -> U32 ! {Foreign}) => combine (tick 1) (tick 2)
-entry const named = fn (tick: U32 -> U32 ! {Foreign}) => dimensions { height: tick 2, width: tick 1 }
-entry const later = fn (tick: U32 -> U32 ! {Foreign}) => (staged tick) 4
+  return func (value: U32) => return @u32.add base value
+entry const positional = func (tick: U32 -> U32 ! {Foreign}) => return combine (tick 1) (tick 2)
+entry const named = func (tick: U32 -> U32 ! {Foreign}) => return dimensions { height: tick 2, width: tick 1 }
+entry const later = func (tick: U32 -> U32 ! {Foreign}) => return (staged tick) 4
 `,
     (guest) => {
       const calls: number[] = [];
@@ -57,7 +57,7 @@ entry const later = fn (tick: U32 -> U32 ! {Foreign}) => (staged tick) 4
 
 Deno.test("record-style named calls reject duplicate and unknown argument names at their source", async () => {
   const prefix =
-    `const area = fn (fields: { width: U32, height: U32 }) => @u32.mul fields.width fields.height\nentry const answer = fn () => area `;
+    `const area = func (fields: { width: U32, height: U32 }) => return @u32.mul fields.width fields.height\nentry const answer = func () => return area `;
   const duplicate = `${prefix}{ width: 1, width: 2, height: 3 }\n`;
   await compileExpectedFailure(duplicate, "duplicate_record_field", undefined, {
     span: [duplicate.indexOf("width: 2"), duplicate.indexOf("width: 2")],
@@ -86,12 +86,12 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
       > = [];
       for (
         const declaration of [
-          "fn (first: U32) (second: U32) => @u32.add first second",
-          "fn (first: U32) => fn (second: U32) => @u32.add first second",
+          "func (first: U32) -> (second: U32) => return @u32.add first second",
+          "func (first: U32) => return func (second: U32) => return @u32.add first second",
         ]
       ) {
         const source =
-          `const sum = ${declaration}\nentry const answer = fn (input: U32) => sum input 1\n`;
+          `const sum = ${declaration}\nentry const answer = func (input: U32) => return sum input 1\n`;
         const compiler = await createZigProjectCompiler({
           executable,
           entry,
@@ -136,11 +136,11 @@ Deno.test("named record calls and positional calls expose allocation traffic in 
   const executable = Deno.args[0] ??
     new URL("../zig-out/bin/blotc", import.meta.url);
   const declarations = [
-    `const calculate = fn (a: U32) (b: U32) (c: U32) (d: U32) => @u32.add (@u32.mul a b) (@u32.mul c d)
-entry const answer = fn (input: U32) => calculate input 2 3 4
+    `const calculate = func (a: U32) -> (b: U32) -> (c: U32) -> (d: U32) => return @u32.add (@u32.mul a b) (@u32.mul c d)
+entry const answer = func (input: U32) => return calculate input 2 3 4
 `,
-    `const calculate = fn (args: { a: U32, b: U32, c: U32, d: U32 }) => @u32.add (@u32.mul args.a args.b) (@u32.mul args.c args.d)
-entry const answer = fn (input: U32) => calculate { d: 4, c: 3, b: 2, a: input }
+    `const calculate = func (args: { a: U32, b: U32, c: U32, d: U32 }) => return @u32.add (@u32.mul args.a args.b) (@u32.mul args.c args.d)
+entry const answer = func (input: U32) => return calculate { d: 4, c: 3, b: 2, a: input }
 `,
   ];
   try {

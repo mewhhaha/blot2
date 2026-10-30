@@ -1,9 +1,9 @@
 
-const finished = fn computation => do:
+const finished = func computation => return do:
   for request in @requests computation:
     case request of
       complete value =>
         break value
-entry const answer = fn () => finished (@computation (fn () => 42))
+entry const answer = func () => return finished (@computation (func () => return 42))
 
 entry const checked_answer = answer ()

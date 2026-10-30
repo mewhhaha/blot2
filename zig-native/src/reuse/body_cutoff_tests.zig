@@ -9,13 +9,13 @@ const identity = @import("../backend/runtime_identity.zig");
 const a = std.testing.allocator;
 
 const source =
-    \\const twice = fn f => fn x => f (f x)
-    \\const helper = fn (x: U32) -> U32 => @u32.add x 1
-    \\entry const apply = fn (x: U32) -> U32 => twice helper x
-    \\entry const adder = fn (x: U32) -> U32 => do:
-    \\  let add = fn (y: U32) => @u32.add y x
+    \\const twice = func f => return func x => return f (f x)
+    \\const helper = func (x: U32) : U32 => return @u32.add x 1
+    \\entry const apply = func (x: U32) : U32 => return twice helper x
+    \\entry const adder = func (x: U32) : U32 => return do:
+    \\  let add = func (y: U32) => return @u32.add y x
     \\  break twice add 3
-    \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+    \\entry const edited = func (x: U32) : U32 => return @u32.add x 2
 ;
 const Fixture = struct {
     units: []core.Module,

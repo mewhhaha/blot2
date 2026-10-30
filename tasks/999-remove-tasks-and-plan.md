@@ -3,6 +3,9 @@
 ## Status, dependencies, and originating requirements
 
 - **Status:** Pending — no completion is claimed.
+- **Additional dependencies:** Every task 110–121 in the
+  [owned-storage rewrite](STORAGE_REWRITE.md). Its review does not authorize
+  cleanup or a commit, and this task remains last.
 - **Dependencies:** [001](001-qualify-list-span-prototype.md),
   [002](002-close-packed-list-traversal-regression.md),
   [003](003-specify-general-call-summaries.md),

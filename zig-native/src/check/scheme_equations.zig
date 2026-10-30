@@ -6,6 +6,7 @@ const T = @import("types.zig");
 const F = @import("frozen_types.zig");
 const Import = @import("check_scheme_import.zig").Copier;
 pub const Error = error{ InvalidArtifact, OutOfMemory };
+pub const SourceFailure = struct { unit: u32, span: core.Span };
 pub const Admission = struct {
     const Body = struct { module: *const core.Module, binding: core.BindingId };
     workspace: ?*Workspace = null,
@@ -13,8 +14,10 @@ pub const Admission = struct {
     units: [128]*const core.Module = undefined,
     count: usize = 0,
     source_bodies: bool = false,
-    bodies: [128]Body = undefined,
-    body_count: usize = 0,
+    bodies: std.ArrayList(Body) = .empty,
+    source_rows: std.ArrayList(struct { module: *const core.Module, rows: []T.Effects.Id }) = .empty,
+    source_definitions: std.ArrayList(struct { module: *const core.Module, values: []core.Id }) = .empty,
+    source_failure: ?*?SourceFailure = null,
 };
 pub const Workspace = struct {
     allocator: std.mem.Allocator,
@@ -51,7 +54,10 @@ pub const Solver = struct {
     rigid_rows: std.AutoHashMapUnmanaged(u32, void) = .empty,
     remaining: *usize,
     pub fn init(allocator: std.mem.Allocator, module: *const core.Module, views: anytype, remaining: *usize) Error!Solver {
-        var store = T.Store.initWithOptions(allocator, .{ .resolution_cache = false, .composite_cache = false }) catch |err| return convert(err);
+        // This private store owns its mutation/rollback epochs. Reuse exact
+        // epoch resolutions (including rank walks), never cross-epoch or
+        // lexical proof facts. The copied prefix is finalized before queries.
+        var store = T.Store.initWithOptions(allocator, .{ .resolution_cache = true, .composite_cache = false }) catch |err| return convert(err);
         errdefer store.deinit();
         store.nodes.clearRetainingCapacity();
         try store.nodes.appendSlice(allocator, module.types.nodes);
@@ -87,6 +93,14 @@ pub const Solver = struct {
             node.closed_height = 0;
             node.closed_generation = 0;
             if (node.tag == .variable) {
+                // A checked source instance remains the same rigid caller
+                // identity in this inquiry. Carry its existing ownership;
+                // this neither makes it flexible nor infers its concrete type.
+                if (views.source_instances and views.instance_variables.contains(id)) {
+                    if (remaining.* == 0) return error.InvalidArtifact;
+                    remaining.* -= 1;
+                    if (id < rigid_types.capacity()) rigid_types.set(id) else try rigid_type_overflow.put(allocator, @intCast(id), {});
+                }
                 node.* = .{ .tag = .rigid, .a = scope, .b = @intCast(id) };
             }
         }
@@ -98,6 +112,11 @@ pub const Solver = struct {
             if (views.closed_rows.contains(index)) {
                 store.effects.rows.items[index].tail = .closed;
             } else {
+                if (views.source_instances and views.instance_rows.contains(row.tail.variable) and !rigid_rows.contains(row.tail.variable)) {
+                    if (remaining.* == 0 or row.tail.variable >= module.types.effects.variable_count) return error.InvalidArtifact;
+                    remaining.* -= 1;
+                    try rigid_rows.put(allocator, row.tail.variable, {});
+                }
                 const rigid = store.rigid(scope, row.tail.variable, 1) catch |err| return convert(err);
                 store.effects.rows.items[index].tail = .{ .formal = rigid };
             }

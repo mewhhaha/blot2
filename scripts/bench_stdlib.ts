@@ -29,69 +29,74 @@ const evens = [...input].filter((x) => x % 2 === 0);
 const cases = [
   [
     "prefix_sums",
-    "fn (values: Array U32) => array.prefix_sums values",
+    "func (values: Array U32) => return array.prefix_sums values",
     input,
     [...input].map((i) => i * (i + 1) / 2),
   ],
   [
     "indices",
-    "fn (values: Array U32) => array.indices (array.map (fn x => x % 2 == 0) values)",
+    "func (values: Array U32) => return array.indices (array.map (func x => return x % 2 == 0) values)",
     input,
     evens,
   ],
   [
     "filter",
-    "fn (values: Array U32) => array.filter (fn x => x % 2 == 0) values",
+    "func (values: Array U32) => return array.filter (func x => return x % 2 == 0) values",
     input,
     evens,
   ],
   [
     "filter_map",
-    "fn (values: Array U32) => array.filter_map (fn x => if x % 2 == 0 then #Some (x + 1) else #Nothing) values",
+    "func (values: Array U32) => return array.filter_map (func x => return if x % 2 == 0 then #Some (x + 1) else #Nothing) values",
     input,
     evens.map((x) => x + 1),
   ],
-  ["concat", "fn (values: Array U32) => array.concat values values", input, [
-    ...input,
-    ...input,
-  ]],
+  [
+    "concat",
+    "func (values: Array U32) => return array.concat values values",
+    input,
+    [
+      ...input,
+      ...input,
+    ],
+  ],
   [
     "flatten",
-    "fn (values: Array U32) => array.flatten #[#[], values, #[], values, #[]]",
+    "func (values: Array U32) => return array.flatten #[#[], values, #[], values, #[]]",
     input,
     [...input, ...input],
   ],
-  ["push", "fn (values: Array U32) => array.push 42 values", input, [
+  ["push", "func (values: Array U32) => return array.push 42 values", input, [
     ...input,
     42,
   ]],
   [
     "list_append",
-    "fn (count: U32) => do:\n  let values: List U32 = []\n  for i in 0..count:\n    values := list.append i values\n  break Array.from_list values",
+    "func (count: U32) => return do:\n  let values: List U32 = []\n  for i in 0..count:\n    values := list.append i values\n  break Array.from_list values",
     1025,
     Array.from({ length: 1025 }, (_, i) => i),
   ],
   [
     "array_replace",
-    "fn (count: U32) => do:\n  let values = array.fill count 0\n  for i in 0..count:\n    values := array.replace i (i + 1) values\n  break values",
+    "func (count: U32) => return do:\n  let values = array.fill count 0\n  for i in 0..count:\n    values := array.replace i (i + 1) values\n  break values",
     1025,
     Array.from({ length: 1025 }, (_, i) => i + 1),
   ],
   [
     "vector_lerp",
-    "fn (count: U32) => do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  break #[v.x, v.y, v.z]",
+    "func (count: U32) => return do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  break #[v.x, v.y, v.z]",
     8193,
     [2, 4, 6],
   ],
   [
     "result_iterate",
-    "fn (count: U32) => do:\n  let result = Result.iterate 0 (fn i => #Ok (if i < count then #Continue (i + 1) else #Done i))\n  break #[Result.unwrap_or 0 result]",
+    "func (count: U32) => return do:\n  let result = Result.iterate 0 (func i => return #Ok (if i < count then #Continue (i + 1) else #Done i))\n  break #[Result.unwrap_or 0 result]",
     8193,
     [8193],
   ],
   [
     "tan",
-    "fn (values: Array U32) => array.map (fn x => tan (F32.from x / 10000.0)) values",
+    "func (values: Array U32) => return array.map (func x => return tan (F32.from x / 10000.0)) values",
     input,
     null,
   ],
@@ -220,7 +225,7 @@ for (const length of [256, 1024, 4096, 8193]) {
   const source = `${output}/staged-${length}.blot`;
   await Deno.writeTextFile(
     source,
-    `const build = fn count => do:
+    `const build = func count => return do:
   let values: List U32 = []
   for i in 0..count:
     values := [...self, i]

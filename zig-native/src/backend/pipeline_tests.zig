@@ -6,16 +6,16 @@ const checker = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const backend = @import("core_backend.zig");
 const scalar_source =
-    \\const identity = fn value => value
-    \\const add = fn left => fn right => @u32.add left right
+    \\const identity = func value => return value
+    \\const add = func left => return func right => return @u32.add left right
     \\entry const maximum: U32 = 0xFFFF_FFFF
-    \\entry const answer = fn () -> U32 => add (identity 20) (identity 22)
-    \\entry const floating = fn (value: F32) -> F32 => identity value
-    \\entry const capped = fn (value: U32) -> U32 => do:
+    \\entry const answer = func () : U32 => return add (identity 20) (identity 22)
+    \\entry const floating = func (value: F32) : F32 => return identity value
+    \\entry const capped = func (value: U32) : U32 => return do:
     \\  if @u32.lt value 42:
     \\    break value
     \\  break 42
-    \\entry const nested = fn () -> U32 => do:
+    \\entry const nested = func () : U32 => return do:
     \\  let inner = do:
     \\    break 20
     \\  break @u32.add inner 22
@@ -73,13 +73,13 @@ test "a valid source without an entry cannot produce a Wasm program" {
 const provider_source =
     \\effect Read: Unit -> F32
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\const reader = @effect.provider Read (fn () => 1.75)
+    \\const reader = @effect.provider Read (func () => return 1.75)
     \\const state = @effect.state (State.get F32) (State.set F32) 1.75
     \\entry const folded = do reader:
     \\  break Read ()
-    \\entry const callback = fn () => do reader:
+    \\entry const callback = func () => return do reader:
     \\  break Read ()
-    \\entry const answer = fn (value: F32) => do:
+    \\entry const answer = func (value: F32) => return do:
     \\  let (next, old) = do state:
     \\    use old <- State.get F32 ()
     \\    use State.set F32 (@f32.add old value)
@@ -99,9 +99,9 @@ test "provider emission releases callback code rows frames and State data on eve
 
 fn foreignPipelineScenario(allocator: std.mem.Allocator) !void {
     const source =
-        \\const invoke = fn callback => callback 21
-        \\entry const scalar = fn (host: U32 -> U32 ! {Foreign}) => invoke host
-        \\entry const arrays = fn (host: Array F32 -> Array F32 ! {Foreign}) => host #[1.25]
+        \\const invoke = func callback => return callback 21
+        \\entry const scalar = func (host: U32 -> U32 ! {Foreign}) => return invoke host
+        \\entry const arrays = func (host: Array F32 -> Array F32 ! {Foreign}) => return host #[1.25]
     ;
     var result = try compileSource(allocator, source);
     defer result.deinit(allocator);
@@ -115,9 +115,9 @@ const record_witness_source =
     \\const apple = 0.0
     \\type Pair is data = #Pair { zebra: U32, apple: F32 }
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\const get = fn (witness: p -> a) -> a => State.get ()
+    \\const get = func (witness: p -> a) : a => return State.get ()
     \\const state = @effect.state (State.get Pair) (State.set Pair) (#Pair { zebra: 42, apple: 1.5 })
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let (_, result) = do state:
     \\    use value <- get #Pair
     \\    break value.zebra
@@ -137,30 +137,30 @@ test "closed record evidence retains caller field storage during generic effect 
 const retained_checkpoint_sources = [_][]const u8{
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
     \\type Builder [world,scope,checkpoint] is data = #Builder { initial: world, scope: world -> scope, checkpoint: checkpoint }
-    \\const empty = fn () => do:
-    \\  let scope = fn world => fn action => do:
+    \\const empty = func () => return do:
+    \\  let scope = func world => return func action => return do:
     \\    use result <- action ()
     \\    break (world,result)
-    \\  break #Builder { initial: (), scope, checkpoint: fn () => () }
-    \\const insert = fn initial => fn builder => do:
+    \\  break #Builder { initial: (), scope, checkpoint: func () => return () }
+    \\const insert = func initial => return func builder => return do:
     \\  let #Builder { initial: previous_initial, scope: previous_scope, checkpoint } = builder
-    \\  let scope = fn world => fn action => do:
+    \\  let scope = func world => return func action => return do:
     \\    let (current,previous) = world
-    \\    use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
+    \\    use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
     \\    let (next,(previous_next,result)) = outcome
     \\    break ((next,previous_next),result)
     \\  break #Builder { initial: (initial,previous_initial), scope, checkpoint }
-    \\const snapshot = fn initial => fn builder => do:
+    \\const snapshot = func initial => return func builder => return do:
     \\  let #Builder { checkpoint: previous_checkpoint } = builder
     \\  let #Builder { initial: previous_initial, scope: previous_scope } = insert initial builder
-    \\  let checkpoint = fn () => do:
+    \\  let checkpoint = func () => return do:
     \\    use previous_checkpoint ()
     \\    use current <- State.get ()
     \\    use State.set (@u32.add current 1)
     \\    break ()
     \\  break #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
     \\const built = snapshot 41 (empty ())
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let #Builder { initial,scope,checkpoint } = built
     \\  let (world,_) = scope initial checkpoint
     \\  let (current,_) = world
@@ -168,19 +168,19 @@ const retained_checkpoint_sources = [_][]const u8{
     ,
     \\effect Read: Unit -> U32
     \\effect Touch: U32 -> Unit
-    \\const previous: Unit -> Unit = fn () => ()
-    \\const extend = fn previous => fn () => do:
+    \\const previous: Unit -> Unit = func () => return ()
+    \\const extend = func previous => return func () => return do:
     \\  use previous ()
     \\  use value <- Read ()
     \\  use Touch value
     \\  break ()
     \\const checkpoint = extend previous
-    \\const reader = @effect.provider Read (fn () => 42)
-    \\const touch = @effect.provider Touch (fn value => ())
-    \\const run = fn () => do touch:
+    \\const reader = @effect.provider Read (func () => return 42)
+    \\const touch = @effect.provider Touch (func value => return ())
+    \\const run = func () => return do touch:
     \\  use checkpoint ()
     \\  break 42
-    \\entry const answer = fn () => do reader:
+    \\entry const answer = func () => return do reader:
     \\  break run ()
     ,
 };
@@ -205,32 +205,32 @@ const curried_dispatch_source =
     \\type Box is data = #Box F32
     \\type Deferred is data = #Deferred F32
     \\type Scale is data = #Scale F32
-    \\const Box.mix = fn left => fn right => fn weight => do:
+    \\const Box.mix = func left => return func right => return func weight => return do:
     \\  let #Box base = left
     \\  break @f32.add base (@f32.mul right weight)
-    \\const Deferred.mix = fn left => do:
+    \\const Deferred.mix = func left => return do:
     \\  let #Deferred base = left
     \\  use offset <- Read ()
-    \\  break fn right => fn weight => @f32.add (@f32.add base offset) (@f32.mul right weight)
-    \\const Scale.mix = fn left => fn right => fn weight => do:
+    \\  break func right => return func weight => return @f32.add (@f32.add base offset) (@f32.mul right weight)
+    \\const Scale.mix = func left => return func right => return func weight => return do:
     \\  let #Scale scale = right
     \\  break @f32.add left (@f32.mul scale weight)
-    \\const mix = fn left => fn right => @type.call "mix" left right
-    \\const reader = @effect.provider Read (fn () => 2.0)
-    \\entry const nominal = fn (value: F32) => mix (#Box value) 2.0 1.0
-    \\entry const partial = fn (value: F32) => do:
+    \\const mix = func left => return func right => return @type.call "mix" left right
+    \\const reader = @effect.provider Read (func () => return 2.0)
+    \\entry const nominal = func (value: F32) => return mix (#Box value) 2.0 1.0
+    \\entry const partial = func (value: F32) => return do:
     \\  let blend = mix (#Box value) 4.0
     \\  break blend 0.5
-    \\entry const deferred = fn (value: F32) => do reader:
+    \\entry const deferred = func (value: F32) => return do reader:
     \\  break mix (#Deferred value) 4.0 0.5
-    \\entry const right = fn (value: F32) => mix value (#Scale 2.0) 1.0
+    \\entry const right = func (value: F32) => return mix value (#Scale 2.0) 1.0
     \\type Live is data = #Live F32
-    \\const Live.mix = fn left => fn right => fn () => do:
+    \\const Live.mix = func left => return func right => return func () => return do:
     \\  let #Live base = left
     \\  use value <- Read ()
     \\  break @f32.add base (@f32.add right value)
-    \\const earlier = @effect.provider Read (fn () => 100.0)
-    \\entry const live = fn (value: F32) => do:
+    \\const earlier = @effect.provider Read (func () => return 100.0)
+    \\entry const live = func (value: F32) => return do:
     \\  let callback = do earlier:
     \\    break mix (#Live value) 0.0
     \\  break do reader:
@@ -250,9 +250,9 @@ test "runtime scalar exports release startup functions and global names on every
         \\entry let integer: U32 = @u32.add base 2
         \\let base: U32 = 40
         \\entry let floating: F32 = @f32.add 1.25 2.5
-        \\entry let enabled: Bool = #True
+        \\entry let enabled: Bool = true
         \\entry let empty: Unit = ()
-        \\entry const read = fn () => @u32.add integer base
+        \\entry const read = func () => return @u32.add integer base
     );
     defer module.deinit(allocator);
     try retainedCallableScenario(allocator, &module);

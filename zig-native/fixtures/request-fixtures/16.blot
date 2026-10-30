@@ -1,6 +1,6 @@
 
 type Counter is effect = { next: U32 -> U32 }
-const count = fn computation => do:
+const count = func computation => return do:
   let first = 0
   let second = 0
   for request in @requests computation:
@@ -15,7 +15,7 @@ const count = fn computation => do:
         yield @u32.add first second
       complete value =>
         break @u32.add (@u32.add first second) value
-entry const answer = fn () => count (@computation (fn () => do:
+entry const answer = func () => return count (@computation (func () => return do:
   use Counter.next 0
   use value <- Counter.next 1
   break value

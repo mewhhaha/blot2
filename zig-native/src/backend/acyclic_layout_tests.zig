@@ -25,17 +25,17 @@ const shapes =
     \\type Draw is data = #Draw { position: link.Vec, tint: Maybe link.Vec, extra: Array link.Vec, path: List link.Vec, chain: link.Link U32 }
     \\type Tree is data = #Leaf U32 | #Branch (Array Tree)
     \\type Callback is data = #Ready U32 | #Later (Unit -> U32)
-    \\entry const answer = fn (value: U32) => value
+    \\entry const answer = func (value: U32) => return value
     \\
 ;
 const owner =
     \\import * as link from "./link"
-    \\const grow = fn (count: U32) => do:
+    \\const grow = func (count: U32) => return do:
     \\  let root: link.Link U32 = #link.End
     \\  for index in 0..count:
     \\    root := #link.Next (self, index)
     \\  break root
-    \\entry const run = fn (count: U32) => do:
+    \\entry const run = func (count: U32) => return do:
     \\  let root = grow count
     \\  break count
     \\

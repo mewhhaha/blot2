@@ -5,11 +5,11 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
-entry const answer = fn () => do:
-  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    break @effect.scope (fn (s: State U32) => do:
+entry const answer = func () => return do:
+  let (stored, result) = do (@effect.state Box.get Box.set (func () => return 0)):
+    break @effect.scope (func (s: State U32) => return do:
       use previous <- Box.get ()
-      use Box.set (fn () => 0)
+      use Box.set (func () => return 0)
       break previous ()
     )
   break result
@@ -47,8 +47,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
         }
       }
       const invalid = source.replace(
-        "fn () => 0)\n      break",
-        "fn () => do (@effect.state s.get s.set 7):\n        break s.get ()\n      )\n      break",
+        "func () => return 0)\n      break",
+        "func () => return do (@effect.state s.get s.set 7):\n        break s.get ()\n      )\n      break",
       );
       const rejected = await compiler.build({ sources: { [entry]: invalid } });
       assert(!rejected.success);

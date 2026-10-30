@@ -12,7 +12,7 @@ const a = std.testing.allocator;
 const compiler: [32]u8 = @splat(17);
 const source =
     \\type Box is data = #Box U32
-    \\const extract = fn (box: Box) -> U32 => case box of
+    \\const extract = func (box: Box) : U32 => return case box of
     \\  #Box value => value
     \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box 2))
 ;
@@ -175,16 +175,16 @@ fn nonemptyImport(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: 
 test "portable principal results own inferred types and effect rows through restarts invalid inputs and allocation failures" {
     const row_source =
         \\entry const builder: U32 where { type_rep U32 } = do:
-        \\  let local = fn value => value
+        \\  let local = func value => return value
         \\  break local 42
     ;
     const type_source =
-        \\const from = fn value => @type.result "from" value
-        \\const U32.from = fn value => @f32.to_u32 value
-        \\const F32.from = fn value => @u32.to_f32 value
-        \\const U32.add = fn left => fn right => @u32.add left right
-        \\const F32.add = fn left => fn right => @f32.add left right
-        \\const add = fn left => fn right => @type.call "add" left right
+        \\const from = func value => return @type.result "from" value
+        \\const U32.from = func value => return @f32.to_u32 value
+        \\const F32.from = func value => return @u32.to_f32 value
+        \\const U32.add = func left => return func right => return @u32.add left right
+        \\const F32.add = func left => return func right => return @f32.add left right
+        \\const add = func left => return func right => return @type.call "add" left right
         \\const count = 10000
         \\entry const builder = add (from (@f32.ceil (@f32.sqrt (from count)))) 2
     ;
@@ -231,7 +231,7 @@ fn implementationRestart(allocator: std.mem.Allocator, fixture: *const Fixture, 
     try std.testing.expectEqualSlices(u8, &before, &@import("code_artifacts.zig").stamp(loaded.principal.snapshot));
 }
 test "implementation checkpoints reconstruct selected proofs after source owners die and equations change" {
-    const original = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = fn value => value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }\nentry const answer: U32 = Source.first #[42]\n";
+    const original = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = U32, const first = func value => return value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = func values => return Source.first (@array.get values 0) }\nentry const answer: U32 = Source.first #[42]\n";
     const bytes = blk: {
         var initial = try Fixture.init(original);
         defer initial.deinit();
@@ -241,7 +241,7 @@ test "implementation checkpoints reconstruct selected proofs after source owners
         break :blk try archive.encode(a, compiler, &compiled.capture.?);
     };
     defer a.free(bytes);
-    for ([_][]const u8{ original, "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = F32, const first = fn value => @u32.to_f32 value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }\nentry const answer: F32 = Source.first #[42]\n" }) |text| {
+    for ([_][]const u8{ original, "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl Scalar : Source U32 = { type Item = F32, const first = func value => return @u32.to_f32 value }\nimpl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = func values => return Source.first (@array.get values 0) }\nentry const answer: F32 = Source.first #[42]\n" }) |text| {
         var fixture = try Fixture.init(text);
         defer fixture.deinit();
         var fresh = try fixture.emit(a, null);

@@ -3,14 +3,14 @@ import { demandCases } from "./demand_cases.ts";
 
 Deno.test("persistent demanded arrays survive arena resets and local demands retain snapshots", async () => {
   await compileAndRun(`
-const delay = fn ~value => value
+const delay = func ~value => return value
 const pending = delay (@array.fill 3 7)
 const alias = pending
-entry const read = fn () -> U32 => @array.get (@force pending) 2
-entry const read_alias = fn () -> U32 => @array.get (@force alias) 0
-entry const pressure = fn (count: U32) -> Array U32 => @array.fill count 99
-entry const local = fn (value: U32) -> U32 => do:
-  let pending = delay (@array.generate 3 (fn index => @u32.add value index))
+entry const read = func () : U32 => return @array.get (@force pending) 2
+entry const read_alias = func () : U32 => return @array.get (@force alias) 0
+entry const pressure = func (count: U32) : Array U32 => return @array.fill count 99
+entry const local = func (value: U32) : U32 => return do:
+  let pending = delay (@array.generate 3 (func index => return @u32.add value index))
   let before = @force pending
   value := 99
   let after = @force pending

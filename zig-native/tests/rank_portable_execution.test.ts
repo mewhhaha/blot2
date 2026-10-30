@@ -4,37 +4,37 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
-const producer = `const id: forall [a] => a -> a = fn value => value
-const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = fn identity => fn value => (identity value, identity (@u32.to_f32 value))
-const array: (forall [a] => a -> a) -> Array U32 -> Array U32 = fn identity => fn values => identity values
-const floating: (forall [a] => a -> a) -> Array F32 -> Array F32 = fn identity => fn values => identity values
-const list: (forall [a] => a -> a) -> List U32 -> List U32 = fn identity => fn values => identity values
-const floating_list: (forall [a] => a -> a) -> List F32 -> List F32 = fn identity => fn values => identity values
+const producer = `const id: forall [a] => a -> a = func value => return value
+const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = func identity => return func value => return (identity value, identity (@u32.to_f32 value))
+const array: (forall [a] => a -> a) -> Array U32 -> Array U32 = func identity => return func values => return identity values
+const floating: (forall [a] => a -> a) -> Array F32 -> Array F32 = func identity => return func values => return identity values
+const list: (forall [a] => a -> a) -> List U32 -> List U32 = func identity => return func values => return identity values
+const floating_list: (forall [a] => a -> a) -> List F32 -> List F32 = func identity => return func values => return identity values
 `;
 const consumer =
   `import {id, two, array, floating, list, floating_list} from "./identity"
-entry const whole = fn (value: U32) => @product.get (two id value) 0
-entry const fraction = fn (value: U32) => @product.get (two (fn item => item) value) 1
-entry const exact_array = fn (values: Array F32) => floating id values
-entry const exact_list = fn (values: Array F32) => @array.from_list (floating_list id (@list.from_array values))
-entry const kept = fn (value: U32) => do:
+entry const whole = func (value: U32) => return @product.get (two id value) 0
+entry const fraction = func (value: U32) => return @product.get (two (func item => return item) value) 1
+entry const exact_array = func (values: Array F32) => return floating id values
+entry const exact_list = func (values: Array F32) => return @array.from_list (floating_list id (@list.from_array values))
+entry const kept = func (value: U32) => return do:
   let result = array id (@array.fill 256 value)
   let pressure = @array.fill 8192 99
   break if @u32.eq pressure[0] 99 then result else @panic "pressure"
-entry const floating_kept = fn (value: U32) => do:
+entry const floating_kept = func (value: U32) => return do:
   let identity: forall [a] => a -> a = id
   let result = floating identity (@array.fill 256 (@f32.add (@u32.to_f32 value) 0.25))
   let pressure = @array.fill 8192 99
   break if @u32.eq pressure[0] 99 then result else @panic "pressure"
-entry const listed_kept = fn (value: U32) => do:
+entry const listed_kept = func (value: U32) => return do:
   let result = list id (@list.from_array (@array.fill 256 value))
   let pressure = @array.fill 8192 99
   break if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
-entry const floating_list_kept = fn (value: U32) => do:
-  let result = floating_list (fn item => item) (@list.from_array (@array.fill 256 (@f32.add (@u32.to_f32 value) 0.25)))
+entry const floating_list_kept = func (value: U32) => return do:
+  let result = floating_list (func item => return item) (@list.from_array (@array.fill 256 (@f32.add (@u32.to_f32 value) 0.25)))
   let pressure = @array.fill 8192 99
   break if @u32.eq pressure[0] 99 then @array.from_list result else @panic "pressure"
-entry const anonymous = fn (value: U32) => array (fn item => item) #[value, 42]
+entry const anonymous = func (value: U32) => return array (func item => return item) #[value, 42]
 `;
 
 async function run(bytes: Uint8Array<ArrayBuffer>) {
@@ -174,10 +174,10 @@ Deno.test("portable rank identities execute source archive checkpoint restart an
         checkpoint = await archive.exportCheckpoint();
         for (
           const failed of [
-            consumer.replace("fn item => item", "fn item => 42"),
+            consumer.replace("func item => return item", "func item => return 42"),
             consumer.replace(
               "two id value",
-              "two (fn (item: U32) => item) value",
+              "two (func (item: U32) => return item) value",
             ),
           ]
         ) {

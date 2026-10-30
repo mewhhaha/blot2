@@ -1,6 +1,6 @@
 
 type Validate is effect = { check: U32 -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   let count = 10
   for request in @requests computation:
     case request of
@@ -12,11 +12,11 @@ const checked = fn computation => do:
       complete value =>
         break value
   break @u32.add count 30
-const calculation = @computation (fn () => do:
+const calculation = @computation (func () => return do:
   use Validate.check 40
   use Validate.check 0
   break @panic "break resumed the computation"
 )
-entry const answer = fn () => checked calculation
+entry const answer = func () => return checked calculation
 
 entry const checked_answer = answer ()

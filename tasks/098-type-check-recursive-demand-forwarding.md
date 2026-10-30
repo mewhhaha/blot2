@@ -18,10 +18,10 @@ does for any other lazy callee.
 
 ## Starting point
 
-`const recursive: ~U32 -> U32 = fn ~(value: U32) => recursive (@demand value)`
+`const recursive: ~U32 -> U32 = func ~(value: U32) => return recursive (@demand value)`
 reports `type_mismatch` over the whole declaration, with or without the
-annotation and with `fn ~value`. Forwarding to another lazy function
-(`fn ~(value: U32) => twice (@demand value)`) checks. The law "recursive demand
+annotation and with `func ~value`. Forwarding to another lazy function
+(`func ~(value: U32) => return twice (@demand value)`) checks. The law "recursive demand
 forwarding declines its bounded inline proof" in
 [demand_inline_tests.zig](../zig-native/src/backend/demand_inline_tests.zig)
 expects the recursive program to check and is skipped until this task completes;

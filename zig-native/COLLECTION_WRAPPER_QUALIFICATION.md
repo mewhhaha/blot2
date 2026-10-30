@@ -2,7 +2,7 @@
 
 Issue #17 exposed a size-dependent cost cliff in an otherwise ordinary array
 update loop. A direct `array.replace` reused the loop's exclusive array, but a
-source wrapper `fn index value values => array.replace index value values`
+source wrapper `func index -> value -> values => return array.replace index value values`
 copied the entire array on every edit. The forwarding proof now admits one
 source wrapper that passes every parameter exactly once to an edit primitive,
 including a plain alias or parameter reordering. The compiler evaluates actual

@@ -106,7 +106,7 @@ function wrongStartSignature(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 }
 Deno.test("task ABI rejects missing duplicate stale versions counts and forged adapter contracts", async () => {
   await compileAndRun(
-    `entry const answer = fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => value)))`,
+    `entry const answer = func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return value)))`,
     async (guest, bytes) => {
       assert.equal(guest.call("answer", 42), 42);
       const abi = readGuestAbi(new WebAssembly.Module(bytes));

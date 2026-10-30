@@ -85,14 +85,14 @@ for (const width of widths) {
   const path = `${output}/width-${width}.blot`;
   await Deno.writeTextFile(
     path,
-    `let rows = @list.generate ${count} (fn i => ${value})
-entry const fold = fn repeat => do:
+    `let rows = @list.generate ${count} (func i => return ${value})
+entry const fold = func repeat => return do:
   let total = ${scalar === "f32" ? "0.0" : "0"}
   for pass in 0..repeat:
     for ${binder} in rows:
       total := self + ${sum}
   break total
-entry const cursor = fn repeat => do:
+entry const cursor = func repeat => return do:
   let total = ${scalar === "f32" ? "0.0" : "0"}
   for pass in 0..repeat:
     let cursor = rows.iter
@@ -102,7 +102,7 @@ entry const cursor = fn repeat => do:
       cursor := @cursor.advance self
   break total
 // An aggregate entry exposes the arena to the host memory measurement.
-entry const memory_probe = fn (seed: U32) => #[seed]
+entry const memory_probe = func (seed: U32) => return #[seed]
 `,
   );
   pins[path] = await hash(path);

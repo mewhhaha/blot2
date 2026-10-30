@@ -34,16 +34,16 @@ const Fixture = struct {
         return core.lower(allocator, &self.tree, &self.pool, &self.checked);
     }
 };
-const records_source = "infixl 60 (+) = _fixity_add\n" ++ records_body ++ "\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n";
+const records_source = "infixl 60 (+) = _fixity_add\n" ++ records_body ++ "\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n";
 const records_body =
     \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
-    \\const sum = fn point => do:
+    \\const sum = func point => return do:
     \\  let #Vec2 { x, y } = point
     \\  break x + y
     \\const origin = #Vec2 { y: 2.0, x: 20.0 }
-    \\entry const answer = fn () -> F32 => sum origin
-    \\entry const projected = fn () -> F32 => origin.x
-    \\entry const tuple = fn () -> U32 => @product.get (20, 22) 1
+    \\entry const answer = func () : F32 => return sum origin
+    \\entry const projected = func () : F32 => return origin.x
+    \\entry const tuple = func () : U32 => return @product.get (20, 22) 1
 ;
 test "owned nominal core preserves written values canonical pattern fields and typed projections" {
     var fixture = try Fixture.init(records_source);
@@ -83,10 +83,10 @@ test "owned nominal core preserves written values canonical pattern fields and t
     try std.testing.expectEqual(@as(u32, 1), module.projectionVariants(tuple.b)[0].field);
 }
 
-const alternatives_source = "infix 30 (>=) = _fixity_ge\ninfixl 60 (+) = _fixity_add\n" ++ alternatives_body ++ "\nconst _fixity_ge = fn left => fn right => @type.call \"ge\" left right\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n";
+const alternatives_source = "infix 30 (>=) = _fixity_ge\ninfixl 60 (+) = _fixity_add\n" ++ alternatives_body ++ "\nconst _fixity_ge = func left => return func right => return @type.call \"ge\" left right\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n";
 const alternatives_body =
     \\type Choice is data = #First U32 | #Second U32 | #Empty
-    \\const choose = fn candidate => case candidate of
+    \\const choose = func candidate => return case candidate of
     \\  #First value | #Second value if value >= 40 => value
     \\  #First value | #Second value => value + 2
     \\  #Empty => 0
@@ -116,12 +116,12 @@ test "ordered alternatives share their checked binding guard and body" {
 const nullary_nominal_source =
     \\type Mode is data = #On | #Off
     \\type Level is data = #Low | #High
-    \\const keep = fn (mode: Mode) -> Mode => mode
-    \\const level = fn (mode: Mode) -> Level => case mode of
+    \\const keep = func (mode: Mode) : Mode => return mode
+    \\const level = func (mode: Mode) : Level => return case mode of
     \\  #On => #High
     \\  #Off => #Low
-    \\const twice = fn (mode: Mode) -> Mode => keep (keep mode)
-    \\const both = fn (mode: Mode) -> (Mode, Level) => (twice mode, level mode)
+    \\const twice = func (mode: Mode) : Mode => return keep (keep mode)
+    \\const both = func (mode: Mode) : (Mode, Level) => return (twice mode, level mode)
     \\entry const answer = both #On
 ;
 fn nullaryNominalPublication(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
@@ -155,7 +155,7 @@ test "argument-free nominal types publish one node each" {
 test "variant field projections retain constructor-specific canonical indices" {
     var fixture = try Fixture.init(
         \\type Point is data = #Left { x: U32, y: F32 } | #Right { y: F32, x: U32 }
-        \\const pick = fn (point: Point) -> U32 => point.x
+        \\const pick = func (point: Point) : U32 => return point.x
         \\entry const answer = pick (#Right { x: 42, y: 1.5 })
     );
     defer fixture.deinit();
@@ -174,7 +174,7 @@ test "variant field projections retain constructor-specific canonical indices" {
 test "refutable let and conditional matches preserve the outer return boundary" {
     var fixture = try Fixture.init(
         \\type Choice is data = #Some U32 | #Nothing
-        \\const pick = fn candidate => do:
+        \\const pick = func candidate => return do:
         \\  let #Some value = candidate else:
         \\    break 0
         \\  if let #Some other = candidate:
@@ -208,7 +208,7 @@ test "aggregate catalogs projections and pattern artifacts release on every allo
     var fixture = try Fixture.init(
         "infix 30 (>=) = _fixity_ge\ninfixl 60 (+) = _fixity_add\n" ++
             records_body ++ "\n" ++ alternatives_body ++
-            "\nconst _fixity_ge = fn left => fn right => @type.call \"ge\" left right\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n",
+            "\nconst _fixity_ge = func left => return func right => return @type.call \"ge\" left right\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n",
     );
     defer fixture.deinit();
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationScenario, .{&fixture});

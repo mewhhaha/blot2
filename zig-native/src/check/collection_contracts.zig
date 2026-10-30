@@ -8,6 +8,12 @@ fn require(ok: bool) Error!void {
 pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []const T.Id, output_: T.Id, proof: anytype) Error!void {
     if (inputs.len == 0) return error.InvalidArtifact;
     try require(inputs.len == @import("../backend/collection_ops.zig").arity(operation));
+    if (operation == .get) if (@import("storage_types.zig").info(types, inputs[0]) != null) {
+        const element = @import("storage_types.zig").readableElement(types, inputs[0]) orelse return error.InvalidArtifact;
+        try proof.same(T.u32_type, inputs[1]);
+        try proof.same(element, output_);
+        return;
+    };
     const first = types.node(inputs[0]);
     const result = types.node(output_);
     switch (operation) {
@@ -79,7 +85,10 @@ pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []con
         .cursor_has, .cursor_value, .cursor_advance => {
             try require(first.tag == .cursor);
             const sequence = types.node(first.a);
-            if (sequence.tag != .array and sequence.tag != .list) {
+            const readable = if (sequence.tag == .list) sequence.a else @import("storage_types.zig").readableElement(types, first.a);
+            if (readable == null) {
+                // Only a declared generic collection predicate supplies an
+                // unknown sequence; Ref/Link never become concrete readers.
                 if (comptime @hasDecl(@TypeOf(proof), "collection")) {
                     var element: T.Id = 0;
                     if (operation == .cursor_value) element = output_;
@@ -88,7 +97,7 @@ pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []con
             }
             switch (operation) {
                 .cursor_has => try proof.same(T.boolean, output_),
-                .cursor_value => if (sequence.tag == .array or sequence.tag == .list) try proof.same(sequence.a, output_),
+                .cursor_value => if (readable) |element| try proof.same(element, output_),
                 .cursor_advance => try proof.same(inputs[0], output_),
                 else => unreachable,
             }

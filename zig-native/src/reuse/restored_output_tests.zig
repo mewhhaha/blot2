@@ -10,8 +10,8 @@ const a = std.testing.allocator;
 const io = std.testing.io;
 const compiler: [32]u8 = @splat(5);
 const main = "import * as dep from \"./dep\"\nentry const answer:U32=dep.read ()\n";
-const original = "const value:U32=42\nconst read:Unit->U32=fn () => value\n";
-const edited = "const value:U32=43\nconst read:Unit->U32=fn () => value\n";
+const original = "const value:U32=42\nconst read:Unit->U32=func () => return value\n";
+const edited = "const value:U32=43\nconst read:Unit->U32=func () => return value\n";
 
 const Fixture = struct {
     dir: std.testing.TmpDir,

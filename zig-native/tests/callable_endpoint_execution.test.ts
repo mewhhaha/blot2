@@ -4,18 +4,18 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const main = `entry const run = fn (seed: U32) => do:
+const main = `entry const run = func (seed: U32) => return do:
   let callable = make seed
   let alias = callable
   let published = {callback: callable}
   let pressure = @array.fill 8192 0
   break read (alias ()) + read (published.callback ()) + pressure[8191]
 `;
-const record = `const make = fn (seed: U32) => fn () => {saved: seed}
-const read = fn value => value.saved
+const record = `const make = func (seed: U32) => return func () => return {saved: seed}
+const read = func value => return value.saved
 `;
-const array = `const make = fn (seed: U32) => fn () => #[seed + 1]
-const read = fn value => value[0]
+const array = `const make = func (seed: U32) => return func () => return #[seed + 1]
+const read = func value => return value[0]
 `;
 Deno.test("returned callable endpoints retain owners through graph publication and single-unit producer type edits with identical ABI", async () => {
   const directory = await Deno.makeTempDir({

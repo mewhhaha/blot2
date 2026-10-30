@@ -79,17 +79,17 @@ fn projectEqual(left: *const checker.CheckedProject, right: *const checker.Check
         } else try std.testing.expect(r == null);
     }
 }
-const prelude_source = "const identity = fn value => value\n";
+const prelude_source = "const identity = func value => return value\n";
 const Cases = struct { name: []const u8, sources: []const Source, has_prelude: bool = false, mode: project.InputMode = .project, semantic_reject: bool = false, no_worker: bool = false };
 const cases = [_]Cases{
-    .{ .name = "no-import", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = 42\nentry const answer = fn () => first\n" }} },
-    .{ .name = "source", .mode = .source, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: U32 = 42\nentry const answer = fn () => first\n" }} },
-    .{ .name = "import", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "helper.blot", .text = "const supply: U32 = 0\n" }, .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nlet local: U32 = 42\nentry const answer = fn () => identity (@u32.add supply local)\n" } } },
-    .{ .name = "nominal", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "type Box is data = #Box U32\nlet local: U32 = 42\nlet boxed = #Box local\nentry const answer = fn () => case boxed of\n  #Box value => identity value\n" } } },
-    .{ .name = "effect", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "effect Read: Unit -> U32\nlet local: U32 = 42\nconst reader = @effect.provider Read (fn () => local)\nentry const answer = fn () => do reader:\n  break Read ()\n" } } },
-    .{ .name = "mismatch", .semantic_reject = true, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: F32 = 1.25\nentry const answer = fn () => 42\n" }} },
-    .{ .name = "cycle", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = first\nentry const answer = fn () => first\n" }} },
-    .{ .name = "source-import-boundary", .mode = .source, .semantic_reject = true, .no_worker = true, .sources = &.{ .{ .name = "helper.blot", .text = "const supply = 42\n" }, .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nentry const answer = fn () => supply\n" } } },
+    .{ .name = "no-import", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = 42\nentry const answer = func () => return first\n" }} },
+    .{ .name = "source", .mode = .source, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: U32 = 42\nentry const answer = func () => return first\n" }} },
+    .{ .name = "import", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "helper.blot", .text = "const supply: U32 = 0\n" }, .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nlet local: U32 = 42\nentry const answer = func () => return identity (@u32.add supply local)\n" } } },
+    .{ .name = "nominal", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "type Box is data = #Box U32\nlet local: U32 = 42\nlet boxed = #Box local\nentry const answer = func () => return case boxed of\n  #Box value => identity value\n" } } },
+    .{ .name = "effect", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "effect Read: Unit -> U32\nlet local: U32 = 42\nconst reader = @effect.provider Read (func () => return local)\nentry const answer = func () => return do reader:\n  break Read ()\n" } } },
+    .{ .name = "mismatch", .semantic_reject = true, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: F32 = 1.25\nentry const answer = func () => return 42\n" }} },
+    .{ .name = "cycle", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = first\nentry const answer = func () => return first\n" }} },
+    .{ .name = "source-import-boundary", .mode = .source, .semantic_reject = true, .no_worker = true, .sources = &.{ .{ .name = "helper.blot", .text = "const supply = 42\n" }, .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nentry const answer = func () => return supply\n" } } },
 };
 
 test "project alias forwarding preserves every typed state history global trace and Wasm or diagnostic" {
@@ -187,7 +187,7 @@ test "project alias forwarding owns source free Core and releases every whole pr
     const sources = [_]Source{
         .{ .name = "prelude.blot", .text = prelude_source },
         .{ .name = "helper.blot", .text = "const supply: U32 = 0\n" },
-        .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nlet first: U32 = second\nlet second: U32 = 42\nentry const answer = fn () => identity (@u32.add supply first)\n" },
+        .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nlet first: U32 = second\nlet second: U32 = 42\nentry const answer = func () => return identity (@u32.add supply first)\n" },
     };
     var fixture = try Fixture.init(&sources, true);
     defer fixture.deinit();
@@ -212,7 +212,7 @@ test "project alias forwarding owns source free Core and releases every whole pr
 }
 
 test "project scheduling admits a callable before its long alias dependency" {
-    const last_line = "entry const answer = fn () => cell0\n";
+    const last_line = "entry const answer = func () => return cell0\n";
     try std.testing.expect(std.mem.endsWith(u8, long_source, last_line));
     const source = try std.mem.concat(a, u8, &.{ last_line, long_source[0 .. long_source.len - last_line.len] });
     defer a.free(source);
@@ -235,8 +235,8 @@ test "project alias forwarding preserves ordinary partial preparation qualified 
     const Dependency = @import("frozen_dependency.zig").FrozenDependency;
     var fixture = try Fixture.init(&.{
         .{ .name = "prelude.blot", .text = prelude_source },
-        .{ .name = "helper.blot", .text = "type Box is data = #Box U32\nconst wrap = fn (value: U32) => #Box value\n" },
-        .{ .name = "main.blot", .text = "import {Box, wrap} from \"./helper\"\nlet scalar: U32 = 42\nconst boxed = wrap 42\nentry const answer = fn () => case boxed of\n  #Box value => identity value\n" },
+        .{ .name = "helper.blot", .text = "type Box is data = #Box U32\nconst wrap = func (value: U32) => return #Box value\n" },
+        .{ .name = "main.blot", .text = "import {Box, wrap} from \"./helper\"\nlet scalar: U32 = 42\nconst boxed = wrap 42\nentry const answer = func () => return case boxed of\n  #Box value => identity value\n" },
     }, true);
     defer fixture.deinit();
     var source = try project.load(a, io, fixture.path, fixture.options(.project));

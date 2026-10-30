@@ -60,6 +60,15 @@ pub fn lookup(name: []const u8) ?Intrinsic {
     for (specific) |entry| if (std.mem.eql(u8, member, entry[0])) return .{ .op = entry[1], .arity = arity(entry[2]), .floating = floating, .shape = entry[2] };
     return null;
 }
+/// Resolve an immutable Core operation through the same namespace catalog as
+/// source checking. Operand/result shapes still have to establish this lane.
+pub fn operation(op: core.Op, lane_: Lane) ?Intrinsic {
+    const floating = lane_ == .f32;
+    for (shared) |entry| if (entry[1] == op) return .{ .op = op, .arity = arity(entry[2]), .floating = floating, .shape = entry[2] };
+    const specific: []const Entry = if (floating) &floating_only else &integer_only;
+    for (specific) |entry| if (entry[1] == op) return .{ .op = op, .arity = arity(entry[2]), .floating = floating, .shape = entry[2] };
+    return null;
+}
 pub fn arity(shape: Shape) u8 {
     return switch (shape) {
         .unary, .convert, .reduce => 1,

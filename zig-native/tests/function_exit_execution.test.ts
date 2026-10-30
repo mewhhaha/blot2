@@ -3,7 +3,7 @@ import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 Deno.test("return exits the function while break value finishes the nearest do", async () => {
   await compileAndRun(
-    `entry const answer = fn (flag: Bool) -> U32 => do:
+    `entry const answer = func (flag: Bool) : U32 => return do:
   let inner = do:
     if flag:
       return 7
@@ -19,12 +19,12 @@ Deno.test("return exits the function while break value finishes the nearest do",
 
 Deno.test("return works in inferred and once closures", async () => {
   await compileAndRun(
-    `const identity = fn value => do:
+    `const identity = func value => return do:
   return value
-const make_once = fn () -> once (Unit -> U32) => fn () => do:
+const make_once = func () : once (Unit -> U32) => return func () => return do:
   return 7
-entry const generic = fn () => identity 9
-entry const one_shot = fn () => (make_once ()) ()
+entry const generic = func () => return identity 9
+entry const one_shot = func () => return (make_once ()) ()
 `,
     (guest) => {
       equal(guest.call("generic", null), 9);
@@ -43,23 +43,23 @@ Deno.test("return without a function is diagnosed at its source", async () => {
 
 Deno.test("return exits from a statement case arm and stays within the innermost function", async () => {
   await compileAndRun(
-    `entry const choose = fn (flag: Bool) -> U32 => do:
+    `entry const choose = func (flag: Bool) : U32 => return do:
   let count = 9
   case flag of
-    #True => do:
+    true => do:
       return 7
-    #False => do:
+    false => do:
       count := self + 1
   break count
-entry const nested = fn (value: U32) -> U32 => do:
-  let inner = fn (input: U32) -> U32 => do:
+entry const nested = func (value: U32) : U32 => return do:
+  let inner = func (input: U32) : U32 => return do:
     return input + 1
   break inner value + 10
-entry const expression_case = fn (flag: Bool) -> U32 => do:
+entry const expression_case = func (flag: Bool) : U32 => return do:
   let choice = case flag of
-    #True => do:
+    true => do:
       return 42
-    #False => do:
+    false => do:
       break 7
   break choice + 1
 `,
@@ -75,7 +75,7 @@ entry const expression_case = fn (flag: Bool) -> U32 => do:
 
 Deno.test("break value leaves do through a loop while bare break leaves only the loop", async () => {
   await compileAndRun(
-    `entry const choose = fn (stop: Bool) -> U32 => do:
+    `entry const choose = func (stop: Bool) : U32 => return do:
   let inner = do:
     for index in 0..4:
       if stop:
@@ -93,16 +93,16 @@ Deno.test("break value leaves do through a loop while bare break leaves only the
 
 Deno.test("return exits through if let, let else, and a loop", async () => {
   await compileAndRun(
-    `entry const matched = fn (flag: Bool) -> U32 => do:
+    `entry const matched = func (flag: Bool) : U32 => return do:
   let candidate = if flag then #Some 42 else #Nothing
   if let #Some value = candidate:
     return value
   break 7
-entry const fallback = fn (flag: Bool) -> U32 => do:
+entry const fallback = func (flag: Bool) : U32 => return do:
   let #Some value = if flag then #Some 42 else #Nothing else:
     return 9
   break value
-entry const looped = fn (flag: Bool) -> U32 => do:
+entry const looped = func (flag: Bool) : U32 => return do:
   for index in 0..3:
     if flag:
       return index + 40
@@ -120,13 +120,13 @@ entry const looped = fn (flag: Bool) -> U32 => do:
 });
 
 Deno.test("return across a monadic continuation has a source diagnostic", async () => {
-  const source = `const choose = fn (flag: Bool) -> Maybe U32 => do:
+  const source = `const choose = func (flag: Bool) : Maybe U32 => return do:
   let wrapped = do (monad Maybe):
     if flag:
       return #Some 42
     break 7
   break wrapped
-entry const answer = fn (flag: Bool) -> U32 => Maybe.unwrap_or 0 (choose flag)
+entry const answer = func (flag: Bool) : U32 => return Maybe.unwrap_or 0 (choose flag)
 `;
   const start = source.indexOf("return #Some 42");
   await compileExpectedFailure(source, "return_across_continuation", undefined, {
@@ -137,14 +137,14 @@ entry const answer = fn (flag: Bool) -> U32 => Maybe.unwrap_or 0 (choose flag)
 Deno.test("return from a request handler cancels the captured computation", async () => {
   await compileAndRun(
     `type Tick is effect = { read: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         return 42
       complete value =>
         break value
-entry const answer = fn () => handled (@computation (fn () => do:
+entry const answer = func () => return handled (@computation (func () => return do:
   use Tick.read ()
   break @panic "cancelled computation continued"
 ))
@@ -155,7 +155,7 @@ entry const answer = fn () => handled (@computation (fn () => do:
 
 Deno.test("return through a nested request callback has a source diagnostic", async () => {
   const source = `type Tick is effect = { read: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   let inner = do:
     for request in @requests computation:
       case request of
@@ -165,7 +165,7 @@ const handled = fn computation => do:
           break value
     break 0
   break inner
-entry const answer = fn () => handled (@computation (fn () => Tick.read ()))
+entry const answer = func () => return handled (@computation (func () => return Tick.read ()))
 `;
   const start = source.indexOf("return 42");
   await compileExpectedFailure(source, "return_across_continuation", undefined, {

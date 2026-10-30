@@ -260,10 +260,10 @@ where the relevant representation is supported.
 | Canonical specialization    | Separately allocated but equal complete body/evidence/capture graphs request one semantic region.                                                                     | Different nominal identities, provider instances, captured aliases, staging inputs or selected evidence never collide semantically. | Force hash collisions, reorder allocation, and repeat retained/imported requests. Counters show no duplicate region for the same admitted complete canonical key.                              |
 
 Concrete source examples use the existing guide syntax:
-`const twice = fn value
-=> value + value`; a reducer accepts
-`fn accumulator => fn element => ...`; effects use `use` and `@effect.provider`;
-recursive functions use ordinary named `fn` bindings. No new annotation or
+`const twice = func value
+=> return value + value`; a reducer accepts
+`func accumulator => return func element => return ...`; effects use `use` and `@effect.provider`;
+recursive functions use ordinary named `func` bindings. No new annotation or
 declaration syntax belongs to this feature. The full
 [language guide](../compiler/guide.md) remains authoritative for syntax,
 dispatch order and source admission.

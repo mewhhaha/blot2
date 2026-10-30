@@ -407,8 +407,8 @@ const Reader = struct {
             try self.put(&self.body, " = ");
             if (value.kind == .boolean) {
                 if (value.n != 0) {
-                    try self.put(&self.body, "#True");
-                } else try self.put(&self.body, "#False");
+                    try self.put(&self.body, "true");
+                } else try self.put(&self.body, "false");
             } else if (value.kind == .u32_value) {
                 var buffer: [32]u8 = undefined;
                 try self.put(&self.body, std.mem.print(&buffer, "{d}", .{@as(u32, @intFromFloat(value.n))}) catch unreachable);
@@ -876,7 +876,7 @@ fn identifierContinue(byte: u8) bool {
 }
 fn blotName(text: []const u8) bool {
     if (text.len == 0 or std.mem.eql(u8, text, "_") or !(std.ascii.isLower(text[0]) or text[0] == '_')) return false;
-    var words = std.mem.tokenizeScalar(u8, "const let type data effect is fn do use return yield break for ever in case of if then else as import infix infixl infixr self where", ' ');
+    var words = std.mem.tokenizeScalar(u8, "const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where", ' ');
     while (words.next()) |word| if (std.mem.eql(u8, word, text)) return false;
     for (text) |byte| if (!identifierContinue(byte)) return false;
     return true;
@@ -1001,7 +1001,7 @@ fn expectSource(allocator: Allocator, input: []const u8, expected: []const u8) !
     }
 }
 test "WGSL reflection folds scalar constants and resolves Parameters aliases" {
-    try expectSource(std.testing.allocator, "alias Scalar = f32; struct Parameters { amount: Scalar, time: f32, } const integer: u32 = 2; const count = 1u + 2u; const amount = clamp(2.0, 0.0, 1.0); const origin = -4.0; const enabled = true && !false; const ignored = vec3f(1., 2., 3.); const lane = ignored.y;", "type Parameters is data = #Parameters { amount: F32, time: F32 }\nconst count: U32 = 3\nconst amount: F32 = 1.0\nconst origin: F32 = (-4.0)\nconst enabled: Bool = #True\nconst lane: F32 = 2.0\n");
+    try expectSource(std.testing.allocator, "alias Scalar = f32; struct Parameters { amount: Scalar, time: f32, } const integer: u32 = 2; const count = 1u + 2u; const amount = clamp(2.0, 0.0, 1.0); const origin = -4.0; const enabled = true and !false; const ignored = vec3f(1., 2., 3.); const lane = ignored.y;", "type Parameters is data = #Parameters { amount: F32, time: F32 }\nconst count: U32 = 3\nconst amount: F32 = 1.0\nconst origin: F32 = (-4.0)\nconst enabled: Bool = true\nconst lane: F32 = 2.0\n");
 }
 test "WGSL syntax validates bodies and rejects malformed reflected declarations" {
     const inputs = [_][]const u8{ "struct Parameters { a: vec2f, }", "struct Parameters { a:f32,b:f32,c:f32,d:f32,e:f32 }", "@vertex fn main( -> {", "fn main() { let x = ; }", "/* unclosed", "const broken=1.0+;" };

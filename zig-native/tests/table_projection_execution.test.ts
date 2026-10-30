@@ -6,13 +6,13 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 const source = `
 import * as iter from "std/iter"
-entry const run = fn count => iter.fold_left add 0
-  (iter.take count (iter.map (fn value => value + 1) (iter.range 0 count)))
-entry const effects = fn (host: U32 -> U32 ! {Foreign}) =>
-  iter.fold_left (fn total => fn value => host (total + value)) 0 (iter.range 0 8)
-entry const references = fn count => do:
+entry const run = func count => return iter.fold_left add 0
+  (iter.take count (iter.map (func value => return value + 1) (iter.range 0 count)))
+entry const effects = func (host: U32 -> U32 ! {Foreign}) => return
+  iter.fold_left (func total => return func value => return host (total + value)) 0 (iter.range 0 8)
+entry const references = func count => return do:
   let initial = #[8192]
-  let answer = iter.fold_left (fn total => fn value => #[total[0] + value]) initial (iter.range 0 count)
+  let answer = iter.fold_left (func total => return func value => return #[total[0] + value]) initial (iter.range 0 count)
   break #[initial[0], answer[0]]
 `;
 
@@ -89,7 +89,7 @@ Deno.test("table projection consumes exact changed source bodies in retained and
   const entry = `${directory}/main.blot`;
   const helper = `${directory}/reduce.blot`;
   const program =
-    `import * as iter from "std/iter"\nimport * as reduce from "./reduce"\nentry const run = fn count => iter.fold_left reduce.add 0 (iter.range 0 count)\n`;
+    `import * as iter from "std/iter"\nimport * as reduce from "./reduce"\nentry const run = func count => return iter.fold_left reduce.add 0 (iter.range 0 count)\n`;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {
       const options = {
@@ -107,7 +107,7 @@ Deno.test("table projection consumes exact changed source bodies in retained and
           const sources = {
             [entry]: program,
             [helper]:
-              `const add = fn (left: U32) => fn (right: U32) => left + right + ${offset}\n`,
+              `const add = func (left: U32) => return func (right: U32) => return left + right + ${offset}\n`,
           };
           const built = await retained.build({ sources });
           const fresh = await createZigProjectCompiler(options);
@@ -138,7 +138,7 @@ Deno.test("table projection consumes exact changed source bodies in retained and
         const sources = {
           [entry]: program,
           [helper]:
-            "const add = fn (left: U32) => fn (right: U32) => left + right + 1\n",
+            "const add = func (left: U32) => return func (right: U32) => return left + right + 1\n",
         };
         const built = await resumed.build({ sources });
         const ordinary = await fresh.build({ sources });

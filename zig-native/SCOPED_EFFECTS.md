@@ -15,7 +15,7 @@ family. Its type arguments describe operation signatures; its identity is a
 separate checked value fact. Two values of `State U32` can therefore name
 different instances without inventing different U32 types.
 
-`@effect.scope (fn (state: State U32) => body)` creates one fresh capability,
+`@effect.scope (func (state: State U32) => return body)` creates one fresh capability,
 calls the callback once, and returns its result. The callback has exactly one
 capability parameter with an explicit family annotation. Every dynamic scope
 entry is fresh, including recursion and repeated calls at the same source site.
@@ -31,8 +31,8 @@ ordinary effect declarations determine members and signatures.
 ```blot
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 
-entry const two = fn () => @effect.scope (fn (left: State U32) =>
-  @effect.scope (fn (right: State U32) => do:
+entry const two = func () => return @effect.scope (func (left: State U32) => return
+  @effect.scope (func (right: State U32) => return do:
     use (outer, result) <- do (@effect.state left.get left.set 10):
       use (inner, reads) <- do (@effect.state right.get right.set 100):
         use a <- left.get ()
@@ -59,8 +59,8 @@ Rows may also name a capability operation or its proven operation alias.
 Parameter scope includes its function's result annotation:
 
 ```blot
-const read = fn (state: State a) -> a ! {state.get} => state.get ()
-const alias = fn (state: State a) => do:
+const read = func (state: State a) : a ! {state.get} => return state.get ()
+const alias = func (state: State a) => return do:
   let operation = state.get
   return operation ()
 ```
@@ -70,7 +70,7 @@ type. Its value name is in scope only in subsequent arrow/result annotations; it
 is not a general value-dependent type expression.
 
 ```blot
-const apply: (state: State a) -> ((Unit -> a ! {state.get}) -> a ! {state.get}) = fn state => fn callback => callback ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get}) -> a ! {state.get}) = func state => return func callback => return callback ()
 ```
 
 The grouped result preserves ordinary arrow-row placement: its written row

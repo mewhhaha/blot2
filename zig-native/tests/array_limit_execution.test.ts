@@ -2,8 +2,8 @@ import {compileAndRun,compileExpectedFailure,equal} from "./compile_helpers.ts";
 
 Deno.test("compile-time array limit preserves operand order and leaves generators unvisited",async()=>{
   for(const source of [
-    "entry const answer = @array.length (@array.generate 4194304 (fn (index: U32) -> U32 => index))\n",
-    "entry const answer = @array.length (@array.generate 4294967295 (fn (index: U32) -> U32 => @panic \"unvisited\"))\n",
+    "entry const answer = @array.length (@array.generate 4194304 (func (index: U32) : U32 => return index))\n",
+    "entry const answer = @array.length (@array.generate 4294967295 (func (index: U32) : U32 => return @panic \"unvisited\"))\n",
     "entry const answer = @array.length (@array.fill 4194304 7)\n",
     "entry const answer = @array.length (@array.fill 4294967295 7)\n",
   ]) await compileExpectedFailure(source,"backend_limit","array length exceeds the 16 MiB bootstrap arena",{prelude:"none"});
@@ -17,10 +17,10 @@ Deno.test("compile-time array limit preserves operand order and leaves generator
 
 Deno.test("compile-time legal arrays preserve empty callbacks and generated scalar values",async()=>{
   await compileAndRun(`
-entry const empty = @array.length (@array.generate 0 (fn (index: U32) -> U32 => @panic "unvisited"))
-entry const generated = @array.get (@array.generate 3 (fn (index: U32) -> U32 => @u32.add index 40)) 2
+entry const empty = @array.length (@array.generate 0 (func (index: U32) : U32 => return @panic "unvisited"))
+entry const generated = @array.get (@array.generate 3 (func (index: U32) : U32 => return @u32.add index 40)) 2
 entry const filled = @array.get (@array.fill 3 42) 2
-entry const small = fn () => @array.get (@array.generate 3 (fn (index: U32) -> U32 => @u32.add index 40)) 2
+entry const small = func () => return @array.get (@array.generate 3 (func (index: U32) : U32 => return @u32.add index 40)) 2
 `,guest=>{
     equal(guest.read("empty"),0);
     equal(guest.read("generated"),42);

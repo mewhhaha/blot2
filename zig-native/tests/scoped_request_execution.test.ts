@@ -6,9 +6,9 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const header = `type State a is effect = {get: Unit -> a, set: a -> Unit}\n`;
 const source = header + `
-entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let right_read = right.get
-  let computation = @computation (fn () => do:
+  let computation = @computation (func () => return do:
     use a <- left.get ()
     use b <- right_read ()
     break @u32.add a b
@@ -22,8 +22,8 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.sco
       complete value =>
         break value
 ))
-entry const forwarded = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do (@effect.provider left.get (fn () => 20)):
-  let computation = @computation (fn () => do:
+entry const forwarded = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do (@effect.provider left.get (func () => return 20)):
+  let computation = @computation (func () => return do:
     use a <- left.get ()
     use b <- right.get ()
     break @u32.add a b
@@ -35,8 +35,8 @@ entry const forwarded = fn () => @effect.scope (fn (left: State U32) => @effect.
       complete value =>
         break value
 ))
-entry const cancelled = fn () => @effect.scope (fn (s: State U32) => do:
-  let computation = @computation (fn () => do:
+entry const cancelled = func () => return @effect.scope (func (s: State U32) => return do:
+  let computation = @computation (func () => return do:
     use s.get ()
     break @panic "cancelled computation continued"
   )
@@ -48,9 +48,9 @@ entry const cancelled = fn () => @effect.scope (fn (s: State U32) => do:
         break value
 )
 type Validate is effect = {check: U32 -> U32}
-const keep = fn ~value => fn () => @force value
-entry const retry = fn () => do:
-  let delayed = keep (@effect.scope (fn (s: State U32) => do:
+const keep = func ~value => return func () => return @force value
+entry const retry = func () => return do:
+  let delayed = keep (@effect.scope (func (s: State U32) => return do:
     use nested <- do (@effect.state s.get s.set 7):
       use previous <- s.get ()
       use reply <- Validate.check previous
@@ -59,7 +59,7 @@ entry const retry = fn () => do:
     let (state, result) = nested
     break result
   ))
-  let computation = @computation (fn () => delayed ())
+  let computation = @computation (func () => return delayed ())
   let first = do:
     for request in @requests computation:
       case request of
@@ -75,8 +75,8 @@ entry const retry = fn () => do:
         complete value =>
           break value
   break @u32.add first second
-entry const host = fn (callback: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-  let computation = @computation (fn () => do:
+entry const host = func (callback: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+  let computation = @computation (func () => return do:
     use a <- left.get ()
     use b <- right.get ()
     break @u32.add a b

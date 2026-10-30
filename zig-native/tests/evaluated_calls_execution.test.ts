@@ -8,45 +8,45 @@ const stdRoot = new URL("../../std", import.meta.url).pathname;
 const program = `import * as iter from "std/iter"
 type Log is data = #Log {calls: U32, trace: U32}
 const sum = iter.fold_left add 0
-const biased = iter.fold_left (fn total => fn value => total + value + 3) 10
-const add_float = fn (total: F32) => fn (value: F32) => @f32.add total value
+const biased = iter.fold_left (func total => return func value => return total + value + 3) 10
+const add_float = func (total: F32) => return func (value: F32) => return @f32.add total value
 const sum_float = iter.fold_left add_float 1.25
-const append = fn values => fn value => [...values, value]
+const append = func values => return func value => return [...values, value]
 const collect = iter.fold_left append [100]
 const collect_float = iter.fold_left append [1.25]
-const collect_refs = iter.fold_left (fn values => fn value => [...values, #[value, value + 1]]) [#[100, 101]]
-const traced_add = fn total => fn value => do:
+const collect_refs = iter.fold_left (func values => return func value => return [...values, #[value, value + 1]]) [#[100, 101]]
+const traced_add = func total => return func value => return do:
   use log <- @state.get #Log
   use @state.set (#Log {calls: log.calls + 1, trace: log.trace * 31 + value + 1})
   return total + value
 const traced_sum = iter.fold_left traced_add 0
-entry const pure = fn count => sum (iter.range 0 count)
-entry const alias = fn count => do:
+entry const pure = func count => return sum (iter.range 0 count)
+entry const alias = func count => return do:
   let reduce = sum
   return reduce (iter.range 0 count)
-entry const capture = fn count => biased (iter.range 0 count)
-entry const floating = fn count => sum_float (iter.map (fn value => @u32.to_f32 value) (iter.range 0 count))
-entry const references = fn count => Array.from_list (collect (iter.range 0 count))
-entry const pointer_values = fn count => Array.from_list (collect (iter.map (fn value => value + 65536) (iter.range 0 count)))
-entry const reference_floats = fn count => Array.from_list (collect_float (iter.map (fn value => @u32.to_f32 value) (iter.range 0 count)))
-entry const reference_rows = fn count => do:
+entry const capture = func count => return biased (iter.range 0 count)
+entry const floating = func count => return sum_float (iter.map (func value => return @u32.to_f32 value) (iter.range 0 count))
+entry const references = func count => return Array.from_list (collect (iter.range 0 count))
+entry const pointer_values = func count => return Array.from_list (collect (iter.map (func value => return value + 65536) (iter.range 0 count)))
+entry const reference_floats = func count => return Array.from_list (collect_float (iter.map (func value => return @u32.to_f32 value) (iter.range 0 count)))
+entry const reference_rows = func count => return do:
   let values = collect_refs (iter.range 0 count)
   let pressure = @array.fill 2048 99
   let total = 0
   for value in values:
     total := self + value[0] + value[1]
   return total + pressure[2047] - 99
-entry const effects = fn count => do:
-  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (fn () => traced_sum (iter.range 0 count))
+entry const effects = func count => return do:
+  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (func () => return traced_sum (iter.range 0 count))
   return #[log.calls, log.trace, answer]
-const event = fn value => do:
+const event = func value => return do:
   use log <- @state.get #Log
   use @state.set (#Log {calls: log.calls + 1, trace: log.trace * 31 + value})
   return value
-const apply = fn callback => fn first => fn second => callback first second
+const apply = func callback => return func first => return func second => return callback first second
 const selected = apply add
-entry const argument_order = fn seed => do:
-  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (fn () => do:
+entry const argument_order = func seed => return do:
+  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (func () => return do:
     use first <- event seed
     use second <- event (seed + 1)
     return selected first second)
@@ -132,11 +132,11 @@ Deno.test("optimized evaluated folds remove per-step adapter allocations", async
         sources: {
           [entry]: `import * as iter from "std/iter"
 const sum = iter.fold_left add 0
-entry const range = fn count => sum (iter.range 0 count)
-entry const mapped = fn count => sum (iter.map (fn value => value + 1) (iter.range 0 count))
-entry const filtered = fn count => sum (iter.filter (fn value => value % 2 == 0) (iter.range 0 count))
-entry const taken = fn count => sum (iter.take (count / 2) (iter.range 0 count))
-entry const probe = fn (seed: U32) => #[seed]
+entry const range = func count => return sum (iter.range 0 count)
+entry const mapped = func count => return sum (iter.map (func value => return value + 1) (iter.range 0 count))
+entry const filtered = func count => return sum (iter.filter (func value => return value % 2 == 0) (iter.range 0 count))
+entry const taken = func count => return sum (iter.take (count / 2) (iter.range 0 count))
+entry const probe = func (seed: U32) => return #[seed]
 `,
         },
       });
@@ -183,22 +183,22 @@ Deno.test("retained evaluated captures preserve static sharing after edits and k
       `  let copy_${index} = ${index ? `copy_${index - 1}` : "value"}`,
   ).join("\n");
   const library = (values: readonly number[]) =>
-    `const factory = fn values => fn (index: U32) => values[@u32.rem index 2]
+    `const factory = func values => return func (index: U32) => return values[@u32.rem index 2]
 const stored = factory #[${values.join(", ")}]
-const add = fn amount => fn value => @u32.add amount value
+const add = func amount => return func value => return @u32.add amount value
 const biased = add 8
-const read = fn (value: U32) => do:
+const read = func (value: U32) => return do:
 ${aliases}
   return stored copy_32
-const scalar = fn (value: U32) => do:
+const scalar = func (value: U32) => return do:
 ${aliases}
   return biased copy_32
 `;
   const source = (offset: number) =>
     `import {read, stored, scalar} from "./dep"
-entry const left = fn (value: U32) => read value
-entry const right = fn (value: U32) => stored (@u32.add value ${offset})
-entry const stable = fn (value: U32) => scalar value
+entry const left = func (value: U32) => return read value
+entry const right = func (value: U32) => return stored (@u32.add value ${offset})
+entry const stable = func (value: U32) => return scalar value
 `;
   try {
     await Deno.writeTextFile(entry, source(1));

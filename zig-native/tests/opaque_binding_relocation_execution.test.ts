@@ -31,9 +31,9 @@ function library(edit: Edit) {
     : "";
   return inserted + privateType + (edit === "move" ? "" : offset) +
     `opaque type Token ${parameter} = ${parameter}\n` +
-    `const make: ${variable} -> Token ${variable} = fn ${argument} => #Token ${argument}\n` +
-    `const read: Token ${variable} -> ${variable} = fn (#Token ${argument}) => ${argument}\n` +
-    "const adjust: U32 -> U32 = fn value => @u32.add value offset\n" +
+    `const make: ${variable} -> Token ${variable} = func ${argument} => return #Token ${argument}\n` +
+    `const read: Token ${variable} -> ${variable} = func (#Token ${argument}) => return ${argument}\n` +
+    "const adjust: U32 -> U32 = func value => return @u32.add value offset\n" +
     (edit === "move" ? offset : "");
 }
 
@@ -49,18 +49,18 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const tokens = directory + "/tokens.blot";
       const bundle = directory + "/dependencies.blotdep";
       const body = "opaque type Token = U32\n" +
-        "const make: Unit -> Token = fn () => #Token 42\n" +
-        "const read: Token -> Unit = fn (#Token value) => ()\n";
+        "const make: Unit -> Token = func () => return #Token 42\n" +
+        "const read: Token -> Unit = func (#Token value) => return ()\n";
       const producer = (name: string) =>
         "type PublicRead " + name + " is effect = Unit -> " + name + "\n" +
         body;
       const bridge = 'import {PublicRead, make, read} from "./tokens"\n' +
-        "const consume = fn () -> U32 => do (@effect.provider (PublicRead U32) (fn () => 42)):\n  read (make ())\n" +
+        "const consume = func () : U32 => return do (@effect.provider (PublicRead U32) (func () => return 42)):\n  read (make ())\n" +
         "  break PublicRead U32 ()\n";
       try {
         await Deno.writeTextFile(
           entry,
-          'import {consume} from "./bridge"\nentry const answer = fn () => consume ()\n',
+          'import {consume} from "./bridge"\nentry const answer = func () => return consume ()\n',
         );
         await Deno.writeTextFile(tokens, producer("element"));
         await Deno.writeTextFile(directory + "/bridge.blot", bridge);
@@ -159,14 +159,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
   );
 }
 const bridge = `import {Token, make, read, adjust} from "./tokens"
-const factories = #[make, fn value => make value]
-const readers = #[read, fn value => read value]
-const transform = fn (value: U32) => do:
+const factories = #[make, func value => return make value]
+const readers = #[read, func value => return read value]
+const transform = func (value: U32) => return do:
   let token: Token U32 = (factories[@u32.rem value 2]) (adjust value)
   break (readers[@u32.rem value 2]) token
 `;
 const main = `import {transform} from "./bridge"
-entry const answer = fn (value: U32) => transform value
+entry const answer = func (value: U32) => return transform value
 `;
 
 async function execute(bytes: Uint8Array<ArrayBuffer>, offset: number) {

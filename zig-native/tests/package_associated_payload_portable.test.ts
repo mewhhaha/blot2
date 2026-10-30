@@ -5,20 +5,20 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer =
   `type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => @u32.add owner value }
-impl Flag : Source Bool = { type Item = F32, const get = fn value => if value then 7.5 else 9.5, const show = fn owner => fn value => @u32.add (@f32.to_u32 value) (if owner then 0 else 2) }
+impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return @u32.add owner value }
+impl Flag : Source Bool = { type Item = F32, const get = func value => return if value then 7.5 else 9.5, const show = func owner => return func value => return @u32.add (@f32.to_u32 value) (if owner then 0 else 2) }
 type Item = exists [a] where { Source a } => (a, Source.Item a)
-const make: Bool -> Item = fn flag => if flag then pack [U32] (20,22) as Item else pack [Bool] (#True,7.5) as Item
-const reseal = fn (item: Item) => unpack item as [a] value in pack [a] value as Item
-const read = fn (item: Item) => unpack item as [a] value in Source.show (@product.get value 0) (@product.get value 1)
-const both = fn (left: Item) => fn (right: Item) => @u32.add (read left) (read right)
+const make: Bool -> Item = func flag => return if flag then pack [U32] (20,22) as Item else pack [Bool] (true,7.5) as Item
+const reseal = func (item: Item) => return unpack item as [a] value in pack [a] value as Item
+const read = func (item: Item) => return unpack item as [a] value in Source.show (@product.get value 0) (@product.get value 1)
+const both = func (left: Item) => return func (right: Item) => return @u32.add (read left) (read right)
 `;
 const consumer = `import {make, read, both} from "./identity"
-entry const cache_control = fn (value: U32) => @u32.add value 1
-entry const answer = fn (flag: Bool) => read (make flag)
-entry const combined = fn (flag: Bool) => both (make flag) (make #False)
-entry const collection = fn (flag: Bool) => do:
-  let items = #[make flag, make #False]
+entry const cache_control = func (value: U32) => return @u32.add value 1
+entry const answer = func (flag: Bool) => return read (make flag)
+entry const combined = func (flag: Bool) => return both (make flag) (make false)
+entry const collection = func (flag: Bool) => return do:
+  let items = #[make flag, make false]
   break @u32.add (read (@array.get items 0)) (read (@array.get items 1))
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
@@ -100,7 +100,7 @@ Deno.test("associated package payloads retain exact equations across source arch
         for (
           const failed of [
             consumer.replace("read (make flag)", "read 42"),
-            consumer.replace("read (make flag)", "both (make flag) #True"),
+            consumer.replace("read (make flag)", "both (make flag) true"),
           ]
         ) {
           const live = await source.build({ sources: { [entry]: failed } });

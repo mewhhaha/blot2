@@ -8,12 +8,12 @@ let spine = "Read ()";
 for (let index = 0; index < 16; index++) spine = `@u32.add (${spine}) 0`;
 const library = `effect Read: Unit -> U32
 const marker = 2
-const invoke = fn () => @u32.add (${spine}) marker
+const invoke = func () => return @u32.add (${spine}) marker
 `;
 const source = (seed: string, prefix = "") =>
   `import {Read as Input, invoke} from "./logic"
 ${prefix}const seed = ${seed}
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do (@effect.provider Input (fn () => host seed)):
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do (@effect.provider Input (func () => return host seed)):
   break invoke ()
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, seed: number) {

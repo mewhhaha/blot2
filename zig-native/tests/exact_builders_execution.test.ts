@@ -4,27 +4,27 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("exact nested builders preserve arrays, lists, empty extents and element order", async () => {
   await compileAndRun(
     `
-entry const rectangle = fn count => do:
+entry const rectangle = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     for y in 2..5:
       result := [...self, x * 10 + y]
   break @array.from_list result
-entry const product = fn (values: Array U32) => #[x * 10 + y | x <- values, y <- values]
-const lists = fn (values: Array U32) => [x * 10 + y | x <- values, y <- values]
-entry const list_result = fn values => Array.from_list (lists values)
-entry const reversed = fn count => do:
+entry const product = func (values: Array U32) => return #[x * 10 + y | x <- values, y <- values]
+const lists = func (values: Array U32) => return [x * 10 + y | x <- values, y <- values]
+entry const list_result = func values => return Array.from_list (lists values)
+entry const reversed = func count => return do:
   let result: List U32 = []
   for x in count..2:
     result := [...self, x]
   break @array.from_list result
-entry const ragged = fn count => do:
+entry const ragged = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     for y in 0..x:
       result := [...self, x * 10 + y]
   break @array.from_list result
-entry const observed = fn count => do:
+entry const observed = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     result := [...self, result.length]
@@ -67,7 +67,7 @@ entry const observed = fn count => do:
 Deno.test("effectful builders retain the ordinary path and nested-loop order", async () => {
   await compileAndRun(
     `
-entry const run = fn (send: U32 -> U32 ! {Foreign}) => do:
+entry const run = func (send: U32 -> U32 ! {Foreign}) => return do:
   let result: List U32 = []
   for x in 0..2:
     for y in 1..3:

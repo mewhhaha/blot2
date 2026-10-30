@@ -16,8 +16,8 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
 test "small package collection carriers preserve complete replay and emission allocation failures" {
     const source =
         \\type Item = exists [a] => (Array a, Array a -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32] (#[value], fn values => @array.get values 0) as Item
-        \\entry const answer = fn (value: U32) => unpack (make value) as [a] body in (@product.get body 1) (@product.get body 0)
+        \\const make: U32 -> Item = func value => return pack [U32] (#[value], func values => return @array.get values 0) as Item
+        \\entry const answer = func (value: U32) => return unpack (make value) as [a] body in (@product.get body 1) (@product.get body 0)
     ;
     var tokens = try lexer.lex(a, source);
     defer tokens.deinit(a);
@@ -62,7 +62,7 @@ fn nominalBinderSource(allocator: std.mem.Allocator) !void {
     try checkInput(allocator,
         \\type Box a is data = #Box a
         \\type Item = exists [a] => (Box a, Box a -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32] (#Box value, fn (#Box inner) => inner) as Item
+        \\const make: U32 -> Item = func value => return pack [U32] (#Box value, func (#Box inner) => return inner) as Item
     , true);
 }
 
@@ -72,11 +72,11 @@ test "nominal package binders retain lexical scope and allocation failure owners
     try checkInput(a,
         \\type Box a is data = #Box a
         \\type Item = exists [a] => Box a
-        \\const wrong: Item -> Box U32 = fn item => unpack item as [a] value in value
+        \\const wrong: Item -> Box U32 = func item => return unpack item as [a] value in value
     , false);
     try checkInput(a,
         \\type Box a is data = #Box a
         \\type Item = exists [a] => Box a
-        \\const wrong: Item -> Item -> Unit = fn left => fn right => unpack left as [a] x in unpack right as [b] y in (fn (other: Box a) => ()) y
+        \\const wrong: Item -> Item -> Unit = func left => return func right => return unpack left as [a] x in unpack right as [b] y in (func (other: Box a) => return ()) y
     , false);
 }

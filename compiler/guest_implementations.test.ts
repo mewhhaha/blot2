@@ -4,32 +4,32 @@ import { compile } from "./test_compile.ts";
 
 const source =
   `type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
+impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
 `;
 
 for (
   const [name, body, input, expected] of [
     [
       "direct scalar",
-      "entry const answer = fn (value: U32) => Source.first #[value]",
+      "entry const answer = func (value: U32) => return Source.first #[value]",
       42,
       42,
     ],
     [
       "generic given",
-      "const read: s -> (Source.Item s) where { Source s } = fn values => Source.first values\nentry const answer = fn (value: U32) => read #[value]",
+      "const read: s -> (Source.Item s) where { Source s } = func values => return Source.first values\nentry const answer = func (value: U32) => return read #[value]",
       42,
       42,
     ],
     [
       "reference",
-      "entry const answer = fn (value: Array U32) => Source.first #[value]",
+      "entry const answer = func (value: Array U32) => return Source.first #[value]",
       new Uint32Array([20, 22]),
       new Uint32Array([20, 22]),
     ],
     [
       "callback",
-      "entry const answer = fn (value: U32) => do:\n  let selected: (Array U32) -> U32 = Source.first\n  break selected #[value]",
+      "entry const answer = func (value: U32) => return do:\n  let selected: (Array U32) -> U32 = Source.first\n  break selected #[value]",
       42,
       42,
     ],
@@ -48,13 +48,13 @@ for (
 
 Deno.test("implementation witness proofs preserve anonymous callback rows without executing prerequisites", async () => {
   const artifact = await compile(`type Token a is data = #Token a
-const Token.add = fn (left: Token a) => fn (right: Token a) => case left of
-  #Token witness => @state.reader witness (fn () => @panic "proof executed") (fn () => do:
+const Token.add = func (left: Token a) => return func (right: Token a) => return case left of
+  #Token witness => @state.reader witness (func () => return @panic "proof executed") (func () => return do:
     use unused <- @state.get witness
     break left)
 type Source s is contract = { associated "add" s s s ! {}, type Item, const first: s -> (Source.Item s) }
-impl TokenSource a : Source (Token a) = { type Item = U32, const first = fn value => 42 }
-entry const answer: Unit -> U32 = fn () => Source.first (#Token (fn () -> U32 => 7))
+impl TokenSource a : Source (Token a) = { type Item = U32, const first = func value => return 42 }
+entry const answer: Unit -> U32 = func () => return Source.first (#Token (func () : U32 => return 7))
 `);
   const guest = await instantiateGuest(artifact.bytes);
   try {
@@ -69,8 +69,8 @@ Deno.test("implementation overlap and missing witnesses reject before execution"
     () =>
       compile(
         source +
-          `impl Other a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
-entry const answer = fn () => 42
+          `impl Other a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
+entry const answer = func () => return 42
 `,
       ),
     /overlapping_implementation/,
@@ -78,7 +78,7 @@ entry const answer = fn () => 42
   await rejects(
     () =>
       compile(
-        source + `entry const answer = fn () => Source.first 42
+        source + `entry const answer = func () => return Source.first 42
 `,
       ),
     /missing_implementation/,
@@ -88,10 +88,10 @@ entry const answer = fn () => 42
 Deno.test("implementation generic operation heads preserve selected callback rows", async () => {
   const artifact = await compile(
     `type State a is effect = { get: Unit -> a, set: a -> Unit }
-const read: Unit -> a ! {State.get a} = fn () => State.get ()
+const read: Unit -> a ! {State.get a} = func () => return State.get ()
 type Callable f is contract = { type Run, const keep: f -> f }
-impl Callback a : Callable (Unit -> a ! {State.get a}) = { type Run = a, const keep = fn value => value }
-entry const answer: Unit -> U32 = fn () => @product.get (@effect.run State.get State.set 42 (fn () => Callable.keep read ())) 1
+impl Callback a : Callable (Unit -> a ! {State.get a}) = { type Run = a, const keep = func value => return value }
+entry const answer: Unit -> U32 = func () => return @product.get (@effect.run State.get State.set 42 (func () => return Callable.keep read ())) 1
 `,
   );
   const guest = await instantiateGuest(artifact.bytes);
@@ -105,8 +105,8 @@ entry const answer: Unit -> U32 = fn () => @product.get (@effect.run State.get S
 Deno.test("implementation methods retain captures and curried argument order", async () => {
   const artifact = await compile(`const seed = 40
 type Source s is contract = { type Item, const at: s -> U32 -> (Source.Item s) }
-impl ArraySource a : Source (Array a) = { type Item = a, const at = fn values => fn index => @array.get values index }
-entry const answer = fn (value: U32) => Source.at #[seed, value] 1
+impl ArraySource a : Source (Array a) = { type Item = a, const at = func values => return func index => return @array.get values index }
+entry const answer = func (value: U32) => return Source.at #[seed, value] 1
 `);
   const guest = await instantiateGuest(artifact.bytes);
   try {
@@ -119,9 +119,9 @@ entry const answer = fn (value: U32) => Source.at #[seed, value] 1
 Deno.test("implementation complete prerequisite chains normalize nested arrays", async () => {
   const artifact = await compile(
     `type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-impl Scalar : Source U32 = { type Item = U32, const first = fn value => value }
-impl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }
-entry const answer = fn (value: U32) => Source.first #[#[value]]
+impl Scalar : Source U32 = { type Item = U32, const first = func value => return value }
+impl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = func values => return Source.first (@array.get values 0) }
+entry const answer = func (value: U32) => return Source.first #[#[value]]
 `,
   );
   const guest = await instantiateGuest(artifact.bytes);
@@ -136,10 +136,10 @@ for (const asynchronous of [false, true]) {
   Deno.test(`implementation selected Foreign method preserves callback order (${asynchronous})`, async () => {
     const artifact = await compile(
       `type Callable f is contract = { type Run, const run: f -> (Unit -> (Callable.Run f) ! {Foreign}) }
-impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = fn callback => fn () => do:
+impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = func callback => return func () => return do:
   use value <- callback ()
   break value }
-entry const answer = fn (callback: Unit -> U32 ! {Foreign}) => do:
+entry const answer = func (callback: Unit -> U32 ! {Foreign}) => return do:
   use first <- Callable.run callback ()
   use second <- Callable.run callback ()
   break @u32.add first second

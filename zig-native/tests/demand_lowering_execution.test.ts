@@ -33,20 +33,20 @@ for (const codegenTier of ["development", "optimized"] as const) {
     const entry = `${directory}/main.blot`;
     const leaf = `${directory}/leaf.blot`;
     const archive = `${directory}/deps.blotdep`;
-    const leafSource = `const enabled = #True
-const conjunction = fn (condition: Bool) => fn ~(value: Bool) =>
-  if enabled then if condition then @demand value else #False else #False
-const disjunction = fn (condition: Bool) => fn ~(value: Bool) =>
-  if condition then #True else @demand value
+    const leafSource = `const enabled = true
+const conjunction = func (condition: Bool) => return func ~(value: Bool) => return
+  if enabled then if condition then @demand value else false else false
+const disjunction = func (condition: Bool) => return func ~(value: Bool) => return
+  if condition then true else @demand value
 `;
     const source = `import { alias, alternate } from "./forward"
 infixr 35 (&&) = alias
 infixr 34 (||) = alternate
-entry const and = fn (value: U32) => (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10)
-entry const or = fn (value: U32) => (@u32.eq value 0) || (@u32.eq (@u32.div 100 value) 10)
-entry const explicit_and = fn (value: U32) => if @u32.eq value 10 then @u32.eq (@u32.div 100 value) 10 else #False
-entry const explicit_or = fn (value: U32) => if @u32.eq value 0 then #True else @u32.eq (@u32.div 100 value) 10
-entry const loop = fn (value: U32) => do:
+entry const conjunction = func (value: U32) => return (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10)
+entry const disjunction = func (value: U32) => return (@u32.eq value 0) || (@u32.eq (@u32.div 100 value) 10)
+entry const explicit_and = func (value: U32) => return if @u32.eq value 10 then @u32.eq (@u32.div 100 value) 10 else false
+entry const explicit_or = func (value: U32) => return if @u32.eq value 0 then true else @u32.eq (@u32.div 100 value) 10
+entry const loop = func (value: U32) => return do:
   let total = 0
   for index in 0..8:
     total := @u32.add total (if (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10) then 1 else 0)
@@ -58,9 +58,9 @@ entry const loop = fn (value: U32) => do:
       await Deno.writeTextFile(
         `${directory}/forward.blot`,
         `import { conjunction, disjunction } from "./leaf"
-const forward = fn (condition: Bool) => fn ~(value: Bool) => conjunction condition (@demand value)
+const forward = func (condition: Bool) => return func ~(value: Bool) => return conjunction condition (@demand value)
 const alias = forward
-const alternate = fn (condition: Bool) => fn ~(value: Bool) => disjunction condition (@demand value)
+const alternate = func (condition: Bool) => return func ~(value: Bool) => return disjunction condition (@demand value)
 `,
       );
       const packed = await new Deno.Command(executable, {
@@ -121,8 +121,8 @@ const alternate = fn (condition: Bool) => fn ~(value: Bool) => disjunction condi
           // An immutable captured value is a code dependency, even though the
           // callable's public type and its branch shape remain unchanged.
           const changed = leafSource.replace(
-            "enabled = #True",
-            "enabled = #False",
+            "enabled = true",
+            "enabled = false",
           );
           const edited = await compiler.build({ sources: { [leaf]: changed } });
           assert(edited.success, JSON.stringify(edited));
@@ -148,7 +148,7 @@ const alternate = fn (condition: Bool) => fn ~(value: Bool) => disjunction condi
           const checkpoint = await compiler.exportCheckpoint();
           const failed = await compiler.build({
             sources: {
-              [leaf]: changed.replace("enabled = #False", "enabled = missing"),
+              [leaf]: changed.replace("enabled = false", "enabled = missing"),
             },
           });
           assert(!failed.success);
@@ -214,11 +214,11 @@ for (const codegenTier of ["development", "optimized"] as const) {
           const or = booleanChain(count, "||");
           const source = `infixl 35 (&&) = conjunction
 infixl 34 (||) = disjunction
-const conjunction = fn (condition: Bool) => fn ~(value: Bool) => if condition then @demand value else #False
-const disjunction = fn (condition: Bool) => fn ~(value: Bool) => if condition then #True else @demand value
-entry const and = fn (value: U32) => ${and}
-entry const or = fn (value: U32) => ${or}
-entry const loop = fn (value: U32) => do:
+const conjunction = func (condition: Bool) => return func ~(value: Bool) => return if condition then @demand value else false
+const disjunction = func (condition: Bool) => return func ~(value: Bool) => return if condition then true else @demand value
+entry const conjunction = func (value: U32) => return ${and}
+entry const disjunction = func (value: U32) => return ${or}
+entry const loop = func (value: U32) => return do:
   let total = 0
   for index in 0..8:
     total := @u32.add total (if ${and} then 1 else 0)
@@ -238,8 +238,8 @@ entry const loop = fn (value: U32) => do:
           const guest = await instantiateGuest(result.bytes);
           try {
             for (const value of [0, 1]) {
-              assert.equal(guest.call("and", value), value === 0);
-              assert.equal(guest.call("or", value), value === 0);
+              assert.equal(guest.call("conjunction", value), value === 0);
+              assert.equal(guest.call("disjunction", value), value === 0);
               let total = 0;
               if (value === 0) total = 8;
               assert.equal(guest.call("loop", value), total);
@@ -261,16 +261,16 @@ Deno.test("demand explanation follows actual local storage without changing byte
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-const ignore = fn ~(value: U32) => 42
-const once = fn ~(value: U32) => @demand value
-const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-const stored = fn ~(value: U32) => fn () => @demand value
-const unknown = fn (next: ~U32 -> U32) => fn ~(value: U32) => next (@demand value)
-entry const eliminated = fn (value: U32) => ignore value
-entry const direct = fn (value: U32) => once value
-entry const memo = fn (value: U32) => twice value
-entry const escape = fn (value: U32) => (stored value) ()
-entry const indirect = fn (value: U32) => unknown once value
+const ignore = func ~(value: U32) => return 42
+const once = func ~(value: U32) => return @demand value
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+const stored = func ~(value: U32) => return func () => return @demand value
+const unknown = func (next: ~U32 -> U32) => return func ~(value: U32) => return next (@demand value)
+entry const eliminated = func (value: U32) => return ignore value
+entry const direct = func (value: U32) => return once value
+entry const memo = func (value: U32) => return twice value
+entry const escape = func (value: U32) => return (stored value) ()
+entry const indirect = func (value: U32) => return unknown once value
 `;
   try {
     await Deno.writeTextFile(entry, source);
@@ -358,11 +358,11 @@ for (const codegenTier of ["development", "optimized"] as const) {
     try {
       await Deno.writeTextFile(
         library,
-        `const choose = fn (condition: Bool) => fn ~(value: Bool) => if condition then @demand value else #False\nconst alias = choose\n`,
+        `const choose = func (condition: Bool) => return func ~(value: Bool) => return if condition then @demand value else false\nconst alias = choose\n`,
       );
       await Deno.writeTextFile(
         entry,
-        'import { alias } from "./library"\nentry const run = fn (value: U32) => alias (value != 0) (100 / value == 10)\nentry const explicit = fn (value: U32) => if value != 0 then 100 / value == 10 else #False\n',
+        'import { alias } from "./library"\nentry const run = func (value: U32) => return alias (value != 0) (100 / value == 10)\nentry const explicit = func (value: U32) => return if value != 0 then 100 / value == 10 else #False\n',
       );
       const compiler = await createZigProjectCompiler({
         executable,

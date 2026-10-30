@@ -4,7 +4,7 @@ import { compileAndRun } from "./compile_helpers.ts";
 Deno.test("dynamic Array copies preserve reference aliases and retire discarded snapshots", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let item = #[41, 8192]
   let left = @array.fill count item
   let right = @array.fill count #[42, 65536]

@@ -57,7 +57,7 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // lambda_upper
     .{ .source =
-    \\entry const x = fn X => 0
+    \\entry const x = func X => 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // range_upper
@@ -71,7 +71,7 @@ const cases = [_]Case{
     // request_upper
     .{ .source =
     \\entry const x = do:
-    \\  for Request in @requests (@computation (fn () => 0)):
+    \\  for Request in @requests (@computation (func () => return 0)):
     \\    case request of
     \\      complete value =>
     \\        break value
@@ -81,7 +81,7 @@ const cases = [_]Case{
     .{ .source =
     \\effect tick: Unit -> U32
     \\entry const x = do:
-    \\  for request in @requests (@computation (fn () => tick ())):
+    \\  for request in @requests (@computation (func () => return tick ())):
     \\    case request of
     \\      effect tick X =>
     \\        yield 0
@@ -92,7 +92,7 @@ const cases = [_]Case{
     // complete_payload_upper
     .{ .source =
     \\entry const x = do:
-    \\  for request in @requests (@computation (fn () => 0)):
+    \\  for request in @requests (@computation (func () => return 0)):
     \\    case request of
     \\      complete X =>
     \\        break 0
@@ -115,7 +115,7 @@ const cases = [_]Case{
     , .valid = true },
     // attribute_upper
     .{ .source =
-    \\@[fn value => value]
+    \\@[func value => return value]
     \\entry const x = do:
     \\  let X = 0
     \\  break 0
@@ -123,12 +123,12 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 1 },
     // lambda_annotated_upper
     .{ .source =
-    \\entry const x = fn (X: U32) => 0
+    \\entry const x = func (X: U32) => 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // lambda_demand_upper
     .{ .source =
-    \\entry const x = fn ~X => 0
+    \\entry const x = func ~X => 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // record_payload_upper
@@ -147,7 +147,7 @@ const cases = [_]Case{
     , .valid = false, .start = 0, .end = 5 },
     // lambda_boolean_upper
     .{ .source =
-    \\entry const x = fn True => 0
+    \\entry const x = func True => 0
     \\
     , .valid = false, .start = 0, .end = 5 },
     // uppercase_global
@@ -157,13 +157,13 @@ const cases = [_]Case{
     , .valid = true },
     // qualified_namespace
     .{ .source =
-    \\const Foo.bar = fn x => x
+    \\const Foo.bar = func x => return x
     \\
     , .valid = true },
     // boolean_constructor_pattern
     .{ .source =
     \\entry const x = do:
-    \\  let #True = #True
+    \\  let true = true
     \\  break 0
     \\
     , .valid = true },

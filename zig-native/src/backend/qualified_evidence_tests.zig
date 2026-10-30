@@ -26,15 +26,15 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 const fixture =
     \\data Cell value = #Cell value
     \\type Increment is data = #Increment U32
-    \\const Increment.add = fn left => fn right => do:
+    \\const Increment.add = func left => return func right => return do:
     \\  let #Increment a = left
     \\  let #Increment b = right
     \\  break #Increment (@u32.add a b)
-    \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
-    \\entry const answer = fn () => do:
-    \\  let unused: a -> a where { associated "missing" a a a } = fn value => value
-    \\  let read_local = fn witness => @state.get witness
-    \\  let (_, #Cell count) = @state.run (#Cell 40) (fn () => read_local (fn ignored -> Cell U32 => @panic "unused"))
+    \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
+    \\entry const answer = func () => return do:
+    \\  let unused: a -> a where { associated "missing" a a a } = func value => return value
+    \\  let read_local = func witness => return @state.get witness
+    \\  let (_, #Cell count) = @state.run (#Cell 40) (func () => return read_local (func ignored : Cell U32 => return @panic "unused"))
     \\  let local = twice
     \\  let #Increment delta = local (#Increment 1)
     \\  break @u32.add count delta
@@ -57,13 +57,13 @@ test "explicit closed extras and independent rows require proof while unused cal
     const cases = [_]struct { source: []const u8, code: ?backend.Code }{
         .{ .source = "entry const answer: U32 where { associated \"missing\" Bool Bool Bool } = 42\n", .code = .missing_associated },
         .{ .source = "entry let answer: U32 where { associated \"missing\" Bool Bool Bool } = 42\n", .code = .missing_associated },
-        .{ .source = "const identity: a -> a where { effect_rep ! {| e} } = fn value => value\nentry const answer = fn () => identity 42\n", .code = .ambiguous_qualified },
+        .{ .source = "const identity: a -> a where { effect_rep ! {| e} } = func value => return value\nentry const answer = func () => return identity 42\n", .code = .ambiguous_qualified },
         .{ .source = "entry const answer: U32 where { type_rep a } = 42\n", .code = .ambiguous_qualified },
         .{ .source = "entry const answer: U32 where { effect_rep ! {| e} } = 42\n", .code = .ambiguous_qualified },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { effect_rep ! {| e} } = 42\n  break 42\n", .code = .ambiguous_qualified },
-        .{ .source = "const unused: a -> a where { associated \"missing\" a a a } = fn value => value\nentry const answer = 42\n", .code = null },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 -> U32 where { associated \"missing\" Bool Bool Bool } = fn value => value\n  break 42\n", .code = null },
-        .{ .source = "entry const answer = fn () => do:\n  let unused: U32 where { associated \"missing\" Bool Bool Bool } = 42\n  break 42\n", .code = .missing_associated },
+        .{ .source = "entry const answer = func () => return do:\n  let unused: U32 where { effect_rep ! {| e} } = 42\n  break 42\n", .code = .ambiguous_qualified },
+        .{ .source = "const unused: a -> a where { associated \"missing\" a a a } = func value => return value\nentry const answer = 42\n", .code = null },
+        .{ .source = "entry const answer = func () => return do:\n  let unused: U32 -> U32 where { associated \"missing\" Bool Bool Bool } = func value => return value\n  break 42\n", .code = null },
+        .{ .source = "entry const answer = func () => return do:\n  let unused: U32 where { associated \"missing\" Bool Bool Bool } = 42\n  break 42\n", .code = .missing_associated },
     };
     const a = std.testing.allocator;
     for (cases) |case| {

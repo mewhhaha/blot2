@@ -35,7 +35,7 @@ async function writeProject(
   await Deno.writeTextFile(`${app}/blot.json`, JSON.stringify(project));
   await Deno.writeTextFile(
     `${app}/nested/deep/main.blot`,
-    'import { value } from "math/value"\nentry const answer = fn () => value\n',
+    'import { value } from "math/value"\nentry const answer = func () => return value\n',
   );
   return { app, entry: `${app}/nested/deep/main.blot`, library };
 }
@@ -80,14 +80,14 @@ Deno.test("CLI manifest defaults can be overridden and omitted prelude stays abs
     // Package import is loaded while an explicit prelude suppresses the manifest's prelude.
     await Deno.writeTextFile(
       entry,
-      'import { value } from "math/value"\nentry const answer = fn () => value\n',
+      'import { value } from "math/value"\nentry const answer = func () => return value\n',
     );
     equal(await runCli(executable, ["check", entry, "--prelude", "none"]), 0);
 
     // The declared prelude is used by default.
     await Deno.writeTextFile(
       entry,
-      "entry const answer = fn () => from_package_prelude\n",
+      "entry const answer = func () => return from_package_prelude\n",
     );
     equal(await runCli(executable, ["check", entry]), 0);
 
@@ -96,7 +96,10 @@ Deno.test("CLI manifest defaults can be overridden and omitted prelude stays abs
       `${directory}/app/blot.json`,
       JSON.stringify({ dependencies: { math: { path: "../library" } } }),
     );
-    await Deno.writeTextFile(entry, "entry const answer = fn () => Array\n");
+    await Deno.writeTextFile(
+      entry,
+      "entry const answer = func () => return Array\n",
+    );
     equal(await runCli(executable, ["check", entry]), 1);
 
     // An explicit alias with the same prefix replaces the package mapping.
@@ -105,7 +108,7 @@ Deno.test("CLI manifest defaults can be overridden and omitted prelude stays abs
     await Deno.writeTextFile(`${override}/value.blot`, "const value = 43\n");
     await Deno.writeTextFile(
       entry,
-      'import { value } from "math/value"\nentry const answer = fn () => value\n',
+      'import { value } from "math/value"\nentry const answer = func () => return value\n',
     );
     const output = `${directory}/answer.wasm`;
     equal(
@@ -146,7 +149,10 @@ Deno.test("manifest dependency failures are surfaced by CLI", async () => {
       "exports:\n  .: ./src\n",
     );
     const entry = `${app}/main.blot`;
-    await Deno.writeTextFile(entry, "entry const answer = fn () => 42\n");
+    await Deno.writeTextFile(
+      entry,
+      "entry const answer = func () => return 42\n",
+    );
     equal(await runCli(executable, ["check", entry]), 1);
   } finally {
     await Deno.remove(directory, { recursive: true });
@@ -168,7 +174,7 @@ Deno.test("this checkout exports the standard prelude as an explicit package cho
     );
     await Deno.writeTextFile(
       entry,
-      "entry const answer = fn () => (Array.from_list [40, 2])[0] + 2\n",
+      "entry const answer = func () => return (Array.from_list [40, 2])[0] + 2\n",
     );
     equal(await runCli(executable, ["build", entry, output]), 0);
     const guest = await instantiateGuest(await Deno.readFile(output));
@@ -179,7 +185,10 @@ Deno.test("this checkout exports the standard prelude as an explicit package cho
     }
     await Deno.writeTextFile(manifest, JSON.stringify({ dependencies }));
     equal(await runCli(executable, ["check", entry]), 1);
-    await Deno.writeTextFile(entry, "entry const answer = fn () => 42\n");
+    await Deno.writeTextFile(
+      entry,
+      "entry const answer = func () => return 42\n",
+    );
     equal(await runCli(executable, ["check", entry]), 0);
   } finally {
     await Deno.remove(directory, { recursive: true });

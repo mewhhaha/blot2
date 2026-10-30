@@ -10157,6 +10157,7 @@ pub const Owner = struct {
             .update => try self.update(id, depth),
             .array => try self.array(id, depth),
             .array_op => try self.arrayOperation(id, depth),
+            .storage => return g.fail(self.unit_id, id, .storage_unsupported),
             .closure, .suspend_ => try self.closure(id),
             .force => if (!try self.inlineDemand(id, depth)) try self.forceDemand(id, depth),
             .apply => try self.apply(id, depth),

@@ -16,54 +16,54 @@ const lines = (rows: readonly string[]): string => rows.join("\n") + "\n";
 
 /** Annotated chain: every link is monomorphic, so each call is closed. */
 export function chainMono(size: number): SyntheticProgram {
-  const rows = ["const f_0 = fn (x: U32) -> U32 => x + 1"];
+  const rows = ["const f_0 = func (x: U32) : U32 => return x + 1"];
   for (let i = 1; i <= size; i++) {
-    rows.push(`const f_${i} = fn (x: U32) -> U32 => f_${i - 1} x + 1`);
+    rows.push(`const f_${i} = func (x: U32) : U32 => return f_${i - 1} x + 1`);
   }
-  rows.push(`entry const main = fn (x: U32) -> U32 => f_${size} x`);
+  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "chain_mono",
     size,
     source: lines(rows),
     edit: {
-      search: "const f_0 = fn (x: U32) -> U32 => x + 1",
-      replace: "const f_0 = fn (x: U32) -> U32 => x + 2",
+      search: "const f_0 = func (x: U32) : U32 => return x + 1",
+      replace: "const f_0 = func (x: U32) : U32 => return x + 2",
     },
   };
 }
 
 /** The same chain without annotations: every link is generic. */
 export function chainGeneric(size: number): SyntheticProgram {
-  const rows = ["const f_0 = fn x => x + 1"];
+  const rows = ["const f_0 = func x => return x + 1"];
   for (let i = 1; i <= size; i++) {
-    rows.push(`const f_${i} = fn x => f_${i - 1} x + 1`);
+    rows.push(`const f_${i} = func x => return f_${i - 1} x + 1`);
   }
-  rows.push(`entry const main = fn (x: U32) -> U32 => f_${size} x`);
+  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "chain_generic",
     size,
     source: lines(rows),
     edit: {
-      search: "const f_0 = fn x => x + 1",
-      replace: "const f_0 = fn x => x + 2",
+      search: "const f_0 = func x => return x + 1",
+      replace: "const f_0 = func x => return x + 2",
     },
   };
 }
 
 /** Each generic link calls its predecessor twice: 2^size paths, size+1 bodies. */
 export function diamond(size: number): SyntheticProgram {
-  const rows = ["const f_0 = fn x => x + 1"];
+  const rows = ["const f_0 = func x => return x + 1"];
   for (let i = 1; i <= size; i++) {
-    rows.push(`const f_${i} = fn x => f_${i - 1} (f_${i - 1} x)`);
+    rows.push(`const f_${i} = func x => return f_${i - 1} (f_${i - 1} x)`);
   }
-  rows.push(`entry const main = fn (x: U32) -> U32 => f_${size} x`);
+  rows.push(`entry const main = func (x: U32) : U32 => return f_${size} x`);
   return {
     name: "diamond",
     size,
     source: lines(rows),
     edit: {
-      search: "const f_0 = fn x => x + 1",
-      replace: "const f_0 = fn x => x + 2",
+      search: "const f_0 = func x => return x + 1",
+      replace: "const f_0 = func x => return x + 2",
     },
   };
 }
@@ -71,8 +71,10 @@ export function diamond(size: number): SyntheticProgram {
 /** Many independent generic functions, each instantiated at U32 and F32. */
 export function fanout(size: number): SyntheticProgram {
   const rows: string[] = [];
-  for (let i = 0; i < size; i++) rows.push(`const g_${i} = fn x => x + x`);
-  rows.push("entry const main = fn (x: U32) => do:");
+  for (let i = 0; i < size; i++) {
+    rows.push(`const g_${i} = func x => return x + x`);
+  }
+  rows.push("entry const main = func (x: U32) => return do:");
   rows.push("  let whole = 0");
   rows.push("  let fraction = 0.0");
   for (let i = 0; i < size; i++) {
@@ -87,8 +89,8 @@ export function fanout(size: number): SyntheticProgram {
     size,
     source: lines(rows),
     edit: {
-      search: "const g_0 = fn x => x + x",
-      replace: "const g_0 = fn x => x + x + x",
+      search: "const g_0 = func x => return x + x",
+      replace: "const g_0 = func x => return x + x + x",
     },
   };
 }
@@ -123,33 +125,33 @@ export const editSuite: SyntheticProject = {
       "type Vec2 is data = #Vec2 { x: F32, y: F32 }",
       "const zero = #Vec2 { x: 0.0, y: 0.0 }",
       "const unit = #Vec2 { x: 1.0, y: 1.0 }",
-      "const dot = fn (a: Vec2) => fn (b: Vec2) => a.x * b.x + a.y * b.y",
-      "const scale = fn (k: F32) => fn (v: Vec2) => #Vec2 { x: k * v.x, y: k * v.y }",
-      "const add = fn (a: Vec2) => fn (b: Vec2) => #Vec2 { x: a.x + b.x, y: a.y + b.y }",
+      "const dot = func (a: Vec2) => return func (b: Vec2) => return a.x * b.x + a.y * b.y",
+      "const scale = func (k: F32) => return func (v: Vec2) => return #Vec2 { x: k * v.x, y: k * v.y }",
+      "const add = func (a: Vec2) => return func (b: Vec2) => return #Vec2 { x: a.x + b.x, y: a.y + b.y }",
     ]),
     "robots.blot": lines([
       'import * as math from "./math"',
       "type Carry is data = #Carry { depth: F32, width: F32 }",
       "const floor_half_extent = 60.0",
-      "const step = fn (carry: Carry) => #Carry { depth: carry.depth + 0.5, width: carry.width }",
-      "const reach = fn (v: math.Vec2) => math.dot v v * floor_half_extent",
-      "const walk = fn (phase: F32) => floor phase + 1.0",
-      "const carried = fn (x: F32) => do:",
+      "const step = func (carry: Carry) => return #Carry { depth: carry.depth + 0.5, width: carry.width }",
+      "const reach = func (v: math.Vec2) => return math.dot v v * floor_half_extent",
+      "const walk = func (phase: F32) => return floor phase + 1.0",
+      "const carried = func (x: F32) => return do:",
       "  let #Carry { depth, width } = step (#Carry { depth: x, width: 1.0 })",
       "  break depth + width",
     ]),
     "hud.blot": lines([
       'import * as math from "./math"',
       "const offset = math.add math.unit (math.scale 2.0 math.zero)",
-      "const width = fn (v: math.Vec2) => math.dot v (math.add offset v)",
+      "const width = func (v: math.Vec2) => return math.dot v (math.add offset v)",
     ]),
     "main.blot": lines([
       'import * as math from "./math"',
       'import * as robots from "./robots"',
       'import * as hud from "./hud"',
-      "entry const score = fn (x: F32) => robots.reach (math.scale x math.unit) + hud.width (math.scale x math.unit)",
-      "entry const walked = fn (x: F32) => robots.walk x",
-      "entry const carried = fn (x: F32) => robots.carried x",
+      "entry const score = func (x: F32) => return robots.reach (math.scale x math.unit) + hud.width (math.scale x math.unit)",
+      "entry const walked = func (x: F32) => return robots.walk x",
+      "entry const carried = func (x: F32) => return robots.carried x",
     ]),
   },
   scenarios: [
@@ -223,7 +225,8 @@ export const editSuite: SyntheticProject = {
       replacements: [{
         file: "math.blot",
         search: "const unit =",
-        replace: "const probe_unused = fn (x: F32) => x + 1.0\nconst unit =",
+        replace:
+          "const probe_unused = func (x: F32) => return x + 1.0\nconst unit =",
       }],
     },
   ],

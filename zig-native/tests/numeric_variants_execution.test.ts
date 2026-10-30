@@ -3,58 +3,58 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const source = `type Choice is data = #Empty | #One U32 | #Pair {x: U32, y: U32}
-const make = fn (i: U32) -> Choice => if i % 3 == 0 then #Empty else if i % 3 == 1 then #One i else #Pair {x: i, y: i + 10}
-const read = fn (v: Choice) -> U32 => case v of
+const make = func (i: U32) : Choice => return if i % 3 == 0 then #Empty else if i % 3 == 1 then #One i else #Pair {x: i, y: i + 10}
+const read = func (v: Choice) : U32 => return case v of
   #Empty => 0
   #One n => n
   #Pair (x, y) => x + y
-entry const mixed = fn (count: U32) => do:
+entry const mixed = func (count: U32) => return do:
   let values = @array.generate count make
   let sum = 0
   for value in values:
     sum := self + read value
   break sum
-entry const list = fn (index: U32) => do:
+entry const list = func (index: U32) => return do:
   let values = @list.generate 513 make
   let cursor = @list.cursor values
   for step in 0..index:
     cursor := @cursor.advance cursor
   break read (@cursor.value cursor)
-entry const saved = fn (index: U32) => do:
+entry const saved = func (index: U32) => return do:
   let values = @array.generate 513 make
   let old = values
   values[index] := #Pair {x: 100, y: 200}
   break read old[index] + read values[index]
-entry const static_values = fn (index: U32) => do:
+entry const static_values = func (index: U32) => return do:
   let values = #[#Empty, #One 7, #Pair {x: 2, y: 3}]
   break read values[index]
-entry const conversions = fn (index: U32) => do:
+entry const conversions = func (index: U32) => return do:
   let values = @array.generate 700 make
   let middle = @array.slice values 17 600
   let tree = @list.from_array middle
   let selected = @list.slice tree 63 513
   let copied = @array.from_list selected
   break read copied[index]
-entry const callback = fn (index: U32) => do:
+entry const callback = func (index: U32) => return do:
   let values = @array.generate 513 make
   let selected = values[index]
-  let callbacks = #[fn (ignored: U32) => read selected]
+  let callbacks = #[func (ignored: U32) => return read selected]
   break callbacks[0] 0
 type Nested is data = #Wrapped Choice | #Scalar U32
 type FloatChoice is data = #NoFloat | #Float F32
-entry const absent_escape = fn (count: U32) => do:
-  let values = @array.generate count (fn (i: U32) -> Choice => #Empty)
+entry const absent_escape = func (count: U32) => return do:
+  let values = @array.generate count (func (i: U32) : Choice => return #Empty)
   let saved = values
-  let copy = @array.generate count (fn i => saved[i])
+  let copy = @array.generate count (func i => return saved[i])
   break copy.length
-entry const anonymous = fn (seed: U32) => do:
-  let values = @array.generate 2000 (fn (i: U32) -> Choice => if i % 2 == 0 then #One seed else #Empty)
+entry const anonymous = func (seed: U32) => return do:
+  let values = @array.generate 2000 (func (i: U32) : Choice => return if i % 2 == 0 then #One seed else #Empty)
   let sum = 0
   for value in values:
     sum := self + read value
   break sum
-entry const nested = fn (count: U32) => do:
-  let values = @array.generate count (fn (i: U32) -> Nested => if i % 2 == 0 then #Wrapped (if i % 4 == 0 then #Empty else #One i) else #Scalar i)
+entry const nested = func (count: U32) => return do:
+  let values = @array.generate count (func (i: U32) : Nested => return if i % 2 == 0 then #Wrapped (if i % 4 == 0 then #Empty else #One i) else #Scalar i)
   let sum = 0
   for value in values:
     sum := self + case value of
@@ -63,8 +63,8 @@ entry const nested = fn (count: U32) => do:
       #Wrapped (#Pair (x, y)) => x + y
       #Scalar n => n
   break sum
-entry const floating = fn (seed: F32) => do:
-  let values = @array.generate 3 (fn (i: U32) -> FloatChoice => if i == 1 then #NoFloat else #Float seed)
+entry const floating = func (seed: F32) => return do:
+  let values = @array.generate 3 (func (i: U32) : FloatChoice => return if i == 1 then #NoFloat else #Float seed)
   let result = @array.fill 3 1.0
   for i in 0..3:
     result[i] := case values[i] of

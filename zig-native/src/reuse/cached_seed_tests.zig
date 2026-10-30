@@ -13,8 +13,8 @@ const io = std.testing.io;
 const compiler: [32]u8 = @splat(9);
 const main = "import * as dep from \"./dep\"\nentry const answer:U32=dep.read ()\n";
 const main_edited = "import * as dep from \"./dep\"\nentry const answer:U32=dep.read ()\nentry const other:U32=7\n";
-const original = "const value:U32=42\nconst read:Unit->U32=fn () => value\n";
-const edited = "const value:U32=43\nconst read:Unit->U32=fn () => value\n";
+const original = "const value:U32=42\nconst read:Unit->U32=func () => return value\n";
+const edited = "const value:U32=43\nconst read:Unit->U32=func () => return value\n";
 
 const Fixture = struct {
     dir: std.testing.TmpDir,

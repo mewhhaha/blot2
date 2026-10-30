@@ -1064,7 +1064,7 @@ fn checkProjectModeDeferring(allocator: Allocator, source: *project.Project, exe
 
 test "project exports preserve positioned inference budget rejection with empty catalogs" {
     const allocator = std.testing.allocator;
-    const text = "const exhausted = fn x => x\n";
+    const text = "const exhausted = func x => return x\n";
     var tokens = try @import("../parse/lexer.zig").lex(allocator, text);
     defer tokens.deinit(allocator);
     var source: project.Project = .{};

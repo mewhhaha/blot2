@@ -36,11 +36,11 @@ fn span(source: []const u8, expression: []const u8) core.Span {
 
 test "specialization dispatch keeps its definition beside the outermost use" {
     const cases = [_]struct { source: []const u8, use: []const u8, definition: []const u8 }{
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=fn()=>do:\n  let x=add #True #False\n  break 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nconst forward=fn a=>fn b=>add a b\nentry const answer=fn()=>do:\n  let x=forward #True #False\n  break 7\n", .use = "forward #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" v v) #True\n  break 7\n", .use = "twice (fn v=>@type.call \"add\" v v) #True", .definition = "@type.call \"add\" v v" },
-        .{ .source = "const add=fn a=>fn b=>@type.call \"add\" a b\nentry const answer=do:\n  let x=add #True #False\n  break 7\n", .use = "add #True #False", .definition = "@type.call \"add\" a b" },
-        .{ .source = "type Box is data=#Box U32\nconst convert=fn v=>@type.result \"from\" v\nentry const answer=fn()=>do:\n  let value: Box=convert 1\n  break 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
+        .{ .source = "const add=func a=> return func b=> return @type.call \"add\" a b\nentry const answer=func()=> return do:\n  let x=add true false\n  break 7\n", .use = "add true false", .definition = "@type.call \"add\" a b" },
+        .{ .source = "const add=func a=> return func b=> return @type.call \"add\" a b\nconst forward=func a=> return func b=> return add a b\nentry const answer=func()=> return do:\n  let x=forward true false\n  break 7\n", .use = "forward true false", .definition = "@type.call \"add\" a b" },
+        .{ .source = "const twice=func f=> return func x=> return f (f x)\nentry const answer=func()=> return do:\n  let x=twice (func v=> return @type.call \"add\" v v) true\n  break 7\n", .use = "twice (func v=> return @type.call \"add\" v v) true", .definition = "@type.call \"add\" v v" },
+        .{ .source = "const add=func a=> return func b=> return @type.call \"add\" a b\nentry const answer=do:\n  let x=add true false\n  break 7\n", .use = "add true false", .definition = "@type.call \"add\" a b" },
+        .{ .source = "type Box is data=#Box U32\nconst convert=func v=> return @type.result \"from\" v\nentry const answer=func()=> return do:\n  let value: Box=convert 1\n  break 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
     };
     for (cases) |case| {
         const diagnostic = try diagnose(case.source);
@@ -54,16 +54,16 @@ test "specialization dispatch keeps its definition beside the outermost use" {
 }
 
 test "specialization keeps concrete failures at their own body" {
-    const source = "const broken=fn value=>@type.call \"add\" #True #False\nentry const answer=fn()=>do:\n  let x=broken 42\n  break 7\n";
+    const source = "const broken=func value=> return @type.call \"add\" true false\nentry const answer=func()=> return do:\n  let x=broken 42\n  break 7\n";
     const diagnostic = try diagnose(source);
-    try std.testing.expectEqualDeep(span(source, "@type.call \"add\" #True #False"), diagnostic.span);
+    try std.testing.expectEqualDeep(span(source, "@type.call \"add\" true false"), diagnostic.span);
     try std.testing.expect(diagnostic.related == null);
 }
 
 test "specialization keeps concrete callback failures inside the callback" {
     const sources = [_][]const u8{
-        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn v=>@type.call \"add\" #True #False) #True\n  break 7\n",
-        "const twice=fn f=>fn x=>f (f x)\nentry const answer=fn()=>do:\n  let x=twice (fn (v: Bool)=>@type.call \"add\" v v) #True\n  break 7\n",
+        "const twice=func f=> return func x=> return f (f x)\nentry const answer=func()=> return do:\n  let x=twice (func v=> return @type.call \"add\" true false) true\n  break 7\n",
+        "const twice=func f=> return func x=> return f (f x)\nentry const answer=func()=> return do:\n  let x=twice (func (v: Bool)=> return @type.call \"add\" v v) true\n  break 7\n",
     };
     for (sources) |source| {
         const diagnostic = try diagnose(source);
@@ -75,7 +75,7 @@ test "specialization keeps concrete callback failures inside the callback" {
 
 test "specialization callback provenance survives the dependency codec" {
     const allocator = std.testing.allocator;
-    const source = "const generic=fn value=>value\nconst fixed=fn (value: Bool)=>value\nentry const answer=7\n";
+    const source = "const generic=func value=> return value\nconst fixed=func (value: Bool)=> return value\nentry const answer=7\n";
     var lexed = try lexer.lex(allocator, source);
     defer lexed.deinit(allocator);
     var pool: symbols.Pool = .{};

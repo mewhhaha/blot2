@@ -1,5 +1,10 @@
 //! Independently compiled backend laws.
 comptime {
+    _ = @import("backend/scoped_backend_tests.zig");
+    _ = @import("backend/storage_plan_tests.zig");
+    _ = @import("backend/storage_calls_tests.zig");
+    _ = @import("backend/storage_data_tests.zig");
+    _ = @import("backend/storage_initialization_tests.zig");
     _ = @import("backend/numeric_rows.zig");
     _ = @import("backend/activation_graph.zig");
     _ = @import("backend/callable_origins.zig");

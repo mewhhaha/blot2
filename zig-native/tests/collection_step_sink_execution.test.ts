@@ -3,10 +3,10 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const adjacentSource = `import * as iter from "std/iter"
-const sum = fn (total: U32) => fn (value: U32) => total + value
-entry const arrays = fn (input: U32) => iter.fold_left (fn total => fn window => total + iter.fold_left sum 0 window) 0 (iter.windows (input / 1024 + 1) (@array.generate (input % 1024) identity))
-entry const lists = fn (input: U32) => iter.fold_left (fn total => fn window => total + iter.fold_left sum 0 window) 0 (iter.windows (input / 1024 + 1) (@list.generate (input % 1024) identity))
-entry const references = fn (seed: U32) => do:
+const sum = func (total: U32) => return func (value: U32) => return total + value
+entry const arrays = func (input: U32) => return iter.fold_left (func total => return func window => return total + iter.fold_left sum 0 window) 0 (iter.windows (input / 1024 + 1) (@array.generate (input % 1024) identity))
+entry const lists = func (input: U32) => return iter.fold_left (func total => return func window => return total + iter.fold_left sum 0 window) 0 (iter.windows (input / 1024 + 1) (@list.generate (input % 1024) identity))
+entry const references = func (seed: U32) => return do:
   let original = #[#[seed, seed + 1], #[9, 10]].iter
   use step <- original.next
   let #Some (value, rest) = step else:
@@ -22,7 +22,7 @@ entry const references = fn (seed: U32) => do:
   let #Some (second, _) = next else:
     break #[997]
   break #[value[0], value[1], saved[0], second[0]]
-entry const retained = fn (seed: U32) => do:
+entry const retained = func (seed: U32) => return do:
   use step <- #[seed, seed + 1].iter.next
   let #Some (first, rest) = step else:
     break 999
@@ -32,10 +32,10 @@ entry const retained = fn (seed: U32) => do:
   let #Some (again, _) = step else:
     break 997
   break first + second + again
-const make = fn (host: U32 -> U32 ! {Foreign}) => do:
+const make = func (host: U32 -> U32 ! {Foreign}) => return do:
   use seed <- host 41
   break (@array.fill 2 seed).iter
-entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use step <- (make host).next
   let #Some (value, rest) = step else:
     break 999
@@ -187,7 +187,7 @@ for (const direct of [false, true]) {
       "then #Some (@u32.add (@cursor.value cursor) 1, @cursor.advance cursor)",
     );
     assert.notEqual(original, changed);
-    let text = `entry const pull = fn (seed: U32) => do:
+    let text = `entry const pull = func (seed: U32) => return do:
   use step <- (@array.fill 1 seed).iter.next
   let #Some (value, _) = step else:
     break 999

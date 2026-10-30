@@ -25,21 +25,21 @@ type Pair is data = #Pair { left: U32, right: U32 }
 const pair = #Pair { left: 20, right: 22 }
 const aliased = (table, table)
 const other = ${other}
-entry const pick = fn (i: U32) => table[i]
-entry const first = fn () => do:
+entry const pick = func (i: U32) => return table[i]
+entry const first = func () => return do:
   let #Pair { left, right } = pair
   break @u32.add left right
-entry const sum_alias = fn (i: U32) => do:
+entry const sum_alias = func (i: U32) => return do:
   let (left, right) = aliased
   break @u32.add left[i] right[i]
-entry const from_dep = fn (i: U32) => dep.shared[i]
-entry const unrelated = fn () => other
+entry const from_dep = func (i: U32) => return dep.shared[i]
+entry const unrelated = func () => return other
 `;
   // Moved functions and data, an element edit, a trapping constant, recovery.
   const revisions: [string, string, string][] = [
     ["", "30", "0"],
     ["", "30", "1"],
-    ["const moved: Array U32 = #[7, 8]\nentry const early = fn (i: U32) => moved[i]\n", "30", "1"],
+    ["const moved: Array U32 = #[7, 8]\nentry const early = func (i: U32) => return moved[i]\n", "30", "1"],
     ["", "31", "2"],
     ["", "31", "@u32.div 1 0"],
     ["", "31", "3"],

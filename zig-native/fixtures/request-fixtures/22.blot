@@ -1,12 +1,12 @@
 
 type Inspect a is effect = a -> a
-const inspected = fn computation => do:
+const inspected = func computation => return do:
   for request in @requests computation:
     case request of
       effect (Inspect U32) value =>
         yield @u32.add value 2
       complete value =>
         break value
-entry const answer = fn () => inspected (@computation (fn () => Inspect U32 40))
+entry const answer = func () => return inspected (@computation (func () => return Inspect U32 40))
 
 entry const checked_answer = answer ()

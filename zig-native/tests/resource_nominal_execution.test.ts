@@ -6,22 +6,22 @@ const executable = Deno.args[0] ??
 const library = `type Box a is data = #Box a
 opaque type Secret = {left: U32, right: Array U32}
 type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-const inspect = fn (value: U32) => @resource.scope (fn () => #Box #[value, 7]) (fn owner => ()) (fn loan => 42)
-const make_secret = fn (value: U32) => @resource.acquire (fn () => #Secret {right: #[value, 8], left: value}) (fn owner => ())
-const finish_secret = fn (owner: unique Secret) => @resource.release owner
-const tree = fn (value: U32) => @resource.scope (fn () => #Branch (#Leaf value, #Leaf 9)) (fn owner => ()) (fn loan => 42)
-const failing = fn (value: U32) => @resource.scope (fn () => #Box #[value, 7]) (fn owner => @panic "nominal cleanup failure") (fn loan => 42)
+const inspect = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return ()) (func loan => return 42)
+const make_secret = func (value: U32) => return @resource.acquire (func () => return #Secret {right: #[value, 8], left: value}) (func owner => return ())
+const finish_secret = func (owner: unique Secret) => return @resource.release owner
+const tree = func (value: U32) => return @resource.scope (func () => return #Branch (#Leaf value, #Leaf 9)) (func owner => return ()) (func loan => return 42)
+const failing = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return @panic "nominal cleanup failure") (func loan => return 42)
 `;
 const source =
   `import {inspect, make_secret, finish_secret, tree, failing} from "./cleanup"
-entry const answer = fn (value: U32) => do:
+entry const answer = func (value: U32) => return do:
   use owner <- make_secret value
-  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => finish_secret owner
+  let transfer: once (Unit -> Unit ! {Foreign}) = func () => return finish_secret owner
   use transfer ()
   use first <- inspect value
   use other <- tree value
   break @u32.add first other
-entry const failure = fn (value: U32) => failing value
+entry const failure = func (value: U32) => return failing value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`nominal resource owners preserve generic constructor and opaque payload roles (${codegenTier})`, async () => {
@@ -89,8 +89,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
             sources: {
               [entry]: source,
               [dependency]: library.replace(
-                "(fn owner => ())",
-                "(fn owner => do:\n    for ever:\n      let ignored = 7\n    break ())",
+                "(func owner => return ())",
+                "(func owner => return do:\n    for ever:\n      let ignored = 7\n    break ())",
               ),
             },
           });

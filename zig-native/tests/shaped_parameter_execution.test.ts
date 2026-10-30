@@ -11,13 +11,13 @@ type Curried input => type output is effect = input -> output
 type Named {input, output} is effect = input -> output
 type Token () is data = #Token
 type Ping () is effect = Unit -> U32
-const convert = fn value => Convert value
-const explicit = fn (value:a) -> b => Named {output:b,input:a} value
+const convert = func value => return Convert value
+const explicit = func (value:a) : b => return Named {output:b,input:a} value
 const curried = Curried
-entry const answer = fn () => do (@effect.provider (Convert [U32,F32]) (fn value => @u32.to_f32 value)):
-  break do (@effect.provider ((Curried U32) F32) (fn value => @u32.to_f32 value)):
-    break do (@effect.provider (Named {output:F32,input:U32}) (fn value => @u32.to_f32 value)):
-      break do (@effect.provider (Ping ()) (fn () => 42)):
+entry const answer = func () => return do (@effect.provider (Convert [U32,F32]) (func value => return @u32.to_f32 value)):
+  break do (@effect.provider ((Curried U32) F32) (func value => return @u32.to_f32 value)):
+    break do (@effect.provider (Named {output:F32,input:U32}) (func value => return @u32.to_f32 value)):
+      break do (@effect.provider (Ping ()) (func () => return 42)):
         let token: Token () = #Token
         use first <- convert 20
         use second <- explicit 12
@@ -35,7 +35,7 @@ Deno.test("empty runtime arrays remain operands of implicitly instantiated effec
   await compileAndRun(
     `
 type Inspect a is effect = Array a -> a
-entry const answer = fn () => do (@effect.provider (Inspect U32) (fn values => @array.length values)):
+entry const answer = func () => return do (@effect.provider (Inspect U32) (func values => return @array.length values)):
   use first <- Inspect #[]
   use second <- Inspect #[1,2,3]
   break @u32.add first second

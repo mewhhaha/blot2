@@ -48,16 +48,16 @@ async function withCompilation(
 Deno.test("native source executes through the existing guest ABI", async () => {
   await withCompilation(
     `
-const identity = fn value => value
-const add = fn left => fn right => @u32.add left right
+const identity = func value => return value
+const add = func left => return func right => return @u32.add left right
 entry const maximum: U32 = 0xFFFF_FFFF
-entry const answer = fn () -> U32 => add (identity 20) (identity 22)
-entry const floating = fn (value: F32) -> F32 => identity value
-entry const capped = fn (value: U32) -> U32 => do:
+entry const answer = func () : U32 => return add (identity 20) (identity 22)
+entry const floating = func (value: F32) : F32 => return identity value
+entry const capped = func (value: U32) : U32 => return do:
   if @u32.lt value 42:
     break value
   break 42
-entry const nested = fn () -> U32 => do:
+entry const nested = func () : U32 => return do:
   let inner = do:
     break 20
   break @u32.add inner 22
@@ -82,10 +82,10 @@ entry const nested = fn () -> U32 => do:
 Deno.test("native recursive calls and unsigned overflow preserve behavior", async () => {
   await withCompilation(
     `
-const factorial = fn (value: U32) -> U32 =>
+const factorial = func (value: U32) : U32 => return
   if @u32.lt value 2 then 1 else @u32.mul value (factorial (@u32.sub value 1))
-entry const run = fn (value: U32) -> U32 => factorial value
-entry const wrap = fn (value: U32) -> U32 => @u32.add value 1
+entry const run = func (value: U32) : U32 => return factorial value
+entry const wrap = func (value: U32) : U32 => return @u32.add value 1
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -106,10 +106,10 @@ entry const wrap = fn (value: U32) -> U32 => @u32.add value 1
 Deno.test("native logical operators skip a trapping right operand", async () => {
   await withCompilation(
     `
-entry const conjunction = fn (left: Bool) -> Bool =>
-  left && @u32.eq (@u32.div 1 0) 0
-entry const disjunction = fn (left: Bool) -> Bool =>
-  left || @u32.eq (@u32.div 1 0) 0
+entry const conjunction = func (left: Bool) : Bool => return
+  left and @u32.eq (@u32.div 1 0) 0
+entry const disjunction = func (left: Bool) : Bool => return
+  left or @u32.eq (@u32.div 1 0) 0
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -136,8 +136,8 @@ Deno.test("native source fixity targets are ordinary functions", async () => {
   await withCompilation(
     `
 infixl 60 (+) = subtract
-const subtract = fn left => fn right => @u32.sub left right
-entry const custom = fn () -> U32 => 20 + 22
+const subtract = func left => return func right => return @u32.sub left right
+entry const custom = func () : U32 => return 20 + 22
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -153,7 +153,7 @@ entry const custom = fn () -> U32 => 20 + 22
 Deno.test("native branch rebinding preserves immutable aliases", async () => {
   await withCompilation(
     `
-entry const run = fn (enabled: Bool) -> U32 => do:
+entry const run = func (enabled: Bool) : U32 => return do:
   let value = 20
   let saved = value
   if enabled:
@@ -175,7 +175,7 @@ entry const run = fn (enabled: Bool) -> U32 => do:
 Deno.test("native F32 conversion uses saturating Wasm behavior", async () => {
   await withCompilation(
     `
-entry const convert = fn (value: F32) -> U32 => @f32.to_u32 value
+entry const convert = func (value: F32) : U32 => return @f32.to_u32 value
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -213,7 +213,7 @@ Deno.test("native compilation diagnoses reachable constant traps", async () => {
       const output = `${dir}/${code}.wasm`;
       await Deno.writeTextFile(
         source,
-        `${declaration}\nentry const answer = fn () -> U32 => 42\n`,
+        `${declaration}\nentry const answer = func () : U32 => return 42\n`,
       );
       const result = await new Deno.Command(compiler, {
         args: ["build", source, output],
@@ -244,20 +244,20 @@ Deno.test("native compilation diagnoses reachable constant traps", async () => {
 Deno.test("typed core evaluates pure recursive functions and branch merges at compile time", async () => {
   await withCompilation(
     `
-const identity = fn value => value
-const factorial = fn (value: U32) -> U32 =>
+const identity = func value => return value
+const factorial = func (value: U32) : U32 => return
   if @u32.lt value 2 then 1 else @u32.mul value (factorial (@u32.sub value 1))
-const branch = fn (enabled: Bool) -> U32 => do:
+const branch = func (enabled: Bool) : U32 => return do:
   let value = 20
   let saved = value
   if enabled:
     value := 40
   break @u32.add value saved
 entry const answer = identity (factorial 5)
-entry const yes = branch #True
-entry const no = branch #False
+entry const yes = branch true
+entry const no = branch false
 entry const floating = identity 1.25
-entry const safe = if #False then @u32.div 1 0 else 42
+entry const safe = if false then @u32.div 1 0 else 42
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);
@@ -282,8 +282,8 @@ Deno.test("named constant references in dead branches retain compilation depende
   try {
     for (
       const entry of [
-        "entry const value = if #False then bad else 42",
-        "entry const value = fn () -> U32 => if #False then bad else 42",
+        "entry const value = if false then bad else 42",
+        "entry const value = func () : U32 => return if false then bad else 42",
       ]
     ) {
       const input = `${dir}/invalid.blot`;
@@ -309,7 +309,7 @@ Deno.test("native compiler checks unused definitions without executing their con
   await withCompilation(
     `
 const unused = @u32.div 1 0
-entry const answer = fn () -> U32 => 42
+entry const answer = func () : U32 => return 42
 `,
     async (bytes) => {
       const guest = await instantiateGuest(bytes);

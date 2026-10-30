@@ -43,19 +43,19 @@ fn target(module: *const core.Module, name: []const u8) core.BindingRef {
 }
 
 const generic_source =
-    \\const identity = fn value => value
-    \\entry const direct = fn value => value
+    \\const identity = func value => return value
+    \\entry const direct = func value => return value
     \\entry const alias = identity
-    \\entry const update = fn value => do:
+    \\entry const update = func value => return do:
     \\  value.lower := 42
     \\  break value
-    \\const maker = fn captured => fn (value: U32) => @u32.add captured value
+    \\const maker = func captured => return func (value: U32) => return @u32.add captured value
     \\entry const selected = maker 21
-    \\entry const closed = fn (value: U32) => value
-    \\const hidden = fn captured => fn value => captured
-    \\entry const unclosed_capture = hidden (fn value => value)
-    \\entry const unresolved_body = fn value => do:
-    \\  let deferred = fn owner => owner.missing
+    \\entry const closed = func (value: U32) => return value
+    \\const hidden = func captured => return func value => return captured
+    \\entry const unclosed_capture = hidden (func value => return value)
+    \\entry const unresolved_body = func value => return do:
+    \\  let deferred = func owner => return owner.missing
     \\  break (deferred value, value)
 ;
 fn entryInferenceScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {

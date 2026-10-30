@@ -5,12 +5,12 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const pack = fn first => fn second => fn third => (third, (first, second), first)
-const keep = fn unused => fn retained => (retained, 42)
-const shadow = fn same => fn same => (same, 1)
+const pack = func first => return func second => return func third => return (third, (first, second), first)
+const keep = func unused => return func retained => return (retained, 42)
+const shadow = func same => return func same => return (same, 1)
 `;
 const main = `import {State, pack, keep, shadow} from "./state"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let (selected, (first, second), repeated) = pack left right right
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
@@ -26,7 +26,7 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
   let (state, result) = outer
   break result
 ))
-entry const mixed = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State F32) => do:
+entry const mixed = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State F32) => return do:
   let (selected, (first, second), repeated) = pack left right right
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 1.5):
@@ -38,16 +38,16 @@ entry const mixed = fn () => @effect.scope (fn (left: State U32) => @effect.scop
   let (state, result) = outer
   break result
 ))
-entry const lifetime = fn () => @effect.scope (fn (older: State U32) => do:
-  let (borrowed, count) = @effect.scope (fn (younger: State U32) => keep younger older)
+entry const lifetime = func () => return @effect.scope (func (older: State U32) => return do:
+  let (borrowed, count) = @effect.scope (func (younger: State U32) => return keep younger older)
   use handled <- do (@effect.state borrowed.get borrowed.set 7):
     use value <- borrowed.get ()
     break @u32.add value count
   let (state, result) = handled
   break result
 )
-entry const shadowed = fn () => @effect.scope (fn (older: State U32) => do:
-  let (borrowed, count) = @effect.scope (fn (younger: State U32) => shadow younger older)
+entry const shadowed = func () => return @effect.scope (func (older: State U32) => return do:
+  let (borrowed, count) = @effect.scope (func (younger: State U32) => return shadow younger older)
   use handled <- do (@effect.state borrowed.get borrowed.set 7):
     use value <- borrowed.get ()
     break @u32.add value count
@@ -56,7 +56,7 @@ entry const shadowed = fn () => @effect.scope (fn (older: State U32) => do:
 )
 `;
 const escaping = `import {State, pack} from "./state"
-entry const bad = fn () => @effect.scope (fn (state: State U32) => pack state 42 7)
+entry const bad = func () => return @effect.scope (func (state: State U32) => return pack state 42 7)
 `;
 const variants = [{
   shape: "product",
@@ -65,7 +65,7 @@ const variants = [{
   body: "(third, (first, second), first)",
   changedBody: "(third, (second, first), second)",
   lostBody:
-    "do:\n  let saved = (fn value => value) first\n  break (third, (saved, second), first)",
+    "do:\n  let saved = (func value => return value) first\n  break (third, (saved, second), first)",
 }, {
   shape: "record",
   library: library.replace(
@@ -83,7 +83,7 @@ const variants = [{
   changedBody:
     "{selected: third, nested: {first: second, second: first}, repeated: second}",
   lostBody:
-    "do:\n  let saved = (fn value => value) first\n  break {selected: third, nested: {first: saved, second}, repeated: first}",
+    "do:\n  let saved = (func value => return value) first\n  break {selected: third, nested: {first: saved, second}, repeated: first}",
 }];
 const cases = variants.flatMap((variant) =>
   (["optimized", "development"] as const).map((codegenTier) => ({

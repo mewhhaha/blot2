@@ -54,10 +54,10 @@ Deno.test("typed JSON modules execute, reuse, edit, reject, and recover without 
     },
   });
   const source = `import * as config from "./config.json"
-const read = fn (config_value: config.Data) => @u32.add config_value.offset config_value.items[1].value
-entry const answer = fn () => read config.value
-entry const text = fn () => (config.value).title.bytes[0]
-entry const fraction = fn () => (config.value).scale
+const read = func (config_value: config.Data) => return @u32.add config_value.offset config_value.items[1].value
+entry const answer = func () => return read config.value
+entry const text = func () => return (config.value).title.bytes[0]
+entry const fraction = func () => return (config.value).scale
 `;
   const original =
     '{"offset":20,"items":[{"value":10},{"value":22}],"title":"雪","scale":-1.5}';
@@ -139,11 +139,11 @@ Deno.test("shader parser exports input types and content handles with tracked in
     assets: { "./shader.wgsl": { path: "./shader.wgsl", parser } },
   });
   const source = `import * as shader from "./shader.wgsl"
-const read = fn (value: shader.Inputs) => value.scale
-entry const answer = fn () => read (#shader.Inputs { scale: shader.scale })
-entry const handle = fn () => case shader.shader of
+const read = func (value: shader.Inputs) => return value.scale
+entry const answer = func () => return read (#shader.Inputs { scale: shader.scale })
+entry const handle = func () => return case shader.shader of
   #shader.Shader id => id
-entry const upload = fn (send: U32 -> U32 ! {Foreign}) => case shader.shader of
+entry const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader.shader of
   #shader.Shader id => send id
 `;
   const shader =
@@ -184,7 +184,7 @@ entry const upload = fn (send: U32 -> U32 ! {Foreign}) => case shader.shader of
     const rejected = await compiler.build({
       ...options(),
       sources: {
-        [entry]: source.replace("scale: shader.scale", "scale: #True"),
+        [entry]: source.replace("scale: shader.scale", "scale: true"),
       },
     });
     ok(!rejected.success);
@@ -220,7 +220,7 @@ Deno.test("asset templates own parser results and queued byte overlays", async (
   });
   const sources = {
     [entry]:
-      'import { value } from "./value"\nentry const answer = fn () => value.value\n',
+      'import { value } from "./value"\nentry const answer = func () => return value.value\n',
   };
   try {
     const bytes = new Uint8Array([42]);
@@ -386,7 +386,7 @@ Deno.test("optional includes track absence, addition, removal and obsolete depen
   });
   const sources = {
     [entry]:
-      'import { value } from "./config"\nentry const answer = fn () => value\n',
+      'import { value } from "./config"\nentry const answer = func () => return value\n',
   };
   const options = (optional: string | null, root = 1) => ({
     sources,
@@ -449,7 +449,7 @@ Deno.test("asset IDs and snapshots are deterministic across parser order and sha
   });
   const sources = {
     [entry]:
-      'import * as a from "./a"\nimport * as b from "./b"\nentry const answer = fn () => case a.shader of\n  #a.Shader id => id\n',
+      'import * as a from "./a"\nimport * as b from "./b"\nentry const answer = func () => return case a.shader of\n  #a.Shader id => id\n',
   };
   const options = (shader = "first") => ({
     sources,
@@ -505,7 +505,7 @@ Deno.test("retargeting an asset symlink with identical bytes invalidates relativ
   const options = {
     sources: {
       [entry]:
-        'import { value } from "./asset"\nentry const answer = fn () => value\n',
+        'import { value } from "./asset"\nentry const answer = func () => return value\n',
     },
   };
   try {
@@ -527,9 +527,9 @@ Deno.test("JSON root values always export their exact Data type, including empty
     ["42", "value", 42],
     ["1.5", "@f32.to_u32 value", 1],
     ["true", "if value then 42 else 0", 42],
-    ["null", "(fn (_: Data) => 42) value", 42],
-    ["[]", "(fn (_: Data) => 42) value", 42],
-    ["{}", "(fn (_: Data) => 42) value", 42],
+    ["null", "(func (_: Data) => return 42) value", 42],
+    ["[]", "(func (_: Data) => return 42) value", 42],
+    ["{}", "(func (_: Data) => return 42) value", 42],
     ["[40,2]", "@u32.add value[0] value[1]", 42],
     ["[40,true]", "@product.get value 0", 40],
   ] as const;
@@ -545,7 +545,7 @@ Deno.test("JSON root values always export their exact Data type, including empty
     try {
       for (const [json, expression, expected] of cases) {
         const source =
-          `import { value, Data } from "./config"\nconst identity = fn (input: Data) -> Data => input\nentry const answer = fn () => ${expression}\n`;
+          `import { value, Data } from "./config"\nconst identity = func (input: Data) : Data => return input\nentry const answer = func () => return ${expression}\n`;
         equal(
           await call(
             await compiler.build({

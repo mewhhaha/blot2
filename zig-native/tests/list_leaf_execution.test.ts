@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
-const source = `entry const carried = fn (count: U32) => do:
-  let values = @list.generate count (fn index => #[index])
+const source = `entry const carried = func (count: U32) => return do:
+  let values = @list.generate count (func index => return #[index])
   let kept = #[42]
   for row in values:
     values := []
@@ -14,7 +14,7 @@ const source = `entry const carried = fn (count: U32) => do:
     if pressure[0] != count:
       @panic "pressure changed"
   break kept
-entry const trace = fn (send: U32 -> U32 ! {Foreign}) => do:
+entry const trace = func (send: U32 -> U32 ! {Foreign}) => return do:
   let values = [#[41], #[42]]
   let sum = 0
   for row in values:

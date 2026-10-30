@@ -295,8 +295,8 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     let id = 3;
     for (
       const source of [
-        "// 雪\nconst incomplete = fn (value: U32) -> U32 => @hole\nentry const answer = 42\n",
-        'entry const answer = @type.call "add" #True #True\n',
+        "// 雪\nconst incomplete = func (value: U32) : U32 => return @hole\nentry const answer = 42\n",
+        'entry const answer = @type.call "add" true true\n',
       ]
     ) {
       const payload = encoder.encode(source);
@@ -399,8 +399,8 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
         }
       } else {
         const explanation = diagnostic.details.explanation;
-        const first = source.indexOf("#True");
-        const second = source.indexOf("#True", first + 1);
+        const first = source.indexOf("true");
+        const second = source.indexOf("true", first + 1);
         equal(explanation.contexts, [
           {
             kind: "left_operand",
@@ -512,8 +512,8 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
 
 Deno.test("wire contract demand reports are opt in and preserve executable bytes", async () => {
   const source =
-    `const choose = fn (left: Bool) => fn ~(right: Bool) => if left then @demand right else #False
-entry const run = fn (value: Bool) => choose value #True
+    `const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
+entry const run = func (value: Bool) => return choose value true
 `;
   const payload = encoder.encode(source);
   let plain: Uint8Array | undefined;
@@ -637,7 +637,7 @@ Deno.test("wire completion is source-only bounded recoverable and leaves retaine
       ok(encoder.encode(JSON.stringify(reply.metadata)).length <= 256 * 1024);
       return reply.metadata;
     };
-    const source = "// 雪\nconst work = fn (value: U32) -> U32 => va<cursor>";
+    const source = "// 雪\nconst work = func (value: U32) : U32 => return va<cursor>";
     const first = await query(source);
     equal(
       first.items.map((
@@ -648,7 +648,7 @@ Deno.test("wire completion is source-only bounded recoverable and leaves retaine
     equal(first.context.nodes[first.context.expected].kind, "u32");
     fields(first.items[0], ["label", "insertText", "kind", "detail", "match"]);
     const scope = await query(
-      "const work = fn (value: U32) -> U32 => do:\n  let original = value\n  value := #True\n  break @ho<cursor>le",
+      "const work = func (value: U32) : U32 => return do:\n  let original = value\n  value := true\n  break @ho<cursor>le",
     );
     equal(
       scope.items.filter((item: Metadata) =>

@@ -383,6 +383,8 @@ fn Validator(comptime Context: type) type {
             try self.scope(pattern_id, body, depth);
         }
         fn operator(self: *Self, symbol: symbols.Symbol, is_named: bool, id: ast.Id) T.Error!void {
+            const spelling = self.pool.get(symbol);
+            if (std.mem.eql(u8, spelling, "and") or std.mem.eql(u8, spelling, "or")) return;
             const point = origin(self.tree, id);
             if (is_named) try self.name(symbol, id, point) else if (!self.context.sourceSymbolicDeclared(symbol)) self.fail(.unknown_operator, id, point, symbol);
         }

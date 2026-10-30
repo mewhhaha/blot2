@@ -5,17 +5,17 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Maybe a is data = #Nothing | #Some a
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const scope_feature = fn () => @effect.scope (fn (s: State U32) => do:
+const scope_feature = func () => return @effect.scope (func (s: State U32) => return do:
   let ignored = s
   break 0
 )
-const generate = fn count => fn generator => @array.generate count generator
-const migrate = fn (version: U32) => case version of
-  1 => #Some (fn (values: Array F32) => generate (@array.length values) (fn index => if @u32.lt 0 index then (if @u32.eq (@u32.rem (@u32.sub index 1) 6) 4 then @f32.mul values[index] 2.0 else values[index]) else values[index]))
+const generate = func count => return func generator => return @array.generate count generator
+const migrate = func (version: U32) => return case version of
+  1 => #Some (func (values: Array F32) => return generate (@array.length values) (func index => return if @u32.lt 0 index then (if @u32.eq (@u32.rem (@u32.sub index 1) 6) 4 then @f32.mul values[index] 2.0 else values[index]) else values[index]))
   _ => #Nothing
 `;
 const source = `import {migrate, Maybe, Some, Nothing} from "./library"
-entry const answer = fn () => case migrate 1 of
+entry const answer = func () => return case migrate 1 of
   #Some callback => @array.get (callback #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]) 5
   #Nothing => 0.0
 `;
@@ -99,7 +99,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
             }
           }
           const rejected = await compiler.build({
-            sources: { [entry]: source.replace("migrate 1", "migrate #True") },
+            sources: { [entry]: source.replace("migrate 1", "migrate true") },
           });
           assert(!rejected.success);
           const recovered = await compiler.build({

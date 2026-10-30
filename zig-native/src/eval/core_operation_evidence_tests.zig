@@ -11,8 +11,8 @@ const a = std.testing.allocator;
 
 const source =
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\entry const run = fn (limit: U32) -> U32 => do:
-    \\  let (state,result) = @effect.run State.get State.set #[0] (fn () => do:
+    \\entry const run = func (limit: U32) : U32 => return do:
+    \\  let (state,result) = @effect.run State.get State.set #[0] (func () => return do:
     \\    let index = 0
     \\    for ever:
     \\      if @u32.eq index limit:
@@ -107,8 +107,8 @@ fn ambiguousScenario(allocator: std.mem.Allocator, module: *const core.Module) !
 test "closed operation rows cannot choose between two compatible generic instances" {
     var module = try lower(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\entry const run = fn () -> Unit => do:
-        \\  let (state,result) = @effect.run State.get State.set #[0] (fn () => do:
+        \\entry const run = func () : Unit => return do:
+        \\  let (state,result) = @effect.run State.get State.set #[0] (func () => return do:
         \\    use values <- State.get ()
         \\    break ())
         \\  break ()

@@ -3,19 +3,19 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
-const universal = "const identity: forall [a] => a -> a = fn value => value\n";
-const entries = `entry const whole = fn (value: U32) => identity value
-entry const fraction = fn (value: F32) => identity value
+const universal = "const identity: forall [a] => a -> a = func value => return value\n";
+const entries = `entry const whole = func (value: U32) => return identity value
+entry const fraction = func (value: F32) => return identity value
 `;
 
 const universalNumericSource =
-    `const witness: forall [a] => (values: Array a) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-const at: forall [a] => (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = fn values => fn index => fn proof => @array.get values index
-entry const whole = fn (index: U32) => do:
+    `const witness: forall [a] => (values: Array a) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+const at: forall [a] => (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = func values => return func index => return func proof => return @array.get values index
+entry const whole = func (index: U32) => return do:
   let values = #[8, 13]
   let proof = witness values index
   break at values index proof
-entry const fraction = fn (index: U32) => do:
+entry const fraction = func (index: U32) => return do:
   let values = #[1.25, 3.5]
   let proof = witness values index
   break at values index proof
@@ -71,7 +71,7 @@ Deno.test("closed universal numeric contracts reject forged slots and recover re
         for (const [source, code] of [
           [universalNumericSource.replaceAll("break at values index proof", "break at values index ()"), "proof_mismatch"],
           [universalNumericSource.replaceAll("break at values index proof", "let stored = #[proof]\n  break at values index proof"), "proof_runtime_use"],
-          [universalNumericSource.replace("fn index => @proof.index values index", "fn index => @proof.index values (@u32.add index 1)"), "proof_mismatch"],
+          [universalNumericSource.replace("func index => return @proof.index values index", "func index => return @proof.index values (@u32.add index 1)"), "proof_mismatch"],
         ]) {
           const failed = await compiler.build({ sources: { [entry]: source } });
           assert(!failed.success, JSON.stringify(failed));
@@ -129,7 +129,7 @@ Deno.test("closed universal numeric contracts survive source and compiled depend
 Deno.test("closed explicit universal functions execute independent U32 and F32 instances", async () => {
   let expected: Uint8Array | undefined;
   await compileAndRun(
-    "const identity = fn value => value\n" + entries,
+    "const identity = func value => return value\n" + entries,
     (_guest, bytes) => {
       expected = bytes.slice();
     },
@@ -141,7 +141,7 @@ Deno.test("closed explicit universal functions execute independent U32 and F32 i
     assert.deepEqual(bytes, expected);
   }, { prelude: "none" });
   await compileExpectedFailure(
-    "const identity: forall [a] => a -> a = fn value => 42\n" + entries,
+    "const identity: forall [a] => a -> a = func value => return 42\n" + entries,
     "rank_mismatch",
     undefined,
     { prelude: "none" },
@@ -161,7 +161,7 @@ Deno.test("closed universal retained edits and failed revisions match fresh outp
   const revisions = [
     universal + entries,
     universal + entries.replace("identity value", "identity 43"),
-    universal.replace("fn value => value", "fn value => 42") + entries,
+    universal.replace("func value => return value", "func value => return 42") + entries,
     universal + entries,
   ];
   try {

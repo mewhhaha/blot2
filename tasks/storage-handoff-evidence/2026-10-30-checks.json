@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-30",
+  "status": "unfinished migration checkpoint",
+  "milestone": "one real Gdev frame in Pen",
+  "gdev_main_wasm": false,
+  "pen_frame": false,
+  "native_inventory_compiled": 2670,
+  "native_execution": "focused laws only; exhaustive full gate incomplete",
+  "record_merge_executed_wasm": {
+    "passed": 2,
+    "failed": 0
+  },
+  "std_syntax_batch": {
+    "passed": 25,
+    "failed": 1,
+    "failure": "scalar exported nonfunction entry unsupported; same against pre-migration std snapshot"
+  },
+  "std_array_followup": {
+    "passed": 10,
+    "failed": 1,
+    "failure": "same scalar-export baseline"
+  },
+  "full_compiler_gate": {
+    "passed": false,
+    "stopped_phase": "smoke",
+    "smoke_passed": 3,
+    "smoke_failed": 1,
+    "failure": "zig_project_protocol.test.ts wire contract diagnostic span ends differ",
+    "raw_log": "2026-10-30-full-gate.txt"
+  },
+  "pen_rustfmt": {
+    "root_workspace": "passed",
+    "plugin_workspace": "passed"
+  },
+  "final_gdev_source_batch": "Boxing concrete numeric, geometry, storage contracts; unbuilt",
+  "latest_gdev_configured_compiler_identity": "71db1abcb18e7df70ea95c47d8c9061681fbe9222e809043840e6156ceaede9d",
+  "latest_dev_compiler_sha256": "d372edd37b3124b88f8737b1f6c616ae95a0a56ed2142dd19ab0c478e254846b",
+  "zig_lint": {
+    "passed": true,
+    "findings": 0,
+    "production_files": 553,
+    "fixture_files": 1
+  },
+  "sibling_commits": {
+    "gdev": "ab425424864bd17854d6f026c731c7cdf7f5ff28",
+    "ink": "a63a693188f873b200d7c2c7f7bab1aa21b81912",
+    "pen": "d1658af9c303a50d91b6bc4a879e5e9e77dd84f2"
+  },
+  "handoff_native_helper_check": {
+    "inventory_compiled": 2670,
+    "focused_merge_law_passed": 1,
+    "failed": 0
+  }
+}

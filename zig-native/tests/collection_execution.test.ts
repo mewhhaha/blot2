@@ -2,23 +2,23 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("lists and arrays have different types and explicit conversions", async () => {
   await compileAndRun(`
-entry const list = fn (x: U32) => (Array.from_list [x, 2])[0]
-entry const array = fn (x: U32) -> Array U32 => #[x, 2]
-entry const copy = fn (xs: Array U32) => Array.from_list (List.from_array xs)
-entry const nested = fn (x: U32) => (Array.from_list ((Array.from_list [[x], [2]])[0]))[0]
-entry const method = fn (x: U32) => [x, 2].length
+entry const list = func (x: U32) => return (Array.from_list [x, 2])[0]
+entry const array = func (x: U32) : Array U32 => return #[x, 2]
+entry const copy = func (xs: Array U32) => return Array.from_list (List.from_array xs)
+entry const nested = func (x: U32) => return (Array.from_list ((Array.from_list [[x], [2]])[0]))[0]
+entry const method = func (x: U32) => return [x, 2].length
 entry const empty_length = [].length
 entry const different_kinds = #Type [1] != #Type #[1]
 entry const same_kind = #Type [1] == #Type [2]
-const first = fn xs => xs[0]
-const copied = fn xs => [x | x <- xs]
-const replace_first = fn xs => fn value => do:
+const first = func xs => return xs[0]
+const copied = func xs => return [x | x <- xs]
+const replace_first = func xs => return func value => return do:
   let result = xs
   result[0] := value
   break result
-entry const generic = fn (x: U32) =>
+entry const generic = func (x: U32) => return
   #[first (Array.from_list [x]), first #[x + 1], first (Array.from_list (copied [x + 2])), first (Array.from_list (copied #[x + 3]))]
-entry const generic_update = fn (x: F32) =>
+entry const generic_update = func (x: F32) => return
   #[first (replace_first (Array.from_list [0.5]) x), first (replace_first #[1.5] x)]
 `, guest => {
     equal(guest.call("list", 42), 42);
@@ -32,29 +32,29 @@ entry const generic_update = fn (x: F32) =>
     equal([...(guest.call("generic", 10) as Uint32Array)].join(","), "10,11,12,13");
     equal([...(guest.call("generic_update", 4.5) as Float32Array)].join(","), "4.5,4.5");
   });
-  await compileExpectedFailure("entry const wrong = fn () -> Array U32 => [1]\n", "type_mismatch");
+  await compileExpectedFailure("entry const wrong = func () : Array U32 => return [1]\n", "type_mismatch");
   await compileExpectedFailure("const wrong: List U32 = #[1]\nentry const run = 1\n", "type_mismatch");
   await compileExpectedFailure("const wrong = @array.length [1]\nentry const run = wrong\n", "type_mismatch");
   await compileExpectedFailure("const wrong = @list.length #[1]\nentry const run = wrong\n", "type_mismatch");
-  await compileExpectedFailure("const first = fn xs => xs[0]\nentry const wrong = first 42\n", "type_mismatch");
+  await compileExpectedFailure("const first = func xs => return xs[0]\nentry const wrong = first 42\n", "type_mismatch");
   await compileExpectedFailure("entry const wrong = [...#[1]]\n", "type_mismatch");
   await compileExpectedFailure("entry const wrong = #[...[1]]\n", "type_mismatch");
 });
 
 Deno.test("comprehensions preserve nesting scope short circuiting and result order", async () => {
   await compileAndRun(`
-entry const cartesian = fn (offset: U32) =>
+entry const cartesian = func (offset: U32) => return
   #[a * 10 + b + offset | a <- [1, 2], b <- #[3, 4]]
-entry const dependent = fn (count: U32) =>
-  #[b | a <- @array.generate count (fn i => i + 1), b <- @list.generate a (fn i => i)]
-entry const guarded = fn (count: U32) =>
-  #[squared | x <- @array.generate count (fn i => i), x > 1, let squared = x * x, squared < 20]
-entry const empty = fn () -> Array U32 => #[b | a <- [], b <- [1 / 0]]
-entry const skip = fn () -> Array U32 => #[y | x <- [1, 2], #False, let y = 1 / 0]
-entry const shadow = fn (x: U32) => do:
+entry const dependent = func (count: U32) => return
+  #[b | a <- @array.generate count (func i => return i + 1), b <- @list.generate a (func i => return i)]
+entry const guarded = func (count: U32) => return
+  #[squared | x <- @array.generate count (func i => return i), x > 1, let squared = x * x, squared < 20]
+entry const empty = func () : Array U32 => return #[b | a <- [], b <- [1 / 0]]
+entry const skip = func () : Array U32 => return #[y | x <- [1, 2], false, let y = 1 / 0]
+entry const shadow = func (x: U32) => return do:
   let ys = #[x | x <- [x, x + 1], let x = x + 10]
   break #[x, ys[0], ys[1]]
-entry const captured = fn (xs: Array U32) =>
+entry const captured = func (xs: Array U32) => return
   #[xs[0] + x | x <- List.from_array xs]
 `, guest => {
     equal([...(guest.call("cartesian", 100) as Uint32Array)].join(","), "113,114,123,124");
@@ -70,20 +70,20 @@ entry const captured = fn (xs: Array U32) =>
 Deno.test("list spreads and array updates preserve aliases across chunk boundaries", async () => {
   await compileAndRun(`
 type Item is data = #Item { value: U32 }
-entry const grow = fn (count: U32) => do:
+entry const grow = func (count: U32) => return do:
   let xs: List U32 = []
   for i in 0..count:
     xs := [i, ...self, i + count]
   break Array.from_list xs
-entry const snapshot = fn (count: U32) => do:
-  let original = @list.generate count (fn i => i)
+entry const snapshot = func (count: U32) => return do:
+  let original = @list.generate count (func i => return i)
   let changed = Array.from_list [9, ...original, 8]
   let before = Array.from_list original
   changed[count / 2] := 42
   break #[before[0], before[count / 2], before[count - 1], changed[0], changed[count / 2], changed[count + 1]]
-entry const array_spread = fn (x: U32) => #[x, ...#[2, 3], 4]
-entry const legacy_cons = fn (x: U32) => Array.from_list [x | [2, 3]]
-entry const aggregate = fn (x: U32) => do:
+entry const array_spread = func (x: U32) => return #[x, ...#[2, 3], 4]
+entry const legacy_cons = func (x: U32) => return Array.from_list [x | [2, 3]]
+entry const aggregate = func (x: U32) => return do:
   let xs = Array.from_list [#Item { value: x }, #Item { value: 2 }]
   xs[0].value := 42
   break xs[0].value
@@ -108,24 +108,24 @@ entry const aggregate = fn (x: U32) => do:
 Deno.test("list construction works during staging and preserves F32 values", async () => {
   await compileAndRun(`
 const staged = [x + 1 | x <- [40, 41]]
-const large = @list.generate 513 (fn i => i)
+const large = @list.generate 513 (func i => return i)
 type Item is data = #Item { value: U32 }
-const stored = @list.generate 8193 (fn i => #Item { value: i })
-entry const frozen_item = fn (index: U32) => (Array.from_list stored)[index].value
-entry const frozen_edit = fn (value: U32) => do:
+const stored = @list.generate 8193 (func i => return #Item { value: i })
+entry const frozen_item = func (index: U32) => return (Array.from_list stored)[index].value
+entry const frozen_edit = func (value: U32) => return do:
   let xs = Array.from_list stored
   xs[8192].value := value
   break #[(Array.from_list stored)[8192].value, xs[8192].value]
 entry const answer = (Array.from_list staged)[1]
-entry const frozen_chunks = fn (index: U32) => (Array.from_list large)[index]
-entry const floats = fn (count: U32) =>
-  #[x | x <- @list.generate count (fn i => @f32.add (@u32.to_f32 i) 0.5)]
-entry const float_update = fn (x: F32) => do:
+entry const frozen_chunks = func (index: U32) => return (Array.from_list large)[index]
+entry const floats = func (count: U32) => return
+  #[x | x <- @list.generate count (func i => return @f32.add (@u32.to_f32 i) 0.5)]
+entry const float_update = func (x: F32) => return do:
   let xs = Array.from_list [x, 2.5]
   let before = xs
   xs[0] := 4.5
   break #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
-@[fn value => value + 1]
+@[func value => return value + 1]
 entry const tagged = 41
 `, guest => {
     equal(guest.read("answer"), 42);
@@ -141,13 +141,13 @@ entry const tagged = 41
 
 Deno.test("owned comprehension and append loops allocate proportional to their output", async () => {
   await compileAndRun(`
-entry const build = fn (count: U32) => do:
+entry const build = func (count: U32) => return do:
   let xs: List U32 = []
   for index in 0..count:
     xs := [...self, index]
   break Array.from_list xs
-entry const compact = fn (count: U32) =>
-  #[i + 1 | i <- @array.generate count (fn i => i), i % 2 == 0]
+entry const compact = func (count: U32) => return
+  #[i + 1 | i <- @array.generate count (func i => return i), i % 2 == 0]
 `, guest => {
     const count = 4097;
     const built = guest.call("build", count) as Uint32Array;
@@ -165,9 +165,9 @@ entry const compact = fn (count: U32) =>
 Deno.test("ordinary list library functions compose with prelude methods", async () => {
   await compileAndRun(`
 import * as list from "../../std/list"
-entry const run = fn (value: U32) => do:
-  let values = list.map (fn x => x + 1) (list.prepend value [1, 2, 3])
-  let selected = list.filter (fn x => x > 2) values
+entry const run = func (value: U32) => return do:
+  let values = list.map (func x => return x + 1) (list.prepend value [1, 2, 3])
+  let selected = list.filter (func x => return x > 2) values
   let total = list.fold_left U32.add 0 selected
   break #[total, (Array.from_list values)[0], values.length]
 `, guest => {
@@ -178,9 +178,9 @@ entry const run = fn (value: U32) => do:
 Deno.test("lists reject indexed reads updates and public indexing intrinsics", async () => {
   const rejected = [
     "entry const run = [1, 2][0]",
-    "const first = fn xs => xs[0]\nentry const run = first [1, 2]",
-    "entry const run = fn () => do:\n  let xs = [1, 2]\n  xs[0] := 3\n  break xs.length",
-    "type Item is data = #Item { value: U32 }\nentry const run = fn () => do:\n  let xs = [#Item { value: 1 }]\n  xs[0].value := 3\n  break xs.length",
+    "const first = func xs => return xs[0]\nentry const run = first [1, 2]",
+    "entry const run = func () => return do:\n  let xs = [1, 2]\n  xs[0] := 3\n  break xs.length",
+    "type Item is data = #Item { value: U32 }\nentry const run = func () => return do:\n  let xs = [#Item { value: 1 }]\n  xs[0].value := 3\n  break xs.length",
   ];
   for (const source of rejected) await compileExpectedFailure(source + "\n", "type_mismatch");
   for (const source of ["@list.get [1] 0", "@list.set [1] 0 2"]) {
@@ -194,14 +194,14 @@ Deno.test("lists reject indexed reads updates and public indexing intrinsics", a
 Deno.test("collector traces chunk links snapshots and aggregate elements with bounded storage", async () => {
   await compileAndRun(`
 type Item is data = #Item { value: U32 }
-const sum = fn (values: List Item) => do:
+const sum = func (values: List Item) => return do:
   let result = 0
   for item in values:
     result := self + item.value
   break result
-entry const run = fn (limit: U32) => do:
-  let older = @list.generate 513 (fn i => #Item { value: i })
-  let read = fn () => sum older
+entry const run = func (limit: U32) => return do:
+  let older = @list.generate 513 (func i => return #Item { value: i })
+  let read = func () => return sum older
   let values = older
   let index = 0
   for ever:

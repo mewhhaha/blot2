@@ -25,7 +25,7 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 }
 
 fn observeOwned(allocator: std.mem.Allocator) !void {
-    const source = "const read: Unit -> U32 = fn () => do:\n  for i in 0..1:\n    break second\n  break second\nlet first = read ()\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => @u32.add first (read ())\n";
+    const source = "const read: Unit -> U32 = func () => return do:\n  for i in 0..1:\n    break second\n  break second\nlet first = read ()\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return @u32.add first (read ())\n";
     var ordinary, var observed = blk: {
         var module = try lower(allocator, source);
         defer module.deinit(allocator);

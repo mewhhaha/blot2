@@ -12,23 +12,23 @@ const io = std.testing.io;
 
 const shapes =
     \\type Box is data = #Box { value: U32 }
-    \\const Box.size = fn (box: Box) -> U32 => @u32.add box.value 1
-    \\const Box.add = fn (left: Box) => fn (right: Box) -> Box => #Box { value: @u32.add left.value right.value }
-    \\const Box.from = fn (value: U32) -> Box => #Box { value: @u32.add value 1 }
-    \\const measure = fn box => box.size
-    \\const combine = fn left => fn right => @type.call "add" left right
-    \\const convert = fn value => @type.result "from" value
-    \\const unrelated = fn (value: U32) -> U32 => @u32.add value 1
+    \\const Box.size = func (box: Box) : U32 => return @u32.add box.value 1
+    \\const Box.add = func (left: Box) => return func (right: Box) : Box => return #Box { value: @u32.add left.value right.value }
+    \\const Box.from = func (value: U32) : Box => return #Box { value: @u32.add value 1 }
+    \\const measure = func box => return box.size
+    \\const combine = func left => return func right => return @type.call "add" left right
+    \\const convert = func value => return @type.result "from" value
+    \\const unrelated = func (value: U32) : U32 => return @u32.add value 1
 ;
 const main =
     \\import {Box, measure, combine, convert, unrelated} from "./shapes"
-    \\entry const measured = fn (value: U32) -> U32 => (#Box { value }).size
-    \\entry const generic = fn (value: U32) -> U32 => measure (#Box { value })
-    \\entry const summed = fn (value: U32) -> U32 => (combine (#Box { value }) (#Box { value: 2 })).value
-    \\entry const converted = fn (value: U32) -> U32 => do:
+    \\entry const measured = func (value: U32) : U32 => return (#Box { value }).size
+    \\entry const generic = func (value: U32) : U32 => return measure (#Box { value })
+    \\entry const summed = func (value: U32) : U32 => return (combine (#Box { value }) (#Box { value: 2 })).value
+    \\entry const converted = func (value: U32) : U32 => return do:
     \\  let box: Box = convert value
     \\  break box.value
-    \\entry const plain = fn (value: U32) -> U32 => unrelated value
+    \\entry const plain = func (value: U32) : U32 => return unrelated value
 ;
 // Same-length edits with no new spelling keep the namespace and every
 // published interface, so only the bodies' selectors are rebuilt.

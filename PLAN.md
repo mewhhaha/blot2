@@ -1,5 +1,12 @@
 # Compiler direction
 
+The active greenfield memory-model rewrite is described in the
+[Sol review](zig-native/STORAGE_REWRITE_REVIEW.md) and
+[tasks 110–121](tasks/STORAGE_REWRITE.md). It replaces the counted guest runtime,
+implicit application snapshots and language tasks, preserving copied host worker
+jobs and explicit checkpoints. Earlier ownership/concurrency milestones below
+are historical evidence, not requirements to restore those implementations.
+
 Blot uses the handwritten Zig 0.17 compiler in `zig-native/` and its retained
 project API. The gdev targets are about 500 ms cold compilation and under 100 ms
 incremental compilation, with language, effects, staging and guest behavior
@@ -322,7 +329,7 @@ stops active recursion. The call DAG becomes a tree.
 The depth cliff is `collect`'s `collect_depth >= options.max_depth` (256). It
 raises `error.TypeLimit`, which is reported as `constant_fuel`. Even annotated
 callees are collected inside the caller's region: a 255-deep chain of
-`fn (x: U32) -> U32` functions fails, and so does an operator-free generic chain
+`func (x: U32) -> U32` functions fails, and so does an operator-free generic chain
 at 300.
 
 1. **Depth-free closed-call partition.**

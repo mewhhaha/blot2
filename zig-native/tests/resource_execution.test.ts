@@ -10,38 +10,38 @@ import {
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @u32.add (@usage.read loan) (host ()))
-entry const float = fn () => @resource.scope (fn () => 1.5) (fn owner => ()) (fn loan => @usage.read loan)
-entry const unit = fn () => @resource.scope (fn () => ()) (fn owner => ()) (fn loan => @usage.read loan)
-entry const truth = fn () => @resource.scope (fn () => #True) (fn owner => ()) (fn loan => @usage.read loan)
-entry const nested = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => 9) (fn owner => ()) (fn outer => @resource.scope (fn () => 7) (fn owner => ()) (fn inner => @u32.add (@usage.read outer) (@u32.add (@usage.read inner) (host ()))))
-entry const failed_cleanup = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => 9) (fn owner => @panic "cleanup") (fn loan => host ())
-entry const surviving = fn () => do:
-  use values <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => #[@usage.read loan, @u32.add (@usage.read loan) 1, @u32.add (@usage.read loan) 2])
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @u32.add (@usage.read loan) (host ()))
+entry const float = func () => return @resource.scope (func () => return 1.5) (func owner => return ()) (func loan => return @usage.read loan)
+entry const unit = func () => return @resource.scope (func () => return ()) (func owner => return ()) (func loan => return @usage.read loan)
+entry const truth = func () => return @resource.scope (func () => return true) (func owner => return ()) (func loan => return @usage.read loan)
+entry const nested = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return 9) (func owner => return ()) (func outer => return @resource.scope (func () => return 7) (func owner => return ()) (func inner => return @u32.add (@usage.read outer) (@u32.add (@usage.read inner) (host ()))))
+entry const failed_cleanup = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return 9) (func owner => return @panic "cleanup") (func loan => return host ())
+entry const surviving = func () => return do:
+  use values <- @resource.scope (func () => return 9) (func owner => return ()) (func loan => return #[@usage.read loan, @u32.add (@usage.read loan) 1, @u32.add (@usage.read loan) 2])
   for index in 0..128:
-    use other <- @resource.scope (fn () => 7) (fn owner => ()) (fn loan => @usage.read loan)
+    use other <- @resource.scope (func () => return 7) (func owner => return ()) (func loan => return @usage.read loan)
   break values
-entry const sequential = fn () => do:
+entry const sequential = func () => return do:
   let count = 0
   for index in 0..10000:
-    use value <- @resource.scope (fn () => 7) (fn owner => ()) (fn loan => @usage.read loan)
+    use value <- @resource.scope (func () => return 7) (func owner => return ()) (func loan => return @usage.read loan)
     count := @u32.add self value
   break count
-entry const finite_cleanup = fn () => @resource.scope (fn () => 9) (fn owner => do:
+entry const finite_cleanup = func () => return @resource.scope (func () => return 9) (func owner => return do:
   for index in 0..3:
     for inner in 1..4:
       let value = @u32.add index inner
-  break ()) (fn loan => @usage.read loan)
-entry const finite_cleanup_trap = fn () => @resource.scope (fn () => 9) (fn owner => do:
+  break ()) (func loan => return @usage.read loan)
+entry const finite_cleanup_trap = func () => return @resource.scope (func () => return 9) (func owner => return do:
   for index in 0..3:
     if @u32.eq index 2:
       let value = @panic "finite cleanup"
-  break ()) (fn loan => @usage.read loan)
-entry const empty_cleanup = fn () => @resource.scope (fn () => 9) (fn owner => do:
+  break ()) (func loan => return @usage.read loan)
+entry const empty_cleanup = func () => return @resource.scope (func () => return 9) (func owner => return do:
   for index in 4..2:
     let value = @panic "empty cleanup must not run"
-  break ()) (fn loan => @usage.read loan)
-entry const memory = fn () -> Array U32 => #[]
+  break ()) (func loan => return @usage.read loan)
+entry const memory = func () : Array U32 => return #[]
 `;
 Deno.test("resource scalar scope executes finite cleanup across sync JSPI failures and retained restart", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-resource-" });
@@ -146,8 +146,8 @@ Deno.test("resource scalar scope executes finite cleanup across sync JSPI failur
     const bad = await compiler.build({
       sources: {
         [entry]: source.replace(
-          "(fn loan => @usage.read loan)",
-          "(fn loan => loan)",
+          "(func loan => return @usage.read loan)",
+          "(func loan => return loan)",
         ),
       },
     });
@@ -174,25 +174,25 @@ Deno.test("resource scalar scope executes finite cleanup across sync JSPI failur
 });
 
 const recoverySource = `
-entry const normal = fn (host: Unit -> U32 ! {Foreign}) => do:
+entry const normal = func (host: Unit -> U32 ! {Foreign}) => return do:
   let captured = @array.fill 1024 41
-  use value <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @u32.add (@usage.read loan) (@u32.add captured[0] (host ())))
+  use value <- @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @u32.add (@usage.read loan) (@u32.add captured[0] (host ())))
   break value
-entry const early = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => do:
+entry const early = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return do:
   break @usage.read loan
 )
-entry const branch = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => if @u32.eq (@usage.read loan) 9 then @usage.read loan else 0)
-entry const break_exit = fn () => do:
+entry const branch = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return if @u32.eq (@usage.read loan) 9 then @usage.read loan else 0)
+entry const break_exit = func () => return do:
   let result = 0
   for ever:
-    use value <- @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)
+    use value <- @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)
     result := value
     break
   break result
-entry const trapped = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @u32.div (@usage.read loan) 0)
-entry const acquire_failed = fn () => @resource.scope (fn () -> unique U32 => @panic "acquire") (fn owner => ()) (fn loan => @usage.read loan)
-entry const cleanup_failed = fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => 9) (fn owner => ()) (fn outer => @resource.scope (fn () => 7) (fn owner => @panic "cleanup") (fn inner => host ()))
-entry const memory = fn () -> Array U32 => #[]
+entry const trapped = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @u32.div (@usage.read loan) 0)
+entry const acquire_failed = func () => return @resource.scope (func () : unique U32 => return @panic "acquire") (func owner => return ()) (func loan => return @usage.read loan)
+entry const cleanup_failed = func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return 9) (func owner => return ()) (func outer => return @resource.scope (func () => return 7) (func owner => return @panic "cleanup") (func inner => return host ()))
+entry const memory = func () : Array U32 => return #[]
 `;
 Deno.test("resource typed journal drains compiled traps and suspended failures with flat roots and memory in both tiers", async () => {
   const directory = await Deno.makeTempDir({
@@ -436,9 +436,9 @@ Deno.test("resource owned cleanup contracts survive imported bodies portable che
   };
   const sources = {
     [entry]:
-      `import {run} from "./scope"\nentry const answer = fn () => run ()\n`,
+      `import {run} from "./scope"\nentry const answer = func () => return run ()\n`,
     [dependency]:
-      `const run = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)\n`,
+      `const run = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)\n`,
   };
   const compiler = await createZigProjectCompiler(options);
   try {
@@ -459,8 +459,8 @@ Deno.test("resource owned cleanup contracts survive imported bodies portable che
       sources: {
         ...sources,
         [dependency]: sources[dependency].replace(
-          "(fn owner => ())",
-          "(fn owner => (fn () => ()) ())",
+          "(func owner => return ())",
+          "(func owner => return (func () => return ()) ())",
         ),
       },
     });

@@ -45,17 +45,17 @@ fn target(module: *const core.Module, name: []const u8) core.BindingRef {
 const pattern_source =
     \\type Pair is data = #Pair (U32,U32)
     \\type Fields is data = #Fields { first: U32, second: U32 }
-    \\const first = fn actual => do:
+    \\const first = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
     \\    #Pair (expected,^expected) => expected
     \\    _ => 0
-    \\const second = fn actual => do:
+    \\const second = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
     \\    #Pair (^expected,expected) => expected
     \\    _ => 0
-    \\const fields = fn actual => do:
+    \\const fields = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
     \\    #Fields { first: expected, second: ^expected } => expected

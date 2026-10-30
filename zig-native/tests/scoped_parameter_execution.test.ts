@@ -5,11 +5,11 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const read = fn (s: State a) => s.get ()
-const read_written = fn (s: State a) -> a ! {s.get} => s.get ()
+const read = func (s: State a) => return s.get ()
+const read_written = func (s: State a) : a ! {s.get} => return s.get ()
 `;
 const main = `import {State, read, read_written} from "./state"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
       use a <- read left
@@ -23,7 +23,7 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
   let (state, result) = outer
   break result
 ))
-entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
+entry const floating = func () => return @effect.scope (func (s: State F32) => return do:
   let (state, result) = do (@effect.state s.get s.set 1.5):
     break read_written s
   break result

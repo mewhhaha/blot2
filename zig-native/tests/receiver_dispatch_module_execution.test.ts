@@ -15,15 +15,15 @@ Deno.test("generic receiver calls select members of a caller's type their module
       sources: {
         [entry]: `import * as mix from "./mix"
 type Gauge is data = #Gauge F32
-const Gauge.lerp = fn (a: Gauge) => fn (b: Gauge) => fn (t: F32) => do:
+const Gauge.lerp = func (a: Gauge) => return func (b: Gauge) => return func (t: F32) => return do:
   let #Gauge x = a
   let #Gauge y = b
   break #Gauge (x + (y - x) * t)
-entry const main = fn (x: F32) -> F32 => do:
+entry const main = func (x: F32) : F32 => return do:
   let #Gauge v = mix.halfway (#Gauge 0.0) (#Gauge x)
   break v
 `,
-        [helper]: "const halfway = fn a => fn b => a.lerp b 0.5\n",
+        [helper]: "const halfway = func a => return func b => return a.lerp b 0.5\n",
       },
     });
     ok(built.success, JSON.stringify(built));

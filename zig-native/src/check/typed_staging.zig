@@ -4,8 +4,9 @@ const std = @import("std");
 const T = @import("types.zig");
 pub const code_identity: T.NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 8 };
 pub const descriptor_identity: T.NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 9 };
-pub const Op = enum(u32) { quote, splice, lift, emit, run, describe, same, fields };
+pub const Op = enum(u32) { quote, splice, lift, emit, run, describe, same, fields, evaluate };
 pub fn lookup(name: []const u8) ?Op {
+    if (std.mem.eql(u8, name, "@code.evaluate")) return .evaluate;
     inline for (.{ .{ "@code.quote", Op.quote }, .{ "@code.splice", Op.splice }, .{ "@code.lift", Op.lift }, .{ "@code.emit", Op.emit }, .{ "@code.run", Op.run }, .{ "@code.describe", Op.describe }, .{ "@descriptor.same", Op.same }, .{ "@descriptor.fields", Op.fields } }) |item| {
         if (std.mem.eql(u8, name, item[0])) return item[1];
     }

@@ -12,16 +12,16 @@ const executable = Deno.args[0] ??
 function chain(length: number): string {
   const fields = Array.from(
     { length: 2 },
-    (_, index) => `f${index}: fn x => x`,
+    (_, index) => `f${index}: func x => return x`,
   );
-  const stages = ["const s0 = fn () => (holder ()).g"];
+  const stages = ["const s0 = func () => return (holder ()).g"];
   for (let index = 1; index < length; index++) {
     stages.push(
-      `const s${index} = fn () => @u32.add (holder ()).g (s${index - 1} ())`,
+      `const s${index} = func () => return @u32.add (holder ()).g (s${index - 1} ())`,
     );
   }
-  return `const holder = fn () => #{\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
-    stages.join("\n") + `\nentry const e = fn () => s${length - 1} ()\n`;
+  return `const holder = func () => return #{\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
+    stages.join("\n") + `\nentry const e = func () => return s${length - 1} ()\n`;
 }
 
 function budget(issue: ZigProjectDiagnostic, entry: string, source: string) {

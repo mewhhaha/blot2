@@ -26,16 +26,16 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 Deno.test("quoted affine parameters keep move ownership in sync and JSPI guests", async () => {
-  const source = `const generated = @code.quote (fn (value: unique U32) => do:
+  const source = `const generated = @code.quote (func (value: unique U32) => return do:
   let first = value
   break first)
-const borrowed = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan))
+const borrowed = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan))
 const identity: unique U32 -> unique U32 = @code.emit generated
 const read: unique U32 -> U32 = @code.emit borrowed
 const read_again: unique U32 -> U32 = @code.emit borrowed
-entry const answer = fn (value: unique U32) => identity value
-entry const inspect = fn (value: unique U32) => read value
-entry const inspect_again = fn (value: unique U32) => read_again value
+entry const answer = func (value: unique U32) => return identity value
+entry const inspect = func (value: unique U32) => return read value
+entry const inspect_again = func (value: unique U32) => return read_again value
 `;
   for (const asynchronous of [false, true]) {
     await compileAndRun(source, async (guest) => {
@@ -79,13 +79,13 @@ Deno.test("typed code composes lifts evaluates descriptors and emits ordinary Wa
     `const left: code [U32, row {}] = @code.quote 40
 const right: code [U32, row {}] = @code.quote 2
 const answer_code = @code.quote (@u32.add (@code.splice left) (@code.splice right))
-const make = fn (value: U32) => @code.quote (@u32.add (@code.lift value) 2)
+const make = func (value: U32) => return @code.quote (@u32.add (@code.lift value) 2)
 const generated = make 40
-const description = @code.describe (@code.quote {number: 1, flag: #True})
+const description = @code.describe (@code.quote {number: 1, flag: true})
 const fields = @descriptor.fields description.result
 entry const same: Bool = @descriptor.same fields.number (@code.describe left).result
 entry const checked_answer: U32 = @code.run answer_code
-entry const answer = fn () => @code.emit generated
+entry const answer = func () => return @code.emit generated
 `,
     (guest) => {
       equal(guest.read("same"), true);
@@ -101,7 +101,7 @@ Deno.test("repeated typed-code emissions preserve independent locals beside call
     `const generated = @code.quote (do:
   let value = 19
   break @u32.add value 2)
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let value = 100
   let local = @code.quote 1
   let first = @code.emit generated
@@ -115,8 +115,8 @@ entry const answer = fn () => do:
 
 Deno.test("typed staging rejects runtime construction and stage data at guest boundaries", async () => {
   await compileExpectedFailure(
-    `const make = fn (value: U32) => @code.quote (@code.lift value)
-entry const answer = fn (value: U32) => @code.emit (make value)
+    `const make = func (value: U32) => return @code.quote (@code.lift value)
+entry const answer = func (value: U32) => return @code.emit (make value)
 `,
     "stage_unavailable",
     undefined,
@@ -132,14 +132,14 @@ entry const answer = fn (value: U32) => @code.emit (make value)
 
 Deno.test("typed code preserves future closures and delays quoted traps until emission", async () => {
   await compileAndRun(
-    `const make = fn (value: U32) => @code.quote (fn (argument: U32) => @u32.add argument (@code.lift value))
+    `const make = func (value: U32) => return @code.quote (func (argument: U32) => return @u32.add argument (@code.lift value))
 const first = make 2
 const second = make 3
 const run_first = @code.run first
 const latent: code [U32, row {}] = @code.quote (@panic "generated trap")
-entry const answer = fn (argument: U32) => @u32.add ((@code.emit first) argument) ((@code.emit second) argument)
-entry const evaluated = fn (argument: U32) => run_first argument
-entry const guarded = fn (flag: Bool) => if flag then @code.emit latent else 7
+entry const answer = func (argument: U32) => return @u32.add ((@code.emit first) argument) ((@code.emit second) argument)
+entry const evaluated = func (argument: U32) => return run_first argument
+entry const guarded = func (flag: Bool) => return if flag then @code.emit latent else 7
 `,
     (guest) => {
       equal(guest.call("answer", 20), 45);
@@ -160,10 +160,10 @@ entry const guarded = fn (flag: Bool) => if flag then @code.emit latent else 7
 
 Deno.test("nested typed quotes carry explicit lifts through each stage", async () => {
   await compileAndRun(
-    `const make = fn (value: U32) => @code.quote (@code.quote (@u32.add (@code.lift (@code.lift value)) 2))
+    `const make = func (value: U32) => return @code.quote (@code.quote (@u32.add (@code.lift (@code.lift value)) 2))
 const outer = make 40
 const inner = @code.run outer
-entry const answer = fn () => @code.emit inner
+entry const answer = func () => return @code.emit inner
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },
@@ -183,10 +183,10 @@ Deno.test("imported typed generators preserve hygiene retained edits failures an
     cacheDirectory: `${directory}/cache`,
   };
   const library =
-    "const make = fn (step: U32) => @code.quote (fn (value: U32) => @u32.add value (@code.lift step))\n";
+    "const make = func (step: U32) => return @code.quote (func (value: U32) => return @u32.add value (@code.lift step))\n";
   const source = `import {make} from "./generator"
 const generated = make 2
-entry const answer = fn (value: U32) => (@code.emit generated) value
+entry const answer = func (value: U32) => return (@code.emit generated) value
 `;
   const compiler = await createZigProjectCompiler(options);
   const observe = async (bytes: Uint8Array<ArrayBuffer>, expected: number) => {
@@ -267,7 +267,7 @@ Deno.test("imported staging tracks fixed-type inputs and future bodies across in
   };
   const cached = { ...options, cacheDirectory: `${directory}/cache` };
   const library =
-    `const make = fn (step: U32) => @code.quote (fn (value: U32) => do:
+    `const make = func (step: U32) => return @code.quote (func (value: U32) => return do:
   let step = @u32.add value (@code.lift step)
   let value = 1
   break @u32.add step value)
@@ -277,7 +277,7 @@ import {left, right} from "./inputs"
 const first = make left
 const second = make right
 entry const same: Bool = @descriptor.same (@code.describe first).result (@code.describe second).result
-entry const answer = fn (argument: U32) => do:
+entry const answer = func (argument: U32) => return do:
   let value = 100
   let step = 1000
   let a = (@code.emit first) argument
@@ -405,25 +405,25 @@ for (
       codegenTier,
     };
     const cached = { ...options, cacheDirectory: `${directory}/cache` };
-    let library = `const helper = fn (value: U32) => @u32.add value 2
-const twice = fn (value: U32) => helper (helper value)
-const make = fn (value: U32) => @code.quote (twice (@code.lift value))
-const callable = @code.quote (fn (value: U32) => twice value)
+    let library = `const helper = func (value: U32) => return @u32.add value 2
+const twice = func (value: U32) => return helper (helper value)
+const make = func (value: U32) => return @code.quote (twice (@code.lift value))
+const callable = @code.quote (func (value: U32) => return twice value)
 `;
     let source = `import {make, callable} from "./generator"
 const generated = make 38
 entry const checked: U32 = @code.run generated
-entry const run = fn (seed: U32) => do:
+entry const run = func (seed: U32) => return do:
   let value = 100
   let first = @code.emit generated
   let second = @code.emit generated
   break @u32.add value (@u32.add first (@u32.add second ((@code.emit callable) seed)))
 `;
     if (generic) {
-      library = `const identity = fn value => value
-const pair = fn value => (identity value, identity value)
-const choose = fn (flag: Bool) => fn left => fn right => if flag then left else right
-const floating = @code.quote (choose #True (identity 1.5) (identity 2.5))
+      library = `const identity = func value => return value
+const pair = func value => return (identity value, identity value)
+const choose = func (flag: Bool) => return func left => return func right => return if flag then left else right
+const floating = @code.quote (choose true (identity 1.5) (identity 2.5))
 ` +
         library.replace(
           "helper (helper value)",
@@ -442,35 +442,35 @@ const floating = @code.quote (choose #True (identity 1.5) (identity 2.5))
     }
     if (helper === "locals") {
       library = library.replace(
-        "=> @u32.add value 2",
-        "=> do:\n  let incremented = @u32.add value 2\n  let value = incremented\n  break value",
+        "=> return @u32.add value 2",
+        "=> return do:\n  let incremented = @u32.add value 2\n  let value = incremented\n  break value",
       );
     }
     if (helper === "nominal") {
       library = `type Packet a is data = #Packet {item: a}
-const helper = fn (value: U32) => @u32.add value 2
-const twice = fn (value: U32) => #Packet {item: helper (helper value)}
-const make = fn (value: U32) => @code.quote (twice (@code.lift value)).item
-const callable = @code.quote (fn (value: U32) => (twice value).item)
+const helper = func (value: U32) => return @u32.add value 2
+const twice = func (value: U32) => return #Packet {item: helper (helper value)}
+const make = func (value: U32) => return @code.quote (twice (@code.lift value)).item
+const callable = @code.quote (func (value: U32) => return (twice value).item)
 `;
     }
     if (nominalRead) {
       library = `type Packet a is data = #Packet {item: a, shadow: a}
-const helper = fn (value: U32) => @u32.add value 2
-const read = fn (packet: Packet a) => packet.item
-const twice = fn (value: U32) => read (#Packet {item: helper (helper value), shadow: 0})
-const make = fn (value: U32) => @code.quote (twice (@code.lift value))
-const callable = @code.quote (fn (value: U32) => twice value)
-const float_callable = @code.quote (fn (value: F32) => read (#Packet {shadow: 9.5, item: value}))
+const helper = func (value: U32) => return @u32.add value 2
+const read = func (packet: Packet a) => return packet.item
+const twice = func (value: U32) => return read (#Packet {item: helper (helper value), shadow: 0})
+const make = func (value: U32) => return @code.quote (twice (@code.lift value))
+const callable = @code.quote (func (value: U32) => return twice value)
+const float_callable = @code.quote (func (value: F32) => return read (#Packet {shadow: 9.5, item: value}))
 `;
       source =
         source.replace("{make, callable}", "{make, callable, float_callable}") +
-        "entry const fraction = fn (value: F32) => (@code.emit float_callable) value\n";
+        "entry const fraction = func (value: F32) => return (@code.emit float_callable) value\n";
     }
     if (collections) {
       library = library.replace(
-        "=> @u32.add value 2",
-        `=> do:
+        "=> return @u32.add value 2",
+        `=> return do:
   let items = @array.concat #[0] #[2]
   let window = @array.slice items 0 2
   let restored = @array.from_list (@list.from_array window)
@@ -594,10 +594,10 @@ Deno.test("typed generators track exact host asset bytes through edits failures 
   const source = `import * as config from "./config.json"
 import {make} from "./generator"
 const generated = make (config.value).step
-entry const answer = fn (value: U32) => (@code.emit generated) value
+entry const answer = func (value: U32) => return (@code.emit generated) value
 `;
   const library =
-    `const make = fn (step: U32) => @code.quote (fn (value: U32) => @u32.add value (@code.lift step))\n`;
+    `const make = func (step: U32) => return @code.quote (func (value: U32) => return @u32.add value (@code.lift step))\n`;
   const changed = library.replace(
     "@code.lift step",
     "@code.lift (@u32.add step 1)",
@@ -700,12 +700,12 @@ Deno.test("imported typed generators lift nominal payloads through edits and res
   const entry = `${directory}/main.blot`;
   const producer = `${directory}/generator.blot`;
   const source = `import {generated, empty, description} from "./generator"
-entry const answer = fn () => @u32.add (@code.emit generated) (@code.emit empty)
+entry const answer = func () => return @u32.add (@code.emit generated) (@code.emit empty)
 entry const same = @descriptor.same description.result (@code.describe generated).result
 `;
   const library = `type Packet a is data = #Packet {item: a}
 type Option a is data = #Absent | #Present a
-const make = fn (value: Option (Packet U32)) => @code.quote (case @code.lift value of
+const make = func (value: Option (Packet U32)) => return @code.quote (case @code.lift value of
   #Absent => 0
   #Present (#Packet item) => item)
 const generated = make (#Present (#Packet {item: 42}))
@@ -759,7 +759,7 @@ const description = @code.describe generated
             ...sources,
             [producer]: sources[producer].replace(
               `item: ${value}`,
-              "item: #True",
+              "item: true",
             ),
           },
         });
@@ -790,8 +790,8 @@ const description = @code.describe generated
 Deno.test("nominal lifts reject hidden callable payloads before publication", async () => {
   await compileExpectedFailure(
     `type Hidden is data = #Hidden (Unit -> U32)
-const generated = @code.quote (@code.lift (#Hidden (fn () => 42)))
-entry const answer = fn () => case @code.emit generated of
+const generated = @code.quote (@code.lift (#Hidden (func () => return 42)))
+entry const answer = func () => return case @code.emit generated of
   #Hidden callback => callback ()
 `,
     "cross_stage_authority",
@@ -811,13 +811,13 @@ Deno.test("public nominal descriptors retain field owners across imports edits a
 const fields = @descriptor.fields (@code.describe future).result
 const shared = @descriptor.fields (@code.describe choice).result
 entry const same = @descriptor.same fields.item (@code.describe (@code.quote 1)).result
-entry const common = @descriptor.same shared.value (@code.describe (@code.quote #True)).result
-entry const answer = fn () => (@code.emit future).item
+entry const common = @descriptor.same shared.value (@code.describe (@code.quote true)).result
+entry const answer = func () => return (@code.emit future).item
 `;
   const library = `type Packet a is data = #Packet {item: a, flag: Bool}
 type Choice a is data = #Left {value: a, left: U32} | #Right {value: a, right: Bool}
-const future = @code.quote #Packet {item: 42, flag: #True}
-const choice = @code.quote #Left {value: #True, left: 1}
+const future = @code.quote #Packet {item: 42, flag: true}
+const choice = @code.quote #Left {value: true, left: 1}
 `;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {

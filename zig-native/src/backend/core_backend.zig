@@ -73,6 +73,8 @@ pub const Result = struct {
     } = .{},
     artifacts: ?ArtifactSummary = null,
     capture: ?artifact_capture.Capture = null,
+    /// This backend retains complete Wasm, not legacy per-function artifacts.
+    whole_module_only: bool = false,
     reuse: artifact_fragment.Stats = .{},
     principal: principal_evidence_reuse.Stats = .{},
     source_validation: @import("../reuse/dependency_certificate.zig").Stats = .{},
@@ -2317,6 +2319,8 @@ pub fn compile(allocator: Allocator, units: []const core.Module, entry: u32) Err
 
 const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.artifact_replay else false;
 pub const CompileOptions = struct {
+    /// Bounded guest data-region and copied-packet budgets.
+    storage: ?@import("storage_plan.zig").Config = null,
     /// Private ABI inspection control; avoids hiding callees through inlining.
     inline_named: bool = true,
     /// Collect bounded explanations; code is regenerated to observe every site.
@@ -2364,6 +2368,7 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 }
 
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
+    if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithConfig(allocator, units, entry, options.storage orelse options.policy.storage.config());
     return compileLocals(allocator, units, entry, options, true) catch |err| {
         if (err != error.SpeculativeLocalRetry) return @errorCast(err);
         // A promoted generalized local could not serve one of its uses, or

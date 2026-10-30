@@ -6,14 +6,14 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("static package phantom dictionaries keep exact methods and sealed closures", async () => {
   await compileAndRun(
     `type Tag a is contract = { const read: Unit -> U32 }
-impl Number : Tag U32 = { const read = fn unit => 42 }
+impl Number : Tag U32 = { const read = func unit => return 42 }
 type Item = exists [a] where { Tag a } => Unit
 type Sealed = exists [b] => Unit -> U32
 const item: Item = pack [U32] () as Item
-const read = fn (value: Item) => unpack value as [a] payload in Tag.read ()
-const keep = fn (value: Item) => unpack value as [a] payload in pack [a] Tag.read as Sealed
-const invoke = fn (value: Sealed) => unpack value as [b] callback in callback ()
-entry const answer = fn () => @u32.add (read item) (invoke (keep item))
+const read = func (value: Item) => return unpack value as [a] payload in Tag.read ()
+const keep = func (value: Item) => return unpack value as [a] payload in pack [a] Tag.read as Sealed
+const invoke = func (value: Sealed) => return unpack value as [b] callback in callback ()
+entry const answer = func () => return @u32.add (read item) (invoke (keep item))
 `,
     (guest) => equal(guest.call("answer", null), 84),
     { prelude: "none" },
@@ -22,11 +22,11 @@ entry const answer = fn () => @u32.add (read item) (invoke (keep item))
 Deno.test("static package concrete scalars bridge stored method arguments", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
+impl Number : Render U32 = { const show = func value => return value }
 type Item = exists [a] where { Render a } => a
 const item: Item = pack [U32] 42 as Item
-const read = fn (value: Item) => unpack value as [a] payload in Render.show payload
-entry const answer = fn () => read item
+const read = func (value: Item) => return unpack value as [a] payload in Render.show payload
+entry const answer = func () => return read item
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },
@@ -36,9 +36,9 @@ Deno.test("static package products adapt callbacks and retain ordinary captures"
   await compileAndRun(
     `type Item = exists [a] => (a, a -> U32)
 const offset: U32 = 7
-const item: Item = pack [U32] (35, fn value => @u32.add value offset) as Item
-const read = fn (value: Item) => unpack value as [a] payload in (@product.get payload 1) (@product.get payload 0)
-entry const answer = fn () => read item
+const item: Item = pack [U32] (35, func value => return @u32.add value offset) as Item
+const read = func (value: Item) => return unpack value as [a] payload in (@product.get payload 1) (@product.get payload 0)
+entry const answer = func () => return read item
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },
@@ -48,9 +48,9 @@ entry const answer = fn () => read item
 Deno.test("static package arrays and Lists retain each abstract element", async () => {
   await compileAndRun(
     `type Item = exists [a] => (Array a, List a, a -> U32)
-const item: Item = pack [U32] (#[20, 22], [20, 22], fn value => value) as Item
-const read = fn (value: Item) => unpack value as [a] payload in @u32.add ((@product.get payload 2) (@array.get (@product.get payload 0) 0)) ((@product.get payload 2) (@array.get (@array.from_list (@product.get payload 1)) 1))
-entry const answer = fn () => read item
+const item: Item = pack [U32] (#[20, 22], [20, 22], func value => return value) as Item
+const read = func (value: Item) => return unpack value as [a] payload in @u32.add ((@product.get payload 2) (@array.get (@product.get payload 0) 0)) ((@product.get payload 2) (@array.get (@array.from_list (@product.get payload 1)) 1))
+entry const answer = func () => return read item
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },
@@ -59,9 +59,9 @@ entry const answer = fn () => read item
 Deno.test("static package Float witnesses keep bits across callable adapters", async () => {
   await compileAndRun(
     `type Item = exists [a] => (a, a -> F32)
-const item: Item = pack [F32] (41.5, fn value => @f32.add value 0.5) as Item
-const read = fn (value: Item) => unpack value as [a] payload in (@product.get payload 1) (@product.get payload 0)
-entry const answer = fn () => read item
+const item: Item = pack [F32] (41.5, func value => return @f32.add value 0.5) as Item
+const read = func (value: Item) => return unpack value as [a] payload in (@product.get payload 1) (@product.get payload 0)
+entry const answer = func () => return read item
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },
@@ -76,15 +76,15 @@ Deno.test("static package source archives checkpoints and same-layout literal ed
     library = `${directory}/library.blot`,
     dependencies = `${directory}/library.blotdep`;
   const producer = `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
+impl Number : Render U32 = { const show = func value => return value }
 type Item = exists [a] where { Render a } => (Array a, a)
 const item: Item = pack [U32] (#[20, 22], 42) as Item
-const read = fn (value: Item) => unpack value as [a] payload in Render.show (@product.get payload 1)
-const answer = fn () => read item
+const read = func (value: Item) => return unpack value as [a] payload in Render.show (@product.get payload 1)
+const answer = func () => return read item
 `;
   const consumer = `import {answer} from "./library"
-entry const run = fn () => answer ()
-entry const snapshot = fn (value: U32) => #[value]
+entry const run = func () => return answer ()
+entry const snapshot = func (value: U32) => return #[value]
 `;
   async function execute(bytes: Uint8Array<ArrayBuffer>, expected: number) {
     for (const asynchronous of [false, true]) {
@@ -190,11 +190,11 @@ entry const snapshot = fn (value: U32) => #[value]
 Deno.test("static package nominal payloads retain constructor witnesses", async () => {
   await compileAndRun(
     `type Box a is data = #Box a
-const unwrap = fn (#Box value) => value
+const unwrap = func (#Box value) => return value
 type Item = exists [a] => (Box a, a -> U32)
-const item: Item = pack [U32] (#Box 42, fn value => value) as Item
-const read = fn (value: Item) => unpack value as [a] payload in (@product.get payload 1) (unwrap (@product.get payload 0))
-entry const answer = fn () => read item
+const item: Item = pack [U32] (#Box 42, func value => return value) as Item
+const read = func (value: Item) => return unpack value as [a] payload in (@product.get payload 1) (unwrap (@product.get payload 0))
+entry const answer = func () => return read item
 `,
     (guest) => equal(guest.call("answer", null), 42),
     { prelude: "none" },

@@ -7,10 +7,10 @@ A public reduction builds a record with 64 arithmetic callbacks and a U32 field.
 Each stage reads that field and calls the previous stage:
 
 ```blot
-const holder = fn () => #{ f0: fn x => x * 2.0 + x / 3.0, g: 4 }
-const s0 = fn () => (holder ()).g
-const s1 = fn () => (holder ()).g + s0 ()
-entry const e = fn () => s1 ()
+const holder = func () => return #{ f0: func x => return x * 2.0 + x / 3.0, g: 4 }
+const s0 = func () => return (holder ()).g
+const s1 = func () => return (holder ()).g + s0 ()
+entry const e = func () => return s1 ()
 ```
 
 The regression generator in

@@ -10,18 +10,18 @@ const producer = (captured = "35", increment = "1", valid = true) => {
   return `
 type Maybe a is data = #Some a | #None
 type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => @u32.add value ${increment} }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
-const choose: forall [a] => a -> a = fn value => ${chosen}
-const make: U32 -> (forall [a] => a -> a) = fn captured => fn item => do:
+impl Number : Render U32 = { const show = func value => return @u32.add value ${increment} }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
+const choose: forall [a] => a -> a = func value => return ${chosen}
+const make: U32 -> (forall [a] => a -> a) = func captured => return func item => return do:
   let ignored = @u32.add captured 1
   break item
-const trace: U32 -> (forall [a] => ((U32 -> U32 ! {Foreign}), a) -> a ! {Foreign}) = fn captured => fn pair => do:
+const trace: U32 -> (forall [a] => ((U32 -> U32 ! {Foreign}), a) -> a ! {Foreign}) = func captured => return func pair => return do:
   (@product.get pair 0) captured
   break @product.get pair 1
-const show: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
+const show: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
 const wrap: forall [a] => a -> Maybe a = #Some
-const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
+const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
 const packet = do:
   let cost = 35
   for index in 0..256:
@@ -31,14 +31,14 @@ const packet = do:
 };
 const consumer = (seed = "2") =>
   `import {packet, Some, None, Render} from "./producer"
-entry const whole = fn () => packet.choose packet.cost
-entry const fraction = fn () => packet.other 3.5
-entry const shown = fn () => @u32.add (packet.show 35) (packet.show #True)
-entry const wrapped = fn () => case packet.wrap packet.cost of
+entry const whole = func () => return packet.choose packet.cost
+entry const fraction = func () => return packet.other 3.5
+entry const shown = func () => return @u32.add (packet.show 35) (packet.show true)
+entry const wrapped = func () => return case packet.wrap packet.cost of
   #Some value => value
   #None => 0
-entry const host = fn (callback: U32 -> U32 ! {Foreign}) => packet.apply (callback, packet.cost)
-entry const captured = fn (callback: U32 -> U32 ! {Foreign}) => packet.traced (callback, 3.5)
+entry const host = func (callback: U32 -> U32 ! {Foreign}) => return packet.apply (callback, packet.cost)
+entry const captured = func (callback: U32 -> U32 ! {Foreign}) => return packet.traced (callback, 3.5)
 entry const sibling = ${seed}
 `;
 async function execute(
@@ -120,14 +120,14 @@ const simpleProducer = (captured = "35", increment = "1", valid = true) => {
   if (!valid) chosen = "42";
   let cost = `@u32.add ${captured} ${increment}`;
   for (let i = 0; i < 80; i++) cost = `@u32.add 1 (${cost})`;
-  return `const choose: forall [a] => a -> a = fn value => ${chosen}
+  return `const choose: forall [a] => a -> a = func value => return ${chosen}
 const packet = {choose, cost:${cost}}
 `;
 };
 const simpleConsumer = (seed = "2") =>
   `import {packet} from "./producer"
-entry const whole = fn () => packet.choose packet.cost
-entry const fraction = fn () => packet.choose 3.5
+entry const whole = func () => return packet.choose packet.cost
+entry const fraction = func () => return packet.choose 3.5
 entry const sibling = ${seed}
 `;
 async function executeSimple(

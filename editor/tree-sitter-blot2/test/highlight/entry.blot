@@ -1,4 +1,4 @@
-entry const create = fn () => 1
+entry const create = func () => return 1
 // <- keyword.storage.modifier
 //    ^^^^^ keyword.storage.type
 //          ^ function
@@ -8,13 +8,13 @@ entry let count: U32 = 2
 //    ^^^ keyword.storage.type
 //        ^ variable
 
-const entry = fn entry => entry
+const entry = func entry => return entry
 // <- keyword.storage.type
 //    ^ function
-//               ^ variable.parameter
-//                        ^ variable
+//                 ^ variable.parameter
+//                                 ^ variable
 
-const read = fn value => do:
+const read = func value => return do:
   let entry = value
 //    ^ variable
   break entry

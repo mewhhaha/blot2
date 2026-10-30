@@ -151,7 +151,7 @@ function requirements(shape: DeriveShape, contract: string): string {
 function formatField(type: string, value: string): string {
   if (!type.startsWith("Array ")) return `_derive_text.format ${value}`;
   const inner = type.slice("Array ".length);
-  return `_derive_text.join "" #["[", _derive_text.join ", " (@array.generate ${value}.length (fn index => ${
+  return `_derive_text.join "" #["[", _derive_text.join ", " (@array.generate ${value}.length (func index => return ${
     formatField(inner, `${value}[index]`)
   })), "]"]`;
 }
@@ -182,34 +182,34 @@ export function deriveEqualityAndDebug(
     const head = `  ${pattern(constructor, "l")}, ${
       pattern(constructor, "r")
     } =>`;
-    if (!constructor.fields.length) return [`${head} #True`];
+    if (!constructor.fields.length) return [`${head} true`];
     const lines = [`${head} do:`];
     constructor.fields.forEach((field, index) => {
       if (field.type.startsWith("Array ")) {
         lines.push(
           `    if l${index}.length != r${index}.length:`,
-          `      break #False`,
-          `    let same${index} = #True`,
+          `      break false`,
+          `    let same${index} = true`,
           `    for index${index} in 0..l${index}.length:`,
           `      if Bool.not (_derive_eq.Eq.eq l${index}[index${index}] r${index}[index${index}]):`,
-          `        same${index} := #False`,
+          `        same${index} := false`,
           `    if Bool.not same${index}:`,
-          `      break #False`,
+          `      break false`,
         );
       } else {
         lines.push(
           `    if Bool.not (_derive_eq.Eq.eq l${index} r${index}):`,
-          `      break #False`,
+          `      break false`,
         );
       }
     });
-    lines.push(`    break #True`);
+    lines.push(`    break true`);
     return lines;
   });
   const eq = [
-    `const ${shape.name}.eq = fn left => fn right => case left, right of`,
+    `const ${shape.name}.eq = func left => return func right => return case left, right of`,
     ...eqArms,
-    `  _, _ => #False`,
+    `  _, _ => false`,
   ].join("\n");
   const parameter = shape.parameters.length === 0
     ? ""
@@ -222,7 +222,7 @@ export function deriveEqualityAndDebug(
       typeHead(shape)
     }${
       requirements(shape, "_derive_eq.Eq")
-    } = { const eq = fn left => fn right => ${shape.name}.eq left right }`;
+    } = { const eq = func left => return func right => return ${shape.name}.eq left right }`;
   const formatArms = shape.constructors.map((constructor) => {
     const labels = constructor.fields.flatMap((field, index) => [
       JSON.stringify(`${index === 0 ? "(" : ", "}${field.name}=`),
@@ -238,7 +238,7 @@ export function deriveEqualityAndDebug(
     `impl ${shape.name}DerivedFormat${parameter} : _derive_text.Format ${
       typeHead(shape)
     }${requirement} = {`,
-    `  const format = fn value => case value of`,
+    `  const format = func value => return case value of`,
     ...formatArms,
     `}`,
   ].join("\n");
@@ -528,13 +528,13 @@ export function deriveCodec(
     },
   );
   return [
-    `const ${encodeName}${encodeAnnotation} = fn value => case value of`,
+    `const ${encodeName}${encodeAnnotation} = func value => return case value of`,
     ...encodeArms,
     `impl ${shape.name}DerivedCodec${parameter} : _derive_codec.Codec ${
       typeHead(shape)
     }${requirement} = {`,
-    `  const encode = fn value => ${encodeName} value,`,
-    "  const decode = fn words => do:",
+    `  const encode = func value => return ${encodeName} value,`,
+    "  const decode = func words => return do:",
     `    if words.length < 3 || words[0] != ${schema.version}:`,
     "      return #Nothing",
     "    let tag = words[1]",

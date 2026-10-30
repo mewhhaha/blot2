@@ -17,15 +17,15 @@ const compiler: [32]u8 = @splat(29);
 
 const source =
     \\type Box is data = #Box U32
-    \\const open = fn (box: Box) -> U32 => case box of
+    \\const open = func (box: Box) : U32 => return case box of
     \\  #Box value => value
-    \\const factory = fn number => fn extra => @u32.add number (open (#Box extra))
+    \\const factory = func number => return func extra => return @u32.add number (open (#Box extra))
     \\const callback = factory 42
     \\const other = 0
     \\entry const schema: U32 = 7
-    \\entry const answer = fn (extra: U32) -> U32 => callback extra
-    \\entry const plain = fn (x: U32) => @u32.add x 2
-    \\entry const unrelated = fn () => other
+    \\entry const answer = func (extra: U32) : U32 => return callback extra
+    \\entry const plain = func (x: U32) => return @u32.add x 2
+    \\entry const unrelated = func () => return other
 ;
 /// A literal edit, a body edit and a revert to the original program.
 const edits = [_]struct { from: []const u8, to: []const u8 }{

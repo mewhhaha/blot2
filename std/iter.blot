@@ -2,138 +2,138 @@
 // starts an iteration; `next` returns Maybe (item, next_cursor). No adapter
 // names have special meaning to the compiler.
 
-type Range is data = #Range { current: U32, end: U32 }
-const range = fn start => fn end => #Range { current: start, end }
-const Range.iter = fn (cursor: Range) => cursor
-const Range.next = fn (cursor: Range) =>
-  if cursor.current >= cursor.end then #Nothing
-  else #Some (cursor.current, #Range { current: cursor.current + 1, end: cursor.end })
+type Range is data = $Range { current: U32, end: U32 }
+const range = func start -> end => return $Range { current: start, end }
+const Range.iter = func (cursor: Range) => return cursor
+const Range.next = func (cursor: Range) => return
+  if cursor.current >= cursor.end then $Nothing
+  else $Some (cursor.current, $Range { current: cursor.current + 1, end: cursor.end })
 
-type Take i is data = #Take { remaining: U32, cursor: i }
-const take = fn count => fn values => #Take { remaining: count, cursor: values.iter }
-const Take.iter = fn (cursor: Take i) => cursor
-const Take.next = fn (state: Take i) => do:
+type Take i is data = $Take { remaining: U32, cursor: i }
+const take = func count -> values => return $Take { remaining: count, cursor: values.iter }
+const Take.iter = func (cursor: Take i) => return cursor
+const Take.next = func (state: Take i) => return do:
   if state.remaining == 0:
-    break #Nothing
+    break $Nothing
   use step <- state.cursor.next
-  let #Some (value, rest) = step else:
-    break #Nothing
-  break #Some (value, #Take { remaining: state.remaining - 1, cursor: rest })
+  let $Some (value, rest) = step else:
+    break $Nothing
+  break $Some (value, $Take { remaining: state.remaining - 1, cursor: rest })
 
-type TakeWhile [i, p] is data = #TakeWhile { cursor: i, predicate: p }
-const take_while = fn predicate => fn values => #TakeWhile { cursor: values.iter, predicate }
-const TakeWhile.iter = fn (cursor: TakeWhile [i, p]) => cursor
-const TakeWhile.next = fn (state: TakeWhile [i, p]) => do:
+type TakeWhile [i, p] is data = $TakeWhile { cursor: i, predicate: p }
+const take_while = func predicate -> values => return $TakeWhile { cursor: values.iter, predicate }
+const TakeWhile.iter = func (cursor: TakeWhile [i, p]) => return cursor
+const TakeWhile.next = func (state: TakeWhile [i, p]) => return do:
   use step <- state.cursor.next
-  let #Some (value, rest) = step else:
-    break #Nothing
+  let $Some (value, rest) = step else:
+    break $Nothing
   use accepted <- state.predicate value
   if accepted:
-    break #Some (value, #TakeWhile { cursor: rest, predicate: state.predicate })
-  break #Nothing
+    break $Some (value, $TakeWhile { cursor: rest, predicate: state.predicate })
+  break $Nothing
 
-type Map [i, f] is data = #Map { cursor: i, transform: f }
-const map = fn transform => fn values => #Map { cursor: values.iter, transform }
-const Map.iter = fn (cursor: Map [i, f]) => cursor
-const Map.next = fn (state: Map [i, f]) => do:
+type Map [i, f] is data = $Map { cursor: i, transform: f }
+const map = func transform -> values => return $Map { cursor: values.iter, transform }
+const Map.iter = func (cursor: Map [i, f]) => return cursor
+const Map.next = func (state: Map [i, f]) => return do:
   use step <- state.cursor.next
-  let #Some (value, rest) = step else:
-    break #Nothing
+  let $Some (value, rest) = step else:
+    break $Nothing
   use result <- state.transform value
-  break #Some (result, #Map { cursor: rest, transform: state.transform })
+  break $Some (result, $Map { cursor: rest, transform: state.transform })
 
-type Filter [i, p] is data = #Filter { cursor: i, predicate: p }
-const filter = fn predicate => fn values => #Filter { cursor: values.iter, predicate }
-const Filter.iter = fn (cursor: Filter [i, p]) => cursor
-const Filter.next = fn (state: Filter [i, p]) => do:
+type Filter [i, p] is data = $Filter { cursor: i, predicate: p }
+const filter = func predicate -> values => return $Filter { cursor: values.iter, predicate }
+const Filter.iter = func (cursor: Filter [i, p]) => return cursor
+const Filter.next = func (state: Filter [i, p]) => return do:
   let cursor = state.cursor
   for ever:
     use step <- cursor.next
-    let #Some (value, rest) = step else:
-      break #Nothing
+    let $Some (value, rest) = step else:
+      break $Nothing
     use accepted <- state.predicate value
     if accepted:
-      break #Some (value, #Filter { cursor: rest, predicate: state.predicate })
+      break $Some (value, $Filter { cursor: rest, predicate: state.predicate })
     cursor := rest
 
-type Enumerate i is data = #Enumerate { index: U32, cursor: i }
-const enumerate = fn values => #Enumerate { index: 0, cursor: values.iter }
-const Enumerate.iter = fn (cursor: Enumerate i) => cursor
-const Enumerate.next = fn (state: Enumerate i) => do:
+type Enumerate i is data = $Enumerate { index: U32, cursor: i }
+const enumerate = func values => return $Enumerate { index: 0, cursor: values.iter }
+const Enumerate.iter = func (cursor: Enumerate i) => return cursor
+const Enumerate.next = func (state: Enumerate i) => return do:
   use step <- state.cursor.next
-  let #Some (value, rest) = step else:
-    break #Nothing
-  break #Some ((state.index, value), #Enumerate { index: state.index + 1, cursor: rest })
+  let $Some (value, rest) = step else:
+    break $Nothing
+  break $Some ((state.index, value), $Enumerate { index: state.index + 1, cursor: rest })
 
-type Zip [l, r] is data = #Zip { left: l, right: r }
-const zip = fn left => fn right => #Zip { left: left.iter, right: right.iter }
-const Zip.iter = fn (cursor: Zip [l, r]) => cursor
+type Zip [l, r] is data = $Zip { left: l, right: r }
+const zip = func left -> right => return $Zip { left: left.iter, right: right.iter }
+const Zip.iter = func (cursor: Zip [l, r]) => return cursor
 // Pull left, then right. An exhausted left never polls the right. If right
 // ends first, the last unpaired left item has already been pulled.
-const Zip.next = fn (state: Zip [l, r]) => do:
+const Zip.next = func (state: Zip [l, r]) => return do:
   use left <- state.left.next
-  let #Some (a, left_rest) = left else:
-    break #Nothing
+  let $Some (a, left_rest) = left else:
+    break $Nothing
   use right <- state.right.next
-  let #Some (b, right_rest) = right else:
-    break #Nothing
-  break #Some ((a, b), #Zip { left: left_rest, right: right_rest })
+  let $Some (b, right_rest) = right else:
+    break $Nothing
+  break $Some ((a, b), $Zip { left: left_rest, right: right_rest })
 
-type ZipStrict [l, r] is data = #ZipStrict { left: l, right: r }
-const zip_strict = fn left => fn right => #ZipStrict { left: left.iter, right: right.iter }
-const ZipStrict.iter = fn (cursor: ZipStrict [l, r]) => cursor
-const ZipStrict.next = fn (state: ZipStrict [l, r]) => do:
+type ZipStrict [l, r] is data = $ZipStrict { left: l, right: r }
+const zip_strict = func left -> right => return $ZipStrict { left: left.iter, right: right.iter }
+const ZipStrict.iter = func (cursor: ZipStrict [l, r]) => return cursor
+const ZipStrict.next = func (state: ZipStrict [l, r]) => return do:
   use left <- state.left.next
   use right <- state.right.next
   break case left, right of
-    #Nothing, #Nothing => #Nothing
-    #Some (a, left_rest), #Some (b, right_rest) =>
-      #Some ((a, b), #ZipStrict { left: left_rest, right: right_rest })
+    $Nothing, $Nothing => $Nothing
+    $Some (a, left_rest), $Some (b, right_rest) =>
+      $Some ((a, b), $ZipStrict { left: left_rest, right: right_rest })
     _, _ => @panic "zip_strict inputs have different lengths"
 
-type Windows [i, a] is data = #Windows { width: U32, cursor: i, buffer: List a }
+type Windows [i, a] is data = $Windows { width: U32, cursor: i, buffer: List a }
 // Full overlapping windows, each a persistent list snapshot. Width zero is
 // rejected, and an input shorter than the width yields no windows.
-const windows = fn width => fn values =>
+const windows = func width -> values => return
   if width == 0 then @panic "windows requires a positive width"
-  else #Windows { width, cursor: values.iter, buffer: [] }
-const Windows.iter = fn (cursor: Windows [i, a]) => cursor
-const Windows.next = fn (state: Windows [i, a]) => do:
+  else $Windows { width, cursor: values.iter, buffer: [] }
+const Windows.iter = func (cursor: Windows [i, a]) => return cursor
+const Windows.next = func (state: Windows [i, a]) => return do:
   let cursor = state.cursor
   let buffer = state.buffer
   for ever:
     if buffer.length == state.width:
       break
     use step <- cursor.next
-    let #Some (value, rest) = step else:
-      break #Nothing
+    let $Some (value, rest) = step else:
+      break $Nothing
     buffer := [...self, value]
     cursor := rest
   let rest = @list.slice buffer 1 (state.width - 1)
-  break #Some (buffer, #Windows { width: state.width, cursor, buffer: rest })
+  break $Some (buffer, $Windows { width: state.width, cursor, buffer: rest })
 
-const fold_left = fn reduce => fn initial => fn values => do:
+const fold_left = func reduce -> initial -> values => return do:
   let state = initial
   for value in values:
     use next <- reduce state value
     state := next
   break state
 
-const collect_list = fn values => do:
+const collect_list = func values => return do:
   let collected = []
   for value in values:
     collected := [...self, value]
   break collected
-const collect_array = fn values => Array.from_list (collect_list values)
-const any = fn predicate => fn values => do:
+const collect_array = func values => return Array.from_list (collect_list values)
+const any = func predicate -> values => return do:
   for value in values:
     use accepted <- predicate value
     if accepted:
-      break #True
-  break #False
-const all = fn predicate => fn values => do:
+      break true
+  break false
+const all = func predicate -> values => return do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
-      break #False
-  break #True
+      break false
+  break true

@@ -7,8 +7,8 @@ opaque type Box a = { value: a }
 private type Alias = U32
 private type Protocol a is contract = { type_rep a }
 private effect Hidden: Unit -> U32
-private entry const run = fn (value: U32) => #Token value
-const read = fn (#Token value) => value
+private entry const run = func (value: U32) => return #Token value
+const read = func (#Token value) => return value
 export { Token as Ticket, read } from "./tokens"
 
 ---
@@ -63,6 +63,7 @@ export { Token as Ticket, read } from "./tokens"
         (separator)
         (type_identifier))))
   (operator)
+  (keyword)
   (constructor_reference
     (constructor_marker)
     (type_identifier))
@@ -78,6 +79,7 @@ export { Token as Ticket, read } from "./tokens"
           (type_identifier))
         (identifier))))
   (operator)
+  (keyword)
   (identifier)
   (export_declaration
     (braced
@@ -93,9 +95,9 @@ export { Token as Ticket, read } from "./tokens"
 Declaration words remain ordinary binding and parameter names
 ==================
 
-const private = fn opaque => opaque
-const export = fn private => private
-const opaque = fn export => export
+const private = func opaque => return opaque
+const export = func private => return private
+const opaque = func export => return export
 
 ---
 
@@ -107,6 +109,7 @@ const opaque = fn export => export
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier)
   (function_binding
     (binding_keyword)
@@ -115,6 +118,7 @@ const opaque = fn export => export
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (function_binding
     (private_binding
       (private_modifier)
@@ -124,6 +128,7 @@ const opaque = fn export => export
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier))
 
 ==================
@@ -132,7 +137,7 @@ Associated type equations signatures and nested projections
 
 type Identity a is contract = { type Item = a }
 type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
+const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
 type Imported s = lib.Source.Item s
 
 ---
@@ -193,6 +198,7 @@ type Imported s = lib.Source.Item s
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier)
   (type_header
     (type_identifier)

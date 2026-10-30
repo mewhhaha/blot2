@@ -2,31 +2,36 @@ import { deepStrictEqual as equal } from "node:assert/strict";
 import { formatSource } from "./format.ts";
 
 Deno.test("formatter preserves spark and receive boundaries", async () => {
-  const source = `entry const sparked = fn () => @task.scope (fn group => do:
+  const source =
+    `entry const sparked = func () => return @task.scope (func group => return do:
   let pending = *(work 42)
   return |pending|)
 `;
   const formatted = await formatSource(source);
-  equal(formatted.includes("@task.scope (fn group => do:"), true);
+  equal(formatted.includes("@task.scope (func group => return do:"), true);
   equal(formatted.includes("*(work 42)"), true);
   equal(formatted.includes("|pending|"), true);
   equal(await formatSource(formatted), formatted);
 });
 
 Deno.test("formatter preserves grouped curried parameter lists and named record calls", async () => {
-  const source = `const area=fn (width:U32) (height:U32)=>@u32.mul width height
-const named=fn (fields:{width:U32,height:U32})=>area fields.width fields.height
-entry const answer=fn ()=>named {height:3,width:4}
+  const source =
+    `const area=func (width:U32) -> (height:U32)=> return @u32.mul width height
+const named=func (fields:{width:U32,height:U32})=> return area fields.width fields.height
+entry const answer=func ()=> return named {height:3,width:4}
 `;
   const formatted = await formatSource(source);
-  equal(formatted.includes("fn (width: U32) (height: U32) =>"), true);
+  equal(
+    formatted.includes("func (width: U32) -> (height: U32) => return "),
+    true,
+  );
   equal(formatted.includes("named { height: 3, width: 4 }"), true);
   equal(await formatSource(formatted), formatted);
 });
 
 Deno.test("formatter preserves continue and a flat pattern guard", async () => {
   const source = `type Candidate is data=#Keep U32|#Skip
-entry const kept=fn (values:Array Candidate)=>do:
+entry const kept=func (values:Array Candidate)=> return do:
   let total=0
   for candidate in values:
     let #Keep value=candidate else:
@@ -41,11 +46,11 @@ entry const kept=fn (values:Array Candidate)=>do:
 
 Deno.test("formatter preserves typed code descriptors and stage composition", async () => {
   const source = `const code=1
-const descriptor=fn code=>code
+const descriptor=func code=> return code
 const left:code [U32,row {}]=@code.quote 40
 const shape:descriptor (code [U32,row {Foreign}])=@code.describe left
 const answer=@code.quote (@u32.add (@code.splice left) (@code.lift 2))
-entry const run=fn ()=>@code.emit answer
+entry const run=func ()=> return @code.emit answer
 `;
   const formatted = await formatSource(source);
   equal(formatted.includes("code [U32, row {}]"), true);
@@ -55,8 +60,8 @@ entry const run=fn ()=>@code.emit answer
 
 Deno.test("formatter preserves erased proof annotations and exact operand grouping", async () => {
   const source =
-    `const at:(values:Array a)->(index:U32)->(@proof.Index values index)->a=fn values=>fn index=>fn proof=>@array.get values index
-const less:(values:List U32)->@proof.U32Lt (0) (@list.length values)=fn values=>@proof.lt 0 (@list.length values)
+    `const at:(values:Array a)->(index:U32)->(@proof.Index values index)->a=func values=> return func index=> return func proof=> return @array.get values index
+const less:(values:List U32)->@proof.U32Lt (0) (@list.length values)=func values=> return @proof.lt 0 (@list.length values)
 const last:@proof.U32Le 0 4294967295=@proof.le 0 4294967295
 `;
   const formatted = await formatSource(source);
@@ -69,8 +74,8 @@ const last:@proof.U32Le 0 4294967295=@proof.le 0 4294967295
 
 Deno.test("formatter preserves dependent arrow binders and staged row grouping", async () => {
   const source = `type State a is effect={get:Unit->a,set:a->Unit}
-const read:(state:State a)->a!{state.get}=fn input=>input.get ()
-const apply:(state:State a)->((Unit->a!{state.get|e})->a!{state.get|e})=fn input=>fn callback=>callback ()
+const read:(state:State a)->a!{state.get}=func input=> return input.get ()
+const apply:(state:State a)->((Unit->a!{state.get|e})->a!{state.get|e})=func input=> return func callback=> return callback ()
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -88,19 +93,19 @@ private type Choice is data=#Choice U32
 private type Read a is contract={type_rep a}
 private effect Hidden:Unit->U32
 private type HiddenFamily is effect={ask:Unit->U32}
-private const private=fn opaque=>opaque
-private entry const answer=fn export=>private export
-const unwrap=fn (#Box value)=>value.value
-const typed=fn (value:U32)=>value
-const pattern=fn ((left,right))=>left
+private const private=func opaque=> return opaque
+private entry const answer=func export=> return private export
+const unwrap=func (#Box value)=> return value.value
+const typed=func (value:U32)=> return value
+const pattern=func ((left,right))=> return left
 export {Box} from "./tokens"
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
   equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
   equal(formatted.includes("private opaque type Token = F32"), true);
-  equal(formatted.includes("fn (#Box value)"), true);
-  equal(formatted.includes("fn ((left, right))"), true);
+  equal(formatted.includes("func (#Box value)"), true);
+  equal(formatted.includes("func ((left, right))"), true);
   equal(
     formatted.includes('export { Token as Ticket, make } from "./tokens"'),
     true,
@@ -121,9 +126,9 @@ Deno.test({
       const entry = `${directory}/main.blot`;
       const sources = {
         [entry]:
-          'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nentry const answer=fn (value:F32)=>facade.read (make value)\nentry const folded=facade.read (make 40.0)\n',
+          'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nentry const answer=func (value:F32)=> return facade.read (make value)\nentry const folded=facade.read (make 40.0)\n',
         [`${directory}/tokens.blot`]:
-          "opaque type Token=F32\nprivate const offset=2.0\nconst make:F32->Token=fn value=>#Token (@f32.add value offset)\nconst read:Token->F32=fn (#Token value)=>value\nprivate const Token.hidden=read\n",
+          "opaque type Token=F32\nprivate const offset=2.0\nconst make:F32->Token=func value=> return #Token (@f32.add value offset)\nconst read:Token->F32=func (#Token value)=> return value\nprivate const Token.hidden=read\n",
         [`${directory}/facade.blot`]:
           'export {Token as Ticket,read} from "./tokens"\n',
       };
@@ -165,8 +170,8 @@ import * as array from "std/array"
 
 type Point is data =
   | #Point {x:U32,y:U32}
-const from = fn value=>value
-entry const answer=fn ()=>do:
+const from = func value=> return value
+entry const answer=func ()=> return do:
   let point=#Point {x: 1,y:2} // keep this
   let values = array.map (.x) #[point]
   let choose = if :point==:(#Point {x:2,y:3}) then 40 else 0
@@ -185,10 +190,10 @@ entry const answer=fn ()=>do:
 Deno.test("formatter separates variants and preserves arithmetic and call grouping", async () => {
   const source =
     `type Drag is data = #Idle | #Draw { x: F32, y: F32, width: F32, height: F32 } | #Move { x: F32, y: F32 }
-const apply = fn f => fn value => f value
-entry const answer = fn x => do:
+const apply = func f => return func value => return f value
+entry const answer = func x => return do:
     let total = (1 + 2) * x
-    let value = apply (fn value => value) (total + 1)
+    let value = apply (func value => return value) (total + 1)
     break ((value))
 `;
   const formatted = await formatSource(source);
@@ -206,7 +211,7 @@ const array=#[1, 2]
 const front=[0,...list]
 const back=#[...array,3]
 const mapped=#[x+1 | x <- list, x>0, let y=x*2]
-const get=fn xs=>xs[0]
+const get=func xs=> return xs[0]
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -225,10 +230,10 @@ type Add a is contract = {
   associated "add" a a a,
   contracts.Read a,
 }
-const contract=fn contract=>contract
-const twice:a->a where {Add a}=fn value=>value+value
-const convert:a->b ! {|e} where {result "from" a b ! {|e}}=fn value=>@type.result "from" value
-const unfinished=fn (action:Action U32)=>@hole
+const contract=func contract=> return contract
+const twice:a->a where {Add a}=func value=> return value+value
+const convert:a->b ! {|e} where {result "from" a b ! {|e}}=func value=> return @type.result "from" value
+const unfinished=func (action:Action U32)=> return @hole
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -241,8 +246,8 @@ const unfinished=fn (action:Action U32)=>@hole
 Deno.test("formatter preserves structural record applications, patterns and merge contracts", async () => {
   const source = `type Point={x:U32,y:F32}
 type Merge [a,b,c] is contract={merge a b c}
-const combine:a->b->c where {Merge [a,b,c]}=fn left=>fn right=>@record.merge left right
-const f=fn (point:Point)=>do:
+const combine:a->b->c where {Merge [a,b,c]}=func left=> return func right=> return @record.merge left right
+const f=func (point:Point)=> return do:
     let {y,x}=point
     break combine point {x:y}
 const value=f {y:2.0,x:40}
@@ -255,14 +260,14 @@ const value=f {y:2.0,x:40}
 
 Deno.test("formatter accepts nominal record patterns and spaces named operators", async () => {
   const source = `type Vec2 is data = #Vec2 { x: F32, y: F32 }
-const plus=fn left=>fn right=>left+right
-const length=fn value=>do:
+const plus=func left=> return func right=> return left+right
+const length=func value=> return do:
     let #Vec2 {x,y:height}=value
     break x+height
-const first=fn value=>case value of
+const first=func value=> return case value of
     #Some (#Vec2 {x}) => x
     _ => 0.0
-const sum=fn ()=>20 \`plus\` 22
+const sum=func ()=> return 20 \`plus\` 22
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -321,7 +326,7 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
 Deno.test("formatter preserves associated equations abstract signatures and projection rows", async () => {
   const source = `type Identity a is contract={type Item=a}
 type Source s is contract={type Item,const first:s->(Source.Item s)}
-const keep:a->(Identity.Item a) where{Identity a,type_eq (Identity.Item a) a}=fn value=>value
+const keep:a->(Identity.Item a) where{Identity a,type_eq (Identity.Item a) a}=func value=> return value
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -333,8 +338,8 @@ const keep:a->(Identity.Item a) where{Identity a,type_eq (Identity.Item a) a}=fn
 Deno.test("formatter preserves implementation heads requirements and ordinary lambda members", async () => {
   const source =
     `type Source s is contract={type Item,const first:s->(Source.Item s)}
-private impl ArraySource a:Source (Array a) where{type_eq a U32}={type Item=a,const first=fn values=>@array.get values 0}
-const impl=fn impl=>impl
+private impl ArraySource a:Source (Array a) where{type_eq a U32}={type Item=a,const first=func values=> return @array.get values 0}
+const impl=func impl=> return impl
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -344,22 +349,24 @@ const impl=fn impl=>impl
   );
   equal(formatted.includes("type Item = a"), true);
   equal(
-    formatted.includes("const first = fn values => @array.get values 0"),
+    formatted.includes(
+      "const first = func values => return @array.get values 0",
+    ),
     true,
   );
-  equal(formatted.includes("const impl = fn impl => impl"), true);
+  equal(formatted.includes("const impl = func impl => return impl"), true);
 });
 
 Deno.test("formatter preserves usage qualifiers and contextual value names", async () => {
   const source = `const unique=1
-const f:once (borrow r U32->shared U32)=fn x=>x
-const g:cleanup (unique U32->Unit)=fn x=>()
+const f:once (borrow r U32->shared U32)=func x=> return x
+const g:cleanup (unique U32->Unit)=func x=> return ()
 const h:borrow_mut r [U32]=unique
-const i:many (U32->U32)=fn x=>x
+const i:many (U32->U32)=func x=> return x
 const j:concurrent (U32->U32 ! {Foreign})=host
 const concurrent=1
 const share=@usage.share unique
-const scope=@resource.scope acquire release (fn resource=>resource)
+const scope=@resource.scope acquire release (func resource=> return resource)
 `;
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -368,13 +375,13 @@ const scope=@resource.scope acquire release (fn resource=>resource)
 });
 
 Deno.test("formatter preserves quantified binders and package opening scope", async () => {
-  const source = `const forall=fn pack=>pack
+  const source = `const forall=func pack=> return pack
  type Id=forall [a]=>a->a
  type Borrower=forall [a,row e,region r]=>borrow r a->a!{|e}
  type Item=exists [a] where {Render a}=>a
  const make=pack [U32] 42 as Item
- const read=fn item=>unpack item as [a] value in Render.show value
- const plain=fn unpack=>unpack 1
+ const read=func item=> return unpack item as [a] value in Render.show value
+ const plain=func unpack=> return unpack 1
 `.replaceAll("\n ", "\n");
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
@@ -384,4 +391,17 @@ Deno.test("formatter preserves quantified binders and package opening scope", as
     formatted.includes("unpack item as [a] value in Render.show value"),
     true,
   );
+});
+
+Deno.test("formatter preserves primitive boolean words and bare patterns", async () => {
+  const source =
+    `const choose=func (left:Bool)->(right:Bool)=> return left or right and false
+entry const classify=func (value:Bool)=> return case value of
+  true=>1
+  false=>0
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("left or right and false"), true);
+  equal(formatted.includes("true => 1"), true);
+  equal(await formatSource(formatted), formatted);
 });

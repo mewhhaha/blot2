@@ -1,5 +1,5 @@
-const make = fn () => do:
+const make = func () => return do:
   let captured = 40
-  break fn (value: U32) => @u32.add captured value
+  break func (value: U32) => return @u32.add captured value
 const saved = make ()
 entry const answer: U32 -> U32 = saved

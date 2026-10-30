@@ -12,27 +12,27 @@ Deno.test("numeric aggregates preserve imported calls, lane order and immutable 
   const entry = `${directory}/main.blot`, library = `${directory}/shapes.blot`;
   const fixture = numericAggregateSources();
   const main = fixture.main + numericShapes.map(([shape]) => `
-entry const array_dynamic_${shape} = fn (choice: Bool) => do:
+entry const array_dynamic_${shape} = func (choice: Bool) => return do:
   let read = if choice then shape.read_${shape} else shape.alternate_${shape}
-  let values = @array.generate 32 (fn index => shape.make_${shape} (@u32.to_f32 index))
+  let values = @array.generate 32 (func index => return shape.make_${shape} (@u32.to_f32 index))
   let total = 0.0
   for value in values:
     total := self + read value
   return total
-entry const escaped_${shape} = fn (count: U32) => do:
-  let values = @array.generate count (fn index => shape.make_${shape} (@u32.to_f32 index))
+entry const escaped_${shape} = func (count: U32) => return do:
+  let values = @array.generate count (func index => return shape.make_${shape} (@u32.to_f32 index))
   let selected = shape.make_${shape} 0.0
   for value in values:
     selected := value
   return shape.read_${shape} selected
-entry const captured_${shape} = fn (count: U32) => do:
+entry const captured_${shape} = func (count: U32) => return do:
   let matrix = shape.make_${shape} 5.0
-  let rows = @array.generate count (fn index => matrix)
+  let rows = @array.generate count (func index => return matrix)
   return shape.read_${shape} matrix + shape.read_${shape} rows[count - 1]
-entry const interrupted_${shape} = fn (count: U32) => do:
-  let rows = @array.generate count (fn index => if index == 1 then @panic "interrupted row" else shape.make_${shape} 0.0)
+entry const interrupted_${shape} = func (count: U32) => return do:
+  let rows = @array.generate count (func index => return if index == 1 then @panic "interrupted row" else shape.make_${shape} 0.0)
   return @array.length rows
-entry const stored_bits_${shape} = fn (seed: F32) => do:
+entry const stored_bits_${shape} = func (seed: F32) => return do:
   let rows = @array.fill 1 (shape.make_${shape} 0.0)
   rows[0].${shape.endsWith("nested") ? "a.x" : "ax"} := seed
   return shape.wire_${shape} rows[0]
@@ -156,7 +156,7 @@ entry const stored_bits_${shape} = fn (seed: F32) => do:
           sources: {
             ...sources,
             [entry]: main +
-              "\nentry const wrong = fn () => shape.read_nominal_nested (shape.make_nominal_flat 0.0)\n",
+              "\nentry const wrong = func () => return shape.read_nominal_nested (shape.make_nominal_flat 0.0)\n",
           },
         });
         assert(!rejected.success, "distinct nominal matrices must not unify");

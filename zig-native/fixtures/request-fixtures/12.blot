@@ -1,15 +1,15 @@
 
 type Validate is effect = { check: U32 -> U32 }
 type Input is effect = { read: Unit -> U32 }
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield value
       complete value =>
         break value
-entry const answer = fn () => do (@effect.provider Input.read (fn () => 2)):
-  break checked (@computation (fn () => do:
+entry const answer = func () => return do (@effect.provider Input.read (func () => return 2)):
+  break checked (@computation (func () => return do:
     use left <- Validate.check 40
     use right <- Input.read ()
     break @u32.add left right

@@ -24,25 +24,25 @@ fn law(source: []const u8, expected: ?check.Code) !void {
     return error.TestUnexpectedResult;
 }
 test "usage qualifiers preserve affine moves aliases and branch ownership" {
-    try law("const keep = fn (owner: unique U32) => owner\n", null);
-    try law("const duplicate = fn (owner: unique U32) => (owner, owner)\n", .use_after_move);
-    try law("const alias = fn (owner: unique U32) => do:\n  let next = owner\n  break (next, owner)\n", .use_after_move);
-    try law("const branch = fn (owner: unique U32) => fn choose => do:\n  if choose:\n    let moved = owner\n  break owner\n", .use_after_move);
-    try law("const pair = fn (owners: (unique U32, U32)) => (owners, owners)\n", .use_after_move);
-    try law("const unknown = fn (owner: unique U32) => fn (callback: a -> a) => callback owner\n", .multiplicity_unknown);
+    try law("const keep = func (owner: unique U32) => return owner\n", null);
+    try law("const duplicate = func (owner: unique U32) => return (owner, owner)\n", .use_after_move);
+    try law("const alias = func (owner: unique U32) => return do:\n  let next = owner\n  break (next, owner)\n", .use_after_move);
+    try law("const branch = func (owner: unique U32) => return func choose => return do:\n  if choose:\n    let moved = owner\n  break owner\n", .use_after_move);
+    try law("const pair = func (owners: (unique U32, U32)) => return (owners, owners)\n", .use_after_move);
+    try law("const unknown = func (owner: unique U32) => return func (callback: a -> a) => return callback owner\n", .multiplicity_unknown);
 }
 test "usage once calls cannot repeat or hide in many closures" {
-    try law("const run = fn (callback: once (Unit -> U32)) => callback ()\n", null);
-    try law("const twice = fn (callback: once (Unit -> U32)) => (callback (), callback ())\n", .once_reused);
-    try law("const many_capture = fn (owner: unique U32) => fn () => owner\n", .duplicate_owner);
-    try law("const capture = fn (owner: unique U32) -> once (Unit -> unique U32) => fn () => owner\n", null);
-    try law("const one: once (Unit -> U32) = fn () => 7\n", null);
-    try law("const loops = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..3:\n    let value = callback ()\n  break ()\n", .once_reused);
+    try law("const run = func (callback: once (Unit -> U32)) => return callback ()\n", null);
+    try law("const twice = func (callback: once (Unit -> U32)) => return (callback (), callback ())\n", .once_reused);
+    try law("const many_capture = func (owner: unique U32) => return func () => return owner\n", .duplicate_owner);
+    try law("const capture = func (owner: unique U32) : once (Unit -> unique U32) => return func () => return owner\n", null);
+    try law("const one: once (Unit -> U32) = func () => return 7\n", null);
+    try law("const loops = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..3:\n    let value = callback ()\n  break ()\n", .once_reused);
 }
 
 test "usage immutable Core rejects repeated owners independently of source and capture catalogs" {
     const a = std.testing.allocator;
-    const source = "const call = fn (callback: once (Unit -> U32)) => do:\n  let value = callback ()\n  break value\n";
+    const source = "const call = func (callback: once (Unit -> U32)) => return do:\n  let value = callback ()\n  break value\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -77,16 +77,16 @@ test "usage immutable Core rejects repeated owners independently of source and c
 }
 
 test "usage unchecked package and cleanup authority stay rejected" {
-    try law("const hidden = fn (owner: unique U32) => pack [unique U32] owner as exists [a] => a\n", .usage_evidence_mismatch);
-    try law("data Box = #Box (unique U32)\nconst read = fn owner => #Box owner\n", null);
-    try law("const cleanup = fn (release: cleanup (Unit -> Unit)) => release ()\n", .cleanup_not_safe);
-    try law("const bad = fn (owner: shared (unique U32)) => owner\n", .usage_evidence_mismatch);
+    try law("const hidden = func (owner: unique U32) => return pack [unique U32] owner as exists [a] => a\n", .usage_evidence_mismatch);
+    try law("data Box = #Box (unique U32)\nconst read = func owner => return #Box owner\n", null);
+    try law("const cleanup = func (release: cleanup (Unit -> Unit)) => return release ()\n", .cleanup_not_safe);
+    try law("const bad = func (owner: shared (unique U32)) => return owner\n", .usage_evidence_mismatch);
 }
 fn usageOwnershipAllocationLaw(allocator: std.mem.Allocator) !void {
     const source =
-        "const capture = fn (owner: unique U32) -> once (Unit -> unique U32) => fn () => owner\n" ++
-        "const controlled = fn (callback: once (Unit -> Bool)) => do:\n  let value = do:\n    break #True\n  for index in 0..1:\n    let checked = case #True of\n      #True if callback () => #True\n      #True => #True\n      #False => #False\n  break #True\n" ++
-        "const stopped = fn (callback: once (Unit -> U32)) => do:\n  for ever:\n    use callback ()\n    break\n  break ()\n";
+        "const capture = func (owner: unique U32) : once (Unit -> unique U32) => return func () => return owner\n" ++
+        "const controlled = func (callback: once (Unit -> Bool)) => return do:\n  let value = do:\n    break true\n  for index in 0..1:\n    let checked = case true of\n      true if callback () => true\n      true => true\n      false => false\n  break true\n" ++
+        "const stopped = func (callback: once (Unit -> U32)) => return do:\n  for ever:\n    use callback ()\n    break\n  break ()\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     var tokens = try lexer.lex(allocator, source);
@@ -105,29 +105,29 @@ test "usage owning capture and control flow preserve cleanup on every allocation
 }
 
 test "usage range bounds execute once before loop ownership joins" {
-    try law("const bounds = fn (callback: once (Unit -> U32)) => do:\n  for (callback ())..3:\n    use ()\n  break callback ()\n", .once_reused);
-    try law("const bounds = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..(callback ()):\n    use ()\n  break callback ()\n", .once_reused);
-    try law("const bounds = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..(callback ()):\n    use ()\n  break ()\n", null);
+    try law("const bounds = func (callback: once (Unit -> U32)) => return do:\n  for (callback ())..3:\n    use ()\n  break callback ()\n", .once_reused);
+    try law("const bounds = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..(callback ()):\n    use ()\n  break callback ()\n", .once_reused);
+    try law("const bounds = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..(callback ()):\n    use ()\n  break ()\n", null);
 }
 
 test "usage failed guards retain outer moves and cannot consume pattern owners" {
-    try law("const guarded = fn (callback: once (Unit -> Bool)) => case #True of\n  #True if callback () => #True\n  #True => callback ()\n  #False => #False\n", .once_reused);
-    try law("const separate = fn (callback: once (Unit -> Bool)) => case #True of\n  #True => callback ()\n  #False => callback ()\n", null);
-    try law("const guarded = fn (callbacks: (once (Unit -> Bool), Bool)) => case callbacks of\n  (callback, #True) if callback () => #True\n  (callback, _) => callback ()\n", .duplicate_owner);
+    try law("const guarded = func (callback: once (Unit -> Bool)) => return case true of\n  true if callback () => true\n  true => callback ()\n  false => false\n", .once_reused);
+    try law("const separate = func (callback: once (Unit -> Bool)) => return case true of\n  true => callback ()\n  false => callback ()\n", null);
+    try law("const guarded = func (callbacks: (once (Unit -> Bool), Bool)) => return case callbacks of\n  (callback, true) if callback () => true\n  (callback, _) => callback ()\n", .duplicate_owner);
 }
 
 test "usage nested do returns restore the enclosing owner flow" {
-    try law("const nested = fn (callback: once (Unit -> U32)) => do:\n  let value = do:\n    break callback ()\n  break callback ()\n", .once_reused);
-    try law("const nested = fn (callback: once (Unit -> Bool)) => do:\n  let value = do:\n    if #True:\n      break callback ()\n    break #False\n  break callback ()\n", .once_reused);
-    try law("const nested = fn (callback: once (Unit -> U32)) => do:\n  let value = do:\n    break 7\n  break callback ()\n", null);
-    try law("const named = fn (callback: once (Unit -> U32)) => do:\n  use next <- callback\n  break next ()\n", null);
+    try law("const nested = func (callback: once (Unit -> U32)) => return do:\n  let value = do:\n    break callback ()\n  break callback ()\n", .once_reused);
+    try law("const nested = func (callback: once (Unit -> Bool)) => return do:\n  let value = do:\n    if true:\n      break callback ()\n    break false\n  break callback ()\n", .once_reused);
+    try law("const nested = func (callback: once (Unit -> U32)) => return do:\n  let value = do:\n    break 7\n  break callback ()\n", null);
+    try law("const named = func (callback: once (Unit -> U32)) => return do:\n  use next <- callback\n  break next ()\n", null);
 }
 
 test "usage loop breaks and returns carry moves without creating a backedge" {
-    try law("const stopped = fn (callback: once (Unit -> U32)) => do:\n  for ever:\n    use callback ()\n    break\n  break ()\n", null);
-    try law("const stopped = fn (callback: once (Unit -> U32)) => do:\n  for ever:\n    if #True:\n      use callback ()\n      break\n    break\n  break callback ()\n", .once_reused);
-    try law("const stopped = fn (callback: once (Unit -> U32)) => do:\n  for ever:\n    let value = do:\n      use callback ()\n      break\n  break ()\n", null);
-    try law("const returned = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..3:\n    break callback ()\n  break 0\n", null);
+    try law("const stopped = func (callback: once (Unit -> U32)) => return do:\n  for ever:\n    use callback ()\n    break\n  break ()\n", null);
+    try law("const stopped = func (callback: once (Unit -> U32)) => return do:\n  for ever:\n    if true:\n      use callback ()\n      break\n    break\n  break callback ()\n", .once_reused);
+    try law("const stopped = func (callback: once (Unit -> U32)) => return do:\n  for ever:\n    let value = do:\n      use callback ()\n      break\n  break ()\n", null);
+    try law("const returned = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..3:\n    break callback ()\n  break 0\n", null);
 }
 
 fn portableControl(source: []const u8, corruption: enum { none, nested, guard, break_, bound, carry }) !void {
@@ -191,44 +191,44 @@ fn portableControl(source: []const u8, corruption: enum { none, nested, guard, b
 }
 
 test "usage immutable control flow reconstructs nested return guard fallthrough and break moves" {
-    try portableControl("const nested = fn (callback: once (Unit -> Bool)) => do:\n  let value = do:\n    break #True\n  break callback ()\n", .nested);
-    try portableControl("const guarded = fn (callback: once (Unit -> Bool)) => case #True of\n  #True if callback () => #True\n  #True => #True\n  #False => #False\n", .guard);
-    try portableControl("const stopped = fn (callback: once (Unit -> U32)) => do:\n  for ever:\n    use callback ()\n    break\n  break 0\n", .break_);
-    try portableControl("const bounds = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..(callback ()):\n    use ()\n  break ()\n", .none);
-    try portableControl("const returned = fn (callback: once (Unit -> U32)) => do:\n  for index in 0..3:\n    break callback ()\n  break 0\n", .none);
+    try portableControl("const nested = func (callback: once (Unit -> Bool)) => return do:\n  let value = do:\n    break true\n  break callback ()\n", .nested);
+    try portableControl("const guarded = func (callback: once (Unit -> Bool)) => return case true of\n  true if callback () => true\n  true => true\n  false => false\n", .guard);
+    try portableControl("const stopped = func (callback: once (Unit -> U32)) => return do:\n  for ever:\n    use callback ()\n    break\n  break 0\n", .break_);
+    try portableControl("const bounds = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..(callback ()):\n    use ()\n  break ()\n", .none);
+    try portableControl("const returned = func (callback: once (Unit -> U32)) => return do:\n  for index in 0..3:\n    break callback ()\n  break 0\n", .none);
 }
 
 test "usage exact one iteration bounds admit outer owners and reject later reuse" {
-    try law("const one = fn (callback: once (Unit -> U32)) => do:\n  for index in (3)..(4):\n    use callback ()\n  break ()\n", null);
-    try law("const reused = fn (callback: once (Unit -> U32)) => do:\n  for index in 3..4:\n    use callback ()\n  break callback ()\n", .once_reused);
-    try law("const repeated = fn (callback: once (Unit -> U32)) => do:\n  for index in 3..5:\n    use callback ()\n  break ()\n", .once_reused);
-    try portableControl("const one = fn (callback: once (Unit -> U32)) => do:\n  for index in (3)..(4):\n    use callback ()\n  break ()\n", .bound);
+    try law("const one = func (callback: once (Unit -> U32)) => return do:\n  for index in (3)..(4):\n    use callback ()\n  break ()\n", null);
+    try law("const reused = func (callback: once (Unit -> U32)) => return do:\n  for index in 3..4:\n    use callback ()\n  break callback ()\n", .once_reused);
+    try law("const repeated = func (callback: once (Unit -> U32)) => return do:\n  for index in 3..5:\n    use callback ()\n  break ()\n", .once_reused);
+    try portableControl("const one = func (callback: once (Unit -> U32)) => return do:\n  for index in (3)..(4):\n    use callback ()\n  break ()\n", .bound);
 }
 
 test "usage closures discover guard and if let capture ownership" {
-    try law("const hidden = fn (callback: once (Unit -> Bool)) => fn () => case #True of\n  #True if callback () => #True\n  #True => #True\n  #False => #False\n", .duplicate_owner);
-    try law("const hidden = fn (callback: once (Unit -> U32)) => fn () => do:\n  if let #True = #True:\n    break callback ()\n  break 0\n", .duplicate_owner);
+    try law("const hidden = func (callback: once (Unit -> Bool)) => return func () => return case true of\n  true if callback () => true\n  true => true\n  false => false\n", .duplicate_owner);
+    try law("const hidden = func (callback: once (Unit -> U32)) => return func () => return do:\n  if let true = true:\n    break callback ()\n  break 0\n", .duplicate_owner);
 }
 
 test "usage lexical loans restore owners and reject result capture and conflicting access" {
-    try law("const inspect = fn (owner: unique U32) => do:\n  let result = @usage.borrow owner (fn loan => @usage.read loan)\n  break owner\n", null);
-    try law("const inspect = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @u32.add (@usage.read loan) (@usage.read loan))\n", null);
-    try law("const escape = fn (owner: unique U32) => @usage.borrow owner (fn loan => loan)\n", .borrow_escape);
-    try law("const escape = fn (owner: unique U32) => @usage.borrow owner (fn loan => fn () => @usage.read loan)\n", .borrow_escape);
-    try law("const conflict = fn (owner: unique U32) => @usage.borrow owner (fn loan => owner)\n", .borrow_conflict);
-    try law("const incompatible = fn (owner: shared U32) => @usage.borrow_mut owner (fn loan => 7)\n", .usage_evidence_mismatch);
-    try law("const moved = fn (owner: unique U32) => do:\n  let next = owner\n  break @usage.borrow owner (fn loan => @usage.read loan)\n", .borrow_conflict);
-    try law("const nested = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @usage.borrow loan (fn inner => @usage.read inner))\n", null);
+    try law("const inspect = func (owner: unique U32) => return do:\n  let result = @usage.borrow owner (func loan => return @usage.read loan)\n  break owner\n", null);
+    try law("const inspect = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @u32.add (@usage.read loan) (@usage.read loan))\n", null);
+    try law("const escape = func (owner: unique U32) => return @usage.borrow owner (func loan => return loan)\n", .borrow_escape);
+    try law("const escape = func (owner: unique U32) => return @usage.borrow owner (func loan => return func () => return @usage.read loan)\n", .borrow_escape);
+    try law("const conflict = func (owner: unique U32) => return @usage.borrow owner (func loan => return owner)\n", .borrow_conflict);
+    try law("const incompatible = func (owner: shared U32) => return @usage.borrow_mut owner (func loan => return 7)\n", .usage_evidence_mismatch);
+    try law("const moved = func (owner: unique U32) => return do:\n  let next = owner\n  break @usage.borrow owner (func loan => return @usage.read loan)\n", .borrow_conflict);
+    try law("const nested = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @usage.borrow loan (func inner => return @usage.read inner))\n", null);
 }
 
 test "usage loan callbacks cannot pass captured region authority to unknown callees" {
-    try law("const bad = fn (store: (Unit -> Unit ! {}) -> Unit ! {Foreign}) => fn (owner: unique U32) => @usage.borrow owner (fn loan => store (fn () => do:\n  let value = loan\n  break ()\n))\n", .borrow_escape);
-    try law("const size = fn (owner: unique (Array U32)) => @usage.borrow owner (fn loan => @usage.length loan)\n", null);
-    try law("const size = fn (owner: unique (List U32)) => @usage.borrow owner (fn loan => @usage.length loan)\n", null);
+    try law("const bad = func (store: (Unit -> Unit ! {}) -> Unit ! {Foreign}) => return func (owner: unique U32) => return @usage.borrow owner (func loan => return store (func () => return do:\n  let value = loan\n  break ()\n))\n", .borrow_escape);
+    try law("const size = func (owner: unique (Array U32)) => return @usage.borrow owner (func loan => return @usage.length loan)\n", null);
+    try law("const size = func (owner: unique (List U32)) => return @usage.borrow owner (func loan => return @usage.length loan)\n", null);
 }
 
 fn loanArtifact(allocator: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const inspect = fn (owner: unique U32) => do:\n  let result = @usage.borrow owner (fn loan => @usage.read loan)\n  break result\n";
+    const source = "const inspect = func (owner: unique U32) => return do:\n  let result = @usage.borrow owner (func loan => return @usage.read loan)\n  break result\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     var tokens = try lexer.lex(allocator, source);
@@ -264,7 +264,7 @@ fn loanArtifact(allocator: std.mem.Allocator, corrupt: bool) !void {
 
 test "usage immutable loan reads retain lexical region ownership and reject retired reads" {
     try loanArtifact(std.testing.allocator, true);
-    try portableControl("const nested = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @usage.borrow loan (fn inner => @usage.read inner))\n", .none);
+    try portableControl("const nested = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @usage.borrow loan (func inner => return @usage.read inner))\n", .none);
 }
 
 test "usage lexical loan publication releases every failed allocation" {
@@ -272,20 +272,20 @@ test "usage lexical loan publication releases every failed allocation" {
 }
 
 test "usage fresh scalar inputs preserve ownership without casting existing bindings" {
-    try law("const inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)\nentry const answer = fn () => inspect 9\n", null);
-    try law("const inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)\nconst bad = fn (existing: U32) => inspect existing\n", .type_mismatch);
-    try law("const inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)\nconst bad = fn (existing: shared U32) => inspect existing\n", .type_mismatch);
-    try law("const escape = fn (owner: unique U32) -> unique U32 => @usage.borrow owner (fn loan => loan)\n", .borrow_escape);
+    try law("const inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)\nentry const answer = func () => return inspect 9\n", null);
+    try law("const inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)\nconst bad = func (existing: U32) => return inspect existing\n", .type_mismatch);
+    try law("const inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)\nconst bad = func (existing: shared U32) => return inspect existing\n", .type_mismatch);
+    try law("const escape = func (owner: unique U32) : unique U32 => return @usage.borrow owner (func loan => return loan)\n", .borrow_escape);
 }
 
 test "usage immutable break operands retain executable owner moves" {
-    try portableControl("const carry = fn (callback: once (Unit -> U32)) => do:\n  let count = 0\n  for ever:\n    count := @u32.add self 1\n    break\n  break callback ()\n", .carry);
+    try portableControl("const carry = func (callback: once (Unit -> U32)) => return do:\n  let count = 0\n  for ever:\n    count := @u32.add self 1\n    break\n  break callback ()\n", .carry);
 }
 
 fn storedLoan(named: bool) !void {
     const a = std.testing.allocator;
-    var source: []const u8 = "const inspect = fn (store: (Unit -> U32 ! {}) -> U32 ! {Foreign}) => fn (owner: unique U32) => @usage.borrow owner (fn loan => do:\n  let callback = fn () => 7\n  break @u32.add (store callback) (@usage.read loan)\n)\n";
-    if (named) source = "const store = fn (callback: Unit -> U32 ! {}) => callback ()\nconst inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => do:\n  let callback = fn () => 7\n  break @u32.add (store callback) (@usage.read loan)\n)\n";
+    var source: []const u8 = "const inspect = func (store: (Unit -> U32 ! {}) -> U32 ! {Foreign}) => return func (owner: unique U32) => return @usage.borrow owner (func loan => return do:\n  let callback = func () => return 7\n  break @u32.add (store callback) (@usage.read loan)\n)\n";
+    if (named) source = "const store = func (callback: Unit -> U32 ! {}) => return callback ()\nconst inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return do:\n  let callback = func () => return 7\n  break @u32.add (store callback) (@usage.read loan)\n)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -328,14 +328,14 @@ test "usage portable calls reject hidden loan capture arguments through aliases"
 }
 
 test "resource scalar scopes check finite pure cleanup and fresh loans" {
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)\n", null);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => @panic \"cleanup\") (fn loan => @usage.read loan)\n", null);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => loan)\n", .borrow_escape);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => (fn () => ()) ()) (fn loan => ())\n", .cleanup_not_safe);
-    try law("const run = fn (drop: unique U32 -> Unit) => @resource.scope (fn () => 9) drop (fn loan => @usage.read loan)\n", .cleanup_not_safe);
-    try law("const run = fn () => @resource.scope (fn () => #[1]) (fn owner => ()) (fn loan => @usage.length loan)\n", null);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..3:\n    let value = index\n  break ()) (fn loan => ())\n", null);
-    try law("const run = @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)\n", .const_effect);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)\n", null);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return @panic \"cleanup\") (func loan => return @usage.read loan)\n", null);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return loan)\n", .borrow_escape);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return (func () => return ()) ()) (func loan => return ())\n", .cleanup_not_safe);
+    try law("const run = func (drop: unique U32 -> Unit) => return @resource.scope (func () => return 9) drop (func loan => return @usage.read loan)\n", .cleanup_not_safe);
+    try law("const run = func () => return @resource.scope (func () => return #[1]) (func owner => return ()) (func loan => return @usage.length loan)\n", null);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..3:\n    let value = index\n  break ()) (func loan => return ())\n", null);
+    try law("const run = @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)\n", .const_effect);
 }
 
 fn resourceArtifact(a: std.mem.Allocator, corrupt: bool, kind: enum { integer, unit, float, boolean, array, list }) !void {
@@ -343,13 +343,13 @@ fn resourceArtifact(a: std.mem.Allocator, corrupt: bool, kind: enum { integer, u
         .integer => "9",
         .unit => "()",
         .float => "1.5",
-        .boolean => "#True",
+        .boolean => "true",
         .array => "#[1, 2]",
         .list => "[1.5, 2.5]",
     };
     var read: []const u8 = "read";
     if (kind == .array or kind == .list) read = "length";
-    const source = try a.print("const run = fn () => @resource.scope (fn () => {s}) (fn owner => ()) (fn loan => @usage.{s} loan)\n", .{ literal, read });
+    const source = try a.print("const run = func () => return @resource.scope (func () => return {s}) (func owner => return ()) (func loan => return @usage.{s} loan)\n", .{ literal, read });
     defer a.free(source);
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -416,7 +416,7 @@ fn resourceArtifact(a: std.mem.Allocator, corrupt: bool, kind: enum { integer, u
     return error.TestUnexpectedResult;
 }
 test "resource cleanup cannot hide recursive member invocations in projections" {
-    try law("type Counter is data = #Counter Unit\nconst Counter.next: Counter -> U32 ! {} = fn counter => Counter.next counter\nconst run = fn (counter: Counter) => @resource.scope (fn () => 9) (fn owner => do:\n  let value = counter.next\n  break ()) (fn loan => @usage.read loan)\n", .cleanup_not_safe);
+    try law("type Counter is data = #Counter Unit\nconst Counter.next: Counter -> U32 ! {} = func counter => return Counter.next counter\nconst run = func (counter: Counter) => return @resource.scope (func () => return 9) (func owner => return do:\n  let value = counter.next\n  break ()) (func loan => return @usage.read loan)\n", .cleanup_not_safe);
 }
 
 test "resource immutable adapter and loan contracts cannot be forged" {
@@ -433,14 +433,14 @@ test "resource immutable scalar scopes preserve Unit Bool and F32 shapes" {
 }
 
 test "resource reference payloads own fresh primitive collections without binding promotion" {
-    try law("const run = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => @usage.length loan)\n", null);
-    try law("const run = fn () => @resource.scope (fn () => [1.5, 2.5]) (fn owner => ()) (fn loan => @usage.length loan)\n", null);
-    try law("const run = fn () => @resource.scope (fn () -> unique (Array U32) => #[]) (fn owner => ()) (fn loan => @usage.length loan)\n", null);
-    try law("const inspect = fn (owner: unique (Array U32)) => @usage.borrow owner (fn loan => @usage.length loan)\nconst run = fn () => inspect #[1, 2]\n", null);
-    try law("const run = fn (existing: Array U32) => @resource.scope (fn () => existing) (fn owner => ()) (fn loan => @usage.length loan)\n", .type_mismatch);
-    try law("const run = fn (existing: shared (Array U32)) => @resource.scope (fn () => existing) (fn owner => ()) (fn loan => @usage.length loan)\n", .type_mismatch);
-    try law("const run = fn () => @resource.scope (fn () => #[1, 2]) (fn owner => ()) (fn loan => loan)\n", .borrow_escape);
-    try portableControl("const run = fn () => @resource.scope (fn () => #[(1, 2)]) (fn owner => ()) (fn loan => ())\n", .none);
+    try law("const run = func () => return @resource.scope (func () => return #[1, 2]) (func owner => return ()) (func loan => return @usage.length loan)\n", null);
+    try law("const run = func () => return @resource.scope (func () => return [1.5, 2.5]) (func owner => return ()) (func loan => return @usage.length loan)\n", null);
+    try law("const run = func () => return @resource.scope (func () : unique (Array U32) => return #[]) (func owner => return ()) (func loan => return @usage.length loan)\n", null);
+    try law("const inspect = func (owner: unique (Array U32)) => return @usage.borrow owner (func loan => return @usage.length loan)\nconst run = func () => return inspect #[1, 2]\n", null);
+    try law("const run = func (existing: Array U32) => return @resource.scope (func () => return existing) (func owner => return ()) (func loan => return @usage.length loan)\n", .type_mismatch);
+    try law("const run = func (existing: shared (Array U32)) => return @resource.scope (func () => return existing) (func owner => return ()) (func loan => return @usage.length loan)\n", .type_mismatch);
+    try law("const run = func () => return @resource.scope (func () => return #[1, 2]) (func owner => return ()) (func loan => return loan)\n", .borrow_escape);
+    try portableControl("const run = func () => return @resource.scope (func () => return #[(1, 2)]) (func owner => return ()) (func loan => return ())\n", .none);
 }
 
 test "resource reference immutable scopes reject callable payload forgery and release failed publication" {
@@ -450,22 +450,22 @@ test "resource reference immutable scopes reject callable payload forgery and re
 }
 
 test "usage sharing consumes unique owners and permits repeated immutable scalar collection views" {
-    try law("const read = fn () => do:\n  let owner: unique (Array U32) = #[1, 2]\n  let convert: once (Unit -> shared (Array U32)) = fn () => @usage.share owner\n  let shared = convert ()\n  break @usage.length shared\n", null);
-    try law("const bad = fn (value: Array U32) => do:\n  let owner: unique (Array U32) = value\n  break @usage.share owner\n", .type_mismatch);
-    try law("const read: unique U32 -> shared U32 = fn owner => @usage.share owner\nconst size: shared (Array U32) -> U32 = fn values => @usage.length values\n", null);
-    try law("const read = fn (owner: unique U32) => do:\n  let shared = @usage.share owner\n  break @u32.add (@usage.read shared) (@usage.read shared)\n", null);
-    try law("const read = fn (owner: unique (Array U32)) => do:\n  let shared = @usage.share owner\n  break (@usage.length shared, @usage.length shared)\n", null);
-    try law("const read = fn (owner: unique (List F32)) => do:\n  let shared = @usage.share owner\n  break (@usage.length shared, @usage.length shared)\n", null);
-    try law("const reused = fn (owner: unique U32) => (@usage.share owner, owner)\n", .use_after_move);
-    try law("const reused = fn (owner: unique U32) => (@usage.share owner, @usage.share owner)\n", .use_after_move);
-    try law("const bad = fn (owner: shared U32) => @usage.share owner\n", .usage_evidence_mismatch);
-    try law("const bad = fn (owner: U32) => @usage.share owner\n", .usage_evidence_mismatch);
-    try law("const bad = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.share loan)\n", .usage_evidence_mismatch);
-    try law("const bad = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.share owner)\n", .borrow_conflict);
+    try law("const read = func () => return do:\n  let owner: unique (Array U32) = #[1, 2]\n  let convert: once (Unit -> shared (Array U32)) = func () => return @usage.share owner\n  let shared = convert ()\n  break @usage.length shared\n", null);
+    try law("const bad = func (value: Array U32) => return do:\n  let owner: unique (Array U32) = value\n  break @usage.share owner\n", .type_mismatch);
+    try law("const read: unique U32 -> shared U32 = func owner => return @usage.share owner\nconst size: shared (Array U32) -> U32 = func values => return @usage.length values\n", null);
+    try law("const read = func (owner: unique U32) => return do:\n  let shared = @usage.share owner\n  break @u32.add (@usage.read shared) (@usage.read shared)\n", null);
+    try law("const read = func (owner: unique (Array U32)) => return do:\n  let shared = @usage.share owner\n  break (@usage.length shared, @usage.length shared)\n", null);
+    try law("const read = func (owner: unique (List F32)) => return do:\n  let shared = @usage.share owner\n  break (@usage.length shared, @usage.length shared)\n", null);
+    try law("const reused = func (owner: unique U32) => return (@usage.share owner, owner)\n", .use_after_move);
+    try law("const reused = func (owner: unique U32) => return (@usage.share owner, @usage.share owner)\n", .use_after_move);
+    try law("const bad = func (owner: shared U32) => return @usage.share owner\n", .usage_evidence_mismatch);
+    try law("const bad = func (owner: U32) => return @usage.share owner\n", .usage_evidence_mismatch);
+    try law("const bad = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.share loan)\n", .usage_evidence_mismatch);
+    try law("const bad = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.share owner)\n", .borrow_conflict);
 }
 
 fn sharingArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const read = fn (owner: unique (Array U32)) => do:\n  let shared = @usage.share owner\n  break (shared, shared)\n";
+    const source = "const read = func (owner: unique (Array U32)) => return do:\n  let shared = @usage.share owner\n  break (shared, shared)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -512,9 +512,9 @@ test "usage sharing reconstructs portable consumption and rejects owning result 
 test "usage qualified returned callbacks preserve lambda and declaration header capture boundaries" {
     const a = std.testing.allocator;
     const source =
-        \\const local = fn (owner: unique U32) -> once (Unit -> unique U32) => fn () => owner
-        \\const declared: unique U32 -> once (Unit -> unique U32) = fn owner => fn () => owner
-        \\const flat: U32 -> Unit -> U32 = fn owner => fn () => owner
+        \\const local = func (owner: unique U32) : once (Unit -> unique U32) => return func () => return owner
+        \\const declared: unique U32 -> once (Unit -> unique U32) = func owner => return func () => return owner
+        \\const flat: U32 -> Unit -> U32 = func owner => return func () => return owner
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -546,21 +546,21 @@ test "usage qualified returned callbacks preserve lambda and declaration header 
 }
 
 test "resource transferred owners preserve explicit contracts and reject captured loan cleanup authority" {
-    try law("const make = fn () -> unique U32 ! {Foreign} => @resource.acquire (fn () => 9) (fn owner => ())\nconst forward = fn (owner: unique U32) => owner\nconst drop = fn (owner: unique U32) => @resource.release owner\n", null);
-    try law("const bad = fn (owner: unique U32) => @usage.borrow owner (fn loan => @resource.acquire (fn () => 9) (fn resource => do:\n  let read = @usage.read loan\n  break ()))\n", .cleanup_not_safe);
-    try law("const bad = fn (owner: shared U32) => @resource.release owner\n", .cleanup_not_safe);
-    try law("const bad = fn () => @resource.acquire (fn () => 9) (fn owner => @resource.release owner)\n", .cleanup_not_safe);
+    try law("const make = func () : unique U32 ! {Foreign} => return @resource.acquire (func () => return 9) (func owner => return ())\nconst forward = func (owner: unique U32) => return owner\nconst drop = func (owner: unique U32) => return @resource.release owner\n", null);
+    try law("const bad = func (owner: unique U32) => return @usage.borrow owner (func loan => return @resource.acquire (func () => return 9) (func resource => return do:\n  let read = @usage.read loan\n  break ()))\n", .cleanup_not_safe);
+    try law("const bad = func (owner: shared U32) => return @resource.release owner\n", .cleanup_not_safe);
+    try law("const bad = func () => return @resource.acquire (func () => return 9) (func owner => return @resource.release owner)\n", .cleanup_not_safe);
 }
 
 test "resource transferred owners cannot enter persistent module startup storage" {
-    try law("const owner = @resource.acquire (fn () => 9) (fn owner => ())\n", .const_effect);
-    try law("let owner = @resource.acquire (fn () => 9) (fn owner => ())\nentry const read = fn () => @usage.borrow owner (fn loan => @usage.read loan)\n", .initializer_effect);
-    try law("let owner = do:\n  use resource <- @resource.acquire (fn () => 9) (fn owner => ())\n  break @usage.share resource\nentry const read = fn () => @usage.read owner\n", .initializer_effect);
-    try law("let stored = do:\n  use resource <- @resource.acquire (fn () => 9) (fn owner => ())\n  let owner = @usage.share resource\n  break fn () => @usage.read owner\nentry const read = fn () => stored ()\n", .initializer_effect);
+    try law("const owner = @resource.acquire (func () => return 9) (func owner => return ())\n", .const_effect);
+    try law("let owner = @resource.acquire (func () => return 9) (func owner => return ())\nentry const read = func () => return @usage.borrow owner (func loan => return @usage.read loan)\n", .initializer_effect);
+    try law("let owner = do:\n  use resource <- @resource.acquire (func () => return 9) (func owner => return ())\n  break @usage.share resource\nentry const read = func () => return @usage.read owner\n", .initializer_effect);
+    try law("let stored = do:\n  use resource <- @resource.acquire (func () => return 9) (func owner => return ())\n  let owner = @usage.share resource\n  break func () => return @usage.read owner\nentry const read = func () => return stored ()\n", .initializer_effect);
 }
 
 fn transferredArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const make = fn () => @resource.acquire (fn () => #[1, 2]) (fn owner => ())\nconst drop = fn (owner: unique (Array U32)) => @resource.release owner\n";
+    const source = "const make = func () => return @resource.acquire (func () => return #[1, 2]) (func owner => return ())\nconst drop = func (owner: unique (Array U32)) => return @resource.release owner\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -597,16 +597,16 @@ test "resource transfer publication reconstructs owned effects and releases ever
 }
 
 test "resource cleanup exact range recipes check nested work and reject unknown bounds" {
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..3:\n    for inner in 0..4:\n      let value = @u32.add index inner\n  break ()) (fn loan => @usage.read loan)\n", null);
-    try law("const run = fn () => @resource.acquire (fn () => 9) (fn owner => do:\n  for index in 4..2:\n    let value = index\n  break ())\n", null);
-    try law("const run = fn (bound: U32) => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..bound:\n    let value = index\n  break ()) (fn loan => ())\n", .cleanup_not_safe);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..1000:\n    for inner in 0..1000:\n      let value = index\n  break ()) (fn loan => ())\n", .cleanup_not_safe);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..0:\n    let value = (fn () => ()) ()\n  break ()) (fn loan => ())\n", .cleanup_not_safe);
-    try law("const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for ever:\n    let value = 9\n  break ()) (fn loan => ())\n", .cleanup_not_safe);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..3:\n    for inner in 0..4:\n      let value = @u32.add index inner\n  break ()) (func loan => return @usage.read loan)\n", null);
+    try law("const run = func () => return @resource.acquire (func () => return 9) (func owner => return do:\n  for index in 4..2:\n    let value = index\n  break ())\n", null);
+    try law("const run = func (bound: U32) => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..bound:\n    let value = index\n  break ()) (func loan => return ())\n", .cleanup_not_safe);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..1000:\n    for inner in 0..1000:\n      let value = index\n  break ()) (func loan => return ())\n", .cleanup_not_safe);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..0:\n    let value = (func () => return ()) ()\n  break ()) (func loan => return ())\n", .cleanup_not_safe);
+    try law("const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for ever:\n    let value = 9\n  break ()) (func loan => return ())\n", .cleanup_not_safe);
 }
 
 fn finiteCleanupArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const run = fn () => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..3:\n    for inner in 1..4:\n      let value = @u32.add index inner\n  break ()) (fn loan => @usage.read loan)\n";
+    const source = "const run = func () => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..3:\n    for inner in 1..4:\n      let value = @u32.add index inner\n  break ()) (func loan => return @usage.read loan)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -673,11 +673,11 @@ test "resource cleanup finite range publication releases every failed allocation
 test "resource request cancellation admits invocation owners without closing unrelated effects" {
     const source =
         \\type Ask is effect = {ask: Unit -> U32}
-        \\entry const run = fn () => do:
-        \\  let computation = @computation (fn () => do:
-        \\    use owner <- @resource.acquire (fn () => 9) (fn resource => ())
+        \\entry const run = func () => return do:
+        \\  let computation = @computation (func () => return do:
+        \\    use owner <- @resource.acquire (func () => return 9) (func resource => return ())
         \\    use value <- Ask.ask ()
-        \\    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+        \\    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
         \\  )
         \\  for request in @requests computation:
         \\    case request of
@@ -693,14 +693,14 @@ test "resource request cancellation admits invocation owners without closing unr
 fn resourceRequestArtifact(a: std.mem.Allocator, corrupt: bool) !void {
     const source =
         \\type Ask is effect = {ask: Unit -> U32}
-        \\const keep = fn ~value => fn () => @force value
-        \\entry const run = fn () => do:
+        \\const keep = func ~value => return func () => return @force value
+        \\entry const run = func () => return do:
         \\  let delayed = keep (do:
-        \\    use owner <- @resource.acquire (fn () => 9) (fn resource => ())
+        \\    use owner <- @resource.acquire (func () => return 9) (func resource => return ())
         \\    use value <- Ask.ask ()
-        \\    break @usage.borrow owner (fn loan => @u32.add value (@usage.read loan))
+        \\    break @usage.borrow owner (func loan => return @u32.add value (@usage.read loan))
         \\  )
-        \\  let computation = @computation (fn () => delayed ())
+        \\  let computation = @computation (func () => return delayed ())
         \\  use first <- do:
         \\    for request in @requests computation:
         \\      case request of
@@ -778,25 +778,25 @@ test "resource request cancellation publication releases every allocation failur
 }
 
 test "resource retry demands reject consuming captured owners while creating fresh owners" {
-    try law("const keep = fn ~value => fn () => @force value\nconst bad = fn (owner: unique U32) => keep owner\n", .duplicate_owner);
-    try law("const keep = fn ~value => fn () => @force value\nconst bad = fn (owner: unique U32) => keep (@usage.share owner)\n", .duplicate_owner);
+    try law("const keep = func ~value => return func () => return @force value\nconst bad = func (owner: unique U32) => return keep owner\n", .duplicate_owner);
+    try law("const keep = func ~value => return func () => return @force value\nconst bad = func (owner: unique U32) => return keep (@usage.share owner)\n", .duplicate_owner);
 }
 
 test "usage nominal payload affinity follows closed owning fields and nested families" {
-    try law("type Box is data = #Box (unique U32)\nconst move = fn (owner: Box) => owner\n", null);
-    try law("type Box is data = #Box (unique U32)\nconst duplicate = fn (owner: Box) => (owner, owner)\n", .use_after_move);
-    try law("type Box is data = #Box (unique U32)\ntype Outer is data = #Outer Box\nconst duplicate = fn (owner: Outer) => (owner, owner)\n", .use_after_move);
-    try law("type Box is data = #Box (unique U32)\nconst bad = fn (owner: shared Box) => owner\n", .usage_evidence_mismatch);
-    try law("opaque type Box = unique U32\nconst move = fn (owner: Box) => owner\n", null);
+    try law("type Box is data = #Box (unique U32)\nconst move = func (owner: Box) => return owner\n", null);
+    try law("type Box is data = #Box (unique U32)\nconst duplicate = func (owner: Box) => return (owner, owner)\n", .use_after_move);
+    try law("type Box is data = #Box (unique U32)\ntype Outer is data = #Outer Box\nconst duplicate = func (owner: Outer) => return (owner, owner)\n", .use_after_move);
+    try law("type Box is data = #Box (unique U32)\nconst bad = func (owner: shared Box) => return owner\n", .usage_evidence_mismatch);
+    try law("opaque type Box = unique U32\nconst move = func (owner: Box) => return owner\n", null);
 }
 
 test "usage nominal Core independently reconstructs hidden affinity before allowing moves" {
-    try portableControl("type Box is data = #Box (unique U32)\nconst move = fn (owner: Box) => owner\n", .none);
-    try portableControl("opaque type Box = unique U32\nconst move = fn (owner: Box) => owner\n", .none);
+    try portableControl("type Box is data = #Box (unique U32)\nconst move = func (owner: Box) => return owner\n", .none);
+    try portableControl("opaque type Box = unique U32\nconst move = func (owner: Box) => return owner\n", .none);
 }
 
 fn nominalOwnershipArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "type Box is data = #Box (unique U32)\nopaque type Secret = unique U32\nconst move = fn (owner: Box) => owner\nconst secret = fn (owner: Secret) => owner\n";
+    const source = "type Box is data = #Box (unique U32)\nopaque type Secret = unique U32\nconst move = func (owner: Box) => return owner\nconst secret = func (owner: Secret) => return owner\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -846,11 +846,11 @@ test "usage nominal owned graphs reject erased hidden affinity and release every
 }
 
 test "resource host cleanup accepts exact synchronous descriptor roles and excludes ordinary callbacks" {
-    try portableControl("const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 9) (fn owner => do:\n  for index in 0..3:\n    let value = index\n  break drop owner) (fn loan => @usage.read loan)\n", .none);
-    try portableControl("const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 9) drop (fn loan => @usage.read loan)\n", .none);
-    try portableControl("const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => do:\n  use owner <- @resource.acquire (fn () => 9) drop\n  break @usage.borrow owner (fn loan => @usage.read loan)\n", .none);
-    try law("const run = fn (drop: (unique U32) -> Unit ! {Foreign}) => @resource.scope (fn () => 9) drop (fn loan => @usage.read loan)\n", .cleanup_not_safe);
-    try law("const run = fn (drop: cleanup ((unique U32) -> Unit)) => @resource.scope (fn () => 9) drop (fn loan => ())\n", .cleanup_not_safe);
+    try portableControl("const run = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 9) (func owner => return do:\n  for index in 0..3:\n    let value = index\n  break drop owner) (func loan => return @usage.read loan)\n", .none);
+    try portableControl("const run = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 9) drop (func loan => return @usage.read loan)\n", .none);
+    try portableControl("const run = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return do:\n  use owner <- @resource.acquire (func () => return 9) drop\n  break @usage.borrow owner (func loan => return @usage.read loan)\n", .none);
+    try law("const run = func (drop: (unique U32) -> Unit ! {Foreign}) => return @resource.scope (func () => return 9) drop (func loan => return @usage.read loan)\n", .cleanup_not_safe);
+    try law("const run = func (drop: cleanup ((unique U32) -> Unit)) => return @resource.scope (func () => return 9) drop (func loan => return ())\n", .cleanup_not_safe);
 }
 
 test "usage nominal DAG scans consume one shared work budget" {
@@ -879,7 +879,7 @@ test "usage nominal DAG scans consume one shared work budget" {
 }
 
 fn hostCleanupArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 9) drop (fn loan => @usage.read loan)\n";
+    const source = "const run = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 9) drop (func loan => return @usage.read loan)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -931,15 +931,15 @@ test "resource host cleanup publication releases every failed allocation" {
 }
 
 test "resource standalone explicit pure cleanup literals require finite source receipts" {
-    try portableControl("const drop: cleanup ((unique U32) -> Unit) = fn owner => do:\n  for index in 0..3:\n    let value = index\n  break ()\n", .none);
-    try portableControl("const run = fn () => do:\n  let drop: cleanup ((unique U32) -> Unit) = fn owner => ()\n  break ()\n", .none);
-    try law("const drop: cleanup ((unique U32) -> Unit) = fn owner => drop owner\n", .type_mismatch);
-    try law("const helper = fn () => ()\nconst drop: cleanup ((unique U32) -> Unit) = fn owner => helper ()\n", .cleanup_not_safe);
-    try law("const drop: cleanup ((unique U32) -> Unit) = fn owner => do:\n  for ever:\n    let value = 9\n  break ()\n", .cleanup_not_safe);
+    try portableControl("const drop: cleanup ((unique U32) -> Unit) = func owner => return do:\n  for index in 0..3:\n    let value = index\n  break ()\n", .none);
+    try portableControl("const run = func () => return do:\n  let drop: cleanup ((unique U32) -> Unit) = func owner => return ()\n  break ()\n", .none);
+    try law("const drop: cleanup ((unique U32) -> Unit) = func owner => return drop owner\n", .type_mismatch);
+    try law("const helper = func () => return ()\nconst drop: cleanup ((unique U32) -> Unit) = func owner => return helper ()\n", .cleanup_not_safe);
+    try law("const drop: cleanup ((unique U32) -> Unit) = func owner => return do:\n  for ever:\n    let value = 9\n  break ()\n", .cleanup_not_safe);
 }
 
 fn pureCleanupArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const drop: cleanup ((unique U32) -> Unit) = fn owner => do:\n  for index in 0..3:\n    let value = index\n  break ()\nconst run = fn () => do:\n  let adapter: cleanup ((unique U32) -> Unit) = fn owner => ()\n  break ()\n";
+    const source = "const drop: cleanup ((unique U32) -> Unit) = func owner => return do:\n  for index in 0..3:\n    let value = index\n  break ()\nconst run = func () => return do:\n  let adapter: cleanup ((unique U32) -> Unit) = func owner => return ()\n  break ()\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -1032,21 +1032,21 @@ test "usage nominal phantom package witnesses cannot erase affinity before paylo
     try phantomAffinePackage(std.testing.allocator, true);
 }
 test "usage nominal affinity cannot be lifted across a stage through an opaque payload" {
-    try law("type Box is data = #Box (unique U32)\nconst make = fn (value: Box) => @code.quote (@code.lift value)\n", .cross_stage_authority);
-    try law("opaque type Box = unique U32\nconst make = fn (value: Box) => @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("type Box is data = #Box (unique U32)\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("opaque type Box = unique U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
 }
 
 test "resource closed aggregate payloads preserve fresh ownership and reject hidden authority" {
-    try portableControl("const run = fn (value: U32) => @resource.scope (fn () => {left: value, right: #[value]}) (fn owner => @panic \"failure\") (fn loan => 42)\n", .none);
-    try portableControl("const run = fn () => @resource.scope (fn () => (7, #[1, 2])) (fn owner => ()) (fn loan => 42)\n", .none);
-    try portableControl("const run = fn () => @resource.scope (fn () => {left: 7, right: #[1, 2]}) (fn owner => ()) (fn loan => 42)\n", .none);
-    try portableControl("const run = fn () => @resource.scope (fn () => #[#[1, 2], #[3]]) (fn owner => ()) (fn loan => @usage.length loan)\n", .none);
-    try law("const run = fn () => @resource.scope (fn () => (7, fn () => 8)) (fn owner => ()) (fn loan => ())\n", .cleanup_not_safe);
-    try law("const run = fn (value: (U32, Array U32)) => @resource.scope (fn () => value) (fn owner => ()) (fn loan => ())\n", .type_mismatch);
+    try portableControl("const run = func (value: U32) => return @resource.scope (func () => return {left: value, right: #[value]}) (func owner => return @panic \"failure\") (func loan => return 42)\n", .none);
+    try portableControl("const run = func () => return @resource.scope (func () => return (7, #[1, 2])) (func owner => return ()) (func loan => return 42)\n", .none);
+    try portableControl("const run = func () => return @resource.scope (func () => return {left: 7, right: #[1, 2]}) (func owner => return ()) (func loan => return 42)\n", .none);
+    try portableControl("const run = func () => return @resource.scope (func () => return #[#[1, 2], #[3]]) (func owner => return ()) (func loan => return @usage.length loan)\n", .none);
+    try law("const run = func () => return @resource.scope (func () => return (7, func () => return 8)) (func owner => return ()) (func loan => return ())\n", .cleanup_not_safe);
+    try law("const run = func (value: (U32, Array U32)) => return @resource.scope (func () => return value) (func owner => return ()) (func loan => return ())\n", .type_mismatch);
 }
 
 fn aggregateResourceArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "const run = fn () => @resource.scope (fn () => {left: 7, right: #[#[1, 2], #[3]]}) (fn owner => @panic \"failure\") (fn loan => 42)\n";
+    const source = "const run = func () => return @resource.scope (func () => return {left: 7, right: #[#[1, 2], #[3]]}) (func owner => return @panic \"failure\") (func loan => return 42)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -1112,10 +1112,10 @@ test "resource closed aggregate shape walks charge repeated DAG edges to one bud
 }
 
 test "usage nominal repeatable owners still carry lifetime authority across lift and package boundaries" {
-    try law("opaque type Box = shared U32\nconst make = fn (value: Box) => @code.quote (@code.lift value)\n", .cross_stage_authority);
-    try law("type Box is data = #Box (shared U32)\ntype Outer is data = #Outer Box\nconst make = fn (value: Outer) => @code.quote (@code.lift value)\n", .cross_stage_authority);
-    try law("opaque type Box = shared U32\nconst hide = fn (value: Box) => pack [Box] value as exists [a] => a\n", .usage_evidence_mismatch);
-    try portableControl("opaque type Box = shared U32\nconst duplicate = fn (value: Box) => (value, value)\n", .none);
+    try law("opaque type Box = shared U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("type Box is data = #Box (shared U32)\ntype Outer is data = #Outer Box\nconst make = func (value: Outer) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("opaque type Box = shared U32\nconst hide = func (value: Box) => return pack [Box] value as exists [a] => a\n", .usage_evidence_mismatch);
+    try portableControl("opaque type Box = shared U32\nconst duplicate = func (value: Box) => return (value, value)\n", .none);
 }
 
 fn repeatableNominalArtifact(a: std.mem.Allocator, corrupt: bool) !void {
@@ -1168,15 +1168,15 @@ test "usage nominal repeatable lifetime metadata independently rejects erasure a
 }
 
 test "resource nominal closed storage owns fresh constructor payloads without hidden authority" {
-    try portableControl("type Box[a] is data = #Box a\nconst run = fn () => @resource.scope (fn () => #Box 7) (fn owner => ()) (fn loan => 42)\n", .none);
-    try portableControl("opaque type Box = {left: U32, right: Array U32}\nconst run = fn () => @resource.scope (fn () => #Box {left: 7, right: #[1, 2]}) (fn owner => ()) (fn loan => 42)\n", .none);
-    try law("opaque type Box = Unit -> U32\nconst run = fn () => @resource.scope (fn () => #Box (fn () => 7)) (fn owner => ()) (fn loan => ())\n", .cleanup_not_safe);
-    try portableControl("type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)\nconst run = fn () => @resource.scope (fn () => #Branch (#Leaf 7, #Leaf 9)) (fn owner => ()) (fn loan => 42)\n", .none);
-    try portableControl("const run = fn () => do:\n  let owner: unique {left: U32, right: Array U32} = {right: #[1, 2], left: 7}\n  break @usage.borrow owner (fn loan => 42)\n", .none);
+    try portableControl("type Box[a] is data = #Box a\nconst run = func () => return @resource.scope (func () => return #Box 7) (func owner => return ()) (func loan => return 42)\n", .none);
+    try portableControl("opaque type Box = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return #Box {left: 7, right: #[1, 2]}) (func owner => return ()) (func loan => return 42)\n", .none);
+    try law("opaque type Box = Unit -> U32\nconst run = func () => return @resource.scope (func () => return #Box (func () => return 7)) (func owner => return ()) (func loan => return ())\n", .cleanup_not_safe);
+    try portableControl("type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)\nconst run = func () => return @resource.scope (func () => return #Branch (#Leaf 7, #Leaf 9)) (func owner => return ()) (func loan => return 42)\n", .none);
+    try portableControl("const run = func () => return do:\n  let owner: unique {left: U32, right: Array U32} = {right: #[1, 2], left: 7}\n  break @usage.borrow owner (func loan => return 42)\n", .none);
 }
 
 fn closedNominalArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "type Box[a] is data = #Box a\nopaque type Secret = {left: U32, right: Array U32}\nconst run = fn () => @resource.scope (fn () => #Box 7) (fn owner => ()) (fn loan => 42)\nconst secret = fn () => @resource.scope (fn () => #Secret {right: #[1, 2], left: 7}) (fn owner => ()) (fn loan => 42)\n";
+    const source = "type Box[a] is data = #Box a\nopaque type Secret = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return #Box 7) (func owner => return ()) (func loan => return 42)\nconst secret = func () => return @resource.scope (func () => return #Secret {right: #[1, 2], left: 7}) (func owner => return ()) (func loan => return 42)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);

@@ -44,7 +44,7 @@ effect_operations = ("{" LAYOUT_NEWLINE? (fields:effect_operation (("," LAYOUT_N
 effect_operation = (name:source_identifier ":" signature:type_expression) ;
 data_type = (("data" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" | "type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "data" "=") "|"? constructors:constructor ("|" constructors:constructor)*) ;
 constructor = ("#" name:TYPE_IDENT payload:type_expression?) ;
-symbolic_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "(" symbol:(SYMBOL | "$" | "*" | "^" | "|") ")" "=" target:qualified_name) ;
+symbolic_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "(" symbol:(SYMBOL | "&" | "$" | "*" | "^" | "|") ")" "=" target:qualified_name) ;
 named_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "`" target:qualified_name "`") ;
 qualified_name = (root:(source_identifier | TYPE_IDENT) rest:("." (source_identifier | TYPE_IDENT))*) ;
 parameter = (demand:"~"? (name:source_identifier | "(" (typed:typed_parameter | pattern:pattern)? ")")) ;
@@ -67,7 +67,8 @@ constraint_body = ("{" LAYOUT_NEWLINE? (predicates:constraint_predicate ("," LAY
 constraint_predicate = (kind:qualified_name member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;
 demand_type = ("~" value:type_atom) ;
-type_atom = (code_type | descriptor_type | quantified_type | usage_type | qualified_name | type_binder | type_group | type_array | type_record | demand_type | proof_type) ;
+type_atom = (storage_type | code_type | descriptor_type | quantified_type | usage_type | qualified_name | type_binder | type_group | type_array | type_record | demand_type | proof_type) ;
+storage_type = (operator:("&" | "^") value:type_atom) ;
 code_type = ("code" "[" result:type_expression "," "row" effects:code_row "]") ;
 code_row = ("{" (labels:type_application ("," labels:type_application)*)? ("|" tail:source_identifier)? "}" | tail:source_identifier) ;
 descriptor_type = ("descriptor" value:type_atom) ;
@@ -80,17 +81,20 @@ type_binder = ("(" name:source_identifier ":" annotation:type_expression ")") ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
 
 expression = (value:(package_pack | package_unpack | lambda | do_block | case_expression | if_expression | receive | infix_expression)) ;
-lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:expression) ;
+lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:expression | body:do_block)) ;
 infix_expression = (head:prefix_expression tails:infix_tail*) ;
 // Standalone $, *, and ^ are also reserved by forwarding, imports, and patterns.
-infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | "|" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
-prefix_expression = (operator:(SYMBOL | "*" | "^")? value:application) ;
+infix_tail = (operator:(SYMBOL | "&" | "$" | "*" | "^" | "|" | "and" | "or" | named_operator) argument:(lambda | do_block | case_expression | if_expression | prefix_expression)) ;
+prefix_expression = (operator:(SYMBOL | "&" | "*" | "^")? value:application) ;
 named_operator = ("`" name:qualified_name "`") ;
-application = (head:atom arguments:(atom | member_access)*) ;
+application = (head:atom arguments:(atom | member_access | slice_access)*) ;
 member_access = ("." name:(source_identifier | TYPE_IDENT)) ;
-atom = (FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+atom = (boolean | FLOAT | INTEGER | STRING | INTRINSIC | PROOF_LENGTH | static_run | static_do | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+static_run = ("#" "run" value:expression) ;
+static_do = ("#" value:do_block) ;
 receive = ("|" value:(qualified_name | group) "|") ;
-constructor_reference = ("#" value:(record | qualified_name | "True" | "False")) ;
+boolean = ("true" | "false") ;
+constructor_reference = ("#" value:(record | qualified_name)) ;
 selector = ("·" name:(source_identifier | TYPE_IDENT) ("." name:(source_identifier | TYPE_IDENT))*) ;
 type_witness = (":" value:atom) ;
 if_expression = ("if" condition:infix_expression "then" consequence:expression "else" alternative:expression) ;
@@ -113,12 +117,12 @@ case_expression = ("case" values:expression ("," values:expression)* "of" body:c
 case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
 case_arm = (alternatives:pattern_row ("|" alternatives:pattern_row)* ("if" guard:expression)? "=>" body:expression LAYOUT_NEWLINE) ;
 pattern_row = (patterns:pattern ("," patterns:pattern)*) ;
-pattern = (source_identifier | INTEGER | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_constructor_pattern) ;
-boolean_constructor_pattern = ("#" value:("True" | "False")) ;
+pattern = (source_identifier | INTEGER | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_pattern) ;
+boolean_pattern = (value:("true" | "false")) ;
 value_pattern = ("^" name:qualified_name) ;
 constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:record_pattern | payload:constructor_payload)?) ;
 // Braces after a constructor always name its fields, never a record payload.
-constructor_payload = (source_identifier | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_constructor_pattern) ;
+constructor_payload = (source_identifier | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_pattern) ;
 qualified_constructor = (((source_identifier | TYPE_IDENT) ".")+ TYPE_IDENT) ;
 pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
@@ -128,6 +132,7 @@ statement = (value:(binding | rebinding | effect_binding | effect_step | functio
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:source_identifier path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
+slice_access = ("[" start:expression ".." end:expression "]") ;
 for_statement = ("for" "let"? pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;
 range_statement = ("for" start:expression ".." end:expression ":" body:suite) ;
 ever_statement = ("for" "ever" ":" body:suite) ;
@@ -150,12 +155,12 @@ else_clause = (LAYOUT_NEWLINE? "else" ":" alternative:suite) ;
 // At this nesting level a pipe begins comprehension qualifiers or a cons tail.
 // Parenthesized and nested expressions retain the ordinary operator grammar.
 collection_expression = (value:(collection_lambda | do_block | case_expression | collection_if | collection_infix)) ;
-collection_lambda = ("fn" parameter:parameter+ result:("->" type_expression)? "=>" body:collection_expression) ;
+collection_lambda = ("func" parameter:parameter ("->" parameter:parameter)* result:(":" type_expression)? "=>" ("return" body:collection_expression | body:do_block)) ;
 collection_if = ("if" condition:collection_infix "then" consequence:collection_expression "else" alternative:collection_expression) ;
 collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
-collection_infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
+collection_infix_tail = (operator:(SYMBOL | "&" | "$" | "*" | "^" | "and" | "or" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;
 
-source_identifier = (IDENT | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
+source_identifier = (IDENT | "run" | "code" | "descriptor" | "forall" | "exists" | "row" | "region" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent") ;
 
 quantified_type = (kind:("forall" | "exists") "[" binders:quantified_binder ("," binders:quantified_binder)* "]" where:quantified_where? "=>" body:type_expression) ;
 quantified_binder = (sort:("row" | "region")? name:(IDENT | "forall" | "exists" | "pack" | "unpack" | "where" | "unique" | "shared" | "borrow" | "borrow_mut" | "once" | "many" | "cleanup" | "concurrent")) ;

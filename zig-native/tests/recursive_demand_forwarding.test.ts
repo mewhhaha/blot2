@@ -12,10 +12,10 @@ for (const annotation of ["", ": U32 -> ~U32 -> U32"]) {
   Deno.test(`recursive demand forwarding terminates through curried calls ${annotation}`, async () => {
     await compileAndRun(
       `
-const recursive${annotation} = fn (count: U32) => fn ~(value: U32) =>
+const recursive${annotation} = func (count: U32) => return func ~(value: U32) => return
   if @u32.eq count 0 then @demand value
   else recursive (@u32.sub count 1) (@demand value)
-entry const run = fn (count: U32) => recursive count 42
+entry const run = func (count: U32) => return recursive count 42
 `,
       (guest) => {
         for (const count of [0, 1, 2, 9, 32]) {
@@ -27,13 +27,13 @@ entry const run = fn (count: U32) => recursive count 42
   Deno.test(`mutual demand forwarding keeps one shared argument ${annotation}`, async () => {
     await compileAndRun(
       `
-const even${annotation} = fn (count: U32) => fn ~(value: U32) =>
+const even${annotation} = func (count: U32) => return func ~(value: U32) => return
   if @u32.eq count 0 then @u32.add (@demand value) (@demand value)
   else odd (@u32.sub count 1) (@demand value)
-const odd${annotation} = fn (count: U32) => fn ~(value: U32) =>
+const odd${annotation} = func (count: U32) => return func ~(value: U32) => return
   if @u32.eq count 0 then @u32.add (@demand value) (@demand value)
   else even (@u32.sub count 1) (@demand value)
-entry const run = fn (count: U32) => even count 21
+entry const run = func (count: U32) => return even count 21
 `,
       (guest) => {
         for (const count of [0, 1, 2, 9, 32]) {
@@ -47,8 +47,8 @@ entry const run = fn (count: U32) => even count 21
 Deno.test("recursive demand mode remains checked in unused ill-typed bodies", async () => {
   await compileExpectedFailure(
     `
-const wrong: ~U32 -> U32 = fn ~(value: U32) =>
-  if #True then wrong (@demand value) else #False
+const wrong: ~U32 -> U32 = func ~(value: U32) => return
+  if true then wrong (@demand value) else false
 entry const unused = 42
 `,
     "type_mismatch",
@@ -68,10 +68,10 @@ Deno.test("recursive demand forwarding preserves retained edits rejection and re
     cacheDirectory: false as const,
   };
   const source = (value: number) => `
-const recursive = fn (count: U32) => fn ~value =>
+const recursive = func (count: U32) => return func ~value => return
   if @u32.eq count 0 then @demand value
   else recursive (@u32.sub count 1) (@demand value)
-entry const run = fn (count: U32) => recursive count ${value}
+entry const run = func (count: U32) => return recursive count ${value}
 `;
   const retained = await createZigProjectCompiler(options);
   try {
@@ -98,7 +98,7 @@ entry const run = fn (count: U32) => recursive count ${value}
         await fresh.dispose();
       }
       const rejected = await retained.build({
-        sources: { [entry]: source(value) + "\nconst wrong: U32 = #False\n" },
+        sources: { [entry]: source(value) + "\nconst wrong: U32 = false\n" },
       });
       assert(!rejected.success);
       assert.equal(rejected.revision, revision);

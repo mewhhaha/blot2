@@ -3,12 +3,12 @@ import { equal } from "./compile_helpers.ts";
 
 const prelude = `
 infixl 60 (+) = add
-const add = fn left => fn right => @type.call "add" left right
-const U32.add = fn left => fn right => @u32.sub left right
-const F32.add = fn left => fn right => @f32.add left right
-const U32.to_f32 = fn (value: U32) => @u32.to_f32 value
-const convert = fn value => value.to_f32
-const identity = fn value => value
+const add = func left => return func right => return @type.call "add" left right
+const U32.add = func left => return func right => return @u32.sub left right
+const F32.add = func left => return func right => return @f32.add left right
+const U32.to_f32 = func (value: U32) => return @u32.to_f32 value
+const convert = func value => return value.to_f32
+const identity = func value => return value
 type Maybe value is data = #Some value | #Nothing
 `;
 
@@ -19,12 +19,12 @@ async function fixture(run: (dir: string) => Promise<void>): Promise<void> {
     await Deno.writeTextFile(`${dir}/helper.blot`, "const base = identity 44\n");
     await Deno.writeTextFile(`${dir}/main.blot`, `
 import { base } from "./helper"
-entry const ordinary = fn () -> U32 => base + 2
-entry const primitive = fn () -> U32 => @u32.add 40 2
-entry const floating = fn () -> F32 => identity (1.5 + 2.5)
-entry const converted = fn (value: U32) -> F32 => convert value
-entry const accessor = fn (value: U32) -> F32 => (.to_f32) value
-entry const nominal = fn (value: U32) -> U32 => case #Some value of
+entry const ordinary = func () : U32 => return base + 2
+entry const primitive = func () : U32 => return @u32.add 40 2
+entry const floating = func () : F32 => return identity (1.5 + 2.5)
+entry const converted = func (value: U32) : F32 => return convert value
+entry const accessor = func (value: U32) : F32 => return (.to_f32) value
+entry const nominal = func (value: U32) : U32 => return case #Some value of
   #Some item => identity item
   #Nothing => 0
 `);

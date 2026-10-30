@@ -2,6 +2,7 @@
 //! fresh type variables and their own numeric obligations. Every declaration is
 //! checked, including declarations not reachable from an entrypoint.
 const std = @import("std");
+const storage_types = @import("storage_types.zig");
 const region_arena = @import("../eval/region_arena.zig");
 const ast = @import("../parse/ast.zig");
 const symbols = @import("../parse/symbols.zig");
@@ -334,7 +335,7 @@ pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { function_return_required, task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_demand_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -506,6 +507,7 @@ pub const Diagnostic = struct {
             .call_arity => "This compiler primitive requires its exact literal and operand arguments",
             .break_scope => "Break requires an enclosing loop in this function",
             .continue_scope => "Continue requires an enclosing loop in this function",
+            .function_return_required => "Every path through a function do block must return explicitly",
             .invalid_return => "Loop control cannot escape a suspended argument",
             .unreachable_statement => switch (self.source_terminator) {
                 .return_, .break_, .yield_ => "statement after return in the same suite",
@@ -956,6 +958,7 @@ const Engine = struct {
     function_body: ast.Id = 0,
     function_exit_allowed: bool = false,
     function_exit_target: T.Id = 0,
+    function_result_expected: T.Id = 0,
     function_exit_lambdas: std.ArrayList(ast.Id) = .empty,
     /// The case being checked as a statement, whose value is discarded.
     statement_case: ast.Id = 0,
@@ -1827,10 +1830,9 @@ const Engine = struct {
         self.constrainEquationRoot(left, right, id) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.InfiniteType => try self.diagnostic(.infinite_type, id),
-            error.TypeMismatch => try self.diagnostic(.type_mismatch, id),
             error.InfiniteEffect => try self.diagnostic(.infinite_effect, id),
-            error.EffectMismatch => {
-                try self.diagnostic(.effect_mismatch, id);
+            error.TypeMismatch, error.EffectMismatch => {
+                try self.diagnostic(if (err == error.TypeMismatch) .type_mismatch else .effect_mismatch, id);
                 const display = @import("../reuse/type_display.zig");
                 const application = self.tree.node(id).tag == .apply;
                 const first = self.types.node(self.types.head(left, 0));
@@ -1855,7 +1857,8 @@ const Engine = struct {
                 }
                 var detail: std.ArrayList(u8) = .empty;
                 defer detail.deinit(self.allocator);
-                try display.text(self, &detail, if (arguments) "Effect rows do not match; expected argument: " else "Effect rows do not match; one side: ");
+                try display.text(self, &detail, if (err == error.TypeMismatch) "Types do not match; " else "Effect rows do not match; ");
+                try display.text(self, &detail, if (arguments) "expected argument: " else "one side: ");
                 try display.text(self, &detail, expected.items);
                 try display.text(self, &detail, if (arguments) "; actual argument: " else "; other side: ");
                 try display.text(self, &detail, actual.items);
@@ -2029,18 +2032,7 @@ const Engine = struct {
         return .none;
     }
     fn identityOf(self: *const Engine, ty: T.Id) ?Identity {
-        const n = self.types.node(self.types.head(ty, 0));
-        return switch (n.tag) {
-            .nominal => .{ .unit = n.a, .decl = n.b },
-            .u32 => .{ .unit = 0, .decl = T.u32_type },
-            .f32 => .{ .unit = 0, .decl = T.f32_type },
-            .boolean => .{ .unit = 0, .decl = T.boolean },
-            .unit => .{ .unit = 0, .decl = T.unit },
-            .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
-            .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
-            .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
-            else => null,
-        };
+        return T.receiverIdentity(self.types.node(self.types.head(ty, 0)));
     }
     fn indexAssociated(self: *Engine) T.Error!void {
         var globals = self.catalogs.globals.iterator();
@@ -2056,10 +2048,10 @@ const Engine = struct {
                 if (self.nominals.items[index].alias == 0) identity = self.nominals.items[index].identity;
             };
             if (identity == null and self.builtin_catalog) {
-                if (std.mem.eql(u8, head, "U32")) identity = .{ .unit = 0, .decl = T.u32_type } else if (std.mem.eql(u8, head, "F32")) identity = .{ .unit = 0, .decl = T.f32_type } else if (std.mem.eql(u8, head, "Bool")) identity = .{ .unit = 0, .decl = T.boolean } else if (std.mem.eql(u8, head, "Unit")) identity = .{ .unit = 0, .decl = T.unit } else if (std.mem.eql(u8, head, "Array")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) } else if (std.mem.eql(u8, head, "List")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 } else if (std.mem.eql(u8, head, "Cursor")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 };
+                if (std.mem.eql(u8, head, "U32")) identity = .{ .unit = 0, .decl = T.u32_type } else if (std.mem.eql(u8, head, "F32")) identity = .{ .unit = 0, .decl = T.f32_type } else if (std.mem.eql(u8, head, "Bool")) identity = .{ .unit = 0, .decl = T.boolean } else if (std.mem.eql(u8, head, "Unit")) identity = .{ .unit = 0, .decl = T.unit } else if (std.mem.eql(u8, head, "Array")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) } else if (std.mem.eql(u8, head, "List")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 } else if (std.mem.eql(u8, head, "Cursor")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 } else if (storage_types.named(head)) |kind| identity = .{ .unit = std.math.maxInt(u32), .decl = @backingInt(kind) };
             }
             if (identity) |owner| {
-                if (owner.unit != 0 and owner.unit != self.unit) continue;
+                if (owner.unit != 0 and owner.unit != self.unit and !(self.builtin_catalog and storage_types.identity(owner.unit, owner.decl) != null)) continue;
                 const operator = memberOperator(text[dot + 1 ..]);
                 const index: u32 = @intCast(self.associated.items.len);
                 try self.associated.append(self.allocator, .{ .identity = owner, .member = member, .operator = operator, .binding = entry.value_ptr.* });
@@ -2295,6 +2287,7 @@ const Engine = struct {
             },
             .type_name => {
                 const name = self.pool.get(node.a);
+                if (storage_types.named(name) != null) return;
                 if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null) _ = try self.typeVariable(node.a, id);
             },
             .effect_row => {
@@ -5005,6 +4998,94 @@ const Engine = struct {
         self.expr_types[original] = ty;
         return ty;
     }
+    fn storageApplication(self: *Engine, id: ast.Id) T.Error!?T.Id {
+        const ops = @import("storage_ops.zig");
+        var head = id;
+        var backwards: [3]ast.Id = undefined;
+        var count: usize = 0;
+        while (self.tree.node(head).tag == .apply) {
+            const application = self.tree.node(head);
+            if (count < backwards.len) backwards[count] = application.b;
+            count += 1;
+            head = application.a;
+        }
+        const syntax = self.tree.node(head);
+        if (syntax.tag != .intrinsic) return null;
+        const op = ops.lookup(self.pool.get(syntax.a)) orelse return null;
+        if (count != ops.arity(op)) {
+            try self.diagnostic(.call_arity, id);
+            return try self.types.fresh();
+        }
+        const first = backwards[count - 1];
+        const input = try self.expression(first);
+        const resolved = try self.types.resolve(input, 0);
+        const kind = storage_types.info(&self.types, resolved);
+        const element = storage_types.arrayElement(&self.types, resolved) orelse
+            (if (kind) |value| (if (value.kind == .view) value.element else null) else null);
+        var result: T.Id = T.unit;
+        var valid = true;
+        switch (op) {
+            .ref => {
+                var place = first;
+                while (self.tree.node(place).tag == .group) place = self.tree.node(place).a;
+                valid = self.tree.node(place).tag == .name or self.tree.node(place).tag == .field_access;
+                result = try storage_types.make(&self.types, .ref, input);
+            },
+            .at, .link, .view => {
+                valid = element != null and (op != .link or (kind == null or kind.?.kind == .grow));
+                const target = element orelse try self.types.fresh();
+                result = try storage_types.make(&self.types, switch (op) {
+                    .at => .ref,
+                    .link => .link,
+                    else => .view,
+                }, target);
+                for (backwards[0 .. count - 1]) |argument| try self.constrain(try self.expression(argument), T.u32_type, argument);
+            },
+            .load, .write => {
+                valid = if (kind) |value| value.kind == .ref or value.kind == .link else false;
+                const target = if (valid) kind.?.element else try self.types.fresh();
+                if (op == .load) result = target else try self.constrain(try self.expression(backwards[0]), target, backwards[0]);
+            },
+            .length => {
+                valid = element != null;
+                result = T.u32_type;
+            },
+            .read => {
+                valid = element != null;
+                try self.constrain(try self.expression(backwards[0]), T.u32_type, backwards[0]);
+                result = element orelse try self.types.fresh();
+            },
+            .push => {
+                valid = if (kind) |value| value.kind == .grow or value.kind == .resize else false;
+                try self.constrain(try self.expression(backwards[0]), element orelse try self.types.fresh(), backwards[0]);
+            },
+            .reserve => {
+                valid = if (kind) |value| value.kind == .grow or value.kind == .resize else false;
+                const argument = backwards[0];
+                try self.constrain(try self.expression(argument), T.u32_type, argument);
+                var literal = argument;
+                while (self.tree.node(literal).tag == .group) literal = self.tree.node(literal).a;
+                if (self.tree.node(literal).tag != .integer) {
+                    try self.diagnostic(.literal_required, argument);
+                    self.diagnostics.items[self.diagnostics.items.len - 1].detail = try self.allocator.dupe(u8, "@storage.reserve requires a U32 integer literal element count");
+                }
+            },
+            .pop, .truncate => {
+                valid = if (kind) |value| value.kind == .resize else false;
+                if (op == .pop) result = element orelse try self.types.fresh() else try self.constrain(try self.expression(backwards[0]), T.u32_type, backwards[0]);
+            },
+            .freeze => {
+                valid = if (kind) |value| value.kind == .grow or value.kind == .resize else false;
+                result = try self.types.array(element orelse try self.types.fresh());
+            },
+            .copy => {
+                valid = element != null and (kind == null or kind.?.kind != .view);
+                result = input;
+            },
+        }
+        if (!valid) try self.diagnostic(.type_mismatch, first);
+        return result;
+    }
     fn stagingApplication(self: *Engine, id: ast.Id) T.Error!?T.Id {
         var head = id;
         var backwards: [2]ast.Id = undefined;
@@ -5023,6 +5104,14 @@ const Engine = struct {
             return try self.types.fresh();
         }
         const operand = backwards[count - 1];
+        if (op == .evaluate) {
+            const parent = self.ambient;
+            self.ambient = try self.types.freshEffects();
+            defer self.ambient = parent;
+            const result = try self.expression(operand);
+            try self.constrainEffects(self.ambient, 0, operand);
+            return result;
+        }
         if (op == .quote) {
             if (self.staging_depth >= 128) {
                 try self.diagnostic(.staging_budget, id);
@@ -7617,6 +7706,13 @@ const Engine = struct {
             return result;
         }
         const name = self.tree.node(head).a;
+        if (storage_types.named(self.pool.get(name))) |kind| if (std.mem.startsWith(u8, self.pool.get(name), "@storage.") or self.catalogs.nominal_names.get(self.catalogKey(name)) == null) {
+            if (arguments.len != 1) {
+                try self.typeArity(source, if (arguments.len == 0) .missing_nominal else .extra);
+                return self.types.fresh();
+            }
+            return storage_types.make(&self.types, kind, try self.annotation(arguments[0]));
+        };
         if (try self.projectionAnnotation(name, arguments, source)) |projection| return projection;
         if (std.mem.eql(u8, self.pool.get(name), "Array") or std.mem.eql(u8, self.pool.get(name), "List") or std.mem.eql(u8, self.pool.get(name), "Cursor")) {
             if (arguments.len == 0) {
@@ -7721,7 +7817,7 @@ const Engine = struct {
                     break;
                 }
             }
-        } else if (n.tag == .nominal) {
+        } else if (n.tag == .nominal and storage_types.identity(n.a, n.b) == null) {
             identity = .{ .unit = n.a, .decl = n.b };
             const index = self.nominalIndex(identity) orelse {
                 try self.diagnostic(.unknown_field, source);
@@ -8951,7 +9047,29 @@ const Engine = struct {
             self.expr_types[source] = value;
             return value;
         }
-        const expected = self.types.node(try self.types.resolve(required, 0));
+        const resolved_required = try self.types.resolve(required, 0);
+        const expected = self.types.node(resolved_required);
+        if (storage_types.info(&self.types, resolved_required)) |storage| {
+            if (storage.kind == .grow or storage.kind == .resize) {
+                if (syntax.tag == .array and syntax.c == 0) {
+                    for (self.tree.children(source)) |child| {
+                        const value = try self.contextualLambda(child, storage.element);
+                        try self.constrain(value, storage.element, child);
+                    }
+                    self.expr_types[source] = required;
+                    return required;
+                }
+                if (syntax.tag == .if_expr) {
+                    try self.constrain(try self.expression(syntax.a), T.boolean, syntax.a);
+                    const left = try self.contextualLambda(syntax.b, required);
+                    const right = try self.contextualLambda(syntax.c, required);
+                    try self.constrain(left, required, syntax.b);
+                    try self.constrain(right, required, syntax.c);
+                    self.expr_types[source] = required;
+                    return required;
+                }
+            }
+        }
         if (expected.tag == .usage and (expected.b == @backingInt(T.UsageKind.unique) or expected.b == @backingInt(T.UsageKind.shared))) {
             var constructor = syntax.tag == .constructor_ref;
             if (syntax.tag == .apply) {
@@ -10570,7 +10688,7 @@ const Engine = struct {
         const required = if (declaration.annotation != 0) try self.declaredProofAnnotation(binding, declaration.annotation) else 0;
         if (declaration.annotation != 0) {
             const written = self.tree.node(declaration.annotation);
-            if (written.tag == .type_usage or try self.types.containsQuantifier(required) or try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, required) or (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder) or self.proofContract(binding) != null) self.expr_types[declaration.annotation] = required;
+            if (storage_types.isArray(&self.types, self.types.head(required, 0)) or written.tag == .type_usage or try self.types.containsQuantifier(required) or try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, required) or (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder) or self.proofContract(binding) != null) self.expr_types[declaration.annotation] = required;
             if (self.types.node(required).tag == .forall) try self.types.bindRankAnnotation(self.bindings.items[binding].ty, required);
         }
         self.body_elaborations += 1;
@@ -11636,6 +11754,7 @@ const Engine = struct {
         try self.constrain(item.ty, shape, id);
     }
     fn intrinsicArity(name: []const u8) ?usize {
+        if (@import("storage_ops.zig").lookup(name)) |op| return @import("storage_ops.zig").arity(op);
         if (@import("task_types.zig").lookup(name)) |operation| return @import("task_types.zig").arity(operation);
         if (staging.lookup(name)) |op| return staging.arity(op);
         if (proof_terms.constructor(name) != null) return 2;
@@ -11666,6 +11785,9 @@ const Engine = struct {
         return null;
     }
     fn constrainCollection(self: *Engine, owner: T.Id, element: T.Id, source: ast.Id) T.Error!void {
+        if (storage_types.readableElement(&self.types, self.types.head(owner, 0))) |actual| {
+            return self.constrain(element, actual, source);
+        }
         const tag = self.types.node(self.types.head(owner, 0)).tag;
         if (tag == .variable) {
             try self.appendPending(.{ .owner = self.current, .value = .{ .kind = .collection, .ty = owner, .result = element, .source = source } });
@@ -12110,7 +12232,9 @@ const Engine = struct {
         const owner = try self.expression(node.a);
         const index = try self.expression(node.b);
         const element = try self.types.fresh();
-        try self.constrain(owner, try self.types.sequence(.array, element), id);
+        if (storage_types.readableElement(&self.types, self.types.head(owner, 0))) |actual| {
+            try self.constrain(element, actual, id);
+        } else try self.constrain(owner, try self.types.sequence(.array, element), id);
         try self.constrain(index, T.u32_type, node.b);
         return element;
     }
@@ -12183,6 +12307,7 @@ const Engine = struct {
         const saved_function_body = self.function_body;
         const saved_function_exit_allowed = self.function_exit_allowed;
         const saved_function_exit_target = self.function_exit_target;
+        const saved_function_result_expected = self.function_result_expected;
         const saved_loops = self.loop_stack;
         const saved_escape = self.suspended_loop_escape;
         const saved_resolver = self.resolver_scope;
@@ -12211,6 +12336,7 @@ const Engine = struct {
             self.function_body = saved_function_body;
             self.function_exit_allowed = saved_function_exit_allowed;
             self.function_exit_target = saved_function_exit_target;
+            self.function_result_expected = saved_function_result_expected;
         }
         if (parameter.name != 0) {
             const binding = try self.addBinding(.{ .name = parameter.name, .declaration = node.a, .owner = id, .kind = .parameter, .ty = parameter_ty });
@@ -12221,10 +12347,17 @@ const Engine = struct {
         self.expr_types[node.a] = parameter_ty;
         const result_annotation = if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) self.tree.node(node.c).a else node.c;
         const required = if (result_annotation != 0) try self.annotation(result_annotation) else 0;
+        self.function_result_expected = if (required != 0) required else if (contextual) required_arrow.b else 0;
         if (node.c != 0 and self.tree.node(node.c).tag == .type_effect) try self.constrainEffects(latent, try self.annotationEffects(self.tree.node(node.c).b), id);
         var result: T.Id = 0;
         self.function_body = node.b;
         if (required != 0) result = try self.contextualLambda(node.b, required) else if (contextual) result = try self.contextualLambda(node.b, required_arrow.b) else result = try self.expression(node.b);
+        if (parameter.requires_return) {
+            // A constructor parameter's synthetic binding block wraps the
+            // written do body. Only that written body proves explicit exits.
+            const written = if (parameter.pattern_bound) self.tree.node(self.tree.children(node.b)[1]).a else node.b;
+            if (self.function_exit_target == 0 or try self.types.resolve(self.expr_types[written], 0) != T.never) try self.diagnostic(.function_return_required, id);
+        }
         if (self.function_exit_target != 0) {
             try self.function_exit_lambdas.append(self.allocator, id);
             if (try self.types.resolve(result, 0) != T.never) try self.constrain(self.function_exit_target, result, id);
@@ -12302,6 +12435,7 @@ const Engine = struct {
             self.expr_types[direct_source] = try self.types.function(input, result);
             return result;
         }
+        if (try self.storageApplication(id)) |ty| return ty;
         if (try self.taskApplication(id)) |ty| return ty;
         if (try self.resourceScope(id)) |ty| return ty;
         if (try self.usageBorrow(id)) |ty| return ty;
@@ -12383,7 +12517,7 @@ const Engine = struct {
         const saved_exact = self.exact_argument_types;
         self.exact_argument_types = saved_exact or try self.evidenceCall(node.a, 0);
         const argument = blk_argument: {
-            if (function.tag == .function and (self.types.node(try self.types.resolve(function.a, 0)).tag == .forall or self.types.node(self.types.head(function.a, 0)).tag == .usage)) break :blk_argument try self.contextualLambda(node.b, function.a);
+            if (function.tag == .function and (self.types.node(try self.types.resolve(function.a, 0)).tag == .forall or self.types.node(self.types.head(function.a, 0)).tag == .usage or storage_types.isArray(&self.types, self.types.head(function.a, 0)))) break :blk_argument try self.contextualLambda(node.b, function.a);
             break :blk_argument self.checkArgument(node.b, lazy);
         } catch |err| {
             self.exact_argument_types = saved_exact;
@@ -12534,7 +12668,7 @@ const Engine = struct {
             self.arm_nested_return = 0;
         }
         var result = try self.types.fresh();
-        if (self.expected_lambda_source == id and self.types.node(self.types.head(self.expected_lambda_type, 0)).tag == .erased_proof) result = self.expected_lambda_type;
+        if (self.expected_lambda_source == id and (self.types.node(self.types.head(self.expected_lambda_type, 0)).tag == .erased_proof or storage_types.isArray(&self.types, self.types.head(self.expected_lambda_type, 0)))) result = self.expected_lambda_type;
         self.resolver_scope = .{};
         var block_index: u32 = 0;
         if (resolver_type != 0) {
@@ -12639,7 +12773,7 @@ const Engine = struct {
                 const declaration = self.tree.valueDecl(self.bindings.items[self.current].declaration);
                 if (declaration.body == body and declaration.annotation != 0) {
                     const written = self.tree.node(declaration.annotation);
-                    if ((self.expr_types[declaration.annotation] != 0 and (try self.types.containsQuantifier(self.expr_types[declaration.annotation]) or try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, self.expr_types[declaration.annotation]))) or self.proofContract(self.current) != null or written.tag == .type_usage or (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder)) return self.contextualLambda(body, self.expr_types[declaration.annotation]);
+                    if ((self.expr_types[declaration.annotation] != 0 and (try self.types.containsQuantifier(self.expr_types[declaration.annotation]) or try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, self.expr_types[declaration.annotation]))) or self.proofContract(self.current) != null or storage_types.isArray(&self.types, self.types.head(self.expr_types[declaration.annotation], 0)) or written.tag == .type_usage or (written.tag == .type_function and self.tree.node(written.a).tag == .type_binder)) return self.contextualLambda(body, self.expr_types[declaration.annotation]);
                 }
             }
             return self.expression(body);
@@ -12869,6 +13003,11 @@ const Engine = struct {
     fn binary(self: *Engine, id: ast.Id) T.Error!T.Id {
         const node = self.tree.node(id);
         const operator = self.pool.get(node.a);
+        if (std.mem.eql(u8, operator, "and") or std.mem.eql(u8, operator, "or")) {
+            try self.constrain(try self.expression(node.b), T.boolean, node.b);
+            try self.constrain(try self.expression(node.c), T.boolean, node.c);
+            return T.boolean;
+        }
         const declared = self.catalogs.overrides.get(node.a);
         // A named operator is an ordinary qualified name between backticks.
         // It has source precedence 80 without a declaration. Its fixity sets
@@ -13138,7 +13277,7 @@ const Engine = struct {
         const requirement_start = self.pending.items.len;
         try self.beginQualification(id, value_.where_node, value_.annotation, value_.value);
         var contextual: T.Id = 0;
-        if (required != 0 and try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, required)) contextual = required;
+        if (required != 0 and (storage_types.isArray(&self.types, self.types.head(required, 0)) or try @import("usage_check.zig").containsNominal(&self.types, self.nominals.items, required))) contextual = required;
         const inferred_value = try self.pureExpression(value_.value, contextual);
         if (required != 0) try self.constrain(inferred_value, required, id);
         // Preserve the written principal root while checking the RHS
@@ -13216,6 +13355,26 @@ const Engine = struct {
             if (entry.name == self.self_name) continue;
             const binding = self.bindings.items[entry.binding];
             if (binding.predecessor == 0 or binding.read) continue;
+            // A capability-array element update writes through its owner even
+            // when the local successor binding does not leave this block.
+            const writes_storage = blk: {
+                // A branch merge's declaration is the enclosing if/case, so
+                // inspect the versions contributing effects in this block.
+                for (self.bindings.items[first_binding..]) |version| {
+                    if (version.name != entry.name or version.declaration >= self.rebindings.len) continue;
+                    const selectors = self.types.list(self.access_nodes[version.declaration]);
+                    const path_types = self.types.list(self.access_types[version.declaration]);
+                    for (selectors, 0..) |access, part| {
+                        if (self.tree.node(access).tag != .index_access or part >= path_types.len) continue;
+                        const owner_type = self.types.head(path_types[part], 0);
+                        if (self.types.node(owner_type).tag == .array) break :blk true;
+                        const storage_type = @import("storage_types.zig").info(&self.types, owner_type) orelse continue;
+                        if (storage_type.kind == .grow or storage_type.kind == .resize) break :blk true;
+                    }
+                }
+                break :blk false;
+            };
+            if (writes_storage) continue;
             const last = for (self.env.items[index + 1 ..]) |next| {
                 if (next.name == entry.name) break false;
             } else true;
@@ -13266,7 +13425,7 @@ const Engine = struct {
             return .{ .exits = true, .returns = true };
         }
         var value: T.Id = undefined;
-        if (self.return_target != 0 and self.types.node(self.types.head(self.return_target, 0)).tag == .erased_proof) {
+        if (self.return_target != 0 and (self.types.node(self.types.head(self.return_target, 0)).tag == .erased_proof or storage_types.isArray(&self.types, self.types.head(self.return_target, 0)))) {
             value = try self.contextualLambda(node.a, self.return_target);
         } else value = try self.expression(node.a);
         if (self.has_tasks and self.spawnUse(node.a) != null) try self.diagnostic(.task_capture_transfer, node.a);
@@ -13307,7 +13466,8 @@ const Engine = struct {
         return .{ .ty = T.never, .exits = true, .returns = true };
     }
     fn functionReturnStatement(self: *Engine, id: ast.Id) T.Error!Flow {
-        const value = try self.expression(self.tree.node(id).a);
+        const operand = self.tree.node(id).a;
+        const value = if (self.function_result_expected != 0) try self.contextualLambda(operand, self.function_result_expected) else try self.expression(operand);
         if (!self.function_exit_allowed) {
             try self.diagnostic(.return_outside_function, id);
         } else {
@@ -13731,11 +13891,15 @@ const Engine = struct {
                 try self.constrain(value, T.u32_type, node.b);
                 try self.constrain(try self.expression(parts[0]), T.u32_type, parts[0]);
             } else {
-                const source_tag = self.types.node(try self.types.resolve(value, 0)).tag;
-                if (source_tag != .array and source_tag != .list)
-                    return self.iteratorStatement(id);
-                element = try self.types.fresh();
-                try self.constrainCollection(value, element, node.b);
+                const source_type = try self.types.resolve(value, 0);
+                const source_tag = self.types.node(source_type).tag;
+                if (storage_types.readableElement(&self.types, source_type)) |item| {
+                    element = item;
+                } else {
+                    if (source_tag != .list) return self.iteratorStatement(id);
+                    element = try self.types.fresh();
+                    try self.constrainCollection(value, element, node.b);
+                }
             }
         }
         const targets = loop_targets.collect(self.allocator, self.tree, self.pool, pattern_id, body) catch |err| return switch (err) {
@@ -13969,6 +14133,11 @@ const Engine = struct {
             return .{};
         };
         std.mem.reverse(ast.Id, reverse.items);
+        // A path through an owned array mutates its element in place. Fields
+        // before that boundary only select the owner; they are not rebound.
+        const first_index = for (reverse.items, 0..) |access, part| {
+            if (self.tree.node(access).tag == .index_access) break part;
+        } else reverse.items.len;
         var ty = self.bindings.items[previous].ty;
         var path: std.ArrayList(T.Id) = .empty;
         defer path.deinit(self.allocator);
@@ -13980,17 +14149,20 @@ const Engine = struct {
         // Selector expressions see the original root; the RHS sees the old
         // final leaf. Each selector is checked once in written path order.
         try self.env.append(self.allocator, .{ .name = self.self_name, .binding = previous });
-        for (reverse.items) |access| {
+        for (reverse.items, 0..) |access, part| {
             const selector = self.tree.node(access);
             var projection: u32 = 0;
             if (selector.tag == .index_access) {
-                const element = try self.types.fresh();
-                try self.constrain(ty, try self.types.sequence(.array, element), access);
+                const element = @import("storage_types.zig").arrayElement(&self.types, self.types.head(ty, 0)) orelse blk: {
+                    const inferred = try self.types.fresh();
+                    try self.constrain(ty, try self.types.sequence(.array, inferred), access);
+                    break :blk inferred;
+                };
                 try self.constrain(try self.expression(selector.b), T.u32_type, selector.b);
                 ty = element;
             } else {
                 const pending_start = self.pending.items.len;
-                const projected = try self.projectField(ty, selector.b, access, true, null);
+                const projected = try self.projectField(ty, selector.b, access, first_index == reverse.items.len or part >= first_index, null);
                 // The updater proves this physical selector. Its old leaf is
                 // available to `self`, independently of the replacement type.
                 for (self.pending.items[pending_start..]) |*pending| if (pending.value.kind == .writable_field and pending.value.source == access) {
@@ -14020,6 +14192,8 @@ const Engine = struct {
             const owner = types_.items[remaining];
             if (selector.tag == .index_access) {
                 try self.constrain(types_.items[remaining + 1], updated, id);
+                updated = owner;
+            } else if (first_index < reverse.items.len and remaining < first_index) {
                 updated = owner;
             } else if (try self.updatedFieldType(owner, selector.b, updated, reverse.items[remaining])) |result| {
                 updated = result;
@@ -14247,7 +14421,9 @@ const Engine = struct {
         if (constraint.kind == .collection) {
             const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
             if (owner.tag == .variable or owner.tag == .projection) return progress;
-            if (owner.tag == .array or owner.tag == .list) {
+            if (storage_types.readableElement(&self.types, self.types.head(constraint.ty, 0))) |element| {
+                try self.constrain(element, constraint.result, constraint.source);
+            } else if (owner.tag == .list) {
                 try self.constrain(owner.a, constraint.result, constraint.source);
             } else try self.diagnostic(.type_mismatch, constraint.source);
             self.pending.items[i].solved = true;
@@ -14856,6 +15032,7 @@ const Engine = struct {
             }
             if (pending.value.kind == .field or pending.value.kind == .writable_field) {
                 try self.diagnostic(if (pending.value.kind == .writable_field) .missing_field else .missing_member, pending.value.source);
+                if (pending.value.kind == .field) try self.explainReceiver(pending.value.ty, pending.value.name);
                 continue;
             }
             if (pending.value.kind == .result_dispatch) {
@@ -14871,6 +15048,20 @@ const Engine = struct {
             }
             if (tag == .u32 or (tag == .f32 and pending.value.kind != .integer) or (tag == .boolean and pending.value.kind == .equality)) continue;
             try self.diagnostic(.ambiguous_operator, pending.value.source);
+            const display = @import("../reuse/type_display.zig");
+            var detail: std.ArrayList(u8) = .empty;
+            defer detail.deinit(self.allocator);
+            try display.text(self, &detail, "Unresolved ");
+            try display.text(self, &detail, @tagName(pending.value.kind));
+            try display.text(self, &detail, " requirement for ");
+            try display.append(self, &detail, resolved);
+            if (pending.value.kind == .update and pending.value.name != 0) {
+                try display.text(self, &detail, " at field ");
+                try display.text(self, &detail, self.pool.get(pending.value.name));
+                try display.text(self, &detail, " with replacement ");
+                try display.append(self, &detail, try self.types.resolve(pending.value.other, 0));
+            }
+            self.diagnostics.items[self.diagnostics.items.len - 1].detail = try detail.toOwnedSlice(self.allocator);
         }
         for (self.expr_types) |*id| if (id.* != 0) {
             id.* = try self.types.resolve(id.*, 0);

@@ -1,16 +1,16 @@
 type Tick is effect = { read: Array U32 -> Array U32 }
-const work = @computation (fn () => do:
+const work = @computation (func () => return do:
   use reply <- Tick.read #[41, 42]
   break reply
 )
-entry const scalar = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const scalar = func (host: U32 -> U32 ! {Foreign}) => return do:
   use result <- host 41
   break result
-entry const arrays = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const arrays = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let captured = @array.fill 64 41
   use reply <- host captured
   break @array.set reply 0 (@u32.add captured[1] reply[1])
-entry const requests = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const requests = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let saved = #[90, 91]
   for request in @requests work:
     case request of
@@ -24,11 +24,11 @@ entry const requests = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
 
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-const cycle = fn (seed: U32) => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+const cycle = func (seed: U32) => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use first <- delayed ()
     use State.set #End
@@ -43,7 +43,7 @@ const cycle = fn (seed: U32) => do:
   )
   break result
 
-entry const cycles = fn (count: U32) => do:
+entry const cycles = func (count: U32) => return do:
   let sum = 0
   for index in 0..count:
     sum := @u32.add self (cycle index)

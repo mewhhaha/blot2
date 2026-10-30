@@ -8,7 +8,7 @@ const repo = new URL("../../", import.meta.url).pathname;
 const prelude = `${repo}std/prelude.blot`;
 // Resolver continuations bind checker-local payloads in frozen Core.
 const library = `const try = monad Maybe
-const add_present = fn left => fn right => do try:
+const add_present = func left => return func right => return do try:
   use first <- left
   use second <- right
   break first + second
@@ -17,7 +17,7 @@ const add_present = fn left => fn right => do try:
 // validation exercises a persisted, independently selected semantic receipt.
 const entrySource = (offset: string) =>
   `import * as lib from "./lib"
-const factory = fn number => fn extra => do:
+const factory = func number => return func extra => return do:
   let query_copy_00 = extra
   let query_copy_01 = query_copy_00
   let query_copy_02 = query_copy_01
@@ -53,8 +53,8 @@ const factory = fn number => fn extra => do:
   let query_copy_32 = query_copy_31
   return @u32.add number query_copy_32
 const callback = factory ${offset}
-entry const answer = fn (extra: U32) -> U32 => callback extra
-entry const present = fn () => Maybe.unwrap_or 0 (lib.add_present (#Some 1) (#Some 2))
+entry const answer = func (extra: U32) : U32 => return callback extra
+entry const present = func () => return Maybe.unwrap_or 0 (lib.add_present (#Some 1) (#Some 2))
 `;
 
 async function project() {

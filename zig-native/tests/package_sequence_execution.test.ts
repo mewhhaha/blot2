@@ -32,11 +32,11 @@ Deno.test("sequence carrier witness revisions preserve both-tier retained failur
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `type Item = exists [a] => (Array a, Array a -> U32)
-const make: U32 -> Item = fn count => pack [U32] (@array.generate count (fn index => index), fn (values: Array U32) => @array.length values) as Item
-entry const answer = fn (count: U32) => unpack (make count) as [a] body in (@product.get body 1) (@product.get body 0)
+const make: U32 -> Item = func count => return pack [U32] (@array.generate count (func index => return index), func (values: Array U32) => return @array.length values) as Item
+entry const answer = func (count: U32) => return unpack (make count) as [a] body in (@product.get body 1) (@product.get body 0)
 `;
   const edited = source.replaceAll("U32]", "Bool]")
-    .replace("fn index => index", "fn index => #True")
+    .replace("func index => return index", "func index => return true")
     .replace("values: Array U32", "values: Array Bool");
   const revisions = [
     source,
@@ -103,9 +103,9 @@ for (const collection of ["Array", "List"] as const) {
     if (collection === "List") rows = "(@array.from_list rows)";
     await compileAndRun(
       `type Item = exists [a] => (${collection} (a, U32), ${collection} (a, U32) -> U32)
-const make: U32 -> Item = fn count => pack [U32] (@${prefix}.generate count (fn index => (index, @u32.add index 10)), fn (rows: ${collection} (U32, U32)) => @u32.add (@product.get (@array.get ${rows} 0) 0) (@product.get (@array.get ${rows} (@u32.sub count 1)) 1)) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (count: U32) => read (make count)
+const make: U32 -> Item = func count => return pack [U32] (@${prefix}.generate count (func index => return (index, @u32.add index 10)), func (rows: ${collection} (U32, U32)) => return @u32.add (@product.get (@array.get ${rows} 0) 0) (@product.get (@array.get ${rows} (@u32.sub count 1)) 1)) as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (count: U32) => return read (make count)
 `,
       (guest, bytes) => {
         const state = new Uint8Array(
@@ -130,9 +130,9 @@ entry const answer = fn (count: U32) => read (make count)
 Deno.test("package collection adapters preserve hidden reference leaves and operation results", async () => {
   await compileAndRun(
     `type Item = exists [a] => (Array a, Array a -> a, a -> U32)
-const make: U32 -> Item = fn value => pack [Array U32] (#[#[value], #[@u32.add value 1]], fn (values: Array (Array U32)) => @array.get values 1, fn (values: Array U32) => @array.get values 0) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
-entry const answer = fn (value: U32) => read (make value)
+const make: U32 -> Item = func value => return pack [Array U32] (#[#[value], #[@u32.add value 1]], func (values: Array (Array U32)) => return @array.get values 1, func (values: Array U32) => return @array.get values 0) as Item
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+entry const answer = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       const state = new Uint8Array(
@@ -156,12 +156,12 @@ Deno.test("package adapters convert tagged and recursive nominal payloads throug
   await compileAndRun(
     `type Chain a is data = #End | #Link (a, Chain a)
 type Item = exists [a] => (Chain a, Chain a -> U32)
-const make: U32 -> Item = fn value => pack [U32] (#Link (value, #Link (13, #End)), fn (chain: Chain U32) => case chain of
+const make: U32 -> Item = func value => return pack [U32] (#Link (value, #Link (13, #End)), func (chain: Chain U32) => return case chain of
   #End => 0
   #Link (head, tail) => head
 ) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (value: U32) => read (make value)
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       const state = new Uint8Array(
@@ -184,11 +184,11 @@ Deno.test("package adapters preserve opaque nominal erasure across scalar and ab
   await compileAndRun(
     `opaque type Box a = a
 type Item = exists [a] => (Box a, Box a -> U32)
-const make: U32 -> Item = fn value => pack [U32] (#Box value, fn (box: Box U32) => case box of
+const make: U32 -> Item = func value => return pack [U32] (#Box value, func (box: Box U32) => return case box of
   #Box inner => inner
 ) as Item
-const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (value: U32) => read (make value)
+const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       const state = new Uint8Array(
@@ -225,50 +225,50 @@ for (const codegenTier of ["optimized", "development"] as const) {
         sources: {
           [entry]: `
 type Units = exists [a] => (Array a, List a, Array a -> U32, List a -> U32)
-const units: U32 -> Units = fn count => pack [Unit] (@array.fill count (), @list.fill count (), fn values => @array.length values, fn values => @list.length values) as Units
-entry const count = fn (count: U32) => unpack (units count) as [a] body in @u32.add ((@product.get body 2) (@product.get body 0)) ((@product.get body 3) (@product.get body 1))
+const units: U32 -> Units = func count => return pack [Unit] (@array.fill count (), @list.fill count (), func values => return @array.length values, func values => return @list.length values) as Units
+entry const count = func (count: U32) => return unpack (units count) as [a] body in @u32.add ((@product.get body 2) (@product.get body 0)) ((@product.get body 3) (@product.get body 1))
 type Nested = exists [a] => (Array (List a), Array (List a) -> U32)
-const nested: U32 -> Nested = fn value => pack [Array U32] (@array.fill 2 (@list.fill 3 #[value]), fn rows => @array.get (@array.get (@array.from_list (@array.get rows 1)) 2) 0) as Nested
-const read: Nested -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-entry const answer = fn (value: U32) => read (nested value)
-entry const snapshot = fn (value: U32) => #[read (nested value)]
+const nested: U32 -> Nested = func value => return pack [Array U32] (@array.fill 2 (@list.fill 3 #[value]), func rows => return @array.get (@array.get (@array.from_list (@array.get rows 1)) 2) 0) as Nested
+const read: Nested -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+entry const answer = func (value: U32) => return read (nested value)
+entry const snapshot = func (value: U32) => return #[read (nested value)]
 type Chain a is data = #End | #Link (a, Chain a)
 type Nominal = exists [a] => (Chain a, Chain a -> U32)
-const nominal: U32 -> Nominal = fn value => pack [Array U32] (if @u32.eq value 0 then #End else #Link (#[value], #Link (#[13], #End)), fn chain => case chain of
+const nominal: U32 -> Nominal = func value => return pack [Array U32] (if @u32.eq value 0 then #End else #Link (#[value], #Link (#[13], #End)), func chain => return case chain of
   #End => 0
   #Link (head, tail) => @array.get head 0
 ) as Nominal
-entry const tagged = fn (value: U32) => unpack (nominal value) as [a] body in (@product.get body 1) (@product.get body 0)
+entry const tagged = func (value: U32) => return unpack (nominal value) as [a] body in (@product.get body 1) (@product.get body 0)
 opaque type Box a = a
 type Opaque = exists [a] => (Box a, Box a -> U32)
-const opaque: U32 -> Opaque = fn value => pack [Array U32] (#Box (@array.fill 3 value), fn box => case box of
+const opaque: U32 -> Opaque = func value => return pack [Array U32] (#Box (@array.fill 3 value), func box => return case box of
   #Box inner => @array.get inner 2
 ) as Opaque
-entry const boxed = fn (value: U32) => unpack (opaque value) as [a] body in (@product.get body 1) (@product.get body 0)
+entry const boxed = func (value: U32) => return unpack (opaque value) as [a] body in (@product.get body 1) (@product.get body 0)
 type UnitBox = exists [a] => (Box a, Box a -> U32)
-const unit_box: Unit -> UnitBox = fn () => pack [Unit] (#Box (), fn box => case box of
+const unit_box: Unit -> UnitBox = func () => return pack [Unit] (#Box (), func box => return case box of
   #Box inner => 42
 ) as UnitBox
-entry const unit_boxed = fn () => unpack (unit_box ()) as [a] body in (@product.get body 1) (@product.get body 0)
+entry const unit_boxed = func () => return unpack (unit_box ()) as [a] body in (@product.get body 1) (@product.get body 0)
 type Stop is effect = { check: U32 -> U32 }
-const stop = fn computation => do:
+const stop = func computation => return do:
   for request in @requests computation:
     case request of
       effect Stop.check value =>
         break value
       complete value =>
         break value
-entry const canceled = fn (value: U32) => stop (@computation (fn () => do:
+entry const canceled = func (value: U32) => return stop (@computation (func () => return do:
   let item = nested value
   use Stop.check (read item)
   break @panic "carrier computation continued after cancellation"
 ))
 type Empty = exists [a] => (Array a, Array a -> U32)
-const empty: U32 -> Empty = fn ignored => pack [Unit] (@array.fill 0 (), fn values => do:
+const empty: U32 -> Empty = func ignored => return pack [Unit] (@array.fill 0 (), func values => return do:
   let first = @array.get values 0
   break 42
 ) as Empty
-entry const trapped = fn (value: U32) => unpack (empty value) as [a] body in (@product.get body 1) (@product.get body 0)
+entry const trapped = func (value: U32) => return unpack (empty value) as [a] body in (@product.get body 1) (@product.get body 0)
 `,
         },
       });

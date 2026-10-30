@@ -4,25 +4,25 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer =
-  `const first: forall [a, b] => (a, b) -> a = fn value => @product.get value 0
-const twice: forall [a] => a -> (a, a) = fn value => (value, value)
+  `const first: forall [a, b] => (a, b) -> a = func value => return @product.get value 0
+const twice: forall [a] => a -> (a, a) = func value => return (value, value)
 const twice_alias: forall [a] => a -> (a, a) = twice
-const record: forall [a] => a -> {value: a} = fn value => {value: value}
-const head: forall [a] => Array a -> a = fn values => @array.get values 0
-const keep: forall [a] => a -> (forall [b] => b -> a) = fn first => fn second => first
-const pass: (forall [a] => (Bool, a) -> U32) -> U32 = fn recurse => recurse (#False, 42)
-const recursive: forall [a] => (Bool, a) -> U32 = fn pair => if @product.get pair 0 then pass recursive else 0
-const apply_twice: (forall [a, b] => (a, b) -> a) -> U32 -> (U32, F32) = fn first => fn value => (first (value, #True), first (@u32.to_f32 value, value))
+const record: forall [a] => a -> {value: a} = func value => return {value: value}
+const head: forall [a] => Array a -> a = func values => return @array.get values 0
+const keep: forall [a] => a -> (forall [b] => b -> a) = func first => return func second => return first
+const pass: (forall [a] => (Bool, a) -> U32) -> U32 = func recurse => return recurse (false, 42)
+const recursive: forall [a] => (Bool, a) -> U32 = func pair => return if @product.get pair 0 then pass recursive else 0
+const apply_twice: (forall [a, b] => (a, b) -> a) -> U32 -> (U32, F32) = func first => return func value => return (first (value, true), first (@u32.to_f32 value, value))
 `;
 const consumer =
   `import {first, twice_alias, record, head, keep, recursive, apply_twice} from "./identity"
-entry const recursive_call = fn (value: U32) => recursive (#True, value)
-entry const whole = fn (value: U32) => @product.get (apply_twice first value) 0
-entry const fraction = fn (value: U32) => @product.get (apply_twice first value) 1
-entry const duplicate = fn (value: F32) => @product.get (twice_alias value) 1
-entry const stored = fn (value: U32) => (record value).value
-entry const array_head = fn (value: U32) => head #[value, 42]
-entry const held = fn (value: U32) => (keep value) #True
+entry const recursive_call = func (value: U32) => return recursive (true, value)
+entry const whole = func (value: U32) => return @product.get (apply_twice first value) 0
+entry const fraction = func (value: U32) => return @product.get (apply_twice first value) 1
+entry const duplicate = func (value: F32) => return @product.get (twice_alias value) 1
+entry const stored = func (value: U32) => return (record value).value
+entry const array_head = func (value: U32) => return head #[value, 42]
+entry const held = func (value: U32) => return (keep value) true
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
   const guest = await instantiateGuest(new WebAssembly.Module(bytes));
@@ -93,11 +93,11 @@ Deno.test("parametric rank templates execute structural results nested captures 
           const failed of [
             consumer.replace(
               "apply_twice first value",
-              "apply_twice (fn item => 42) value",
+              "apply_twice (func item => return 42) value",
             ),
             consumer.replace(
               "apply_twice first value",
-              "apply_twice (fn item => @product.get item 1) value",
+              "apply_twice (func item => return @product.get item 1) value",
             ),
           ]
         ) {

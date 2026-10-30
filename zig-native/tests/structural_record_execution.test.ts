@@ -12,12 +12,12 @@ Deno.test("structural records preserve shapes, field order and type-changing nes
     `
 type Point = { x: U32, y: F32 }
 type Box a is data = #Box a
-const read = fn record => record.x
-const replace = fn record => do:
-  record.x := #True
+const read = func record => return record.x
+const replace = func record => return do:
+  record.x := true
   break record
-const identity = fn (point: Point) => point
-entry const answer = fn (value: U32) => do:
+const identity = func (point: Point) => return point
+entry const answer = func (value: U32) => return do:
   let original = { y: 2.5, x: value }
   let point = identity original
   let { y, x } = point
@@ -27,8 +27,8 @@ entry const answer = fn (value: U32) => do:
   let { point: { x: fraction } } = nested
   let #Box boxed = #Box original
   break if updated.x then @f32.add fraction (@u32.to_f32 (@u32.add nested.retained (@u32.sub (read boxed) x))) else y
-entry const reordered = fn () => read { y: #True, x: 42 }
-entry const array = fn () => do:
+entry const reordered = func () => return read { y: true, x: 42 }
+entry const array = func () => return do:
   let values: Array { x: U32 } = #[{ x: 42 }]
   break (@array.get values 0).x
 `,
@@ -49,10 +49,10 @@ entry const array = fn () => do:
 Deno.test("structural record construction evaluates fields once in source order with latent callbacks", async () => {
   await compileAndRun(
     `
-const invoke = fn record => record.callback ()
-entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
+const invoke = func record => return record.callback ()
+entry const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
   use record <- do:
-    break { z: send 1, a: send 2, callback: fn () => send 3 }
+    break { z: send 1, a: send 2, callback: func () => return send 3 }
   use last <- invoke record
   break @u32.add record.z (@u32.add record.a last)
 `,
@@ -90,17 +90,17 @@ Deno.test("generic record extension preserves fields and replaces their types in
   await compileAndRun(
     `
 type Merge [a, b, c] is contract = { merge a b c }
-const combine: a -> b -> c where { Merge [a, b, c] } = fn left => fn right => @record.merge left right
-const extend = fn record => combine record { extra: 2 }
-const frozen = extend { x: 40, callback: fn value => @u32.add value 1 }
-entry const answer = fn (value: U32) => do:
+const combine: a -> b -> c where { Merge [a, b, c] } = func left => return func right => return @record.merge left right
+const extend = func record => return combine record { extra: 2 }
+const frozen = extend { x: 40, callback: func value => return @u32.add value 1 }
+entry const answer = func (value: U32) => return do:
   let original = { y: 40, x: value }
-  let changed = combine original { x: 2.0, z: #True }
+  let changed = combine original { x: 2.0, z: true }
   let empty = combine {} (combine changed {})
   break if empty.z then @f32.add empty.x (@u32.to_f32 empty.y) else 0.0
-entry const constant = fn () => @u32.add frozen.x frozen.extra
-entry const callback = fn () => frozen.callback 41
-entry const repeated = fn () => do:
+entry const constant = func () => return @u32.add frozen.x frozen.extra
+entry const callback = func () => return frozen.callback 41
+entry const repeated = func () => return do:
   let point = { x: 0, y: 2 }
   for index in 0 .. 40:
     point := @record.merge point { x: @u32.add point.x 1 }
@@ -119,10 +119,10 @@ entry const repeated = fn () => do:
 Deno.test("record merge evaluates overridden fields and retains effectful callbacks", async () => {
   await compileAndRun(
     `
-const combine = fn left => fn right => @record.merge left right
-entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
+const combine = func left => return func right => return @record.merge left right
+entry const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
   use result <- do:
-    break combine { x: send 1, z: send 2 } { x: send 3, callback: fn () => send 4 }
+    break combine { x: send 1, z: send 2 } { x: send 3, callback: func () => return send 4 }
   use last <- result.callback ()
   break @u32.add result.x (@u32.add result.z last)
 `,
@@ -155,7 +155,7 @@ Deno.test("record extension rejects non-records and omitted written merge requir
     });
   }
   await compileExpectedFailure(
-    "const merge: a -> b -> c where { type_rep a } = fn left => fn right => @record.merge left right\nentry const answer = 42\n",
+    "const merge: a -> b -> c where { type_rep a } = func left => return func right => return @record.merge left right\nentry const answer = 42\n",
     "missing_predicate",
     undefined,
     { prelude: "none" },
@@ -172,19 +172,19 @@ Deno.test("structural record contracts survive imports, dependency relocation an
   const declaration = `
 type Point = { z: U32, a: F32 }
 type Merge [a, b, c] is contract = { merge a b c }
-const combine: a -> b -> c where { Merge [a, b, c] } = fn left => fn right => @record.merge left right
-const make = fn (value: U32) => { a: 2.0, z: value }
+const combine: a -> b -> c where { Merge [a, b, c] } = func left => return func right => return @record.merge left right
+const make = func (value: U32) => return { a: 2.0, z: value }
 const frozen = combine (make 40) { z: 40 }
-const read = fn (point: Point) => @f32.add (@u32.to_f32 point.z) point.a
+const read = func (point: Point) => return @f32.add (@u32.to_f32 point.z) point.a
 `;
   const application = `
 import { Point, combine, make, frozen, read } from "./record"
-entry const answer = fn (value: U32) => do:
+entry const answer = func (value: U32) => return do:
   let p: Point = combine { z: value } { a: 2.0 }
-  let record = combine { z: #False, kept: p.a } { z: frozen.z }
+  let record = combine { z: false, kept: p.a } { z: frozen.z }
   break read { a: record.kept, z: record.z }
-entry const callback = fn (send: U32 -> U32 ! {Foreign}) => do:
-  let record = combine { a: 2.0 } { call: fn () => send 41 }
+entry const callback = func (send: U32 -> U32 ! {Foreign}) => return do:
+  let record = combine { a: 2.0 } { call: func () => return send 41 }
   break record.call ()
 `;
   await Deno.writeTextFile(entry, application);
@@ -240,7 +240,7 @@ entry const callback = fn (send: U32 -> U32 ! {Foreign}) => do:
     ok(changed.success, JSON.stringify(changed));
     await run(changed.bytes, 43);
     const broken = await compiler.build({
-      sources: { [library]: declaration.replace("{ z: 40 }", "{ z: #False }") },
+      sources: { [library]: declaration.replace("{ z: 40 }", "{ z: false }") },
     });
     ok(!broken.success);
     equal(broken.revision, changed.revision);

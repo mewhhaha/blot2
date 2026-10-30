@@ -14,8 +14,8 @@ function wideRecord(width: number): SyntheticProgram {
   return {
     name: "review_record",
     size: width,
-    source: `const keep = fn value => value
-entry const main = fn (x: U32) => do:
+    source: `const keep = func value => return value
+entry const main = func (x: U32) => return do:
   let value = keep { ${fields.join(", ")} }
   break @u32.add value.f0 value.f${width - 1}
 `,
@@ -29,19 +29,19 @@ function wideEffects(width: number): SyntheticProgram {
     size: width,
     source:
       effects.map((name) => `type ${name} is effect = Unit -> U32`).join("\n") +
-      `\nconst run = fn (action: Unit -> U32 ! {${
+      `\nconst run = func (action: Unit -> U32 ! {${
         effects.join(", ")
       }}) => do:\n` +
       Array.from({ length: 16 }, (_, i) => `  use value${i} <- action ()\n`)
         .join("") +
       "  break @u32.add value0 1\n" +
-      "const action = fn () => do:\n" +
+      "const action = func () => return do:\n" +
       effects.map((name, i) => `  use result${i} <- ${name} ()\n`).join("") +
-      "  break result0\nentry const main = fn (x: U32) => " +
+      "  break result0\nentry const main = func (x: U32) => return " +
       effects.map((name, i) =>
         `${
           i === 0 ? "" : "  ".repeat(i) + "break "
-        }do (@effect.provider ${name} (fn () => x)):\n`
+        }do (@effect.provider ${name} (func () => return x)):\n`
       ).join("") +
       "  ".repeat(width) + "break run action\n",
     edit: { search: "@u32.add value0 1", replace: "@u32.add value0 2" },
@@ -51,8 +51,9 @@ function deepClosure(depth: number): SyntheticProgram {
   return {
     name: "review_closures",
     size: depth,
-    source: `entry const main = fn (x: U32) => do:\n  let nested = ` +
-      Array.from({ length: depth }, (_, i) => `fn (v${i}: U32) => `).join("") +
+    source: `entry const main = func (x: U32) => return do:\n  let nested = ` +
+      Array.from({ length: depth }, (_, i) => `func (v${i}: U32) => return `)
+        .join("") +
       `@u32.add v0 (@u32.add v${depth - 1} 1)\n  break nested ` +
       Array(depth).fill("x").join(" ") + "\n",
     edit: {
@@ -67,28 +68,28 @@ function quantified(width: number): SyntheticProgram {
     name: "review_quantified",
     size: width,
     source: `entry const seed: U32 where { type_rep U32 } = do:
-  let keep = fn (value: {${
+  let keep = func (value: {${
       fields.map((name, i) => `${name}: a${i}`).join(", ")
     }}) => value
   let value = keep {${fields.map((name) => `${name}: 7`).join(", ")}}
   break @u32.add value.f0 value.f${width - 1}
-entry const main = fn (x: U32) => @u32.add x seed
+entry const main = func (x: U32) => return @u32.add x seed
 `,
     edit: { search: "f0: 7", replace: "f0: 8" },
   };
 }
 function modules(count: number): SyntheticProject {
   const files: Record<string, string> = {
-    "m0.blot": "const step = fn (x: U32) => @u32.add x 1\n",
+    "m0.blot": "const step = func (x: U32) => return @u32.add x 1\n",
   };
   for (let i = 1; i < count; i++) {
     files[`m${i}.blot`] = `import * as previous from "./m${
       i - 1
-    }"\nconst step = fn (x: U32) => @u32.add (previous.step x) 1\n`;
+    }"\nconst step = func (x: U32) => return @u32.add (previous.step x) 1\n`;
   }
   files["main.blot"] = `import * as last from "./m${
     count - 1
-  }"\nentry const main = fn (x: U32) => last.step x\n`;
+  }"\nentry const main = func (x: U32) => return last.step x\n`;
   return {
     name: `review_modules_${count}`,
     files,
@@ -116,7 +117,7 @@ export const reviewPrograms: readonly SyntheticProgram[] = [
   {
     name: "review_small",
     size: 1,
-    source: "entry const main = fn (x: U32) => @u32.add x 1\n",
+    source: "entry const main = func (x: U32) => return @u32.add x 1\n",
     edit: { search: "@u32.add x 1", replace: "@u32.add x 2" },
   },
 ];

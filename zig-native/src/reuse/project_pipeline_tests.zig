@@ -33,31 +33,31 @@ const Fixture = struct {
 // Source-facing guests instead load the complete actual std/prelude module.
 const diamond = [_]Source{
     .{ .name = "prelude.blot", .text =
-    \\const U32.add = fn left => fn right => @u32.add left right
-    \\const F32.add = fn left => fn right => @f32.add left right
+    \\const U32.add = func left => return func right => return @u32.add left right
+    \\const F32.add = func left => return func right => return @f32.add left right
     },
     .{ .name = "main.blot", .text =
     \\import * as left from "./left"
     \\import * as right from "./right"
     \\const left_alias = (left).run
     \\const right_alias = right.run
-    \\entry const integer = fn (value: U32) -> U32 => left_alias value
-    \\entry const floating = fn (value: F32) -> F32 => right_alias value
+    \\entry const integer = func (value: U32) : U32 => return left_alias value
+    \\entry const floating = func (value: F32) : F32 => return right_alias value
     \\entry const answer = 42
     },
     .{ .name = "left.blot", .text =
     \\import { twice, identity as id } from "./shared"
-    \\const run = fn (value: U32) -> U32 => twice (id value)
+    \\const run = func (value: U32) : U32 => return twice (id value)
     },
     .{ .name = "right.blot", .text =
     \\import * as common from "./shared"
-    \\const run = fn (value: F32) -> F32 => common.twice (common.identity value)
+    \\const run = func (value: F32) : F32 => return common.twice (common.identity value)
     },
     .{ .name = "shared.blot", .text =
     \\infixl 60 (+) = _fixity_add
-    \\const identity = fn value => value
-    \\const twice = fn value => value + value
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\const identity = func value => return value
+    \\const twice = func value => return value + value
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
     },
 };
 

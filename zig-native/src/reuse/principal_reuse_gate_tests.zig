@@ -14,9 +14,9 @@ const a = std.testing.allocator;
 
 test "call identity follows unique owned declaration names across source movement without admitting changed bodies" {
     const source =
-        \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1
-        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
-        \\entry const later = fn (x: U32) -> U32 => @u32.add x 3
+        \\entry const earlier = func (x: U32) : U32 => return @u32.add x 1
+        \\entry const edited = func (x: U32) : U32 => return @u32.add x 2
+        \\entry const later = func (x: U32) : U32 => return @u32.add x 3
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -73,8 +73,8 @@ fn referencedBodyExtentFailure(allocator: std.mem.Allocator, before: *const Pinn
 }
 
 test "named header references ignore producer body extent while preserving transitive invalidation through OOM" {
-    const prefix = "entry const producer = fn (x: U32) -> U32 => @u32.add x ";
-    const suffix = "\nentry const consumer = fn (x: U32) -> U32 => producer x\n";
+    const prefix = "entry const producer = func (x: U32) : U32 => return @u32.add x ";
+    const suffix = "\nentry const consumer = func (x: U32) : U32 => return producer x\n";
     var before = try Fixture.init(a, &.{prefix ++ "1" ++ suffix});
     defer before.deinit(a);
     var pinned = try Pinned.init(a, &before);
@@ -92,7 +92,7 @@ test "named header references ignore producer body extent while preserving trans
 }
 
 test "checked requirement interfaces reject changed producer flags requirement kinds and diagnostic positions" {
-    const source = "entry const local: U32 -> U32 where { type_rep U32 } = fn x => @u32.add x 1\n";
+    const source = "entry const local: U32 -> U32 where { type_rep U32 } = func x => return @u32.add x 1\n";
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
     var pinned = try Pinned.init(a, &before);
@@ -125,8 +125,8 @@ test "checked requirement interfaces reject changed producer flags requirement k
 
 test "declaration projection workspace isolates declined scans generation rollover and allocation failure" {
     const source =
-        \\entry const earlier = fn (x: U32) -> U32 => @u32.add x 1
-        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+        \\entry const earlier = func (x: U32) : U32 => return @u32.add x 1
+        \\entry const edited = func (x: U32) : U32 => return @u32.add x 2
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -151,8 +151,8 @@ fn projectionWorkspaceLaw(allocator: std.mem.Allocator, old: *const core.Module,
 
 test "relative declaration projection preserves captures and rejects inconsistent positions through OOM" {
     const source =
-        \\entry const read = fn (value: { left: U32, right: U32 }) -> U32 => do:
-        \\  let inner = fn (x: U32) => @u32.add x value.left
+        \\entry const read = func (value: { left: U32, right: U32 }) : U32 => return do:
+        \\  let inner = func (x: U32) => return @u32.add x value.left
         \\  break inner value.right
     ;
     var before = try Fixture.init(a, &.{source});
@@ -264,7 +264,7 @@ fn certify(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixtur
 }
 
 test "source validation certificates reject exact graph namespace producer order and foreign bound mutations despite unchanged stamps" {
-    var before = try Fixture.init(a, &.{ independent, "entry const safe = fn (value:U32) => value\n" });
+    var before = try Fixture.init(a, &.{ independent, "entry const safe = func (value:U32) => return value\n" });
     defer before.deinit(a);
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
@@ -313,7 +313,7 @@ test "source validation certificates reject exact graph namespace producer order
 }
 
 test "published dependency validation certificates retain exact graphs context and failure ownership" {
-    const consumer = "entry const dependent: U32 = schema\nentry const safe = fn (value: U32) => value\n";
+    const consumer = "entry const dependent: U32 = schema\nentry const safe = func (value: U32) => return value\n";
     var before = try Fixture.init(a, &.{ independent, consumer });
     defer before.deinit(a);
     var pinned = try Pinned.init(a, &before);
@@ -377,22 +377,22 @@ fn recapture(module: *core.Module) !void {
 
 const independent =
     \\entry const schema: U32 = 7
-    \\entry const builder = fn (value: U32) -> U32 => value
+    \\entry const builder = func (value: U32) : U32 => return value
 ;
 const direct_transitive =
     \\entry const schema: U32 = 7
     \\entry const direct: U32 = schema
     \\entry const transitive: U32 = direct
-    \\entry const builder = fn (value: U32) -> U32 => value
+    \\entry const builder = func (value: U32) : U32 => return value
 ;
 
 const changed_function_producer =
-    \\entry const schema = fn (value: U32) -> U32 => @u32.add value 7
-    \\entry const builder = fn (value: U32) -> U32 => value
+    \\entry const schema = func (value: U32) : U32 => return @u32.add value 7
+    \\entry const builder = func (value: U32) : U32 => return value
 ;
 const changed_function_consumer =
-    \\entry const dependent = fn (value: U32) -> U32 => schema value
-    \\entry const safe = fn (value: U32) -> U32 => value
+    \\entry const dependent = func (value: U32) : U32 => return schema value
+    \\entry const safe = func (value: U32) : U32 => return value
 ;
 fn mutateFunction(fixture: *Fixture) !void {
     const node = fixture.units[0].nodes[root(&fixture.units[0], "schema")];
@@ -503,9 +503,9 @@ test "principal gate invalidates direct and transitive staged declaration depend
 test "principal gate declines unchanged builders reading changed constants directly or transitively" {
     const source =
         \\entry const schema: U32 = 7
-        \\entry const direct = fn (value: U32) -> U32 => schema
-        \\entry const transitive = fn (value: U32) -> U32 => direct value
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const direct = func (value: U32) : U32 => return schema
+        \\entry const transitive = func (value: U32) : U32 => return direct value
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -554,8 +554,8 @@ test "principal gate rejects a changed state-provider initial value and its cons
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
         \\entry const schema: U32 = 7
         \\entry const state = @effect.state (State.get U32) (State.set U32) 42
-        \\entry const builder = fn (value: U32) -> U32 => value
-        \\entry const consumer = fn () => do:
+        \\entry const builder = func (value: U32) : U32 => return value
+        \\entry const consumer = func () => return do:
         \\  let (_, old) = do state:
         \\    break State.get U32 ()
         \\  break old
@@ -599,7 +599,7 @@ test "principal gate accepts no-op and revert while rejecting changes to functio
     try std.testing.expect(gate.admits(target(&after.units[0], "builder")));
     const fixture =
         \\entry const schema: U32 = 7
-        \\entry const builder = fn (value: U32) -> U32 => 4
+        \\entry const builder = func (value: U32) : U32 => return 4
     ;
     var old_function = try Fixture.init(a, &.{fixture});
     defer old_function.deinit(a);
@@ -619,7 +619,7 @@ test "principal gate propagates external alias and producer references across un
     const consumer =
         \\entry const direct: U32 = schema
         \\entry const transitive: U32 = direct
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{ producer, consumer });
     defer before.deinit(a);
@@ -652,10 +652,10 @@ test "principal gate propagates external alias and producer references across un
 test "principal gate preserves erased source dependency invalidation" {
     const source =
         \\entry const schema: U32 = 7
-        \\entry const direct = fn (value: U32) -> U32 => schema
+        \\entry const direct = func (value: U32) : U32 => return schema
         \\entry const erased = @effect.of direct
         \\entry const transitive: U32 = @effect.count erased
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -677,9 +677,9 @@ test "principal gate preserves erased source dependency invalidation" {
 test "principal gate rejects missing erased source metadata even when dependency recipes agree" {
     const source =
         \\entry const schema: U32 = 7
-        \\entry const direct = fn (value: U32) -> U32 => schema
+        \\entry const direct = func (value: U32) : U32 => return schema
         \\entry const erased = @effect.of direct
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -703,11 +703,11 @@ const selecting =
     \\entry const schema: U32 = 7
     \\entry const direct: U32 = schema
     \\entry const transitive: U32 = direct
-    \\entry const builder = fn (value: U32) -> U32 => value
-    \\entry const doubled: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
-    \\entry const user = fn (value: U32) -> U32 => doubled value
-    \\entry const projected = fn (pair: Pair) -> U32 => pair.left
-    \\entry const reader = fn (pair: Pair) -> U32 => projected pair
+    \\entry const builder = func (value: U32) : U32 => return value
+    \\entry const doubled: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
+    \\entry const user = func (value: U32) : U32 => return doubled value
+    \\entry const projected = func (pair: Pair) : U32 => return pair.left
+    \\entry const reader = func (pair: Pair) : U32 => return projected pair
 ;
 fn symbolId(names: identity.View, spelling: []const u8) u32 {
     for (1..names.symbols.len) |id| if (std.mem.eql(u8, names.symbol(@intCast(id)).?, spelling)) return @intCast(id);
@@ -940,8 +940,8 @@ test "semantic catalog identity survives body edits without granting executable 
     const source =
         \\data Box a = #Box a
         \\type Read a is effect = Unit -> a
-        \\entry const schema = fn (value: U32) -> U32 => @u32.add value 7
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const schema = func (value: U32) : U32 => return @u32.add value 7
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -971,12 +971,12 @@ test "semantic catalog admission rejects payload constructor and effect argument
     const old_source =
         \\data Choice = #First (List U32) | #Second (Array U32)
         \\type Read a is effect = Unit -> a
-        \\entry const schema = fn (value: U32) -> U32 => @u32.add value 7
+        \\entry const schema = func (value: U32) : U32 => return @u32.add value 7
     ;
     const cases = [_][]const u8{
-        "data Choice = #First (Array U32) | #Second (Array U32)\ntype Read a is effect = Unit -> a\nentry const schema = fn (value: U32) -> U32 => @u32.add value 7\n",
-        "data Choice = #Second (Array U32) | #First (List U32)\ntype Read a is effect = Unit -> a\nentry const schema = fn (value: U32) -> U32 => @u32.add value 7\n",
-        "data Choice = #First (List U32) | #Second (Array U32)\ntype Read a is effect = a -> a\nentry const schema = fn (value: U32) -> U32 => @u32.add value 7\n",
+        "data Choice = #First (Array U32) | #Second (Array U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
+        "data Choice = #Second (Array U32) | #First (List U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
+        "data Choice = #First (List U32) | #Second (Array U32)\ntype Read a is effect = a -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
     };
     var before = try Fixture.init(a, &.{old_source});
     defer before.deinit(a);
@@ -1133,8 +1133,8 @@ test "equivalent validation preserves complete transitive gates and every alloca
 
 test "equivalent validation admits only opaque isolated scalar payload changes" {
     const inputs = [_][]const u8{
-        "entry const schema: U32 = 7\nentry const flag: Bool = #False\nentry const builder = fn (value: U32) -> U32 => value",
-        "entry const schema: U32 = 7\nentry const fraction: F32 = 1.25\nentry const builder = fn (value: U32) -> U32 => value",
+        "entry const schema: U32 = 7\nentry const flag: Bool = false\nentry const builder = func (value: U32) : U32 => return value",
+        "entry const schema: U32 = 7\nentry const fraction: F32 = 1.25\nentry const builder = func (value: U32) : U32 => return value",
     };
     for (inputs, 0..) |input, index| {
         var before = try Fixture.init(a, &.{input});
@@ -1225,9 +1225,9 @@ test "equivalent validation rejects bounds-valid equal cycles without accepting 
 test "equivalent validation retains mandatory erased source dependency checks" {
     const source =
         \\entry const schema: U32 = 7
-        \\entry const direct = fn (value: U32) -> U32 => schema
+        \\entry const direct = func (value: U32) : U32 => return schema
         \\entry const erased = @effect.of direct
-        \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const builder = func (value: U32) : U32 => return value
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -1280,9 +1280,9 @@ test "declaration principal projection preserves an unchanged sibling and reject
 test "declaration principal projection checks call arguments record destinations tags and binding metadata" {
     const source =
         \\data Pair = #Pair { left: U32, right: U32 }
-        \\entry const identity = fn (value: U32) -> U32 => value
-        \\entry const schema = fn (value: U32) -> U32 => identity (@u32.add value 7)
-        \\entry const builder = fn (value: U32) => #Pair { left: value, right: 7 }
+        \\entry const identity = func (value: U32) : U32 => return value
+        \\entry const schema = func (value: U32) : U32 => return identity (@u32.add value 7)
+        \\entry const builder = func (value: U32) => return #Pair { left: value, right: 7 }
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -1373,7 +1373,7 @@ fn reusedCertificate(allocator: std.mem.Allocator, gate: *const Gate, pins: []co
 }
 
 test "published certificates share exactly proven unchanged images and recapture edited units" {
-    const consumer = "entry const dependent: U32 = schema\nentry const safe = fn (value: U32) => value\n";
+    const consumer = "entry const dependent: U32 = schema\nentry const safe = func (value: U32) => return value\n";
     var before = try Fixture.init(a, &.{ independent, consumer });
     defer before.deinit(a);
     var pinned = try Pinned.init(a, &before);
@@ -1443,14 +1443,14 @@ fn closureIn(module: *const core.Module, text: []const u8, declaration: []const 
 
 test "closure roots in an edited module follow their owner's exact projection" {
     const source =
-        \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
-        \\entry const apply = fn (x: U32) -> U32 => do:
-        \\  let inner = fn (y: U32) => helper y
+        \\entry const helper = func (x: U32) : U32 => return @u32.add x 1
+        \\entry const apply = func (x: U32) : U32 => return do:
+        \\  let inner = func (y: U32) => return helper y
         \\  break inner x
-        \\entry const other = fn (x: U32) -> U32 => do:
-        \\  let inner = fn (y: U32) => @u32.add y 3
+        \\entry const other = func (x: U32) : U32 => return do:
+        \\  let inner = func (y: U32) => return @u32.add y 3
         \\  break inner x
-        \\entry const edited = fn (x: U32) -> U32 => @u32.add x 2
+        \\entry const edited = func (x: U32) : U32 => return @u32.add x 2
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -1485,19 +1485,19 @@ test "closure roots in an edited module follow their owner's exact projection" {
     // declaration's annotation leaves every earlier ID in place, yet revokes
     // the referencing owner's closures but not an unrelated owner's.
     const reordered =
-        \\entry const apply = fn (x: U32) -> U32 => do:
-        \\  let inner = fn (y: U32) => helper y
+        \\entry const apply = func (x: U32) : U32 => return do:
+        \\  let inner = func (y: U32) => return helper y
         \\  break inner x
-        \\entry const other = fn (x: U32) -> U32 => do:
-        \\  let inner = fn (y: U32) => @u32.add y 3
+        \\entry const other = func (x: U32) : U32 => return do:
+        \\  let inner = func (y: U32) => return @u32.add y 3
         \\  break inner x
-        \\entry const helper = fn (x: U32) -> U32 => @u32.add x 1
+        \\entry const helper = func (x: U32) : U32 => return @u32.add x 1
     ;
     var first = try Fixture.init(a, &.{reordered});
     defer first.deinit(a);
     var first_pins = try Pinned.init(a, &first);
     defer first_pins.deinit(a);
-    const changed = try std.mem.replaceOwned(u8, a, reordered, "fn (x: U32) -> U32 => @u32.add x 1", "fn x => @u32.add x 1");
+    const changed = try std.mem.replaceOwned(u8, a, reordered, "func (x: U32) : U32 => return @u32.add x 1", "func x => return @u32.add x 1");
     defer a.free(changed);
     var after = try Fixture.init(a, &.{changed});
     defer after.deinit(a);
@@ -1513,8 +1513,8 @@ test "shifted declaration origins preserve exact relative bodies and revoke chan
     const source =
         \\// a short comment
         \\entry const early: U32 = 1
-        \\entry const doubled: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
-        \\entry const late = fn (x: U32) -> U32 => doubled x
+        \\entry const doubled: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
+        \\entry const late = func (x: U32) : U32 => return doubled x
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -1539,10 +1539,10 @@ test "shifted declaration origins preserve exact relative bodies and revoke chan
 test "foreign-only certificates require actual package callers and gates recheck changed pure helper bodies" {
     const V = @import("../check/frozen_core_validation.zig");
     const Certificate = @import("dependency_certificate.zig").Certificate;
-    const producer = "entry const schema: U32 -> U32 = fn value => value\n";
+    const producer = "entry const schema: U32 -> U32 = func value => return value\n";
     const consumer =
         \\type Item = exists [a] => a
-        \\entry const run: U32 -> U32 = fn value => schema (unpack (pack [U32] value as Item) as [a] hidden in 42)
+        \\entry const run: U32 -> U32 = func value => return schema (unpack (pack [U32] value as Item) as [a] hidden in 42)
     ;
     var helper = try Fixture.init(a, &.{producer});
     defer helper.deinit(a);

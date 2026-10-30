@@ -5,11 +5,11 @@ Deno.test("state and memoized demands can form cycles that must be reclaimed aft
   await compileAndRun(`
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-const cycle = fn (seed: U32) => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
-    let delayed = keep (get (fn () => #End))
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+const cycle = func (seed: U32) => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+    let delayed = keep (get (func () => return #End))
     use State.set (#Next delayed)
     use first <- delayed ()
     use State.set #End
@@ -23,7 +23,7 @@ const cycle = fn (seed: U32) => do:
           #Next _ => seed
   )
   break result
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let index = 0
   let sum = 0
   for ever:
@@ -31,7 +31,7 @@ entry const run = fn (count: U32) => do:
       break sum
     sum := self + cycle index
     index := self + 1
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `, guest => {
     equal(guest.call("run", 512), 511 * 512 / 2);
     const warmed = guest.memoryBytes();
@@ -44,9 +44,9 @@ entry const memory = fn () -> Array U32 => #[]
 Deno.test("forever collection preserves array carries, older captures and scalar bits with bounded memory", async () => {
   await compileAndRun(
     `
-entry const run = fn (limit: U32) -> U32 => do:
+entry const run = func (limit: U32) : U32 => return do:
   let older = @array.fill 4096 65552
-  let read = fn index => @array.get older index
+  let read = func index => return @array.get older index
   let values = #[0]
   let index = 0
   for ever:
@@ -55,7 +55,7 @@ entry const run = fn (limit: U32) -> U32 => do:
     let discarded = @array.fill 8192 index
     values[0] := @u32.add self 1
     index := @u32.add self 1
-entry const floating = fn (limit: U32) -> F32 => do:
+entry const floating = func (limit: U32) : F32 => return do:
   let total = 0.0
   let index = 0
   for ever:
@@ -64,7 +64,7 @@ entry const floating = fn (limit: U32) -> F32 => do:
     let discarded = @array.fill 8192 index
     total := @f32.add self 0.5
     index := @u32.add self 1
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("run", 256), 65808);
@@ -81,7 +81,7 @@ Deno.test("forever collection traces updated state cells pinned before the loop"
   await compileAndRun(
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const run = fn (limit: U32) -> U32 => do:
+entry const run = func (limit: U32) : U32 => return do:
   let provider = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[0]
   let (state,result) = do provider:
     let index = 0
@@ -93,7 +93,7 @@ entry const run = fn (limit: U32) -> U32 => do:
       use State.set (Array U32) #[index]
       let discarded = @array.fill 8192 index
   break @u32.add (@array.get state 0) result
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("run", 256), 512);
@@ -117,7 +117,7 @@ Deno.test({
   fn: async () => {
     await compileAndRun(
       `
-entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) -> Unit => do:
+entry const main = func (host: Array F32 -> Array F32 ! {Foreign}) : Unit => return do:
   let pending = #[0.0, 1.0]
   for ever:
     if @f32.eq (@array.get pending 1) 0.0:

@@ -49,6 +49,13 @@ export function parserSource(
     index++
   ) {
     const token = prepared.tokens[index];
+    // Normalize the constructor sigil for the shared CST grammar without
+    // changing spans or the original text used by formatting and diagnostics.
+    if (
+      token.text === "$" &&
+      prepared.tokens[index + 1]?.span.start === token.span.end &&
+      /^[A-Za-z_]/.test(prepared.tokens[index + 1]?.text ?? "")
+    ) replace(token.span.start, token.span.end, "#");
     if (token.type === "named" && token.kind === "INTEGER") {
       replace(
         token.span.start,

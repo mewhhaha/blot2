@@ -1,6 +1,6 @@
 import * as list from "std/list"
-entry const run = fn (seed: U32) -> U32 => do:
-  let values = list.generate 4096 (fn index => (seed + index) % 1024)
-  let mapped = list.map (fn value => value * 3) values
-  let selected = list.filter (fn value => value % 2 == 0) mapped
-  break list.fold_left (fn total value => total + value) 0 selected
+entry const run = func (seed: U32) : U32 => return do:
+  let values = list.generate 4096 (func index => return (seed + index) % 1024)
+  let mapped = list.map (func value => return value * 3) values
+  let selected = list.filter (func value => return value % 2 == 0) mapped
+  break list.fold_left (func total -> value => return total + value) 0 selected

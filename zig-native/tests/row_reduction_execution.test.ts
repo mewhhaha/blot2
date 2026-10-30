@@ -14,10 +14,10 @@ Deno.test("contiguous row sums preserve U32 wrapping, scalar tails and empty inp
         (_, i) => `row.f${width - 1 - i}`,
       ).join(" + ");
       functions.push(`
-entry const ${collection}_${width} = fn (input: Array U32) => do:
+entry const ${collection}_${width} = func (input: Array U32) => return do:
   let count = input[0]
   let initial = input[1]
-  let rows = @${collection}.generate count (fn index => {${fields.join(", ")}})
+  let rows = @${collection}.generate count (func index => return {${fields.join(", ")}})
   let total = initial
   for row in rows:
     total := self + ${sum}
@@ -82,10 +82,10 @@ Deno.test("floating row sums retain source evaluation order", async () => {
         (_, field) => `row.f${width % 2 === 0 ? field : width - 1 - field}`,
       ).join(" + ");
       functions.push(`
-entry const ${collection}_${width} = fn (input: Array F32) => do:
+entry const ${collection}_${width} = func (input: Array F32) => return do:
   let count = @f32.to_u32 input[0]
   let total = input[1]
-  let rows = @${collection}.generate count (fn index => {${fields.join(", ")}})
+  let rows = @${collection}.generate count (func index => return {${fields.join(", ")}})
   for row in rows:
     total := self + ${sum}
   break total

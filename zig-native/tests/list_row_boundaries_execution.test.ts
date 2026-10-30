@@ -36,13 +36,13 @@ Deno.test("whole-row List edits preserve source-ordered F32 folds and saved valu
         savedFirst = "let first = (@cursor.value cursor).f0";
       }
       functions.push(`
-const fold_${name} = fn values => do:
+const fold_${name} = func values => return do:
   let total = 0.0
   for ${binding} in values:
     total := self + ${names.join(" + ")}
   break total
-entry const ${name} = fn (input: Array F32) => do:
-  let original = @list.generate 600 (fn i => ${row})
+entry const ${name} = func (input: Array F32) => return do:
+  let original = @list.generate 600 (func i => return ${row})
   let saved = original
   let cursor = saved.iter
   let sentinel = @cursor.value cursor
@@ -124,14 +124,14 @@ entry const ${name} = fn (input: Array F32) => do:
 
 Deno.test("retained packed List directories survive reset and stay bounded across entries", async () => {
   const source = `
-let rows = @list.generate 16384 (fn i => { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
-entry const fold = fn (repeat: U32) => do:
+let rows = @list.generate 16384 (func i => return { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
+entry const fold = func (repeat: U32) => return do:
   let total = 0.0
   for pass in 0..repeat:
     for row in rows:
       total := self + row.a + row.b + row.c + row.d
   break total
-entry const unused = fn (seed: U32) => #[seed]
+entry const unused = func (seed: U32) => return #[seed]
 `;
   await compileAndRun(source, (guest) => {
     let expected = 0;
@@ -178,8 +178,8 @@ Deno.test("static packed List directories retain exact rows and bounded owners a
         fields = fields.map((field) => `row.${field}`);
       }
       source.push(`
-const rows_${name} = @list.generate 300 (fn i => ${row})
-entry const ${name} = fn (seed: F32) => do:
+const rows_${name} = @list.generate 300 (func i => return ${row})
+entry const ${name} = func (seed: F32) => return do:
   let total = seed
   for ${binding} in rows_${name}:
     total := self + ${fields.join(" + ")}
@@ -187,7 +187,7 @@ entry const ${name} = fn (seed: F32) => do:
 `);
     }
   }
-  source.push("entry const memory_probe = fn (seed: U32) => #[seed]");
+  source.push("entry const memory_probe = func (seed: U32) => return #[seed]");
   await compileAndRun(source.join("\n"), (guest, bytes) => {
     const ownership = WebAssembly.Module.customSections(
       new WebAssembly.Module(bytes),
@@ -221,19 +221,19 @@ entry const ${name} = fn (seed: F32) => do:
 
 Deno.test("late static List traversal retains no unrelated pressure allocation", async () => {
   const source = `
-const rows = @list.generate 600 (fn i => { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
-let witness = @list.generate 600 (fn i => { a: i, b: i, c: i })
-const read = fn (seed: F32) => do:
+const rows = @list.generate 600 (func i => return { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
+let witness = @list.generate 600 (func i => return { a: i, b: i, c: i })
+const read = func (seed: F32) => return do:
   let total = seed
   for row in rows:
     total := self + row.a + row.b + row.c + row.d
   break total
-entry const pressure = fn (count: U32) => do:
-  let unrelated = @array.generate count (fn i => i)
+entry const pressure = func (count: U32) => return do:
+  let unrelated = @array.generate count (func i => return i)
   let total = read (@u32.to_f32 count)
   break total + @u32.to_f32 unrelated[count - 1]
-entry const witness_length = fn () => witness.length
-entry const memory_probe = fn (seed: U32) => #[seed]
+entry const witness_length = func () => return witness.length
+entry const memory_probe = func (seed: U32) => return #[seed]
 `;
   await compileAndRun(source, async (_guest, bytes) => {
     const module = new WebAssembly.Module(bytes);
@@ -277,24 +277,24 @@ Deno.test("late dynamic slice and concat traversal retain no unrelated pressure 
     ]
   ) {
     const source = `
-let original = @list.generate 600 (fn i => { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
+let original = @list.generate 600 (func i => return { a: @u32.to_f32 i, b: 0.125, c: -0.25, d: 3.5 })
 let rows = ${construction}
-const read = fn (seed: F32) => do:
+const read = func (seed: F32) => return do:
   let total = seed
   for row in rows:
     total := self + row.a + row.b + row.c + row.d
   break total
-entry const rows_length = fn () => rows.length
-entry const cursor_probe = fn (repeat: U32) => do:
+entry const rows_length = func () => return rows.length
+entry const cursor_probe = func (repeat: U32) => return do:
   let cursor = rows.iter
   for i in 0..repeat:
     cursor := @cursor.advance self
   break (@cursor.value cursor).a
-entry const pressure = fn (count: U32) => do:
-  let unrelated = @array.generate count (fn i => i)
+entry const pressure = func (count: U32) => return do:
+  let unrelated = @array.generate count (func i => return i)
   let total = read (@u32.to_f32 count)
   break total + @u32.to_f32 unrelated[count - 1]
-entry const memory_probe = fn (seed: U32) => #[seed]
+entry const memory_probe = func (seed: U32) => return #[seed]
 `;
     await compileAndRun(source, async (_guest, bytes) => {
       const module = new WebAssembly.Module(bytes);

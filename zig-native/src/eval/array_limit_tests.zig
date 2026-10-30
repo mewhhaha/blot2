@@ -52,8 +52,8 @@ fn reject(allocator: std.mem.Allocator, module: *const core.Module) !void {
 
 test "compile-time array bootstrap boundary rejects before cells or generator invocation and releases every failed allocation" {
     for ([_][]const u8{
-        "entry const answer = @array.length (@array.generate 4194304 (fn (index: U32) -> U32 => index))\n",
-        "entry const answer = @array.length (@array.generate 4294967295 (fn (index: U32) -> U32 => @panic \"unvisited\"))\n",
+        "entry const answer = @array.length (@array.generate 4194304 (func (index: U32) : U32 => return index))\n",
+        "entry const answer = @array.length (@array.generate 4294967295 (func (index: U32) : U32 => return @panic \"unvisited\"))\n",
         "entry const answer = @array.length (@array.fill 4194304 7)\n",
         "entry const answer = @array.length (@array.fill 4294967295 7)\n",
     }) |source| {

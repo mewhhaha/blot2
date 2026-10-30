@@ -8,7 +8,7 @@ import {
   variant,
 } from "./effectful_dictionary_closure_helpers.ts";
 
-for (const helper of ["fn value => Render.show value", "Render.show"]) {
+for (const helper of ["func value => return Render.show value", "Render.show"]) {
   for (const asynchronous of [false, true]) {
     Deno.test(`effectful ${helper} preserves the first application before returned closure calls (${asynchronous})`, async () => {
       await compileAndRun(variant(helper), async (guest) => {
@@ -27,8 +27,8 @@ Deno.test("effectful dictionary closure rows cannot be erased or moved into call
   );
   await compileExpectedFailure(
     `effect Read: Unit -> U32
-const consume: (Unit -> U32 ! {}) -> U32 = fn callback => callback ()
-entry const answer: Unit -> U32 ! {Read} = fn unit => consume Read
+const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()
+entry const answer: Unit -> U32 ! {Read} = func unit => return consume Read
 `,
     "effect_mismatch",
     undefined,
@@ -40,10 +40,10 @@ Deno.test("effectful callback mismatch names the expected and actual argument in
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const invalid = `effect Read: Unit -> U32
-const consume: (Unit -> U32 ! {}) -> U32 = fn callback => callback ()
-entry const answer: Unit -> U32 = fn unit => consume Read
+const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()
+entry const answer: Unit -> U32 = func unit => return consume Read
 `;
-  const corrected = invalid.replace("consume Read", "consume (fn () => 42)");
+  const corrected = invalid.replace("consume Read", "consume (func () => return 42)");
   const executable = Deno.args[0] ??
     new URL("../zig-out/bin/blotc", import.meta.url).pathname;
   const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;

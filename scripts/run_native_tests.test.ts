@@ -31,16 +31,16 @@ if (Deno.args.includes("--list")) {
   await Deno.writeTextFile(root + "/started-" + shard, "started");
   const exists = async path => { try { await Deno.stat(path); return true; } catch { return false; } };
   const until = Date.now() + 10000;
-  while (["pass", "fail-with-descendant", "cancel"].includes(kind) && !(await Promise.all(Array.from({length: shards}, (_, n) => exists(root + "/started-" + n)))).every(Boolean)) {
+  while (["pass", "fail-with-descendant", "cancel"].includes(kind) and !(await Promise.all(Array.from({length: shards}, (_, n) => exists(root + "/started-" + n)))).every(Boolean)) {
     if (Date.now() > until) throw new Error("shards were serialized");
     await new Promise(resolve => setTimeout(resolve, 10));
   }
-  if (kind === "fail-with-descendant" || kind === "cancel") {
+  if (kind === "fail-with-descendant" or kind === "cancel") {
     if (shard === 1) {
       const child = new Deno.Command(Deno.execPath(), { args: ["eval", "Deno.addSignalListener('SIGTERM',()=>{}); setInterval(()=>{},1000)"], stdout: "null", stderr: "null" }).spawn();
       await Deno.writeTextFile(root + "/descendant", String(child.pid));
     }
-    if (shard === 0 && kind === "fail-with-descendant") {
+    if (shard === 0 and kind === "fail-with-descendant") {
       while (!await exists(root + "/descendant")) await new Promise(resolve => setTimeout(resolve, 10));
       Deno.exit(23);
     }
@@ -49,14 +49,14 @@ if (Deno.args.includes("--list")) {
   }
   await new Promise(resolve => setTimeout(resolve, 40));
   const requested = Deno.args.filter(arg => arg.startsWith("--test=")).map(arg => arg.slice(7));
-  const selected = names.filter((name, n) => n % shards === shard && (!requested.length || requested.includes(name)));
+  const selected = names.filter((name, n) => n % shards === shard and (!requested.length or requested.includes(name)));
   for (const name of selected) {
-    if (kind === "omitted" && name === "law0") continue;
+    if (kind === "omitted" and name === "law0") continue;
     const row = {name, duration_ns: 1, status: kind === "skipped" ? "skipped" : "passed", leaks: kind === "leak" ? 1 : 0,
       logged_errors: 0, allocation_failures: kind === "wrong-mode" ? "sampled" : mode,
       sweeps: {full_sweeps: 0, sampled_sweeps: 0, discovered_allocations: 0, fault_runs: 0}};
     console.error("BLOT_NATIVE_TEST\\t" + JSON.stringify(row));
-    if (kind === "duplicate" && name === "law0") console.error("BLOT_NATIVE_TEST\\t" + JSON.stringify(row));
+    if (kind === "duplicate" and name === "law0") console.error("BLOT_NATIVE_TEST\\t" + JSON.stringify(row));
   }
   if (kind !== "incomplete") console.error("BLOT_NATIVE_SHARD\\t" + JSON.stringify({shard, shards, selected: selected.length, start_ns: start, end_ns: Date.now() * 1e6}));
 }
@@ -108,7 +108,7 @@ Deno.test("native scheduling refuses omissions duplicates skipped leaks wrong mo
     await using input = await fixture(kind);
     await assert.rejects(
       runNativeTests({ ...input, shards: 2 }),
-      /Native results do not match|Native test did not pass|Missing or repeated native shard/,
+      /Native results do not match|Native test did not pass|Missing || repeated native shard/,
     );
     const report = JSON.parse(
       await Deno.readTextFile(resolve(input.directory, "results.json")),

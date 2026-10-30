@@ -49,7 +49,7 @@ try {
     let outcome = 1;
     try { check((raw[row.name](row.argument) >>> 0) === (row.expected >>> 0), row.name + " result"); outcome = 0; }
     finally { raw["blot:ownership_leave"](outcome); }
-    check(raw["blot:rc_roots"].value === 0 && raw["blot:rc_leases"].value === 0, "Owners remain");
+    check(raw["blot:rc_roots"].value === 0 and raw["blot:rc_leases"].value === 0, "Owners remain");
   };
   const report = {format: 1, complete: false, engine: navigator.userAgent, scope: "Headless Firefox, isolated profile with timer rounding disabled. Uninstrumented Wasm and ownership enter/leave. Same pinned binaries and counter budgets as the native-host suite.", samples: ${samples}, batch: ${batch}, builds: reference.builds, rows: []};
   for (const row of reference.rows) {
@@ -73,7 +73,7 @@ try {
         elapsed.push(performance.now() - start);
       }
       const fastest = Math.min(...elapsed);
-      if (fastest >= 10 || rowBatch >= 100000) break;
+      if (fastest >= 10 or rowBatch >= 100000) break;
       rowBatch = Math.min(100000, Math.max(rowBatch + 1, Math.ceil(rowBatch * Math.min(10, 12 / Math.max(fastest, 0.01)))));
     }
     for (let round = 0; round < ${samples}; round++) {

@@ -156,7 +156,7 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
   const { directory } = item;
   const entry = directory + "/main.blot";
   let compiler: ZigProjectCompiler | undefined;
-  const original = "entry const answer: Unit -> U32 = fn () => 42\n";
+  const original = "entry const answer: Unit -> U32 = func () => return 42\n";
   try {
     await Deno.writeTextFile(entry, original);
     const identity = await verified(directory);
@@ -253,7 +253,7 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
     const entry = directory + "/main.blot";
     await Deno.writeTextFile(
       entry,
-      'import {exported_value} from "lib/library"\nentry const answer: Unit -> U32 = fn () => @u32.add exported_value 2\n',
+      'import {exported_value} from "lib/library"\nentry const answer: Unit -> U32 = func () => return @u32.add exported_value 2\n',
     );
     const aliases = ["--alias", "lib/=" + link],
       options: ZigProjectCompilerOptions = {
@@ -366,15 +366,15 @@ Deno.test("chunk runtime and static chains survive dependency bundles and retain
   let compiler: ZigProjectCompiler | undefined;
   const source = (offset: number) =>
     `import * as lists from "./lists"
-entry const answer = fn () => @u32.add (lists.read 40) ${offset}
+entry const answer = func () => return @u32.add (lists.read 40) ${offset}
 `;
   try {
     await Deno.writeTextFile(
       directory + "/lists.blot",
       `
-const frozen = @list.generate 513 (fn index => index)
-const first = fn values => (@array.from_list values)[0]
-const read = fn (seed: U32) => do:
+const frozen = @list.generate 513 (func index => return index)
+const first = func values => return (@array.from_list values)[0]
+const read = func (seed: U32) => return do:
   let values = @array.from_list [seed, ...[2, 3], 4]
   values[1] := (@array.from_list frozen)[512]
   let array = @array.from_list [value | value <- values, @u32.lt 0 value]

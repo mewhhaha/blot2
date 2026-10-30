@@ -11,14 +11,14 @@ const fixtures = [
     count: 100000,
     expected: 19999900000 >>> 0,
     source: `
-const skip = fn count => fn cursor => do:
+const skip = func count => return func cursor => return do:
   for index in 0..count:
     cursor := @cursor.advance self
   break cursor
 let values = @list.generate 200000 identity
 let origin = values.iter
 let distant = skip 100000 origin
-entry const run = fn count => do:
+entry const run = func count => return do:
   let left = origin
   let right = distant
   let total = 0
@@ -34,13 +34,13 @@ entry const run = fn count => do:
     count: 100000,
     expected: 10000000000 >>> 0,
     source: `
-const pair = fn value => [value, value + 1]
-const sum = fn (values: List U32) => do:
+const pair = func value => return [value, value + 1]
+const sum = func (values: List U32) => return do:
   let result = 0
   for value in values:
     result := self + value
   break result
-entry const run = fn count => do:
+entry const run = func count => return do:
   let result = 0
   for index in 0..count:
     result := self + sum (pair index)
@@ -52,13 +52,13 @@ entry const run = fn count => do:
     count: 500,
     expected: 250000,
     source: `
-const build = fn count => do:
+const build = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     for y in 0..count:
       result := [...self, x + y]
   break @array.from_list result
-entry const run = fn count => (build count).length
+entry const run = func count => return (build count).length
 `,
   },
 ];
@@ -71,7 +71,8 @@ for (const fixture of fixtures) {
   const path = `${output}/${fixture.name}.blot`;
   await Deno.writeTextFile(
     path,
-    fixture.source + "\nentry const probe = fn (seed: U32) => #[seed]\n",
+    fixture.source +
+      "\nentry const probe = func (seed: U32) => return #[seed]\n",
   );
   const guests: Awaited<ReturnType<typeof instantiateGuest>>[] = [];
   for (const variant of variants) {

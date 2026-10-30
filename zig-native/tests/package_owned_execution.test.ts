@@ -7,10 +7,10 @@ const executable = Deno.args[0] ??
   new URL("../zig-out-dev/bin/blotc", import.meta.url).pathname;
 const source = (value: number) =>
   `type Item = exists [a] => (unique a, (unique a) -> U32)
-const read: (unique U32) -> U32 = fn hidden => @usage.borrow hidden (fn loan => @usage.read loan)
-const make = fn (owner: unique U32) => pack [U32] (owner, read) as Item
-entry const answer = fn () => do:
-  use owner <- @resource.acquire (fn () => ${value}) (fn released => ())
+const read: (unique U32) -> U32 = func hidden => return @usage.borrow hidden (func loan => return @usage.read loan)
+const make = func (owner: unique U32) => return pack [U32] (owner, read) as Item
+entry const answer = func () => return do:
+  use owner <- @resource.acquire (func () => return ${value}) (func released => return ())
   break unpack (make owner) as [a] value in do:
     let (hidden, operation) = value
     break operation hidden
@@ -202,15 +202,15 @@ Deno.test("imported owning package operations retain their principal and cleanup
   const producer = `${directory}/producer.blot`;
   const archive = `${directory}/producer.blotdep`;
   const library = `type Item = exists [a] => (unique a, (unique a) -> U32)
-const read: (unique U32) -> U32 = fn hidden => @usage.borrow hidden (fn loan => @usage.read loan)
-const make: (unique U32) -> Item = fn owner => pack [U32] (owner, read) as Item
-const consume: Item -> U32 = fn item => unpack item as [a] value in do:
+const read: (unique U32) -> U32 = func hidden => return @usage.borrow hidden (func loan => return @usage.read loan)
+const make: (unique U32) -> Item = func owner => return pack [U32] (owner, read) as Item
+const consume: Item -> U32 = func item => return unpack item as [a] value in do:
   let (hidden, operation) = value
   break operation hidden
 `;
   const consumer = `import {make, consume} from "./producer"
-entry const answer = fn () => do:
-  use owner <- @resource.acquire (fn () => 42) (fn released => ())
+entry const answer = func () => return do:
+  use owner <- @resource.acquire (func () => return 42) (func released => return ())
   break consume (make owner)
 `;
   try {

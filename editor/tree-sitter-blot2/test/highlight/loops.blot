@@ -1,4 +1,4 @@
-entry const main = fn host => do:
+entry const main = func host => return do:
   let ever = 0
 //    ^ variable
   for 0..5:

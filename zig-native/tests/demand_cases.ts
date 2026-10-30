@@ -1,25 +1,25 @@
 export const demandCases = [
   {
     name: "lazy_skip",
-    source: `const ignore=fn ~(value:U32)=>42
+    source: `const ignore=func ~(value:U32)=> return 42
 entry const answer=ignore (@panic "not forced")
 `,
     expected: {"answer": 42},
   },
   {
     name: "aliases_and_callback",
-    source: `const twice=fn ~(value:U32)=>@u32.add (@force value) (@force value)
+    source: `const twice=func ~(value:U32)=> return @u32.add (@force value) (@force value)
 const alias=twice
-const call=fn (callback:~U32->U32)=>callback (@u32.add 20 1)
+const call=func (callback:~U32->U32)=> return callback (@u32.add 20 1)
 entry const folded=call alias
-entry const run=fn(value:U32)=>alias value
+entry const run=func(value:U32)=> return alias value
 `,
     expected: {"folded": 42, "run": 42},
     arguments: { run: 21 },
   },
   {
     name: "partial_application",
-    source: `const first=fn ~(left:U32)=>fn ~(right:U32)=>@force left
+    source: `const first=func ~(left:U32)=> return func ~(right:U32)=> return @force left
 const choose=first 42
 entry const answer=choose (@panic "second never forced")
 `,
@@ -27,9 +27,9 @@ entry const answer=choose (@panic "second never forced")
   },
   {
     name: "captured_versions",
-    source: `const delay=fn ~value=>value
-const capture=fn ~value=>fn ()=>@force value
-entry const answer=fn ()=>do:
+    source: `const delay=func ~value=> return value
+const capture=func ~value=> return func ()=> return @force value
+entry const answer=func ()=> return do:
   let amount=20
   let pending=delay (@u32.add amount 1)
   let thunk=capture (@u32.add (@force pending) 21)
@@ -40,8 +40,8 @@ entry const answer=fn ()=>do:
   },
   {
     name: "forward_existing",
-    source: `const twice=fn ~(value:U32)=>@u32.add (@force value) (@force value)
-const forward=fn ~(value:U32)=>twice (@force value)
+    source: `const twice=func ~(value:U32)=> return @u32.add (@force value) (@force value)
+const forward=func ~(value:U32)=> return twice (@force value)
 entry const answer=forward 21
 `,
     expected: {"answer": 42},
@@ -54,16 +54,16 @@ entry const answer=forward 21
   },
   {
     name: "mode_mismatch",
-    source: `const eager=fn(value:U32)=>value
-const pass=fn(callback:~U32->U32)=>callback 42
+    source: `const eager=func(value:U32)=> return value
+const pass=func(callback:~U32->U32)=> return callback 42
 entry const answer=pass eager
 `,
     error: "type_mismatch",
   },
   {
     name: "unused_argument_type_error",
-    source: `const ignore=fn ~(value:U32)=>42
-entry const answer=ignore #True
+    source: `const ignore=func ~(value:U32)=> return 42
+entry const answer=ignore true
 `,
     error: "type_mismatch",
   },
@@ -76,24 +76,24 @@ entry const answer=42
   },
   {
     name: "unknown_callback_is_eager",
-    source: `const lazy=fn ~(value:U32)=>@force value
-const call=fn callback=>callback 42
+    source: `const lazy=func ~(value:U32)=> return @force value
+const call=func callback=> return callback 42
 entry const answer=call lazy
 `,
     error: "type_mismatch",
   },
   {
     name: "demand_reference_not_forward",
-    source: `const lazy=fn ~(value:U32)=>@force value
-const forward=fn ~(value:U32)=>lazy value
+    source: `const lazy=func ~(value:U32)=> return @force value
+const forward=func ~(value:U32)=> return lazy value
 entry const answer=forward 42
 `,
     error: "type_mismatch",
   },
   {
     name: "break_argument_scope",
-    source: `const ignore=fn ~value=>42
-entry const answer=fn()=>do:
+    source: `const ignore=func ~value=> return 42
+entry const answer=func()=> return do:
   for index in 0..1:
     use ignore (do:
       break
@@ -106,9 +106,9 @@ entry const answer=fn()=>do:
   {
     name: "both_demand_infix",
     source: `infixl 60 (+) = choose
-const choose = fn ~(left:U32) => fn ~(right:U32) => @force left
+const choose = func ~(left:U32) => return func ~(right:U32) => return @force left
 entry const answer = 42 + (@panic "right never forced")
-entry const run = fn (value:U32) => value + (@panic "runtime right never forced")
+entry const run = func (value:U32) => return value + (@panic "runtime right never forced")
 `,
     expected: {"answer": 42, "run": 42},
     arguments: {"run": 42},
@@ -116,19 +116,19 @@ entry const run = fn (value:U32) => value + (@panic "runtime right never forced"
   },
   {
     name: "global_array_memo",
-    source: `const keep = fn ~value => fn () => @force value
+    source: `const keep = func ~value => return func () => return @force value
 const saved = keep #[40, 2]
 const alias = saved
-entry const read = fn () => do:
+entry const read = func () => return do:
   let first = saved ()
   let second = alias ()
   break @u32.add first[0] second[1]
-entry const changed = fn () => do:
+entry const changed = func () => return do:
   let first = saved ()
   first[0] := 0
   break @u32.add first[0] (alias ())[0]
-entry const allocate = fn () => do:
-  let values = @array.generate 128 (fn index => index)
+entry const allocate = func () => return do:
+  let values = @array.generate 128 (func index => return index)
   break values[42]
 `,
     expected: {"read": 42, "changed": 40, "allocate": 42},

@@ -12,12 +12,12 @@ const compiler = Deno.args[0] ??
 Deno.test("qualified aliases and local templates instantiate separate concrete evidence", async () => {
   await compileAndRun(
     `
-const twice: a -> a where { associated "add" a a a } = fn value => value + value
+const twice: a -> a where { associated "add" a a a } = func value => return value + value
 const alias = twice
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let local = alias
   let integer = local 20
-  let choose: a -> a where { type_rep a } = fn value => value
+  let choose: a -> a where { type_rep a } = func value => return value
   break @u32.add (choose integer) (@f32.to_u32 (local (choose 1.0)))
 `,
     (guest) => equal(guest.call("answer", null), 42),
@@ -29,15 +29,15 @@ Deno.test("qualified fields receivers and updates prove physical and selected me
   await compileAndRun(
     `
 type Box a is data = #Box { value: a }
-const Box.plus = fn (box: Box U32) => fn (amount: U32) => @u32.add box.value amount
-const first: a -> b where { field "value" a b } = fn box => box.value
-const bind: a -> (U32 -> U32) where { receiver "plus" a Unit (U32 -> U32) } = fn box => box.plus
-const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
+const Box.plus = func (box: Box U32) => return func (amount: U32) => return @u32.add box.value amount
+const first: a -> b where { field "value" a b } = func box => return box.value
+const bind: a -> (U32 -> U32) where { receiver "plus" a Unit (U32 -> U32) } = func box => return box.plus
+const replace: a -> b -> c where { update "value" a b c } = func box => return func value => return do:
   let current = box
   current.value := value
   break current
-entry const answer = fn () => @u32.add (first (#Box { value: 20 })) ((bind (#Box { value: 20 })) 2)
-entry const changed = fn () => do:
+entry const answer = func () => return @u32.add (first (#Box { value: 20 })) ((bind (#Box { value: 20 })) 2)
+entry const changed = func () => return do:
   let #Box { value } = replace (#Box { value: 20 }) 42.0
   break value
 `,
@@ -52,10 +52,10 @@ Deno.test("qualified operation arguments share written open row identities", asy
   await compileAndRun(
     `
 type Signal a is effect = { get: Unit -> a }
-const read: Unit -> a ! {| e} where { operation Signal.get a } = fn () => Signal.get a ()
-const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = fn callback => callback ()
-entry const answer = fn () -> U32 => do (@effect.provider (Signal.get U32) (fn () => 42)):
-  break invoke (fn () => read ())
+const read: Unit -> a ! {| e} where { operation Signal.get a } = func () => return Signal.get a ()
+const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = func callback => return callback ()
+entry const answer = func () : U32 => return do (@effect.provider (Signal.get U32) (func () => return 42)):
+  break invoke (func () => return read ())
 `,
     (guest) => equal(guest.call("answer", null), 42),
   );
@@ -64,10 +64,10 @@ entry const answer = fn () -> U32 => do (@effect.provider (Signal.get U32) (fn (
 Deno.test("predicate-only variables and closed extra clauses narrow reached schemes", async () => {
   await compileAndRun(
     `
-const identity: U32 -> U32 where { associated "add" U32 U32 a } = fn value => value
-const unused: a -> a where { associated "missing" a a a } = fn value => value
-entry const answer = fn () => do:
-  let increment: U32 -> U32 where { associated "add" F32 F32 F32 ! {} } = fn value => value + 1
+const identity: U32 -> U32 where { associated "add" U32 U32 a } = func value => return value
+const unused: a -> a where { associated "missing" a a a } = func value => return value
+entry const answer = func () => return do:
+  let increment: U32 -> U32 where { associated "add" F32 F32 F32 ! {} } = func value => return value + 1
   break identity (increment 41)
 entry const number: U32 where { type_rep U32 } = 42
 entry let runtime: U32 where { effect_rep ! {} } = 7
@@ -97,15 +97,15 @@ Deno.test("written clauses reject malformed shapes missing body coverage and par
         "invalid_constraint",
       ],
       [
-        "entry const answer = fn (callback: U32 -> U32 where {}) => 42\n",
+        "entry const answer = func (callback: U32 -> U32 where {}) => return 42\n",
         "higher_rank_constraint",
       ],
       [
-        "const twice: a -> a where {} = fn value => value + value\nentry const answer = 42\n",
+        "const twice: a -> a where {} = func value => return value + value\nentry const answer = 42\n",
         "missing_predicate",
       ],
       [
-        "const identity: e -> e where { effect_rep ! {| e} } = fn value => value\nentry const answer = 42\n",
+        "const identity: e -> e where { effect_rep ! {| e} } = func value => return value\nentry const answer = 42\n",
         "annotation_kind_mismatch",
       ],
       [
@@ -120,23 +120,23 @@ Deno.test("reached extra clauses require exact concrete type and effect evidence
   for (
     const source of [
       'entry const answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
-      'entry const answer: Unit -> U32 where { associated "missing" Bool Bool Bool } = fn () => 42\n',
+      'entry const answer: Unit -> U32 where { associated "missing" Bool Bool Bool } = func () => return 42\n',
       'entry let answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
     ]
   ) await compileExpectedFailure(source, "missing_associated");
   await compileExpectedFailure(
     `
-const identity: a -> a where { effect_rep ! {| e} } = fn value => value
-entry const answer = fn () => identity 42
+const identity: a -> a where { effect_rep ! {| e} } = func value => return value
+entry const answer = func () => return identity 42
 `,
     "ambiguous_qualified",
   );
   await compileExpectedFailure(
     `
 type Tick is effect = Unit -> Unit
-const identity: a -> a where { associated "add" U32 U32 U32 ! {Tick} } = fn value => value
+const identity: a -> a where { associated "add" U32 U32 U32 ! {Tick} } = func value => return value
 const alias = identity
-entry const answer = fn () => alias 42
+entry const answer = func () => return alias 42
 `,
     "effect_mismatch",
     undefined,
@@ -146,11 +146,11 @@ entry const answer = fn () => alias 42
 
 Deno.test("qualified computed values retain one evidence instance", async () => {
   const header =
-    'const twice: a -> a where { associated "add" a a a } = fn value => value + value\n';
-  const selected = `entry const answer = fn () => do:
-  let selected = case #True of
-    #True => twice
-    #False => twice
+    'const twice: a -> a where { associated "add" a a a } = func value => return value + value\n';
+  const selected = `entry const answer = func () => return do:
+  let selected = case true of
+    true => twice
+    false => twice
 `;
   await compileAndRun(
     header + selected + "  break selected 21\n",
@@ -175,7 +175,7 @@ Deno.test("qualified imports preserve representation predicates and callback row
     const library = `${directory}/library.blot`;
     await Deno.writeTextFile(
       library,
-      "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {} } = fn callback => callback ()\n",
+      "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {} } = func callback => return callback ()\n",
     );
     const main = `${directory}/main.blot`;
     const output = `${directory}/program.wasm`;
@@ -183,10 +183,10 @@ Deno.test("qualified imports preserve representation predicates and callback row
       main,
       `import { invoke } from "./library"
 type Read is effect = Unit -> U32
-const pure_callback: Unit -> U32 = fn () => 37
-const read_callback: Unit -> U32 ! {Read} = fn () => Read ()
-entry const pure = fn () => invoke pure_callback
-entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
+const pure_callback: Unit -> U32 = func () => return 37
+const read_callback: Unit -> U32 ! {Read} = func () => return Read ()
+entry const pure = func () => return invoke pure_callback
+entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
   break invoke read_callback
 `,
     );
@@ -211,12 +211,12 @@ entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
     }
     await Deno.writeTextFile(
       library,
-      "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = fn callback => callback ()\n",
+      "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = func callback => return callback ()\n",
     );
     await Deno.writeTextFile(
       main,
       `import {invoke} from "./library"
-entry const answer = fn () => invoke (fn () => 42)
+entry const answer = func () => return invoke (func () => return 42)
 `,
     );
     const rejected = await new Deno.Command(compiler, {

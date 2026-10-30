@@ -18,7 +18,7 @@ const compiler = await createCompiler({
 });
 try {
   const result = await compiler.build({
-    sources: { "/project/main.blot": "entry const answer = fn () => 42\n" },
+    sources: { "/project/main.blot": "entry const answer = func () => return 42\n" },
   });
   if (result.success) await Deno.writeFile("program.wasm", result.bytes);
   else console.error(result.diagnostics);
@@ -59,6 +59,16 @@ lifetime analysis still run. The default is `"optimized"`. A project session
 keeps its selected tier; start a separate session to compare outputs. Optimized
 body captures are valid only for the tier that produced them. This option does
 not change the optimization mode used to build the native compiler itself.
+
+`storage` sets the bounded data-stack budgets for the whole project session:
+`temporaryBytes`, `growerBytes`, `persistentBytes`, `transportBytes` and
+`ownerCapacity`. Byte values must be positive U32 multiples of 16; owner capacity
+must be a positive U32. Defaults are 1 MiB for temporary storage, 1 MiB per live
+growable region, 1 MiB per persistent global pool, 2 MiB for copied transport and
+4096 owner slots. These are reserved capacities, not automatic growth targets.
+Exhaustion traps before mutation. Budget values participate in retained-output
+and restart-cache matching; open a new session to change them. Per-pool named
+budgets are not yet exposed by this API.
 
 `profileMemory: true` emits diagnostic counters, pinned source origins and final
 runtime function names. Use `memoryProfileReport(bytes, exports)` from

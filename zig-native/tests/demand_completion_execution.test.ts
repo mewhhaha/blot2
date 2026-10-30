@@ -17,8 +17,8 @@ function counted(bytes: Uint8Array<ArrayBuffer>): void {
 function cancellationSource(exit: "return" | "break", nested: boolean): string {
   return `
 type Tick is effect = { read: U32 -> U32 }
-const delay = fn ~value => value
-const abort = fn log => fn computation => do:
+const delay = func ~value => return value
+const abort = func log => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -27,7 +27,7 @@ const abort = fn log => fn computation => do:
       complete value =>
         break value
   break 7
-const finish = fn log => fn computation => do:
+const finish = func log => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -35,45 +35,45 @@ const finish = fn log => fn computation => do:
         yield @u32.add value 40
       complete value =>
         break value
-const scenario = fn log => do:
+const scenario = func log => return do:
   let inner = delay (Tick.read 1)
   let pending = delay (do:
     use value <- ${nested ? "@demand inner" : "Tick.read 1"}
     break @u32.add value 1
   )
-  let work = @computation (fn () => @demand pending)
+  let work = @computation (func () => return @demand pending)
   use first <- abort log work
   use second <- finish log work
   use third <- finish log work
   break @u32.add first (@u32.add second third)
-entry const answer = fn (log: U32 -> U32 ! {Foreign}) => do:
+entry const answer = func (log: U32 -> U32 ! {Foreign}) => return do:
   use result <- scenario log
   break result
-entry const folded = scenario (fn value => value)
+entry const folded = scenario (func value => return value)
 `;
 }
 
 const trappedSource = `
 type Tick is effect = { read: Unit -> U32 }
-const keep = fn ~value => fn () => @demand value
+const keep = func ~value => return func () => return @demand value
 const saved = keep (Tick.read ())
 const divided = keep (@u32.div 1 (Tick.read ()))
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do (@effect.provider Tick.read host):
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return do (@effect.provider Tick.read host):
   break saved ()
-entry const divide = fn (host: Unit -> U32 ! {Foreign}) => do (@effect.provider Tick.read host):
+entry const divide = func (host: Unit -> U32 ! {Foreign}) => return do (@effect.provider Tick.read host):
   break divided ()
-entry const pure = fn () => 7
+entry const pure = func () => return 7
 `;
 
 const recursiveSource = `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Node is data = #End | #Next (Unit -> U32 ! {State.get Node})
-const keep = fn ~value => fn () => @demand value
-const get = fn (witness: Unit -> a) -> a => State.get ()
-entry const answer = fn () => do:
-  let (_, result) = @effect.run State.get State.set #End (fn () => do:
+const keep = func ~value => return func () => return @demand value
+const get = func (witness: Unit -> a) : a => return State.get ()
+entry const answer = func () => return do:
+  let (_, result) = @effect.run State.get State.set #End (func () => return do:
     let delayed = keep (do:
-      use link <- get (fn () => #End)
+      use link <- get (func () => return #End)
       break case link of
         #End => 0
         #Next callback => callback ()
@@ -82,7 +82,7 @@ entry const answer = fn () => do:
     break delayed ()
   )
   break result
-entry const pure = fn () => 7
+entry const pure = func () => return 7
 `;
 
 for (const asynchronous of [false, true]) {

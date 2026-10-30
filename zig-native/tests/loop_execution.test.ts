@@ -39,7 +39,7 @@ Deno.test("native loops reject invalid bounds, refutable iterators and escaped c
 Deno.test("native range iteration uses constant stack on large runtime bounds", async () => {
   await compileAndRun(
     `
-entry const run = fn (limit: U32) -> U32 => do:
+entry const run = func (limit: U32) : U32 => return do:
   let total = 0
   for index in 0..limit:
     total := @u32.add self index
@@ -56,7 +56,7 @@ entry const run = fn (limit: U32) -> U32 => do:
 Deno.test("continue works in a loop local to a request callback", async () => {
   await compileAndRun(`
 type Tick is effect = { read: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
@@ -68,28 +68,28 @@ const handled = fn computation => do:
         yield total
       complete value =>
         break value
-entry const answer = fn () => handled (@computation (fn () => Tick.read ()))
+entry const answer = func () => return handled (@computation (func () => return Tick.read ()))
 `, guest => equal(guest.call("answer", null), 4));
 });
 
 Deno.test("continue cannot cross a request callback boundary", async () => {
   const source = `
 type Tick is effect = { read: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         continue
       complete value =>
         break value
-entry const answer = fn () => handled (@computation (fn () => Tick.read ()))
+entry const answer = func () => return handled (@computation (func () => return Tick.read ()))
 `;
   await compileExpectedFailure(source, "invalid_return");
 });
 
 Deno.test("continue and a guarded body perform the same effects", async () => {
   await compileAndRun(`
-entry const skipped = fn (record: U32 -> U32 ! {Foreign}) => do:
+entry const skipped = func (record: U32 -> U32 ! {Foreign}) => return do:
   let total = 0
   for index in 0..5:
     if @u32.eq index 2:
@@ -97,7 +97,7 @@ entry const skipped = fn (record: U32 -> U32 ! {Foreign}) => do:
     use record index
     total := @u32.add self index
   break total
-entry const guarded = fn (record: U32 -> U32 ! {Foreign}) => do:
+entry const guarded = func (record: U32 -> U32 ! {Foreign}) => return do:
   let total = 0
   for index in 0..5:
     if @u32.eq index 2:
@@ -120,7 +120,7 @@ entry const guarded = fn (record: U32 -> U32 ! {Foreign}) => do:
 
 Deno.test("continue retires skipped iteration arrays and restores ownership roots", async () => {
   await compileAndRun(`
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let checksum = 0
   for index in 0..count:
     let discarded = @array.fill 8192 index
@@ -146,8 +146,8 @@ entry const run = fn (count: U32) => do:
 
 Deno.test("continue advances packed array and list rows across leaf boundaries", async () => {
   await compileAndRun(`
-entry const run = fn (count: U32) => do:
-  let rows = @array.generate count (fn index => {value: index, extra: @u32.add index 1})
+entry const run = func (count: U32) => return do:
+  let rows = @array.generate count (func index => return {value: index, extra: @u32.add index 1})
   let listed = @list.from_array rows
   let total = 0
   for row in rows:

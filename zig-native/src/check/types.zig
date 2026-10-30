@@ -36,6 +36,20 @@ comptime {
 /// Opaque declarations use a relocated spelling handle rather than an AST ordinal.
 pub const opaque_name_bit: u32 = 0x80000000;
 pub const NominalIdentity = struct { unit: u32, decl: u32 };
+/// Associated members of builtin and user-defined receiver families.
+pub fn receiverIdentity(node: Node) ?NominalIdentity {
+    return switch (node.tag) {
+        .nominal => .{ .unit = node.a, .decl = node.b },
+        .u32 => .{ .unit = 0, .decl = u32_type },
+        .f32 => .{ .unit = 0, .decl = f32_type },
+        .boolean => .{ .unit = 0, .decl = boolean },
+        .unit => .{ .unit = 0, .decl = unit },
+        .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
+        .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+        .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
+        else => null,
+    };
+}
 pub const Operation = struct { identity: NominalIdentity, arguments: List = .{}, instance: NominalIdentity = .{ .unit = 0, .decl = 0 } };
 pub const foreign_operation: Effects.Label = 1;
 // Builtin operations occupy a compiler-owned unit outside source module IDs.
@@ -53,6 +67,7 @@ pub fn compilerNominalArity(identity: NominalIdentity) ?u32 {
         6 => 3, // Decision[reply, state, result]
         8 => 2, // Code[result, latent effects]
         9 => 1, // Descriptor[target]
+        20...24 => 1, // Storage mode, reference, view and relative link.
         16 => 0, // Task group (scoped)
         17, 18 => 2, // Task[group, thunk], View[array, instance version]
         else => null,

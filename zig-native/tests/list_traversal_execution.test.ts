@@ -11,8 +11,8 @@ Deno.test("packed List field snapshots survive branch reads and loop carries at 
     const zero = Array.from({ length: width }, (_, field) => `f${field}: 0`)
       .join(", ");
     return `
-entry const width_${width} = fn count => do:
-  let rows = @list.generate count (fn i => {${fields}})
+entry const width_${width} = func count => return do:
+  let rows = @list.generate count (func i => return {${fields}})
   let previous = {${zero}}
   let total = 0
   for row in rows:
@@ -65,8 +65,8 @@ Deno.test("packed List tuple bindings preserve every scalar across short and cro
     );
     const names = Array.from({ length: width }, (_, i) => `a${i}`);
     return `
-entry const tuple_${width} = fn count => do:
-  let values = @list.generate count (fn i => (${values}))
+entry const tuple_${width} = func count => return do:
+  let values = @list.generate count (func i => return (${values}))
   let total = 0
   for (${names.join(", ")}) in values:
     total := self + ${names.join(" + ")}
@@ -98,9 +98,9 @@ Deno.test("borrowed List fields preserve float bits and live values across colle
         }`,
     );
     return `
-entry const bits_${width} = fn (input: Array F32) => do:
+entry const bits_${width} = func (input: Array F32) => return do:
   let count = 257
-  let values = @list.generate count (fn i => {${fields.join(", ")}})
+  let values = @list.generate count (func i => return {${fields.join(", ")}})
   let result = #[]
   for row in values:
     result := #[...self, row.f0, row.f${width - 1}]
@@ -108,16 +108,16 @@ entry const bits_${width} = fn (input: Array F32) => do:
 `;
   });
   const source = functions.join("\n") + `
-entry const edit_during = fn count => do:
-  let values = @list.generate count (fn i => {a: i, b: i + 1, c: i + 2})
+entry const edit_during = func count => return do:
+  let values = @list.generate count (func i => return {a: i, b: i + 1, c: i + 2})
   let total = 0
   for row in values:
     let before = row.a
     values := [{a: 100000, b: 200000, c: 300000}, ...self]
     total := self + before + row.c
   break #[total, values.length]
-entry const collect = fn count => do:
-  let rows = @list.generate 3 (fn i => {a: i, b: i + 1, c: i + 2})
+entry const collect = func count => return do:
+  let rows = @list.generate 3 (func i => return {a: i, b: i + 1, c: i + 2})
   let total = 0
   for row in rows:
     let first = row.a

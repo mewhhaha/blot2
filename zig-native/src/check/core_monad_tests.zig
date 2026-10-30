@@ -9,15 +9,15 @@ const T = @import("types.zig");
 const a = std.testing.allocator;
 const source =
     \\type Box value is data = #Box value
-    \\const Box.pure = fn value => #Box value
-    \\const Box.bind = fn candidate => fn next => case candidate of
+    \\const Box.pure = func value => return #Box value
+    \\const Box.bind = func candidate => return func next => return case candidate of
     \\  #Box value => next value
-    \\const sequence = fn () => do (@do.monad Box):
+    \\const sequence = func () => return do (@do.monad Box):
     \\  let total = 20
     \\  use value <- #Box 22
     \\  total := @u32.add self value
     \\  break total
-    \\entry const answer = fn () => do:
+    \\entry const answer = func () => return do:
     \\  let #Box value = sequence ()
     \\  break value
 ;
@@ -112,12 +112,12 @@ test "resolver protocol and continuation allocation failures release every owned
 const iteration_source =
     \\type Iteration [state,result] is data = #Continue state | #Done result
     \\type Maybe value is data = #Some value | #Nothing
-    \\const monad = fn constructor => @do.monad constructor
-    \\const Maybe.pure = fn value => #Some value
-    \\const Maybe.bind = fn candidate => fn next => case candidate of
+    \\const monad = func constructor => return @do.monad constructor
+    \\const Maybe.pure = func value => return #Some value
+    \\const Maybe.bind = func candidate => return func next => return case candidate of
     \\  #Some value => next value
     \\  #Nothing => #Nothing
-    \\const Maybe.iterate = fn initial => fn step => do:
+    \\const Maybe.iterate = func initial => return func step => return do:
     \\  let state = initial
     \\  for ever:
     \\    use candidate <- step state
@@ -126,7 +126,7 @@ const iteration_source =
     \\    let #Some (#Continue next) = candidate else:
     \\      break #Nothing
     \\    state := next
-    \\const sequence = fn forwarded => do (monad Maybe):
+    \\const sequence = func forwarded => return do (monad Maybe):
     \\  let total = 20
     \\  for outer in 0..2:
     \\    for inner in 0..2:
@@ -138,7 +138,7 @@ const iteration_source =
     \\        break @u32.add total 20
     \\      break
     \\  break total
-    \\entry const answer = fn () => case sequence #True of
+    \\entry const answer = func () => return case sequence true of
     \\  #Some value => value
     \\  #Nothing => 0
 ;
@@ -222,15 +222,15 @@ test "flat monadic statement sequences do not consume the nested expression dept
     defer text.deinit(a);
     try text.appendSlice(a,
         \\type Box value is data = #Box value
-        \\const Box.pure = fn value => #Box value
-        \\const sequence = fn () => do (@do.monad Box):
+        \\const Box.pure = func value => return #Box value
+        \\const sequence = func () => return do (@do.monad Box):
         \\  let total = 0
     );
     try text.append(a, '\n');
     for (0..1536) |_| try text.appendSlice(a, "  total := @u32.add self 1\n");
     try text.appendSlice(a,
         \\  break total
-        \\entry const answer = fn () => do:
+        \\entry const answer = func () => return do:
         \\  let #Box value = sequence ()
         \\  break value
     );

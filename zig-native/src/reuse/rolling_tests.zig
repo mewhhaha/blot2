@@ -66,19 +66,19 @@ test "ordinary rolling and summary trees preserve Core and deterministic retaine
         \\import * as rolling from "std/rolling"
         \\import * as summary from "std/summary"
         \\import * as iter from "std/iter"
-        \\const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\entry const run = fn (count: U32) => do:
+        \\const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\entry const run = func (count: U32) => return do:
         \\  let values = iter.range 0 count
         \\  let first = iter.fold_left add 0 (rolling.monoid add 0 3 values)
-        \\  let second = iter.fold_left add 0 (rolling.group add (fn value => @u32.sub 0 value) 0 3 values)
+        \\  let second = iter.fold_left add 0 (rolling.group add (func value => return @u32.sub 0 value) 0 3 values)
         \\  let original = summary.build add 0 values
         \\  let changed = summary.set add 0 99 original
         \\  let joined = summary.concat add original changed
         \\  let selected = summary.query add 0 0 1 joined
         \\  break @u32.add (@u32.add first second) (@u32.add selected (summary.get 0 original))
-        \\entry const references = fn (count: U32) => do:
-        \\  let combine = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-        \\  let values = iter.map (fn index => #[index]) (iter.range 0 count)
+        \\entry const references = func (count: U32) => return do:
+        \\  let combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+        \\  let values = iter.map (func index => return #[index]) (iter.range 0 count)
         \\  let original = summary.build combine #[] values
         \\  let changed = summary.set combine 0 #[99] original
         \\  let joined = summary.concat combine original changed
@@ -102,10 +102,10 @@ test "ordinary rolling and summary trees preserve Core and deterministic retaine
 test "rolling state preserves Core and output through every emission allocation failure" {
     try faultLaw(
         \\type State is data = #State { values: Array U32, advance: U32 -> U32, width: U32 }
-        \\const next = fn (#State { values, advance, width }) =>
+        \\const next = func (#State { values, advance, width }) => return
         \\  #State { values, advance, width: advance width }
-        \\entry const run = fn (values: Array U32) => do:
-        \\  let state = #State { values, advance: fn width => @u32.add width (@array.length values), width: 1 }
+        \\entry const run = func (values: Array U32) => return do:
+        \\  let state = #State { values, advance: func width => return @u32.add width (@array.length values), width: 1 }
         \\  let #State { values: retained, width } = next state
         \\  break @array.concat retained #[width]
     , false);
@@ -114,15 +114,15 @@ test "rolling state preserves Core and output through every emission allocation 
 test "summary reference replacement preserves Core and output through every emission allocation failure" {
     try faultLaw(
         \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a, a)
-        \\const total = fn tree => case tree of
+        \\const total = func tree => return case tree of
         \\  #Leaf value => value
         \\  #Branch (_, _, value) => value
-        \\const replace = fn value => fn tree => case tree of
+        \\const replace = func value => return func tree => return case tree of
         \\  #Leaf _ => #Leaf value
         \\  #Branch (left, right, _) => do:
         \\    let changed = replace value left
         \\    break #Branch (changed, right, @array.concat (total changed) (total right))
         \\const original = #Branch (#Leaf #[1], #Leaf #[2], #[1, 2])
-        \\entry const run = fn (values: Array U32) => total (replace values original)
+        \\entry const run = func (values: Array U32) => return total (replace values original)
     , true);
 }

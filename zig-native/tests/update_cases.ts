@@ -4,13 +4,13 @@ export const updateCases = [
     expected: { folded: 41, run: 41 },
     arguments: { run: 1 },
     source: `
-const update = fn index => do:
+const update = func index => return do:
   let values = #[10, 20, 30]
   let before = values
   values[index] := @u32.add self 1
   break @u32.add (@array.get before index) (@array.get values index)
 entry const folded = update 1
-entry const run = fn (index: U32) -> U32 => update index
+entry const run = func (index: U32) : U32 => return update index
 `,
   },
   {
@@ -19,7 +19,7 @@ entry const run = fn (index: U32) -> U32 => update index
     source: `
 type Point is data = #Point { x: U32, y: U32 }
 type Bucket is data = #Bucket { points: Array Point }
-entry const run = fn () -> U32 => do:
+entry const run = func () : U32 => return do:
   let bucket = #Bucket { points: #[#Point { y: 1, x: 10 }, #Point { y: 2, x: 20 }] }
   let before = bucket
   bucket.points[1].x := @u32.add self 2
@@ -30,7 +30,7 @@ entry const run = fn () -> U32 => do:
     name: "nested_array_indexes",
     expected: { run: 45 },
     source: `
-entry const run = fn () -> U32 => do:
+entry const run = func () : U32 => return do:
   let values = #[#[1, 2], #[3, 4]]
   let before = values
   values[1][0] := @u32.add self 39
@@ -41,7 +41,7 @@ entry const run = fn () -> U32 => do:
     name: "selector_self_root_rhs_self_leaf",
     expected: { run: 42 },
     source: `
-entry const run = fn () -> U32 => do:
+entry const run = func () : U32 => return do:
   let values = #[1, 41]
   values[@u32.sub (@array.length self) 1] := @u32.add self 1
   break values[1]
@@ -51,18 +51,18 @@ entry const run = fn () -> U32 => do:
     name: "generic_update_u32_f32",
     expected: { integer: 42, floating: 4.5 },
     source: `
-const replace = fn values => fn index => fn value => do:
+const replace = func values => return func index => return func value => return do:
   values[index] := value
   break values
-entry const integer = fn () -> U32 => (replace #[1, 2] 1 42)[1]
-entry const floating = fn () -> F32 => (replace #[1.0, 2.0] 0 4.5)[0]
+entry const integer = func () : U32 => return (replace #[1, 2] 1 42)[1]
+entry const floating = func () : F32 => return (replace #[1.0, 2.0] 0 4.5)[0]
 `,
   },
   {
     name: "nested_update_rhs_catalog_identity",
     expected: { folded: 42, run: 42 },
     source: `
-const changed = fn () -> U32 => do:
+const changed = func () : U32 => return do:
   let values = #[1]
   values[0] := do:
     let other = #[40]
@@ -70,7 +70,7 @@ const changed = fn () -> U32 => do:
     break other[0]
   break values[0]
 entry const folded = changed ()
-entry const run = fn () -> U32 => changed ()
+entry const run = func () : U32 => return changed ()
 `,
   },
   {

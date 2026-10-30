@@ -6,6 +6,7 @@ export const compilerFixtures = [
   "resource-retire-fixture",
   "region-owner-publication-fixture",
   "task-context-fixture",
+  "data-stacks-fixture",
 ] as const;
 export type CompilerFixture = typeof compilerFixtures[number];
 
@@ -46,6 +47,9 @@ export function fixturesForGuestFiles(
     }
     if (file.endsWith("/task_context_execution.test.ts")) {
       needed.add("task-context-fixture");
+    }
+    if (file.endsWith("/data_stacks_execution.test.ts")) {
+      needed.add("data-stacks-fixture");
     }
     if (file.endsWith("/list_runtime.test.ts")) {
       needed.add("list-runtime-fixture");

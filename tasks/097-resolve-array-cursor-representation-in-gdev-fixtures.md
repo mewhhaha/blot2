@@ -19,19 +19,19 @@ instead of failing code emission.
 The gdev session reduced it to a program without gdev:
 
 ```blot
-const count = fn xs => do:
+const count = func xs => return do:
   let n = 0
   for x in xs:
     n := self + 1
   return n
-entry const create = fn () => count #[]
+entry const create = func () => return count #[]
 ```
 
 It fails with
 `unresolved_type: Code emission requires concrete representation
 evidence` at
 `std/prelude.blot` 13092–13144
-(`const Array.iter = fn values =>
+(`const Array.iter = func values => return
 @array.cursor values`): the empty array leaves
 its element type unpinned, and specialization reaches the cursor without a
 representation for it. `count

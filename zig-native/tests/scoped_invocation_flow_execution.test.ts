@@ -5,45 +5,45 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const header = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const first = fn callback => fn left => fn right => callback ()
-const shadow = fn callback => fn callback => fn unused => callback ()
+const first = func callback => return func left => return func right => return callback ()
+const shadow = func callback => return func callback => return func unused => return callback ()
 `;
 const libraries = {
   parameter: header +
-    `const invoke = fn (left: State a) => fn (right: State b) => fn (callback: Unit -> U32 ! {left.get, right.get | e}) => callback ()
+    `const invoke = func (left: State a) => return func (right: State b) => return func (callback: Unit -> U32 ! {left.get, right.get | e}) => return callback ()
 `,
   arrow: header +
-    `const invoke: (left: State a) -> ((right: State b) -> ((Unit -> U32 ! {left.get, right.get | e}) -> U32 ! {left.get, right.get | e})) = fn x => fn y => fn callback => callback ()
+    `const invoke: (left: State a) -> ((right: State b) -> ((Unit -> U32 ! {left.get, right.get | e}) -> U32 ! {left.get, right.get | e})) = func x => return func y => return func callback => return callback ()
 `,
 };
 const main = `import {State, invoke, first, shadow} from "./state"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
-      use a <- invoke left right (fn () => do:
+      use a <- invoke left right (func () => return do:
         use x <- left.get ()
         use y <- right.get ()
         use z <- host x
         break @u32.add z y
       )
-      use b <- invoke right left (fn () => do:
+      use b <- invoke right left (func () => return do:
         use x <- right.get ()
         use y <- left.get ()
         break @u32.add x y
       )
-      use c <- first (fn () => left.get ()) left left
-      use d <- first (fn () => left.get ()) left right
-      use e <- shadow left (fn () => right.get ()) right
+      use c <- first (func () => return left.get ()) left left
+      use d <- first (func () => return left.get ()) left right
+      use e <- shadow left (func () => return right.get ()) right
       break @u32.add (@u32.add a b) (@u32.add c (@u32.add d e))
     let (state, result) = inner
     break result
   let (state, result) = outer
   break result
 ))
-entry const mixed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State F32) => do:
+entry const mixed = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State F32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 1.5):
-      break invoke left right (fn () => do:
+      break invoke left right (func () => return do:
         use value <- left.get ()
         use ignored <- right.get ()
         break host value
@@ -53,10 +53,10 @@ entry const mixed = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left
   let (state, result) = outer
   break result
 ))
-entry const repeated = fn () => @effect.scope (fn (state: State U32) => do:
+entry const repeated = func () => return @effect.scope (func (state: State U32) => return do:
   use outer <- do (@effect.state state.get state.set 7):
     use inner <- do (@effect.state state.get state.set 11):
-      break invoke state state (fn () => do:
+      break invoke state state (func () => return do:
         use x <- state.get ()
         use y <- state.get ()
         break @u32.add x y
@@ -68,9 +68,9 @@ entry const repeated = fn () => @effect.scope (fn (state: State U32) => do:
 )
 `;
 const unmatched = `import {State, invoke} from "./state"
-entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const invalid = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use handled <- do (@effect.state left.get left.set 7):
-    break invoke left right (fn () => do:
+    break invoke left right (func () => return do:
       use x <- left.get ()
       use y <- right.get ()
       break @u32.add x y
@@ -183,8 +183,8 @@ for (const [syntax, library] of Object.entries(libraries)) {
               sources: {
                 ...sources,
                 [dependency]: library.replace(
-                  "=> callback ()",
-                  "=> do:\n  let saved = callback\n  break saved ()",
+                  "=> return callback ()",
+                  "=> return do:\n  let saved = callback\n  break saved ()",
                 ),
               },
             });

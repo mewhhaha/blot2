@@ -2,15 +2,15 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 
 Deno.test("generic exported functions infer numeric evidence through actual closure captures", async () => {
   await compileAndRun(`
-entry const increment = fn value => value + 1
-entry const doubled = fn value => value * 2
-const compose = fn outer => fn inner => fn value => outer (inner value)
+entry const increment = func value => return value + 1
+entry const doubled = func value => return value * 2
+const compose = func outer => return func inner => return func value => return outer (inner value)
 entry const composed = compose doubled increment
-entry const factorial = fn value => do:
+entry const factorial = func value => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
-entry const floating = fn value => value + 1.5
+entry const floating = func value => return value + 1.5
 `, guest => {
     for (const value of [0, 1, 20, 41, 0xffffffff]) {
       equal(guest.call("increment", value), (value + 1) >>> 0);
@@ -27,14 +27,14 @@ entry const floating = fn value => value + 1.5
 Deno.test("entry inference preserves unhandled operations and unresolved host parameters", async () => {
   await compileExpectedFailure(`
 effect Read: Unit -> U32
-entry const invalid = fn value => do:
+entry const invalid = func value => return do:
   use ignored <- Read ()
   break value + 1
 `, "entry_type", undefined, { prelude: "std/prelude.blot" });
-  await compileExpectedFailure(`entry const identity = fn value => value\n`, "entry_type");
+  await compileExpectedFailure(`entry const identity = func value => return value\n`, "entry_type");
   await compileExpectedFailure(`
 effect Read: Unit -> U32
-entry const invalid = fn (callback: Unit -> U32 ! {Read}) => callback ()
+entry const invalid = func (callback: Unit -> U32 ! {Read}) => return callback ()
 `, "entry_type");
 });
 

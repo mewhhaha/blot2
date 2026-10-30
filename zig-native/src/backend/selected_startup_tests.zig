@@ -26,8 +26,8 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     try std.testing.expectEqual(@as(usize, 0), result.diagnostics.len);
     return result;
 }
-const associated_cycle = "type Box is data = #Box U32\nconst Box.read = fn value => first\nconst pick = fn value => value.read\nlet first: U32 = pick (#Box 1)\nentry const answer: Unit -> U32 = fn () => first\n";
-const separate_instances = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = fn value => 0\nconst Right.read = fn value => first\nconst pick = fn value => value.read\nlet first: U32 = pick (#Left 1)\nlet second: U32 = pick (#Right 2)\nentry const answer: Unit -> U32 = fn () => @u32.add first second\n";
+const associated_cycle = "type Box is data = #Box U32\nconst Box.read = func value => return first\nconst pick = func value => return value.read\nlet first: U32 = pick (#Box 1)\nentry const answer: Unit -> U32 = func () => return first\n";
+const separate_instances = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = func value => return 0\nconst Right.read = func value => return first\nconst pick = func value => return value.read\nlet first: U32 = pick (#Left 1)\nlet second: U32 = pick (#Right 2)\nentry const answer: Unit -> U32 = func () => return @u32.add first second\n";
 fn emit(allocator: std.mem.Allocator, module: *const core.Module, expected: ?backend.Code, point: ?u32) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);
     defer result.deinit(allocator);
@@ -39,7 +39,7 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module, expected: ?bac
 test "selected startup projection target detects real cell cycle after frontend teardown" {
     var module = try lower(a, associated_cycle);
     defer module.deinit(a);
-    try emit(a, &module, .initialization_cycle, 103);
+    try emit(a, &module, .initialization_cycle, 121);
 }
 test "selected startup projection edges stay separate across generic initializer instances" {
     var module = try lower(a, separate_instances);
@@ -74,10 +74,10 @@ test "selected startup evidence owns numeric edges without executing or retainin
 test "selected startup cyclic graph releases every backend allocation failure" {
     var module = try lower(a, associated_cycle);
     defer module.deinit(a);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{ &module, @as(?backend.Code, .initialization_cycle), @as(?u32, 103) });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{ &module, @as(?backend.Code, .initialization_cycle), @as(?u32, 121) });
 }
 
-const ready_demand = "const keep = fn ~(value: Unit -> U32) => value\nconst helper = fn () => first\nconst pending = keep helper\nconst cached = @force pending\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = fn () => first\n";
+const ready_demand = "const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return first\nconst pending = keep helper\nconst cached = @force pending\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n";
 test "selected startup global allocation precedes recursive initializer helper emission" {
     var module = try lower(a, ready_demand);
     defer module.deinit(a);
@@ -85,8 +85,8 @@ test "selected startup global allocation precedes recursive initializer helper e
 }
 test "selected startup global emission preserves real direct cycles and legal function recursion" {
     const cases = [_]struct { source: []const u8, expected: ?backend.Code }{
-        .{ .source = "let first: U32 = first\nentry const answer = fn () => first\n", .expected = .initialization_cycle },
-        .{ .source = "const recurse: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else recurse (@u32.sub value 1)\nentry const answer = fn () => recurse 3\n", .expected = null },
+        .{ .source = "let first: U32 = first\nentry const answer = func () => return first\n", .expected = .initialization_cycle },
+        .{ .source = "const recurse: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else recurse (@u32.sub value 1)\nentry const answer = func () => return recurse 3\n", .expected = null },
     };
     for (cases) |c| {
         var module = try lower(a, c.source);
@@ -106,17 +106,17 @@ test "selected startup allocated slots and initializer emission release every al
 }
 
 const completeness_cases = [_]struct { source: []const u8, expected: ?backend.Code, point: ?u32 }{
-    .{ .source = "type Box is data = #Box U32\nconst Box.add = fn left => fn right => first\nconst combine = fn left => fn right => @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 144 },
-    .{ .source = "type Box is data = #Box U32\nconst Box.add = fn left => fn right => second\nconst combine = fn left => fn right => @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = first\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 145 },
-    .{ .source = "type Box is data = #Box U32\nconst Box.add = fn left => fn right => second\nconst combine = fn left => fn right => @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "type Box is data = #Box U32\ntype Left is data = #Left U32\nconst Box.add = fn left => fn right => second\nconst Left.read = fn value => first\nconst combine = fn left => fn right => @type.call \"add\" left right\nconst pick = fn value => value.read\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 247 },
-    .{ .source = "type Box value is data = #Box value\nconst Box.from = fn value => first\nconst from = fn value => @type.result \"from\" value\nlet first: Box U32 = from 42\nentry const answer = fn () => case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 126 },
-    .{ .source = "type Box value is data = #Box value\nconst Box.from = fn value => second\nconst from = fn value => @type.result \"from\" value\nlet first: Box U32 = from 0\nlet second: Box U32 = #Box 42\nentry const answer = fn () => case first of\n  #Box value => value\n", .expected = null, .point = null },
-    .{ .source = "type Box value is data = #Box value\nconst Box.pure = fn value => first\nlet first: Box U32 = do (@do.monad Box):\n  break 42\nentry const answer = fn () => case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 75 },
-    .{ .source = "type Box value is data = #Box value\nconst Box.pure = fn value => second\nlet first: Box U32 = do (@do.monad Box):\n  break 0\nlet second: Box U32 = #Box 42\nentry const answer = fn () => case first of\n  #Box value => value\n", .expected = null, .point = null },
-    .{ .source = "type Box value is data = #Box value\nconst Box.pure = fn value => #Box value\nconst Box.bind = fn candidate => fn next => first\nlet first: Box U32 = do (@do.monad Box):\n  use value <- #Box 1\n  break value\nentry const answer = fn () => case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 130 },
-    .{ .source = "const make = fn () => do:\n  let unused = fn value => value.read\n  break second\nlet first: U32 = make ()\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "type Box is data = #Box U32\nconst Box.add = fn left => fn right => cached\nconst cached = @u32.add 40 2\nconst combine = fn left => fn right => @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
+    .{ .source = "type Box is data = #Box U32\nconst Box.add = func left => return func right => return first\nconst combine = func left => return func right => return @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 180 },
+    .{ .source = "type Box is data = #Box U32\nconst Box.add = func left => return func right => return second\nconst combine = func left => return func right => return @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = first\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 181 },
+    .{ .source = "type Box is data = #Box U32\nconst Box.add = func left => return func right => return second\nconst combine = func left => return func right => return @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "type Box is data = #Box U32\ntype Left is data = #Left U32\nconst Box.add = func left => return func right => return second\nconst Left.read = func value => return first\nconst combine = func left => return func right => return @type.call \"add\" left right\nconst pick = func value => return value.read\nlet first: U32 = combine (#Box 1) (#Box 2)\nlet second: U32 = pick (#Left 1)\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 301 },
+    .{ .source = "type Box value is data = #Box value\nconst Box.from = func value => return first\nconst from = func value => return @type.result \"from\" value\nlet first: Box U32 = from 42\nentry const answer = func () => return case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 144 },
+    .{ .source = "type Box value is data = #Box value\nconst Box.from = func value => return second\nconst from = func value => return @type.result \"from\" value\nlet first: Box U32 = from 0\nlet second: Box U32 = #Box 42\nentry const answer = func () => return case first of\n  #Box value => value\n", .expected = null, .point = null },
+    .{ .source = "type Box value is data = #Box value\nconst Box.pure = func value => return first\nlet first: Box U32 = do (@do.monad Box):\n  break 42\nentry const answer = func () => return case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 84 },
+    .{ .source = "type Box value is data = #Box value\nconst Box.pure = func value => return second\nlet first: Box U32 = do (@do.monad Box):\n  break 0\nlet second: Box U32 = #Box 42\nentry const answer = func () => return case first of\n  #Box value => value\n", .expected = null, .point = null },
+    .{ .source = "type Box value is data = #Box value\nconst Box.pure = func value => return #Box value\nconst Box.bind = func candidate => return func next => return first\nlet first: Box U32 = do (@do.monad Box):\n  use value <- #Box 1\n  break value\nentry const answer = func () => return case first of\n  #Box value => value\n", .expected = .initialization_cycle, .point = 157 },
+    .{ .source = "const make = func () => return do:\n  let unused = func value => return value.read\n  break second\nlet first: U32 = make ()\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "type Box is data = #Box U32\nconst Box.add = func left => return func right => return cached\nconst cached = @u32.add 40 2\nconst combine = func left => return func right => return @type.call \"add\" left right\nlet first: U32 = combine (#Box 1) (#Box 2)\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
 };
 
 test "selected startup admitted binary result and resolver targets cover newly reached initializer cells" {
@@ -158,14 +158,14 @@ test "selected startup complete and guarded fallback plans release every backend
 }
 
 const pattern_cases = [_]struct { source: []const u8, expected: ?backend.Code, point: ?u32 }{
-    .{ .source = "let selected: U32 = second\nconst pick = fn () => case 0 of\n  ^selected => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "let selected: U32 = first\nconst pick = fn () => case 0 of\n  ^selected => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 89 },
-    .{ .source = "type Carrier is data = #Carrier U32\nlet selected: U32 = second\nconst pick = fn () => case (#Carrier 0, 0) of\n  (#Carrier ^selected, _) => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "type Carrier is data = #Carrier U32\nlet selected: U32 = first\nconst pick = fn () => case (#Carrier 0, 0) of\n  (#Carrier ^selected, _) => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 153 },
-    .{ .source = "type Carrier is data = #Carrier {value: U32}\nlet selected: U32 = second\nconst pick = fn () => case #Carrier {value: 0} of\n  #Carrier {value: ^selected} => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "type Carrier is data = #Carrier {value: U32}\nlet selected: U32 = first\nconst pick = fn () => case #Carrier {value: 0} of\n  #Carrier {value: ^selected} => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 170 },
-    .{ .source = "let selected: U32 = second\nconst pick = fn () => do:\n  let ^selected = 0 else:\n    break 0\n  break 42\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = fn () => first\n", .expected = null, .point = null },
-    .{ .source = "let selected: U32 = first\nconst pick = fn () => do:\n  let ^selected = 0 else:\n    break 0\n  break 42\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = fn () => first\n", .expected = .initialization_cycle, .point = 105 },
+    .{ .source = "let selected: U32 = second\nconst pick = func () => return case 0 of\n  ^selected => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "let selected: U32 = first\nconst pick = func () => return case 0 of\n  ^selected => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 98 },
+    .{ .source = "type Carrier is data = #Carrier U32\nlet selected: U32 = second\nconst pick = func () => return case (#Carrier 0, 0) of\n  (#Carrier ^selected, _) => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "type Carrier is data = #Carrier U32\nlet selected: U32 = first\nconst pick = func () => return case (#Carrier 0, 0) of\n  (#Carrier ^selected, _) => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 162 },
+    .{ .source = "type Carrier is data = #Carrier {value: U32}\nlet selected: U32 = second\nconst pick = func () => return case #Carrier {value: 0} of\n  #Carrier {value: ^selected} => 42\n  _ => 0\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "type Carrier is data = #Carrier {value: U32}\nlet selected: U32 = first\nconst pick = func () => return case #Carrier {value: 0} of\n  #Carrier {value: ^selected} => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 179 },
+    .{ .source = "let selected: U32 = second\nconst pick = func () => return do:\n  let ^selected = 0 else:\n    break 0\n  break 42\nlet first: U32 = pick ()\nlet second: U32 = 0\nentry const answer: Unit -> U32 = func () => return first\n", .expected = null, .point = null },
+    .{ .source = "let selected: U32 = first\nconst pick = func () => return do:\n  let ^selected = 0 else:\n    break 0\n  break 42\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = func () => return first\n", .expected = .initialization_cycle, .point = 114 },
 };
 
 test "selected startup value pattern trees preserve exact source cycles and ordered valid values" {
@@ -200,7 +200,7 @@ test "selected startup value patterns cannot certify relaxed storage in region o
     }
 }
 
-const pattern_adversary = "type Box is data = #Box U32\nconst Box.read = fn value => first\nconst box = #Box 1\nconst latent = fn () => box.read\nconst sentinel: U32 = 0\nconst pick = fn () => case 0 of\n  ^sentinel => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = fn () => first\n";
+const pattern_adversary = "type Box is data = #Box U32\nconst Box.read = func value => return first\nconst box = #Box 1\nconst latent = func () => return box.read\nconst sentinel: U32 = 0\nconst pick = func () => return case 0 of\n  ^sentinel => 42\n  _ => 0\nlet first: U32 = pick ()\nentry const answer: Unit -> U32 = func () => return first\n";
 fn patternAdversary(allocator: std.mem.Allocator, module: *const core.Module, target: core.BindingRef) !void {
     var session = try eval.Session.init(allocator, &.{module.*});
     defer session.deinit();
@@ -252,18 +252,18 @@ test "selected startup same owner pattern projection cannot hide a method cycle 
 
 test "selected startup empty plan entry selection preserves guarded on demand cells" {
     {
-        var module = try lower(a, "type Box is data = #Box U32\nconst Box.read = fn value => second\nconst pick = fn value => value.read\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => pick (#Box 1)\n");
+        var module = try lower(a, "type Box is data = #Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return pick (#Box 1)\n");
         defer module.deinit(a);
         try emit(a, &module, null, null);
     }
     {
-        var module = try lower(a, "const keep = fn ~(value: Unit -> U32) => value\nconst helper = fn () => first\nconst pending = keep helper\nconst cached = @force pending\nconst sentinel: U32 = 0\nconst make = fn () => fn (value: U32) -> U32 => case value of\n  ^sentinel => 42\n  _ => 0\nentry const extra: U32 -> U32 = make ()\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = fn () => first\n");
+        var module = try lower(a, "const keep = func ~(value: Unit -> U32) => return value\nconst helper = func () => return first\nconst pending = keep helper\nconst cached = @force pending\nconst sentinel: U32 = 0\nconst make = func () => return func (value: U32) : U32 => return case value of\n  ^sentinel => 42\n  _ => 0\nentry const extra: U32 -> U32 = make ()\nlet first: U32 = cached ()\nentry const answer: Unit -> U32 = func () => return first\n");
         defer module.deinit(a);
         try emit(a, &module, null, null);
     }
     {
-        var module = try lower(a, "type Box is data = #Box U32\nconst Box.read = fn value => second\nconst pick = fn value => value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = fn () => pick (#Box 1)\n");
+        var module = try lower(a, "type Box is data = #Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = func () => return pick (#Box 1)\n");
         defer module.deinit(a);
-        try emit(a, &module, .initialization_cycle, 104);
+        try emit(a, &module, .initialization_cycle, 122);
     }
 }

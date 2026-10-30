@@ -10,10 +10,10 @@ const a = std.testing.allocator;
 
 fn predicateFreeSummaryScenario(allocator: std.mem.Allocator) !void {
     const prefix =
-        \\const identity = fn value => value
-        \\const apply = fn transform => fn value => transform value
-        \\const nested = fn value => do:
-        \\  let local = fn item => identity item
+        \\const identity = func value => return value
+        \\const apply = func transform => return func value => return transform value
+        \\const nested = func value => return do:
+        \\  let local = func item => return identity item
         \\  let first = local 1
         \\  let second = local 1.5
         \\  break local value
@@ -60,9 +60,9 @@ test "recursive frontend scheduling keeps forward chains independent of native a
         for ([_]bool{ false, true }) |annotated| {
             var source: std.ArrayList(u8) = .empty;
             defer source.deinit(a);
-            try source.appendSlice(a, "entry const run = fn value => f_0 value\n");
-            for (0..depth) |index| try source.print(a, "const f_{d}{s} = fn value => f_{d} value\n", .{ index, if (annotated) ": U32 -> U32" else "", index + 1 });
-            try source.print(a, "const f_{d}{s} = fn value => value\n", .{ depth, if (annotated) ": U32 -> U32" else "" });
+            try source.appendSlice(a, "entry const run = func value => return f_0 value\n");
+            for (0..depth) |index| try source.print(a, "const f_{d}{s} = func value => return f_{d} value\n", .{ index, if (annotated) ": U32 -> U32" else "", index + 1 });
+            try source.print(a, "const f_{d}{s} = func value => return value\n", .{ depth, if (annotated) ": U32 -> U32" else "" });
             var fixture = try Fixture.init(source.items);
             defer fixture.deinit();
             try fixture.valid();
@@ -73,14 +73,14 @@ test "recursive frontend scheduling keeps forward chains independent of native a
 
 test "recursive frontend dependency discovery preserves local and pattern shadowing" {
     var fixture = try Fixture.init(
-        \\const global = fn value => value
-        \\const run = fn global => global 1
-        \\const local = fn value => do:
-        \\  let global = fn item => item
+        \\const global = func value => return value
+        \\const run = func global => return global 1
+        \\const local = func value => return do:
+        \\  let global = func item => return item
         \\  break global value
-        \\const pattern = fn value => case value of
+        \\const pattern = func value => return case value of
         \\  (global, ignored) => global ignored
-        \\entry const result = local (run (fn value => pattern ((fn item => item), value)))
+        \\entry const result = local (run (func value => return pattern ((func item => return item), value)))
     );
     defer fixture.deinit();
     try fixture.valid();
@@ -90,27 +90,27 @@ test "recursive frontend discovery restores names after a forever suite" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
     try source.appendSlice(a,
-        \\entry const run = fn value => do:
+        \\entry const run = func value => return do:
         \\  for ever:
-        \\    let f_0 = fn item => item
+        \\    let f_0 = func item => return item
         \\    break
         \\  break f_0 value
         \\
     );
-    for (0..1000) |index| try source.print(a, "const f_{d} = fn value => f_{d} value\n", .{ index, index + 1 });
-    try source.appendSlice(a, "const f_1000 = fn value => value\n");
+    for (0..1000) |index| try source.print(a, "const f_{d} = func value => return f_{d} value\n", .{ index, index + 1 });
+    try source.appendSlice(a, "const f_1000 = func value => return value\n");
     var fixture = try Fixture.init(source.items);
     defer fixture.deinit();
     try fixture.valid();
 }
 
 const scheduled_diagnostic_source =
-    \\const parent: U32 -> U32 = fn value => do:
+    \\const parent: U32 -> U32 = func value => return do:
     \\  let first: U32 = 1.5
     \\  let second = broken value
     \\  let last: U32 = 1.5
     \\  break value
-    \\const broken: U32 -> F32 = fn value => value
+    \\const broken: U32 -> F32 = func value => return value
 ;
 
 fn scheduledFailureScenario(allocator: std.mem.Allocator) !void {
@@ -140,12 +140,12 @@ test "recursive frontend scheduled child diagnostics keep their original referen
     for ([_][]const u8{
         scheduled_diagnostic_source,
         \\type Box is data = #Box U32
-        \\const parent: U32 -> U32 = fn value => do:
+        \\const parent: U32 -> U32 = func value => return do:
         \\  let first: U32 = 1.5
         \\  let selected = (#Box 1).read
         \\  let last: U32 = 1.5
         \\  break value
-        \\const Box.read: Box -> U32 = fn box => do:
+        \\const Box.read: Box -> U32 = func box => return do:
         \\  let inner: U32 = 1.5
         \\  break 42
     }) |source| {
@@ -175,8 +175,8 @@ test "recursive frontend waits for the preferred left dispatch before right fall
         \\type X is data = #X U32
         \\const prime = @type.call "merge" (#X 1) (#R 2)
         \\entry const answer: U32 = @type.call "merge" (#L 1) (#R 2)
-        \\const L.merge: L -> R -> U32 = fn left => fn right => 1
-        \\const R.merge: a -> R -> F32 = fn left => fn right => 1.0
+        \\const L.merge: L -> R -> U32 = func left => return func right => return 1
+        \\const R.merge: a -> R -> F32 = func left => return func right => return 1.0
     );
     defer fixture.deinit();
     try fixture.valid();
@@ -190,8 +190,8 @@ test "recursive frontend waits for the preferred left dispatch before right fall
 test "recursive frontend retries publish only owned final scheme predicates" {
     var fixture = try Fixture.init(
         \\type Box is data = #Box U32
-        \\const choose: a -> Box where { associated "merge" Box Box Box } = fn value => @type.call "merge" value value
-        \\const Box.merge: Box -> Box -> Box = fn left => fn right => left
+        \\const choose: a -> Box where { associated "merge" Box Box Box } = func value => return @type.call "merge" value value
+        \\const Box.merge: Box -> Box -> Box = func left => return func right => return left
         \\entry const answer: Box = choose (#Box 1)
     );
     defer fixture.deinit();
@@ -210,18 +210,18 @@ test "recursive frontend queued method preserves declaration and call diagnostic
     const prefix =
         \\type Seed is data = #Seed
         \\type Box a is data = #Box a
-        \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
-        \\const wrap = fn value => @type.call "build" value #Seed
-        \\const parent: U32 -> U32 = fn value => if @u32.eq value 0 then 1.5 else (wrap value).read
-        \\const Box.read: Box U32 -> U32 = fn box => case box of
+        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
+        \\const wrap = func value => return @type.call "build" value #Seed
+        \\const parent: U32 -> U32 = func value => return if @u32.eq value 0 then 1.5 else (wrap value).read
+        \\const Box.read: Box U32 -> U32 = func box => return case box of
     ;
     const bodies = [_][]const u8{
         "  #Box value => parent (@u32.sub value 1)\n",
         "  #Box value => do:\n    let next = @u32.sub value 1\n    break parent next\n",
-        "  #Box value => do:\n    let next = fn arg => parent arg\n    break next (@u32.sub value 1)\n",
+        "  #Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)\n",
     };
     for (bodies) |body| {
-        const source = try std.mem.concat(a, u8, &.{ prefix, "\n", body, "entry const run: U32 -> U32 = fn value => parent value\n" });
+        const source = try std.mem.concat(a, u8, &.{ prefix, "\n", body, "entry const run: U32 -> U32 = func value => return parent value\n" });
         defer a.free(source);
         var tokens = try lexer.lex(a, source);
         defer tokens.deinit(a);
@@ -245,12 +245,12 @@ test "recursive frontend queued method preserves declaration and call diagnostic
 const late_recursive_source =
     \\type Seed is data = #Seed
     \\type Box a is data = #Box a
-    \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
-    \\const f_0 = fn value => @type.call "build" value #Seed
-    \\const parent: a -> a = fn value => (f_0 value).read
-    \\const Box.read: Box a -> a = fn box => case box of
+    \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
+    \\const f_0 = func value => return @type.call "build" value #Seed
+    \\const parent: a -> a = func value => return (f_0 value).read
+    \\const Box.read: Box a -> a = func box => return case box of
     \\  #Box value => parent value
-    \\entry const generic = fn value => parent value
+    \\entry const generic = func value => return parent value
 ;
 
 test "late selected recursive components keep their placeholder until all schemes publish" {
@@ -308,9 +308,9 @@ test "pending effect operations wait for their types instead of rescanning" {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
         try text.appendSlice(a, "type Probe a is effect = { ask: Unit -> a }\nconst app = { ");
-        for (0..count) |index| try text.print(a, "{s}f{d}: fn () => Probe.ask ()", .{ if (index == 0) "" else ", ", index });
+        for (0..count) |index| try text.print(a, "{s}f{d}: func () => return Probe.ask ()", .{ if (index == 0) "" else ", ", index });
         try text.appendSlice(a, " }\n");
-        for (0..count) |index| try text.print(a, "const use_{d} = fn () => do:\n  let handlers = app\n  use value <- handlers.f{d} ()\n  break value\n", .{ index, index });
+        for (0..count) |index| try text.print(a, "const use_{d} = func () => return do:\n  let handlers = app\n  use value <- handlers.f{d} ()\n  break value\n", .{ index, index });
         var tokens = try lexer.lex(a, text.items);
         defer tokens.deinit(a);
         var pool: symbols.Pool = .{};
@@ -337,17 +337,17 @@ test "pending callback selections wait for their unknown receivers" {
             \\infixl 60 (+) = add
             \\infixl 70 (*) = mul
             \\infixl 70 (/) = div
-            \\const add = fn left => fn right => @type.call "add" left right
-            \\const mul = fn left => fn right => @type.call "mul" left right
-            \\const div = fn left => fn right => @type.call "div" left right
-            \\const U32.add = fn left => fn right => @u32.add left right
-            \\const holder = fn () => #{
+            \\const add = func left => return func right => return @type.call "add" left right
+            \\const mul = func left => return func right => return @type.call "mul" left right
+            \\const div = func left => return func right => return @type.call "div" left right
+            \\const U32.add = func left => return func right => return @u32.add left right
+            \\const holder = func () => return #{
             \\
         );
-        for (0..16) |index| try text.print(a, "f{d}: fn x => x * 2.0 + x / 3.0,\n", .{index});
-        try text.appendSlice(a, "g: 4\n}\nconst s0 = fn () => (holder ()).g\n");
-        for (1..depth) |index| try text.print(a, "const s{d} = fn () => (holder ()).g + s{d} ()\n", .{ index, index - 1 });
-        try text.print(a, "entry const answer = fn () => s{d} ()\n", .{depth - 1});
+        for (0..16) |index| try text.print(a, "f{d}: func x => return x * 2.0 + x / 3.0,\n", .{index});
+        try text.appendSlice(a, "g: 4\n}\nconst s0 = func () => return (holder ()).g\n");
+        for (1..depth) |index| try text.print(a, "const s{d} = func () => return (holder ()).g + s{d} ()\n", .{ index, index - 1 });
+        try text.print(a, "entry const answer = func () => return s{d} ()\n", .{depth - 1});
         var fixture = try Fixture.init(text.items);
         defer fixture.deinit();
         try fixture.valid();
@@ -359,19 +359,19 @@ test "pending callback selections wait for their unknown receivers" {
 
 const header =
     \\infixl 60 (+) = _fixity_add
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
     \\
 ;
 /// A nominal counter whose `+` resolves through an associated member.
 const counter =
     \\type N is data = #N U32
-    \\const N.add = fn left => fn right => case left, right of
+    \\const N.add = func left => return func right => return case left, right of
     \\  #N a, #N b => #N (@u32.add a b)
     \\
 ;
 const box =
     \\type Box a is data = #Box a
-    \\const Box.add = fn left => fn right => case left, right of
+    \\const Box.add = func left => return func right => return case left, right of
     \\  #Box a, #Box b => #Box (a + b)
     \\
 ;
@@ -418,9 +418,9 @@ fn diamond(depth: usize) ![]u8 {
     errdefer out.deinit(a);
     try out.appendSlice(a, header);
     try out.appendSlice(a, counter);
-    try out.appendSlice(a, "const f_0 = fn x => x + (#N 1)\n");
-    for (1..depth + 1) |i| try out.print(a, "const f_{d} = fn x => f_{d} (f_{d} x)\n", .{ i, i - 1, i - 1 });
-    try out.print(a, "entry const main = fn (x: N) -> N => f_{d} x\n", .{depth});
+    try out.appendSlice(a, "const f_0 = func x => return x + (#N 1)\n");
+    for (1..depth + 1) |i| try out.print(a, "const f_{d} = func x => return f_{d} (f_{d} x)\n", .{ i, i - 1, i - 1 });
+    try out.print(a, "entry const main = func (x: N) : N => return f_{d} x\n", .{depth});
     return out.toOwnedSlice(a);
 }
 fn chain(depth: usize) ![]u8 {
@@ -428,9 +428,9 @@ fn chain(depth: usize) ![]u8 {
     errdefer out.deinit(a);
     try out.appendSlice(a, header);
     try out.appendSlice(a, counter);
-    try out.appendSlice(a, "const f_0 = fn x => x + (#N 1)\n");
-    for (1..depth + 1) |i| try out.print(a, "const f_{d} = fn x => f_{d} x + (#N 1)\n", .{ i, i - 1 });
-    try out.print(a, "entry const main = fn (x: N) -> N => f_{d} x\n", .{depth});
+    try out.appendSlice(a, "const f_0 = func x => return x + (#N 1)\n");
+    for (1..depth + 1) |i| try out.print(a, "const f_{d} = func x => return f_{d} x + (#N 1)\n", .{ i, i - 1 });
+    try out.print(a, "entry const main = func (x: N) : N => return f_{d} x\n", .{depth});
     return out.toOwnedSlice(a);
 }
 fn appended(source: []const u8) !u64 {
@@ -474,8 +474,8 @@ test "a generic chain appends obligations linearly" {
 test "inferred operation wrappers retain their written callee latent rows" {
     var fixture = try Fixture.init(
         \\type Signal a is effect = { get: Unit -> a }
-        \\const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()
-        \\const operation_1 = fn token => do:
+        \\const operation_0: a -> a ! {| e} where { operation Signal.get a } = func token => return Signal.get a ()
+        \\const operation_1 = func token => return do:
         \\  use result <- operation_0 token
         \\  break result
     );
@@ -494,11 +494,11 @@ test "left operand dispatch wins through a shared callee" {
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a, box);
-    try source.appendSlice(a, "const wide = fn value => ");
+    try source.appendSlice(a, "const wide = func value => return ");
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\
-        \\entry const answer = fn (value: F32) => case wide (#Box value) of
+        \\entry const answer = func (value: F32) => return case wide (#Box value) of
         \\  #Box result => result
         \\
     );
@@ -510,13 +510,13 @@ test "left operand dispatch wins through a shared callee" {
 
 test "shared written predicates keep computed operands monomorphic and unrelated parameters fresh" {
     var f = try Fixture.init(
-        \\const keep: a -> b -> b where { associated "add" a a a } = fn value => fn other => do:
+        \\const keep: a -> b -> b where { associated "add" a a a } = func value => return func other => return do:
         \\  let ignored = @type.call "add" value value
         \\  break other
-        \\entry const answer = fn () => do:
-        \\  let selected = case #True of
-        \\    #True => keep
-        \\    #False => keep
+        \\entry const answer = func () => return do:
+        \\  let selected = case true of
+        \\    true => keep
+        \\    false => keep
         \\  let integer = selected 21 7
         \\  break @f32.add (@u32.to_f32 integer) (selected 21 1.5)
     );
@@ -541,7 +541,7 @@ test "shared written requirements retain the local computation reference origin"
     try std.testing.expectEqual(@as(u32, 1), answer.scheme.obligations.len);
     const requirement = f.checked.obligations[answer.scheme.obligations.start];
     try std.testing.expectEqual(@import("types.zig").ObligationKind.callee_use, requirement.kind);
-    try std.testing.expectEqualDeep(ast.Span{ .start = 592, .end = 603 }, f.tree.span(requirement.source));
+    try std.testing.expectEqualDeep(ast.Span{ .start = 654, .end = 665 }, f.tree.span(requirement.source));
 }
 
 test "a conflicting operand reports the same outcome through a shared callee" {
@@ -549,13 +549,13 @@ test "a conflicting operand reports the same outcome through a shared callee" {
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a, box);
-    try source.appendSlice(a, "const wide = fn left => fn right => ");
+    try source.appendSlice(a, "const wide = func left => return func right => return ");
     try wideSum(&source, "left", 20);
     try source.appendSlice(a, " + ");
     try wideSum(&source, "right", 20);
     try source.appendSlice(a,
         \\
-        \\entry const answer = fn (value: F32) => case wide (#Box value) 1 of
+        \\entry const answer = func (value: F32) => return case wide (#Box value) 1 of
         \\  #Box result => result
         \\
     );
@@ -573,18 +573,18 @@ test "return type polymorphism preserves independent expected results through sh
     try source.appendSlice(a, header);
     try source.appendSlice(a,
         \\type Box value is data = #Box value
-        \\const Box.from = fn value => #Box value
-        \\const from = fn value => @type.result "from" value
+        \\const Box.from = func value => return #Box value
+        \\const from = func value => return @type.result "from" value
         \\
     );
-    try source.appendSlice(a, "const wide = fn value => from (");
+    try source.appendSlice(a, "const wide = func value => return from (");
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\)
-        \\entry const integer = fn () => do:
+        \\entry const integer = func () => return do:
         \\  let #Box value:Box U32 = wide 21
         \\  break value
-        \\entry const floating = fn () => do:
+        \\entry const floating = func () => return do:
         \\  let #Box value:Box F32 = wide 1.5
         \\  break value
         \\
@@ -606,9 +606,9 @@ test "result directed principal diamonds keep frontend work bounded by distinct 
     for ([_]usize{ 8, 16, 64 }) |depth| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "const f_0 = fn value => @type.result \"from\" value\n");
-        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
-        try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
+        try text.appendSlice(a, "const f_0 = func value => return @type.result \"from\" value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = func value => return f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = func value => return f_{d} value\n", .{depth});
         var f = try Fixture.init(text.items);
         defer f.deinit();
         try f.valid();
@@ -624,10 +624,10 @@ test "mutually recursive generic functions keep flat obligations" {
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a, counter);
-    try source.appendSlice(a, "const left = fn value => (");
+    try source.appendSlice(a, "const left = func value => return (");
     try wideSum(&source, "value", 40);
-    try source.appendSlice(a, ") + right value\nconst right = fn value => left (value + (#N 1))\n");
-    try source.appendSlice(a, "entry const main = fn (value: N) -> N => left value\n");
+    try source.appendSlice(a, ") + right value\nconst right = func value => return left (value + (#N 1))\n");
+    try source.appendSlice(a, "entry const main = func (value: N) : N => return left value\n");
     var f = try Fixture.init(source.items);
     defer f.deinit();
     try f.valid();
@@ -645,11 +645,11 @@ test "higher order callees are solved at their use" {
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a, counter);
-    try source.appendSlice(a, "const apply = fn run => fn value => run (");
+    try source.appendSlice(a, "const apply = func run => return func value => return run (");
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\)
-        \\entry const main = fn (value: N) -> N => apply (fn total => total + (#N 1)) value
+        \\entry const main = func (value: N) : N => return apply (func total => return total + (#N 1)) value
         \\
     );
     var f = try Fixture.init(source.items);
@@ -691,12 +691,12 @@ test "a lexical closure over outer variables expands its shared callee in place"
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a, counter);
-    try source.appendSlice(a, "const wide = fn value => ");
+    try source.appendSlice(a, "const wide = func value => return ");
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\
-        \\entry const main = fn (outer: N) -> N => do:
-        \\  let inner = fn value => wide (value + outer)
+        \\entry const main = func (outer: N) : N => return do:
+        \\  let inner = func value => return wide (value + outer)
         \\  break inner (#N 1)
         \\
     );

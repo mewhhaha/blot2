@@ -6,30 +6,30 @@ const executable = Deno.args[0] ??
 const library = `type Box is data = #Box (unique U32)
 opaque type Secret = unique U32
 opaque type Shared = shared U32
-const make_box = fn (owner: unique U32) => #Box owner
-const read_box = fn (#Box owner) => @usage.borrow owner (fn loan => @usage.read loan)
-const make_secret = fn (owner: unique U32) => #Secret owner
-const make_shared = fn (owner: unique U32) => #Shared (@usage.share owner)
-const read_shared = fn (#Shared owner) => @usage.read owner
-const repeat_shared = fn (owner: Shared) => @u32.add (read_shared owner) (read_shared owner)
-const read_secret = fn (#Secret owner) => @usage.borrow owner (fn loan => @usage.read loan)
+const make_box = func (owner: unique U32) => return #Box owner
+const read_box = func (#Box owner) => return @usage.borrow owner (func loan => return @usage.read loan)
+const make_secret = func (owner: unique U32) => return #Secret owner
+const make_shared = func (owner: unique U32) => return #Shared (@usage.share owner)
+const read_shared = func (#Shared owner) => return @usage.read owner
+const repeat_shared = func (owner: Shared) => return @u32.add (read_shared owner) (read_shared owner)
+const read_secret = func (#Secret owner) => return @usage.borrow owner (func loan => return @usage.read loan)
 `;
 const source =
   `import {Box, Secret, make_box, read_box, make_secret, read_secret, make_shared, repeat_shared} from "./owners"
-entry const run = fn () => do:
-  use owner <- @resource.acquire (fn () => 42) (fn value => ())
+entry const run = func () => return do:
+  use owner <- @resource.acquire (func () => return 42) (func value => return ())
   let box = make_box owner
   break read_box box
-entry const secret = fn () => do:
-  use owner <- @resource.acquire (fn () => 42) (fn value => ())
+entry const secret = func () => return do:
+  use owner <- @resource.acquire (func () => return 42) (func value => return ())
   let box = make_secret owner
   break read_secret box
-entry const shared = fn () => do:
-  use owner <- @resource.acquire (fn () => 21) (fn value => ())
+entry const shared = func () => return do:
+  use owner <- @resource.acquire (func () => return 21) (func value => return ())
   let box = make_shared owner
   break repeat_shared box
-entry const shared_cleanup = fn (release: cleanup ((unique U32) -> Unit ! {Foreign})) => do:
-  use owner <- @resource.acquire (fn () => 21) release
+entry const shared_cleanup = func (release: cleanup ((unique U32) -> Unit ! {Foreign})) => return do:
+  use owner <- @resource.acquire (func () => return 21) release
   let box = make_shared owner
   break repeat_shared box
 `;
@@ -118,7 +118,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               sources: {
                 ...sources,
                 [entry]: source +
-                  `\nconst bad = fn (owner: ${type}) => (owner, owner)\n`,
+                  `\nconst bad = func (owner: ${type}) => return (owner, owner)\n`,
               },
             });
             assert(!bad.success, JSON.stringify(bad));

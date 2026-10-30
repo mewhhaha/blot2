@@ -10,21 +10,23 @@ Deno.test("array scans and compaction preserve order, wrap, snapshots and linear
   await compileAndRun(
     `
 import * as array from "../../std/array"
-entry const scan = fn (values: Array U32) => array.prefix_sums values
-entry const filter = fn (values: Array U32) => array.filter (fn x => x % 2 == 0) values
-entry const filter_map = fn (values: Array U32) =>
-  array.filter_map (fn x => if x % 2 == 0 then #Some (x + 1) else #Nothing) values
-entry const indices = fn (values: Array U32) => array.indices (array.map (fn x => x % 2 == 0) values)
-entry const concat = fn (values: Array U32) => array.concat values values
-entry const flatten = fn (values: Array U32) => array.flatten #[#[], values, #[], values, #[]]
-entry const push = fn (values: Array U32) => array.push 42 values
+entry const scan = func (values: Array U32) => return array.prefix_sums values
+entry const filter = func (values: Array U32) => return array.filter (func x => return x % 2 == 0) values
+entry const filter_map = func (values: Array U32) => return
+  array.filter_map (func x => return if x % 2 == 0 then #Some (x + 1) else #Nothing) values
+entry const indices = func (values: Array U32) => return array.indices (array.map (func x => return x % 2 == 0) values)
+entry const concat = func (values: Array U32) => return array.concat values values
+entry const flatten = func (values: Array U32) => return array.flatten
+  #[{start: 0, count: 0}, {start: 0, count: values.length}, {start: values.length, count: 0},
+    {start: 0, count: values.length}, {start: values.length, count: 0}] values
+entry const push = func (values: Array U32) => return array.push 42 values
 entry const staged = (array.prefix_sums (array.generate 1025 identity))[1024]
-entry const staged_filter = (array.filter_map (fn x => if x == 1 then #Nothing else #Some x) #[1, 42])[0]
-entry const snapshots = fn () => do:
+entry const staged_filter = (array.filter_map (func x => return if x == 1 then #Nothing else #Some x) #[1, 42])[0]
+entry const snapshots = func () => return do:
   let input = #[1, 2, 3]
   let scan = array.prefix_sums input
   scan[0] := 99
-  let filtered = array.filter (fn x => #True) input
+  let filtered = array.filter (func x => return true) input
   filtered[0] := 7
   break #[input[0], scan[0], filtered[0]]
 `,
@@ -80,15 +82,15 @@ Deno.test("list folds sequence effects and list predicates stop at the first dec
   await compileAndRun(
     `
 import * as list from "../../std/list"
-entry const fold = fn (host: U32 -> U32 ! {Foreign}) =>
-  list.fold_left (fn total => fn value => do:
+entry const fold = func (host: U32 -> U32 ! {Foreign}) => return
+  list.fold_left (func total => return func value => return do:
     use amount <- host value
     break total + amount) 0 [1, 2, 3]
-entry const any = fn (host: U32 -> Bool ! {Foreign}) => list.any host [1, 2, 3]
-entry const all = fn (host: U32 -> Bool ! {Foreign}) => list.all host [1, 2, 3]
-entry const empty_any = fn (host: U32 -> Bool ! {Foreign}) => list.any host []
-entry const empty_all = fn (host: U32 -> Bool ! {Foreign}) => list.all host []
-entry const filter = fn (host: U32 -> Bool ! {Foreign}) => Array.from_list (list.filter host [1, 2, 3])
+entry const any = func (host: U32 -> Bool ! {Foreign}) => return list.any host [1, 2, 3]
+entry const all = func (host: U32 -> Bool ! {Foreign}) => return list.all host [1, 2, 3]
+entry const empty_any = func (host: U32 -> Bool ! {Foreign}) => return list.any host []
+entry const empty_all = func (host: U32 -> Bool ! {Foreign}) => return list.all host []
+entry const filter = func (host: U32 -> Bool ! {Foreign}) => return Array.from_list (list.filter host [1, 2, 3])
 `,
     (guest) => {
       const calls: number[] = [];
@@ -151,7 +153,7 @@ Deno.test("array filtering and collection mapping keep their pure callback contr
     await compileExpectedFailure(
       `
 import * as collection from "../../std/${module}"
-entry const run = fn (host: U32 -> Bool ! {Foreign}) =>
+entry const run = func (host: U32 -> Bool ! {Foreign}) => return
   (collection.${member} host ${values}).length
 `,
       "effect_mismatch",
@@ -162,7 +164,7 @@ entry const run = fn (host: U32 -> Bool ! {Foreign}) =>
 Deno.test("pattern branches preserve aliased list versions while appending", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let values: List U32 = []
   let prior: List U32 = []
   for i in 0..count:
@@ -191,13 +193,13 @@ Deno.test("list append and prepend wrappers retain linear construction through a
     `
 import * as list from "../../std/list"
 const alias = list.append
-const prepend = fn item => fn items => @list.prepend items item
-entry const appended = fn (count: U32) => do:
+const prepend = func item => return func items => return @list.prepend items item
+entry const appended = func (count: U32) => return do:
   let values: List U32 = []
   for index in 0..count:
     values := alias index values
   break Array.from_list values
-entry const prepended = fn (count: U32) => do:
+entry const prepended = func (count: U32) => return do:
   let values: List F32 = []
   for index in 0..count:
     values := prepend (F32.from index) values
@@ -225,17 +227,17 @@ Deno.test("collection wrapper elimination preserves argument effects and shared 
   await compileAndRun(
     `
 import * as list from "../../std/list"
-entry const order = fn (host: U32 -> U32 ! {Foreign}) => Array.from_list (list.append (host 1) (do:
+entry const order = func (host: U32 -> U32 ! {Foreign}) => return Array.from_list (list.append (host 1) (do:
   use initial <- host 2
   break [initial]))
-entry const shared = fn () => do:
+entry const shared = func () => return do:
   let original = [1, 2]
   let appended = list.append 3 original
   break #[original.length, appended.length, (Array.from_list original)[1]]
-entry const captured = fn (count: U32) => do:
+entry const captured = func (count: U32) => return do:
   let callbacks: List (Unit -> U32) = []
   for index in 0..count:
-    callbacks := list.append (fn () => callbacks.length) callbacks
+    callbacks := list.append (func () => return callbacks.length) callbacks
   break #[callback () | callback <- callbacks]
 `,
     (guest) => {
@@ -269,8 +271,8 @@ Deno.test("retained collection wrapper bodies invalidate after append becomes pr
   };
   const compiler = await createCompiler(options);
   const declarations =
-    `const append = fn item => fn items => @list.append items item
-const build = fn (count: U32) => do:
+    `const append = func item => return func items => return @list.append items item
+const build = func (count: U32) => return do:
   let values: List U32 = []
   for index in 0..count:
     values := append index values
@@ -288,7 +290,7 @@ const build = fn (count: U32) => do:
     ) {
       const sources = {
         [entry]:
-          `import * as lib from "./lib"\nentry const run = fn (count: U32) => lib.build (count + ${offset})\n`,
+          `import * as lib from "./lib"\nentry const run = func (count: U32) => return lib.build (count + ${offset})\n`,
         [library]: source,
       };
       const result = await compiler.build({ sources });
@@ -326,11 +328,11 @@ Deno.test("Maybe and Result deferred fallbacks skip work on success and run on f
 entry const some = Maybe.unwrap_or_else (@panic "unused fallback") (#Some 42)
 entry const ok = Result.unwrap_or_else (@panic "unused fallback") (#Ok 42)
 entry const nothing = Maybe.unwrap_or_else 42 #Nothing
-entry const error = Result.unwrap_or_else 42 (#Err #False)
-entry const success = fn (host: Unit -> U32 ! {Foreign}) =>
+entry const error = Result.unwrap_or_else 42 (#Err false)
+entry const success = func (host: Unit -> U32 ! {Foreign}) => return
   Result.unwrap_or_else (host ()) (#Ok 42)
-entry const failure = fn (host: Unit -> U32 ! {Foreign}) =>
-  Result.unwrap_or_else (host ()) (#Err #False)
+entry const failure = func (host: Unit -> U32 ! {Foreign}) => return
+  Result.unwrap_or_else (host ()) (#Err false)
 `,
     (guest) => {
       for (const name of ["some", "ok", "nothing", "error"]) {
@@ -360,16 +362,16 @@ Deno.test("F32 trig boundaries and vector interpolation retain scalar arithmetic
   await compileAndRun(
     `
 import { Vec2, Vec3 } from "../../std/vector"
-entry const trig = fn (value: F32) => do:
+entry const trig = func (value: F32) => return do:
   let (s, c) = sin_cos value
   break #[sin value, cos value, tan value, s, c]
-entry const vector = fn (values: Array F32) => do:
+entry const vector = func (values: Array F32) => return do:
   let a = #Vec3 { x: values[0], y: values[1], z: values[2] }
   let b = #Vec3 { x: values[3], y: values[4], z: values[5] }
   let v = lerp a b values[6]
   let w = lerp (#Vec2 { x: a.x, y: a.y }) (#Vec2 { x: b.x, y: b.y }) values[6]
   break #[v.x, v.y, v.z, w.x, w.y]
-entry const zero = fn () => do:
+entry const zero = func () => return do:
   let v = (#Vec3 { x: 0.0, y: 0.0, z: 0.0 }).normalized
   break #[v.x, v.y, v.z]
 `,

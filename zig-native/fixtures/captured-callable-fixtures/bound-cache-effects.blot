@@ -1,11 +1,11 @@
 type Read is effect = { get: Unit -> U32 }
-const call = fn callback => do:
-  let bound = fn value => callback value
+const call = func callback => return do:
+  let bound = func value => return callback value
   break bound 1
-const provider = @effect.provider Read.get (fn () => 41)
-entry const answer = fn () => do provider:
-  let pure = call (fn value => @u32.add value 40)
-  use effectful <- call (fn value => do:
+const provider = @effect.provider Read.get (func () => return 41)
+entry const answer = func () => return do provider:
+  let pure = call (func value => return @u32.add value 40)
+  use effectful <- call (func value => return do:
     use seed <- Read.get ()
     break @u32.add seed value
   )

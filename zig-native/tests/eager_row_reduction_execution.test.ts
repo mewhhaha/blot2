@@ -11,9 +11,9 @@ function program(width: number, bias: number, pressure = false) {
   );
   let garbage = "";
   if (pressure) garbage = "    let garbage = @array.fill 8192 index\n";
-  return `entry const run_${width} = fn (input: Array U32) => do:
+  return `entry const run_${width} = func (input: Array U32) => return do:
   let count = input[0]
-  let rows = @list.generate count (fn index => (${fields.join(", ")}))
+  let rows = @list.generate count (func index => return (${fields.join(", ")}))
   let cursor = @list.cursor rows
   let total = input[1]
   for index in 0..count:
@@ -21,7 +21,7 @@ function program(width: number, bias: number, pressure = false) {
     total := self + ${names.join(" + ")}
 ${garbage}    cursor := @cursor.advance self
   break total
-entry const probe_${width} = fn (seed: U32) => #[seed]
+entry const probe_${width} = func (seed: U32) => return #[seed]
 `;
 }
 const values = Uint32Array.of(0xffffffff, 0x80000000, 0, 1, 17, 99);

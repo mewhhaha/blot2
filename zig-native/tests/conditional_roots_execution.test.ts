@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const source = `
-const choose = fn (values: Array U32) => fn (branch: U32) => do:
+const choose = func (values: Array U32) => return func (branch: U32) => return do:
   if branch == 0:
     break values
   if branch == 1:
@@ -11,7 +11,7 @@ const choose = fn (values: Array U32) => fn (branch: U32) => do:
       break values
     break @array.set values 0 77
   break @array.fill 64 branch
-entry const run = fn (branch: U32) => do:
+entry const run = func (branch: U32) => return do:
   let values = @array.fill 64 41
   let selected = choose values branch
   for index in 0..200:
@@ -19,11 +19,11 @@ entry const run = fn (branch: U32) => do:
     if discarded[8191] != index:
       @panic "pressure"
   break selected
-entry const suspend = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const suspend = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let selected = choose (@array.fill 64 41) 1
   use reply <- host selected
   break #[selected[0], reply[0]]
-entry const trap = fn (branch: U32) => do:
+entry const trap = func (branch: U32) => return do:
   let selected = choose (@array.fill 64 41) branch
   if selected[0] == 41:
     @panic "selected trap"

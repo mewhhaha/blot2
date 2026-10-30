@@ -120,13 +120,13 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 const backend = @import("core_backend.zig");
 const Control = struct { source: []const u8, code: ?backend.Code, point: ?u32 = null, message: ?[]const u8 = null };
 const controls = [_]Control{
-    .{ .source = "let base = 1\nconst saved = 41\nconst delay = fn ~value => value\nentry const answer = fn () => @u32.add base (@force (delay saved))\n", .code = null },
-    .{ .source = "let first: U32 = second\nlet second = first\nentry const answer = if #True then 42 else first\n", .code = .initialization_cycle, .point = 28 },
-    .{ .source = "let first: U32 = second\nlet second = first\nentry const answer: Unit -> U32 = fn () => first\nentry const bad: U32 = @panic \"later\"\n", .code = .const_panic, .point = 0, .message = "later" },
-    .{ .source = "let first: U32 = second\nlet second = first\nlet saved = 42\nentry const answer: Unit -> U32 = fn () => first\nentry const bad = saved\n", .code = .const_runtime_dependency, .point = 0 },
+    .{ .source = "let base = 1\nconst saved = 41\nconst delay = func ~value => return value\nentry const answer = func () => return @u32.add base (@force (delay saved))\n", .code = null },
+    .{ .source = "let first: U32 = second\nlet second = first\nentry const answer = if true then 42 else first\n", .code = .initialization_cycle, .point = 28 },
+    .{ .source = "let first: U32 = second\nlet second = first\nentry const answer: Unit -> U32 = func () => return first\nentry const bad: U32 = @panic \"later\"\n", .code = .const_panic, .point = 0, .message = "later" },
+    .{ .source = "let first: U32 = second\nlet second = first\nlet saved = 42\nentry const answer: Unit -> U32 = func () => return first\nentry const bad = saved\n", .code = .const_runtime_dependency, .point = 0 },
     .{ .source = "let first: U32 = second\nlet second = first\nentry const answer = 42\n", .code = null },
-    .{ .source = "let first: U32 = second\nlet second = first\nconst read: Unit -> U32 = fn () => first\nentry const answer = @effect.count (@effect.of read)\n", .code = .initialization_cycle, .point = 28 },
-    .{ .source = "const read: Unit -> U32 = fn () => first\nlet first = read ()\nentry const answer = fn () => first\n", .code = .initialization_cycle, .point = 45 },
+    .{ .source = "let first: U32 = second\nlet second = first\nconst read: Unit -> U32 = func () => return first\nentry const answer = @effect.count (@effect.of read)\n", .code = .initialization_cycle, .point = 28 },
+    .{ .source = "const read: Unit -> U32 = func () => return first\nlet first = read ()\nentry const answer = func () => return first\n", .code = .initialization_cycle, .point = 54 },
 };
 fn emitControl(allocator: std.mem.Allocator, module: *const core.Module, control: Control) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);

@@ -5,10 +5,10 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0];
 assert(executable);
 const initial = "opaque type Token = U32\nopaque type Other = U32\n" +
-  "const make: U32 -> Token = fn value => #Token value\n" +
-  "const make_other: U32 -> Other = fn value => #Other value\n" +
-  "const Token.read: Token -> U32 = fn (#Token value) => value\n" +
-  "const Other.read: Other -> U32 = fn (#Other value) => @u32.add value 1\n";
+  "const make: U32 -> Token = func value => return #Token value\n" +
+  "const make_other: U32 -> Other = func value => return #Other value\n" +
+  "const Token.read: Token -> U32 = func (#Token value) => return value\n" +
+  "const Other.read: Other -> U32 = func (#Other value) => return @u32.add value 1\n";
 const variants = [
   initial,
   "private const unrelated = 99\n" + initial,
@@ -28,11 +28,11 @@ for (const codegenTier of ["development", "optimized"] as const) {
       await Deno.writeTextFile(producer, initial);
       await Deno.writeTextFile(
         directory + "/bridge.blot",
-        'import {Token, Other, make, make_other} from "./tokens"\nconst consume: U32 -> U32 = fn value => @u32.add ((make value).read) ((make_other value).read)\n',
+        'import {Token, Other, make, make_other} from "./tokens"\nconst consume: U32 -> U32 = func value => return @u32.add ((make value).read) ((make_other value).read)\n',
       );
       await Deno.writeTextFile(
         entry,
-        'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = fn value => consume value\n',
+        'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = func value => return consume value\n',
       );
       const packed = await new Deno.Command(executable, {
         args: ["dependencies", entry, archive, "--prelude", "none"],
@@ -125,8 +125,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
           for (
             const changed of [
               initial.replace(
-                "const Token.read: Token -> U32 = fn (#Token value) => value",
-                "const Token.read: Token -> F32 = fn (#Token value) => @u32.to_f32 value",
+                "const Token.read: Token -> U32 = func (#Token value) => return value",
+                "const Token.read: Token -> F32 = func (#Token value) => return @u32.to_f32 value",
               ),
               initial.replace("const Token.read", "private const Token.read"),
             ]
@@ -185,11 +185,11 @@ Deno.test("symbolic opaque getters retain package authority through archives res
       'import {make, make_other} from "./tokens"\n' +
         "type Capsule = exists [a] => a\n" +
         "const capsule: Capsule = pack [U32] 0 as Capsule\n" +
-        "const consume: U32 -> U32 = fn value => @u32.add ((make value).read) ((make_other value).read)\n",
+        "const consume: U32 -> U32 = func value => return @u32.add ((make value).read) ((make_other value).read)\n",
     );
     await Deno.writeTextFile(
       entry,
-      'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = fn value => consume value\n',
+      'import {consume} from "./bridge"\nentry const answer: U32 -> U32 = func value => return consume value\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, archive, "--prelude", "none"],

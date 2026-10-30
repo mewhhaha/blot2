@@ -1735,6 +1735,7 @@ const Named = struct {
                 // are proved by stagingScopes, the module-wide staging pass and
                 // Effects; this proof owns only the later-stage value shape.
                 const op: staging.Op = @fromBackingInt(n.c);
+                if (op == .evaluate) return self.node(n.a, parameters, closed_rows, depth + 1);
                 try require(op == .lift or op == .splice);
             },
             // Other executable forms need their own complete semantic proof;
@@ -2553,6 +2554,7 @@ const Effects = struct {
                 try self.visit(n.b, depth + 1);
                 try self.visit(n.c, depth + 1);
             },
+            .storage => return error.InvalidArtifact,
             .array_op => {
                 try self.arguments(self.m.children(id), depth);
                 if (self.m.arrayOperation(id) == .generate) try self.execute(self.m.children(id)[1], null, depth + 1);
@@ -2663,6 +2665,10 @@ fn selectedEffects(m: *const core.Module, units: []const *const core.Module, id:
 pub fn quoteEffects(m: *const core.Module, quote: core.Node, closed_rows: T.List, remaining: *usize) Error!void {
     return quoteEffectsContext(m, &.{}, quote, closed_rows, remaining);
 }
+pub fn evaluateEffects(m: *const core.Module, units: []const *const core.Module, node: core.Node, closed_rows: T.List, remaining: *usize, workspace: ?*@import("scheme_equations.zig").Workspace) Error!void {
+    var effects: Effects = .{ .workspace = workspace, .m = m, .units = units, .target_module = m, .target = .{ .labels = .{}, .tail = .closed }, .closed_rows = closed_rows, .remaining = remaining };
+    try effects.visit(node.a, 0);
+}
 pub fn quoteEffectsContext(m: *const core.Module, units: []const *const core.Module, quote: core.Node, closed_rows: T.List, remaining: *usize) Error!void {
     return quoteEffectsContextWorkspace(m, units, quote, closed_rows, remaining, null);
 }
@@ -2756,6 +2762,7 @@ pub fn shapes(m: *const core.Module) Error!void {
         const op: staging.Op = @fromBackingInt(n.c);
         const input = m.typeOf(n.a);
         switch (op) {
+            .evaluate => try result(m, n.ty, input, &remaining),
             .quote => try require(staging.codeInfo(&m.types, n.ty) != null),
             .lift => {
                 try result(m, n.ty, input, &remaining);

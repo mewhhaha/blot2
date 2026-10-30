@@ -119,12 +119,12 @@ test "unchanged output owns demand explanations through result teardown and allo
 
 const Current = struct {
     prepared: partial.Prepared,
-    artifacts: capture.Capture,
+    artifacts: ?capture.Capture,
     snapshot: inputs.Frozen,
     output: ?CachedOutput = null,
     fn deinit(self: *Current, a: Allocator) void {
         // Artifact producer pins are invalid once Prepared's fresh Core dies.
-        self.artifacts.deinit();
+        if (self.artifacts) |*artifacts| artifacts.deinit();
         self.prepared.deinit(a);
         self.snapshot.deinit();
         if (self.output) |*output| output.deinit(a);
@@ -420,7 +420,12 @@ pub const Session = struct {
     pub fn encodeCheckpoint(self: *const Session, a: Allocator, compiler: [32]u8, report: *@import("../backend/backend_checkpoint.zig").Report) ![]u8 {
         if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
         const current = &(self.current orelse return error.NoSuccessfulRevision);
-        return @import("../backend/backend_checkpoint.zig").encodeReporting(a, compiler, &current.artifacts, report);
+        const artifacts = &(current.artifacts orelse return error.NoSuccessfulRevision);
+        return @import("../backend/backend_checkpoint.zig").encodeReporting(a, compiler, artifacts, report);
+    }
+    fn currentArtifacts(self: *Session) ?*const capture.Capture {
+        if (self.current) |*current| if (current.artifacts) |*artifacts| return artifacts;
+        return null;
     }
     /// The committed revision's output and inputs for `Restored.decode`, or
     /// null when it cannot be restored: an explained output, or an input
@@ -993,9 +998,9 @@ pub const Session = struct {
                         .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
                         .policy = self.policy,
                         .retain_artifacts = true,
-                        .previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
-                        .query_previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
-                        .principal_previous = if (rebuilt and self.current != null) &self.current.?.artifacts else null,
+                        .previous = if (compatible) self.currentArtifacts() else null,
+                        .query_previous = if (compatible) self.currentArtifacts() else null,
+                        .principal_previous = if (rebuilt) self.currentArtifacts() else null,
                         .cached_units = prepared.cached,
                     });
                 };
@@ -1004,9 +1009,10 @@ pub const Session = struct {
                     snapshot_alive = false;
                     return .{ .rejected = .{ .result = result, .snapshot = snapshot, .stats = .{ .rebuilt_seed = rebuilt, .inputs = snapshot.counts, .fallback = fallback_counts } } };
                 }
-                var artifacts = result.result.compiled.capture orelse return error.MissingOwnedArtifacts;
+                var artifacts = result.result.compiled.capture;
+                if (artifacts == null and !result.result.compiled.whole_module_only) return error.MissingOwnedArtifacts;
                 result.result.compiled.capture = null;
-                errdefer artifacts.deinit();
+                errdefer if (artifacts) |*owned| owned.deinit();
                 var cached_output = try CachedOutput.init(a, entry_path, output_identity, &result, prepared.units.len, self.policy);
                 errdefer cached_output.deinit(a);
                 const candidate = try a.create(Candidate);

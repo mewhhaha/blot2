@@ -8,7 +8,7 @@ let spine = "seed";
 for (let index = 0; index < 16; index++) spine = `@u32.add (${spine}) 0`;
 const source = (seed: string, prefix = "", increment = 1) =>
   `${prefix}const seed = ${seed}
-const sum = fn (limit: U32) -> U32 => do:
+const sum = func (limit: U32) : U32 => return do:
   use initial <- ${spine}
   use initial
   let total = initial
@@ -24,15 +24,15 @@ const sum = fn (limit: U32) -> U32 => do:
     let total = 42
     break
   break total
-const keep = fn (values: Array U32) -> Array U32 => do:
+const keep = func (values: Array U32) : Array U32 => return do:
   let chosen = values
   for index in 0..4:
     chosen := values
     if @u32.eq index 2:
       break
   break chosen
-entry const run = fn (limit: U32) -> U32 => sum limit
-entry const copied = fn (limit: U32) -> Array U32 => keep #[limit, seed]
+entry const run = func (limit: U32) : U32 => return sum limit
+entry const copied = func (limit: U32) : Array U32 => return keep #[limit, seed]
 `;
 
 for (const codegenTier of ["development", "optimized"] as const) {
@@ -49,7 +49,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
     const retained = await createZigProjectCompiler(options);
     try {
       const inserted =
-        "const earlier = fn (value: F32) -> F32 => @f32.add value 1.0\n";
+        "const earlier = func (value: F32) : F32 => return @f32.add value 1.0\n";
       const revisions: readonly (readonly [string, number | null])[] = [
         [source("2"), 2],
         [source("2", inserted), 2],

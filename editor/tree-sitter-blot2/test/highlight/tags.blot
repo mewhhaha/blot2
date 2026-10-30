@@ -1,4 +1,4 @@
-const decorate = fn amount => fn value => value + amount
+const decorate = func amount => return func value => return value + amount
 
 @[decorate 1]
 //^ attribute
@@ -6,5 +6,5 @@ const decorate = fn amount => fn value => value + amount
 //^ attribute
 //        ^ attribute
 
-@[fn value => value] entry let initialized = 42
+@[func value => return value] entry let initialized = 42
 // <- punctuation.special

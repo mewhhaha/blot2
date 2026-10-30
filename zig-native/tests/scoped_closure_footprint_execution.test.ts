@@ -5,16 +5,16 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-entry const pure = fn () => do:
-  let callback = @effect.scope (fn (s: State U32) => fn () => 42)
+entry const pure = func () => return do:
+  let callback = @effect.scope (func (s: State U32) => return func () => return 42)
   break callback ()
-entry const capture = fn (value: U32) => do:
-  let callback = @effect.scope (fn (s: State U32) => fn () => @u32.add value 1)
+entry const capture = func (value: U32) => return do:
+  let callback = @effect.scope (func (s: State U32) => return func () => return @u32.add value 1)
   break callback ()
-entry const outer = fn () => @effect.scope (fn (left: State U32) => do:
+entry const outer = func () => return @effect.scope (func (left: State U32) => return do:
   let read = left.get
   let write = left.set
-  let callback = @effect.scope (fn (right: State U32) => fn () => do:
+  let callback = @effect.scope (func (right: State U32) => return func () => return do:
     let (state, result) = do (@effect.state read write 7):
       break read ()
     break result
@@ -66,8 +66,8 @@ for (const codegenTier of ["optimized", "development"] as const) {
         await restored.dispose();
       }
       const captured = source.replace(
-        "fn () => 42)",
-        `fn () => do:
+        "func () => return 42)",
+        `func () => return do:
     let (state, result) = do (@effect.state s.get s.set 0):
       break 42
     break result

@@ -11,7 +11,7 @@ Deno.test("cursor directories preserve snapshots pressure and changed producer r
   const entry = `${directory}/main.blot`;
   const helper = `${directory}/rows.blot`;
   const program = `import * as rows from "./rows"
-entry const run = fn count => do:
+entry const run = func count => return do:
   let values = rows.make count
   let warm = 0
   for row in values:
@@ -36,9 +36,9 @@ entry const run = fn count => do:
     let row = "{x: i, y: i + 1, z: i + 2}";
     if (wide) row = "{x: i, y: i + 1, z: i + 2, w: i + 3}";
     if (sliced) {
-      return `const make = fn count => @list.slice (@list.generate (count + 2) (fn i => ${row})) 1 count\n`;
+      return `const make = func count => return @list.slice (@list.generate (count + 2) (func i => return ${row})) 1 count\n`;
     }
-    return `const make = fn count => @list.generate count (fn i => ${row})\n`;
+    return `const make = func count => return @list.generate count (func i => return ${row})\n`;
   };
   const execute = async (bytes: Uint8Array<ArrayBuffer>, sliced: boolean) => {
     const guest = await instantiateGuest(bytes);
@@ -136,7 +136,7 @@ Deno.test("static packed directories retain scalar leaf addresses through snapsh
     .join(",");
   await compileAndRun(
     `const saved = [${rows}]
-entry const run = fn count => do:
+entry const run = func count => return do:
   let cursor = @list.cursor saved
   let old = cursor
   let total = 0

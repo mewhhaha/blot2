@@ -3,123 +3,123 @@
 // Every operation with a scalar counterpart gives bit-identical lanes.
 type U32x4 = (U32, U32, U32, U32)
 type F32x4 = (F32, F32, F32, F32)
-const u32_splat = fn (value: U32) -> U32x4 => (value, value, value, value)
-const f32_splat = fn (value: F32) -> F32x4 => (value, value, value, value)
-const u32_add = fn left => fn right => @simd.u32x4.add left right
-const u32_sub = fn left => fn right => @simd.u32x4.sub left right
-const u32_mul = fn left => fn right => @simd.u32x4.mul left right
-const u32_and = fn left => fn right => @simd.u32x4.bit_and left right
-const u32_or = fn left => fn right => @simd.u32x4.bit_or left right
-const u32_xor = fn left => fn right => @simd.u32x4.bit_xor left right
-const f32_add = fn left => fn right => @simd.f32x4.add left right
-const f32_sub = fn left => fn right => @simd.f32x4.sub left right
-const f32_mul = fn left => fn right => @simd.f32x4.mul left right
-const f32_div = fn left => fn right => @simd.f32x4.div left right
-const f32_abs = fn value => @simd.f32x4.abs value
-const f32_neg = fn value => @simd.f32x4.neg value
-const f32_sqrt = fn value => @simd.f32x4.sqrt value
-const f32_ceil = fn value => @simd.f32x4.ceil value
-const f32_floor = fn value => @simd.f32x4.floor value
-const f32_trunc = fn value => @simd.f32x4.trunc value
-const to_f32 = fn value => @simd.u32x4.to_f32 value
-const to_u32 = fn value => @simd.f32x4.to_u32 value
+const u32_splat = func (value: U32) : U32x4 => return (value, value, value, value)
+const f32_splat = func (value: F32) : F32x4 => return (value, value, value, value)
+const u32_add = func left -> right => return @simd.u32x4.add left right
+const u32_sub = func left -> right => return @simd.u32x4.sub left right
+const u32_mul = func left -> right => return @simd.u32x4.mul left right
+const u32_and = func left -> right => return @simd.u32x4.bit_and left right
+const u32_or = func left -> right => return @simd.u32x4.bit_or left right
+const u32_xor = func left -> right => return @simd.u32x4.bit_xor left right
+const f32_add = func left -> right => return @simd.f32x4.add left right
+const f32_sub = func left -> right => return @simd.f32x4.sub left right
+const f32_mul = func left -> right => return @simd.f32x4.mul left right
+const f32_div = func left -> right => return @simd.f32x4.div left right
+const f32_abs = func value => return @simd.f32x4.abs value
+const f32_neg = func value => return @simd.f32x4.neg value
+const f32_sqrt = func value => return @simd.f32x4.sqrt value
+const f32_ceil = func value => return @simd.f32x4.ceil value
+const f32_floor = func value => return @simd.f32x4.floor value
+const f32_trunc = func value => return @simd.f32x4.trunc value
+const to_f32 = func value => return @simd.u32x4.to_f32 value
+const to_u32 = func value => return @simd.f32x4.to_u32 value
 // Signed conversions use two's-complement U32 lane bits. Float-to-signed
 // truncates toward zero and saturates, including zero for NaN.
-const to_f32_signed = fn value => @simd.u32x4.to_f32_signed value
-const to_u32_signed = fn value => @simd.f32x4.to_u32_signed value
+const to_f32_signed = func value => return @simd.u32x4.to_f32_signed value
+const to_u32_signed = func value => return @simd.f32x4.to_u32_signed value
 
 // Shifts take a scalar count, which wraps modulo 32 like the U32 `<<`/`>>`.
 // `u32_sar` shifts in copies of each lane's top bit.
-const u32_shl = fn (count: U32) => fn lanes => @simd.u32x4.shl lanes count
-const u32_shr = fn (count: U32) => fn lanes => @simd.u32x4.shr lanes count
-const u32_sar = fn (count: U32) => fn lanes => @simd.u32x4.sar lanes count
+const u32_shl = func (count: U32) -> lanes => return @simd.u32x4.shl lanes count
+const u32_shr = func (count: U32) -> lanes => return @simd.u32x4.shr lanes count
+const u32_sar = func (count: U32) -> lanes => return @simd.u32x4.sar lanes count
 
 // `f32_min a b` is the prelude's `min a b`, `if a < b then a else b`, in each
 // lane, including its NaN and signed-zero choices; `f32_max` likewise.
-const f32_min = fn left => fn right => @simd.f32x4.min left right
-const f32_max = fn left => fn right => @simd.f32x4.max left right
-const u32_min = fn left => fn right => @simd.u32x4.min left right
-const u32_max = fn left => fn right => @simd.u32x4.max left right
+const f32_min = func left -> right => return @simd.f32x4.min left right
+const f32_max = func left -> right => return @simd.f32x4.max left right
+const u32_min = func left -> right => return @simd.u32x4.min left right
+const u32_max = func left -> right => return @simd.u32x4.max left right
 
 // Comparisons give a U32x4 mask: all ones where the scalar comparison holds,
 // zero elsewhere. Unsigned comparisons follow U32 ordering.
-const f32_eq = fn left => fn right => @simd.f32x4.eq left right
-const f32_ne = fn left => fn right => @simd.f32x4.ne left right
-const f32_lt = fn left => fn right => @simd.f32x4.lt left right
-const f32_le = fn left => fn right => @simd.f32x4.le left right
-const f32_gt = fn left => fn right => @simd.f32x4.gt left right
-const f32_ge = fn left => fn right => @simd.f32x4.ge left right
-const u32_eq = fn left => fn right => @simd.u32x4.eq left right
-const u32_ne = fn left => fn right => @simd.u32x4.ne left right
-const u32_lt = fn left => fn right => @simd.u32x4.lt left right
-const u32_le = fn left => fn right => @simd.u32x4.le left right
-const u32_gt = fn left => fn right => @simd.u32x4.gt left right
-const u32_ge = fn left => fn right => @simd.u32x4.ge left right
+const f32_eq = func left -> right => return @simd.f32x4.eq left right
+const f32_ne = func left -> right => return @simd.f32x4.ne left right
+const f32_lt = func left -> right => return @simd.f32x4.lt left right
+const f32_le = func left -> right => return @simd.f32x4.le left right
+const f32_gt = func left -> right => return @simd.f32x4.gt left right
+const f32_ge = func left -> right => return @simd.f32x4.ge left right
+const u32_eq = func left -> right => return @simd.u32x4.eq left right
+const u32_ne = func left -> right => return @simd.u32x4.ne left right
+const u32_lt = func left -> right => return @simd.u32x4.lt left right
+const u32_le = func left -> right => return @simd.u32x4.le left right
+const u32_gt = func left -> right => return @simd.u32x4.gt left right
+const u32_ge = func left -> right => return @simd.u32x4.ge left right
 
 // Selection is bitwise: a mask bit of one takes `yes`, zero takes `no`.
-const f32_select = fn (mask: U32x4) => fn yes => fn no => @simd.f32x4.select mask (yes, no)
-const u32_select = fn (mask: U32x4) => fn yes => fn no => @simd.u32x4.select mask (yes, no)
+const f32_select = func (mask: U32x4) -> yes -> no => return @simd.f32x4.select mask (yes, no)
+const u32_select = func (mask: U32x4) -> yes -> no => return @simd.u32x4.select mask (yes, no)
 // There is no I32 surface type. Flip the sign bit to compare U32 lanes as
 // two's-complement signed words, then use the same masks and selection.
 const u32_sign_mask = (0x80000000, 0x80000000, 0x80000000, 0x80000000)
-const u32_lt_signed = fn left => fn right => u32_lt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
-const u32_le_signed = fn left => fn right => u32_le (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
-const u32_gt_signed = fn left => fn right => u32_gt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
-const u32_ge_signed = fn left => fn right => u32_ge (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
-const u32_min_signed = fn left => fn right => u32_select (u32_lt_signed left right) left right
-const u32_max_signed = fn left => fn right => u32_select (u32_gt_signed left right) left right
+const u32_lt_signed = func left -> right => return u32_lt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_le_signed = func left -> right => return u32_le (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_gt_signed = func left -> right => return u32_gt (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_ge_signed = func left -> right => return u32_ge (u32_xor left u32_sign_mask) (u32_xor right u32_sign_mask)
+const u32_min_signed = func left -> right => return u32_select (u32_lt_signed left right) left right
+const u32_max_signed = func left -> right => return u32_select (u32_gt_signed left right) left right
 // Wasm SIMD has no integer divide. Keep U32's quotient and divide-by-zero
 // behavior with four scalar lanes until a vector reciprocal is appropriate.
-const u32_div = fn (left: U32x4) => fn (right: U32x4) => do:
+const u32_div = func (left: U32x4) -> (right: U32x4) => return do:
   let (a, b, c, d) = left
   let (e, f, g, h) = right
   break (@u32.div a e, @u32.div b f, @u32.div c g, @u32.div d h)
-const u32_not = fn lanes => @simd.u32x4.not lanes
-const u32_andnot = fn left => fn right => @simd.u32x4.andnot left right
-const any_true = fn mask => @simd.u32x4.any_true mask
-const all_true = fn mask => @simd.u32x4.all_true mask
+const u32_not = func lanes => return @simd.u32x4.not lanes
+const u32_andnot = func left -> right => return @simd.u32x4.andnot left right
+const any_true = func mask => return @simd.u32x4.any_true mask
+const all_true = func mask => return @simd.u32x4.all_true mask
 
 // Lane selectors must be literal U32 values at a direct, fully applied call.
 // Shuffle indices 0-3 take lanes from `left`, 4-7 from `right`.
-const f32_shuffle = fn lanes => fn left => fn right => @simd.f32x4.shuffle lanes (left, right)
-const f32_swizzle = fn lanes => fn value => @simd.f32x4.swizzle lanes value
-const f32_broadcast = fn (lane: U32) => fn value => @simd.f32x4.broadcast value lane
-const u32_shuffle = fn lanes => fn left => fn right => @simd.u32x4.shuffle lanes (left, right)
-const u32_swizzle = fn lanes => fn value => @simd.u32x4.swizzle lanes value
-const u32_broadcast = fn (lane: U32) => fn value => @simd.u32x4.broadcast value lane
+const f32_shuffle = func lanes -> left -> right => return @simd.f32x4.shuffle lanes (left, right)
+const f32_swizzle = func lanes -> value => return @simd.f32x4.swizzle lanes value
+const f32_broadcast = func (lane: U32) -> value => return @simd.f32x4.broadcast value lane
+const u32_shuffle = func lanes -> left -> right => return @simd.u32x4.shuffle lanes (left, right)
+const u32_swizzle = func lanes -> value => return @simd.u32x4.swizzle lanes value
+const u32_broadcast = func (lane: U32) -> value => return @simd.u32x4.broadcast value lane
 
 // Bit reinterpretation keeps every bit, including NaN payloads.
-const f32_bits = fn lanes => @simd.f32x4.bits lanes
-const f32_from_bits = fn lanes => @simd.u32x4.from_bits lanes
+const f32_bits = func lanes => return @simd.f32x4.bits lanes
+const f32_from_bits = func lanes => return @simd.u32x4.from_bits lanes
 
 // Opt-in fused or unfused `a * b + c` and `-(a * b) + c`. Their rounding
 // depends on the host; nothing else selects them implicitly.
-const f32_relaxed_madd = fn a => fn b => fn c => @simd.f32x4.relaxed_madd a (b, c)
-const f32_relaxed_nmadd = fn a => fn b => fn c => @simd.f32x4.relaxed_nmadd a (b, c)
+const f32_relaxed_madd = func a -> b -> c => return @simd.f32x4.relaxed_madd a (b, c)
+const f32_relaxed_nmadd = func a -> b -> c => return @simd.f32x4.relaxed_nmadd a (b, c)
 
 // One range check precedes the index arithmetic, so a wrapping index cannot
 // select unrelated lanes. Loads copy four elements; stores keep the ordinary
 // Array snapshot contract and replace in place when the Array is exclusive.
 // U32, F32 and Bool elements are supported.
-const load = fn index => fn values => @simd.load values index
-const store = fn index => fn lanes => fn values => @simd.store values index lanes
+const load = func index -> values => return @simd.load values index
+const store = func index -> lanes -> values => return @simd.store values index lanes
 
 // Reductions never reassociate implicitly. The pairwise variant is an explicit
 // choice of grouping and can round differently from the left-to-right version.
-const f32_sum = fn (values: F32x4) => do:
+const f32_sum = func (values: F32x4) => return do:
   let (a, b, c, d) = values
   break ((a + b) + c) + d
-const f32_sum_pairwise = fn (values: F32x4) => do:
+const f32_sum_pairwise = func (values: F32x4) => return do:
   let (a, b, c, d) = values
   break (a + b) + (c + d)
-const u32_sum = fn (values: U32x4) => do:
+const u32_sum = func (values: U32x4) => return do:
   let (a, b, c, d) = values
   break ((a + b) + c) + d
 // Dot products group exactly like std/vector's `Vec3.dot`, left to right:
 // `((a.x * b.x + a.y * b.y) + a.z * b.z) + a.w * b.w`; `f32_dot3` ignores lane 3.
-const f32_dot = fn (left: F32x4) => fn (right: F32x4) => do:
+const f32_dot = func (left: F32x4) -> (right: F32x4) => return do:
   let (x, y, z, w) = f32_mul left right
   break ((x + y) + z) + w
-const f32_dot3 = fn (left: F32x4) => fn (right: F32x4) => do:
+const f32_dot3 = func (left: F32x4) -> (right: F32x4) => return do:
   let (x, y, z, _) = f32_mul left right
   break (x + y) + z

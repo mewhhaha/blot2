@@ -13,14 +13,14 @@ const stdRoot = `${repo}std`;
 // Their reads pass through the same recorder, so the principal keeps a
 // complete input key. Only such keys are portable to the restart cache.
 const probe = (schema: number) => `
-const probe_with = fn pick => fn value => do:
-  let (_, count) = run_scoped simulation (create ()) (fn () => do:
+const probe_with = func pick => return func value => return do:
+  let (_, count) = run_scoped simulation (create ()) (func () => return do:
     use time <- get #Time
     let #Time { seconds } = time
     break pick ())
   break value + value + count
 entry const probe_schema: U32 = ${schema}
-entry const probe: U32 where { type_rep U32 } = probe_with (fn () => probe_schema) 3
+entry const probe: U32 where { type_rep U32 } = probe_with (func () => return probe_schema) 3
 `;
 Deno.test("principal inputs survive summary jobs drained inside the recorded region", async () => {
   const ecs = await Deno.readTextFile(`${repo}examples/ecs.blot`);

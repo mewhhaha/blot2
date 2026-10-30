@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
-entry const local = fn (count: U32) => do:
+entry const local = func (count: U32) => return do:
   let sum = 0
   for index in 0..count:
     let pair = (#[index, index + 1], index)
@@ -16,7 +16,7 @@ entry const local = fn (count: U32) => do:
     let pressure = @array.fill 8192 index
     sum := self + left[0] + right[1] + pressure[8191]
   break sum
-entry const carries = fn (count: U32) => do:
+entry const carries = func (count: U32) => return do:
   let current = (#[7, 42], 0)
   let previous = current
   let saved = current
@@ -35,7 +35,7 @@ entry const carries = fn (count: U32) => do:
   let (after, _) = current
   let (original, _) = saved
   break #[sum, before[0], after[0], original[1]]
-entry const suspended = fn (host: Array U32 -> U32 ! {Foreign}) => do:
+entry const suspended = func (host: Array U32 -> U32 ! {Foreign}) => return do:
   let pair = (#[7, 42], 99)
   let first = pair
   let second = first

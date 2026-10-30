@@ -8,17 +8,17 @@ const executable = Deno.args[0] ??
 const stdRoot = new URL("../../std/", import.meta.url).pathname;
 const paths = `
 import * as path from "std/path"
-const position = path.make (fn source => source.position)
-  (fn replacement => fn source => @record.merge source { position: replacement })
-const x = path.make (fn source => source.x)
-  (fn replacement => fn source => @record.merge source { x: replacement })
+const position = path.make (func source => return source.position)
+  (func replacement => return func source => return @record.merge source { position: replacement })
+const x = path.make (func source => return source.x)
+  (func replacement => return func source => return @record.merge source { x: replacement })
 const position_x = path.compose position x
 `;
 const deepPaths = `
-const inner = path.make (fn source => source.inner)
-  (fn replacement => fn source => @record.merge source { inner: replacement })
-const p0 = path.make (fn source => source.x)
-  (fn replacement => fn source => @record.merge source { x: replacement })
+const inner = path.make (func source => return source.inner)
+  (func replacement => return func source => return @record.merge source { inner: replacement })
+const p0 = path.make (func source => return source.x)
+  (func replacement => return func source => return @record.merge source { x: replacement })
 ${
   Array.from({ length: 12 }, (_, index) =>
     `const p${index + 1} = path.compose inner p${index}`).join("\n")
@@ -40,33 +40,33 @@ for (const asynchronous of [false, true]) {
   Deno.test(`typed paths compose beyond inlining bounds and support large returning accessors (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       paths + deepPaths + `
-const long = path.make (fn source => do:
+const long = path.make (func source => return do:
   if @u32.eq source.x 0:
     break 7
   break ${longGetter})
-  (fn replacement => fn source => @record.merge source { x: replacement })
-entry const deep = fn (input: U32) => do:
+  (func replacement => return func source => return @record.merge source { x: replacement })
+entry const deep = func (input: U32) => return do:
   let original = ${
         nestedSource(
           12,
-          "{ x: input, callback: fn value => @u32.add value input }",
-          "fn value => @u32.add value input",
+          "{ x: input, callback: func value => return @u32.add value input }",
+          "func value => return @u32.add value input",
         )
       }
   let changed = path.set p12 2.5 original
   break @f32.add (path.get p12 changed) (@u32.to_f32 (original.callback 2))
-entry const large = fn (input: U32) => do:
-  let original = { x: input, callback: fn value => @u32.add value input }
+entry const large = func (input: U32) => return do:
+  let original = { x: input, callback: func value => return @u32.add value input }
   break @u32.add input (path.get long original)
-entry const closed = fn (input: U32) => path.get p12 ${
-        nestedSource(12, "{ x: input, callback: #False }", "#False")
+entry const closed = func (input: U32) => return path.get p12 ${
+        nestedSource(12, "{ x: input, callback: false }", "false")
       }
-entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
+entry const effects = func (send: U32 -> U32 ! {Foreign}) => return do:
   let original = ${
         nestedSource(
           12,
-          "{ x: 40, callback: fn value => send value }",
-          "fn value => send value",
+          "{ x: 40, callback: func value => return send value }",
+          "func value => return send value",
         )
       }
   let changed = path.set p12 2.5 original
@@ -104,26 +104,26 @@ entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
   Deno.test(`typed paths preserve type-changing updates aliases and captures (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       paths + `
-const wrap = path.make (fn source => source.wrapped)
-  (fn replacement => fn source => @record.merge source { wrapped: replacement })
+const wrap = path.make (func source => return source.wrapped)
+  (func replacement => return func source => return @record.merge source { wrapped: replacement })
 const left = path.compose (path.compose wrap position) x
 const right = path.compose wrap (path.compose position x)
-entry const answer = fn (input: U32) => do:
-  let original: { position: { x: U32, y: U32 }, health: U32, callback: U32 -> U32 } = { position: { x: input, y: 7 }, health: 3, callback: fn value => @u32.add value input }
+entry const answer = func (input: U32) => return do:
+  let original: { position: { x: U32, y: U32 }, health: U32, callback: U32 -> U32 } = { position: { x: input, y: 7 }, health: 3, callback: func value => return @u32.add value input }
   let changed = path.set position_x 2.5 original
-  let again = path.modify position_x (fn value => @f32.add value 0.5) changed
+  let again = path.modify position_x (func value => return @f32.add value 0.5) changed
   break @f32.add (path.get position_x again) (@u32.to_f32 (@u32.add original.position.x again.health))
-entry const captured = fn (input: U32) => do:
-  let original = { position: { x: input, y: 7 }, callback: fn value => @u32.add value input }
-  let changed = path.set position_x #True original
+entry const captured = func (input: U32) => return do:
+  let original = { position: { x: input, y: 7 }, callback: func value => return @u32.add value input }
+  let changed = path.set position_x true original
   break changed.callback 2
-entry const associated = fn (input: U32) => do:
+entry const associated = func (input: U32) => return do:
   let original = { wrapped: { position: { x: input, y: 7 }, health: 3 }, kept: 9 }
   let a = path.set left 2.5 original
   let b = path.set right 2.5 original
   break @f32.add (path.get left a) (path.get right b)
-entry const whole = fn (input: U32) => path.set path.identity (@u32.add input 2) #False
-entry const empty = fn (input: U32) => path.get path.identity input
+entry const whole = func (input: U32) => return path.set path.identity (@u32.add input 2) false
+entry const empty = func (input: U32) => return path.get path.identity input
 `,
       async (guest) => {
         const call = asynchronous ? guest.callAsync : guest.call;
@@ -145,8 +145,8 @@ entry const empty = fn (input: U32) => path.get path.identity input
   Deno.test(`typed paths retain effects of callbacks in untouched fields (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       paths + `
-entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
-  let original = { position: { x: 40, y: 7 }, callback: fn value => send value }
+entry const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
+  let original = { position: { x: 40, y: 7 }, callback: func value => return send value }
   let changed = path.set position_x 2.5 original
   let focus = path.get position_x changed
   break @f32.add focus (@u32.to_f32 (changed.callback 2))
@@ -174,12 +174,12 @@ entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
   Deno.test(`path modification sequences arguments and its effectful transform once (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       paths + `
-entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
+entry const answer = func (send: U32 -> U32 ! {Foreign}) => return do:
   use original <- do:
     break { position: { x: send 1, y: 7 }, health: 3 }
   use changed <- do:
     break path.set position_x (send 2) original
-  use modified <- path.modify position_x (fn value => send value) changed
+  use modified <- path.modify position_x (func value => return send value) changed
   break @u32.add modified.position.x (@u32.add original.position.x modified.health)
 `,
       async (guest) => {
@@ -206,8 +206,8 @@ entry const answer = fn (send: U32 -> U32 ! {Foreign}) => do:
 Deno.test("typed paths reject incompatible source types and effectful accessors", async () => {
   for (
     const source of [
-      `import * as path from "std/path"\nconst wrong = path.make (fn (value: U32) => value) (fn replacement => fn (value: F32) => value)\nentry const answer = 42\n`,
-      `import * as path from "std/path"\nconst whole = path.make (fn (value: U32) => value) (fn replacement => fn (value: U32) => replacement)\nconst boolean = path.make (fn (value: Bool) => value) (fn replacement => fn (value: Bool) => replacement)\nentry const answer = path.get (path.compose whole boolean) 0\n`,
+      `import * as path from "std/path"\nconst wrong = path.make (func (value: U32) => return value) (func replacement => return func (value: F32) => return value)\nentry const answer = 42\n`,
+      `import * as path from "std/path"\nconst whole = path.make (func (value: U32) => return value) (func replacement => return func (value: U32) => return replacement)\nconst boolean = path.make (func (value: Bool) => return value) (func replacement => return func (value: Bool) => return replacement)\nentry const answer = path.get (path.compose whole boolean) 0\n`,
     ]
   ) {
     await compileExpectedFailure(source, "type_mismatch", undefined, {
@@ -216,16 +216,16 @@ Deno.test("typed paths reject incompatible source types and effectful accessors"
     });
   }
   await compileExpectedFailure(
-    `import * as path from "std/path"\neffect Read: Unit -> U32\nconst wrong = path.make (fn () => Read ()) (fn replacement => fn () => replacement)\nentry const answer = 42\n`,
+    `import * as path from "std/path"\neffect Read: Unit -> U32\nconst wrong = path.make (func () => return Read ()) (func replacement => return func () => return replacement)\nentry const answer = 42\n`,
     "effect_mismatch",
     undefined,
     { prelude: "none", stdRoot },
   );
   await compileExpectedFailure(
     `import * as path from "std/path"
-const call = path.make (fn source => source.callback ())
-  (fn replacement => fn source => @record.merge source { stored: replacement })
-entry const answer = fn (send: Unit -> U32 ! {Foreign}) => path.get call { callback: send, stored: 0 }
+const call = path.make (func source => return source.callback ())
+  (func replacement => return func source => return @record.merge source { stored: replacement })
+entry const answer = func (send: Unit -> U32 ! {Foreign}) => return path.get call { callback: send, stored: 0 }
 `,
     "effect_mismatch",
     undefined,
@@ -250,11 +250,11 @@ Deno.test("typed path dependencies and checkpoints preserve edited output and fa
     await Deno.writeTextFile(library, librarySource);
     await Deno.writeTextFile(
       entry,
-      `import * as path from "std/path"\nimport { position_x, p4 } from "./library"\nentry const answer = fn (input: U32) => do:\n  let original = { position: { x: input, y: 7 }, health: 3, callback: fn value => @u32.add value input }\n  let changed = path.set position_x 2.5 original\n  break @f32.add (path.get position_x changed) (@u32.to_f32 original.position.x)\nentry const deep = fn (input: U32) => do:\n  let original = ${
+      `import * as path from "std/path"\nimport { position_x, p4 } from "./library"\nentry const answer = func (input: U32) => return do:\n  let original = { position: { x: input, y: 7 }, health: 3, callback: func value => return @u32.add value input }\n  let changed = path.set position_x 2.5 original\n  break @f32.add (path.get position_x changed) (@u32.to_f32 original.position.x)\nentry const deep = func (input: U32) => return do:\n  let original = ${
         nestedSource(
           4,
-          "{ x: input, callback: fn value => @u32.add value input }",
-          "fn value => @u32.add value input",
+          "{ x: input, callback: func value => return @u32.add value input }",
+          "func value => return @u32.add value input",
         )
       }\n  let changed = path.set p4 2.5 original\n  break path.get p4 changed\n`,
     );

@@ -6,12 +6,12 @@ const compiler = Deno.args[0] ??
 const std = new URL("../../std", import.meta.url).pathname;
 
 const tree = `
-const grow = fn (count: U32) => do:
+const grow = func (count: U32) => return do:
   let root: Link = #End
   for index in 0..count:
     root := #Next (self, index)
   break root
-entry const run = fn (count: U32) => do:
+entry const run = func (count: U32) => return do:
   let original = grow count
   let changed = #Next (original, 8192)
   let saved = case original of
@@ -22,7 +22,7 @@ entry const run = fn (count: U32) => do:
       #Next (_, latest) => @u32.add value (@u32.add latest saved)
       _ => 0
     _ => 0
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 type Exports = Record<string, unknown>;
@@ -137,13 +137,13 @@ Deno.test("temporary containers of proven elements skip candidacy", async () => 
   await compileAndRun(
     `import * as array from "std/array"
 type Scalar is data = #Scalar { a: U32, b: F32 }
-entry const run = fn (frames: U32) -> U32 => do:
+entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
     let items = #[#Scalar { a: index, b: 1.0 } | index <- array.generate 4000 identity]
     total := self + items[3].a
   break total
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))
@@ -165,22 +165,25 @@ Deno.test("trial passes skip proven payloads of candidate elements", async () =>
     `import * as array from "std/array"
 type Scalar is data = #Scalar { a: U32, b: F32 }
 type Item is data = #Plain Scalar | #Lazy (Unit -> U32)
-const value = fn (item: Item) -> U32 => case item of
+const value = func (item: Item) : U32 => return case item of
   #Plain (#Scalar { a, b }) => a
   #Lazy later => later ()
-entry const run = fn (frames: U32) -> U32 => do:
+entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
     let items = #[#Plain (#Scalar { a: index, b: 1.0 }) | index <- array.generate 4000 identity]
     total := self + value items[3]
   break total
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))
         .exports;
       assert.equal((raw.run as CallableFunction)(frames), 3 * frames);
-      assert(metric(raw, "cycle_passes") > 0, "Item containers stay candidates");
+      assert(
+        metric(raw, "cycle_passes") > 0,
+        "Item containers stay candidates",
+      );
       // Each Item cell is one vertex with one edge to its proven Scalar,
       // which discovery does not visit; visiting it would equalize the two.
       const vertices = metric(raw, "cycle_vertices");
@@ -196,7 +199,7 @@ entry const memory = fn () -> Array U32 => #[]
 // flattened, with math types in another module and Maybe/Array fields.
 const gmath = `type Vec4 is data = #Vec4 { x: F32, y: F32, z: F32, w: F32 }
 type Mat4 is data = #Mat4 { x: Vec4, y: Vec4, z: Vec4, w: Vec4 }
-const Mat4.translation = fn (x: F32) => fn (y: F32) => fn (z: F32) => #Mat4 {
+const Mat4.translation = func (x: F32) => return func (y: F32) => return func (z: F32) => return #Mat4 {
   x: #Vec4 { x: 1.0, y: 0.0, z: 0.0, w: 0.0 },
   y: #Vec4 { x: 0.0, y: 1.0, z: 0.0, w: 0.0 },
   z: #Vec4 { x: 0.0, y: 0.0, z: 1.0, w: 0.0 },
@@ -207,7 +210,7 @@ const frames = `import * as array from "std/array"
 import * as m from "./gmath"
 type Stack is data = #Stack { x: F32, z: F32, count: U32 }
 type Draw is data = #Draw { mesh: U32, material: U32, matrix: m.Mat4, parameters: Maybe m.Vec4, extra: Array m.Vec4, path: List m.Vec4 }
-const draw_of = fn (stack: Stack) => fn (above: U32) => #Draw {
+const draw_of = func (stack: Stack) => return func (above: U32) => return #Draw {
   mesh: 1,
   material: above,
   matrix: m.Mat4.translation stack.x (U32.to_f32 above) stack.z,
@@ -215,30 +218,34 @@ const draw_of = fn (stack: Stack) => fn (above: U32) => #Draw {
   extra: #[],
   path: [#m.Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }],
 }
-const stack_draws = fn (stack: Stack) =>
+const stack_draws = func (stack: Stack) => return
   #[draw_of stack above | above <- array.generate stack.count identity]
-const frame = fn (stacks: Array Stack) => do:
+const frame = func (stacks: Array Stack) => return do:
   let parts = #[part | stack <- stacks, part <- stack_draws stack]
   let origin = #Stack { x: 0.0, z: 0.0, count: 1 }
   let head = #[draw_of origin 0]
-  let flat = array.flatten #[head, parts]
+  let payload = array.concat head parts
+  let flat = array.flatten #[{start: 0, count: head.length}, {start: head.length, count: parts.length}] payload
   let sum = 0
   for d in flat:
     sum := self + d.material
   break sum
-entry const run = fn (frames: U32) -> U32 => do:
-  let stacks = array.generate 64 (fn i => #Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
+entry const run = func (frames: U32) : U32 => return do:
+  let stacks = array.generate 64 (func i => return #Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
   let total = 0
   for f in 0..frames:
     total := self + frame stacks
   break total
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `;
 
 Deno.test("frame draws with foreign math, Maybe, Array and List fields skip cycle work", async () => {
-  const bytes = await buildProject({ "gmath.blot": gmath, "main.blot": frames }, {
-    std: true,
-  });
+  const bytes = await buildProject(
+    { "gmath.blot": gmath, "main.blot": frames },
+    {
+      std: true,
+    },
+  );
   const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
   const run = raw.run as CallableFunction;
   // Each stack draws materials 0 and 1; the head draw has material 0.
@@ -260,21 +267,21 @@ Deno.test("List copies, slices, concatenations and conversions keep the element 
     `import * as list from "std/list"
 type Point is data = #Point { x: U32, y: Maybe U32 }
 type Bag is data = #Bag { items: List Point, extra: Array Point }
-const point = fn (index: U32) => #Point { x: index, y: #Some index }
-const sum = fn (values: List Point) -> U32 => list.fold_left (fn total => fn (p: Point) => @u32.add total p.x) 0 values
-entry const run = fn (frames: U32) -> U32 => do:
+const point = func (index: U32) => return #Point { x: index, y: #Some index }
+const sum = func (values: List Point) : U32 => return list.fold_left (func total => return func (p: Point) => return @u32.add total p.x) 0 values
+entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
     let base = list.generate 600 point
     let grown = list.append (point 9) base
     let joined = list.concat base grown
     let middle = list.slice 100 700 joined
-    let even = list.filter (fn (p: Point) => @u32.rem p.x 2 == 0) middle
+    let even = list.filter (func (p: Point) => return @u32.rem p.x 2 == 0) middle
     let bag = #Bag { items: even, extra: list.to_array middle }
     let back = list.from_array bag.extra
     total := self + sum back + sum bag.items + base.length
   break total
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (_, bytes) => {
       const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes))

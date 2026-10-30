@@ -422,12 +422,12 @@ Deno.test("typed collection descriptors count shared leaves and skip owner token
 });
 
 const source = `
-entry const array_group = fn (value: U32) => do:
+entry const array_group = func (value: U32) => return do:
   let child = #[value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value, value + 1]
   let left = #[child, child]
   let right = #[child, child]
   break left[0][17] + right[1][0]
-entry const arrays = fn (value: U32) => do:
+entry const arrays = func (value: U32) => return do:
   if value == 0:
     break 0
   let child = #[value, value + 1]
@@ -435,7 +435,7 @@ entry const arrays = fn (value: U32) => do:
   let before = values
   values[0] := #[value + 10, value + 20]
   break before[0][1] + values[0][1] + values[1][0]
-entry const lists = fn (value: U32) => do:
+entry const lists = func (value: U32) => return do:
   if value == 0:
     break 0
   let child = #[value, value + 1]
@@ -445,8 +445,8 @@ entry const lists = fn (value: U32) => do:
   let copied = @array.from_list values
   let old = @array.from_list before
   break old[0][1] + copied[0][1] + copied[500][0]
-entry const clear = fn () => 0
-entry const trapped = fn (value: U32) => do:
+entry const clear = func () => return 0
+entry const trapped = func (value: U32) => return do:
   let values = @list.fill 500 #[value]
   let copied = @array.from_list values
   break copied[501][0]

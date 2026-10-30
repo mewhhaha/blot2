@@ -7,13 +7,13 @@ Deno.test("completed captured callbacks preserve edits rejection recovery and bo
   });
   const entry = `${directory}/main.blot`;
   const source = (seed: number | null, schema: number) =>
-    `const add = fn extra => ${
+    `const add = func extra => return ${
       seed === null ? "@f32.add extra 1.0" : `@u32.add extra ${seed}`
     }
-const factory = fn invoke => fn extra => invoke extra
+const factory = func invoke => return func extra => return invoke extra
 const callback = factory add
 entry const schema: U32 = ${schema}
-entry const answer = fn (extra: U32) -> U32 => callback extra
+entry const answer = func (extra: U32) : U32 => return callback extra
 `;
   try {
     await Deno.writeTextFile(entry, source(42, 7));
@@ -70,11 +70,11 @@ Deno.test("retained nested source owners preserve unrelated edits consumed closu
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source = (divisor: number, unused: number) =>
-    `const force = fn ~(value: U32) => @force value
-const make = fn (seed: U32) => do:
-  let captured = fn (value: U32) => @u32.div (@u32.add seed (force value)) ${divisor}
+    `const force = func ~(value: U32) => return @force value
+const make = func (seed: U32) => return do:
+  let captured = func (value: U32) => return @u32.div (@u32.add seed (force value)) ${divisor}
   break captured
-const unrelated = fn (value: U32) => @u32.add value ${unused}
+const unrelated = func (value: U32) => return @u32.add value ${unused}
 `;
   try {
     await Deno.writeTextFile(
@@ -145,8 +145,8 @@ Deno.test("retained principal results omit deep optional call proofs and preserv
     (_, i) => `  let layer_${i + 1} = wrap layer_${i}`,
   ).join("\n");
   const source = (value: number) =>
-    `const wrap = fn value => (value, 0)
-const ignore = fn value => 1
+    `const wrap = func value => return (value, 0)
+const ignore = func value => return 1
 entry const answer: U32 where { type_rep U32 } = do:
   let seed = ${value}
   let layer_0 = wrap seed
@@ -225,13 +225,13 @@ Deno.test("nonempty principal and recursive summary replay preserve body edits f
   });
   const entry = `${directory}/main.blot`;
   const source = (seed: number, operation = "add", unrelated = "sub") =>
-    `const local = fn value => @u32.${operation} value 1
-const subtract = fn value => @u32.sub value 2
-const unused = fn value => @u32.${unrelated} value 2
-const even: U32 -> U32 = fn value => if @u32.eq value 0 then 41 else odd (@u32.sub value 1)
-const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 41 else even (@u32.sub value 1)
+    `const local = func value => return @u32.${operation} value 1
+const subtract = func value => return @u32.sub value 2
+const unused = func value => return @u32.${unrelated} value 2
+const even: U32 -> U32 = func value => return if @u32.eq value 0 then 41 else odd (@u32.sub value 1)
+const odd: U32 -> U32 = func value => return if @u32.eq value 0 then 41 else even (@u32.sub value 1)
 entry const first: U32 where { type_rep U32 } = do:
-  let identity = fn value => value
+  let identity = func value => return value
   break identity (@u32.div 8 ${seed})
 entry const second: U32 where { type_rep U32 } = local (even ${seed})
 entry const third: U32 where { type_rep U32 } = local (odd ${seed})
@@ -352,12 +352,12 @@ Deno.test("checked interface principal reuse executes changed bodies and preserv
   });
   const entry = `${directory}/main.blot`;
   const source = (operation: string, operand: number, required = false) =>
-    `const add = fn (x: U32) -> U32 => @u32.add x 1
-const sub = fn (x: U32) -> U32 => @u32.sub x 1
-const div = fn (x: U32) -> U32 => @u32.div x 1
+    `const add = func (x: U32) : U32 => return @u32.add x 1
+const sub = func (x: U32) : U32 => return @u32.sub x 1
+const div = func (x: U32) : U32 => return @u32.div x 1
 const local${
       required ? ": U32 -> U32 where { type_rep U32 }" : ""
-    } = fn (x: U32) -> U32 => @u32.${operation} x ${operand}
+    } = func (x: U32) : U32 => return @u32.${operation} x ${operand}
 entry const answer: U32 where { type_rep U32 } = local 41
 `;
   try {
@@ -446,16 +446,16 @@ Deno.test("completed inferred interfaces preserve current conversions body edits
   const entry = `${directory}/main.blot`;
   const source = (rounding: string, member = "from", written = false) =>
     `type Token is data = #Token U32
-const Token.from = fn value => #Token (@f32.to_u32 value)
-const Token.fail = fn value => #Token (@u32.div (@f32.to_u32 value) 0)
+const Token.from = func value => return #Token (@f32.to_u32 value)
+const Token.fail = func value => return #Token (@u32.div (@f32.to_u32 value) 0)
 const from${
       written ? `: a -> b where { result "${member}" a b }` : ""
-    } = fn value => @type.result "${member}" value
-const floor_impl = fn value => @f32.floor value
-const ceil_impl = fn value => @f32.ceil value
+    } = func value => return @type.result "${member}" value
+const floor_impl = func value => return @f32.floor value
+const ceil_impl = func value => return @f32.ceil value
 const floor = floor_impl
 const ceil = ceil_impl
-const local = fn value => from (${rounding} value)
+const local = func value => return from (${rounding} value)
 entry const answer: U32 where { type_rep U32 } = case local 41.25 of
   #Token value => value
 `;

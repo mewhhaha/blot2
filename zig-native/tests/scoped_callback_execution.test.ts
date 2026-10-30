@@ -6,14 +6,14 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-entry const operation = fn () => @effect.scope (fn (s: State U32) => do:
+entry const operation = func () => return @effect.scope (func (s: State U32) => return do:
   let (state, result) = do (@effect.state s.get s.set 7):
-    break (fn callback => callback ()) s.get
+    break (func callback => return callback ()) s.get
   break result
 )
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (s: State U32) => return do:
   use nested <- do (@effect.state s.get s.set 7):
-    break (fn callback => callback ()) (fn () => do:
+    break (func callback => return callback ()) (func () => return do:
       use previous <- s.get ()
       use next <- host previous
       use s.set next

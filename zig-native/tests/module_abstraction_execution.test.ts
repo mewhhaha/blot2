@@ -4,20 +4,20 @@ const scalarSource = `
 opaque type Count = U32
 opaque type Floating = F32
 opaque type Box a = a
-const make_count: U32 -> Count = fn value => #Count value
-const read_count: Count -> U32 = fn (#Count value) => value
-const make_floating: F32 -> Floating = fn value => #Floating value
-const read_floating: Floating -> F32 = fn (#Floating value) => value
+const make_count: U32 -> Count = func value => return #Count value
+const read_count: Count -> U32 = func (#Count value) => return value
+const make_floating: F32 -> Floating = func value => return #Floating value
+const read_floating: Floating -> F32 = func (#Floating value) => return value
 const box = #Box
-const unbox = fn (#Box value) => value
-const captured = fn () => do:
+const unbox = func (#Box value) => return value
+const captured = func () => return do:
   let constructor = #Floating
-  break fn value => read_floating (constructor value)
-entry const unsigned = fn (value: U32) => read_count (make_count value)
-entry const floating = fn (value: F32) => read_floating (make_floating value)
-entry const generic_unsigned = fn (value: U32) => unbox (box value)
-entry const generic_floating = fn (value: F32) => unbox (box value)
-entry const captured_floating = fn (value: F32) => (captured ()) value
+  break func value => return read_floating (constructor value)
+entry const unsigned = func (value: U32) => return read_count (make_count value)
+entry const floating = func (value: F32) => return read_floating (make_floating value)
+entry const generic_unsigned = func (value: U32) => return unbox (box value)
+entry const generic_floating = func (value: F32) => return unbox (box value)
+entry const captured_floating = func (value: F32) => return (captured ()) value
 entry const folded = read_floating (#Floating 42.5)
 `;
 
@@ -54,13 +54,13 @@ Deno.test("opaque reference storage keeps representation aliases and projections
     `
 opaque type Box a = { value: a }
 opaque type Wrapped a = Array a
-const make = fn value => #Box { value: value }
-const read = fn (#Box value) => value.value
-const field = fn value => value.value
+const make = func value => return #Box { value: value }
+const read = func (#Box value) => return value.value
+const field = func value => return value.value
 const wrap = #Wrapped
-const unwrap = fn (#Wrapped value) => value
-entry const answer = fn (value: U32) => @u32.add (read (make value)) (field (make 2))
-entry const shared = fn (value: U32) => do:
+const unwrap = func (#Wrapped value) => return value
+entry const answer = func (value: U32) => return @u32.add (read (make value)) (field (make 2))
+entry const shared = func (value: U32) => return do:
   let original = #[value, 2]
   let copied = unwrap (wrap original)
   break @u32.add (@array.get original 0) (@array.get copied 1)
@@ -78,9 +78,9 @@ Deno.test("opaque callback captures preserve effects and scalar wrapping adds no
   await compileAndRun(
     `
 opaque type Token = U32
-const make: U32 -> Token = fn value => #Token value
-const read: Token -> U32 = fn (#Token value) => value
-private entry const run = fn (value: U32) => read (make value)
+const make: U32 -> Token = func value => return #Token value
+const read: Token -> U32 = func (#Token value) => return value
+private entry const run = func (value: U32) => return read (make value)
 `,
     (guest, bytes) => {
       equal(guest.call("run", 42), 42);
@@ -98,9 +98,9 @@ private entry const run = fn (value: U32) => read (make value)
     `
 opaque type Callback a = a
 const wrap = #Callback
-const unwrap = fn (#Callback value) => value
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
-  let saved = wrap (fn value => host value)
+const unwrap = func (#Callback value) => return value
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
+  let saved = wrap (func value => return host value)
   use result <- (unwrap saved) 41
   break @u32.add result 1
 `,
@@ -126,14 +126,14 @@ Deno.test("opaque structured generic parameters and staged aggregate words prese
 opaque type First [left, right] = left
 opaque type Second {left, right} = right
 const first: F32 -> First [F32,U32] = #First
-const read_first = fn (#First value) => value
+const read_first = func (#First value) => return value
 const second: F32 -> Second {left:U32,right:F32} = #Second
-const read_second = fn (#Second value) => value
+const read_second = func (#Second value) => return value
 opaque type Float = F32
 const floats = #[#Float 40.0, #Float 2.5]
-const read = fn (#Float value) => value
-entry const tuple = fn (value: F32) => read_first (first value)
-entry const record = fn (value: F32) => read_second (second value)
+const read = func (#Float value) => return value
+entry const tuple = func (value: F32) => return read_first (first value)
+entry const record = func (value: F32) => return read_second (second value)
 entry const folded = @f32.add (read (@array.get floats 0)) (read (@array.get floats 1))
 `,
     (guest) => {

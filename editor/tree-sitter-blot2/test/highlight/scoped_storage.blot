@@ -1,0 +1,10 @@
+const read = func (value: &U32) => return @storage.load value
+//                        ^ operator
+const follow = func (value: ^U32) => return @storage.load value
+//                          ^ operator
+const values: GrowArray U32 = #[42]
+//            ^ type
+const first = &values[0]
+//            ^ operator
+const link = ^values[0]
+//           ^ operator

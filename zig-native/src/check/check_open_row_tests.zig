@@ -11,19 +11,19 @@ const a = std.testing.allocator;
 const source =
     \\effect Read: Unit -> U32
     \\type State a is effect = { get: Unit -> a }
-    \\const invoke: (Unit -> a ! {| e}) -> a ! {| e} = fn callback => callback ()
-    \\const pair: (Unit -> U32 ! {| e}) -> (Unit -> U32 ! {| e}) -> U32 = fn left => fn right => 42
-    \\const integer = fn (callback: Unit -> U32 ! {| e}) => callback ()
-    \\const floating = fn (callback: Unit -> F32 ! {| e}) => callback ()
-    \\const prefixed = fn (callback: Unit -> U32 ! {State.get U32, Read, Read | e}) => callback ()
-    \\const local = fn () => do:
-    \\  let first = fn (callback: Unit -> U32 ! {| e}) => callback ()
-    \\  let second = fn (value: e) => value
-    \\  break second (first (fn () => 42))
-    \\const inherited = fn () => do:
-    \\  let shared = fn (callback: Unit -> U32 ! {| e}) => callback ()
-    \\  break fn (callback: Unit -> U32 ! {| e}) => shared callback
-    \\entry const answer = fn () => invoke (fn () => local ())
+    \\const invoke: (Unit -> a ! {| e}) -> a ! {| e} = func callback => return callback ()
+    \\const pair: (Unit -> U32 ! {| e}) -> (Unit -> U32 ! {| e}) -> U32 = func left => return func right => return 42
+    \\const integer = func (callback: Unit -> U32 ! {| e}) => return callback ()
+    \\const floating = func (callback: Unit -> F32 ! {| e}) => return callback ()
+    \\const prefixed = func (callback: Unit -> U32 ! {State.get U32, Read, Read | e}) => return callback ()
+    \\const local = func () => return do:
+    \\  let first = func (callback: Unit -> U32 ! {| e}) => return callback ()
+    \\  let second = func (value: e) => return value
+    \\  break second (first (func () => return 42))
+    \\const inherited = func () => return do:
+    \\  let shared = func (callback: Unit -> U32 ! {| e}) => return callback ()
+    \\  break func (callback: Unit -> U32 ! {| e}) => return shared callback
+    \\entry const answer = func () => return invoke (func () => return local ())
 ;
 
 fn named(checked: *const check.Checked, pool: *const symbols.Pool, name: []const u8) check.Binding {
@@ -95,15 +95,15 @@ test "written open rows preserve shared tails concrete prefixes and binding scop
 
 fn rejectedRows(allocator: std.mem.Allocator) !void {
     const cases = [_]struct { source: []const u8, code: check.Code, marker: []const u8 }{
-        .{ .source = "const bad: e -> U32 ! {| e} = fn value => 1\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e}" },
-        .{ .source = "const bad = fn (callback: Unit -> U32 ! {| e}) => fn (value: e) => 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e) => 42" },
-        .{ .source = "const bad = fn (value: e) => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
-        .{ .source = "const bad = fn (callback: Unit -> U32 ! {| e}) => do:\n  let identity = fn (value: e) => value\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
-        .{ .source = "const outer = fn () => do:\n  let invoke = fn (callback: Unit -> U32 ! {| e}) => callback ()\n  break fn (value: e) => value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
-        .{ .source = "const outer = fn () => do:\n  let identity = fn (value: e) => value\n  break fn (callback: Unit -> U32 ! {| e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
-        .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = fn (callback: Unit -> U32 ! {State.get e | e}) => callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e | e" },
+        .{ .source = "const bad: e -> U32 ! {| e} = func value => return 1\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e}" },
+        .{ .source = "const bad = func (callback: Unit -> U32 ! {| e}) => return func (value: e) => return 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e) => return 42" },
+        .{ .source = "const bad = func (value: e) => return do:\n  let invoke = func (callback: Unit -> U32 ! {| e}) => return callback ()\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
+        .{ .source = "const bad = func (callback: Unit -> U32 ! {| e}) => return do:\n  let identity = func (value: e) => return value\n  break 42\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
+        .{ .source = "const outer = func () => return do:\n  let invoke = func (callback: Unit -> U32 ! {| e}) => return callback ()\n  break func (value: e) => return value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
+        .{ .source = "const outer = func () => return do:\n  let identity = func (value: e) => return value\n  break func (callback: Unit -> U32 ! {| e}) => return callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
+        .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = func (callback: Unit -> U32 ! {State.get e | e}) => return callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e | e" },
         .{ .source = "type Box is data = #Box { callback: Unit -> U32 ! {| e} }\nentry const answer = 42\n", .code = .invalid_effect_annotation, .marker = "e}" },
-        .{ .source = "const pure = fn (callback: Unit -> U32) => callback ()\nconst bad = fn (callback: Unit -> U32 ! {Foreign | e}) => pure callback\nentry const answer = 42\n", .code = .effect_mismatch, .marker = "pure callback" },
+        .{ .source = "const pure = func (callback: Unit -> U32) => return callback ()\nconst bad = func (callback: Unit -> U32 ! {Foreign | e}) => return pure callback\nentry const answer = 42\n", .code = .effect_mismatch, .marker = "pure callback" },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(allocator, item.source);
@@ -128,7 +128,7 @@ test "written open rows reject type-row collisions and pure callbacks" {
 
 fn rejectedTailNames(allocator: std.mem.Allocator) !void {
     for ([_][]const u8{ "U32", "Token", "Bool" }) |name| {
-        const text = try allocator.print("const invoke = fn (callback: Unit -> U32 ! {{| {s}}}) => callback ()\n", .{name});
+        const text = try allocator.print("const invoke = func (callback: Unit -> U32 ! {{| {s}}}) => return callback ()\n", .{name});
         defer allocator.free(text);
         var tokens = try lexer.lex(allocator, text);
         defer tokens.deinit(allocator);
@@ -183,17 +183,17 @@ fn importedRows(allocator: std.mem.Allocator, loaded: *project.Project) !void {
 test "written row quantifiers survive source imports and independent caller instances" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "library.blot", .data = "const invoke: (Unit -> a ! {| e}) -> a ! {| e} = fn callback => callback ()\n" });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "library.blot", .data = "const invoke: (Unit -> a ! {| e}) -> a ! {| e} = func callback => return callback ()\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data =
         \\import { invoke } from "./library"
         \\effect Read: Unit -> U32
         \\effect Measure: Unit -> F32
-        \\const reader = @effect.provider Read (fn () => 42)
-        \\const measure = @effect.provider Measure (fn () => 42.5)
-        \\entry const integer = fn () => do reader:
-        \\  break invoke (fn () => Read ())
-        \\entry const floating = fn () => do measure:
-        \\  break invoke (fn () => Measure ())
+        \\const reader = @effect.provider Read (func () => return 42)
+        \\const measure = @effect.provider Measure (func () => return 42.5)
+        \\entry const integer = func () => return do reader:
+        \\  break invoke (func () => return Read ())
+        \\entry const floating = func () => return do measure:
+        \\  break invoke (func () => return Measure ())
     });
     const path = try tmp.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);

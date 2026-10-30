@@ -1,9 +1,9 @@
-const complete = fn complete => complete
+const complete = func complete => return complete
 //    ^ function
-//                  ^ variable.parameter
-//                              ^ variable
+//                    ^ variable.parameter
+//                                       ^ variable
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
 //               ^ function.builtin
     case request of
@@ -18,7 +18,7 @@ const checked = fn computation => do:
 //             ^ variable.parameter
         break value
 
-const cancelled = fn computation => do:
+const cancelled = func computation => return do:
   for request in @requests computation:
     case request of
       effect (Reader.ask U32) () =>

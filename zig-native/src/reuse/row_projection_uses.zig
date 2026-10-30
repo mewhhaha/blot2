@@ -228,7 +228,7 @@ const Proof = struct {
                 }
                 return true;
             },
-            .block, .suite, .product, .record, .array, .array_op, .break_ => {
+            .block, .suite, .product, .record, .array, .array_op, .storage, .break_ => {
                 for (self.source.children(id)) |child| if (!self.visit(child, depth + 1)) return false;
                 return true;
             },

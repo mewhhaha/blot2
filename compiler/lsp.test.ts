@@ -129,33 +129,36 @@ async function setup(compiler = executable) {
 Deno.test("LSP completes unsaved UTF-16 buffers and imports without an entry and ignores old changes", async () => {
   const item = await setup();
   try {
-    const text = "// 雪😀\r\nconst work = fn (value: U32) -> U32 => va";
+    const text = "// 雪😀\r\nconst work = func (value: U32) : U32 => return va";
     await item.open(text, 10);
-    await item.complete(1, 41);
+    await item.complete(1, 47);
     let rows = await item.output.messages();
     ok(rows[0].result, JSON.stringify(rows));
     equal(rows[0].result.items[0].textEdit, {
       range: {
-        start: { line: 1, character: 39 },
-        end: { line: 1, character: 41 },
+        start: { line: 1, character: 45 },
+        end: { line: 1, character: 47 },
       },
       newText: "value",
     });
     await item.change("invalid", 9);
-    await item.complete(1, 41, 3);
+    await item.complete(1, 47, 3);
     rows = await item.output.messages();
     equal(rows[0].result.items[0].label, "value");
-    await item.change("const work = fn (value: U32) -> U32 => @hole", 11);
-    await item.complete(0, 44, 7);
+    await item.change(
+      "const work = func (value: U32) : U32 => return @hole",
+      11,
+    );
+    await item.complete(0, 50, 7);
     rows = await item.output.messages();
     equal(rows[0].result.items[0].textEdit.newText, "value");
     equal(rows[0].result.items[0].filterText, "holevalue");
     const library = pathToFileURL(item.directory + "/library.blot").href;
     await item.open("const visible = 1.0\n", 1, library);
     const imported =
-      'import {visible as renamed} from "./library"\nconst work = fn () -> F32 => ren';
+      'import {visible as renamed} from "./library"\nconst work = func () : F32 => return ren';
     await item.change(imported, 12);
-    await item.complete(1, 32, 4);
+    await item.complete(1, 38, 4);
     rows = await item.output.messages();
     ok(rows[0].result, JSON.stringify(rows));
     equal(
@@ -167,7 +170,7 @@ Deno.test("LSP completes unsaved UTF-16 buffers and imports without an entry and
     await item.send("textDocument/didClose", {
       textDocument: { uri: library },
     });
-    await item.complete(1, 32, 5);
+    await item.complete(1, 38, 5);
     rows = await item.output.messages();
     ok(rows[0].result, JSON.stringify(rows));
     equal(rows[0].result.items, []);

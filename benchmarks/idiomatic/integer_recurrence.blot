@@ -1,4 +1,4 @@
-entry const run = fn (seed: U32) -> U32 => do:
+entry const run = func (seed: U32) : U32 => return do:
   let state = seed
   let total = 0
   for ignored in 0..65536:

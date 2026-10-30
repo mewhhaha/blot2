@@ -13,28 +13,28 @@ for (const consumerQuote of [false, true]) {
     const executable = Deno.args[0] ??
       new URL("../zig-out-dev/bin/blotc", import.meta.url).pathname;
     let source = `import {generated} from "./producer"
-entry const answer = fn () => @code.emit generated
+entry const answer = func () => return @code.emit generated
 `;
     if (consumerQuote) {
       source = `import {Token, make, read} from "./producer"
 const generated = @code.quote (read (make ()))
-entry const answer = fn () => @code.emit generated
+entry const answer = func () => return @code.emit generated
 `;
     }
     const library = (value: number) => {
       if (consumerQuote) {
         return `opaque type Token = U32
-const make = fn () => #Token ${value}
-const read = fn (value: Token) => case value of
+const make = func () => return #Token ${value}
+const read = func (value: Token) => return case value of
   #Token number => number
 `;
       }
       return `private data Packet a = #Packet {payload: a}
 opaque type Token = U32
-private const make = fn value => #Packet {payload: #Token value}
-private const token = fn (value: Token) => case value of
+private const make = func value => return #Packet {payload: #Token value}
+private const token = func (value: Token) => return case value of
   #Token number => number
-private const read = fn () => token (make ${value}).payload
+private const read = func () => return token (make ${value}).payload
 const generated = @code.quote (read ())
 `;
     };

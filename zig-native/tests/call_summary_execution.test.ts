@@ -24,32 +24,32 @@ Deno.test("source solved structural graphs preserve imported instances through c
     const lines = [
       "type Box a is data = #Box {left: a, keep: a}",
       "type Seed is data = #Seed",
-      "const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box {left: value, keep: value}",
+      "const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box {left: value, keep: value}",
       "type Tick is effect = Unit -> Unit",
       "type Signal a is effect = { get: Unit -> a }",
-      "const read_seven: Unit -> U32 = fn () => @u32.add 0 7",
+      "const read_seven: Unit -> U32 = func () => return @u32.add 0 7",
       invalid === "row"
-        ? "const Box.read: Box a -> a ! {Tick} = fn box => do:\n  use Tick ()\n  break box.left"
+        ? "const Box.read: Box a -> a ! {Tick} = func box => return do:\n  use Tick ()\n  break box.left"
         : `const Box.read: Box a -> a${
           invalid === "header" ? ' where { associated "missing" a a a }' : ""
-        } = fn box => box.${changed ? "keep" : "left"}`,
+        } = func box => return box.${changed ? "keep" : "left"}`,
       "type Count is data = #Count U32",
       "type Other is data = #Other U32",
-      `const project_0 = fn value => {left: value, right: value}.${
+      `const project_0 = func value => return {left: value, right: value}.${
         invalid === "field" ? "missing" : "left"
       }`,
-      "const merge_0 = fn value => (@record.merge {left: value} {right: value}).left",
-      "const update_0 = fn value => do:",
+      "const merge_0 = func value => return (@record.merge {left: value} {right: value}).left",
+      "const update_0 = func value => return do:",
       "  let record = {left: 0, keep: value}",
       "  record.left := value",
       "  break record.left",
-      "const nominal_0 = fn value => (#Box {left: value, keep: value}).left",
-      "const member_0 = fn value => (#Box {left: value, keep: value}).read",
-      'const revealed_seed = fn value => @type.call "build" value #Seed',
-      "const revealed_0 = fn value => (revealed_seed value).read",
-      'const known_0 = fn value => @type.call "add" value (@u32.add 0 1)',
-      "const handler_0: a -> a = fn value => do (@effect.provider (Signal.get U32) read_seven):\n  use ignored <- (Signal.get U32) ()\n  break value",
-      `const compare_0 = fn ignored => @type.same #Count #${
+      "const nominal_0 = func value => return (#Box {left: value, keep: value}).left",
+      "const member_0 = func value => return (#Box {left: value, keep: value}).read",
+      'const revealed_seed = func value => return @type.call "build" value #Seed',
+      "const revealed_0 = func value => return (revealed_seed value).read",
+      'const known_0 = func value => return @type.call "add" value (@u32.add 0 1)',
+      "const handler_0: a -> a = func value => return do (@effect.provider (Signal.get U32) read_seven):\n  use ignored <- (Signal.get U32) ()\n  break value",
+      `const compare_0 = func ignored => return @type.same #Count #${
         changed ? "Count" : "Other"
       }`,
     ];
@@ -68,7 +68,7 @@ Deno.test("source solved structural graphs preserve imported instances through c
     ) {
       for (let i = 1; i <= 12; i++) {
         lines.push(
-          `const ${kind}_${i} = fn value => do:`,
+          `const ${kind}_${i} = func value => return do:`,
           `  ${
             (kind === "member" || kind === "revealed") && invalid === "row"
               ? "use ignored <-"
@@ -99,13 +99,13 @@ Deno.test("source solved structural graphs preserve imported instances through c
           kind === "member" || kind === "revealed"
             ? `: ${type} -> ${type} ! {}`
             : ""
-        } = fn (value: ${type}) -> ${type} => library.${kind}_factory value`,
+        } = func (value: ${type}) : ${type} => return library.${kind}_factory value`,
       );
     }
   }
   program.push(
-    "entry const compare = fn (value: U32) -> Bool => library.compare_factory value",
-    "entry const known = fn (value: U32) -> U32 => library.known_factory value",
+    "entry const compare = func (value: U32) : Bool => return library.compare_factory value",
+    "entry const known = func (value: U32) : U32 => return library.known_factory value",
   );
   const options = { executable, entry, prelude };
   try {
@@ -229,11 +229,11 @@ Deno.test("source solved structural graphs preserve imported instances through c
 Deno.test("source closed State witness diamonds retain unrelated argument instances", async () => {
   const lines = [
     "type Cell a is data = #Cell a",
-    "const f_0 = fn ignored => @state.get (#Cell 0)",
+    "const f_0 = func ignored => return @state.get (#Cell 0)",
   ];
   for (let i = 1; i <= 12; i++) {
     lines.push(
-      `const f_${i} = fn witness => do:`,
+      `const f_${i} = func witness => return do:`,
       `  use ignored <- f_${i - 1} witness`,
       `  break f_${i - 1} witness`,
     );
@@ -241,11 +241,11 @@ Deno.test("source closed State witness diamonds retain unrelated argument instan
   lines.push(
     "const factory = do:",
     "  break f_12",
-    "entry const integer = fn (value: U32) -> U32 => do:",
-    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory value)",
+    "entry const integer = func (value: U32) : U32 => return do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (func () => return factory value)",
     "  break result",
-    "entry const floating = fn (value: F32) -> U32 => do:",
-    "  let (_, #Cell result) = @state.run (#Cell 42) (fn () => factory value)",
+    "entry const floating = func (value: F32) : U32 => return do:",
+    "  let (_, #Cell result) = @state.run (#Cell 42) (func () => return factory value)",
     "  break result",
   );
   await compileAndRun(lines.join("\n") + "\n", (guest) => {
@@ -261,11 +261,11 @@ Deno.test("source closed State witness diamonds retain unrelated argument instan
 Deno.test("source parametric State witness heads preserve independent nominal arguments", async () => {
   const lines = [
     "type Cell a is data = #Cell a",
-    "const f_0 = fn (witness: Cell a) -> Cell a => @state.get witness",
+    "const f_0 = func (witness: Cell a) : Cell a => return @state.get witness",
   ];
   for (let i = 1; i <= 12; i++) {
     lines.push(
-      `const f_${i} = fn witness => do:`,
+      `const f_${i} = func witness => return do:`,
       `  use ignored <- f_${i - 1} witness`,
       `  break f_${i - 1} witness`,
     );
@@ -273,11 +273,11 @@ Deno.test("source parametric State witness heads preserve independent nominal ar
   lines.push(
     "const factory = do:",
     "  break f_12",
-    "entry const integer = fn (value: U32) -> U32 => do:",
-    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0))",
+    "entry const integer = func (value: U32) : U32 => return do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (func () => return factory (#Cell 0))",
     "  break result",
-    "entry const floating = fn (value: F32) -> F32 => do:",
-    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0.0))",
+    "entry const floating = func (value: F32) : F32 => return do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (func () => return factory (#Cell 0.0))",
     "  break result",
   );
   await compileAndRun(lines.join("\n") + "\n", (guest) => {
@@ -298,19 +298,19 @@ Deno.test("witness principal graphs preserve imported nominal state heads and co
   const source = (invalid: "head" | "comparison" | false) => {
     const lines = [
       "type Cell a is data = #Cell a",
-      `const head_0 = fn (witness: w) -> Cell a => @state.get ${
+      `const head_0 = func (witness: w) : Cell a => return @state.get ${
         invalid === "head" ? "0" : "witness"
       }`,
-      `const same_0 = fn left => fn right => @type.same ${
+      `const same_0 = func left => return func right => return @type.same ${
         invalid === "comparison" ? '(@panic "uncalled witness")' : "left"
       } right`,
     ];
     for (let i = 1; i <= 12; i++) {
       lines.push(
-        `const head_${i} = fn witness => do:`,
+        `const head_${i} = func witness => return do:`,
         `  use ignored <- head_${i - 1} witness`,
         `  break head_${i - 1} witness`,
-        `const same_${i} = fn left => fn right => do:`,
+        `const same_${i} = func left => return func right => return do:`,
         `  let ignored = same_${i - 1} left right`,
         `  break same_${i - 1} left right`,
       );
@@ -323,17 +323,17 @@ Deno.test("witness principal graphs preserve imported nominal state heads and co
     await Deno.writeTextFile(
       entry,
       `import * as library from "./library"
-entry const integer = fn (value: U32) -> U32 => do:
-  let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0))
+entry const integer = func (value: U32) : U32 => return do:
+  let (_, #library.Cell result) = @state.run (#library.Cell value) (func () => return library.head_12 (#library.Cell 0))
   break result
-entry const floating = fn (value: F32) -> F32 => do:
-  let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0.0))
+entry const floating = func (value: F32) : F32 => return do:
+  let (_, #library.Cell result) = @state.run (#library.Cell value) (func () => return library.head_12 (#library.Cell 0.0))
   break result
-entry const same_integer = fn (value: U32) -> Bool => library.same_12 value 1
-entry const same_floating = fn (value: F32) -> Bool => library.same_12 value 1.0
-entry const different = fn (value: U32) -> Bool => library.same_12 value 1.0
-entry const same_nominal = fn (value: U32) -> Bool => library.same_12 (#library.Cell value) (#library.Cell 1)
-entry const different_nominal = fn (value: U32) -> Bool => library.same_12 (#library.Cell value) (#library.Cell 1.0)
+entry const same_integer = func (value: U32) : Bool => return library.same_12 value 1
+entry const same_floating = func (value: F32) : Bool => return library.same_12 value 1.0
+entry const different = func (value: U32) : Bool => return library.same_12 value 1.0
+entry const same_nominal = func (value: U32) : Bool => return library.same_12 (#library.Cell value) (#library.Cell 1)
+entry const different_nominal = func (value: U32) : Bool => return library.same_12 (#library.Cell value) (#library.Cell 1.0)
 `,
     );
     const packed = await new Deno.Command(executable, {
@@ -435,22 +435,22 @@ Deno.test("structured residual graphs preserve imported array record nominal and
     const lines = [
       "type Box a is data = #Box a",
       "type Signal a is effect = { get: Unit -> a }",
-      `const array_0 = fn value => #[value.${member}]`,
-      `const record_0 = fn value => {result: value.${member}}`,
-      `const nominal_0 = fn value => #Box value.${member}`,
-      "const representation_0: Box a -> Box a where { type_rep (Box a) } = fn value => value",
-      "const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()",
+      `const array_0 = func value => return #[value.${member}]`,
+      `const record_0 = func value => return {result: value.${member}}`,
+      `const nominal_0 = func value => return #Box value.${member}`,
+      "const representation_0: Box a -> Box a where { type_rep (Box a) } = func value => return value",
+      "const operation_0: a -> a ! {| e} where { operation Signal.get a } = func token => return Signal.get a ()",
     ];
     for (let i = 1; i <= 8; i++) {
       for (const shape of ["array", "record", "nominal"]) {
         lines.push(
-          `const ${shape}_${i} = fn value => do:`,
+          `const ${shape}_${i} = func value => return do:`,
           `  let ignored = ${shape}_${i - 1} value`,
           `  break ${shape}_${i - 1} value`,
         );
       }
       lines.push(
-        `const operation_${i} = fn token => do:`,
+        `const operation_${i} = func token => return do:`,
         `  use result <- operation_${i - 1} token`,
         repeatedOperation
           ? `  break operation_${i - 1} token`
@@ -459,7 +459,7 @@ Deno.test("structured residual graphs preserve imported array record nominal and
     }
     for (let i = 1; i <= 12; i++) {
       lines.push(
-        `const representation_${i} = fn value => representation_${
+        `const representation_${i} = func value => return representation_${
           i - 1
         } (representation_${i - 1} value)`,
       );
@@ -479,21 +479,21 @@ Deno.test("structured residual graphs preserve imported array record nominal and
     await Deno.writeTextFile(
       entry,
       `import * as library from "./library"
-entry const integer = fn (value: U32) -> U32 => do:
+entry const integer = func (value: U32) : U32 => return do:
   let array = library.array_factory {first: value}
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
   let #library.Box represented = library.representation_factory (#library.Box result)
   break represented
-entry const floating = fn (value: F32) -> F32 => do:
+entry const floating = func (value: F32) : F32 => return do:
   let array = library.array_factory {first: value}
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
   let #library.Box represented = library.representation_factory (#library.Box result)
   break represented
-entry const requested = fn (value: U32) -> U32 => do (@effect.provider (library.Signal.get U32) (fn () => value)):
+entry const requested = func (value: U32) : U32 => return do (@effect.provider (library.Signal.get U32) (func () => return value)):
   break library.operation_factory value
-entry const floating_requested = fn (value: F32) -> F32 => do (@effect.provider (library.Signal.get F32) (fn () => value)):
+entry const floating_requested = func (value: F32) : F32 => return do (@effect.provider (library.Signal.get F32) (func () => return value)):
   break library.operation_factory value
 `,
     );
@@ -585,18 +585,18 @@ Deno.test("result principal graphs preserve deep nominal instances through impor
   const source = (double: boolean, invalid: boolean) => {
     const lines = [
       "type Box a is data = #Box a",
-      "const Box.from = fn (box: Box a) -> Box a => case box of",
+      "const Box.from = func (box: Box a) : Box a => return case box of",
       `  #Box value => #Box (${
         invalid
-          ? "value + #True"
+          ? "value + true"
           : double
           ? '@type.call "add" value value'
           : "value"
       })`,
-      'const f_0 = fn value => @type.result "from" value',
+      'const f_0 = func value => return @type.result "from" value',
     ];
     for (let i = 1; i <= 8; i++) {
-      lines.push(`const f_${i} = fn value => f_${i - 1} (f_${i - 1} value)`);
+      lines.push(`const f_${i} = func value => return f_${i - 1} (f_${i - 1} value)`);
     }
     lines.push("const factory = do:", "  break f_8");
     return lines.join("\n") + "\n";
@@ -607,10 +607,10 @@ Deno.test("result principal graphs preserve deep nominal instances through impor
     await Deno.writeTextFile(
       entry,
       `import * as library from "./library"
-entry const integer = fn (value: U32) -> U32 => do:
+entry const integer = func (value: U32) : U32 => return do:
   let #library.Box result: library.Box U32 = library.factory (#library.Box value)
   break result
-entry const floating = fn (value: F32) -> F32 => do:
+entry const floating = func (value: F32) : F32 => return do:
   let #library.Box result: library.Box F32 = library.factory (#library.Box value)
   break result
 `,
@@ -691,23 +691,23 @@ Deno.test("inferred graph edges preserve result witnesses through diamonds, impo
   const library = `${directory}/library.blot`;
   const source = (double: boolean, invalid: boolean) => {
     const lines = [
-      `const f_0 = fn value => ${
+      `const f_0 = func value => return ${
         invalid
-          ? "value + #True"
+          ? "value + true"
           : double
           ? '@type.call "add" value value'
           : "value"
       }`,
     ];
     for (let i = 1; i <= 4; i++) {
-      lines.push(`const f_${i} = fn value => f_${i - 1} (f_${i - 1} value)`);
+      lines.push(`const f_${i} = func value => return f_${i - 1} (f_${i - 1} value)`);
     }
     return lines.join("\n") + `
-const first = fn value => value.first
+const first = func value => return value.first
 type Box a is data = #Box a
 const factory = do:
   break f_4
-const Box.from = fn value => #Box (factory value)
+const Box.from = func value => return #Box (factory value)
 `;
   };
   const options = { executable, entry, prelude };
@@ -717,11 +717,11 @@ const Box.from = fn value => #Box (factory value)
       entry,
       `
 import * as library from "./library"
-const from = fn value => @type.result "from" value
-entry const integer = fn (value: U32) => do:
+const from = func value => return @type.result "from" value
+entry const integer = func (value: U32) => return do:
   let #library.Box result: library.Box U32 = from (library.first ({first: value}))
   break result
-entry const floating = fn (value: F32) => do:
+entry const floating = func (value: F32) => return do:
   let #library.Box result: library.Box F32 = from (library.first ({first: value}))
   break result
 `,
@@ -788,13 +788,13 @@ for (const asynchronous of [false, true]) {
     await compileAndRun(
       `
 effect Read: Unit -> U32
-const apply = fn callback => fn value => callback value
-const compose = fn outer => fn inner => fn value => outer (inner value)
-const plus = fn amount => fn value => @u32.add amount value
-const reading = fn () => apply (fn () => Read ()) ()
-entry const integer = fn (value: U32) => apply (compose (plus 2) (plus 3)) value
-entry const floating = fn (value: F32) => apply (fn item => @f32.add item 0.5) value
-entry const answer = fn (value: U32) => do @effect.provider Read (fn () => value):
+const apply = func callback => return func value => return callback value
+const compose = func outer => return func inner => return func value => return outer (inner value)
+const plus = func amount => return func value => return @u32.add amount value
+const reading = func () => return apply (func () => return Read ()) ()
+entry const integer = func (value: U32) => return apply (compose (plus 2) (plus 3)) value
+entry const floating = func (value: F32) => return apply (func item => return @f32.add item 0.5) value
+entry const answer = func (value: U32) => return do @effect.provider Read (func () => return value):
   use result <- reading ()
   break @u32.add result 5
 `,
@@ -814,7 +814,7 @@ entry const answer = fn (value: U32) => do @effect.provider Read (fn () => value
 function chain(leaf: string, depth: number): string {
   const lines = [leaf];
   for (let i = 1; i <= depth; i++) {
-    lines.push(`const f_${i} = fn value => f_${i - 1} value`);
+    lines.push(`const f_${i} = func value => return f_${i - 1} value`);
   }
   return lines.join("\n") + "\n";
 }
@@ -825,17 +825,17 @@ Deno.test("failed summary jobs retain leaf diagnostics beyond the former depth l
   try {
     for (
       const leaf of [
-        "const f_0 = fn value => value + value",
-        "const f_0 = fn value => @u32.add value #True",
+        "const f_0 = func value => return value + value",
+        "const f_0 = func value => return @u32.add value true",
       ]
     ) {
       const diagnostics = [];
       for (const depth of [0, 300]) {
-        let argument = "#True";
+        let argument = "true";
         if (leaf.includes("@u32")) argument = "0";
         const use = `f_${depth} ${argument}`;
         const source = chain(leaf, depth) +
-          `entry const answer = fn () => ${use}\n`;
+          `entry const answer = func () => return ${use}\n`;
         await Deno.writeTextFile(
           input,
           source,
@@ -891,15 +891,15 @@ Deno.test("summary jobs survive dependencies checkpoints edits and failed revisi
   const library = `${directory}/library.blot`;
   const bundle = `${directory}/library.blotdep`;
   const source = (value: string) =>
-    chain(`const f_0 = fn value => @u32.add value ${value}`, 300) +
-    "const apply = fn callback => fn value => callback value\n" +
-    "const callback = fn value => apply f_300 value\n";
+    chain(`const f_0 = func value => return @u32.add value ${value}`, 300) +
+    "const apply = func callback => return func value => return callback value\n" +
+    "const callback = func value => return apply f_300 value\n";
   const options = { executable, entry, prelude: null };
   try {
     await Deno.writeTextFile(library, source("1"));
     await Deno.writeTextFile(
       entry,
-      'import { callback } from "./library"\nentry const answer = fn (value: U32) => callback value\n',
+      'import { callback } from "./library"\nentry const answer = func (value: U32) => return callback value\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],
@@ -928,7 +928,7 @@ Deno.test("summary jobs survive dependencies checkpoints edits and failed revisi
       assert(restored.success, JSON.stringify(restored));
       assert(restored.stats.cachedModules > 0);
       assert.deepEqual(restored.bytes, expected);
-      for (const value of ["2", "#True", "1"]) {
+      for (const value of ["2", "true", "1"]) {
         const sources = { [library]: source(value) };
         const current = await retained.build({ sources });
         const fresh = await createZigProjectCompiler(options);
@@ -969,19 +969,19 @@ Deno.test("written predicate summaries preserve independent witnesses through im
   const bundle = `${directory}/library.blotdep`;
   const source = (double: boolean) =>
     chain(
-      'const f_0: a -> a where { associated "add" a a a } = fn value => ' +
+      'const f_0: a -> a where { associated "add" a a a } = func value => return ' +
         (double ? '@type.call "add" value value' : "value"),
       128,
     ) +
-    'const first: a -> b where { field "first" a b } = fn value => value.first\n' +
+    'const first: a -> b where { field "first" a b } = func value => return value.first\n' +
     `type Box a is data = #Box a
-const Box.read: Box a -> b where { field "first" a b } = fn box => case box of
+const Box.read: Box a -> b where { field "first" a b } = func box => return case box of
   #Box value => first value
-const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => case box of
+const Box.twice: Box a -> Box a where { associated "add" a a a } = func box => return case box of
   #Box value => #Box (f_128 value)
-const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = fn left => fn right => case left, right of
+const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = func left => return func right => return case left, right of
   #Box value, #Box other => #Box (f_128 value)
-const Box.from: a -> Box a where { associated "add" a a a } = fn value => #Box (f_128 value)
+const Box.from: a -> Box a where { associated "add" a a a } = func value => return #Box (f_128 value)
 const integer_factory: U32 -> U32 = do:
   break f_128
 const floating_factory: F32 -> F32 = do:
@@ -989,20 +989,20 @@ const floating_factory: F32 -> F32 = do:
 `;
   const program = (invalid: boolean) =>
     'import * as library from "./library"\n' +
-    'const add = fn left => fn right => @type.call "add" left right\n' +
-    'const from = fn value => @type.result "from" value\n' +
-    `entry const integer = fn (value: U32) => case (#library.Box ((#library.Box (${
-      invalid ? "#True" : "{first: value}"
+    'const add = func left => return func right => return @type.call "add" left right\n' +
+    'const from = func value => return @type.result "from" value\n' +
+    `entry const integer = func (value: U32) => return case (#library.Box ((#library.Box (${
+      invalid ? "true" : "{first: value}"
     })).read)).twice of\n  #library.Box result => result\n` +
-    `entry const floating = fn (value: F32) => case (#library.Box ((#library.Box ({first: value})).read)).twice of
+    `entry const floating = func (value: F32) => return case (#library.Box ((#library.Box ({first: value})).read)).twice of
   #library.Box result => result
-entry const associated = fn (value: U32) => case add (#library.Box value) (#library.Box value) of
+entry const associated = func (value: U32) => return case add (#library.Box value) (#library.Box value) of
   #library.Box result => result
-entry const constructed = fn (value: F32) => do:
+entry const constructed = func (value: F32) => return do:
   let #library.Box result: library.Box F32 = from value
   break result
-entry const integer_factory = fn (value: U32) => library.integer_factory value
-entry const floating_factory = fn (value: F32) => library.floating_factory value
+entry const integer_factory = func (value: U32) => return library.integer_factory value
+entry const floating_factory = func (value: F32) => return library.floating_factory value
 `;
   const options = { executable, entry, prelude };
   try {

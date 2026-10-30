@@ -489,7 +489,7 @@ pub fn deriveInputFunctionWithFunctions(allocator: A, store: *terms.Store, tree:
 }
 
 fn shapeLaw(allocator: A) !void {
-    const text = "const pack = fn left => fn right => {young: fn () => left (), old: fn () => right ()}\n";
+    const text = "const pack = func left => return func right => return {young: func () => return left (), old: func () => return right ()}\n";
     var tokens = try @import("../parse/lexer.zig").lex(allocator, text);
     defer tokens.deinit(allocator);
     var pool: symbols.Pool = .{};

@@ -99,6 +99,13 @@ export type ZigProjectBuildResult =
     diagnostics: ZigProjectDiagnostic[];
     attemptStats: ZigProjectStats | null;
   };
+export interface StorageBudgets {
+  temporaryBytes?: number;
+  growerBytes?: number;
+  persistentBytes?: number;
+  transportBytes?: number;
+  ownerCapacity?: number;
+}
 export interface ZigProjectCompilerOptions {
   executable: string | URL;
   entry: string | URL;
@@ -114,6 +121,8 @@ export interface ZigProjectCompilerOptions {
   explainAllocations?: boolean;
   /** Development skips optional scalar/vector passes; checking and cleanup remain. */
   codegenTier?: "optimized" | "development";
+  /** Bounded data stacks; byte budgets are positive multiples of 16. */
+  storage?: Readonly<StorageBudgets>;
   /** Prototype: share identical internal machine bodies while keeping table slots. */
   shareMachineCode?: boolean;
   /** Instrument executed guest memory work; not for release timing. */
@@ -1140,6 +1149,7 @@ export async function createZigProjectCompiler(
     "explainDemands",
     "explainAllocations",
     "codegenTier",
+    "storage",
     "shareMachineCode",
     "profileMemory",
     "requireCollectorFree",
@@ -1161,6 +1171,32 @@ export async function createZigProjectCompiler(
     throw new TypeError("assets and nativeAssets cannot be used together");
   }
   const nativeAssets = captureNativeAssets(options.nativeAssets, entry);
+  let storage: StorageBudgets | undefined;
+  if (options.storage !== undefined) {
+    const input = record(options.storage, "storage budgets");
+    keys(input, [
+      "temporaryBytes",
+      "growerBytes",
+      "persistentBytes",
+      "transportBytes",
+      "ownerCapacity",
+    ], "storage");
+    storage = {};
+    for (const key of Object.keys(input) as (keyof StorageBudgets)[]) {
+      const value = input[key];
+      if (
+        typeof value !== "number" || !Number.isInteger(value) || value <= 0 ||
+        value > 0xffffffff || (key !== "ownerCapacity" && value % 16 !== 0)
+      ) {
+        throw new RangeError(
+          `storage.${key} must be a positive U32${
+            key === "ownerCapacity" ? "" : " multiple of 16"
+          }`,
+        );
+      }
+      storage[key] = value;
+    }
+  }
   if (
     options.checkpoint !== undefined &&
     !(options.checkpoint instanceof Uint8Array)
@@ -1260,6 +1296,7 @@ export async function createZigProjectCompiler(
     ...(options.explainDemands ? { explainDemands: true } : {}),
     ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
+    ...(storage ? { storage } : {}),
     ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
     ...(options.profileMemory ? { profileMemory: true } : {}),
     ...(options.requireCollectorFree ? { requireCollectorFree: true } : {}),

@@ -244,14 +244,14 @@ repeated `B/G` events are unobservable. Effect and failure events are observable
 and must stay exact.
 
 ```blot
-entry const triangle = fn count => do:
+entry const triangle = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     for y in 0..x:
       result := [...self, x * 10 + y]
   return @array.from_list result
 
-const selected = fn (values: Array U32) =>
+const selected = func (values: Array U32) => return
   #[square | x <- values, x > 1, let square = x * x, square < 10]
 const selected_at_compile_time = selected #[0, 1, 2, 3, 4]
 ```
@@ -274,24 +274,24 @@ same order and values with the existing List representation.
 These counterexamples must remain ordinary:
 
 ```blot
-entry const trapping_guard = fn (values: Array U32) =>
+entry const trapping_guard = func (values: Array U32) => return
   #[10 / x | x <- values, 1 / (x - 1) == 0]
 
-entry const trapping_bound = fn () => do:
+entry const trapping_bound = func () => return do:
   let result: List U32 = []
   for x in 0..2:
     for y in 0..(1 / (1 - x)):
       result := [...self, 10 / x]
   return @array.from_list result
 
-entry const effectful = fn (send: U32 -> U32 ! {Foreign}) => do:
+entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return do:
   let result: List U32 = []
   for x in 0..3:
     use value <- send x
     result := [...self, value]
   return @array.from_list result
 
-entry const observed = fn count => do:
+entry const observed = func count => return do:
   let result: List U32 = []
   for x in 0..count:
     result := [...self, result.length]

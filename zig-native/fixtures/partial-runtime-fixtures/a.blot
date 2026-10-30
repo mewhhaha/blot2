@@ -1,2 +1,2 @@
 effect Lib: Unit -> F32
-const reader = @effect.provider Lib (fn () => 20.0)
+const reader = @effect.provider Lib (func () => return 20.0)

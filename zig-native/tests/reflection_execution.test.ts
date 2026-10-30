@@ -9,14 +9,14 @@ Deno.test("effect reflection inspects checked rows without evaluating reflected 
     `
 effect Read: Unit -> U32
 effect Other: Unit -> U32
-const read: Unit -> U32 ! {Read,Read} = fn () => @panic "reflected function invoked"
-const count = fn (effects: EffectSet) => @effect.count effects
-const contains = fn effects => fn operation => @effect.has effects operation
-const same = fn (left: EffectDescriptor) => fn right => @effect.same left right
+const read: Unit -> U32 ! {Read,Read} = func () => return @panic "reflected function invoked"
+const count = func (effects: EffectSet) => return @effect.count effects
+const contains = func effects => return func operation => return @effect.has effects operation
+const same = func (left: EffectDescriptor) => return func right => return @effect.same left right
 const requirements = @effect.of read
 const reader = @effect.descriptor Read
-const make = fn extra => fn () => @u32.add (Read ()) extra
-const invoke = fn () => (make 2) ()
+const make = func extra => return func () => return @u32.add (Read ()) extra
+const invoke = func () => return (make 2) ()
 entry const total = count requirements
 entry const present = contains requirements reader
 entry const absent = contains requirements (@effect.descriptor Other)
@@ -25,7 +25,7 @@ entry const different = same reader (@effect.descriptor Other)
 entry const foreign = @effect.same (@effect.descriptor Foreign) (@effect.descriptor Foreign)
 entry const creation_effects = @effect.count (@effect.of make)
 entry const invocation_effects = @effect.count (@effect.of invoke)
-entry const run = fn () => total
+entry const run = func () => return total
 `,
     (guest) => {
       equal(guest.read("total"), 1);
@@ -47,7 +47,7 @@ Deno.test("effect descriptors preserve generic operation arguments and deduplica
   await compileAndRun(
     `
 type State a is effect = {get: Unit -> a,set: a -> Unit}
-const read = fn () => do:
+const read = func () => return do:
   use State.get U32 ()
   use State.get U32 ()
   break State.get F32 ()
@@ -68,29 +68,29 @@ entry const different = @effect.same (@effect.descriptor (State.get U32)) (@effe
 
 Deno.test("reflection rejects open rows, aliased function targets and runtime metadata", async () => {
   await compileExpectedFailure(
-    `const invoke = fn work => work ()
+    `const invoke = func work => return work ()
 const invalid = @effect.of invoke
 entry const answer = 42
 `,
     "open_effect_descriptor",
   );
   await compileExpectedFailure(
-    `const read = fn () => 42
+    `const read = func () => return 42
 const alias = read
 entry const count = @effect.count (@effect.of alias)
 `,
     "function_target",
   );
   await compileExpectedFailure(
-    `const read = fn () => 42
+    `const read = func () => return 42
 const requirements = @effect.of read
-const count = fn effects => @effect.count effects
-entry const run = fn () => count requirements
+const count = func effects => return @effect.count effects
+entry const run = func () => return count requirements
 `,
     "backend_const_only",
   );
   await compileExpectedFailure(
-    `const read = fn () => 42
+    `const read = func () => return 42
 entry const invalid = @effect.of read
 `,
     "entry_type",
@@ -98,26 +98,26 @@ entry const invalid = @effect.of read
 });
 
 Deno.test("opaque reflection metadata cannot become State or type identity through nested values", async () => {
-  const base = `const read = fn () => 42
+  const base = `const read = func () => return 42
 const requirements = @effect.of read
 `;
   await compileExpectedFailure(
     base + `entry const answer = do:
-  let (_, result) = @state.run #[requirements] (fn () => 42)
+  let (_, result) = @state.run #[requirements] (func () => return 42)
   break result
 `,
     "ambiguous_state",
   );
   await compileExpectedFailure(
     base + `entry const answer = do:
-  let (_, result) = @state.run (requirements,42) (fn () => 42)
+  let (_, result) = @state.run (requirements,42) (func () => return 42)
   break result
 `,
     "ambiguous_state",
   );
   await compileExpectedFailure(
     base +
-      `entry const answer = @state.reader requirements (fn () => requirements) (fn () => 42)
+      `entry const answer = @state.reader requirements (func () => return requirements) (func () => return 42)
 `,
     "ambiguous_state",
   );

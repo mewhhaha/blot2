@@ -21,17 +21,17 @@ The proposed effect declarations also use `PascalCase`.
 
 ## Functions and blocks
 
-Functions use `fn pattern => expression`. Bind them at the top level with
-`const name = fn pattern => expression` or
-`let name = fn pattern => expression`. Both forms bind ordinary function values
+Functions use `func pattern => return expression`. Bind them at the top level with
+`const name = func pattern => return expression` or
+`let name = func pattern => return expression`. Both forms bind ordinary function values
 and are public by default.
 
 ```blot
-const identity = fn value => value
-const add_pair = fn (left, right) => left + right
-const curried_add = fn left => fn right => left + right
+const identity = func value => return value
+const add_pair = func (left, right) => left + right
+const curried_add = func left => return func right => return left + right
 
-const increment = fn value => value + 1
+const increment = func value => return value + 1
 const add_ten = curried_add 10
 ```
 
@@ -41,7 +41,7 @@ another explicit function. Type annotations use `:`.
 Rank-one bindings can state their required implementation evidence after a
 complete annotation:
 `const twice: a -> a where { associated "add" a a a } =
-fn value => value + value`.
+func value => return value + value`.
 The same clause is available on a local `let` and constrains the final value
 after expression tags. The word `where` remains an ordinary identifier
 elsewhere. Inferred constraints and explicit clauses share the same semantic
@@ -53,14 +53,14 @@ implementation accepts concrete labels before an open row tail; symbolic generic
 effect labels need a later row-identity representation.
 
 ```blot
-const squared = fn (value: F32) -> F32 => value * value
+const squared = func (value: F32) : F32 => return value * value
 ```
 
 `do:` makes a statement suite into an expression. A function with statements is
-written with `=> do:`; there is no `fn pattern:` block-function form.
+written with `=> do:`; there is no `func pattern:` block-function form.
 
 ```blot
-const squared = fn (value: F32) => do:
+const squared = func (value: F32) => return do:
   let result = value * value
   break result
 
@@ -76,7 +76,7 @@ such as `if` and `for` do not implicitly introduce another `do` result boundary.
 
 Consequently, a statement-bodied function needs no trailing `break ()`. This is
 already implemented for plain blocks: a final expression statement is discarded,
-not implicitly returned. Expression-bodied `fn x => expression` still returns
+not implicitly returned. Expression-bodied `func x => return expression` still returns
 its expression. An explicit non-unit return on one path and unit fallthrough on
 another is a type error; no optional/union result is invented.
 
@@ -94,7 +94,7 @@ callback boundary and receives the same diagnostic.
 `use name <- expression` to bind the result of a possibly effectful computation:
 
 ```blot
-const move = fn () => do:
+const move = func () => return do:
   use velocity <- ecs.get #Velocity
   use position <- ecs.get #Position
   let next = advance (position, velocity)
@@ -134,7 +134,7 @@ around that expression are optional; named const values work the same way:
 ```blot
 const try = monad Maybe
 
-const chain_maybe = fn my_maybe => fn my_other_maybe => do:
+const chain_maybe = func my_maybe => return func my_other_maybe => return do:
   let smth = do try:
     use value <- my_maybe
     break $ my_other_maybe value
@@ -217,13 +217,13 @@ type-valued computation and partial type applications remain future work.
 
 ### Request handlers
 
-`@computation (fn () => ...)` captures a computation without executing it. An
+`@computation (func () => return ...)` captures a computation without executing it. An
 enclosing `do` can handle it with a request loop:
 
 ```blot
 type Validate is effect = { check: U32 -> U32 }
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -260,15 +260,15 @@ request constructors, monad adapter, or prelude declarations. See
 `~` marks a demand-driven parameter, available to any function:
 
 ```blot
-const unwrap_or_else = fn value => fn ~fallback =>
+const unwrap_or_else = func value => return func ~fallback => return
   case value of
     #Some found => found
     #Nothing => @force fallback
 
-const duplicate_if = fn enabled => fn ~value =>
+const duplicate_if = func enabled => return func ~value => return
   case enabled of
-    #False => #Nothing
-    #True => #Some (@force value, @force value)
+    false => #Nothing
+    true => #Some (@force value, @force value)
 ```
 
 Calling such a function captures the argument expression without evaluating it.
@@ -303,7 +303,7 @@ import { clamp as clamp_value } from "./numeric.blot"
 import * as render from "engine/render"
 
 const origin = #Vec2 { x: 0.0, y: 0.0 }
-const identity = fn value => value
+const identity = func value => return value
 ```
 
 An import is not a value-producing expression. A module does not export its
@@ -338,7 +338,7 @@ let selected = #Some position
 ```
 
 Data constructor names require `#` in declarations, construction, and patterns,
-including `#Some`, `#Nothing`, `#True`, and `#False`. Qualified constructors put
+including `#Some`, `#Nothing`, `true`, and `false`. Qualified constructors put
 the marker before the whole name: `#math.Vec3`. Types stay unmarked; generic
 type application uses forms such as `Maybe Vec2` and `Array (Maybe Vec2)`.
 
@@ -368,7 +368,7 @@ type Transform a = a -> a
 `Position` and `Vec2` are interchangeable and share associated operations.
 `EntityId` and `U32` are distinct types despite the wrapper's simple payload.
 
-Booleans use PascalCase constructors: `type Bool is data = #True | #False`,
+Booleans use PascalCase constructors: `type Bool is data = true | false`,
 rather than separate lowercase literal spellings.
 
 The data model does not require a runtime tag or heap allocation for every
@@ -382,9 +382,9 @@ Use `of` to introduce the pattern suite, with one or more comma-separated
 inputs. Single-input cases also use `of`, not `:`.
 
 ```blot
-const choose = fn first => fn enabled => fn fallback =>
+const choose = func first => return func enabled => return func fallback => return
   case first, enabled, fallback of
-    #Some value, #True, _ => value
+    #Some value, true, _ => value
     _, _, #Some value => value
     _, _, _ => 0
 ```
@@ -402,13 +402,13 @@ the successful branch. `#Some(x)` and `#Some x` spell the same constructor
 pattern; parentheses group its payload, not a new multi-argument calling form.
 
 ```blot
-const double_if_present = fn (candidate: Maybe U32) -> U32 => do:
+const double_if_present = func (candidate: Maybe U32) : U32 => return do:
   if let #Some(value) = candidate:
     break value * 2
   else:
     break 0
 
-const double_or_zero = fn (candidate: Maybe U32) -> U32 => do:
+const double_or_zero = func (candidate: Maybe U32) : U32 => return do:
   let #Some(value) = candidate else:
     break 0
   break value * 2
@@ -459,12 +459,12 @@ static. Unlike a nominal `data` declaration, it needs no named constructors:
 ```blot
 type Reading = F64 | Text
 
-const read_score = fn (ready: Bool) -> Reading => do:
+const read_score = func (ready: Bool) : Reading => return do:
   if ready:
     break 42.0
   break "pending"
 
-const reading_label = fn (value: Reading) -> Text => do:
+const reading_label = func (value: Reading) : Text => return do:
   if let (number: F64) = value:
     break "Score: ${number}"
   break value
@@ -536,10 +536,10 @@ numbers.
 A top-level function name can be qualified by a type:
 
 ```blot
-const Vec2.magnitude = fn (value: Vec2) -> F32 =>
+const Vec2.magnitude = func (value: Vec2) : F32 => return
   sqrt (value.x * value.x + value.y * value.y)
 
-const Vec2.scaled = fn (value: Vec2) => fn (factor: F32) -> Vec2 =>
+const Vec2.scaled = func (value: Vec2) => return func (factor: F32) : Vec2 => return
   #Vec2 { x: value.x * factor, y: value.y * factor }
 
 let distance = Vec2.magnitude position
@@ -548,7 +548,7 @@ let enlarged = Vec2.scaled position 2.0
 
 The receiver is an explicit parameter, not an implicit `self`. Qualifying a name
 does not by itself define generic dispatch. Associated bindings use
-`const Vec2.scaled = fn ...` and are public like other top-level bindings.
+`const Vec2.scaled = func ...` and are public like other top-level bindings.
 
 ### Statically checked receiver dispatch
 
@@ -557,11 +557,11 @@ The executable compiler supports receiver-first application:
 it does not unpack tuples or insert a `()` argument. Consequently,
 `position.magnitude` means `Vec2.magnitude position`, and `position.scaled` is a
 function awaiting its factor. Definitions needing another argument use an
-explicit nested `fn`, just like ordinary curried functions.
+explicit nested `func`, just like ordinary curried functions.
 
 ```blot
 // Infer a requirement for the receiver's scaled operation.
-const scale_twice = fn value => do:
+const scale_twice = func value => return do:
   let factor: F32 = 2.0
   let next = value
   next := self.scaled factor
@@ -603,7 +603,7 @@ host import. See [the controlled IO contract](compiler/effects-and-io.md).
 ```blot
 // Standard-library source, in the module owning Int.
 // PROPOSAL: exact primitive names; integer representation remains open.
-const Int.add = fn (left: Int) => fn (right: Int) -> Int =>
+const Int.add = func (left: Int) => return func (right: Int) : Int => return
   @int.add left right
 ```
 
@@ -618,8 +618,8 @@ infixl 60 (+) = add
 infixl 70 (><) = dot
 
 // PROPOSAL: exact static-type lookup spelling.
-const add = fn left => fn right => (@type.of left).add left right
-const dot = fn left => fn right => (@type.of left).dot left right
+const add = func left => return func right => return (@type.of left).add left right
+const dot = func left => return func right => return (@type.of left).dot left right
 ```
 
 `infixl` associates left, `infixr` associates right, and `infix` rejects
@@ -633,15 +633,15 @@ The executable prelude defines low-precedence function application in source:
 
 ```blot
 infixr 0 ($) = apply
-const apply = fn function => fn value => function value
+const apply = func function => return func value => return function value
 
-const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
+const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
 ```
 
 `f $ g $ x` means `f (g x)`. Precedence 0 is below arithmetic, comparisons and
 default backtick fixities; ordinary application still binds tighter. Infix RHSs
 may be lambdas, `do:` blocks or `case` expressions without parentheses, e.g.
-`invoke $ fn value => value + 1`. This syntax works for source operators in
+`invoke $ func value => return value + 1`. This syntax works for source operators in
 general, not through a special application opcode. Operands remain eager and
 left-to-right, unlike Haskell's evaluation model, and callback effects propagate
 through `apply`. The standalone `break $ value` form forwards a resolver result;
@@ -662,14 +662,14 @@ knowledge of particular operator spellings:
 infixr 20 (||) = or
 infixr 25 (&&) = and
 
-const and = fn (left: Bool) => fn ~right => do:
+const and = func (left: Bool) => return func ~right => return do:
   if left:
     break @force right
-  break #False
+  break false
 
-const or = fn (left: Bool) => fn ~right => do:
+const or = func (left: Bool) => return func ~right => return do:
   if left:
-    break #True
+    break true
   break @force right
 ```
 
@@ -704,7 +704,7 @@ This is exactly ordinary curried application, not a tuple call, implicit method
 receiver, or a wrapper function. The callee resolves like an ordinary name,
 including a local function value or parameter. Its argument types, effects,
 evaluation order, and demand modes are unchanged. In particular,
-``#False `and` expensive ()`` does not force the second argument when `and` has
+``false `and` expensive ()`` does not force the second argument when `and` has
 a `~right` parameter. Bind possibly effectful call results with `use`, as usual.
 
 The default fixity is left-associative precedence 80, between the showcase's
@@ -725,7 +725,7 @@ infixl 60 `add`
 infixr 24 `and`
 infixl 10 `on`
 
-const on = fn combine => fn project => fn left => fn right =>
+const on = func combine => return func project => return func left => return func right => return
   combine (project left) (project right)
 
 const closer_to_origin = lt `on` Vec2.magnitude
@@ -753,7 +753,7 @@ part of the existing module-design work.
 Initially, the backticks contain a function name, not an arbitrary expression.
 Bind a composed or partially applied function first. Infix sections with an
 omitted operand are deferred; use ordinary partial application or an explicit
-`fn` instead. The compiler lowering target is the same call as prefix notation,
+`func` instead. The compiler lowering target is the same call as prefix notation,
 with no additional runtime dispatch mechanism.
 
 ## Text interpolation
@@ -761,8 +761,8 @@ with no additional runtime dispatch mechanism.
 Double-quoted text supports `${expression}` interpolation:
 
 ```blot
-const greet = fn (world: Text) -> Text => "Hello ${world}"
-const quoted_greeting = fn (world: Text) -> Text => "Message: ${greet world}"
+const greet = func (world: Text) : Text => return "Hello ${world}"
+const quoted_greeting = func (world: Text) : Text => return "Message: ${greet world}"
 ```
 
 Evaluate embedded expressions once, from left to right. Braces and quoted text
@@ -775,8 +775,8 @@ associated-operation mechanism without implicit conversion elsewhere:
 
 ```blot
 // PROPOSAL: numeric and user-defined interpolation conversions.
-const Vec2.to_text = fn (value: Vec2) -> Text => "(${value.x}, ${value.y})"
-const position_label = fn (position: Vec2) -> Text => "Position: ${position}"
+const Vec2.to_text = func (value: Vec2) : Text => return "(${value.x}, ${value.y})"
+const position_label = func (position: Vec2) : Text => return "Position: ${position}"
 ```
 
 Missing conversions would be compile-time errors. Embedded-expression and
@@ -854,15 +854,15 @@ data Particle = Particle {
 
 data World = World { particles: Array Particle }
 
-const advance = fn (particle: Particle, dt: F32) => do:
+const advance = func (particle: Particle, dt: F32) => return do:
   let next = particle
   next.position.x := self + particle.velocity.x * dt
   next.position.y := self + particle.velocity.y * dt
   break next
 
-const update = fn (world: World, dt: F32) => do:
+const update = func (world: World, dt: F32) => return do:
   let next = world
-  next.particles := array.map (fn particle => advance (particle, dt), self)
+  next.particles := array.map (func particle => return advance (particle, dt), self)
   break next
 ```
 
@@ -883,7 +883,7 @@ storage where the ownership analysis permits it.
 current stage: normally runtime, or const time inside a const evaluation. `let`
 requires a pure RHS; `use` preserves any effects rather than allowing them to
 escape the stage's restrictions. Ordinary functions can run in either stage when
-their operations permit it; a separate class of `const fn` is unnecessary for
+their operations permit it; a separate class of `const func` is unnecessary for
 the baseline. A const-known function closure does not execute its body and may
 describe an effectful runtime system.
 
@@ -895,7 +895,7 @@ descriptors do not imply runtime reflection or runtime allocation.
 Proposed const-parameter spelling:
 
 ```blot
-const vector_type = fn (const element: Type) => fn (const lanes: U32) -> Type =>
+const vector_type = func (const element: Type) -> (const lanes: U32): Type => return
   @type.simd (element, lanes)
 
 type F32x4 = vector_type F32 4
@@ -910,9 +910,9 @@ Value declaration tags use `@[expression]` and apply an ordinary function to the
 declaration's initializer:
 
 ```blot
-const add = fn amount => fn value => value + amount
+const add = func amount => return func value => return value + amount
 @[add 1]
-@[fn value => value * 2]
+@[func value => return value * 2]
 entry const answer: U32 = 20 // add 1 (multiply 2 20) = 41
 ```
 
@@ -947,11 +947,11 @@ entity/world. This does not change the immutability of ordinary values.
 The proposed scoped runner receives that context explicitly:
 
 ```blot
-const read_velocity = fn () => do:
+const read_velocity = func () => return do:
   use velocity <- ecs.get Velocity
   break velocity
 
-const sample_velocity = fn (world, entity) =>
+const sample_velocity = func (world, entity) =>
   ecs.run (world, entity, read_velocity)
 ```
 

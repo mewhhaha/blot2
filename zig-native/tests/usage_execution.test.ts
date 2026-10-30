@@ -4,12 +4,12 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url);
 const library = `
-const capture = fn (owner: once (Unit -> U32 ! {Foreign})) -> once (Unit -> U32 ! {Foreign}) => fn () => owner ()
-const call = fn (callback: once (Unit -> U32 ! {Foreign})) => callback ()
+const capture = func (owner: once (Unit -> U32 ! {Foreign})) : once (Unit -> U32 ! {Foreign}) => return func () => return owner ()
+const call = func (callback: once (Unit -> U32 ! {Foreign})) => return callback ()
 `;
 const entrySource = `
 import {call, capture} from "./usage"
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => call (capture (fn () => host ()))
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return call (capture (func () => return host ()))
 `;
 Deno.test("usage once contracts survive imports retained failures restart and sync JSPI execution", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-usage-" });
@@ -58,27 +58,27 @@ Deno.test("usage exit and exact loop contracts execute across imports and failed
   const entry = `${directory}/main.blot`;
   const dependency = `${directory}/usage.blot`;
   const control = `
-const bounded = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
+const bounded = func (callback: once (Unit -> U32 ! {Foreign})) => return do:
   let initial = do:
     break 0
   for index in 3..4:
     use callback ()
   break 7
-const stopped = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
+const stopped = func (callback: once (Unit -> U32 ! {Foreign})) => return do:
   for ever:
     use callback ()
     break
   break 7
-const guarded = fn (callback: once (Unit -> Bool ! {Foreign})) => case #True of
-  #True if callback () => 7
-  #True => 7
-  #False => 0
+const guarded = func (callback: once (Unit -> Bool ! {Foreign})) => return case true of
+  true if callback () => 7
+  true => 7
+  false => 0
 `;
   const main = `
 import {bounded, stopped, guarded} from "./usage"
-entry const bound = fn (host: Unit -> U32 ! {Foreign}) => bounded (fn () => host ())
-entry const stop = fn (host: Unit -> U32 ! {Foreign}) => stopped (fn () => host ())
-entry const guard = fn (host: Unit -> U32 ! {Foreign}) => guarded (fn () => @u32.eq (host ()) 7)
+entry const bound = func (host: Unit -> U32 ! {Foreign}) => return bounded (func () => return host ())
+entry const stop = func (host: Unit -> U32 ! {Foreign}) => return stopped (func () => return host ())
+entry const guard = func (host: Unit -> U32 ! {Foreign}) => return guarded (func () => return @u32.eq (host ()) 7)
 `;
   const options = {
     executable,
@@ -158,16 +158,16 @@ Deno.test("usage loan regions execute imported reads and survive failed edits re
   const entry = `${directory}/main.blot`;
   const dependency = `${directory}/loans.blot`;
   const loans = `
-const inspect = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @u32.add (@usage.read loan) (@usage.read loan))
-const nested = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @usage.borrow loan (fn inner => @usage.read inner))
-const float = fn (owner: unique F32) => @usage.borrow owner (fn loan => @f32.add (@usage.read loan) 0.5)
+const inspect = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @u32.add (@usage.read loan) (@usage.read loan))
+const nested = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @usage.borrow loan (func inner => return @usage.read inner))
+const float = func (owner: unique F32) => return @usage.borrow owner (func loan => return @f32.add (@usage.read loan) 0.5)
 `;
   const main = `
 import {inspect, nested, float} from "./loans"
-entry const twice = fn () => inspect 9
-entry const again = fn () => nested 9
-entry const half = fn () => float 1.0
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => (fn (owner: unique U32) => @usage.borrow owner (fn loan => @u32.add (@usage.read loan) (host ()))) 9
+entry const twice = func () => return inspect 9
+entry const again = func () => return nested 9
+entry const half = func () => return float 1.0
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return (func (owner: unique U32) => return @usage.borrow owner (func loan => return @u32.add (@usage.read loan) (host ()))) 9
 `;
   const options = { executable, entry, prelude: null, cacheDirectory: `${directory}/cache` };
   const compiler = await createZigProjectCompiler(options);

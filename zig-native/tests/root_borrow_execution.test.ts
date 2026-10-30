@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
-const source = `const scan = fn values => do:
+const source = `const scan = func values => return do:
   let original = values.iter
   let cursor = original
   let total = 0
@@ -13,8 +13,8 @@ const source = `const scan = fn values => do:
     total := self + value
     cursor := rest
   break total
-entry const arrays = fn (count: U32) => scan (@array.generate count identity)
-entry const lists = fn (count: U32) => scan (@list.generate count identity)
+entry const arrays = func (count: U32) => return scan (@array.generate count identity)
+entry const lists = func (count: U32) => return scan (@list.generate count identity)
 `;
 Deno.test("persistent cursor root borrows preserve finite traversal and normal List fallback", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-root-borrow-" });

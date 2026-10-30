@@ -5,18 +5,18 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer = `type Item = exists [a, b] => (a, a -> b, b -> U32)
-const make: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item
-const choose: Bool -> Item = fn flag => if flag then pack [U32, F32] (42, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item else pack [Bool, U32] (flag, fn boolean => if boolean then 9 else 7, fn number => number) as Item
-const captured: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @u32.add (@f32.to_u32 number) value) as Item
-const read: Item -> U32 = fn item => unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+const make: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item
+const choose: Bool -> Item = func flag => return if flag then pack [U32, F32] (42, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item else pack [Bool, U32] (flag, func boolean => return if boolean then 9 else 7, func number => return number) as Item
+const captured: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @u32.add (@f32.to_u32 number) value) as Item
+const read: Item -> U32 = func item => return unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
 `;
 const consumer = `import {make, read, captured, choose} from "./identity"
-entry const whole: U32 -> U32 = fn value => read (make value)
-entry const selected: Bool -> U32 = fn flag => do:
+entry const whole: U32 -> U32 = func value => return read (make value)
+entry const selected: Bool -> U32 = func flag => return do:
   let items = (make 42, choose flag)
   break @u32.add (read (@product.get items 0)) (read (@product.get items 1))
-entry const doubled: U32 -> U32 = fn value => read (captured value)
-entry const fraction: U32 -> U32 = fn value => read (make (@u32.add value 1))
+entry const doubled: U32 -> U32 = func value => return read (captured value)
+entry const fraction: U32 -> U32 = func value => return read (make (@u32.add value 1))
 `;
 
 async function run(bytes: Uint8Array<ArrayBuffer>) {

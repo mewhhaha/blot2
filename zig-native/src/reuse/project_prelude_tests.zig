@@ -23,15 +23,15 @@ fn valid(loaded: *const project.Project, checked: *const semantic.CheckedProject
 const prelude_source =
     \\infixr 90 (++) = add
     \\type Maybe a is data = #Some a | #Nothing
-    \\const add = fn left => fn right => @type.call "add" left right
-    \\const U32.add = fn left => fn right => @u32.add left right
-    \\const F32.add = fn left => fn right => @f32.add left right
-    \\const identity = fn value => value
+    \\const add = func left => return func right => return @type.call "add" left right
+    \\const U32.add = func left => return func right => return @u32.add left right
+    \\const F32.add = func left => return func right => return @f32.add left right
+    \\const identity = func value => return value
 ;
 const entry_source =
     \\import { answer } from "./helper"
-    \\entry const integer = fn () -> U32 => identity (20 ++ answer)
-    \\entry const floating = fn () -> F32 => 1.5 ++ 2.5
+    \\entry const integer = func () : U32 => return identity (20 ++ answer)
+    \\entry const floating = func () : F32 => return 1.5 ++ 2.5
     \\const maybe: Maybe U32 = #Some 42
 ;
 
@@ -77,9 +77,9 @@ test "source fixities and lexical names shadow ordinary prelude exports" {
     try write(tmp.dir, "prelude.blot", prelude_source);
     try write(tmp.dir, "main.blot",
         \\infixl 90 (++) = subtract
-        \\const identity = fn value => value
-        \\const subtract = fn left => fn right => @u32.sub left right
-        \\entry const answer = fn () -> U32 => identity (44 ++ 2)
+        \\const identity = func value => return value
+        \\const subtract = func left => return func right => return @u32.sub left right
+        \\entry const answer = func () : U32 => return identity (44 ++ 2)
     );
     const entry = try path(tmp.dir, "main.blot");
     defer a.free(entry);

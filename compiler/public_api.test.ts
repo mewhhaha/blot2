@@ -21,7 +21,7 @@ for (const packaged of [false, true]) {
     });
     try {
       const original =
-        "entry const answer = fn () => (Array.from_list [40, 2])[0] + 2\n";
+        "entry const answer = func () => return (Array.from_list [40, 2])[0] + 2\n";
       const first = await compiler.build({ sources: { [entry]: original } });
       ok(first.success, JSON.stringify(first));
       const guest = await instantiateGuest(first.bytes);
@@ -73,7 +73,7 @@ const compiler = await createCompiler({ entry });
 try {
   for (const number of [40, 41]) {
     const result = await compiler.build({ sources: { [entry]:
-      'import * as array from "std/array"\\nentry const answer = fn () => (Array.from_list [' + number + ', 2])[0] + 2\\n'
+      'import * as array from "std/array"\\nentry const answer = func () => return (Array.from_list [' + number + ', 2])[0] + 2\\n'
     } });
     if (!result.success) throw new Error(JSON.stringify(result));
     const guest = await instantiateGuest(result.bytes);
@@ -118,7 +118,10 @@ Deno.test("CLI builds projects and dependencies, and fails without publishing in
     const input = `${directory}/main.blot`,
       output = `${directory}/program.wasm`,
       bundle = `${directory}/project.blotdep`;
-    await Deno.writeTextFile(input, "entry const answer = fn () => 42\n");
+    await Deno.writeTextFile(
+      input,
+      "entry const answer = func () => return 42\n",
+    );
     equal(await runCli(executable, ["check", input]), 0);
     equal(await runCli(executable, ["build", input, output]), 0);
     const original = await Deno.readFile(output);
@@ -173,7 +176,7 @@ Deno.test("CLI builds projects and dependencies, and fails without publishing in
     equal(await Deno.readFile(output), original);
     await Deno.writeTextFile(
       input,
-      "entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:\n  use value <- host ()\n  return value\n",
+      "entry const answer = func (host: Unit -> U32 ! {Foreign}) => return do:\n  use value <- host ()\n  return value\n",
     );
     equal(
       await runCli(executable, [

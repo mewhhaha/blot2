@@ -6,18 +6,18 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const libraries = {
   parameter: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const first = fn (left: State a) => fn (right: State b) => left.get ()
-const second = fn (left: State a) => fn (right: State b) => right.get ()
-const shadow = fn (input: State a) => fn (input: State b) => input.get ()
+const first = func (left: State a) => return func (right: State b) => return left.get ()
+const second = func (left: State a) => return func (right: State b) => return right.get ()
+const shadow = func (input: State a) => return func (input: State b) => return input.get ()
 `,
   arrow: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const first: (left: State a) -> ((right: State b) -> a ! {left.get}) = fn x => fn y => x.get ()
-const second: (left: State a) -> ((right: State b) -> b ! {right.get}) = fn x => fn y => y.get ()
-const shadow: (left: State a) -> ((right: State b) -> b ! {right.get}) = fn input => fn input => input.get ()
+const first: (left: State a) -> ((right: State b) -> a ! {left.get}) = func x => return func y => return x.get ()
+const second: (left: State a) -> ((right: State b) -> b ! {right.get}) = func x => return func y => return y.get ()
+const shadow: (left: State a) -> ((right: State b) -> b ! {right.get}) = func input => return func input => return input.get ()
 `,
 };
 const main = `import {State, first, second, shadow} from "./state"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
       use a <- first left right
@@ -34,7 +34,7 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (lef
   let (state, result) = outer
   break result
 ))
-entry const floating = fn () => @effect.scope (fn (s: State F32) => @effect.scope (fn (t: State U32) => do:
+entry const floating = func () => return @effect.scope (func (s: State F32) => return @effect.scope (func (t: State U32) => return do:
   use outer <- do (@effect.state s.get s.set 1.5):
     use inner <- do (@effect.state t.get t.set 100):
       use a <- first s t
@@ -47,7 +47,7 @@ entry const floating = fn () => @effect.scope (fn (s: State F32) => @effect.scop
 ))
 `;
 const unmatched = `import {State, first} from "./state"
-entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const invalid = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use nested <- do (@effect.state right.get right.set 7):
     break first left right
   let (state, result) = nested
@@ -193,13 +193,13 @@ for (const { syntax, library, codegenTier } of cases) {
           assert.deepEqual(afterUnmatched.bytes, built.bytes);
           if (dependencies === undefined) {
             const before = await compiler.exportCheckpoint();
-            let proofFragment = "=> left.get ()";
-            let replacement = `=> do:
+            let proofFragment = "=> return left.get ()";
+            let replacement = `=> return do:
   let operation = left.get
   break operation ()`;
             if (syntax === "arrow") {
-              proofFragment = "=> x.get ()";
-              replacement = `=> do:
+              proofFragment = "=> return x.get ()";
+              replacement = `=> return do:
   let operation = x.get
   break operation ()`;
             }

@@ -9,11 +9,11 @@ const fields = Array.from({ length: 40 }, (_, word) => {
   if (word === 34) return `f034: -0.0`;
   return `f${String(word).padStart(3, "0")}: value + ${word}`;
 }).join(", ");
-const model = `const make = fn (value: U32) => {${fields}}
-const run = fn (value: U32) => do:
+const model = `const make = func (value: U32) => return {${fields}}
+const run = func (value: U32) => return do:
   let object = make value
   let before = object
-  let read = fn () => before.f033[0] + before.f032
+  let read = func () => return before.f033[0] + before.f032
   object.f033 := #[self[0] + 1]
   object.f032 := self + 2
   for index in 0..32:
@@ -21,7 +21,7 @@ const run = fn (value: U32) => do:
     if pressure[8191] != index:
       break #[0]
   break #[before.f033[0], object.f033[0], before.f032, object.f032, read ()]
-const floating = fn (value: U32) => (make value).f034
+const floating = func (value: U32) => return (make value).f034
 `;
 Deno.test("wide ownership preserves snapshots float bits and static shape relocation through retained edits in both tiers", async () => {
   const directory = await Deno.makeTempDir();
@@ -47,8 +47,8 @@ Deno.test("wide ownership preserves snapshots float bits and static shape reloca
             }]`,
             [entry]: `import {run, floating} from "./model"
 import {values} from "./prefix"
-entry const main = fn value => run (value + values.length)
-entry const bits = fn value => floating value
+entry const main = func value => return run (value + values.length)
+entry const bits = func value => return floating value
 `,
           };
           const result = await retained.build({ sources });
@@ -127,12 +127,12 @@ Deno.test("wide ownership selects exact bitmap and size for differently shaped c
           sources: {
             [entry]: `
 type Shape is data = #Small {child: Array U32, value: U32} | #Large {${types}}
-const replace = fn (shape: Shape) => do:
+const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1]
   break shape
-entry const run = fn (mode: U32) => do:
+entry const run = func (mode: U32) => return do:
   let before = if mode == 0 then #Small {child: #[40], value: 7} else #Large {${values}}
-  let captured = fn () => before.child[0]
+  let captured = func () => return before.child[0]
   let changed = replace before
   for index in 0..32:
     let pressure = @array.fill 8192 index

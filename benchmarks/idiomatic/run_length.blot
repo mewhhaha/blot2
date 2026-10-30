@@ -1,6 +1,6 @@
 import * as array from "std/array"
-entry const run = fn (seed: U32) -> U32 => do:
-  let values = array.generate 8192 (fn index => (seed + index / 7) % 16)
+entry const run = func (seed: U32) : U32 => return do:
+  let values = array.generate 8192 (func index => return (seed + index / 7) % 16)
   let output: List (U32, U32) = []
   let current = values[0]
   let length = 0

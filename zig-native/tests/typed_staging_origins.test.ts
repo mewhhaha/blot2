@@ -5,12 +5,12 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out-dev/bin/blotc", import.meta.url).pathname;
 const producerSource =
-  "const make = fn (divisor: U32) => @code.quote (@u32.div 42 (@code.lift divisor))\n";
+  "const make = func (divisor: U32) => return @code.quote (@u32.div 42 (@code.lift divisor))\n";
 const consumerSource = `import {make} from "./producer"
 const first = make 1
 const second = make 0
 const choices = {good: first, bad: second}
-entry const answer = fn () => @code.run choices.good
+entry const answer = func () => return @code.run choices.good
 `;
 
 Deno.test("generated diagnostics retain the selected generator through imports records and recovery", async () => {

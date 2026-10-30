@@ -1,22 +1,22 @@
 type Tick is effect = { read: Unit -> U32 }
-const make = fn action => @computation action
-const whole = fn computation => do:
+const make = func action => return @computation action
+const whole = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         break 20
       complete value =>
         break value
-const floating = fn computation => do:
+const floating = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         break 22.5
       complete value =>
         break value
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let value = 41
-  let computation = make (fn () => do:
+  let computation = make (func () => return do:
     use Tick.read ()
     break @panic "cancelled generic computation continued"
   )

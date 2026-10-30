@@ -34,37 +34,37 @@ pins[new URL(import.meta.url).pathname] = await hash(
   new URL(import.meta.url).pathname,
 );
 function source(count: number): string {
-  return `let inputs = @array.generate ${count} (fn i => i)
-let rows2 = @array.generate ${count} (fn i => {a:i,b:i+1})
-let rows4 = @array.generate ${count} (fn i => {a:i,b:i+1,c:i+2,d:i+3})
-let refs = @array.generate ${count} (fn i => @array.fill 2 i)
+  return `let inputs = @array.generate ${count} (func i => return i)
+let rows2 = @array.generate ${count} (func i => return {a:i,b:i+1})
+let rows4 = @array.generate ${count} (func i => return {a:i,b:i+1,c:i+2,d:i+3})
+let refs = @array.generate ${count} (func i => return @array.fill 2 i)
 let list_inputs = @list.from_array inputs
 let list_rows2 = @list.from_array rows2
-entry const triangle_array = fn count => do:
+entry const triangle_array = func count => return do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
       values := [...self, x * 10 + y]
   break @array.from_list values
-const list = fn count => do:
+const list = func count => return do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
       values := [...self, x * 10 + y]
   break values
-entry const triangle_list = fn count => @list.length (list count)
-entry const filter_none = fn (count: U32) => #[x | x <- inputs, #False]
-entry const filter_half = fn count => #[x | x <- inputs, @u32.lt x (@u32.shr count 1)]
-entry const filter_all = fn (count: U32) => #[x | x <- inputs, #True]
-entry const packed2 = fn count => @array.length (#[row | row <- rows2, row.a < count])
-entry const packed4 = fn count => @array.length (#[row | row <- rows4, row.a < count])
-entry const references = fn (count: U32) => @array.length (#[value | value <- refs, #True])
-entry const list_packed2 = fn count => @array.length (#[row | row <- list_rows2, row.a < count])
-entry const list_nested = fn (count: U32) => #[y | x <- list_inputs, y <- list_inputs, y < x]
-entry const exhausted = fn (count: U32) => do:
+entry const triangle_list = func count => return @list.length (list count)
+entry const filter_none = func (count: U32) => return #[x | x <- inputs, false]
+entry const filter_half = func count => return #[x | x <- inputs, @u32.lt x (@u32.shr count 1)]
+entry const filter_all = func (count: U32) => return #[x | x <- inputs, true]
+entry const packed2 = func count => return @array.length (#[row | row <- rows2, row.a < count])
+entry const packed4 = func count => return @array.length (#[row | row <- rows4, row.a < count])
+entry const references = func (count: U32) => return @array.length (#[value | value <- refs, true])
+entry const list_packed2 = func count => return @array.length (#[row | row <- list_rows2, row.a < count])
+entry const list_nested = func (count: U32) => return #[y | x <- list_inputs, y <- list_inputs, y < x]
+entry const exhausted = func (count: U32) => return do:
   let result: List U32 = []
   for x in 0..count:
-    if #False:
+    if false:
       result := [...self, x]
   break @array.from_list result
 `;
@@ -337,7 +337,7 @@ for (const count of [0, 1, 8, 32, 128, 256, 16384]) {
 const compilation: Record<string, unknown>[] = [];
 const input = `${output}/compile.blot`;
 const original = source(128) +
-  "const saved = list 32\nentry const staged = fn () => @array.length (@array.from_list saved)\n";
+  "const saved = list 32\nentry const staged = func () => return @array.length (@array.from_list saved)\n";
 await Deno.writeTextFile(input, original);
 for (let pair = 0; pair < 7; pair++) {
   const order = [...variants];

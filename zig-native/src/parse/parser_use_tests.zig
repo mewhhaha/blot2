@@ -7,9 +7,9 @@ fn mixed(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     const source = try allocator.dupe(u8,
-        \\const run = fn (value: U32) => do:
+        \\const run = func (value: U32) => return do:
         \\  use value: U32
-        \\  use next: (U32 -> U32 ! {Foreign}) <- fn item => item
+        \\  use next: (U32 -> U32 ! {Foreign}) <- func item => return item
         \\  use answer <- next value
         \\  use discarded: U32 <- answer
         \\  break discarded

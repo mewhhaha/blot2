@@ -10,9 +10,9 @@ const a = std.testing.allocator;
 const key: format.Key = .{ .compiler = @as([32]u8, @splat(1)), .settings = @as([32]u8, @splat(2)), .source = @as([32]u8, @splat(3)), .dependencies = @as([32]u8, @splat(4)) };
 const Payload = struct { symbols: []const []const u8, modules: []core.Module };
 const source =
-    \\const identity = fn value => value
-    \\entry const answer = fn (value: U32) => @u32.add (identity value) 2
-    \\entry const values = fn () => @array.fill 3 (identity 42)
+    \\const identity = func value => return value
+    \\entry const answer = func (value: U32) => return @u32.add (identity value) 2
+    \\entry const values = func () => return @array.fill 3 (identity 42)
 ;
 
 test "dependency invocation wire keeps ordinary payloads compact and validates ordered arguments" {

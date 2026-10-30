@@ -53,29 +53,37 @@ for (const codegenTier of ["development", "optimized"] as const) {
 }
 
 const controls = `import * as array from "std/array"
-type Command is data = #Command {lanes: Array U32, audit: U32}
-entry const saved = fn (count: U32) => do:
-  let commands = array.generate count (fn i => #Command {lanes: array.generate 3 (fn j => i * 3 + j), audit: i})
-  let chunks = array.map (fn c => c.lanes) commands
-  let lanes = array.flatten chunks
-  break lanes.length + (if count == 0 then 0 else commands[0].audit + chunks[0][2])
-entry const ragged = fn (count: U32) => do:
-  let commands = array.generate count (fn i => #Command {lanes: array.generate (i + 1) (fn j => i + j), audit: i})
-  let chunks = array.map (fn c => c.lanes) commands
-  let lanes = array.flatten chunks
+type Range is data = $Range {start: U32, count: U32}
+type Command is data = $Command {lanes: Range, audit: U32}
+entry const saved = func (count: U32) => return do:
+  let payload = array.generate (count * 3) (func i => return i)
+  let commands = array.generate count (func i => return $Command {lanes: $Range {start: i * 3, count: 3}, audit: i})
+  let chunks = array.map (func c => return c.lanes) commands
+  let lanes = array.flatten chunks payload
+  break lanes.length + (if count == 0 then 0 else commands[0].audit + payload[chunks[0].start + 2])
+entry const ragged = func (count: U32) => return do:
+  let commands = array.generate count (func i => return $Command {lanes: $Range {start: i * (i + 1) / 2, count: i + 1}, audit: i})
+  let payload = array.fill (count * (count + 1) / 2) 0
+  for i in 0 .. count:
+    for j in 0 .. i + 1:
+      payload[commands[i].lanes.start + j] := i + j
+  let chunks = array.map (func c => return c.lanes) commands
+  let lanes = array.flatten chunks payload
   break lanes.length
-entry const trap = fn (divisor: U32) => do:
-  let commands = array.generate 2 (fn i => #Command {lanes: array.generate 3 (fn j => i + j), audit: 1 / divisor})
-  let chunks = array.map (fn c => c.lanes) commands
-  let lanes = array.flatten chunks
+entry const trap = func (divisor: U32) => return do:
+  let commands = array.generate 2 (func i => return $Command {lanes: $Range {start: i * 3, count: 3}, audit: 1 / divisor})
+  let payload = array.generate 6 (func i => return i / 3 + i % 3)
+  let chunks = array.map (func c => return c.lanes) commands
+  let lanes = array.flatten chunks payload
   break lanes[0]
-const constant = array.flatten #[#[3, 4], #[], #[5]]
-entry const constant_read = fn (index: U32) => constant[index]
-type Floating is data = #Floating {lanes: Array F32}
-entry const floats = fn (seed: F32) => do:
-  let commands = array.generate 3 (fn i => #Floating {lanes: array.generate 24 (fn j => (seed + @u32.to_f32 i) * @u32.to_f32 j)})
-  let chunks = array.map (fn c => c.lanes) commands
-  let lanes = array.flatten chunks
+const constant = array.flatten #[$Range {start: 0, count: 2}, $Range {start: 2, count: 0}, $Range {start: 2, count: 1}] #[3, 4, 5]
+entry const constant_read = func (index: U32) => return constant[index]
+type Floating is data = $Floating {lanes: Range}
+entry const floats = func (seed: F32) => return do:
+  let commands = array.generate 3 (func i => return $Floating {lanes: $Range {start: i * 24, count: 24}})
+  let payload = array.generate 72 (func i => return (seed + @u32.to_f32 (i / 24)) * @u32.to_f32 (i % 24))
+  let chunks = array.map (func c => return c.lanes) commands
+  let lanes = array.flatten chunks payload
   break lanes
 `;
 for (const codegenTier of ["development", "optimized"] as const) {

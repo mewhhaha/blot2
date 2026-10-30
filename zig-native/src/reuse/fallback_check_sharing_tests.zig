@@ -9,7 +9,7 @@ const stamps = @import("code_artifacts.zig");
 const a = std.testing.allocator;
 const io = std.testing.io;
 const main = "import * as dep from \"./dep\"\nentry const answer:U32=dep.read ()\n";
-const dep = "const value:U32=42\nconst read:Unit->U32=fn () => value\n";
+const dep = "const value:U32=42\nconst read:Unit->U32=func () => return value\n";
 const Fixture = struct {
     dir: std.testing.TmpDir,
     path: [:0]u8,
@@ -62,7 +62,7 @@ test "fallback checker sharing matches a cold session on initial changed depende
     defer fixture.deinit();
     var on = try retained.Session.initEmpty(a, .{});
     defer on.deinit();
-    const versions = [_][]const u8{ dep, "const value:U32=43\nconst read:Unit->U32=fn () => value\n", "const value:U32=true\nconst read:Unit->U32=fn () => value\n", dep, "const read:Unit->U32=fn () => read ()\n", dep };
+    const versions = [_][]const u8{ dep, "const value:U32=43\nconst read:Unit->U32=func () => return value\n", "const value:U32=true\nconst read:Unit->U32=func () => return value\n", dep, "const read:Unit->U32=func () => return read ()\n", dep };
     for (versions, 0..) |text, index| {
         try fixture.write("dep.blot", text);
         const before_on = Before.get(&on);
@@ -177,7 +177,7 @@ test "fallback shared check every changed-closure and encoding allocation failur
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Before.get(&session);
-    try fixture.write("dep.blot", "const value:U32=43\nconst read:Unit->U32=fn () => value\n");
+    try fixture.write("dep.blot", "const value:U32=43\nconst read:Unit->U32=func () => return value\n");
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rebuildFailure, .{ &session, &fixture });
     try before.unchanged(&session);
     var retry = try session.revise(io, fixture.path, null, .{});

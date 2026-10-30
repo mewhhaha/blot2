@@ -11,11 +11,11 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
   const compiler = await createZigProjectCompiler({ executable, entry });
   try {
     const original =
-      'import { next } from "./library"\nentry const answer = fn () => next 41\n';
+      'import { next } from "./library"\nentry const answer = func () => return next 41\n';
     const sources = {
       [entry]: original,
       [`${directory}/library.blot`]:
-        "const next = fn (value: U32) -> U32 => @u32.add value 1\n",
+        "const next = func (value: U32) : U32 => return @u32.add value 1\n",
     };
     const first = await compiler.build({ sources });
     ok(first.success, JSON.stringify(first));
@@ -23,7 +23,7 @@ Deno.test("typed holes reach project diagnostics and preserve the last successfu
       sources: {
         ...sources,
         [`${directory}/library.blot`]:
-          "// 雪\nconst next = fn (value: U32) -> U32 => @hole\n",
+          "// 雪\nconst next = func (value: U32) : U32 => return @hole\n",
       },
     });
     ok(!failed.success);
@@ -63,7 +63,7 @@ Deno.test("typed holes expose shared generic requirements and repeated structure
     const built = await compiler.build({
       sources: {
         [entry]: `type Add a is contract = { associated "add" a a a }
-const incomplete: a -> a where { Add a } = fn value => @hole
+const incomplete: a -> a where { Add a } = func value => return @hole
 entry const answer = 42
 `,
       },

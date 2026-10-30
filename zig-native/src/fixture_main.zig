@@ -8,4 +8,5 @@ pub const main = switch (@import("fixture_options").kind) {
     .region => @import("runtime/region_fixture.zig").main,
     .task_context => @import("runtime/task_context_fixture.zig").main,
     .packed_layout => @import("runtime/packed_layout_fixture.zig").main,
+    .data_stacks => @import("runtime/data_stacks_fixture.zig").main,
 };

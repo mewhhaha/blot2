@@ -1,20 +1,20 @@
 type Tick is effect = { read: U32 -> F32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
         yield @u32.to_f32 value
       complete value =>
         break value
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let value = 41
-  let make = fn action => @computation (fn () => do:
+  let make = func action => return @computation (func () => return do:
     use action ()
     break value
   )
   value := 99
-  let computation = make (fn () => Tick.read 0)
+  let computation = make (func () => return Tick.read 0)
   value := 199
-  let read = fn () => handled computation
+  let read = func () => return handled computation
   break @u32.add (read ()) 1
 entry const folded = answer ()

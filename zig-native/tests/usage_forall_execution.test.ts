@@ -5,20 +5,20 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const producer =
-  `const forward: forall [a] => unique a -> unique a = fn owner => owner
+  `const forward: forall [a] => unique a -> unique a = func owner => return owner
 `;
 const consumer = `import {forward} from "./forward"
-entry const answer = fn () => do:
-  use owner <- @resource.acquire (fn () => 9) (fn owner => ())
+entry const answer = func () => return do:
+  use owner <- @resource.acquire (func () => return 9) (func owner => return ())
   let moved = forward owner
-  use value <- @usage.borrow moved (fn loan => @usage.read loan)
+  use value <- @usage.borrow moved (func loan => return @usage.read loan)
   use @resource.release moved
   break value
-entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => do:
-  use owner <- @resource.acquire (fn () => 9) (fn owner => ())
+entry const ordered = func (host: Unit -> U32 ! {Foreign}) => return do:
+  use owner <- @resource.acquire (func () => return 9) (func owner => return ())
   let moved = forward owner
   use offset <- host ()
-  use value <- @usage.borrow moved (fn loan => @usage.read loan)
+  use value <- @usage.borrow moved (func loan => return @usage.read loan)
   use @resource.release moved
   break @u32.add value offset
 `;
@@ -149,7 +149,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
           });
           assert(recovered.success, JSON.stringify(recovered));
           assert.deepEqual(recovered.bytes, first.bytes);
-          const changed = consumer.replaceAll("fn () => 9", "fn () => 11");
+          const changed = consumer.replaceAll("func () => return 9", "func () => return 11");
           const edited = await compiler.build({
             sources: { [entry]: changed },
           });

@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const hostSource = `
-entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const run = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let captured = @array.fill 2048 41
   use reply <- host captured
   break @array.set reply 0 (@u32.add captured[1] reply[1])
@@ -139,12 +139,12 @@ Deno.test("a pending JSPI invocation keeps copied packets valid and blocks reent
 
 const requestSource = `
 type Tick is effect = { read: Array U32 -> Array U32 }
-const work = @computation (fn () => do:
+const work = @computation (func () => return do:
   use first <- Tick.read #[41, 42]
   use second <- Tick.read first
   break second
 )
-entry const run = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const run = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   let saved = #[90, 91]
   for request in @requests work:
     case request of
@@ -206,12 +206,12 @@ Deno.test("a ready memo retains its original host closure without rebinding a re
   await compileAndRun(
     `
 type Fetch is effect = { read: Unit -> (U32 -> U32 ! {Foreign}) }
-const keep = fn ~(value: U32 -> U32 ! {Foreign}) => value
+const keep = func ~(value: U32 -> U32 ! {Foreign}) => return value
 const saved = keep (Fetch.read ())
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => do (@effect.provider Fetch.read (fn () => host)):
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return do (@effect.provider Fetch.read (func () => return host)):
   use previous <- @demand saved
   break previous 41
-entry const pure = fn () => 7
+entry const pure = func () => return 7
 `,
     async (_, bytes) => {
       const module = admitted(bytes);
@@ -287,8 +287,8 @@ Deno.test("2048 nested demand cancel and settle cycles restore counted roots and
     await compileAndRun(
       `
 type Tick is effect = { read: U32 -> U32 }
-const delay = fn ~value => value
-const abort = fn log => fn computation => do:
+const delay = func ~value => return value
+const abort = func log => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -297,7 +297,7 @@ const abort = fn log => fn computation => do:
       complete value =>
         break value
   break 7
-const finish = fn log => fn computation => do:
+const finish = func log => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read value =>
@@ -305,19 +305,19 @@ const finish = fn log => fn computation => do:
         yield @u32.add value 40
       complete value =>
         break value
-const scenario = fn log => do:
+const scenario = func log => return do:
   let payload = @array.fill 128 41
   let inner = delay (Tick.read 1)
   let pending = delay (do:
     use value <- @demand inner
     break @u32.add payload[1] value
   )
-  let work = @computation (fn () => @demand pending)
+  let work = @computation (func () => return @demand pending)
   use first <- abort log work
   use second <- finish log work
   use third <- finish log work
   break @u32.add first (@u32.add second third)
-entry const answer = fn (log: U32 -> U32 ! {Foreign}) => scenario log
+entry const answer = func (log: U32 -> U32 ! {Foreign}) => return scenario log
 `,
       async (_, bytes) => {
         const module = admitted(bytes);
@@ -375,7 +375,7 @@ entry const answer = fn (log: U32 -> U32 ! {Foreign}) => scenario log
 
 Deno.test("a scalar host reply borrows its Array argument from the suspended caller under allocation pressure", async () => {
   await compileAndRun(`
-entry const run = fn (host: Array U32 -> U32 ! {Foreign}) => do:
+entry const run = func (host: Array U32 -> U32 ! {Foreign}) => return do:
   let captured = @array.fill 4096 21
   use reply <- host captured
   break @u32.add captured[2] reply

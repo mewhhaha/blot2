@@ -1,6 +1,6 @@
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let result = 0
-  for request in @requests (@computation (fn () => 42)):
+  for request in @requests (@computation (func () => return 42)):
     case request of
       complete value =>
         result := value

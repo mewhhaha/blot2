@@ -1,14 +1,14 @@
 
 type Validate is effect = { check: U32 -> U32 }
-const invoke = fn operation => operation 40
+const invoke = func operation => return operation 40
 const selected = Validate.check
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
         yield @u32.add value 2
       complete value =>
         break value
-entry const answer = fn () => checked (@computation (fn () => invoke selected))
+entry const answer = func () => return checked (@computation (func () => return invoke selected))
 
 entry const checked_answer = answer ()

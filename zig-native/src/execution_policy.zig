@@ -3,6 +3,7 @@
 //! Compiler behavior is not policy: fresh and retained builds run the same
 //! implementation, and artifact retention follows the retained session.
 pub const Policy = struct {
+    storage: @import("backend/storage_plan.zig").Budgets = .{},
     codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
     share_machine_code: bool = false,
     /// Diagnostic final-Wasm counters; absent from ordinary release output.

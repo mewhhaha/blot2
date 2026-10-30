@@ -31,10 +31,10 @@ fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
 }
 test "task scope wrapper authority requires its exact callback body" {
     var module = try lower(
-        \\const scope = fn body => @task.scope body
-        \\const relay = fn body => scope body
-        \\entry const answer = fn () => relay (fn group => do:
-        \\  let pending = @task.spawn group (fn () => 42)
+        \\const scope = func body => return @task.scope body
+        \\const relay = func body => return scope body
+        \\entry const answer = func () => return relay (func group => return do:
+        \\  let pending = @task.spawn group (func () => return 42)
         \\  break @task.join pending)
     );
     defer module.deinit(a);
@@ -55,14 +55,14 @@ test "task scope wrapper authority requires its exact callback body" {
 }
 test "spawn helper partial calls retain actual capture ownership and reject forged contracts through OOM" {
     var module = try lower(
-        \\const launch = fn group => fn action => @task.spawn group action
+        \\const launch = func group => return func action => return @task.spawn group action
         \\const alias = launch
-        \\entry const answer = fn (owner: unique U32) => @task.scope (fn group => do:
+        \\entry const answer = func (owner: unique U32) => return @task.scope (func group => return do:
         \\  let here = alias group
         \\  let renamed = here
-        \\  let pending = renamed (fn () => owner)
+        \\  let pending = renamed (func () => return owner)
         \\  let result = |pending|
-        \\  break @usage.borrow result (fn loan => @usage.read loan))
+        \\  break @usage.borrow result (func loan => return @usage.read loan))
     );
     defer module.deinit(a);
     var wrappers: usize = 0;
@@ -83,9 +83,9 @@ test "spawn helper partial calls retain actual capture ownership and reject forg
 }
 test "task collect validates every result field before emission through allocation failures" {
     var module = try lower(
-        \\entry const answer = fn () => @task.scope (fn group => do:
-        \\  let left = @task.spawn group (fn () => 20)
-        \\  let right = @task.spawn group (fn () => 1.5)
+        \\entry const answer = func () => return @task.scope (func group => return do:
+        \\  let left = @task.spawn group (func () => return 20)
+        \\  let right = @task.spawn group (func () => return 1.5)
         \\  let (first, second) = |(left, right)|
         \\  break @f32.add (@u32.to_f32 first) second)
     );
@@ -106,10 +106,10 @@ test "task collect validates every result field before emission through allocati
 }
 test "generic tuple receive preserves a complete task lifetime graph" {
     var module = try lower(
-        \\const await = fn source => |source|
-        \\entry const answer = fn () => @task.scope (fn group => do:
-        \\  let first = @task.spawn group (fn () => 20)
-        \\  let second = @task.spawn group (fn () => 22)
+        \\const await = func source => return |source|
+        \\entry const answer = func () => return @task.scope (func group => return do:
+        \\  let first = @task.spawn group (func () => return 20)
+        \\  let second = @task.spawn group (func () => return 22)
         \\  let (left, right) = await (first, second)
         \\  break @u32.add left right)
     );
@@ -124,9 +124,9 @@ test "generic tuple receive preserves a complete task lifetime graph" {
 }
 test "structured task backend owns replay retained helpers and every failed allocation" {
     var module = try lower(
-        \\entry const answer = fn (owner: unique U32) => do:
-        \\  let result = @task.scope (fn group => @task.join (@task.spawn group (fn () => owner)))
-        \\  break @usage.borrow result (fn loan => @usage.read loan)
+        \\entry const answer = func (owner: unique U32) => return do:
+        \\  let result = @task.scope (func group => return @task.join (@task.spawn group (func () => return owner)))
+        \\  break @usage.borrow result (func loan => return @usage.read loan)
     );
     defer module.deinit(a);
     const before = @import("core_snapshot_tests.zig").stamp(module);
@@ -142,9 +142,9 @@ test "structured task backend owns replay retained helpers and every failed allo
 }
 test "portable task capture proof checks actual named call contracts without reference children" {
     var module = try lower(
-        \\const ordinary = fn (host: Unit -> U32 ! {Foreign}) => host ()
-        \\const helper = fn (host: Unit -> U32 ! {Foreign}) => ordinary host
-        \\entry const answer = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => 42)))
+        \\const ordinary = func (host: Unit -> U32 ! {Foreign}) => return host ()
+        \\const helper = func (host: Unit -> U32 ! {Foreign}) => return ordinary host
+        \\entry const answer = func () => return @task.scope (func group => return @task.join (@task.spawn group (func () => return 42)))
     );
     defer module.deinit(a);
     var foreign_call: core.Id = 0;
@@ -162,9 +162,9 @@ test "portable task capture proof checks actual named call contracts without ref
 test "portable task capture authority encloses the destination rather than only the spawn site" {
     const tasks = @import("task_types.zig");
     var module = try lower(
-        \\entry const answer = fn () => @task.scope (fn outer => do:
-        \\  let unused = @task.spawn outer (fn () => 1)
-        \\  break @task.scope (fn inner => @task.join (@task.spawn inner (fn () => @task.join (@task.spawn inner (fn () => 42))))))
+        \\entry const answer = func () => return @task.scope (func outer => return do:
+        \\  let unused = @task.spawn outer (func () => return 1)
+        \\  break @task.scope (func inner => return @task.join (@task.spawn inner (func () => return @task.join (@task.spawn inner (func () => return 42))))))
     );
     defer module.deinit(a);
     var outer: core.Id = 0;
@@ -193,9 +193,9 @@ test "portable task partitions reject overlapping ranges and a forged moved owne
     const tasks = @import("task_types.zig");
     const regions = @import("task_regions.zig");
     var module = try lower(
-        \\const partition = fn (owner: unique (Array U32)) => @task.split owner ((0, 2), (2, 4)) (fn views => do:
+        \\const partition = func (owner: unique (Array U32)) => return @task.split owner ((0, 2), (2, 4)) (func views => return do:
         \\  let (left, right) = views
-        \\  break @task.scope (fn group => @task.join (@task.spawn group (fn () => @task.read left 0))))
+        \\  break @task.scope (func group => return @task.join (@task.spawn group (func () => return @task.read left 0))))
     );
     defer module.deinit(a);
     var split: core.Id = 0;
@@ -222,9 +222,9 @@ test "portable task partitions reject overlapping ranges and a forged moved owne
 
 test "portable task selected pure arrow cannot replace an actual named Foreign declaration" {
     var module = try lower(
-        \\const ordinary = fn (host: Unit -> U32 ! {Foreign}) => host ()
-        \\const helper = fn (host: Unit -> U32 ! {Foreign}) => ordinary host
-        \\entry const answer = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => 42)))
+        \\const ordinary = func (host: Unit -> U32 ! {Foreign}) => return host ()
+        \\const helper = func (host: Unit -> U32 ! {Foreign}) => return ordinary host
+        \\entry const answer = func () => return @task.scope (func group => return @task.join (@task.spawn group (func () => return 42)))
     );
     defer module.deinit(a);
     var call: core.Id = 0;
@@ -274,8 +274,8 @@ test "task lexical evidence cannot instantiate an ordinary universal data witnes
 
 test "task actual call proof terminates on exact cross unit recursive declarations" {
     const source =
-        \\const recur = fn (value: U32) -> U32 => if @u32.eq value 0 then 42 else recur (@u32.sub value 1)
-        \\entry const answer = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => recur 3)))
+        \\const recur = func (value: U32) : U32 => return if @u32.eq value 0 then 42 else recur (@u32.sub value 1)
+        \\entry const answer = func () => return @task.scope (func group => return @task.join (@task.spawn group (func () => return recur 3)))
     ;
     var left = try lowerUnit(source, 1);
     defer left.deinit(a);
@@ -296,9 +296,9 @@ test "task actual call proof terminates on exact cross unit recursive declaratio
 test "task call proof reconstructs Foreign body after coordinated pure header forgery" {
     const T = @import("types.zig");
     var module = try lower(
-        \\const ordinary = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)
-        \\const invoke = fn () => ordinary ()
-        \\entry const answer = fn () => @task.scope (fn group => @task.join (@task.spawn group (fn () => 42)))
+        \\const ordinary = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)
+        \\const invoke = func () => return ordinary ()
+        \\entry const answer = func () => return @task.scope (func group => return @task.join (@task.spawn group (func () => return 42)))
     );
     defer module.deinit(a);
     var call: core.Id = 0;
@@ -328,9 +328,9 @@ test "task call proof reconstructs Foreign body after coordinated pure header fo
 
 test "task collection generation reconstructs callback bodies despite pure selected claims" {
     var module = try lower(
-        \\const hidden = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)
-        \\const ordinary = fn () => @array.generate 1 (fn (index: U32) => 42)
-        \\entry const answer = fn () -> Array U32 => @task.scope (fn group => @task.join (@task.spawn group (fn () => ordinary ())))
+        \\const hidden = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)
+        \\const ordinary = func () => return @array.generate 1 (func (index: U32) => return 42)
+        \\entry const answer = func () : Array U32 => return @task.scope (func group => return @task.join (@task.spawn group (func () => return ordinary ())))
     );
     defer module.deinit(a);
     var callback: core.Id = 0;

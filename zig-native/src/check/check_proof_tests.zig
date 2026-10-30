@@ -34,7 +34,7 @@ fn sourceLaw(allocator: A, text: []const u8, expected: ?check.Code) !void {
 }
 
 fn declaredProofLaw(allocator: A) !void {
-    try sourceLaw(allocator, "const f: (x: U32) -> (@proof.U32Le 0 x) -> U32 = fn x => fn proof => x", null);
+    try sourceLaw(allocator, "const f: (x: U32) -> (@proof.U32Le 0 x) -> U32 = func x => return func proof => return x", null);
 }
 test "numeric proof checking owns resolved public header contracts through OOM" {
     try declaredProofLaw(std.testing.allocator);
@@ -42,15 +42,15 @@ test "numeric proof checking owns resolved public header contracts through OOM" 
 }
 
 test "numeric proof checking rejects contradictions hidden kinds and unavailable operands" {
-    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> (@proof.U32Lt x x) -> U32 = fn x => fn proof => x", .contradictory_proof);
-    try sourceLaw(std.testing.allocator, "const f: (@proof.U32Le 0 later) -> (later: U32) -> U32 = fn proof => fn later => later", .proof_scope_escape);
-    try sourceLaw(std.testing.allocator, "const f: (x: Bool) -> (@proof.U32Eq x 0) -> U32 = fn x => fn proof => 0", .invalid_proof_operand);
-    try sourceLaw(std.testing.allocator, "const f: (Bool, @proof.U32Eq 0 0) -> U32 = fn packed => 0", .proof_runtime_use);
+    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> (@proof.U32Lt x x) -> U32 = func x => return func proof => return x", .contradictory_proof);
+    try sourceLaw(std.testing.allocator, "const f: (@proof.U32Le 0 later) -> (later: U32) -> U32 = func proof => return func later => return later", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, "const f: (x: Bool) -> (@proof.U32Eq x 0) -> U32 = func x => return func proof => return 0", .invalid_proof_operand);
+    try sourceLaw(std.testing.allocator, "const f: (Bool, @proof.U32Eq 0 0) -> U32 = func packed => return 0", .proof_runtime_use);
 }
 
 fn runtimeProofLaw(allocator: A) !void {
-    const header = "const f: (x: U32) -> (@proof.U32Le 0 x) -> U32 = fn x => fn proof => ";
-    try sourceLaw(allocator, "const identity = fn value => value\n" ++ header ++ "identity proof", .proof_runtime_use);
+    const header = "const f: (x: U32) -> (@proof.U32Le 0 x) -> U32 = func x => return func proof => return ";
+    try sourceLaw(allocator, "const identity = func value => return value\n" ++ header ++ "identity proof", .proof_runtime_use);
     try sourceLaw(allocator, header ++ "do:\n  let stored = (proof, x)\n  break x", .proof_runtime_use);
     try sourceLaw(allocator, header ++ "do:\n  let stored = #[proof]\n  break x", .proof_runtime_use);
     try sourceLaw(allocator, header ++ "do:\n  let stored = {value: proof}\n  break x", .proof_runtime_use);
@@ -62,7 +62,7 @@ test "numeric proof checking rejects data polymorphism and aggregate storage thr
 
 fn introductions(allocator: A) !void {
     const text =
-        \\const inspect = fn (values: Array U32) => fn (other: Array U32) => fn (index: U32) => fn (right: U32) => do:
+        \\const inspect = func (values: Array U32) => return func (other: Array U32) => return func (index: U32) => return func (right: U32) => return do:
         \\  let alias = values
         \\  let first = @proof.index values index
         \\  let same = @proof.index alias index
@@ -110,22 +110,22 @@ test "numeric proof introductions retain exact aliases versions lengths and fals
 }
 
 test "numeric proof introductions reject invalid operands arity storage and inferred results" {
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => @proof.le 0 x", .proof_scope_escape);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.eq #True x\n  break x", .invalid_proof_operand);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.index x 0\n  break x", .invalid_proof_operand);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le x\n  break x", .call_arity);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = @proof.le 0 x x\n  break x", .call_arity);
-    try sourceLaw(std.testing.allocator, "const f = fn (x: U32) => do:\n  let invalid = #[@proof.le 0 x]\n  break x", .proof_runtime_use);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return @proof.le 0 x", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return do:\n  let invalid = @proof.eq true x\n  break x", .invalid_proof_operand);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return do:\n  let invalid = @proof.index x 0\n  break x", .invalid_proof_operand);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return do:\n  let invalid = @proof.le x\n  break x", .call_arity);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return do:\n  let invalid = @proof.le 0 x x\n  break x", .call_arity);
+    try sourceLaw(std.testing.allocator, "const f = func (x: U32) => return do:\n  let invalid = #[@proof.le 0 x]\n  break x", .proof_runtime_use);
 }
 
-const at_source = "const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index\n";
+const at_source = "const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index\n";
 fn exactProofCalls(allocator: A) !void {
     var checked = try checkedSource(allocator, at_source ++
-        \\const forward: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => do:
+        \\const forward: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return do:
         \\  let valid = proof
         \\  break do:
         \\    break at values index valid
-        \\const inspect = fn (values: Array U32) => fn (index: U32) => do:
+        \\const inspect = func (values: Array U32) => return func (index: U32) => return do:
         \\  let alias = values
         \\  let valid = @proof.index alias index
         \\  break do:
@@ -147,26 +147,26 @@ test "numeric proof calls substitute exact public operands and preserve witness 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, exactProofCalls, .{});
 }
 test "numeric proof calls reject other collections rebound indexes mismatched facts and Unit" {
-    const caller = at_source ++ "const inspect = fn (values: Array U32) => fn (other: Array U32) => fn (index: U32) => do:\n  let valid = @proof.index values index\n";
+    const caller = at_source ++ "const inspect = func (values: Array U32) => return func (other: Array U32) => return func (index: U32) => return do:\n  let valid = @proof.index values index\n";
     try sourceLaw(std.testing.allocator, caller ++ "  break at other index valid", .proof_mismatch);
     try sourceLaw(std.testing.allocator, caller ++ "  index := @u32.add self 1\n  break at values index valid", .proof_mismatch);
     try sourceLaw(std.testing.allocator, caller ++ "  let different = @proof.le 0 index\n  break at values index different", .proof_mismatch);
     try sourceLaw(std.testing.allocator, caller ++ "  break at values index ()", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => at values index valid\n  break 0", .proof_scope_escape);
-    try sourceLaw(std.testing.allocator, caller ++ "  let closure = fn () => do:\n    let alias = valid\n    break 0\n  break 0", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, caller ++ "  let closure = func () => return at values index valid\n  break 0", .proof_scope_escape);
+    try sourceLaw(std.testing.allocator, caller ++ "  let closure = func () => return do:\n    let alias = valid\n    break 0\n  break 0", .proof_scope_escape);
     try sourceLaw(std.testing.allocator, at_source ++ "const forged: (values: Array U32) -> (index: U32) -> (@proof.U32Eq index 0) -> U32 = at", .proof_runtime_use);
-    try sourceLaw(std.testing.allocator, at_source ++ "const forged: (values: Array U32) -> (index: U32) -> (@proof.U32Eq index 0) -> U32 = fn values => at values", .proof_runtime_use);
+    try sourceLaw(std.testing.allocator, at_source ++ "const forged: (values: Array U32) -> (index: U32) -> (@proof.U32Eq index 0) -> U32 = func values => return at values", .proof_runtime_use);
 }
 
 fn publicProofResults(allocator: A) !void {
     const text =
-        \\const index: (values: Array U32) -> (at: U32) -> @proof.Index values at = fn values => fn at => @proof.index values at
-        \\const forward: (values: Array U32) -> (at: U32) -> (@proof.Index values at) -> @proof.Index values at = fn values => fn at => fn proof => do:
+        \\const index: (values: Array U32) -> (at: U32) -> @proof.Index values at = func values => return func at => return @proof.index values at
+        \\const forward: (values: Array U32) -> (at: U32) -> (@proof.Index values at) -> @proof.Index values at = func values => return func at => return func proof => return do:
         \\  let alias = proof
         \\  break do:
         \\    break alias
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-        \\const lookup = fn (values: Array U32) => fn (i: U32) => do:
+        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+        \\const lookup = func (values: Array U32) => return func (i: U32) => return do:
         \\  let valid = index values i
         \\  break at values i (forward values i valid)
     ;
@@ -181,6 +181,6 @@ test "numeric proof public results bind complete recipes through aliases calls a
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, publicProofResults, .{});
 }
 test "numeric proof public results reject changed local operands and a different proposition" {
-    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Le x 0 = fn x => @proof.le x 1", .proof_mismatch);
-    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Lt x 10 = fn x => do:\n  x := @u32.add self 1\n  break @proof.lt x 10", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Le x 0 = func x => return @proof.le x 1", .proof_mismatch);
+    try sourceLaw(std.testing.allocator, "const f: (x: U32) -> @proof.U32Lt x 10 = func x => return do:\n  x := @u32.add self 1\n  break @proof.lt x 10", .proof_mismatch);
 }

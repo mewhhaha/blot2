@@ -248,7 +248,7 @@ fn identifier(name: []const u8, upper: bool) bool {
         for ([_][]const u8{ "Unit", "Bool", "U32", "F32", "Array", "List" }) |builtin| if (std.mem.eql(u8, name, builtin)) return false;
     } else if ((name[0] < 'a' or name[0] > 'z') and name[0] != '_') return false;
     for (name[1..]) |byte| if (!std.ascii.isAlphanumeric(byte) and byte != '_') return false;
-    var words = std.mem.tokenizeScalar(u8, "const let type data effect is fn do use return yield break for ever in case of if then else as import infix infixl infixr self where", ' ');
+    var words = std.mem.tokenizeScalar(u8, "const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where", ' ');
     while (words.next()) |word| if (std.mem.eql(u8, word, name)) return false;
     return true;
 }

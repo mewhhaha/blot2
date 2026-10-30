@@ -7,9 +7,9 @@ const executable = Deno.args[0] ??
 const source = (offset: string) => `
 const offset = ${offset}
 entry const folded: U32 where { type_rep U32 } = do:
-  let local = fn value => value
+  let local = func value => return value
   break local offset
-entry const answer = fn (value: U32) => @u32.add value offset
+entry const answer = func (value: U32) => return @u32.add value offset
 `;
 
 async function files(directory: string): Promise<string[]> {
@@ -109,7 +109,7 @@ for (const project of [false, true]) {
       const changed = await build();
       assert.deepEqual(changed.bytes, (await build("")).bytes);
       const beforeFailure = await Deno.readFile(artifact);
-      await Deno.writeTextFile(entry, source("#True"));
+      await Deno.writeTextFile(entry, source("true"));
       const failed = await build(cache, false);
       assert.deepEqual(failed.errors, (await build("", false)).errors);
       assert.deepEqual(await Deno.readFile(artifact), beforeFailure);
@@ -180,7 +180,7 @@ Deno.test("project server persists committed checkpoints across disposal and gra
       assert(changed.success, JSON.stringify(changed));
       expected = changed.bytes;
       const failed = await retained.build({
-        sources: { [entry]: source("#True") },
+        sources: { [entry]: source("true") },
       });
       assert(!failed.success);
       await retained.close();
@@ -520,9 +520,9 @@ Deno.test("project server restarts edited projects from the cached dependency se
   const cache = `${directory}/cache`;
   const options = { executable, entry, prelude: null, cacheDirectory: cache };
   const producer = (value: string) =>
-    `const value: U32 = ${value}\nconst read = fn (x: U32) => @u32.add x value\n`;
+    `const value: U32 = ${value}\nconst read = func (x: U32) => return @u32.add x value\n`;
   const consumer = (offset: string) =>
-    `import * as dep from "./dep"\nentry const answer = fn (x: U32) => @u32.add (dep.read x) ${offset}\n`;
+    `import * as dep from "./dep"\nentry const answer = func (x: U32) => return @u32.add (dep.read x) ${offset}\n`;
   const build = async (cacheDirectory: string | false = cache) => {
     const compiler = await createZigProjectCompiler({
       ...options,

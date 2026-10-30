@@ -17,7 +17,7 @@ long chains of nested stage functions.
 ## Starting point
 
 A module with a chain of about 12–20 nested stage functions
-(`const b = fn () => run (a ()) …`) called from many entries makes
+(`const b = func () => return run (a ()) …`) called from many entries makes
 `blotc serve-project` exit with signal 11 (exit 139); the client reports
 "Unexpected EOF or truncated response frame". Some subsets of the entries
 compile, and adding links to the chain made a compiling module crash. The repro

@@ -21,11 +21,11 @@ async function compile(source: string) {
 
 Deno.test("async capabilities suspend main while retaining locals and exclusive invocation ownership", async () => {
   const bytes = await compile(`
-entry const main = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 40
   use second <- host first
   break @u32.add first second
-entry const pure = fn () => 7
+entry const pure = func () => return 7
 `);
   const guest = await instantiateGuest(bytes, { asynchronous: true });
   let resume!: (value: number) => void;
@@ -81,7 +81,7 @@ entry const pure = fn () => 7
 
 Deno.test("numeric array capabilities copy packets and preserve guest allocations through suspension and growth", async () => {
   const bytes = await compile(`
-entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) => do:
+entry const main = func (host: Array F32 -> Array F32 ! {Foreign}) => return do:
   let retained = @array.fill 70000 9.5
   use first <- host #[1.5, 2.5]
   use second <- host first
@@ -145,13 +145,13 @@ entry const main = fn (host: Array F32 -> Array F32 ! {Foreign}) => do:
 
 Deno.test("array callback signatures support unsigned arrays and mixed scalar results", async () => {
   const bytes = await compile(`
-entry const arrays = fn (host: Array U32 -> Array U32 ! {Foreign}) => do:
+entry const arrays = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   use result <- host #[4_294_967_295]
   break result
-entry const input = fn (host: Array U32 -> U32 ! {Foreign}) => do:
+entry const input = func (host: Array U32 -> U32 ! {Foreign}) => return do:
   use result <- host #[4_294_967_295]
   break result
-entry const output = fn (host: U32 -> Array U32 ! {Foreign}) => do:
+entry const output = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use result <- host 4_294_967_295
   break result
 `);

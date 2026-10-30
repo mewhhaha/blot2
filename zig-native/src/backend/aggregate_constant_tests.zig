@@ -15,11 +15,11 @@ const source =
     \\type Pair is data = #Pair { left: U32, right: U32 }
     \\const pair = #Pair { left: 20, right: 22 }
     \\const other = 0
-    \\entry const pick = fn (i: U32) => table[i]
-    \\entry const first = fn () => do:
+    \\entry const pick = func (i: U32) => return table[i]
+    \\entry const first = func () => return do:
     \\  let #Pair { left, right } = pair
     \\  break @u32.add left right
-    \\entry const unrelated = fn () => other
+    \\entry const unrelated = func () => return other
 ;
 const Fixture = struct {
     units: []core.Module,
@@ -120,11 +120,11 @@ const interleaved =
     \\type Pair is data = #Pair { left: U32, right: U32 }
     \\const pair = #Pair { left: 20, right: 22 }
     \\const other = 0
-    \\entry const three = fn (i: U32) => do:
+    \\entry const three = func (i: U32) => return do:
     \\  let #Pair { left, right } = pair
     \\  let low = @u32.add table[i] left
     \\  break @u32.add low (@u32.add second[i] right)
-    \\entry const unrelated = fn () => other
+    \\entry const unrelated = func () => return other
 ;
 test "admission skips every aggregate child range of one caller and keeps the records between them" {
     var before = try Fixture.init(interleaved);

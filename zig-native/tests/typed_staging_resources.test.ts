@@ -11,56 +11,56 @@ Deno.test("quoted resources and requests retain effect and lifetime owners acros
   const archive = `${directory}/producer.blotdep`;
   const source =
     `import {scoped, released, failed, handled, unused, owned, nested, spliced, owned_once, captured} from "./producer"
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => (@code.emit scoped) host
-entry const again = fn (host: Unit -> U32 ! {Foreign}) => (@code.emit scoped) host
-entry const release = fn () => (@code.emit released) ()
-entry const cleanup_failure = fn () => (@code.emit failed) ()
-entry const handled_result = fn (host: Unit -> U32 ! {Foreign}) => (@code.emit handled) host
-entry const unused_result = fn (host: Unit -> U32 ! {Foreign}) => (@code.emit unused) host
-entry const owned_result = fn () => @code.emit owned
-entry const nested_result = fn () => @code.emit nested
-entry const spliced_result = fn () => @code.emit spliced
-entry const once_result = fn () => @code.emit owned_once
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return (@code.emit scoped) host
+entry const again = func (host: Unit -> U32 ! {Foreign}) => return (@code.emit scoped) host
+entry const release = func () => return (@code.emit released) ()
+entry const cleanup_failure = func () => return (@code.emit failed) ()
+entry const handled_result = func (host: Unit -> U32 ! {Foreign}) => return (@code.emit handled) host
+entry const unused_result = func (host: Unit -> U32 ! {Foreign}) => return (@code.emit unused) host
+entry const owned_result = func () => return @code.emit owned
+entry const nested_result = func () => return @code.emit nested
+entry const spliced_result = func () => return @code.emit spliced
+entry const once_result = func () => return @code.emit owned_once
 const captured_read: unique U32 -> U32 = @code.emit captured
-entry const captured_result = fn () => captured_read 42
+entry const captured_result = func () => return captured_read 42
 `;
   const library = (value: number) =>
     `effect Read: Unit -> U32
-const scoped = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => @resource.scope (fn () => ${value}) (fn owner => ()) (fn loan => @u32.add (@usage.read loan) (host ())))
-const released = @code.quote (fn () => do:
-  use owner <- @resource.acquire (fn () => ${value}) (fn value => ())
+const scoped = @code.quote (func (host: Unit -> U32 ! {Foreign}) => return @resource.scope (func () => return ${value}) (func owner => return ()) (func loan => return @u32.add (@usage.read loan) (host ())))
+const released = @code.quote (func () => return do:
+  use owner <- @resource.acquire (func () => return ${value}) (func value => return ())
   use @resource.release owner
   break ${value})
-const failed = @code.quote (fn () => @resource.scope (fn () => ${value}) (fn owner => @panic "quoted cleanup") (fn loan => @usage.read loan))
-const handled = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
-  let calculation = @computation (fn () => @u32.add (Read ()) ${value})
+const failed = @code.quote (func () => return @resource.scope (func () => return ${value}) (func owner => return @panic "quoted cleanup") (func loan => return @usage.read loan))
+const handled = @code.quote (func (host: Unit -> U32 ! {Foreign}) => return do:
+  let calculation = @computation (func () => return @u32.add (Read ()) ${value})
   for request in @requests calculation:
     case request of
       effect Read () =>
         yield host ()
       complete value =>
         break value)
-const unused = @code.quote (fn (host: Unit -> U32 ! {Foreign}) => do:
-  let calculation = @computation (fn () => ${value})
+const unused = @code.quote (func (host: Unit -> U32 ! {Foreign}) => return do:
+  let calculation = @computation (func () => return ${value})
   for request in @requests calculation:
     case request of
       effect Read () =>
         yield host ()
       complete value =>
         break value)
-const consume = fn (value: unique U32) => @usage.borrow value (fn loan => @usage.read loan)
-const make = fn (value: unique U32) => @code.quote (@code.lift (consume value))
-const make_nested = fn (value: unique U32) => @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
-const make_spliced = fn (value: unique U32) => @code.quote (@code.splice (make value))
-const make_once = fn (value: unique U32) => do:
-  let build: once (Unit -> code [U32, row {}]) = fn () => @code.quote (@code.lift (consume value))
+const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
+const make = func (value: unique U32) => return @code.quote (@code.lift (consume value))
+const make_nested = func (value: unique U32) => return @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
+const make_spliced = func (value: unique U32) => return @code.quote (@code.splice (make value))
+const make_once = func (value: unique U32) => return do:
+  let build: once (Unit -> code [U32, row {}]) = func () => return @code.quote (@code.lift (consume value))
   break build ()
 const owned = make ${value}
 const nested = @code.run (make_nested ${value})
 const spliced = make_spliced ${value}
 const owned_once = make_once ${value}
-const captured = @code.quote (fn (value: unique U32) => @usage.borrow value (fn loan => do:
-  let read = fn () => @usage.read loan
+const captured = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return do:
+  let read = func () => return @usage.read loan
   break read ()))
 `;
   const observe = async (bytes: Uint8Array<ArrayBuffer>, value: number) => {
@@ -177,8 +177,8 @@ const captured = @code.quote (fn (value: unique U32) => @usage.borrow value (fn 
               sources: {
                 ...sources,
                 [producer]: sources[producer].replace(
-                  "let read = fn () => @usage.read loan",
-                  "let read = fn () => loan",
+                  "let read = func () => return @usage.read loan",
+                  "let read = func () => return loan",
                 ),
               },
             });

@@ -3,102 +3,102 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const source = `
-const add22 = fn value => @u32.add value 22
-const add_half = fn value => @f32.add value 0.5
-const await = fn source => |source|
+const add22 = func value => return @u32.add value 22
+const add_half = func value => return @f32.add value 0.5
+const await = func source => return |source|
 const await_alias = await
-const scope = fn body => @task.scope body
-const launch = fn group => fn action => @task.spawn group action
+const scope = func body => return @task.scope body
+const launch = func group => return func action => return @task.spawn group action
 const launch_alias = launch
 const region = scope
-const relay = fn body => scope body
-const wrap = fn () => fn body => scope body
-const identity = fn value => value
+const relay = func body => return scope body
+const wrap = func () => return func body => return scope body
+const identity = func value => return value
 const curried = identity (wrap ())
-entry const dollar_scope = fn () => @task.scope $ fn group => do:
-  let left = @task.spawn group $ fn () => 20
+entry const dollar_scope = func () => return @task.scope $ func group => return do:
+  let left = @task.spawn group $ func () => return 20
   let right = *(add22 0)
   let (a, b) = |(left, right)|
   return @u32.add a b
-entry const dollar_wrapper = fn () => region $ fn group => do:
+entry const dollar_wrapper = func () => return region $ func group => return do:
   let pending = *(add22 20)
   return |pending|
-entry const dollar_nested = fn () => @task.scope $ fn outer => do:
+entry const dollar_nested = func () => return @task.scope $ func outer => return do:
   let left = *(add22 0)
-  let right = region $ fn inner => do:
+  let right = region $ func inner => return do:
     let pending = *(add22 20)
     return |pending|
   return @u32.add (|left|) right
-entry const answer = fn () => @task.scope (fn group => do:
+entry const answer = func () => return @task.scope (func group => return do:
   let left = *(add22 20)
-  let right = @task.spawn group (fn () => 0)
+  let right = @task.spawn group (func () => return 0)
   return @u32.add (|left|) (|right|))
-entry const branch = fn (choice: Bool) => do:
+entry const branch = func (choice: Bool) => return do:
   if choice:
     return 42
   return 5
-entry const sparked = fn () => @task.scope (fn group => do:
+entry const sparked = func () => return @task.scope (func group => return do:
   let pending = *(add22 20)
   return |pending|)
-entry const nested = fn () => @task.scope (fn outer => do:
+entry const nested = func () => return @task.scope (func outer => return do:
   let first = *(add22 0)
-  let second = @task.scope (fn inner => do:
+  let second = @task.scope (func inner => return do:
     let pending = *(add22 20)
     return |pending|)
   return @u32.add (|first|) second)
-entry const wrapped = fn () => @task.scope (fn group => do:
+entry const wrapped = func () => return @task.scope (func group => return do:
   let pending = *(add22 20)
   return await pending)
-entry const wrapped_alias = fn () => @task.scope (fn group => do:
+entry const wrapped_alias = func () => return @task.scope (func group => return do:
   let pending = *(add22 20)
   return await_alias pending)
-entry const direct_f32 = fn () => @task.scope (fn group => do:
+entry const direct_f32 = func () => return @task.scope (func group => return do:
   let pending = *(add_half 1.0)
   return |pending|)
-entry const wrapped_f32 = fn () => @task.scope (fn group => do:
+entry const wrapped_f32 = func () => return @task.scope (func group => return do:
   let pending = *(add_half 1.0)
   return await pending)
-entry const shadowed_group = fn () => @task.scope (fn group => do:
+entry const shadowed_group = func () => return @task.scope (func group => return do:
   let group = 100
   let pending = *(add22 20)
   return @u32.add group (|pending|))
-entry const wrapped_scope = fn () => region (fn group => do:
+entry const wrapped_scope = func () => return region (func group => return do:
   let pending = *(add22 20)
   return |pending|)
-entry const relayed_scope = fn () => relay (fn group => do:
+entry const relayed_scope = func () => return relay (func group => return do:
   let pending = *(add22 20)
   return |pending|)
-entry const curried_scope = fn () => curried (fn group => @task.join (@task.spawn group (fn () => 42)))
-entry const collected = fn () => scope (fn group => do:
+entry const curried_scope = func () => return curried (func group => return @task.join (@task.spawn group (func () => return 42)))
+entry const collected = func () => return scope (func group => return do:
   let left = *(add22 20)
   let right = *(add22 0)
   let (first, second) = |(left, right)|
   return @u32.add first second)
-entry const held_collection = fn () => scope (fn group => do:
+entry const held_collection = func () => return scope (func group => return do:
   let left = *(add22 20)
   let right = *(add22 0)
   let receivers = (left, right)
   let (first, second) = |receivers|
   return @u32.add first second)
-entry const helper_collection = fn () => scope (fn group => do:
+entry const helper_collection = func () => return scope (func group => return do:
   let left = *(add22 20)
   let right = *(add22 0)
   let receivers = (left, right)
   let (first, second) = await receivers
   return @u32.add first second)
-entry const mixed_collection = fn () => scope (fn group => do:
+entry const mixed_collection = func () => return scope (func group => return do:
   let left = *(add22 20)
   let right = *(add_half 1.0)
   let (first, second) = |(left, right)|
   return @f32.add (@u32.to_f32 first) second)
-entry const tuple_payload = fn () => scope (fn group => do:
-  let pending = @task.spawn group (fn () => (20, 22))
+entry const tuple_payload = func () => return scope (func group => return do:
+  let pending = @task.spawn group (func () => return (20, 22))
   let (first, second) = |pending|
   return @u32.add first second)
-entry const spawned_helper = fn () => scope (fn group => do:
+entry const spawned_helper = func () => return scope (func group => return do:
   let launch_here = launch_alias group
   let alias = launch_here
-  let pending = alias (fn () => 42)
+  let pending = alias (func () => return 42)
   return |pending|)
 `;
 
@@ -191,24 +191,24 @@ Deno.test("imported and renamed task receivers preserve their checked contract",
   const dependency = `${directory}/task.blot`;
   const main =
     `import {await as original, alias as imported, scope as region, launch_alias as spawn} from "./task"
-entry const answer = fn () => @task.scope (fn group => do:
-  let pending = @task.spawn group (fn () => 42)
+entry const answer = func () => return @task.scope (func group => return do:
+  let pending = @task.spawn group (func () => return 42)
   return original pending)
-entry const scoped = fn () => region (fn group => do:
-  let pending = @task.spawn group (fn () => 42)
+entry const scoped = func () => return region (func group => return do:
+  let pending = @task.spawn group (func () => return 42)
   return imported pending)
-entry const collected = fn () => region (fn group => do:
-  let first = @task.spawn group (fn () => 20)
-  let second = @task.spawn group (fn () => 22)
+entry const collected = func () => return region (func group => return do:
+  let first = @task.spawn group (func () => return 20)
+  let second = @task.spawn group (func () => return 22)
   let (left, right) = imported (first, second)
   return @u32.add left right)
-entry const spawned = fn () => region (fn group => do:
+entry const spawned = func () => return region (func group => return do:
   let here = spawn group
-  let pending = here (fn () => 42)
+  let pending = here (func () => return 42)
   return imported pending)
 `;
   const task =
-    "const await = fn source => |source|\nconst alias = await\nconst scope = fn body => @task.scope body\nconst launch = fn group => fn action => @task.spawn group action\nconst launch_alias = launch\n";
+    "const await = func source => return |source|\nconst alias = await\nconst scope = func body => return @task.scope body\nconst launch = func group => return func action => return @task.spawn group action\nconst launch_alias = launch\n";
   const executable = Deno.args[0] ??
     new URL("../zig-out/bin/blotc", import.meta.url);
   try {
@@ -263,16 +263,16 @@ Deno.test("spawn helper presence follows imported revisions and restart in both 
   const directory = await Deno.makeTempDir({ prefix: "blot-spawn-revision-" });
   const entry = `${directory}/main.blot`;
   const dependency = `${directory}/helper.blot`;
-  const ordinary = "const value = fn () => 41\n";
+  const ordinary = "const value = func () => return 41\n";
   const helper = ordinary +
-    "const launch = fn group => fn action => @task.spawn group action\nconst alias = launch\n";
+    "const launch = func group => return func action => return @task.spawn group action\nconst alias = launch\n";
   const plain = `import * as helper from "./helper"
-entry const answer = fn () => @u32.add (helper.value ()) 1
+entry const answer = func () => return @u32.add (helper.value ()) 1
 `;
   const spawned = `import {alias as launch, value} from "./helper"
-entry const answer = fn () => @task.scope (fn group => do:
+entry const answer = func () => return @task.scope (func group => return do:
   let here = launch group
-  let pending = here (fn () => @u32.add (value ()) 2)
+  let pending = here (func () => return @u32.add (value ()) 2)
   return |pending|)
 `;
   const executable = Deno.args[0] ??
@@ -365,28 +365,28 @@ entry const answer = fn () => @task.scope (fn group => do:
 
 Deno.test("tuple collection drains failures and transfers owning results once", async () => {
   const text = `
-const launch = fn group => fn action => @task.spawn group action
-entry const collect = fn (host: concurrent (U32 -> U32 ! {Foreign})) => @task.scope (fn group => do:
-  let first = @task.spawn group (fn () => host 1)
-  let second = @task.spawn group (fn () => host 2)
+const launch = func group => return func action => return @task.spawn group action
+entry const collect = func (host: concurrent (U32 -> U32 ! {Foreign})) => return @task.scope (func group => return do:
+  let first = @task.spawn group (func () => return host 1)
+  let second = @task.spawn group (func () => return host 2)
   use received <- |(first, second)|
   let (left, right) = received
   break @u32.add left right)
-entry const owners = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
-  use first <- @resource.acquire (fn () => 20) cleanup
-  use second <- @resource.acquire (fn () => 22) cleanup
-  let (left, right) = @task.scope (fn group => do:
-    let first_task = launch group (fn () => first)
-    let second_task = launch group (fn () => second)
+entry const owners = func (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => return do:
+  use first <- @resource.acquire (func () => return 20) cleanup
+  use second <- @resource.acquire (func () => return 22) cleanup
+  let (left, right) = @task.scope (func group => return do:
+    let first_task = launch group (func () => return first)
+    let second_task = launch group (func () => return second)
     break |(first_task, second_task)|)
-  break @usage.borrow left (fn left_loan => @usage.borrow right (fn right_loan => @u32.add (@usage.read left_loan) (@usage.read right_loan)))
-entry const failed_owner = fn (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => do:
-  use owner <- @resource.acquire (fn () => 20) cleanup
-  break @task.scope (fn group => do:
-    let first = @task.spawn group (fn () => owner)
-    let second = @task.spawn group (fn () -> U32 => @panic "failed child")
+  break @usage.borrow left (func left_loan => return @usage.borrow right (func right_loan => return @u32.add (@usage.read left_loan) (@usage.read right_loan)))
+entry const failed_owner = func (cleanup: cleanup (unique U32 -> Unit ! {Foreign})) => return do:
+  use owner <- @resource.acquire (func () => return 20) cleanup
+  break @task.scope (func group => return do:
+    let first = @task.spawn group (func () => return owner)
+    let second = @task.spawn group (func () : U32 => return @panic "failed child")
     let (left, right) = |(first, second)|
-    break @usage.borrow left (fn loan => @u32.add (@usage.read loan) right))
+    break @usage.borrow left (func loan => return @u32.add (@usage.read loan) right))
 `;
   const directory = await Deno.makeTempDir({ prefix: "blot-task-collect-" });
   const entry = `${directory}/main.blot`;

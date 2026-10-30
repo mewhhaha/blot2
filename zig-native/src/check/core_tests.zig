@@ -10,7 +10,7 @@ const memory = @import("../runtime/memory.zig");
 const a = std.testing.allocator;
 
 fn effectFixture() !Fixture {
-    var fixture = try Fixture.init("entry const chronology = fn () => 42\nentry const principal = fn ~(value: U32) => @force value\n");
+    var fixture = try Fixture.init("entry const chronology = func () => return 42\nentry const principal = func ~(value: U32) => return @force value\n");
     errdefer fixture.deinit();
     var store = &fixture.checked.types;
     const early = try store.internOperation(.{ .unit = 7, .decl = 9 }, &.{types.u32_type});
@@ -89,7 +89,7 @@ test "effect row and operation publication release every failed allocation" {
 }
 
 fn operationFixture() !Fixture {
-    var fixture = try Fixture.init("const identity = fn (value: U32) -> U32 => value\nentry const alias = identity\n");
+    var fixture = try Fixture.init("const identity = func (value: U32) : U32 => return value\nentry const alias = identity\n");
     errdefer fixture.deinit();
     var checked = &fixture.checked;
     const source = fixture.tree.valueDecl(fixture.tree.roots.items[1]).body;
@@ -146,8 +146,8 @@ test "operation callable publication owns producer identity and nominal argument
 test "source providers preserve operation type arguments as metadata" {
     const sources = [_][]const u8{
         \\type Read is effect = { first: Unit -> U32, second: Unit -> U32 }
-        \\const outer = @effect.provider Read.first (fn () => 20)
-        \\const second = @effect.provider Read.second (fn () => Read.first ())
+        \\const outer = @effect.provider Read.first (func () => return 20)
+        \\const second = @effect.provider Read.second (func () => return Read.first ())
         \\entry const answer = do outer:
         \\  break do second:
         \\    break Read.second ()
@@ -176,9 +176,9 @@ test "source providers preserve operation type arguments as metadata" {
 fn runnerFixture() !Fixture {
     return Fixture.init(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\const run = fn initial => fn action => @effect.run State.get State.set initial action
-        \\entry const answer = fn () => do:
-        \\  let (next, old) = run 41 (fn () => do:
+        \\const run = func initial => return func action => return @effect.run State.get State.set initial action
+        \\entry const answer = func () => return do:
+        \\  let (next, old) = run 41 (func () => return do:
         \\    use old <- State.get ()
         \\    use State.set (@u32.add old 1)
         \\    break old)
@@ -276,11 +276,11 @@ fn sharedHeaderPublication(allocator: std.mem.Allocator, fixture: *const Fixture
 
 test "shared written headers retain factory requirements and declaration candidates after publication" {
     var fixture = try Fixture.init(
-        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
-        \\const alias = fn value => twice value
+        \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
+        \\const alias = func value => return twice value
         \\const factory: U32 -> U32 = do:
         \\  break alias
-        \\entry const answer = fn (value: U32) => factory value
+        \\entry const answer = func (value: U32) => return factory value
     );
     defer fixture.deinit();
     try sharedHeaderPublication(a, &fixture);
@@ -290,10 +290,10 @@ test "shared written headers retain factory requirements and declaration candida
 test "one typed body retains principal numeric identity across U32 and F32 uses" {
     const source =
         \\infixl 60 (+) = _fixity_add
-        \\const twice = fn x => x + x
-        \\entry const integer = fn () -> U32 => twice 21
-        \\entry const floating = fn () -> F32 => twice 1.5
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const twice = func x => return x + x
+        \\entry const integer = func () : U32 => return twice 21
+        \\entry const floating = func () : F32 => return twice 1.5
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     ;
     var fixture = try Fixture.init(source);
     defer fixture.deinit();
@@ -346,7 +346,7 @@ test "one typed body retains principal numeric identity across U32 and F32 uses"
 }
 
 test "published unbound cursor views freeze to one principal variable identity" {
-    var fixture = try Fixture.init("entry const identity = fn value => value\n");
+    var fixture = try Fixture.init("entry const identity = func value => return value\n");
     defer fixture.deinit();
     const global = fixture.binding(0);
     const lambda = fixture.tree.node(fixture.tree.valueDecl(fixture.tree.roots.items[0]).body);
@@ -378,7 +378,7 @@ test "published unbound cursor views freeze to one principal variable identity" 
 test "typed core owns export bytes types spans and control after syntax teardown" {
     const source =
         \\infixl 60 (+) = _fixity_add
-        \\entry const nested = fn (flag: Bool) -> U32 => do:
+        \\entry const nested = func (flag: Bool) : U32 => return do:
         \\  let value = 1
         \\  if flag:
         \\    value := 2
@@ -389,7 +389,7 @@ test "typed core owns export bytes types spans and control after syntax teardown
         \\      break 20
         \\    break 21
         \\  break value + inner
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     ;
     var fixture = try Fixture.init(source);
     const global = fixture.binding(0);
@@ -428,8 +428,8 @@ test "lowering preserves unreachable traps and lazy Boolean control without eval
         \\const unused = @u32.div 1 0
         \\entry const safe = (@u32.eq 0 1) && (@u32.div 1 0 == 0)
         \\entry const chosen = if @u32.eq 1 1 then 42 else @u32.div 1 0
-        \\const _fixity_and = fn (left: Bool) => fn ~(right: Bool) => if left then @force right else #False
-        \\const _fixity_eq = fn left => fn right => @type.call "eq" left right
+        \\const _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @force right else false
+        \\const _fixity_eq = func left => return func right => return @type.call "eq" left right
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);
@@ -447,9 +447,9 @@ test "lowering preserves unreachable traps and lazy Boolean control without eval
 test "user fixity resolves to numeric named calls and global aliases stay references" {
     var fixture = try Fixture.init(
         \\infixl 60 (+) = combine
-        \\const combine = fn left => fn right => @u32.sub left right
+        \\const combine = func left => return func right => return @u32.sub left right
         \\const alias = combine
-        \\entry const answer = fn () -> U32 => 44 + 2
+        \\entry const answer = func () : U32 => return 44 + 2
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);
@@ -465,7 +465,7 @@ test "user fixity resolves to numeric named calls and global aliases stay refere
 }
 
 test "ordinary function wrappers retain authoritative fully applied compiler operations" {
-    var fixture = try Fixture.init("const primitive = fn left => fn right => @u32.add left right\n");
+    var fixture = try Fixture.init("const primitive = func left => return func right => return @u32.add left right\n");
     defer fixture.deinit();
     var module = try fixture.lower(a);
     defer module.deinit(a);
@@ -480,14 +480,14 @@ test "ordinary function wrappers retain authoritative fully applied compiler ope
 
 test "foreign aliases and grouped namespaces retain producer identities after all frontends close" {
     var module = lowered: {
-        var producer = try Fixture.init("entry const identity = fn value => value\n");
+        var producer = try Fixture.init("entry const identity = func value => return value\n");
         defer producer.deinit();
         const producer_binding = producer.binding(0);
         const source =
             \\import * as lib from "./producer.blot"
             \\const alias = lib.identity
-            \\entry const integer = fn () -> U32 => (lib).identity 42
-            \\entry const floating = fn () -> F32 => lib.identity 1.5
+            \\entry const integer = func () : U32 => return (lib).identity 42
+            \\entry const floating = func () : F32 => return lib.identity 1.5
         ;
         var lexed = try lexer.lex(a, source);
         defer lexed.deinit(a);
@@ -533,15 +533,15 @@ fn allocationScenario(allocator: std.mem.Allocator, fixture: *const Fixture) !vo
 test "every typed core allocation failure releases partial projected artifacts" {
     var fixture = try Fixture.init(
         \\infixl 60 (+) = _fixity_add
-        \\const twice = fn x => x + x
-        \\entry const integer = fn () -> U32 => twice 21
-        \\entry const floating = fn () -> F32 => twice 1.5
-        \\entry const branch = fn (flag: Bool) -> U32 => do:
+        \\const twice = func x => return x + x
+        \\entry const integer = func () : U32 => return twice 21
+        \\entry const floating = func () : F32 => return twice 1.5
+        \\entry const branch = func (flag: Bool) : U32 => return do:
         \\  let value = 1
         \\  if flag:
         \\    value := 2
         \\  break value
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer fixture.deinit();
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, allocationScenario, .{&fixture});
@@ -550,9 +550,9 @@ test "every typed core allocation failure releases partial projected artifacts" 
 test "ordinary calls use bounded scratch rather than two heap allocations per occurrence" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
-    try source.appendSlice(a, "infixl 60 (+) = _fixity_add\nconst twice = fn x => x + x\nentry const driver = fn () -> U32 => do:\n");
+    try source.appendSlice(a, "infixl 60 (+) = _fixity_add\nconst twice = func x => return x + x\nentry const driver = func () : U32 => return do:\n");
     for (0..1024) |_| try source.appendSlice(a, "  let value = twice 21\n");
-    try source.appendSlice(a, "  break value\nconst _fixity_add = fn left => fn right => @u32.add left right\n");
+    try source.appendSlice(a, "  break value\nconst _fixity_add = func left => return func right => return @u32.add left right\n");
     var fixture = try Fixture.init(source.items);
     defer fixture.deinit();
     var tracked: memory.TrackedAllocator = .{ .backing = a };
@@ -573,8 +573,8 @@ fn longCallFixture() !Fixture {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
     try source.appendSlice(a, "const many = ");
-    for (0..33) |_| try source.appendSlice(a, "fn x => ");
-    try source.appendSlice(a, "x\nentry const driver = fn () -> U32 => many");
+    for (0..33) |_| try source.appendSlice(a, "func x => return ");
+    try source.appendSlice(a, "x\nentry const driver = func () : U32 => return many");
     for (0..33) |index| {
         var buffer: [16]u8 = undefined;
         try source.appendSlice(a, try std.mem.print(&buffer, " {d}", .{index}));

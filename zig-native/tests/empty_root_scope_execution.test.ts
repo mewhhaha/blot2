@@ -2,20 +2,20 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
-const source = `let rows = @list.generate 700 (fn index => {value: index})
-entry const pure = fn (limit: U32) => do:
+const source = `let rows = @list.generate 700 (func index => return {value: index})
+entry const pure = func (limit: U32) => return do:
   let total = 0
   for row in rows:
     if row.value == limit:
       break
     total := self + row.value
   break total
-entry const trap = fn (divisor: U32) => do:
+entry const trap = func (divisor: U32) => return do:
   let total = 0
   for row in rows:
     total := self + row.value / divisor
   break total
-entry const effects = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const effects = func (host: U32 -> U32 ! {Foreign}) => return do:
   let owner = #[40, 2]
   let total = 0
   for row in rows:

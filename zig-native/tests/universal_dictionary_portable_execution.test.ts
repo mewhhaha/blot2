@@ -4,22 +4,22 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer = `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 7 else @panic "dictionary trap" }
-const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
-const forward: forall [a] where { Render a } => a -> U32 = fn value => render value
-const sum: forall [a] where { Render a } => a -> a -> U32 = fn left => fn right => @u32.add (Render.show left) (Render.show right)
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 7 else @panic "dictionary trap" }
+const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
+const forward: forall [a] where { Render a } => a -> U32 = func value => return render value
+const sum: forall [a] where { Render a } => a -> a -> U32 = func left => return func right => return @u32.add (Render.show left) (Render.show right)
 `;
 const consumer = `import {Render, render, forward, sum} from "./render"
-const both: (forall [a] where { Render a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-const choose: Bool -> (forall [a] where { Render a } => a -> U32) = fn flag => if flag then render else forward
-const invoke: (forall [a] where { Render a } => a -> U32) -> Bool -> U32 = fn callback => fn flag => callback flag
-const partial: (forall [a] where { Render a } => a -> a -> U32) -> U32 = fn callback => callback 20 22
-entry const answer = fn (flag: Bool) => both (choose flag)
-entry const curried: Unit -> U32 = fn () => partial sum
-entry const trapped = fn (flag: Bool) => invoke forward flag
-entry const captured = fn (offset: U32) => both (fn value => @u32.add offset (Render.show value))
-entry const snapshot = fn (value: U32) => #[value]
+const both: (forall [a] where { Render a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+const choose: Bool -> (forall [a] where { Render a } => a -> U32) = func flag => return if flag then render else forward
+const invoke: (forall [a] where { Render a } => a -> U32) -> Bool -> U32 = func callback => return func flag => return callback flag
+const partial: (forall [a] where { Render a } => a -> a -> U32) -> U32 = func callback => return callback 20 22
+entry const answer = func (flag: Bool) => return both (choose flag)
+entry const curried: Unit -> U32 = func () => return partial sum
+entry const trapped = func (flag: Bool) => return invoke forward flag
+entry const captured = func (offset: U32) => return both (func value => return @u32.add offset (Render.show value))
+entry const snapshot = func (value: U32) => return #[value]
 `;
 async function execute(bytes: Uint8Array<ArrayBuffer>) {
   for (const asynchronous of [false, true]) {

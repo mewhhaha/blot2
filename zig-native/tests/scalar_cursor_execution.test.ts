@@ -4,7 +4,7 @@ import { compileAndRun } from "./reduction_helpers.ts";
 
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 const source = `
-entry const snapshots = fn (count: U32) => do:
+entry const snapshots = func (count: U32) => return do:
   let cursor = { index: 0, limit: count }
   let original = cursor
   let total = 0
@@ -15,7 +15,7 @@ entry const snapshots = fn (count: U32) => do:
     cursor := { index: self.index + 1, limit: self.limit }
     total := self + saved.index + cursor.index
   break #[total, original.index, cursor.index, cursor.limit]
-entry const nested = fn (count: U32) => do:
+entry const nested = func (count: U32) => return do:
   let total = 0
   for outer in 0..count:
     let cursor = { index: outer, limit: count }
@@ -24,12 +24,12 @@ entry const nested = fn (count: U32) => do:
       cursor := { index: self.index + inner, limit: self.limit }
       total := self + old.index + cursor.index
   break total
-entry const captured = fn (count: U32) => do:
+entry const captured = func (count: U32) => return do:
   let cursor = { index: count, limit: count + 1 }
-  let read = fn () => cursor.index
+  let read = func () => return cursor.index
   cursor := { index: 999, limit: self.limit }
   break read () + cursor.index
-entry const references = fn (seed: U32) => do:
+entry const references = func (seed: U32) => return do:
   let cursor = { value: #[seed, seed + 1], index: 0 }
   let saved = cursor
   cursor := { value: #[99, 100], index: 1 }
@@ -38,7 +38,7 @@ entry const references = fn (seed: U32) => do:
     if pressure[8191] != index:
       @panic "pressure"
   break #[saved.value[saved.index], cursor.value[cursor.index]]
-entry const suspend = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const suspend = func (host: U32 -> U32 ! {Foreign}) => return do:
   let cursor = { index: 41, limit: 99 }
   let saved = cursor
   use next <- host cursor.index

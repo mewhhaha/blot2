@@ -1,10 +1,10 @@
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-const read: Unit -> U32 ! {State.get U32} = fn () => State.get ()
-const apply = fn (callback: Unit -> U32 ! {State.get U32 | e}) => callback ()
-const capture = fn (callback: Unit -> U32 ! {State.get U32}) => fn () => callback ()
-entry const run = fn (count: U32) => do:
+const read: Unit -> U32 ! {State.get U32} = func () => return State.get ()
+const apply = func (callback: Unit -> U32 ! {State.get U32 | e}) => return callback ()
+const capture = func (callback: Unit -> U32 ! {State.get U32}) => return func () => return callback ()
+entry const run = func (count: U32) => return do:
   let total = 0
   for index in 0..count:
-    let result = @product.get (@effect.run State.get State.set index (fn () => apply (capture read))) 1
+    let result = @product.get (@effect.run State.get State.set index (func () => return apply (capture read))) 1
     total := @u32.add total result
   break total

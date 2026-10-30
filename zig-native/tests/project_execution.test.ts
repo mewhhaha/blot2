@@ -47,7 +47,7 @@ async function project(
 Deno.test("namespace-qualified values retain field projections", async () => {
   await project({
     main: `import * as s from "./defaults"
-entry const main = fn () -> F32 => s.defaults.x
+entry const main = func () : F32 => return s.defaults.x
 `,
     defaults: `type Defaults is data = #Defaults { x: F32 }
 const defaults = #Defaults { x: 3.0 }
@@ -67,15 +67,15 @@ Deno.test("project imports preserve quantified written rows at independent effec
     main: `import { invoke } from "./library"
 effect Read: Unit -> U32
 effect Measure: Unit -> F32
-const reader = @effect.provider Read (fn () => 42)
-const measure = @effect.provider Measure (fn () => 42.5)
-entry const integer = fn () => do reader:
-  break invoke (fn () => Read ())
-entry const floating = fn () => do measure:
-  break invoke (fn () => Measure ())
+const reader = @effect.provider Read (func () => return 42)
+const measure = @effect.provider Measure (func () => return 42.5)
+entry const integer = func () => return do reader:
+  break invoke (func () => return Read ())
+entry const floating = func () => return do measure:
+  break invoke (func () => return Measure ())
 `,
     library:
-      `const invoke: (Unit -> a ! {| e}) -> a ! {| e} = fn callback => callback ()
+      `const invoke: (Unit -> a ! {| e}) -> a ! {| e} = func callback => return callback ()
 `,
   }, async (bytes) => {
     const guest = await instantiateGuest(bytes);
@@ -98,7 +98,7 @@ entry const present = @effect.has effects descriptor
 entry const same = @effect.same descriptor (@effect.descriptor Read)
 `,
     library: `effect Read: Unit -> U32
-const read = fn () => @panic "imported reflected function invoked"
+const read = func () => return @panic "imported reflected function invoked"
 const effects = @effect.of read
 const descriptor = @effect.descriptor Read
 `,
@@ -118,12 +118,12 @@ const descriptor = @effect.descriptor Read
 Deno.test("builtin State shares exact identities across imported helpers and separates generic instances", async () => {
   await project({
     main: `import { read, write, Cell } from "./library"
-entry const answer = fn () => do:
-  let (#Cell final, (#Cell floating, value)) = @state.run (#Cell 40) (fn () =>
-    @state.run (#Cell 1.0) (fn () => do:
-      use integer <- read (fn () => #Cell 0)
+entry const answer = func () => return do:
+  let (#Cell final, (#Cell floating, value)) = @state.run (#Cell 40) (func () => return
+    @state.run (#Cell 1.0) (func () => return do:
+      use integer <- read (func () => return #Cell 0)
       let #Cell count = integer
-      use amount <- read (fn () => #Cell 0.0)
+      use amount <- read (func () => return #Cell 0.0)
       let #Cell fraction = amount
       use write (#Cell (@u32.add count 1))
       use write (#Cell (@f32.add fraction 0.5))
@@ -131,8 +131,8 @@ entry const answer = fn () => do:
   break @f32.add (@u32.to_f32 final) (@f32.add floating (@u32.to_f32 value))
 `,
     library: `data Cell value = #Cell value
-const read = fn witness => @state.get witness
-const write = fn value => @state.set value
+const read = func witness => return @state.get witness
+const write = func value => return @state.set value
 `,
   }, async (bytes) => {
     const guest = await instantiateGuest(bytes);
@@ -151,19 +151,19 @@ Deno.test("project emits shared generic producers across a diamond after fronten
     main: `import * as left from "./left"
 import * as right from "./right"
 import { identity as id } from "./shared"
-entry const integer = fn (value: U32) -> U32 => left.twice (id value)
-entry const floating = fn (value: F32) -> F32 => right.twice (id value)
+entry const integer = func (value: U32) : U32 => return left.twice (id value)
+entry const floating = func (value: F32) : F32 => return right.twice (id value)
 entry const answer = left.answer
 `,
     left: `import * as shared from "./shared"
-const twice = fn (value: U32) -> U32 => shared.twice (shared.identity value)
+const twice = func (value: U32) : U32 => return shared.twice (shared.identity value)
 const answer = shared.answer
 `,
     right: `import * as shared from "./shared"
-const twice = fn (value: F32) -> F32 => shared.twice (shared.identity value)
+const twice = func (value: F32) : F32 => return shared.twice (shared.identity value)
 `,
-    shared: `const identity = fn value => value
-const twice = fn value => value + value
+    shared: `const identity = func value => return value
+const twice = func value => return value + value
 const answer = 42
 `,
   }, async (bytes, metrics) => {
@@ -192,11 +192,11 @@ import { identity } from "./arithmetic"
 infixl 60 (+) = arithmetic.subtract
 const alias = arithmetic.identity
 entry const identity_entry = alias
-entry const subtract_entry = fn (arithmetic: U32) -> U32 => 20 + arithmetic
-entry const grouped = fn (value: U32) -> U32 => (arithmetic).identity value
+entry const subtract_entry = func (arithmetic: U32) : U32 => return 20 + arithmetic
+entry const grouped = func (value: U32) : U32 => return (arithmetic).identity value
 `,
-    arithmetic: `const identity = fn (value: U32) -> U32 => value
-const subtract = fn left => fn right => @u32.sub left right
+    arithmetic: `const identity = func (value: U32) : U32 => return value
+const subtract = func left => return func right => return @u32.sub left right
 `,
   }, async (bytes) => {
     const guest = await instantiateGuest(bytes);

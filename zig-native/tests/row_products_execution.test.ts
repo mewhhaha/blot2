@@ -39,11 +39,11 @@ function rowPrograms() {
       for (const collection of ["array", "list"]) {
         const name = `${collection}_${shape}_${width}`;
         cases.push({ name, width, fields: order });
-        functions.push(`entry const ${name} = fn (input: Array F32) => do:
+        functions.push(`entry const ${name} = func (input: Array F32) => return do:
   let count = @f32.to_u32 input[0]
   let start = @f32.to_u32 input[1]
   let factor = input[3]
-  let rows = @${collection}.generate (@u32.add start count) (fn index => ${row})
+  let rows = @${collection}.generate (@u32.add start count) (func index => return ${row})
   let values = @${collection}.slice rows start count
   let total = input[2]
   for row in values:
@@ -54,14 +54,14 @@ function rowPrograms() {
     }
   }
   functions.push(`
-const consume = fn row => @f32.add (@f32.add (@f32.add (@f32.mul row.a 1.25) (@f32.mul row.b 1.25)) (@f32.mul row.c 1.25)) (@f32.mul row.d 1.25)
-entry const shared = fn (input: Array F32) => do:
+const consume = func row => return @f32.add (@f32.add (@f32.add (@f32.mul row.a 1.25) (@f32.mul row.b 1.25)) (@f32.mul row.c 1.25)) (@f32.mul row.d 1.25)
+entry const shared = func (input: Array F32) => return do:
   let rows = @array.fill 257 {a: input[0], b: input[1], c: input[2], d: input[3]}
   let saved = rows
   rows[0].a := 99.0
   let pressure = @array.fill 8192 123
   break #[consume saved[0], consume rows[0]]
-entry const effectful = fn (host: F32 -> F32 ! {Foreign}) => do:
+entry const effectful = func (host: F32 -> F32 ! {Foreign}) => return do:
   let rows = @array.fill 5 {a: 1.0, b: 2.0, c: 3.0, d: 4.0}
   let total = 0.0
   for row in rows:

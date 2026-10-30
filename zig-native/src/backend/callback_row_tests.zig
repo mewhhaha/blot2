@@ -82,7 +82,7 @@ fn checkRows(allocator: std.mem.Allocator, source: []const u8, valid: bool) !voi
 
 test "callback row checking releases every failed allocation and preserves pure requirements" {
     const valid = @import("fixtures").source("callback-fixtures/record.blot");
-    const invalid = "const invoke: (Unit -> F32) -> F32 = fn callback => callback ()\nentry const answer = fn (host:Unit -> F32 ! {Foreign}) => invoke host\n";
+    const invalid = "const invoke: (Unit -> F32) -> F32 = func callback => return callback ()\nentry const answer = func (host:Unit -> F32 ! {Foreign}) => return invoke host\n";
     try checkRows(a, valid, true);
     try checkRows(a, invalid, false);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, checkRows, .{ valid, true });

@@ -10,7 +10,7 @@ const a = std.testing.allocator;
 const T = @import("types.zig");
 const source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
     \\    break s.get ()
     \\  break result
@@ -93,9 +93,9 @@ test "scoped effect frozen evidence rejects missing and substituted scope binder
 
 const request_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\entry const answer = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
     \\  let right_read = right.get
-    \\  let computation = @computation (fn () => do:
+    \\  let computation = @computation (func () => return do:
     \\    use a <- left.get ()
     \\    use b <- right_read ()
     \\    break @u32.add a b
@@ -140,13 +140,13 @@ test "scoped effect request evidence rejects missing and foreign-owner selectors
 
 const generic_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const local = fn (value: a) => @effect.scope (fn (s: State a) => do:
+    \\const local = func (value: a) => return @effect.scope (func (s: State a) => return do:
     \\  let (state, result) = do (@effect.state s.get s.set value):
     \\    break s.get ()
     \\  break result
     \\)
-    \\entry const integer = fn () => local 7
-    \\entry const fraction = fn () => local 1.5
+    \\entry const integer = func () => return local 7
+    \\entry const fraction = func () => return local 1.5
 ;
 fn lowerGenericAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, generic_source);
@@ -163,8 +163,8 @@ test "scoped effect symbolic factories survive lowering emission and failed allo
 
 const outer_result_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => do:
-    \\  let longer = @effect.scope (fn (right: State U32) => {saved: left})
+    \\entry const answer = func () => return @effect.scope (func (left: State U32) => return do:
+    \\  let longer = @effect.scope (func (right: State U32) => return {saved: left})
     \\  let read = longer.saved.get
     \\  let (state, result) = do (@effect.state longer.saved.get longer.saved.set 7):
     \\    break read ()
@@ -192,8 +192,8 @@ test "scoped effect outer authority projection survives lowering emission and fa
 
 const closure_result_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\entry const answer = fn (value: U32) => do:
-    \\  let callback = @effect.scope (fn (s: State U32) => fn () => @u32.add value 1)
+    \\entry const answer = func (value: U32) => return do:
+    \\  let callback = @effect.scope (func (s: State U32) => return func () => return @u32.add value 1)
     \\  break callback ()
 ;
 fn lowerClosureResultAndRelease(allocator: std.mem.Allocator) !void {
@@ -211,9 +211,9 @@ test "scoped effect closure footprint survives lowering emission and failed allo
 
 const flow_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const identity = fn value => value
-    \\const invoke = fn callback => callback ()
-    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\const identity = func value => return value
+    \\const invoke = func callback => return callback ()
+    \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
     \\  let capability = identity s
     \\  let (state, result) = do (@effect.state capability.get capability.set 7):
     \\    break invoke (identity capability.get)
@@ -256,9 +256,9 @@ test "scoped effect public flow contracts validate bodies and release failed all
 }
 
 const task_join_wrapper_source =
-    \\const await = fn source => |source|
-    \\entry const answer = fn () => @task.scope (fn group => do:
-    \\  let pending = @task.spawn group (fn () => 42)
+    \\const await = func source => return |source|
+    \\entry const answer = func () => return @task.scope (func group => return do:
+    \\  let pending = @task.spawn group (func () => return 42)
     \\  return await pending)
 ;
 test "task join wrapper contract requires the exact checked join body" {
@@ -286,8 +286,8 @@ test "task join wrapper contract requires the exact checked join body" {
 
 const parameter_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const read = fn (s: State a) -> a ! {s.get} => s.get ()
-    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\const read = func (s: State a) : a ! {s.get} => return s.get ()
+    \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
     \\    break read s
     \\  break result
@@ -335,10 +335,10 @@ test "scoped effect frozen capability parameters reject substituted binder edges
 
 const curried_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
-    \\entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+    \\const apply = func (s: State a) => return func (callback: Unit -> a ! {s.get | e}) => return callback ()
+    \\entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
     \\  let (state, result) = do (@effect.state s.get s.set 7):
-    \\    break apply s (fn () => s.get ())
+    \\    break apply s (func () => return s.get ())
     \\  break result
     \\)
 ;
@@ -531,12 +531,12 @@ test "scoped effect member closure recipes validate captured ordinals and releas
 
 const multi_input_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const apply2 = fn callback => fn left => fn right => callback left right
-    \\const read2 = fn (left: State U32) => fn (right: State U32) => do:
+    \\const apply2 = func callback => return func left => return func right => return callback left right
+    \\const read2 = func (left: State U32) => return func (right: State U32) => return do:
     \\  use x <- left.get ()
     \\  use y <- right.get ()
     \\  break @u32.add x y
-    \\entry const answer = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\entry const answer = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
     \\  use outer <- do (@effect.state left.get left.set 7):
     \\    use inner <- do (@effect.state right.get right.set 9):
     \\      break apply2 read2 left right
@@ -604,8 +604,8 @@ fn lowerMultiInput(allocator: std.mem.Allocator) !void {
 
 test "captured scalar call receipts require primitive roles pure rows and owned certificates" {
     var module = try lowerText(a,
-        \\const add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const make = fn (seed: U32) => fn () => #[@u32.add seed 1]
+        \\const add = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\const make = func (seed: U32) => return func () => return #[@u32.add seed 1]
     );
     defer module.deinit(a);
     const terms = @import("capability_contracts.zig");
@@ -661,7 +661,7 @@ test "captured scalar call receipts require primitive roles pure rows and owned 
 }
 
 fn forwardingSource(allocator: std.mem.Allocator) ![]u8 {
-    return std.mem.replaceOwned(u8, allocator, "const forward2 = fn callback => fn left => fn right => apply2 callback left right\n" ++ multi_input_source, "break apply2 read2 left right", "break forward2 read2 left right");
+    return std.mem.replaceOwned(u8, allocator, "const forward2 = func callback => return func left => return func right => return apply2 callback left right\n" ++ multi_input_source, "break apply2 read2 left right", "break forward2 read2 left right");
 }
 fn lowerForwarding(allocator: std.mem.Allocator) !void {
     const text = try forwardingSource(allocator);
@@ -717,7 +717,7 @@ test "forwarding invocation reconstructs producer bodies and rejects cycles miss
 }
 
 fn projectedSource(allocator: std.mem.Allocator) ![]u8 {
-    const wrapped = try std.mem.replaceOwned(u8, allocator, multi_input_source, "entry const answer", "const keep = fn callback => {callback}\nconst make = fn () => keep read2\nentry const answer");
+    const wrapped = try std.mem.replaceOwned(u8, allocator, multi_input_source, "entry const answer", "const keep = func callback => return {callback}\nconst make = func () => return keep read2\nentry const answer");
     defer allocator.free(wrapped);
     return std.mem.replaceOwned(u8, allocator, wrapped, "break apply2 read2 left right", "let holder = make ()\n      break apply2 holder.callback left right");
 }

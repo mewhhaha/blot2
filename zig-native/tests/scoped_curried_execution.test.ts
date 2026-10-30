@@ -6,39 +6,39 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const libraries = {
   parameter: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const read = fn (s: State a) => s.get ()
-const apply = fn (s: State a) => fn (callback: Unit -> a ! {s.get | e}) => callback ()
+const read = func (s: State a) => return s.get ()
+const apply = func (s: State a) => return func (callback: Unit -> a ! {s.get | e}) => return callback ()
 `,
   arrow: `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const read: (state: State a) -> a ! {state.get} = fn input => input.get ()
-const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = fn input => fn callback => callback ()
+const read: (state: State a) -> a ! {state.get} = func input => return input.get ()
+const apply: (state: State a) -> ((Unit -> a ! {state.get | e}) -> a ! {state.get | e}) = func input => return func callback => return callback ()
 `,
 };
 const main = `import {State, apply, read} from "./state"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use outer <- do (@effect.state left.get left.set 7):
     use inner <- do (@effect.state right.get right.set 100):
       use a <- read left
-      use b <- apply right (fn () => right.get ())
+      use b <- apply right (func () => return right.get ())
       use next <- host a
       use left.set next
-      use c <- apply left (fn () => left.get ())
+      use c <- apply left (func () => return left.get ())
       break @u32.add (@u32.add a b) c
     let (state, result) = inner
     break result
   let (state, result) = outer
   break result
 ))
-entry const floating = fn () => @effect.scope (fn (s: State F32) => do:
+entry const floating = func () => return @effect.scope (func (s: State F32) => return do:
   let (state, result) = do (@effect.state s.get s.set 1.5):
-    break apply s (fn () => s.get ())
+    break apply s (func () => return s.get ())
   break result
 )
 `;
 const unmatched = `import {State, apply} from "./state"
-entry const invalid = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+entry const invalid = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   use nested <- do (@effect.state left.get left.set 7):
-    break apply left (fn () => right.get ())
+    break apply left (func () => return right.get ())
   let (state, result) = nested
   break result
 ))
@@ -186,8 +186,8 @@ for (const { syntax, library, codegenTier } of cases) {
               sources: {
                 ...sources,
                 [dependency]: library.replace(
-                  "=> callback ()",
-                  `=> do:
+                  "=> return callback ()",
+                  `=> return do:
   let operation = callback
   break operation ()`,
                 ),

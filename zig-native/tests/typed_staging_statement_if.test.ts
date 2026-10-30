@@ -21,8 +21,8 @@ async function generationRecipeLaw(
     new URL("../zig-out/bin/blotc", import.meta.url).pathname;
   const source = `import {generated, evaluated} from "./producer"
 entry const checked: U32 = evaluated
-entry const probe = fn (value: U32) => (@code.emit generated) value
-entry const answer = fn () => do:
+entry const probe = func (value: U32) => return (@code.emit generated) value
+entry const answer = func () => return do:
   let value = 100
   let first = (@code.emit generated) 0
   let second = (@code.emit generated) 1
@@ -31,39 +31,39 @@ entry const answer = fn () => do:
   const library = (base: number) => {
     if (recipe === "provider callbacks") {
       return `effect Read: Unit -> U32
-const callback = fn () => ${base}
-const helper = fn (value: U32) => do (@effect.provider Read callback):
+const callback = func () => return ${base}
+const helper = func (value: U32) => return do (@effect.provider Read callback):
   use initial <- Read ()
   break @u32.add initial value
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "row principals") {
       return `effect Read: Unit -> U32
-const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = fn callback => callback ()
-const helper = fn (value: U32) => do (@effect.provider Read (fn () => @u32.add value ${base})):
-  break apply (fn () => Read ())
-const generated = @code.quote (fn (value: U32) => helper value)
+const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = func callback => return callback ()
+const helper = func (value: U32) => return do (@effect.provider Read (func () => return @u32.add value ${base})):
+  break apply (func () => return Read ())
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "scope providers") {
       return `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const helper = fn (value: U32) => @effect.scope (fn (state: State U32) => do:
-  let read = fn () => state.get ()
+const helper = func (value: U32) => return @effect.scope (func (state: State U32) => return do:
+  let read = func () => return state.get ()
   let pair = do (@effect.state state.get state.set ${base}):
     use previous <- read ()
     use state.set (@u32.add previous value)
     break read ()
   let (final, result) = pair
   break result)
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "loop carries") {
-      return `const helper = fn (value: U32) => do:
+      return `const helper = func (value: U32) => return do:
   let total = ${base}
   for part in #[value, 0]:
     if @u32.eq part 0:
@@ -73,39 +73,39 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
     else:
       total := @u32.add part total
   break total
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "scalar case") {
-      return `const helper = fn (value: U32) => case value of
+      return `const helper = func (value: U32) => return case value of
   0 => ${base}
   value => @u32.add value ${base}
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "product case") {
-      return `const combine = fn (pair: (U32, U32)) => case pair of
+      return `const combine = func (pair: (U32, U32)) => return case pair of
   (left, right) => @u32.add left right
-const helper = fn (value: U32) => combine (value, ${base})
-const generated = @code.quote (fn (value: U32) => helper value)
+const helper = func (value: U32) => return combine (value, ${base})
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
     }
     if (recipe === "Boolean case") {
-      return `const helper = fn (flag: Bool) => fn (value: U32) => case flag of
-  #True => do:
+      return `const helper = func (flag: Bool) => return func (value: U32) => return case flag of
+  true => do:
     let flag = value
     break @u32.add flag ${base}
-  #False => do:
+  false => do:
     let value = @u32.add value ${base}
     break value
-const generated = @code.quote (fn (value: U32) => helper (@u32.eq value 0) value)
-const evaluated: U32 = @code.run (@code.quote (helper #False 2))
+const generated = @code.quote (func (value: U32) => return helper (@u32.eq value 0) value)
+const evaluated: U32 = @code.run (@code.quote (helper false 2))
 `;
     }
-    return `const helper = fn (value: U32) => do:
+    return `const helper = func (value: U32) => return do:
   let kept = @u32.add value ${base}
   if @u32.eq value 0:
     let value = kept
@@ -116,7 +116,7 @@ const evaluated: U32 = @code.run (@code.quote (helper #False 2))
     else:
       break 0
   break @u32.add value ${base}
-const generated = @code.quote (fn (value: U32) => helper value)
+const generated = @code.quote (func (value: U32) => return helper value)
 const evaluated: U32 = @code.run (@code.quote (helper 2))
 `;
   };
@@ -175,30 +175,30 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
             assert.equal(unchanged.stats.nativeWorkSteps, 0);
             let invalid = sources[producer].replace(
               `@u32.add value ${base}`,
-              "#True",
+              "true",
             );
             if (recipe === "loop carries") {
               invalid = sources[producer].replace(
                 "@u32.add total part",
-                "#True",
+                "true",
               );
             }
             if (recipe === "scope providers") {
               invalid = sources[producer].replace(
                 "@u32.add previous value",
-                "#True",
+                "true",
               );
             }
             if (recipe === "provider callbacks") {
               invalid = sources[producer].replace(
-                `fn () => ${base}`,
-                "fn () => #True",
+                `func () => return ${base}`,
+                "func () => return true",
               );
             }
             if (recipe === "product case") {
               invalid = sources[producer].replace(
                 "@u32.add left right",
-                "#True",
+                "true",
               );
             }
             const failed = await retained.build({

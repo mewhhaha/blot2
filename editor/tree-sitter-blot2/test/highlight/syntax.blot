@@ -1,22 +1,22 @@
-const identity = fn value => value
+const identity = func value => return value
 //               ^ keyword.function
 //    ^ function
-//                  ^ variable.parameter
-//                        ^ operator
+//                    ^ variable.parameter
+//                          ^ operator
 
-const Vec2.scaled = fn (value: Vec2) => fn factor => value
+const Vec2.scaled = func (value: Vec2) => return func factor => return value
 //                  ^ keyword.function
 //    ^ type
 //         ^ function
-//                      ^ variable.parameter
-//                             ^ type
-//                                         ^ variable.parameter
+//                        ^ variable.parameter
+//                               ^ type
+//                                                    ^ variable.parameter
 
-const identity = fn value => value
+const identity = func value => return value
 // <- keyword.storage.type
 //    ^ function
 //               ^ keyword.function
-//                  ^ variable.parameter
+//                    ^ variable.parameter
 
 data Maybe a = #Some a | #Nothing
 // <- keyword.storage.type
@@ -55,13 +55,13 @@ type Reading = #F64 | #Text
 //                  ^ operator
 //                     ^ constructor
 
-const read_score = fn (ready: Bool) -> F64 | Text => do:
+const read_score = func (ready: Bool) : F64 | Text => return do:
 //                 ^ keyword.function
 //    ^ function
-//                     ^ variable.parameter
-//                                     ^ type
-//                                         ^ operator
-//                                           ^ type
+//                       ^ variable.parameter
+//                                      ^ type
+//                                          ^ operator
+//                                            ^ type
 
 if let #Some(x) = y:
 // <- keyword.control.conditional
@@ -133,7 +133,7 @@ case first, second, third of
 //   ^ variable
 //        ^ punctuation.delimiter
 //                        ^ keyword.control.conditional
-  #Some value, #True, _ => value
+  #Some value, true, _ => value
 // ^ constructor
 
 "if let Some(x) = y else: F64 | Text"
@@ -162,7 +162,7 @@ infixl 60 (+) = add
 //         ^ operator
 //              ^ variable
 
-infixr 22 (||) = or
+infixr 22 (||) = either
 // <- keyword.directive
 //          ^ operator
 
@@ -174,35 +174,35 @@ prefix 90 (!) = not
 // <- keyword.directive
 //         ^ operator
 
-const add = fn left => fn right => (@type.of left).add left right
-//                                  ^ function.builtin
-//                                           ^ variable
-//                                                 ^ variable.other.member
+const add = func left => return func right => return (@type.of left).add left right
+//                                                    ^ function.builtin
+//                                                             ^ variable
+//                                                                   ^ variable.other.member
 
-const Int.add = fn (left: Int) => fn (right: Int) => @int.add left right
+const Int.add = func (left: Int) => return func (right: Int) => return @int.add left right
 //              ^ keyword.function
 //    ^ type
 //        ^ function
-//                                                   ^ function.builtin
+//                                                                     ^ function.builtin
 
 @f32.sqrt value
 // <- function.builtin
 
-const or = fn left => fn ~right => do:
-//         ^ keyword.function
+const either = func left => return func ~right => return do:
+//             ^ keyword.function
 //    ^ function
-//                       ^ operator
-//                        ^ variable.parameter
+//                                      ^ operator
+//                                       ^ variable.parameter
   if left:
-    break #True
+    break true
   break @force right
 //       ^ function.builtin
 
-const force = fn ~value => @force value
+const force = func ~value => return @force value
 //    ^ function
-//               ^ operator
-//                ^ variable.parameter
-//                         ^ function.builtin
+//                 ^ operator
+//                  ^ variable.parameter
+//                                  ^ function.builtin
 
 let point = Vec2 { x: 1.0, y: 2.0 }
 // <- keyword.storage.type
@@ -309,15 +309,15 @@ point.x := self + 1.0
 //                  ^^ constant.character.escape
 //                          ^^ constant.character.escape
 
-// fn fake "${self}" is a comment.
+// func fake "${self}" is a comment.
 // <- comment
 //    ^ comment
 //            ^ comment
 
-const enabled = #True
+const enabled = true
 //               ^ constant.builtin.boolean
 
-const disabled = #False
+const disabled = false
 //                ^ constant.builtin.boolean
 
 "@force and ~right are text, ${@force right}"

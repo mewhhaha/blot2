@@ -14,7 +14,7 @@ const symbols = @import("../parse/symbols.zig");
 const a = std.testing.allocator;
 const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
 const source = @import("fixtures").source("partial-runtime-fixtures/namespace-ab.blot");
-const prelude = "const identity=fn value=>value\n";
+const prelude = "const identity=func value=> return value\n";
 const SourceReady = struct {
     units: []core.Module,
     names: identity.Metadata,
@@ -81,7 +81,7 @@ const Fixture = struct {
     fn init() !Fixture {
         var dir = std.testing.tmpDir(.{});
         errdefer dir.cleanup();
-        inline for (.{ .{ "a.blot", @import("fixtures").source("partial-runtime-fixtures/a.blot") }, .{ "b.blot", @import("fixtures").source("partial-runtime-fixtures/b.blot") }, .{ "main.blot", source }, .{ "prelude.blot", prelude }, .{ "seed.blot", "entry const initial:Unit->U32=fn()=>0\n" } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
+        inline for (.{ .{ "a.blot", @import("fixtures").source("partial-runtime-fixtures/a.blot") }, .{ "b.blot", @import("fixtures").source("partial-runtime-fixtures/b.blot") }, .{ "main.blot", source }, .{ "prelude.blot", prelude }, .{ "seed.blot", "entry const initial:Unit->U32=func()=> return 0\n" } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
         const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
         errdefer a.free(path);
         const prelude_path = try dir.dir.realPathFileAlloc(std.testing.io, "prelude.blot", a);

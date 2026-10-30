@@ -5,10 +5,10 @@ Deno.test("immutable nullary cells keep nominal matches and persistent payload a
   await compileAndRun(
     `
 type Token a is data = #Empty | #Full a
-const read = fn token => case token of
+const read = func token => return case token of
   #Empty => 7
   #Full values => values[0]
-entry const run = fn (seed: U32) => do:
+entry const run = func (seed: U32) => return do:
   let original = #[#Empty, #Full #[seed, seed + 1], #Empty]
   let changed = @array.set original 1 #Empty
   for index in 0..200:

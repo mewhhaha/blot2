@@ -2,9 +2,9 @@
 Implementation headers explicit product and curried binders remain contextual
 ==================
 
-impl ArraySource a : Source (Array a) where { Source a } = { type Item = a, const first = fn values => @array.get values 0 }
+impl ArraySource a : Source (Array a) where { Source a } = { type Item = a, const first = func values => return @array.get values 0 }
 private impl Pair (a,b) => type c : Map a b c = { type Item = c }
-const impl = fn impl => impl
+const impl = func impl => return impl
 
 ---
 
@@ -35,6 +35,7 @@ const impl = fn impl => impl
       (lambda_header
         (identifier)))
     (operator)
+    (keyword)
     (intrinsic)
     (identifier)
     (integer))
@@ -63,4 +64,5 @@ const impl = fn impl => impl
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier))

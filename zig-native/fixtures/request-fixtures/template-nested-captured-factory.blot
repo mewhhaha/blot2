@@ -1,18 +1,18 @@
 type Tick is effect = { read: Unit -> U32 }
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Tick.read () =>
         break 42.5
       complete value =>
         break value
-const create = fn action => do:
-  let factory = fn callback => @computation (fn () => callback ())
-  break @computation (fn () => do:
+const create = func action => return do:
+  let factory = func callback => return @computation (func () => return callback ())
+  break @computation (func () => return do:
     let computation = factory action
     break handled computation
   )
-entry const answer = fn () => handled (create (fn () => do:
+entry const answer = func () => return handled (create (func () => return do:
   use Tick.read ()
   break @panic "cancelled action continued"
 ))

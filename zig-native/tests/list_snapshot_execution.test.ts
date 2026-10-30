@@ -4,20 +4,20 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
 import * as iter from "std/iter"
-const skip = fn count => fn cursor => do:
+const skip = func count => return func cursor => return do:
   for index in 0..count:
     cursor := @cursor.advance self
   break cursor
-entry const scalar = fn (seed: U32) => do:
-  let values = @list.generate 800 (fn index => index + seed)
+entry const scalar = func (seed: U32) => return do:
+  let values = @list.generate 800 (func index => return index + seed)
   let left = values.iter
   let right = skip 243 values.iter
   values := @list.prepend self 9000
   values := @list.append self 9001
   let changed = Array.from_list values
   break #[@cursor.value left, @cursor.value right, @cursor.value (@cursor.advance right), changed[0], values.length]
-entry const references = fn (seed: U32) => do:
-  let values = @list.generate 800 (fn index => #[index, seed])
+entry const references = func (seed: U32) => return do:
+  let values = @list.generate 800 (func index => return #[index, seed])
   let left = values.iter
   let right = skip 243 values.iter
   values := @list.prepend self #[9000, seed + 1]
@@ -28,7 +28,7 @@ entry const references = fn (seed: U32) => do:
     if pressure[8191] != index:
       @panic "snapshot pressure"
   break #[(@cursor.value left)[0], (@cursor.value right)[0], (@cursor.value (@cursor.advance right))[0], changed[0][0], values.length]
-entry const windows = fn (count: U32) => do:
+entry const windows = func (count: U32) => return do:
   let stream = iter.windows 3 (iter.range 0 count)
   let #Some (first, next) = stream.next else:
     break 0
@@ -36,7 +36,7 @@ entry const windows = fn (count: U32) => do:
   let #Some (second, _) = next.next else:
     break 0
   break @cursor.value saved + iter.fold_left add 0 first + iter.fold_left add 0 second
-entry const constant = fn () => @cursor.value [40, 41, 42].iter
+entry const constant = func () => return @cursor.value [40, 41, 42].iter
 `;
 Deno.test("List cursor snapshots defer copying across writers forks references windows and checkpoints", async () => {
   const directory = await Deno.makeTempDir();

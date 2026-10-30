@@ -16,37 +16,37 @@ const io = std.testing.io;
 const shapes =
     \\data Box a = #Box a
     \\type Pair is data = #Pair { left: F32, right: F32 }
-    \\const pair = fn (left: F32) => fn (right: F32) => #Pair { left, right }
-    \\const swap = fn (value: Pair) => #Pair { left: value.right, right: value.left }
-    \\const boxed = fn value => #Box value
+    \\const pair = func (left: F32) => return func (right: F32) => return #Pair { left, right }
+    \\const swap = func (value: Pair) => return #Pair { left: value.right, right: value.left }
+    \\const boxed = func value => return #Box value
 ;
 const dep =
     \\import {Pair, pair, swap, boxed} from "./shapes"
     \\const value: U32 = 42
-    \\const read: Unit -> U32 = fn () => value
-    \\const choose = fn (value: Pair) => swap (swap value)
-    \\const keep = fn (value: F32) => boxed (pair value 1.0)
+    \\const read: Unit -> U32 = func () => return value
+    \\const choose = func (value: Pair) => return swap (swap value)
+    \\const keep = func (value: F32) => return boxed (pair value 1.0)
 ;
 const main =
     \\import * as dep from "./dep"
     \\import {pair} from "./shapes"
     \\const picked = dep.choose (pair 1.0 2.0)
     \\entry const answer: U32 = dep.read ()
-    \\entry const left = fn (value: F32) -> F32 => (dep.choose (pair value 2.0)).left
+    \\entry const left = func (value: F32) : F32 => return (dep.choose (pair value 2.0)).left
 ;
 const mid =
     \\import * as dep from "./dep"
     \\import {Pair, pair} from "./shapes"
-    \\const read_twice = fn () => @u32.add (dep.read ()) (dep.read ())
-    \\const chosen = fn (value: F32) => dep.choose (pair value 3.0)
+    \\const read_twice = func () => return @u32.add (dep.read ()) (dep.read ())
+    \\const chosen = func (value: F32) => return dep.choose (pair value 3.0)
 ;
 const layered =
     \\import * as mid from "./mid"
     \\import * as dep from "./dep"
     \\import {Box} from "./shapes"
     \\entry const answer: U32 = mid.read_twice ()
-    \\entry const right = fn (value: F32) -> F32 => (mid.chosen value).right
-    \\entry const kept = fn (value: F32) -> F32 => do:
+    \\entry const right = func (value: F32) : F32 => return (mid.chosen value).right
+    \\entry const kept = func (value: F32) : F32 => return do:
     \\  let #Box held = dep.keep value
     \\  break held.left
 ;
@@ -56,8 +56,8 @@ const cases = [_]Case{
     .{ .main = "import * as dep from \"./dep\"\nentry const answer: U32 = true\n" },
     .{ .main = "import * as dep from \"./dep\"\nentry const answer: U32 = missing\n" },
     .{ .main = "import * as dep from \"./dep\"\nimport {nothing} from \"./shapes\"\nentry const answer: U32 = dep.read ()\n" },
-    .{ .dep = "const value: U32 = true\nconst read: Unit -> U32 = fn () => value\n" },
-    .{ .dep = "const read: Unit -> U32 = fn () => read ()\n", .main = "import * as dep from \"./dep\"\nentry const answer: U32 = dep.read ()\n" },
+    .{ .dep = "const value: U32 = true\nconst read: Unit -> U32 = func () => return value\n" },
+    .{ .dep = "const read: Unit -> U32 = func () => return read ()\n", .main = "import * as dep from \"./dep\"\nentry const answer: U32 = dep.read ()\n" },
 };
 
 const Fixture = struct {

@@ -5,23 +5,23 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-const run = fn () => @effect.scope (fn (older: State U32) => do:
-  use escaped <- @effect.scope (fn (younger: State F32) => @resource.scope (fn () => 9) (fn owner => do:
+const run = func () => return @effect.scope (func (older: State U32) => return do:
+  use escaped <- @effect.scope (func (younger: State F32) => return @resource.scope (func () => return 9) (func owner => return do:
     let cleanup_capture = younger
     break ()
-  ) (fn loan => do:
+  ) (func loan => return do:
     let observed = @usage.read loan
-    break fn () => do:
+    break func () => return do:
       let retained = older
       break 42
   ))
   break escaped ()
 )
-const fail = fn () => @effect.scope (fn (state: State U32) => @resource.scope (fn () => 9) (fn owner => @panic "cleanup") (fn loan => @usage.read loan))
+const fail = func () => return @effect.scope (func (state: State U32) => return @resource.scope (func () => return 9) (func owner => return @panic "cleanup") (func loan => return @usage.read loan))
 `;
 const source = `import {run, fail} from "./library"
-entry const answer = fn () => run ()
-entry const failed = fn () => fail ()
+entry const answer = func () => return run ()
+entry const failed = func () => return fail ()
 `;
 async function execute(bytes: Uint8Array, expected: number) {
   for (const asynchronous of [false, true]) {

@@ -6,12 +6,12 @@ const executable = Deno.args[0] ??
 const bodies = [
   `  let metadata = @effect.of described
   let cost = @effect.count metadata`,
-  `  let provider = @effect.provider Read (fn () => base)
+  `  let provider = @effect.provider Read (func () => return base)
   let cost = base`,
-  `  let cost = do (@effect.provider Read (fn () => base)):
+  `  let cost = do (@effect.provider Read (func () => return base)):
     break base`,
   `  let cost = base
-  for request in @requests (@computation (fn () => base)):
+  for request in @requests (@computation (func () => return base)):
     case request of
       effect Read () =>
         yield base
@@ -22,24 +22,24 @@ const bodies = [
     break base
   let cost = case wrapped of
     #Box value => value`,
-  `  let (_, cost) = @state.run base (fn () => base)`,
-  `  let cost = do (@effect.provider Read (fn () => base)):
+  `  let (_, cost) = @state.run base (func () => return base)`,
+  `  let cost = do (@effect.provider Read (func () => return base)):
     use result <- Read ()
     break result`,
   `  let pending = delayed base
   let cost = @force pending
   let again = @force pending`,
-  `  let cost = @effect.scope (fn (state: State U32) => base)`,
+  `  let cost = @effect.scope (func (state: State U32) => return base)`,
   `  let cost = @code.run (@code.quote (@code.lift base))`,
 ];
 function logic(base = "1", row = "Read") {
   return `effect Read: Unit -> U32
 effect Other: Unit -> U32
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const described: Unit -> U32 ! {${row}} = fn () => Read ()
+const described: Unit -> U32 ! {${row}} = func () => return Read ()
 type Box a is data = #Box a
-const Box.pure = fn (value: U32) => #Box value
-const delayed = fn ~value => value
+const Box.pure = func (value: U32) => return #Box value
+const delayed = func ~value => return value
 const base = ${base}
 ${
     bodies.map((body, index) =>
@@ -63,7 +63,7 @@ Deno.test("constant receipts transport dead immutable temporaries while actual S
   const archive = `${directory}/deps.blotdep`;
   const sources = (seed = "2", base = "1", row = "Read") => ({
     [entry]: `import {values} from "./logic"
-entry const answer = fn () => values
+entry const answer = func () => return values
 entry const sibling = ${seed}
 `,
     [dependency]: logic(base, row),

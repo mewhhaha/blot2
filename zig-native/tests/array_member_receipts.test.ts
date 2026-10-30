@@ -35,9 +35,9 @@ Deno.test("shape only member calls retain method edits open elements and capture
           if (extra === -1) body = "missing_name";
           const sources = {
             [prelude]:
-              `${library}\nconst Array.measure: Array a -> U32 = fn values => ${body}\n`,
+              `${library}\nconst Array.measure: Array a -> U32 = func values => return ${body}\n`,
             [entry]: `
-const make = fn seed => {holes: #[], callback: fn value => @u32.add seed value}
+const make = func seed => return {holes: #[], callback: func value => return @u32.add seed value}
 const rows = #[make 11, make 22]
 const measured = do:
   let total = 0
@@ -45,7 +45,7 @@ const measured = do:
     total := @u32.add total rows.measure
   break total
 entry const answer = measured
-entry const callback = fn (value: U32) => rows[0].callback value
+entry const callback = func (value: U32) => return rows[0].callback value
 entry const sibling = ${sibling}
 `,
           };
@@ -96,7 +96,7 @@ Deno.test("array member receipts preserve executed sibling, method, input and fa
   );
   await Deno.writeTextFile(
     prelude,
-    library + "\nconst Array.count = fn values => @array.length values\n",
+    library + "\nconst Array.count = func values => return @array.length values\n",
   );
   let expression = "@array.length values";
   for (let index = 0; index < 80; index++) {
@@ -107,7 +107,7 @@ Deno.test("array member receipts preserve executed sibling, method, input and fa
     body = expression,
     input = "#[]",
   ) =>
-    `const Array.count = fn values => ${body}
+    `const Array.count = func values => return ${body}
 entry const warm: U32 = #[].count
 entry const result: U32 = ${input}.count
 entry const sibling = ${sibling}

@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const llvm_option = b.option(bool, "llvm", "Use LLVM to build the compiler executable");
     const use_llvm: ?bool = if (llvm_option) |value| value else if (optimize == .debug) null else true;
+    const error_tracing = b.option(bool, "error-tracing", "Enable compiler error-return traces for integration diagnostics");
     const artifact_replay = b.option(bool, "artifact-replay", "Private owned backend reconstruction gate") orelse false;
     const identity = b.addOptions();
     identity.addOption(bool, "artifact_replay", artifact_replay);
@@ -19,6 +20,12 @@ pub fn build(b: *std.Build) void {
         hash.update("artifact-replay=true");
         hash.final(&compiler_digest);
     }
+    if (error_tracing) |enabled| {
+        var hash = std.crypto.hash.sha2.Sha256.init(.{});
+        hash.update(&compiler_digest);
+        hash.update(if (enabled) "error-tracing=true" else "error-tracing=false");
+        hash.final(&compiler_digest);
+    }
     identity.addOption([32]u8, "digest", compiler_digest);
     const identity_file = b.addWriteFiles().add("compiler-identity.bin", &compiler_digest);
     const install_identity = b.addInstallFile(identity_file, "compiler-identity.bin");
@@ -27,6 +34,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .error_tracing = error_tracing,
     });
     module.addOptions("compiler_identity", identity);
     const exe = b.addExecutable(.{ .name = "blotc", .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
@@ -83,10 +91,11 @@ pub fn build(b: *std.Build) void {
     addRuntimeFixture(b, target, .resource, "resource-retire-fixture", "Generate deferred owning resource retirement laws");
     addRuntimeFixture(b, target, .region, "region-owner-publication-fixture", "Generate region owner publication execution laws");
     addRuntimeFixture(b, target, .task_context, "task-context-fixture", "Generate suspendable task ownership context laws");
+    addRuntimeFixture(b, target, .data_stacks, "data-stacks-fixture", "Generate compiler-assigned data-stack memory laws");
     addRuntimeFixture(b, target, .packed_layout, "packed-layout-fixture", "Generate the experimental dense scalar row fixture");
 }
 
-const RuntimeFixture = enum { arena, shared_rc, cohort, list, resource, region, task_context, packed_layout };
+const RuntimeFixture = enum { arena, shared_rc, cohort, list, resource, region, task_context, packed_layout, data_stacks };
 fn addRuntimeFixture(b: *std.Build, target: std.Build.ResolvedTarget, kind: RuntimeFixture, name: []const u8, description: []const u8) void {
     // Fixtures are build-time Wasm generators. Release optimization belongs to
     // blotc; keeping generators on the development backend also reuses its cache.

@@ -3,25 +3,25 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const library =
   `type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
+impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
 `;
 const main = `import {Source} from "./library"
-entry const answer = fn (value: U32) => do:
+entry const answer = func (value: U32) => return do:
   let selected: (Array U32) -> U32 = Source.first
   break selected #[value, @u32.add value 1]
-entry const floating = fn (value: F32) => do:
+entry const floating = func (value: F32) => return do:
   let selected: (Array F32) -> F32 = Source.first
   break selected #[value, 2.5]
-entry const reference = fn (value: Array U32) => do:
+entry const reference = func (value: Array U32) => return do:
   let selected: (Array (Array U32)) -> Array U32 = Source.first
   break selected #[value, #[7]]
 `;
 const foreignLibrary =
   `type Callable f is contract = { type Run, const run: f -> (Callable.Run f) ! {Foreign} }
-impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = fn callback => callback () }
+impl Callback a : Callable (Unit -> a ! {Foreign}) = { type Run = a, const run = func callback => return callback () }
 `;
 const foreignMain = `import {Callable} from "./library"
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return do:
   let selected: (Unit -> U32 ! {Foreign}) -> U32 = Callable.run
   break selected host
 `;
@@ -85,7 +85,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(edited.success, JSON.stringify(edited));
       await verify(edited.bytes, true);
       const wrongResult = library.replace("type Item = a", "type Item = Bool")
-        .replace("@array.get values 0", "#True");
+        .replace("@array.get values 0", "true");
       const rejected = await compiler.build({
         sources: { ...sources, [producer]: wrongResult },
       });

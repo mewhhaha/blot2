@@ -34,26 +34,26 @@ const producer = (storage: Storage, parameter = "value") => {
     : "value";
   return `opaque type Token = ${representation}
 private const offset = 2
-const make: U32 -> Token = fn ${parameter} => #Token (${payload})
-const read: Token -> U32 = fn (#Token value) => ${observed}
+const make: U32 -> Token = func ${parameter} => return #Token (${payload})
+const read: Token -> U32 = func (#Token value) => return ${observed}
 `;
 };
 // Runtime selection keeps the opaque argument/result inside real closure calls.
 // Guest exports themselves retain the language's scalar ABI.
 const bridge = `import {make, read} from "./tokens"
-const factories = #[make, fn value => make value]
-const readers = #[read, fn value => read value]
-const transform = fn (value: U32) => (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
+const factories = #[make, func value => return make value]
+const readers = #[read, func value => return read value]
+const transform = func (value: U32) => return (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
 `;
 const main = `import {transform} from "./bridge"
-entry const answer = fn (value: U32) => transform value
+entry const answer = func (value: U32) => return transform value
 `;
 const carrier = `opaque type Envelope = Token
-const pack = fn value => #Envelope (make value)
-const unpack = fn (#Envelope value) => read value
-const factories = #[pack, fn value => pack value]
-const readers = #[unpack, fn value => unpack value]
-const carry = fn (value: U32) => (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
+const pack = func value => return #Envelope (make value)
+const unpack = func (#Envelope value) => return read value
+const factories = #[pack, func value => return pack value]
+const readers = #[unpack, func value => return unpack value]
+const carry = func (value: U32) => return (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
 `;
 
 // Scalar guest APIs need not expose private heap memory. Add only a telemetry

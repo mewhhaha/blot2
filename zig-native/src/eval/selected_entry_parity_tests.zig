@@ -26,8 +26,8 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return module;
 }
 
-const entry_cycle = "type Box is data = #Box U32\nconst Box.read = fn value => second\nconst pick = fn value => value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = fn () => pick (#Box 1)\n";
-const entry_valid = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = fn value => second\nconst Right.read = fn value => first\nconst pick = fn value => value.read\nlet first: U32 = pick (#Left 1)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => pick (#Left 1)\n";
+const entry_cycle = "type Box is data = #Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = func () => return pick (#Box 1)\n";
+const entry_valid = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = func value => return second\nconst Right.read = func value => return first\nconst pick = func value => return value.read\nlet first: U32 = pick (#Left 1)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return pick (#Left 1)\n";
 
 fn selectedEntry(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var session = try eval.Session.init(allocator, &.{module.*});
@@ -67,7 +67,7 @@ test "startup residual entry selected method owns exact numeric target without r
 test "startup residual entry-only method exposes cell cycle at frozen name point" {
     var module = try lower(a, entry_cycle);
     defer module.deinit(a);
-    try emit(a, &module, .initialization_cycle, 104);
+    try emit(a, &module, .initialization_cycle, 122);
 }
 
 test "startup residual unselected entry candidate never introduces initializer cycle" {
@@ -77,7 +77,7 @@ test "startup residual unselected entry candidate never introduces initializer c
 }
 
 test "startup residual selected entry reach remains immutable and releases backend OOM" {
-    for ([_][]const u8{ entry_valid, entry_cycle }, [_]?backend.Code{ null, .initialization_cycle }, [_]?u32{ null, 104 }) |source, code, point| {
+    for ([_][]const u8{ entry_valid, entry_cycle }, [_]?backend.Code{ null, .initialization_cycle }, [_]?u32{ null, 122 }) |source, code, point| {
         var module = try lower(a, source);
         defer module.deinit(a);
         const before = @import("../check/core_snapshot_tests.zig").stamp(module);

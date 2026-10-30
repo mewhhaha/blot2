@@ -17,11 +17,11 @@ const mapped = #[twice | value <- packed, let twice = value * 2]
 //                             ^^ operator
 //                                        ^^^ keyword.storage.type
 
-const append = fn value => fn values => [...values, value]
-//                                       ^^^ operator
+const append = func value => return func values => return [...values, value]
+//                                                         ^^^ operator
 
-const prepend = fn value => fn values => [value, ...values]
-//                                               ^^^ operator
+const prepend = func value => return func values => return [value, ...values]
+//                                                                 ^^^ operator
 
 const named: time.Clock = #time.Clock { ticks: 42 }
 //                        ^ punctuation.special

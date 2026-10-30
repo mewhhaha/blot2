@@ -19,11 +19,11 @@ const table = (count: number, shared: boolean) => {
     },
   ).join(", ");
   let make =
-    "const make = fn (captured: U32) => fn (value: U32) => @u32.add captured value";
+    "const make = func (captured: U32) => return func (value: U32) => return @u32.add captured value";
   let capture = "";
   if (shared) {
     make =
-      "const make = fn (base: Array U32) => fn (captured: U32) => fn (value: U32) => @u32.add base[0] (@u32.add captured value)";
+      "const make = func (base: Array U32) => return func (captured: U32) => return func (value: U32) => return @u32.add base[0] (@u32.add captured value)";
     capture = "  let shared = #[1, 2]\n";
   }
   return `${make}
@@ -38,7 +38,7 @@ Deno.test("lexical capture keys project only reachable scopes in wide closure ta
   // Keep ordinary member inference active: exact generic length bodies can
   // now prove that they need no element or lexical capture interfaces.
   const library = await Deno.readTextFile(prelude) +
-    "\nconst Array.capture_count = fn values => @u32.add 0 (@array.length values)\n";
+    "\nconst Array.capture_count = func values => return @u32.add 0 (@array.length values)\n";
   const compiler = await createZigProjectCompiler({
     executable,
     entry,

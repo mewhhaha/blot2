@@ -1,5 +1,5 @@
 import * as array from "std/array"
-entry const run = fn (seed: U32) -> U32 => do:
-  let values = array.generate 8192 (fn index => (seed + index * 7919) % 65536)
-  let selected = array.filter (fn value => value % 3 == 0) values
-  break array.fold_left (fn total value => total + value) 0 selected
+entry const run = func (seed: U32) : U32 => return do:
+  let values = array.generate 8192 (func index => return (seed + index * 7919) % 65536)
+  let selected = array.filter (func value => return value % 3 == 0) values
+  break array.fold_left (func total -> value => return total + value) 0 selected

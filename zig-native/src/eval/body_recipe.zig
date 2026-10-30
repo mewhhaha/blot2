@@ -45,7 +45,7 @@ pub fn appendChildren(work: anytype, allocator: Allocator, module: *const core.M
         .package_unpack => try work.appendSlice(allocator, &.{ n.a, module.packageOpening(id).body }),
         .staging, .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle, .proof_guard, .resource_acquire, .usage_borrow => try work.appendSlice(allocator, &.{ n.a, n.b }),
         .resource_scope, .if_value, .if_stmt, .state_provider => try work.appendSlice(allocator, &.{ n.a, n.b, n.c }),
-        .task, .block, .suite, .product, .record, .array, .array_op, .call, .contract_method => try work.appendSlice(allocator, module.children(id)),
+        .task, .block, .suite, .product, .record, .array, .array_op, .storage, .call, .contract_method => try work.appendSlice(allocator, module.children(id)),
         .bind => try work.append(allocator, n.b),
         .return_, .project, .result_associated, .force => try work.append(allocator, n.a),
         .construct => try work.append(allocator, n.b),

@@ -4,24 +4,24 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("direct collection loops eliminate temporary packed rows during repeated reads", async () => {
   await compileAndRun(
     `
-let arrays = @array.generate 1024 (fn i => {x: i, y: i * 2, z: i})
+let arrays = @array.generate 1024 (func i => return {x: i, y: i * 2, z: i})
 let lists = @list.from_array arrays
-const total_array = fn () => do:
+const total_array = func () => return do:
   let sum = 0
   for row in arrays:
     sum := self + row.x + row.y + row.z
   break sum
-const total_list = fn () => do:
+const total_list = func () => return do:
   let sum = 0
   for row in lists:
     sum := self + row.x + row.y + row.z
   break sum
-entry const run = fn count => do:
+entry const run = func count => return do:
   let sum = 0
   for i in 0..count:
     sum := self + total_array () + total_list ()
   break sum
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       const total = 4 * 1024 * 1023;
@@ -37,17 +37,17 @@ Deno.test("packed list rows preserve logical lengths, leaf crossings and structu
   await compileAndRun(
     `
 const saved = [{z: 7, a: 3, b: 4}, {b: 5, z: 11, a: 2}]
-const sum = fn values => do:
+const sum = func values => return do:
   let total = 0
   for row in values:
     total := self + row.a + row.b + row.z
   break total
-const skip = fn count => fn cursor => do:
+const skip = func count => return func cursor => return do:
   for i in 0..count:
     cursor := @cursor.advance self
   break cursor
-entry const run = fn count => do:
-  let rows = @list.generate count (fn i => {z: i * 3, a: i, b: i + 1})
+entry const run = func count => return do:
+  let rows = @list.generate count (func i => return {z: i * 3, a: i, b: i + 1})
   let before = rows
   let origin = rows.iter
   rows := [...self, {a: 100, b: 200, z: 300}]
@@ -57,18 +57,18 @@ entry const run = fn count => do:
   let copied = @array.from_list joined
   let distant = skip (count - 1) origin
   break #[sum rows, sum before, sum middle, sum joined, copied.length, rows.length, (@cursor.value origin).a, (@cursor.value distant).z]
-entry const build = fn count => do:
-  let rows = [{z: i * 3, b: i + 1, a: i} | i <- @array.generate count (fn i => i)]
+entry const build = func count => return do:
+  let rows = [{z: i * 3, b: i + 1, a: i} | i <- @array.generate count (func i => return i)]
   break #[sum rows, rows.length, (@array.from_list rows).length]
-entry const rectangular = fn count => do:
+entry const rectangular = func count => return do:
   let rows = [{a: x, b: y, z: 1} | x <- #[1, 2], y <- @array.fill count 3]
   break #[sum rows, rows.length]
-entry const empty = fn count => do:
+entry const empty = func count => return do:
   let rows = @list.fill count {a: 1, b: 2, z: 3}
   let empty = @list.slice rows count 0
   let joined = @list.concat empty saved
   break #[empty.length, sum joined, (@array.from_list empty).length]
-entry const single = fn count => (@list.fill count {value: 7}).length
+entry const single = func count => return (@list.fill count {value: 7}).length
 `,
     (guest) => {
       for (const n of [1, 2, 82, 83, 84, 249, 1000]) {
@@ -105,19 +105,19 @@ Deno.test("packed rows preserve construction, copies, snapshots and ordinary gen
   await compileAndRun(
     `
 const literal = #[{z: 7, a: 3}, {a: 5, z: 11}]
-const identity = fn value => value
-const second = fn values => values[1]
-const rows = fn count => @array.generate count (fn i => {z: i + 7, a: i * 3})
-const sum = fn values => do:
+const identity = func value => return value
+const second = func values => return values[1]
+const rows = func count => return @array.generate count (func i => return {z: i + 7, a: i * 3})
+const sum = func values => return do:
   let total = 0
   for row in values:
     total := self + row.a * 10 + row.z
   break total
-entry const operations = fn count => do:
+entry const operations = func count => return do:
   let values = rows count
   let before = values
   let extracted = values[1]
-  let read = fn () => values[1].a
+  let read = func () => return values[1].a
   values[1].a := self + 100
   let after = @array.set values 0 {a: 20, z: 30}
   let copied = @array.slice after 0 count
@@ -125,12 +125,12 @@ entry const operations = fn count => do:
   let extended = #[{a: 2, z: 4}, ...joined, {z: 9, a: 8}]
   let roundtrip = @array.from_list (@list.from_array extended)
   break #[sum roundtrip, sum before, extracted.a, read (), (second (identity after)).a]
-entry const generated = fn count => sum (#[{z: y + 1, a: x} | x <- #[1, 2], y <- @array.generate count (fn i => i)])
-entry const filled = fn count => sum (@array.fill count {a: 4, z: 6})
-entry const empty = fn count => sum (#[{a: i, z: i} | i <- @array.generate count (fn i => i), i > count])
-entry const single_field = fn count => (@array.generate count (fn i => {value: i}))[count - 1].value
-entry const reference_rows = fn count => do:
-  let values = @array.generate count (fn i => {items: #[i, i + 1], value: i})
+entry const generated = func count => return sum (#[{z: y + 1, a: x} | x <- #[1, 2], y <- @array.generate count (func i => return i)])
+entry const filled = func count => return sum (@array.fill count {a: 4, z: 6})
+entry const empty = func count => return sum (#[{a: i, z: i} | i <- @array.generate count (func i => return i), i > count])
+entry const single_field = func count => return (@array.generate count (func i => return {value: i}))[count - 1].value
+entry const reference_rows = func count => return do:
+  let values = @array.generate count (func i => return {items: #[i, i + 1], value: i})
   let before = values
   values[0].items[0] := 99
   break #[before[0].items[0], values[0].items[0], values[count - 1].value]
@@ -162,10 +162,10 @@ Deno.test("packed tuple cursors preserve independent positions, escaped values a
   await compileAndRun(
     `
 const constant = #[(1, -0.0), (2, 3.5)]
-const first_field = fn row => do:
+const first_field = func row => return do:
   let (value, _, _) = row
   break value
-entry const floating = fn (input: Array F32) => do:
+entry const floating = func (input: Array F32) => return do:
   let rows = #[(i, value) | value <- input, let i = 9]
   let original = rows
   let selected = rows[0]
@@ -178,16 +178,16 @@ entry const floating = fn (input: Array F32) => do:
   let (_, saved) = selected
   let (_, zero) = constant[0]
   break #[first, second, saved, zero]
-entry const conversions = fn (input: Array F32) => do:
-  let rows = #[(value, #True, ()) | value <- input]
+entry const conversions = func (input: Array F32) => return do:
+  let rows = #[(value, true, ()) | value <- input]
   let listed = @list.from_array rows
   let copied = @array.from_list listed
   break #[first_field row | row <- copied]
-entry const fields = fn (input: Array F32) => do:
+entry const fields = func (input: Array F32) => return do:
   let rows = #[{value: value, count: 9} | value <- input]
-  break #[rows[i].value | i <- @array.generate input.length (fn i => i)]
-entry const boundaries = fn count => do:
-  let values = @array.generate count (fn i => (i, i + 1))
+  break #[rows[i].value | i <- @array.generate input.length (func i => return i)]
+entry const boundaries = func count => return do:
+  let values = @array.generate count (func i => return (i, i + 1))
   let selected = @array.slice values count 0
   let cursor = selected.iter
   break @cursor.has cursor
@@ -239,16 +239,16 @@ entry const boundaries = fn count => do:
 Deno.test("packed rows keep eager failure order and effectful field order", async () => {
   await compileAndRun(
     `
-entry const order = fn (visit: U32 -> U32 ! {Foreign}) => do:
+entry const order = func (visit: U32 -> U32 ! {Foreign}) => return do:
   use first <- visit 1
   use last <- visit 2
   let rows = #[{z: first, a: last}]
   use result <- visit (rows[0].a * 10 + rows[0].z)
   break result
-entry const eager = fn divisor => do:
+entry const eager = func divisor => return do:
   let rows = #[(i, 10 / divisor) | i <- #[1, 2]]
   break rows.length
-entry const too_large = fn count => (@array.fill count (1, 2, 3)).length
+entry const too_large = func count => return (@array.fill count (1, 2, 3)).length
 `,
     (guest) => {
       const seen: number[] = [];
@@ -275,10 +275,10 @@ entry const too_large = fn count => (@array.fill count (1, 2, 3)).length
 Deno.test("extracted packed rows and cursors survive collection and later array edits", async () => {
   await compileAndRun(
     `
-entry const run = fn count => do:
-  let rows = @array.generate 257 (fn i => {x: i, y: 65552 + i})
+entry const run = func count => return do:
+  let rows = @array.generate 257 (func i => return {x: i, y: 65552 + i})
   let extracted = rows[256]
-  let read = fn () => extracted.x + extracted.y
+  let read = func () => return extracted.x + extracted.y
   let cursor = rows.iter
   let saved_cursor = (@list.from_array rows).iter
   let index = 0
@@ -289,7 +289,7 @@ entry const run = fn count => do:
     let discarded = @array.fill 8192 index
     cursor := @cursor.advance rows.iter
     index := self + 1
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("run", 256), 131617 + 256);

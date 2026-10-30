@@ -139,6 +139,8 @@ fn callbackName(scalar: Scalar) ?[]const u8 {
 
 pub const Module = struct {
     allocator: Allocator,
+    /// Guest ABI identity is explicit even when no array crosses the boundary.
+    memory_model: enum { counted, data_stacks } = .counted,
     artifacts: ?*artifact.Recorder = null,
     functions: std.ArrayList(Function) = .empty,
     signatures: std.ArrayList(Signature) = .empty,
@@ -146,6 +148,11 @@ pub const Module = struct {
     globals: std.ArrayList(Global) = .empty,
     exports: std.ArrayList(Export) = .empty,
     data: std.ArrayList(u8) = .empty,
+    /// Independent bounded storage profile; never combined with the RC arena.
+    fixed_memory_bytes: u32 = 0,
+    /// Copy-only numeric packet ABI supplied by an independent storage model.
+    /// These functions own transport scratch, never guest application objects.
+    array_transport: ?struct { allocate: u32, reset: u32 } = null,
     arena: ?Arena = null,
     /// Explicit raw reference-fixture helpers; never recorded or accepted by production.
     fixture_helpers: ?[3]u32 = null,
@@ -489,6 +496,7 @@ pub const Module = struct {
     /// Static data and mutable arena metadata have disjoint storage. Dynamic
     /// blocks begin above static data and 64 KiB; payload addresses stay stable.
     pub fn ensureArena(self: *Module) (Allocator.Error || error{ModuleTooLarge})!Arena {
+        if (self.fixed_memory_bytes != 0) return error.ModuleTooLarge;
         if (self.arena) |arena| {
             try self.demandResource(.arena, 0, true);
             return arena;
@@ -745,7 +753,7 @@ pub const Module = struct {
     pub fn exportOwnerFunction(self: *Module, id: u32, name: []const u8, parameter: Scalar, result: Scalar, once: bool, parameter_owner: ?OwnerBoundary, result_owner: ?OwnerBoundary, owner_adapter: bool) !void {
         if (id >= self.functions.items.len) return error.InvalidFunctionReference;
         if (parameter == .array_u32 or parameter == .array_f32 or result == .array_u32 or result == .array_f32) {
-            _ = try self.ensureArena();
+            if (self.array_transport == null) _ = try self.ensureArena();
             try self.publicArena();
         }
         const owned = try self.allocator.dupe(u8, name);
@@ -973,7 +981,7 @@ pub const Module = struct {
         if (id >= self.functions.items.len) return error.InvalidFunctionReference;
         if (callbackName(callback.parameter) == null or callbackName(callback.result) == null or callbackName(result) == null) return error.InvalidFunctionReference;
         if (callback.data or isArray(callback.parameter) or isArray(callback.result) or isArray(result)) {
-            _ = try self.ensureArena();
+            if (self.array_transport == null) _ = try self.ensureArena();
             try self.publicArena();
         }
         const owned = try self.allocator.dupe(u8, name);
@@ -1129,8 +1137,15 @@ pub const Module = struct {
             if (options.collector_rejection) |rejection| rejection.* = collector;
             return error.CollectorFreeUnproven;
         }
-        const roots_admitted = rc_admitted and passes.roots;
+        const roots_admitted = self.memory_model == .counted and rc_admitted and passes.roots;
         const resources = self.resourceCount();
+        if (self.memory_model == .data_stacks) {
+            if (self.arena != null or resources != 0 or self.cleanup_data.len != 0 or self.taskImportNamed("open") != null) return error.InvalidFunctionReference;
+            for (self.exports.items) |item| {
+                if (item.parameter_owner != null or item.result_owner != null or item.owner_adapter or item.task_adapter) return error.InvalidFunctionReference;
+                if (item.callback) |callback| if (callback.cleanup or callback.owned or callback.concurrent or callback.data) return error.InvalidFunctionReference;
+            }
+        }
         if (resources != 0 and !roots_admitted) return error.InvalidFunctionReference;
         const root_mode = blk: {
             const arena = self.arena orelse break :blk 0;
@@ -1198,12 +1213,13 @@ pub const Module = struct {
             try output.section(4, payload.items());
             payload.clear();
         }
-        if (self.arena != null) {
+        if (self.arena != null or self.fixed_memory_bytes != 0) {
             try payload.uleb(1);
             try payload.byte(1); // bounded Wasm32 memory
-            const pages: u32 = @intCast(@max(1, ((if (memory_profile) |profile| profile.end else self.data.items.len) + 65535) / 65536));
+            const memory_bytes = @max(self.fixed_memory_bytes, if (memory_profile) |profile| profile.end else self.data.items.len);
+            const pages: u32 = @intCast(@max(1, (memory_bytes + 65535) / 65536));
             try payload.uleb(pages);
-            try payload.uleb(65536);
+            try payload.uleb(if (self.fixed_memory_bytes != 0) pages else 65536);
             try output.section(5, payload.items());
             payload.clear();
         }
@@ -1251,10 +1267,10 @@ pub const Module = struct {
         if (self.public_arena) {
             try payload.name("blot:allocate");
             try payload.byte(0);
-            try payload.uleb(code.function(if (roots_admitted) self.arena.?.root_public_allocate else self.arena.?.allocate) + import_count);
+            try payload.uleb(code.function(if (self.array_transport) |transport| transport.allocate else if (roots_admitted) self.arena.?.root_public_allocate else self.arena.?.allocate) + import_count);
             try payload.name("blot:reset");
             try payload.byte(0);
-            try payload.uleb(code.function(if (roots_admitted) self.arena.?.root_public_reset else self.arena.?.reset) + import_count);
+            try payload.uleb(code.function(if (self.array_transport) |transport| transport.reset else if (roots_admitted) self.arena.?.root_public_reset else self.arena.?.reset) + import_count);
         }
         // Profilers instrument this raw allocator, including recycled blocks.
         // It is not the ownership-publishing host allocation entry point.
@@ -1451,12 +1467,14 @@ pub const Module = struct {
             try output.section(0, payload.items());
             payload.clear();
         }
-        try payload.name("blot:ownership");
-        try payload.byte(if (roots_admitted) 2 else 1);
-        try payload.byte(if (roots_admitted) 2 else @intFromBool(rc_admitted));
-        try payload.byte(@backingInt(ownership_fallback));
-        try output.section(0, payload.items());
-        payload.clear();
+        if (self.memory_model == .counted) {
+            try payload.name("blot:ownership");
+            try payload.byte(if (roots_admitted) 2 else 1);
+            try payload.byte(if (roots_admitted) 2 else @intFromBool(rc_admitted));
+            try payload.byte(@backingInt(ownership_fallback));
+            try output.section(0, payload.items());
+            payload.clear();
+        }
         if (self.arena != null) {
             try payload.name("blot:cycles");
             try payload.byte(1);
@@ -1486,9 +1504,10 @@ pub const Module = struct {
         };
         const public_owners = version == 6;
         if (self.cleanup_data.len != 0) version = 7;
+        if (self.memory_model == .data_stacks) version = 8;
         try payload.byte(version);
-        if (resources != 0 or version >= 6) try payload.uleb(resources);
-        if (version >= 6) {
+        if (resources != 0 or version == 6 or version == 7) try payload.uleb(resources);
+        if (version == 6 or version == 7) {
             var abi_flags: u8 = @intFromBool(self.resourceRetireImport() != null);
             if (version == 7 and public_owners) abi_flags |= 2;
             try payload.byte(abi_flags);

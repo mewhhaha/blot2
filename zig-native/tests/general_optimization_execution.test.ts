@@ -5,26 +5,26 @@ Deno.test("user-defined checked edits and nested paths retain snapshots across e
   await compileAndRun(
     `
 type Outcome a is data = #Updated a | #Refused
-const replace_if = fn index => fn value => fn values => do:
+const replace_if = func index => return func value => return func values => return do:
   if index < @array.length values:
     break #Updated (@array.set values index value)
   break #Refused
 type Store is data = #Store { left: Array U32, right: Array U32 }
-entry const checked = fn (count: U32) => do:
+entry const checked = func (count: U32) => return do:
   let values = @array.fill count 0
   for i in 0..(count + 1):
     let #Updated next = replace_if i (i + 1) values else:
       break values
     values := next
   break values
-entry const nested = fn (count: U32) => do:
+entry const nested = func (count: U32) => return do:
   let store = #Store { left: @array.fill count 0, right: @array.fill count 1 }
   for i in 0..count:
     if i == 2049:
       break
     store.left[i] := i + 1
   break store.left
-entry const forever = fn (count: U32) => do:
+entry const forever = func (count: U32) => return do:
   let values = @array.fill count 0
   let i = 0
   for ever:
@@ -33,22 +33,22 @@ entry const forever = fn (count: U32) => do:
     values[i] := i + 1
     i := i + 1
   break values
-entry const versions = fn () => do:
+entry const versions = func () => return do:
   let leaf = #[1, 2]
   let store = #Store { left: leaf, right: leaf }
-  let saved = fn () => store.left[0]
+  let saved = func () => return store.left[0]
   for i in 0..2:
     store.left[i] := 9
     if i == 0:
       break
   store.left[1] := 8
   break #[saved (), leaf[0], store.right[0], store.left[0], store.left[1]]
-entry const extracted = fn () => do:
+entry const extracted = func () => return do:
   let values = #[#[1], #[2]]
   let first = values[0]
   values[0][0] := 9
   break #[first[0], values[0][0]]
-entry const after_break = fn () => do:
+entry const after_break = func () => return do:
   let values = #[1, 2]
   let saved = values
   for ever:
@@ -87,21 +87,21 @@ Deno.test("scalar replacement preserves record loop versions, branches and mixed
   await compileAndRun(
     `
 type Pair is data = #Pair { count: U32, value: F32 }
-const advance = fn pair => #Pair { count: pair.count + 1, value: pair.value + 0.25 }
-entry const iterate = fn (count: U32) => do:
+const advance = func pair => return #Pair { count: pair.count + 1, value: pair.value + 0.25 }
+entry const iterate = func (count: U32) => return do:
   let value = #Pair { count: 0, value: -0.5 }
   let previous = value
   for i in 0..count:
     previous := value
     value := advance value
   break #[F32.from value.count, value.value, F32.from previous.count, previous.value]
-entry const branch = fn (flag: Bool) => do:
+entry const branch = func (flag: Bool) => return do:
   let original = #Pair { count: 7, value: -0.0 }
   let changed = if flag then advance original else #Pair { count: 3, value: 1.5 }
   break #[F32.from original.count, original.value, F32.from changed.count, changed.value]
-entry const captured = fn () => do:
+entry const captured = func () => return do:
   let value = #Pair { count: 1, value: 1.0 }
-  let read = fn () => value.count
+  let read = func () => return value.count
   value := advance value
   break read () + value.count
 `,
@@ -139,24 +139,24 @@ Deno.test("user constructor demand matches and known callbacks preserve effects 
   await compileAndRun(
     `
 type Choice a is data = #Chosen a | #Absent
-const select = fn ~(fallback: U32) => fn choice => case choice of
+const select = func ~(fallback: U32) => return func choice => return case choice of
   #Chosen value if @u32.lt 0 value => value
   #Chosen _ => @u32.add (@demand fallback) (@demand fallback)
   #Absent => @demand fallback
-const generate = fn count => fn callback => @array.generate count callback
-entry const demand = fn (host: U32 -> U32 ! {Foreign}) => do:
+const generate = func count => return func callback => return @array.generate count callback
+entry const demand = func (host: U32 -> U32 ! {Foreign}) => return do:
   use a <- select (host 10) (#Chosen 42)
   use b <- select (host 11) (#Chosen 0)
   use c <- select (host 12) #Absent
   break #[a, b, c]
-entry const callback = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const callback = func (host: U32 -> U32 ! {Foreign}) => return do:
   use amount <- host 10
-  let callback = fn i => @u32.add i amount
+  let callback = func i => return @u32.add i amount
   amount := 99
   break generate 4 callback
-entry const untouched = fn (host: U32 -> U32 ! {Foreign}) => generate (host 0) (do:
+entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (host 0) (do:
   use offset <- host 20
-  break fn i => i + offset)
+  break func i => return i + offset)
 `,
     (guest) => {
       const calls: number[] = [];
@@ -189,8 +189,8 @@ entry const untouched = fn (host: U32 -> U32 ! {Foreign}) => generate (host 0) (
 Deno.test("staged indexed construction freezes once and preserves input aliases and repeated indices", async () => {
   await compileAndRun(
     `
-const build = fn values => do:
-  let saved = fn () => values[0]
+const build = func values => return do:
+  let saved = func () => return values[0]
   for i in 0..4096:
     values[i] := i + 1
   break (values, saved ())
@@ -206,7 +206,7 @@ const primitive = do:
   for i in 0..4096:
     values := @array.set values i (i + 1)
   break values
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let (values, old) = constructed
   break #[source[0], old, values[0], values[4095], repeated[0], repeated[1], primitive[4095]]
 `,
@@ -223,18 +223,19 @@ Deno.test("staged nested builders and concatenation keep storage proportional to
   await compileAndRun(
     `
 import * as array from "../../std/array"
-const chunks = @array.generate 2048 (fn i => #[i, i + 1])
-const flattened = array.flatten chunks
+const chunks = @array.generate 2048 (func i => return {start: i * 2, count: 2})
+const payload = @array.generate 4096 (func i => return i / 2 + i % 2)
+const flattened = array.flatten chunks payload
 const joined = array.concat flattened flattened
 const custom = do:
   let output = @array.fill 4096 0
   let start = 0
   for chunk in chunks:
     for i in 0..2:
-      output[start + i] := chunk[i]
+      output[start + i] := payload[chunk.start + i]
     start := start + 2
   break output
-entry const answers = fn () => #[flattened[4095], joined[8191], custom[4095]]
+entry const answers = func () => return #[flattened[4095], joined[8191], custom[4095]]
 `,
     (guest) => {
       assert.deepEqual(

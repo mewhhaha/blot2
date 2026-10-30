@@ -6,7 +6,7 @@ import { compileAndRun } from "./compile_helpers.ts";
 function source(amount: number): string {
   return `type Box is data = #Box { value: U32 }
 type Other is data = #Other { value: U32 }
-const make = fn left => fn right => fn (value: U32) => @u32.add (@u32.add left.value right.value) value
+const make = func left => return func right => return func (value: U32) => return @u32.add (@u32.add left.value right.value) value
 const box = #Box { value: ${amount} }
 const shared = make box box
 const shared_again = make box box
@@ -15,13 +15,13 @@ const separate_again = make (#Box { value: ${amount} }) (#Box { value: ${amount}
 const nominal = make (#Other { value: ${amount + 1} }) (#Other { value: ${
     amount + 1
   } })
-const capture = fn captured => fn (value: U32) => captured value
+const capture = func captured => return func (value: U32) => return captured value
 const nested = capture separate_again
-entry const first: U32 -> U32 = fn value => shared value
-entry const again: U32 -> U32 = fn value => shared_again value
-entry const fresh: U32 -> U32 = fn value => separate value
-entry const equivalent: U32 -> U32 = fn value => nested value
-entry const distinct: U32 -> U32 = fn value => nominal value
+entry const first: U32 -> U32 = func value => return shared value
+entry const again: U32 -> U32 = func value => return shared_again value
+entry const fresh: U32 -> U32 = func value => return separate value
+entry const equivalent: U32 -> U32 = func value => return nested value
+entry const distinct: U32 -> U32 = func value => return nominal value
 `;
 }
 
@@ -57,9 +57,9 @@ Deno.test("typed specialization and principal queries preserve imported captures
       const sources = {
         [entry]: main,
         [dependency]: `${
-          reordered ? "const untouched = fn value => value\n" : ""
+          reordered ? "const untouched = func value => return value\n" : ""
         }const amount = ${amount}\nconst other = ${amount + 1}\n${
-          reordered ? "" : "const untouched = fn value => value\n"
+          reordered ? "" : "const untouched = func value => return value\n"
         }`,
       };
       const fresh = await createZigProjectCompiler(options);

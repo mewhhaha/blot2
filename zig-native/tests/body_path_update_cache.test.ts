@@ -13,16 +13,16 @@ const source = (
   `${prefix}type Point is data = #Point ${point}
 type Bucket is data = #Bucket { points: Array Point }
 const seed = ${seed}
-const update = fn (index: U32) -> Array U32 => do:
+const update = func (index: U32) : Array U32 => return do:
   let bucket = #Bucket { points: #[#Point { y: #[10], x: ${spine} }, #Point { y: #[20], x: ${spine} }] }
   let before = bucket
   bucket.points[index].y[0] := @u32.add self seed
   break #[before.points[index].y[0], bucket.points[index].y[0]]
-const replace = fn values => fn index => fn value => do:
+const replace = func values => return func index => return func value => return do:
   values[index] := value
   break values
-entry const run = fn (index: U32) -> Array U32 => update index
-entry const replaced = fn (value: U32) -> Array U32 => replace #[seed, 41] 1 value
+entry const run = func (index: U32) : Array U32 => return update index
+entry const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`body path update receipts preserve selector order old leaf and snapshots (${codegenTier})`, async () => {
@@ -37,7 +37,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
     };
     const compiler = await createZigProjectCompiler(options);
     try {
-      const prefix = "const earlier = fn (value: F32) => @f32.add value 1.0\n";
+      const prefix = "const earlier = func (value: F32) => return @f32.add value 1.0\n";
       const revisions: readonly (readonly [string, number | null])[] = [
         [source("2"), 2],
         [source("2", prefix), 2],

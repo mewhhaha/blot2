@@ -186,9 +186,9 @@ export const gameScenarios: readonly Scenario[] = [
     replacements: [{
       file: "src/robots.blot",
       search:
-        "const walk_material = fn phase => first_material + from (floor phase)",
+        "const walk_material = func phase => return first_material + from (floor phase)",
       replace:
-        "const walk_material = fn phase => first_material + from (ceil phase)",
+        "const walk_material = func phase => return first_material + from (ceil phase)",
     }],
   },
   {
@@ -220,9 +220,9 @@ export const gameScenarios: readonly Scenario[] = [
     replacements: [{
       file: "ink/math.blot",
       search:
-        "const Quat.dot: Quat -> Quat -> F32 = fn a => fn b =>\n  a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w",
+        "const Quat.dot: Quat -> Quat -> F32 = func a => return func b => return \n  a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w",
       replace:
-        "const Quat.dot: Quat -> Quat -> F32 = fn a => fn b =>\n  a.w * b.w + a.z * b.z + a.y * b.y + a.x * b.x",
+        "const Quat.dot: Quat -> Quat -> F32 = func a => return func b => return \n  a.w * b.w + a.z * b.z + a.y * b.y + a.x * b.x",
     }],
   },
   {
@@ -232,7 +232,7 @@ export const gameScenarios: readonly Scenario[] = [
       file: "ink/math.blot",
       search: "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\n",
       replace:
-        "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = fn (x: F32) => x + 1.0\n",
+        "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = func (x: F32) => return x + 1.0\n",
     }],
   },
 ];

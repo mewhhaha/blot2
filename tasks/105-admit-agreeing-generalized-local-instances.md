@@ -86,7 +86,7 @@ which broke Ink's ECS builders.
     and each callback is serialized at the instance its own body infers
     (`inferClosure`). `closeRetainedRows` (`core_eval.zig`) closed only the
     outer arrow of an anonymous closure, so the curried render system
-    `fn presentation => fn frame => ...` stayed open and declined. A closure
+    `func presentation => return func frame => return ...` stayed open and declined. A closure
     literal that is an anonymous closure's whole body is now closed like a named
     curried body's parameter arrow.
   - In a `:=` builder chain only the head `app.new policy` was closed; each
@@ -101,7 +101,7 @@ which broke Ink's ECS builders.
       native replay, checkpoint and OOM law combining them.
 - [x] Ambiguous holes. A promoted value serialized whole at a use that leaves a
       type variable open (`let boxed = #[b, b]` read only for its length; Ink's
-      effect repro `c1`, whose route callback `fn (e: u) => e` reaches
+      effect repro `c1`, whose route callback `func (e: u) => return e` reaches
       `create_world` with `u` and its row unconstrained) failed both attempts. A
       naive word stand-in at that serialization is unsound: the hole there is
       `boxed`'s own quantified variable, and a later use may read its shared

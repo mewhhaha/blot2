@@ -10,24 +10,24 @@ const io = std.testing.io;
 const Source = struct { name: []const u8, text: []const u8 };
 const named_scalar_shadow_source =
     \\infixl 60 `subtract`
-    \\const subtract = fn left => fn right => @u32.sub left right
-    \\entry const run = fn (subtract: U32) -> U32 => 20 `subtract` 22
+    \\const subtract = func left => return func right => return @u32.sub left right
+    \\entry const run = func (subtract: U32) : U32 => return 20 `subtract` 22
 ;
 const named_function_shadow_source =
     \\infixl 60 `combine`
-    \\const combine = fn left => fn right => @u32.sub left right
-    \\entry const run = fn () -> U32 => do:
-    \\  let combine = fn left => fn right => @u32.add left right
+    \\const combine = func left => return func right => return @u32.sub left right
+    \\entry const run = func () : U32 => return do:
+    \\  let combine = func left => return func right => return @u32.add left right
     \\  break 20 `combine` 22
 ;
 const symbolic_captured_target_source =
     \\infixl 60 (+) = subtract
-    \\const subtract = fn left => fn right => @u32.sub left right
-    \\entry const run = fn (subtract: U32) -> U32 => 20 + 22
+    \\const subtract = func left => return func right => return @u32.sub left right
+    \\entry const run = func (subtract: U32) : U32 => return 20 + 22
 ;
 const default_named_source =
-    \\const combine = fn left => fn right => @u32.add left right
-    \\entry const run = fn () -> U32 => 20 `combine` 22
+    \\const combine = func left => return func right => return @u32.add left right
+    \\entry const run = func () : U32 => return 20 `combine` 22
 ;
 const Fixture = struct {
     tmp: std.testing.TmpDir,
@@ -74,8 +74,8 @@ test "tags on catalog declarations and fixities reject without evaluating tag ex
         "@[missing_tag]\ntype Read is effect = Unit -> U32\nentry const answer = 42\n",
         "@[missing_tag]\ntype Box value is effect = {get: Unit -> value}\nentry const answer = 42\n",
         "@[missing_tag]\ntype Box value is data = #Box value\nentry const answer = 42\n",
-        "@[missing_tag]\ninfixl 60 (+) = add\nconst add = fn left => fn right => @u32.add left right\nentry const answer = 40 + 2\n",
-        "@[missing_tag]\ninfixl 60 `add`\nconst add = fn left => fn right => @u32.add left right\nentry const answer = 40 `add` 2\n",
+        "@[missing_tag]\ninfixl 60 (+) = add\nconst add = func left => return func right => return @u32.add left right\nentry const answer = 40 + 2\n",
+        "@[missing_tag]\ninfixl 60 `add`\nconst add = func left => return func right => return @u32.add left right\nentry const answer = 40 `add` 2\n",
     };
     for (sources) |text| {
         var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = text }});
@@ -97,23 +97,23 @@ test "diamond modules publish one principal body and independently copy imported
         \\import * as right from "./right"
         \\import { twice as doubled } from "./shared"
         \\import * as common from "./shared"
-        \\const integer = fn (value: U32) -> U32 => doubled value
-        \\const floating = fn (value: F32) -> F32 => common.twice value
-        \\entry const run = fn (value: U32) -> U32 => left.integer value
+        \\const integer = func (value: U32) : U32 => return doubled value
+        \\const floating = func (value: F32) : F32 => return common.twice value
+        \\entry const run = func (value: U32) : U32 => return left.integer value
         },
         .{ .name = "left.blot", .text =
         \\import { twice, identity as id } from "./shared"
-        \\const integer = fn (value: U32) -> U32 => twice (id value)
+        \\const integer = func (value: U32) : U32 => return twice (id value)
         },
         .{ .name = "right.blot", .text =
         \\import * as common from "./shared"
-        \\const floating = fn (value: F32) -> F32 => common.twice (common.identity value)
+        \\const floating = func (value: F32) : F32 => return common.twice (common.identity value)
         },
         .{ .name = "shared.blot", .text =
         \\infixl 60 (+) = _fixity_add
-        \\const identity = fn value => value
-        \\const twice = fn value => value + value
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const identity = func value => return value
+        \\const twice = func value => return value + value
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
         },
     });
     defer fixture.deinit();
@@ -176,8 +176,8 @@ test "same declaration spelling in distinct modules preserves foreign identities
 
 test "imported generic constraints reject invalid uses at their own source site" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "main.blot", .text = "import { twice, integer } from \"./library\"\nconst bad = twice #True\nconst mismatch = integer #False\n" },
-        .{ .name = "library.blot", .text = "infixl 60 (+) = _fixity_add\nconst twice = fn value => value + value\nconst integer = fn (value: U32) -> U32 => value\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n" },
+        .{ .name = "main.blot", .text = "import { twice, integer } from \"./library\"\nconst bad = twice true\nconst mismatch = integer false\n" },
+        .{ .name = "library.blot", .text = "infixl 60 (+) = _fixity_add\nconst twice = func value => return value + value\nconst integer = func (value: U32) : U32 => return value\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n" },
     });
     defer fixture.deinit();
     var checked = try project_check.checkProject(a, &fixture.source);
@@ -223,12 +223,12 @@ test "aliases reject collisions and missing exports including empty namespaces" 
 test "all unused module declarations are checked and dependency entries are forbidden" {
     const invalid = [_]Source{
         .{ .name = "library.blot", .text = "const unused = missing\n" },
-        .{ .name = "library.blot", .text = "entry const private_host = fn () => 42\n" },
+        .{ .name = "library.blot", .text = "entry const private_host = func () => return 42\n" },
         .{ .name = "library.blot", .text = "effect Foreign: U32 -> U32\n" },
     };
     const codes = [_][]const u8{ "unknown_value", "entry_module", "sealed_effect" };
     for (invalid, codes) |library, code| {
-        var fixture = try Fixture.init(&.{ .{ .name = "main.blot", .text = "import * as unused from \"./library\"\nentry const answer = fn () => 42\n" }, library });
+        var fixture = try Fixture.init(&.{ .{ .name = "main.blot", .text = "import * as unused from \"./library\"\nentry const answer = func () => return 42\n" }, library });
         defer fixture.deinit();
         var checked = try project_check.checkProject(a, &fixture.source);
         defer checked.deinit(a);
@@ -240,7 +240,7 @@ test "all unused module declarations are checked and dependency entries are forb
 
 test "namespace names do not bypass lexical shadowing after a cached lookup" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "main.blot", .text = "import * as lib from \"./library\"\nconst first = fn () => lib.value\nconst second = fn (lib: U32) => lib.value\n" },
+        .{ .name = "main.blot", .text = "import * as lib from \"./library\"\nconst first = func () => return lib.value\nconst second = func (lib: U32) => return lib.value\n" },
         .{ .name = "library.blot", .text = "const value = 42\n" },
     });
     defer fixture.deinit();
@@ -248,7 +248,7 @@ test "namespace names do not bypass lexical shadowing after a cached lookup" {
     defer checked.deinit(a);
     try std.testing.expect(hasDiagnostic(&checked, "missing_member", 1));
     var grouped = try Fixture.init(&.{
-        .{ .name = "main.blot", .text = "import * as lib from \"./library\"\nentry const answer = fn () => (lib).value\n" },
+        .{ .name = "main.blot", .text = "import * as lib from \"./library\"\nentry const answer = func () => return (lib).value\n" },
         .{ .name = "library.blot", .text = "const value = 42\n" },
     });
     defer grouped.deinit();
@@ -276,12 +276,12 @@ test "imported operator targets and product schemes retain checked producer stru
         \\infixl 60 (+) = arithmetic.subtract
         \\const integer_pair = arithmetic.duplicate 42
         \\const floating_pair = arithmetic.duplicate 1.5
-        \\entry const answer = fn () -> U32 => 20 + 22
-        \\const shadowed_operator = fn (arithmetic: Bool) -> U32 => 20 + 22
+        \\entry const answer = func () : U32 => return 20 + 22
+        \\const shadowed_operator = func (arithmetic: Bool) : U32 => return 20 + 22
         },
         .{ .name = "library.blot", .text =
-        \\const duplicate = fn value => (value, value)
-        \\const subtract = fn (left: U32) => fn (right: U32) => @u32.sub left right
+        \\const duplicate = func value => return (value, value)
+        \\const subtract = func (left: U32) => return func (right: U32) => return @u32.sub left right
         },
     });
     defer fixture.deinit();
@@ -369,17 +369,17 @@ fn inheritedFixityScenario(allocator: std.mem.Allocator, source: *project.Projec
 const inherited_fixity_prelude =
     \\infixl 60 (%%) = combine
     \\infixl 60 `combine`
-    \\const combine = fn (left: F32) => fn (right: F32) => @f32.add left right
+    \\const combine = func (left: F32) => return func (right: F32) => return @f32.add left right
 ;
 const inherited_fixity_uses =
     \\entry const floating = 1.5 %% 2.5
     \\entry const named = 40 `combine` 2
-    \\entry const shadowed = fn (combine: Bool) => 1.5 %% 2.5
+    \\entry const shadowed = func (combine: Bool) => return 1.5 %% 2.5
 ;
 
 test "inherited symbolic fixities retain producer identity through local and imported target shadowing" {
     const shadows = [_][]const u8{
-        "const combine = fn left => fn right => @u32.sub left right\n",
+        "const combine = func left => return func right => return @u32.sub left right\n",
         "import { subtract as combine } from \"./library\"\n",
     };
     for (shadows) |shadow| {
@@ -388,7 +388,7 @@ test "inherited symbolic fixities retain producer identity through local and imp
         var fixture = try Fixture.initWithPrelude(&.{
             .{ .name = "main.blot", .text = text },
             .{ .name = "prelude.blot", .text = inherited_fixity_prelude },
-            .{ .name = "library.blot", .text = "const subtract = fn left => fn right => @u32.sub left right\n" },
+            .{ .name = "library.blot", .text = "const subtract = func left => return func right => return @u32.sub left right\n" },
         }, "prelude.blot");
         defer fixture.deinit();
         const count = fixture.source.symbols.entries.items.len;
@@ -405,9 +405,9 @@ test "local symbolic redeclaration replaces inherited capture while named fixity
     var fixture = try Fixture.initWithPrelude(&.{
         .{ .name = "main.blot", .text =
         \\infixl 60 (%%) = combine
-        \\const combine = fn left => fn right => @u32.sub left right
-        \\entry const answer = fn (combine: Bool) => 40 %% 2
-        \\entry const invalid = fn (combine: Bool) => 40 `combine` 2
+        \\const combine = func left => return func right => return @u32.sub left right
+        \\entry const answer = func (combine: Bool) => return 40 %% 2
+        \\entry const invalid = func (combine: Bool) => return 40 `combine` 2
         },
         .{ .name = "prelude.blot", .text = inherited_fixity_prelude },
     }, "prelude.blot");
@@ -429,11 +429,11 @@ test "local symbolic redeclaration replaces inherited capture while named fixity
 
 test "named imported targets obey aliases and local shadowing at each use" {
     const sources = [_][]const u8{
-        "import { subtract as combine } from \"./library\"\ninfixl 60 `combine`\nentry const run = fn () -> U32 => 20 `combine` 22\n",
-        "import * as arithmetic from \"./library\"\ninfixl 60 `arithmetic.subtract`\nentry const run = fn () -> U32 => 20 `arithmetic.subtract` 22\n",
+        "import { subtract as combine } from \"./library\"\ninfixl 60 `combine`\nentry const run = func () : U32 => return 20 `combine` 22\n",
+        "import * as arithmetic from \"./library\"\ninfixl 60 `arithmetic.subtract`\nentry const run = func () : U32 => return 20 `arithmetic.subtract` 22\n",
     };
     for (sources) |source| {
-        var fixture = try Fixture.init(&.{ .{ .name = "main.blot", .text = source }, .{ .name = "library.blot", .text = "const subtract = fn left => fn right => @u32.sub left right\n" } });
+        var fixture = try Fixture.init(&.{ .{ .name = "main.blot", .text = source }, .{ .name = "library.blot", .text = "const subtract = func left => return func right => return @u32.sub left right\n" } });
         defer fixture.deinit();
         var checked = try project_check.checkProject(a, &fixture.source);
         defer checked.deinit(a);
@@ -444,8 +444,8 @@ test "named imported targets obey aliases and local shadowing at each use" {
             try std.testing.expectEqual(target, module_.bindings[module_.resolved[index]].external.?);
     }
     var fixture = try Fixture.init(&.{
-        .{ .name = "main.blot", .text = "import { subtract as combine } from \"./library\"\ninfixl 60 `combine`\nentry const run = fn (combine: U32) -> U32 => 20 `combine` 22\n" },
-        .{ .name = "library.blot", .text = "const subtract = fn left => fn right => @u32.sub left right\n" },
+        .{ .name = "main.blot", .text = "import { subtract as combine } from \"./library\"\ninfixl 60 `combine`\nentry const run = func (combine: U32) : U32 => return 20 `combine` 22\n" },
+        .{ .name = "library.blot", .text = "const subtract = func left => return func right => return @u32.sub left right\n" },
     });
     defer fixture.deinit();
     var checked = try project_check.checkProject(a, &fixture.source);
@@ -457,7 +457,7 @@ test "checked module type ownership survives release of every source and syntax 
     var checked = semantic: {
         var fixture = try Fixture.init(&.{
             .{ .name = "main.blot", .text = "import * as lib from \"./library\"\nconst integer = lib.identity 42\nconst floating = lib.identity 1.5\n" },
-            .{ .name = "library.blot", .text = "const identity = fn value => value\n" },
+            .{ .name = "library.blot", .text = "const identity = func value => return value\n" },
         });
         defer fixture.deinit();
         var result = try project_check.checkProject(a, &fixture.source);
@@ -485,12 +485,12 @@ test "foreign scheme imports scale with distinct targets rather than uses or ali
     for ([_]usize{ 1, 16, 128 }) |count| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "import { identity as direct } from \"./library\"\nimport * as lib from \"./library\"\nentry const answer = fn () -> U32 => do:\n");
+        try text.appendSlice(a, "import { identity as direct } from \"./library\"\nimport * as lib from \"./library\"\nentry const answer = func () : U32 => return do:\n");
         for (0..count) |index| try text.appendSlice(a, if (index % 2 == 0) "  direct 42\n" else "  lib.identity 1.5\n");
         try text.appendSlice(a, "  break 42\n");
         var fixture = try Fixture.init(&.{
             .{ .name = "main.blot", .text = text.items },
-            .{ .name = "library.blot", .text = "const identity = fn value => value\n" },
+            .{ .name = "library.blot", .text = "const identity = func value => return value\n" },
         });
         defer fixture.deinit();
         var checked = try project_check.checkProject(a, &fixture.source);
@@ -513,7 +513,7 @@ fn allocationScenario(allocator: std.mem.Allocator, source: *project.Project) !v
 test "module interfaces and aliases release every buffer after allocation failure" {
     var fixture = try Fixture.init(&.{
         .{ .name = "main.blot", .text = "import { identity as first } from \"./library\"\nimport * as lib from \"./library\"\nconst integer = first 42\nconst floating = lib.identity 1.5\nconst doubled = lib.twice 21\n" },
-        .{ .name = "library.blot", .text = "infixl 60 (+) = _fixity_add\nconst identity = fn value => value\nconst twice = fn value => value + value\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n" },
+        .{ .name = "library.blot", .text = "infixl 60 (+) = _fixity_add\nconst identity = func value => return value\nconst twice = func value => return value + value\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n" },
     });
     defer fixture.deinit();
     const count = fixture.source.symbols.entries.items.len;
@@ -528,16 +528,16 @@ test "imported nominal families and associated schemes preserve structured ident
         \\import { Point as Position, Point as P } from "./points"
         \\import * as right from "./other"
         \\infixl 60 (+) = _fixity_add
-        \\const coordinate = fn value => value.x
-        \\const plus = fn a => fn b => a + b
+        \\const coordinate = func value => return value.x
+        \\const plus = func a => return func b => return a + b
         \\entry const answer = coordinate (plus (#left.Point {x:20}) (#P {x:22}))
         \\entry const floating = coordinate (#right.Point {x:1.25})
-        \\const annotated = fn (value:Position) => value.x
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const annotated = func (value:Position) => return value.x
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
         },
         .{ .name = "points.blot", .text =
         \\type Point is data = #Point {x:U32}
-        \\const Point.add = fn left => fn right => #Point {x:@u32.add left.x right.x}
+        \\const Point.add = func left => return func right => return #Point {x:@u32.add left.x right.x}
         },
         .{ .name = "other.blot", .text = "type Point is data = #Point {x:F32}\n" },
     });
@@ -564,18 +564,18 @@ test "imported result and demand schemes keep owned quantified relations and num
         .{ .name = "main.blot", .text =
         \\import * as lib from "./library"
         \\import { convert as from, delay as suspend } from "./library"
-        \\entry const integer=fn()=>do:
+        \\entry const integer=func()=> return do:
         \\  let #lib.Box value:lib.Box U32=from 42
         \\  break @force (suspend value)
-        \\entry const floating=fn()=>do:
+        \\entry const floating=func()=> return do:
         \\  let #lib.Box value:lib.Box F32=lib.convert 1.25
         \\  break @force (lib.delay value)
         },
         .{ .name = "library.blot", .text =
         \\type Box value is data = #Box value
-        \\const Box.from=fn value=>#Box value
-        \\const convert=fn value=>@type.result "from" value
-        \\const delay=fn ~value=>value
+        \\const Box.from=func value=> return #Box value
+        \\const convert=func value=> return @type.result "from" value
+        \\const delay=func ~value=> return value
         },
     });
     defer fixture.deinit();
@@ -608,25 +608,25 @@ test "generated monadic progress preserves designated prelude identity through l
     var fixture = try Fixture.initWithPrelude(&.{
         .{ .name = "main.blot", .text =
         \\type Iteration [state,result] is data = #LocalContinue state | #LocalDone result
-        \\const sequence=fn()=>do (monad Maybe):
+        \\const sequence=func()=> return do (monad Maybe):
         \\  let total=0
         \\  for index in 0..3:
         \\    use value <- #Some 1
         \\    total:=@u32.add self value
         \\  break total
-        \\entry const answer=fn()=>case sequence() of
+        \\entry const answer=func()=> return case sequence() of
         \\  #Some value=>value
         \\  #Nothing=>42
         },
         .{ .name = "prelude.blot", .text =
         \\type Iteration [state,result] is data = #Continue state | #Done result
         \\type Maybe value is data = #Some value | #Nothing
-        \\const monad=fn constructor=>@do.monad constructor
-        \\const Maybe.pure=fn value=>#Some value
-        \\const Maybe.bind=fn candidate=>fn next=>case candidate of
+        \\const monad=func constructor=> return @do.monad constructor
+        \\const Maybe.pure=func value=> return #Some value
+        \\const Maybe.bind=func candidate=> return func next=> return case candidate of
         \\  #Some value=>next value
         \\  #Nothing=>#Nothing
-        \\const Maybe.iterate=fn initial=>fn step=>do:
+        \\const Maybe.iterate=func initial=> return func step=> return do:
         \\  let state=initial
         \\  for ever:
         \\    use candidate <- step state
@@ -654,8 +654,8 @@ test "module abstraction public opaque factories hide constructor and representa
     const producer =
         \\opaque type Token = U32
         \\private const offset = 1
-        \\const make: U32 -> Token = fn value => #Token (@u32.add value offset)
-        \\const read: Token -> U32 = fn (#Token value) => value
+        \\const make: U32 -> Token = func value => return #Token (@u32.add value offset)
+        \\const read: Token -> U32 = func (#Token value) => return value
     ;
     var fixture = try Fixture.init(&.{
         .{ .name = "tokens.blot", .text = producer },
@@ -678,7 +678,7 @@ test "module abstraction private named imports and associated declarations stay 
         \\private type Secret is data = #Secret U32
         \\private type Reader is effect = Unit -> U32
         \\type Token is data = #Token U32
-        \\private const Token.hidden = fn (#Token value) => value
+        \\private const Token.hidden = func (#Token value) => return value
     ;
     for ([_][]const u8{ "hidden", "Secret", "Reader" }) |name| {
         const source = try a.print("import {{ {s} }} from \"./producer\"\nentry const answer = 42\n", .{name});
@@ -693,7 +693,7 @@ test "module abstraction private named imports and associated declarations stay 
 
 test "module abstraction selective forwarding preserves type and value producers" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => value\n" },
+        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n" },
         .{ .name = "facade.blot", .text = "export { Token as Ticket, make, read } from \"./tokens\"\n" },
         .{ .name = "outward.blot", .text = "export { Ticket, make, read } from \"./facade\"\n" },
         .{ .name = "main.blot", .text = "import * as outward from \"./outward\"\nconst direct: outward.Ticket = outward.make 42\nentry const answer = outward.read direct\n" },
@@ -709,7 +709,7 @@ test "module abstraction public signatures cannot escape private identities" {
     for ([_][]const u8{
         "private opaque type Secret = U32\nconst leak: Secret = #Secret 42\n",
         "private type Secret is data = #Secret U32\nconst leak = #Secret 42\n",
-        "private type Reader is effect = Unit -> U32\nconst leak = fn () => Reader ()\n",
+        "private type Reader is effect = Unit -> U32\nconst leak = func () => return Reader ()\n",
     }) |source| {
         var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = source }});
         defer fixture.deinit();
@@ -720,12 +720,12 @@ test "module abstraction public signatures cannot escape private identities" {
 }
 
 test "module abstraction opaque import aliases cannot construct project or coerce" {
-    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = fn value => #Token { value: value }\n";
+    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = func value => return #Token { value: value }\n";
     for ([_]struct { text: []const u8, code: []const u8 }{
         .{ .text = "import { Token, make } from \"./producer\"\nentry const answer = (make 42).value\n", .code = "private_access" },
         .{ .text = "import { Token as Ticket } from \"./producer\"\nentry const answer = #Ticket { value: 42 }\n", .code = "private_access" },
-        .{ .text = "import { Token, make } from \"./producer\"\ntype Alias = Token\nconst read = fn (#Token value) => value\nentry const answer = read (make 42)\n", .code = "private_access" },
-        .{ .text = "import { Token } from \"./producer\"\nconst pass: Token -> Token = fn value => value\nentry const answer = pass 42\n", .code = "type_mismatch" },
+        .{ .text = "import { Token, make } from \"./producer\"\ntype Alias = Token\nconst read = func (#Token value) => return value\nentry const answer = read (make 42)\n", .code = "private_access" },
+        .{ .text = "import { Token } from \"./producer\"\nconst pass: Token -> Token = func value => return value\nentry const answer = pass 42\n", .code = "type_mismatch" },
     }) |item| {
         var fixture = try Fixture.init(&.{ .{ .name = "producer.blot", .text = producer }, .{ .name = "main.blot", .text = item.text } });
         defer fixture.deinit();
@@ -757,10 +757,10 @@ test "module abstraction nominal identity ignores unrelated declaration insertio
 
 test "module abstraction private helpers remain usable in public factory bodies" {
     var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text =
-        \\private const identity = fn value => value
+        \\private const identity = func value => return value
         \\opaque type Token a = a
-        \\const make = fn value => #Token (identity value)
-        \\const read = fn (#Token value) => value
+        \\const make = func value => return #Token (identity value)
+        \\const read = func (#Token value) => return value
         \\entry const answer = read (make 42)
     }});
     defer fixture.deinit();
@@ -770,7 +770,7 @@ test "module abstraction private helpers remain usable in public factory bodies"
 }
 
 test "module abstraction distinct producers namespace privacy and reexports cannot bypass access" {
-    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = #Token\nprivate const Token.hidden = fn (#Token value) => value\n";
+    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = #Token\nprivate const Token.hidden = func (#Token value) => return value\n";
     for ([_]struct { source: []const u8, code: []const u8 }{
         .{ .source = "import * as producer from \"./producer\"\nentry const answer = producer.hidden\n", .code = "unknown_value" },
         .{ .source = "export { hidden } from \"./producer\"\nentry const answer = 42\n", .code = "unknown_export" },
@@ -794,9 +794,9 @@ test "module abstraction forwarding retains data constructors effects and contra
         .{ .name = "main.blot", .text =
         \\import {Result, Build, Read, Witness} from "./facade"
         \\const value: Result = #Build 42
-        \\const keep: a -> a where {Witness a} = fn value => value
-        \\const reader = @effect.provider Read (fn () => 42)
-        \\entry const answer = fn () => do reader:
+        \\const keep: a -> a where {Witness a} = func value => return value
+        \\const reader = @effect.provider Read (func () => return 42)
+        \\entry const answer = func () => return do reader:
         \\  use number <- Read ()
         \\  break keep number
         },

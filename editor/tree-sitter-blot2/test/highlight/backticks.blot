@@ -36,7 +36,7 @@ infixl 60 `add`
 //         ^ function
 //            ^ operator
 
-infixr 24 `and`
+infixr 24 `conjoin`
 // <- keyword.directive
 //         ^ function
 
@@ -55,12 +55,12 @@ let on = combine
 //  ^ variable
 //  ^ !keyword
 
-#False `and` (values[0] > 0.0)
-//  ^ constant.builtin.boolean
-//      ^ function
-//           ^ punctuation.bracket
-//                      ^ operator
-//                        ^ constant.numeric.float
+false and (values[0] > 0.0)
+// <- constant.builtin.boolean
+//    ^ operator
+//        ^ punctuation.bracket
+//                   ^ operator
+//                     ^ constant.numeric.float
 
 use left `combine` right
 // <- keyword.storage.type

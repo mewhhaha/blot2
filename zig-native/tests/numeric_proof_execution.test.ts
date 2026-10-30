@@ -5,46 +5,46 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `data Maybe = #Some U32 | #None
-const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-const later: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> Unit -> U32 = fn values => fn index => fn proof => fn unused => @array.get values index
-const invoke = fn callback => callback ()
-const within = fn (index: U32) => fn (values: Array U32) => @u32.lt index (@array.length values)
-entry const lookup = fn (index: U32) => do:
+const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+const later: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> Unit -> U32 = func values => return func index => return func proof => return func unused => return @array.get values index
+const invoke = func callback => return callback ()
+const within = func (index: U32) => return func (values: Array U32) => return @u32.lt index (@array.length values)
+entry const lookup = func (index: U32) => return do:
   let values = #[8, 13]
   let valid = witness values index
   break at values index valid
-entry const partial = fn (index: U32) => do:
+entry const partial = func (index: U32) => return do:
   let values = #[8, 13]
   let valid = witness values index
   let ready = later values index valid
   break invoke ready
-entry const equal = fn (value: U32) => do:
+entry const equal = func (value: U32) => return do:
   let valid = @proof.eq value 7
   break value
-entry const less = fn (value: U32) => do:
+entry const less = func (value: U32) => return do:
   let valid = @proof.lt value 8
   break value
-entry const weak = fn (value: U32) => do:
+entry const weak = func (value: U32) => return do:
   let valid = @proof.le value 8
   break value
-entry const addition = fn (value: U32) => do:
+entry const addition = func (value: U32) => return do:
   let valid = @proof.add_fits value 1
   break value
-entry const subtraction = fn (value: U32) => do:
+entry const subtraction = func (value: U32) => return do:
   let valid = @proof.sub_fits value 1
   break value
-entry const guarded = fn (index: U32) => do:
+entry const guarded = func (index: U32) => return do:
   let values = #[8, 13]
   if @u32.lt index (@array.length values):
     break @array.get values index
   break 0
-entry const named_guarded = fn (index: U32) => do:
+entry const named_guarded = func (index: U32) => return do:
   let values = #[8, 13]
   if within index values:
     break @array.get values index
   break 0
-entry const false_edges = fn (index: U32) => do:
+entry const false_edges = func (index: U32) => return do:
   let values = #[8, 13]
   let length = @array.length values
   if @u32.lt length index:
@@ -52,35 +52,35 @@ entry const false_edges = fn (index: U32) => do:
   if @u32.eq index length:
     break 0
   break @array.get values index
-entry const rebound = fn (index: U32) => do:
+entry const rebound = func (index: U32) => return do:
   let values = #[8, 13]
   if @u32.lt index (@array.length values):
     index := @u32.add self 1
     break @array.get values index
   break 0
-entry const changed = fn (index: U32) => do:
+entry const changed = func (index: U32) => return do:
   let values = #[8, 13]
   let valid = @proof.index values index
   let after = @array.set values index 21
   break @array.get after index
-entry const ranges = fn (index: U32) => do:
+entry const ranges = func (index: U32) => return do:
   let values = #[8, 13]
   let result = index
   for cursor in 0..@array.length values:
     result := @u32.add self (@array.get values cursor)
   break result
-entry const predecessor = fn (index: U32) => do:
+entry const predecessor = func (index: U32) => return do:
   let values = #[8, 13]
   let bounded = @proof.index values index
   let fits = @proof.sub_fits index 1
   break @array.get values (@u32.sub index 1)
-entry const fallback = fn (index: U32) => do:
+entry const fallback = func (index: U32) => return do:
   let values = #[8]
   let #Some selected = if @u32.eq index 0 then #None else #Some 42 else:
     let valid = @proof.index values index
     break 0
   break @array.get values index
-entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use left <- host 1
   use right <- host 2
   let valid = @proof.lt left right
@@ -259,16 +259,16 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/index.blot`;
     const archive = `${directory}/index.blotdep`;
-    const library = `const selected = fn (unused: U32) => fn (index: U32) => do:
+    const library = `const selected = func (unused: U32) => return func (index: U32) => return do:
   let copied = index
   break copied
-const forwarded = fn (index: U32) => selected 42 index
-const count = fn (values: Array U32) => do:
+const forwarded = func (index: U32) => return selected 42 index
+const count = func (values: Array U32) => return do:
   let copied = values
   break @array.length copied
 `;
     const main = `import {forwarded, count} from "./index"
-entry const lookup = fn (index: U32) => do:
+entry const lookup = func (index: U32) => return do:
   let values = #[8, 13]
   if @u32.lt index (count values):
     break @array.get values (forwarded index)
@@ -380,19 +380,19 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const dependency = `${directory}/index.blot`;
     const archive = `${directory}/index.blotdep`;
     const library = `type Probe is data = #Probe U32
-const Probe.choose = fn (unused: Probe) => fn (index: U32) => do:
+const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let copied = index
   break copied
-const Probe.within = fn (unused: Probe) => fn (index: U32) => @u32.lt index 2
-const access = fn probe => fn (index: U32) => do:
+const Probe.within = func (unused: Probe) => return func (index: U32) => return @u32.lt index 2
+const access = func probe => return func (index: U32) => return do:
   let values = #[8, 13]
   if @type.call "within" probe index:
     break @array.get values (@type.call "choose" probe index)
   break 0
 `;
     const main = `import {access, Probe} from "./index"
-entry const lookup = fn (index: U32) => access (#Probe 42) index
-entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const lookup = func (index: U32) => return access (#Probe 42) index
+entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
   let selected = access (#Probe first) 1
   use final <- host 2
@@ -523,22 +523,22 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const dependency = `${directory}/index.blot`;
     const archive = `${directory}/index.blotdep`;
     const library = `type Probe is data = #Probe U32
-const Probe.choose = fn (unused: Probe) => fn (index: U32) => do:
+const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let zero = @u32.sub index index
   let copied = @u32.add 0 index
   break @u32.sub copied zero
-const Probe.within = fn (unused: Probe) => fn (index: U32) => @u32.lt (@u32.sub index 0) 2
-const decode = fn probe => fn (index: U32) => @type.call "choose" probe index
-const access = fn probe => fn (index: U32) => do:
+const Probe.within = func (unused: Probe) => return func (index: U32) => return @u32.lt (@u32.sub index 0) 2
+const decode = func probe => return func (index: U32) => return @type.call "choose" probe index
+const access = func probe => return func (index: U32) => return do:
   let values = #[8, 13]
   if @type.call "within" probe index:
     break @array.get values (@type.call "choose" probe index)
   break 0
 `;
     const main = `import {access, decode, Probe} from "./index"
-entry const lookup = fn (index: U32) => access (#Probe 42) index
-entry const identity = fn (index: U32) => decode (#Probe 42) index
-entry const ordered = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const lookup = func (index: U32) => return access (#Probe 42) index
+entry const identity = func (index: U32) => return decode (#Probe 42) index
+entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
   let selected = access (#Probe first) 1
   use final <- host 2
@@ -675,10 +675,10 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/index.blot`;
     const library =
-      `const selected = fn (index: U32) => if @u32.eq (@u32.div 1 index) 0 then index else index
+      `const selected = func (index: U32) => return if @u32.eq (@u32.div 1 index) 0 then index else index
 `;
     const main = `import {selected} from "./index"
-entry const lookup = fn (index: U32) => do:
+entry const lookup = func (index: U32) => return do:
   let values = #[8, 13, 21, 34]
   if @u32.lt index (@array.length values):
     break @array.get values (selected index)

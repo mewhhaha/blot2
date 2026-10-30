@@ -11,9 +11,9 @@ fn law(allocator: std.mem.Allocator) !void {
         \\type Scalar = U32
         \\type Box is data = #Box { value: Scalar }
         \\type Different is data = #Different { value: U32, enabled: Bool }
-        \\const read: a -> U32 where { ReadAgain a } = fn value => value.value
-        \\entry const first = fn () => read (#Box { value: 42 })
-        \\entry const second = fn () => read (#Different { value: 11, enabled: #True })
+        \\const read: a -> U32 where { ReadAgain a } = func value => return value.value
+        \\entry const first = func () => return read (#Box { value: 42 })
+        \\entry const second = func () => return read (#Different { value: 11, enabled: true })
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -42,8 +42,8 @@ test "contracts validate unused bodies, arity, parameter kinds and cycles" {
         "type A a is contract = { field \"x\" a b }\nentry const answer = 42\n",
         "type A a is contract = { Unknown a }\nentry const answer = 42\n",
         "entry const answer: U32 where { Type_rep U32 } = 42\n",
-        "type A a is contract = { field \"x\" a U32 }\nconst f: a -> U32 where { A } = fn x => x.x\nentry const answer = 42\n",
-        "type A a is contract = { field \"x\" a U32 }\nconst f: a -> U32 where { A a U32 } = fn x => x.x\nentry const answer = 42\n",
+        "type A a is contract = { field \"x\" a U32 }\nconst f: a -> U32 where { A } = func x => return x.x\nentry const answer = 42\n",
+        "type A a is contract = { field \"x\" a U32 }\nconst f: a -> U32 where { A a U32 } = func x => return x.x\nentry const answer = 42\n",
         "type A a is contract = { field \"x\" a U32 }\ntype A = U32\nentry const answer = 42\n",
     }) |source| {
         var tokens = try lexer.lex(allocator, source);
@@ -70,12 +70,12 @@ fn associatedMembersLaw(allocator: std.mem.Allocator) !void {
         \\type Signature s is contract = { type Run = s -> U32, const first: Signature.Run s }
         \\type Reader a is effect = Unit -> a
         \\type Effectful is contract = { type Run = Unit -> U32 ! {Reader (Identity.Item U32)} }
-        \\const keep_effect: Effectful.Run -> (Unit -> U32 ! {Reader U32}) = fn action => action
-        \\const shaped: (Named.First {b: F32, a: U32}) -> ((Curried.First U32) Bool) = fn value => value
-        \\const fixed: Fixed.Value -> U32 = fn value => value
-        \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
-        \\const transitive: a -> U32 where { type_eq a b, type_eq b U32 } = fn value => value
-        \\entry const answer: Unit -> U32 = fn () => keep (transitive 42)
+        \\const keep_effect: Effectful.Run -> (Unit -> U32 ! {Reader U32}) = func action => return action
+        \\const shaped: (Named.First {b: F32, a: U32}) -> ((Curried.First U32) Bool) = func value => return value
+        \\const fixed: Fixed.Value -> U32 = func value => return value
+        \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
+        \\const transitive: a -> U32 where { type_eq a b, type_eq b U32 } = func value => return value
+        \\entry const answer: Unit -> U32 = func () => return keep (transitive 42)
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -99,8 +99,8 @@ test "associated type members reject arity names binder leaks identity mismatche
     const allocator = std.testing.allocator;
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "type Source s is contract = { type Item }\ntype Stored is data = #Stored (Source.Item U32)\n", .code = .missing_implementation },
-        .{ .source = "type Source s is contract = { type Item }\nconst invalid: (Source.Item a) -> U32 where { Source b } = fn value => @panic \"unused\"\n", .code = .missing_predicate },
-        .{ .source = "private type Hidden a is contract = { type Item = a }\nconst leaked: (Hidden.Item a) -> a = fn value => value\n", .code = .private_identity_escape },
+        .{ .source = "type Source s is contract = { type Item }\nconst invalid: (Source.Item a) -> U32 where { Source b } = func value => return @panic \"unused\"\n", .code = .missing_predicate },
+        .{ .source = "private type Hidden a is contract = { type Item = a }\nconst leaked: (Hidden.Item a) -> a = func value => return value\n", .code = .private_identity_escape },
         .{ .source = "type Source s is contract = { type Item }\ntype Box a is data = #Box (Source.Item a)\n", .code = .missing_predicate },
         .{ .source = "type Source s is contract = { type Item }\ntype Bad = Source.Missing U32\n", .code = .missing_type_member },
         .{ .source = "type Identity a is contract = { type Item = a }\ntype Bad = Identity.Item\n", .code = .associated_arity },
@@ -113,8 +113,8 @@ test "associated type members reject arity names binder leaks identity mismatche
         .{ .source = "type Identity a is contract = { type Item = Identity.Item a }\n", .code = .recursive_associated_type },
         .{ .source = "type A a is contract = { type Item = B.Item a }\ntype B a is contract = { type Item = A.Item a }\n", .code = .recursive_associated_type },
         .{ .source = "type A a is contract = { type Item = A.Item (Array a) }\n", .code = .recursive_associated_type },
-        .{ .source = "type Source s is contract = { type Item }\nconst invalid: (Source.Item s) -> U32 where { Source s } = fn value => value\n", .code = .type_mismatch },
-        .{ .source = "type Source s is contract = { type Item }\ntype Other s is contract = { type Item }\nconst invalid: (Source.Item s) -> (Other.Item s) where { Source s, Other s } = fn value => value\n", .code = .type_mismatch },
+        .{ .source = "type Source s is contract = { type Item }\nconst invalid: (Source.Item s) -> U32 where { Source s } = func value => return value\n", .code = .type_mismatch },
+        .{ .source = "type Source s is contract = { type Item }\ntype Other s is contract = { type Item }\nconst invalid: (Source.Item s) -> (Other.Item s) where { Source s, Other s } = func value => return value\n", .code = .type_mismatch },
     };
     for (cases) |case| {
         var tokens = try lexer.lex(allocator, case.source);
@@ -144,7 +144,7 @@ test "associated type members share projection DAG work and spend the enclosing 
         defer allocator.free(line);
         try source.appendSlice(allocator, line);
     }
-    try source.appendSlice(allocator, "const keep: a -> (P32.Item a) = fn value => @panic \"unexecuted\"\nentry const answer = 42\n");
+    try source.appendSlice(allocator, "const keep: a -> (P32.Item a) = func value => return @panic \"unexecuted\"\nentry const answer = 42\n");
     var tokens = try lexer.lex(allocator, source.items);
     defer tokens.deinit(allocator);
     var pool: symbols.Pool = .{};
@@ -172,11 +172,11 @@ test "associated type members share projection DAG work and spend the enclosing 
 fn abstractAssociatedLaw(allocator: std.mem.Allocator) !void {
     const source =
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-        \\const keep: (Source.Item (Array a)) -> (Source.Item (Array a)) where { Source (Array a) } = fn value => value
-        \\const equal_output: (Source.Item s) -> U32 where { Source s, type_eq (Source.Item s) U32 } = fn value => value
+        \\const keep: (Source.Item (Array a)) -> (Source.Item (Array a)) where { Source (Array a) } = func value => return value
+        \\const equal_output: (Source.Item s) -> U32 where { Source s, type_eq (Source.Item s) U32 } = func value => return value
         \\type Callable f is contract = { type Run = f }
-        \\const relay: (Unit -> a ! {| e}) -> (Callable.Run (Unit -> a ! {| e})) = fn value => value
-        \\const congruent: (Source.Item a) -> U32 where { Source a, Source b, type_eq a b, type_eq (Source.Item b) U32 } = fn value => value
+        \\const relay: (Unit -> a ! {| e}) -> (Callable.Run (Unit -> a ! {| e})) = func value => return value
+        \\const congruent: (Source.Item a) -> U32 where { Source a, Source b, type_eq a b, type_eq (Source.Item b) U32 } = func value => return value
         \\entry const answer = 42
     ;
     var tokens = try lexer.lex(allocator, source);
@@ -208,7 +208,7 @@ test "associated type members retain congruent abstract projections logical equa
 test "associated type members retain given structural evidence on symbolic output owners" {
     const source =
         \\type Source s is contract = { type Item }
-        \\const read: (Source.Item s) -> U32 where { Source s, field "value" (Source.Item s) U32 } = fn value => value.value
+        \\const read: (Source.Item s) -> U32 where { Source s, field "value" (Source.Item s) U32 } = func value => return value.value
         \\entry const answer = 42
     ;
     const allocator = std.testing.allocator;
@@ -254,7 +254,7 @@ test "associated contract coverage preserves distinct application binders" {
     const allocator = std.testing.allocator;
     const source =
         \\type Source s is contract = { type Item }
-        \\const unrelated: (Source.Item a) -> (Source.Item b) where { Source a, Source b } = fn value => @panic "unused"
+        \\const unrelated: (Source.Item a) -> (Source.Item b) where { Source a, Source b } = func value => return @panic "unused"
         \\entry const answer = 42
     ;
     var tokens = try lexer.lex(allocator, source);
@@ -277,7 +277,7 @@ fn effectRowSource(allocator: std.mem.Allocator, width: usize, calls: usize, pro
     errdefer source.deinit(allocator);
     try source.appendSlice(allocator,
         \\type Keep a is contract = { const keep: a -> a }
-        \\impl KeepNumber : Keep U32 = { const keep = fn value => value }
+        \\impl KeepNumber : Keep U32 = { const keep = func value => return value }
         \\
     );
     if (projection) try source.appendSlice(allocator,
@@ -286,12 +286,12 @@ fn effectRowSource(allocator: std.mem.Allocator, width: usize, calls: usize, pro
         \\
     );
     for (0..width) |index| try source.print(allocator, "type Read{d} is effect = Unit -> U32\n", .{index});
-    try source.appendSlice(allocator, "entry const answer = fn (action: Unit -> U32 ! {");
+    try source.appendSlice(allocator, "entry const answer = func (action: Unit -> U32 ! {");
     for (0..width) |index| {
         if (index != 0) try source.appendSlice(allocator, ", ");
         try source.print(allocator, "Read{d}", .{index});
     }
-    try source.appendSlice(allocator, "}) => do:\n");
+    try source.appendSlice(allocator, "}) => return do:\n");
     for (0..calls) |index| try source.print(allocator, "  use value{d} <- action ()\n", .{index});
     try source.appendSlice(allocator, "  break 42\n");
     return source.toOwnedSlice(allocator);

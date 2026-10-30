@@ -4,12 +4,12 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const reader = `import {value} from "./changed"
-const identity: forall [a] => a -> a = fn item => item
-const consume = fn (item: unique U32) => @usage.borrow item (fn loan => @usage.read loan)
-const checked = fn (item: U32) => do:
+const identity: forall [a] => a -> a = func item => return item
+const consume = func (item: unique U32) => return @usage.borrow item (func loan => return @usage.read loan)
+const checked = func (item: U32) => return do:
   let witness = @proof.lt 0 item
   break item
-const read: Unit -> U32 = fn () => identity value
+const read: Unit -> U32 = func () => return identity value
 `;
 Deno.test("shared dependency validation owns actual foreign rank usage and proof inputs across archives edits rollback and restart", async () => {
   const directory = await Deno.makeTempDir({
@@ -23,7 +23,7 @@ Deno.test("shared dependency validation owns actual foreign rank usage and proof
   const main = (seed = "2") =>
     `import {read} from "./left"
 import {fixed} from "./right"
-entry const answer = fn () => @u32.add (read ()) fixed
+entry const answer = func () => return @u32.add (read ()) fixed
 entry const sibling = ${seed}
 `;
   const sources = (seed = "2", value = "41", fixed = "1") => ({

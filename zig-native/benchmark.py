@@ -30,8 +30,8 @@ def main():
     inputs = []
     for count in (16, 64, 256, 1024):
         source = (
-            "const twice = fn value => @u32.add value value\n"
-            "entry const answer = fn () -> U32 => do:\n"
+            "const twice = func value => @u32.add value value\n"
+            "entry const answer = func () -> U32 => do:\n"
             + "".join(f"  let value_{i} = twice {i}\n" for i in range(count))
             + f"  return value_{count - 1}\n"
         )

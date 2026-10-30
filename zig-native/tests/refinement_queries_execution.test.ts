@@ -20,21 +20,21 @@ Deno.test("owned refinement queries preserve dependency edits catalog relocation
   const clients: Awaited<ReturnType<typeof createZigProjectCompiler>>[] = [];
   const sources = (changed: number, fixed: number, reordered: boolean) => ({
     [entry]: `import {Box, fixed, read} from "./dep"
-const factory = fn value => fn extra => value
+const factory = func value => return func extra => return value
 const scalar = factory fixed
 const nominal = factory (#Box fixed)
-entry const run = fn (value: U32) => @u32.add (read value) ${changed}
-entry const captured = fn (value: U32) => scalar value
-entry const boxed = fn () => do:
+entry const run = func (value: U32) => return @u32.add (read value) ${changed}
+entry const captured = func (value: U32) => return scalar value
+entry const boxed = func () => return do:
   let #Box value = nominal 0
   break value
 `,
     [dependency]: `${
-      reordered ? "const unrelated = fn value => value\n" : ""
+      reordered ? "const unrelated = func value => return value\n" : ""
     }data Box a = #Box a
 const fixed = ${fixed}
-const read = fn (value: U32) => @u32.add value fixed
-${reordered ? "" : "const unrelated = fn value => value\n"}`,
+const read = func (value: U32) => return @u32.add value fixed
+${reordered ? "" : "const unrelated = func value => return value\n"}`,
   });
   try {
     clients.push(await createZigProjectCompiler(options));

@@ -4,18 +4,18 @@ import { GuestError, instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source =
-  `entry const float = fn (drop: cleanup ((unique F32) -> Unit ! {Foreign})) => @resource.scope (fn () => 1.5) drop (fn loan => @usage.read loan)
-entry const array = fn (drop: cleanup ((unique (Array U32)) -> Unit ! {Foreign})) => @resource.scope (fn () => #[1, 2]) drop (fn loan => @usage.length loan)
-entry const run = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 42) drop (fn loan => @usage.read loan)
-entry const wrapped = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 42) (fn owner => do:
+  `entry const float = func (drop: cleanup ((unique F32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 1.5) drop (func loan => return @usage.read loan)
+entry const array = func (drop: cleanup ((unique (Array U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return #[1, 2]) drop (func loan => return @usage.length loan)
+entry const run = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 42) drop (func loan => return @usage.read loan)
+entry const wrapped = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 42) (func owner => return do:
   for index in 0..3:
     let value = index
-  break drop owner) (fn loan => @usage.read loan)
-entry const acquired = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => do:
-  use owner <- @resource.acquire (fn () => 42) drop
-  break @usage.borrow owner (fn loan => @usage.read loan)
-entry const nested = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 7) drop (fn outer => @resource.scope (fn () => 9) drop (fn inner => @u32.add (@usage.read outer) (@usage.read inner)))
-entry const trapped = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.scope (fn () => 11) drop (fn loan => @u32.div (@usage.read loan) 0)
+  break drop owner) (func loan => return @usage.read loan)
+entry const acquired = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return do:
+  use owner <- @resource.acquire (func () => return 42) drop
+  break @usage.borrow owner (func loan => return @usage.read loan)
+entry const nested = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 7) drop (func outer => return @resource.scope (func () => return 9) drop (func inner => return @u32.add (@usage.read outer) (@usage.read inner)))
+entry const trapped = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.scope (func () => return 11) drop (func loan => return @u32.div (@usage.read loan) 0)
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`host cleanup descriptors remain synchronous and drain every attempt (${codegenTier})`, async () => {
@@ -220,9 +220,9 @@ Deno.test("host cleanup imports preserve exact roles through archives and restar
   const archive = `${directory}/cleanup.blotdep`;
   const library = source.replaceAll("entry const", "const");
   const main = `import {run, acquired, wrapped} from "./cleanup"
-entry const answer = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => run drop
-entry const owned = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => acquired drop
-entry const finite = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => wrapped drop
+entry const answer = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return run drop
+entry const owned = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return acquired drop
+entry const finite = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return wrapped drop
 `;
   await Deno.writeTextFile(entry, main);
   await Deno.writeTextFile(dependency, library);

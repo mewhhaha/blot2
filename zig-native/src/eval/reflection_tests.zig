@@ -11,10 +11,10 @@ const a = std.testing.allocator;
 const source =
     \\effect Read: Unit -> U32
     \\effect Other: Unit -> U32
-    \\const read: Unit -> U32 ! {Read,Read} = fn () => @panic "reflection must never invoke a function"
-    \\const count = fn effects => @effect.count effects
-    \\const contains = fn effects => fn operation => @effect.has effects operation
-    \\const same = fn left => fn right => @effect.same left right
+    \\const read: Unit -> U32 ! {Read,Read} = func () => return @panic "reflection must never invoke a function"
+    \\const count = func effects => return @effect.count effects
+    \\const contains = func effects => return func operation => return @effect.has effects operation
+    \\const same = func left => return func right => return @effect.same left right
     \\const requirements = @effect.of read
     \\const reader = @effect.descriptor Read
     \\entry const total = count requirements
@@ -23,7 +23,7 @@ const source =
     \\entry const same_reader = same reader (@effect.descriptor Read)
     \\entry const different_reader = same reader (@effect.descriptor Other)
     \\entry const foreign = @effect.same (@effect.descriptor Foreign) (@effect.descriptor Foreign)
-    \\entry const answer = fn () => total
+    \\entry const answer = func () => return total
 ;
 fn lower(allocator: std.mem.Allocator) !core.Module {
     var lexed = try lexer.lex(allocator, source);

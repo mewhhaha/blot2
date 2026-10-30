@@ -107,7 +107,7 @@ const encoder = new TextEncoder();
 const limit = 16 * 1024 * 1024;
 const totalLimit = 64 * 1024 * 1024;
 const keywords = new Set(
-  "const let type data effect is fn do use return yield break for ever in case of if then else as import infix infixl infixr self where"
+  "const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where"
     .split(" "),
 );
 function identifier(name: string, upper: boolean): string {
@@ -240,7 +240,7 @@ function prepareModule(
       if (typeof data !== "boolean") {
         throw new TypeError("Expected a Bool asset value");
       }
-      chunks.push(data ? "#True" : "#False");
+      chunks.push(data ? "true" : "false");
     } else if (shape === "U32") {
       if (
         typeof data !== "number" || !Number.isInteger(data) || data < 0 ||

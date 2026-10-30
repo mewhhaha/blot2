@@ -73,7 +73,7 @@ export interface GuestConstant {
 }
 
 export interface GuestAbi {
-  readonly version: 2 | 3 | 4 | 5 | 6 | 7;
+  readonly version: 2 | 3 | 4 | 5 | 6 | 7 | 8;
   readonly functions: readonly GuestFunction[];
   readonly constants: readonly GuestConstant[];
   readonly taskDescriptorCount?: number;
@@ -331,13 +331,14 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   const version = reader.count();
   if (
     version !== 2 && version !== 3 && version !== 4 && version !== 5 &&
-    version !== 6 && version !== 7
+    version !== 6 && version !== 7 && version !== 8
   ) {
     throw new GuestError(
       "invalid_abi",
       `Unsupported guest ABI version ${version}`,
     );
   }
+  const countedOwnership = version >= 3 && version <= 7;
   reader.owners = version === 6;
   reader.structured = version === 7;
   let publicOwners = reader.owners;
@@ -365,7 +366,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     }
     exports.set(name, kind);
   };
-  if (version >= 3) {
+  if (countedOwnership) {
     declare("blot:ownership_enter", "function");
     declare("blot:ownership_leave", "function");
     declare("blot:rc_roots", "global");
@@ -377,7 +378,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   if (taskSections.length === 1) {
     const feature = new AbiReader(new Uint8Array(taskSections[0]));
-    if (version < 3 || feature.byte() !== 2) {
+    if (!countedOwnership || feature.byte() !== 2) {
       throw new GuestError(
         "invalid_abi",
         "Unsupported task ownership contract",
@@ -392,14 +393,14 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     for (const name of taskExports(taskCount)) declare(name, "function");
   }
   let resources = 0;
-  if (version >= 4) {
+  if (version >= 4 && version <= 7) {
     resources = reader.count();
     if ((resources === 0 && version < 6) || resources > 4096) {
       throw new GuestError("invalid_abi", "Invalid resource adapter count");
     }
   }
   let transfer = version === 5;
-  if (version >= 6) {
+  if (version === 6 || version === 7) {
     const flags = reader.byte();
     let limit = 1;
     if (version === 7) limit = 3;
@@ -420,6 +421,16 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     const name = reader.name();
     declare(name, "function");
     const parameter = reader.parameter();
+    if (
+      version === 8 && typeof parameter !== "string" &&
+      (parameter.kind !== "callback" || parameter.concurrent ||
+        parameter.lifetime !== undefined || parameter.dataSchema !== undefined)
+    ) {
+      throw new GuestError(
+        "invalid_abi",
+        "Data-stack ABI accepts only Foreign callbacks",
+      );
+    }
     if (typeof parameter !== "string" && parameter.kind !== "owner") {
       signatures.add(importKey(parameter));
       if (parameter.lifetime === "owned") {
@@ -515,7 +526,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     declare("blot:allocate", "function");
     declare("blot:reset", "function");
   }
-  if (version >= 3 && (signatures.size !== 0 || taskCount !== undefined)) {
+  if (countedOwnership && (signatures.size !== 0 || taskCount !== undefined)) {
     declare("blot:rc_host_refs", "global");
   }
   if (resources !== 0) {
@@ -545,6 +556,12 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const actualExports = WebAssembly.Module.exports(module);
   const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
+  if (version === 8 && ownership.length !== 0) {
+    throw new GuestError(
+      "invalid_abi",
+      "Data-stack ABI cannot declare counted ownership",
+    );
+  }
   if (ownership.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate ownership section");
   }
@@ -554,7 +571,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       state.length !== 3 || (state[0] !== 1 && state[0] !== 2) ||
       state[1] > state[0] || state[2] > 7 ||
       (state[1] !== 0) !== (state[2] === 0) ||
-      (version >= 3) !== (state[0] === 2 && state[1] === 2)
+      countedOwnership !== (state[0] === 2 && state[1] === 2)
     ) throw new GuestError("invalid_abi", "Invalid ownership section");
     if (state[2] !== 1) {
       // Optional raw-allocator identity for development instrumentation. Older
@@ -584,13 +601,19 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
       declare(`blot:cycle_${counter}`, "global");
     }
   }
-  if (version >= 3 && ownership.length !== 1) {
+  if (countedOwnership && ownership.length !== 1) {
     throw new GuestError("invalid_abi", "Missing root ownership section");
   }
   const memoryProfile = WebAssembly.Module.customSections(
     module,
     "blot:memory-profile",
   );
+  if (version === 8 && memoryProfile.length !== 0) {
+    throw new GuestError(
+      "invalid_abi",
+      "Data-stack ABI cannot declare a counted memory profile",
+    );
+  }
   if (memoryProfile.length > 1) {
     throw new GuestError("invalid_abi", "Duplicate memory profile section");
   }
@@ -662,7 +685,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   if (resources !== 0) {
     Object.assign(result, { resourceAdapterCount: resources });
   }
-  if (version >= 6) {
+  if (version === 6 || version === 7) {
     Object.assign(result, { resourceTransfer: transfer, publicOwners });
   }
   if (dataSchemas) abiDataSchemas.set(result, dataSchemas);
@@ -1571,7 +1594,7 @@ export async function instantiateGuest(
   }
 
   let ownership: { enter(): void; leave(outcome: number): void } | undefined;
-  if (abi.version >= 3) {
+  if (abi.version >= 3 && abi.version <= 7) {
     const enter = instance.exports["blot:ownership_enter"];
     const leave = instance.exports["blot:ownership_leave"];
     if (typeof enter !== "function" || typeof leave !== "function") {

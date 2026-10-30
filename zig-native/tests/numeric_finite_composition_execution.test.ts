@@ -5,30 +5,30 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Probe is data = #Probe U32
-const copy = fn (value: U32) => value
-const advance = fn (value: U32) => fn (delta: U32) => @u32.add (copy value) (copy delta)
-const forwarded = fn (value: U32) => advance (copy value) 0
-const invoke = fn callback => fn (index: U32) => callback index
-const Probe.choose = fn (unused: Probe) => do:
+const copy = func (value: U32) => return value
+const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)
+const forwarded = func (value: U32) => return advance (copy value) 0
+const invoke = func callback => return func (index: U32) => return callback index
+const Probe.choose = func (unused: Probe) => return do:
   let copied = forwarded 0
-  break fn (index: U32) => fn (delta: U32) => advance (forwarded index) (advance copied delta)
-const Probe.unknown = fn (unused: Probe) => fn (index: U32) => fn callback => invoke callback index
-const Probe.foreign = fn (unused: Probe) => fn (index: U32) => fn (callback: U32 -> U32 ! {Foreign}) => invoke callback index
-const lookup = fn probe => fn (index: U32) => do:
+  break func (index: U32) => return func (delta: U32) => return advance (forwarded index) (advance copied delta)
+const Probe.unknown = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
+const Probe.foreign = func (unused: Probe) => return func (index: U32) => return func (callback: U32 -> U32 ! {Foreign}) => return invoke callback index
+const lookup = func probe => return func (index: U32) => return do:
   let values = #[8, 13]
   if @u32.lt index 2:
     break @array.get values ((@type.call "choose" probe index) 0)
   break 0
-const lookup_unknown = fn probe => fn (index: U32) => if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "unknown" probe index) (fn (value: U32) => value)) else 0
-const lookup_foreign = fn probe => fn (callback: U32 -> U32 ! {Foreign}) => @array.get #[8, 13] ((@type.call "foreign" probe 1) callback)
-const run = fn (index: U32) => lookup (#Probe 42) index
-const run_unknown = fn (index: U32) => lookup_unknown (#Probe 42) index
-const run_foreign = fn callback => lookup_foreign (#Probe 42) callback
+const lookup_unknown = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "unknown" probe index) (func (value: U32) => return value)) else 0
+const lookup_foreign = func probe => return func (callback: U32 -> U32 ! {Foreign}) => return @array.get #[8, 13] ((@type.call "foreign" probe 1) callback)
+const run = func (index: U32) => return lookup (#Probe 42) index
+const run_unknown = func (index: U32) => return lookup_unknown (#Probe 42) index
+const run_foreign = func callback => return lookup_foreign (#Probe 42) callback
 `;
 const source = `import {run, run_unknown, run_foreign} from "./logic"
-entry const answer = fn (index: U32) => run index
-entry const unknown = fn (index: U32) => run_unknown index
-entry const effectful = fn (callback: U32 -> U32 ! {Foreign}) => run_foreign callback
+entry const answer = func (index: U32) => return run index
+entry const unknown = func (index: U32) => return run_unknown index
+entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return run_foreign callback
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
   for (const asynchronous of [false, true]) {
@@ -131,7 +131,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
           await observe(built.bytes);
           const checkpoint = await compiler.exportCheckpoint();
           const invalid = await compiler.build({
-            sources: { [entry]: source.replace("run index", "run #True") },
+            sources: { [entry]: source.replace("run index", "run true") },
           });
           assert(!invalid.success);
           assert.deepEqual(await compiler.exportCheckpoint(), checkpoint);

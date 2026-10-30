@@ -29,16 +29,16 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 const Case = struct { source: []const u8, code: ?backend.Code, point: ?u32 = null, detail: ?[]const u8 = null };
 const cases = [_]Case{
     .{ .source = "let runtime = 42\nentry const answer = runtime\n", .code = .const_runtime_dependency, .point = 0 },
-    .{ .source = "let runtime = fn () => 42\nconst copied = runtime\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 4, .detail = "a const initializer cannot read a top-level let function" },
-    .{ .source = "// 😀\nlet runtime = fn () => 42\nconst copied = runtime\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 12 },
-    .{ .source = "let saved.action = fn () => 42\nconst copied = saved.action\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 4 },
-    .{ .source = "let runtime = fn value => fn other => 42\nentry const answer: U32 = runtime 1 (@panic \"later\")\n", .code = .const_runtime_dependency, .point = 0 },
-    .{ .source = "let runtime = fn value => fn other => 42\nentry const answer: U32 = runtime (@panic \"first\") (@panic \"later\")\n", .code = .const_panic, .detail = "first" },
-    .{ .source = "let runtime = fn value => fn other => 42\nentry const answer: U32 = runtime (@u32.div 1 0) (@panic \"later\")\n", .code = .integer_divide_by_zero },
-    .{ .source = "let runtime = if #True then (fn value => 42) else (fn value => 41)\nentry const answer: U32 = runtime (@panic \"argument\")\n", .code = .const_runtime_dependency, .point = 0 },
-    .{ .source = "let runtime = fn () => 42\nentry const answer = if #True then 42 else runtime ()\n", .code = null },
+    .{ .source = "let runtime = func () => return 42\nconst copied = runtime\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 4, .detail = "a const initializer cannot read a top-level let function" },
+    .{ .source = "// 😀\nlet runtime = func () => return 42\nconst copied = runtime\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 12 },
+    .{ .source = "let saved.action = func () => return 42\nconst copied = saved.action\nentry const answer: Unit -> U32 = copied\n", .code = .const_runtime_dependency, .point = 4 },
+    .{ .source = "let runtime = func value => return func other => return 42\nentry const answer: U32 = runtime 1 (@panic \"later\")\n", .code = .const_runtime_dependency, .point = 0 },
+    .{ .source = "let runtime = func value => return func other => return 42\nentry const answer: U32 = runtime (@panic \"first\") (@panic \"later\")\n", .code = .const_panic, .detail = "first" },
+    .{ .source = "let runtime = func value => return func other => return 42\nentry const answer: U32 = runtime (@u32.div 1 0) (@panic \"later\")\n", .code = .integer_divide_by_zero },
+    .{ .source = "let runtime = if true then (func value => return 42) else (func value => return 41)\nentry const answer: U32 = runtime (@panic \"argument\")\n", .code = .const_runtime_dependency, .point = 0 },
+    .{ .source = "let runtime = func () => return 42\nentry const answer = if true then 42 else runtime ()\n", .code = null },
     .{ .source = "let runtime = 42\nconst copied = runtime\nentry const answer = 42\n", .code = null },
-    .{ .source = "let runtime = 42\nentry const answer: Unit -> U32 = fn () => runtime\n", .code = null },
+    .{ .source = "let runtime = 42\nentry const answer: Unit -> U32 = func () => return runtime\n", .code = null },
 };
 fn compile(allocator: std.mem.Allocator, module: *const core.Module, case: Case) !void {
     var result = try backend.compile(allocator, &.{module.*}, 1);

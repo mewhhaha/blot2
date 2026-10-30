@@ -31,8 +31,8 @@ fn lower(source: []const u8) !core.Module {
 
 test "borrow backend scalar callbacks retain complete replay and allocation failure ownership" {
     const source =
-        \\const inspect = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @u32.add (@usage.read loan) (@usage.read loan))
-        \\entry const run = fn () => inspect 9
+        \\const inspect = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @u32.add (@usage.read loan) (@usage.read loan))
+        \\entry const run = func () => return inspect 9
     ;
     var module = try lower(source);
     defer module.deinit(a);
@@ -50,7 +50,7 @@ test "borrow backend scalar callbacks retain complete replay and allocation fail
 
 test "borrow backend never supplies missing sort zero value representations" {
     var module = try lower(
-        \\entry const unresolved: forall [a] => a -> a = fn value => value
+        \\entry const unresolved: forall [a] => a -> a = func value => return value
     );
     defer module.deinit(a);
     var has_value_binder = false;
@@ -66,8 +66,8 @@ test "borrow backend never supplies missing sort zero value representations" {
 
 test "borrow backend preserves loan identity and rejects malformed read descriptors" {
     var module = try lower(
-        \\const inspect = fn (owner: unique U32) => @usage.borrow_mut owner (fn loan => @usage.read loan)
-        \\entry const run = fn () => inspect 9
+        \\const inspect = func (owner: unique U32) => return @usage.borrow_mut owner (func loan => return @usage.read loan)
+        \\entry const run = func () => return inspect 9
     );
     defer module.deinit(a);
     var read: core.Id = 0;
@@ -102,7 +102,7 @@ test "borrow backend preserves loan identity and rejects malformed read descript
 
 test "resource backend cleanup journals preserve replay and every failed allocation" {
     var module = try lower(
-        \\entry const run = fn () => @resource.scope (fn () => 9) (fn owner => ()) (fn loan => @usage.read loan)
+        \\entry const run = func () => return @resource.scope (func () => return 9) (func owner => return ()) (func loan => return @usage.read loan)
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -129,7 +129,7 @@ test "resource backend cleanup journals preserve replay and every failed allocat
 
 test "resource reference backend journals preserve replay and every failed allocation" {
     var module = try lower(
-        \\entry const run = fn (value: U32) => @resource.scope (fn () => #[value, @u32.add value 1]) (fn owner => ()) (fn loan => @usage.length loan)
+        \\entry const run = func (value: U32) => return @resource.scope (func () => return #[value, @u32.add value 1]) (func owner => return ()) (func loan => return @usage.length loan)
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -147,13 +147,13 @@ test "resource reference backend journals preserve replay and every failed alloc
 
 test "usage sharing backend preserves managed owners replay and rejects unsealed conversion authority" {
     var module = try lower(
-        \\const shared = fn (owner: unique (Array U32)) => @usage.share owner
-        \\entry const run = fn (value: U32) => do:
+        \\const shared = func (owner: unique (Array U32)) => return @usage.share owner
+        \\entry const run = func (value: U32) => return do:
         \\  let values = shared #[value, @u32.add value 1]
         \\  break @u32.add (@usage.length values) (@usage.length values)
-        \\entry const captured = fn (value: U32) => do:
+        \\entry const captured = func (value: U32) => return do:
         \\  let owner: unique (Array U32) = #[value, @u32.add value 1]
-        \\  let transfer: once (Unit -> shared (Array U32)) = fn () => @usage.share owner
+        \\  let transfer: once (Unit -> shared (Array U32)) = func () => return @usage.share owner
         \\  let shared = transfer ()
         \\  break @usage.length shared
     );
@@ -189,16 +189,16 @@ test "usage sharing backend preserves managed owners replay and rejects unsealed
 
 test "owning entry bridges box fresh inputs and publish typed persistent leases" {
     var module = try lower(
-        \\entry const scalar = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-        \\entry const array = fn (owner: unique (Array U32)) => @usage.borrow owner (fn loan => @usage.length loan)
-        \\entry const float = fn (owner: shared F32) => @usage.read owner
+        \\entry const scalar = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+        \\entry const array = func (owner: unique (Array U32)) => return @usage.borrow owner (func loan => return @usage.length loan)
+        \\entry const float = func (owner: shared F32) => return @usage.read owner
     );
     defer module.deinit(a);
     var admitted = try backend.compile(a, &.{module}, 1);
     defer admitted.deinit(a);
     try std.testing.expectEqual(@as(?backend.Diagnostic, null), admitted.diagnostic);
     var escaped = try lower(
-        \\entry const escaped = fn () -> unique U32 => 9
+        \\entry const escaped = func () : unique U32 => return 9
     );
     defer escaped.deinit(a);
     var rejected = try backend.compile(a, &.{escaped}, 1);
@@ -209,25 +209,25 @@ test "owning entry bridges box fresh inputs and publish typed persistent leases"
 
 test "resource acquired owners execute through exact Core and backend contracts" {
     var module = try lower(
-        \\const forward = fn (owner: unique U32) => owner
-        \\const make = fn () -> unique U32 ! {Foreign} => @resource.acquire (fn () => 9) (fn owner => ())
-        \\entry const run = fn () => do:
+        \\const forward = func (owner: unique U32) => return owner
+        \\const make = func () : unique U32 ! {Foreign} => return @resource.acquire (func () => return 9) (func owner => return ())
+        \\entry const run = func () => return do:
         \\  use owner <- make ()
-        \\  use value <- @usage.borrow owner (fn loan => @usage.read loan)
+        \\  use value <- @usage.borrow owner (func loan => return @usage.read loan)
         \\  use @resource.release (forward owner)
         \\  break value
-        \\entry const merged = fn (choose: Bool) => do:
+        \\entry const merged = func (choose: Bool) => return do:
         \\  let initial_left: unique (Array U32) = #[1]
         \\  let initial_right: unique (Array U32) = #[1, 2]
         \\  let left = @usage.share initial_left
         \\  let right = @usage.share initial_right
         \\  if choose:
-        \\    use first <- @resource.acquire (fn () => #[1, 2]) (fn owner => ())
+        \\    use first <- @resource.acquire (func () => return #[1, 2]) (func owner => return ())
         \\    left := @usage.share first
-        \\    use second <- @resource.acquire (fn () => #[1, 2, 3]) (fn owner => ())
+        \\    use second <- @resource.acquire (func () => return #[1, 2, 3]) (func owner => return ())
         \\    right := @usage.share second
         \\  break @u32.add (@usage.length left) (@usage.length right)
-        \\entry const broken = fn () => do:
+        \\entry const broken = func () => return do:
         \\  for ever:
         \\    use owner <- make ()
         \\    break
@@ -266,7 +266,7 @@ test "resource acquired owners execute through exact Core and backend contracts"
         try @import("frozen_core_validation.zig").validate(a, &module, .{});
     }
     try std.testing.expect(mutated_startup);
-    var escaped = try lower("entry const escaped = fn () => @resource.acquire (fn () => 9) (fn owner => ())\n");
+    var escaped = try lower("entry const escaped = func () => return @resource.acquire (func () => return 9) (func owner => return ())\n");
     defer escaped.deinit(a);
     var rejected = try backend.compile(a, &.{escaped}, 1);
     defer rejected.deinit(a);
@@ -276,10 +276,10 @@ test "resource acquired owners execute through exact Core and backend contracts"
 
 test "resource closed aggregate backend retains child roles through replay and failed allocation" {
     var module = try lower(
-        \\entry const run = fn (value: U32) => @resource.scope (fn () => {left: value, right: #[#[value, 7], #[9]]}) (fn owner => ()) (fn loan => 42)
-        \\entry const tuple = fn (value: U32) => do:
-        \\  use owner <- @resource.acquire (fn () => (value, #[value, 8])) (fn owned => ())
-        \\  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
+        \\entry const run = func (value: U32) => return @resource.scope (func () => return {left: value, right: #[#[value, 7], #[9]]}) (func owner => return ()) (func loan => return 42)
+        \\entry const tuple = func (value: U32) => return do:
+        \\  use owner <- @resource.acquire (func () => return (value, #[value, 8])) (func owned => return ())
+        \\  let transfer: once (Unit -> Unit ! {Foreign}) = func () => return @resource.release owner
         \\  use transfer ()
         \\  break 42
     );
@@ -302,11 +302,11 @@ test "resource nominal closed storage backend owns opaque references through rep
         \\type Box a is data = #Box a
         \\opaque type Secret = {left: U32, right: Array U32}
         \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-        \\entry const boxed = fn (value: U32) => @resource.scope (fn () => #Box #[value, 7]) (fn owner => ()) (fn loan => 42)
-        \\entry const tree = fn (value: U32) => @resource.scope (fn () => #Branch (#Leaf value, #Leaf 9)) (fn owner => ()) (fn loan => 42)
-        \\entry const secret = fn (value: U32) => do:
-        \\  use owner <- @resource.acquire (fn () => #Secret {right: #[value, 8], left: value}) (fn owned => ())
-        \\  let transfer: once (Unit -> Unit ! {Foreign}) = fn () => @resource.release owner
+        \\entry const boxed = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return ()) (func loan => return 42)
+        \\entry const tree = func (value: U32) => return @resource.scope (func () => return #Branch (#Leaf value, #Leaf 9)) (func owner => return ()) (func loan => return 42)
+        \\entry const secret = func (value: U32) => return do:
+        \\  use owner <- @resource.acquire (func () => return #Secret {right: #[value, 8], left: value}) (func owned => return ())
+        \\  let transfer: once (Unit -> Unit ! {Foreign}) = func () => return @resource.release owner
         \\  use transfer ()
         \\  break 42
     );
@@ -326,9 +326,9 @@ test "resource nominal closed storage backend owns opaque references through rep
 
 test "once public entry guards retain exact multiplicity through replay and failed publication" {
     var module = try lower(
-        \\entry const run: once (U32 -> U32) = fn value => value
-        \\entry const failing: once (U32 -> U32) = fn value => @panic "once failure"
-        \\entry const ordinary = fn (value: U32) => value
+        \\entry const run: once (U32 -> U32) = func value => return value
+        \\entry const failing: once (U32 -> U32) = func value => return @panic "once failure"
+        \\entry const ordinary = func (value: U32) => return value
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -347,11 +347,11 @@ test "once public entry guards retain exact multiplicity through replay and fail
 
 test "public owner leases and owned cleanup roles survive replay and allocation failure" {
     var module = try lower(
-        \\entry const make = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.acquire (fn () => 42) drop
-        \\entry const consume = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-        \\entry const pass = fn (owner: unique U32) => owner
-        \\entry const share = fn (owner: unique U32) => @usage.share owner
-        \\entry const read = fn (owner: shared U32) => @usage.borrow owner (fn loan => @usage.read loan)
+        \\entry const make = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.acquire (func () => return 42) drop
+        \\entry const consume = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+        \\entry const pass = func (owner: unique U32) => return owner
+        \\entry const share = func (owner: unique U32) => return @usage.share owner
+        \\entry const read = func (owner: shared U32) => return @usage.borrow owner (func loan => return @usage.read loan)
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});
@@ -369,7 +369,7 @@ test "public owner leases and owned cleanup roles survive replay and allocation 
 }
 
 test "public owner admission refuses forged callable storage authority" {
-    var module = try lower("entry const invalid = fn (owner: unique U32) => ()\n");
+    var module = try lower("entry const invalid = func (owner: unique U32) => return ()\n");
     defer module.deinit(a);
     const function = for (module.types.nodes, 0..) |node, id| {
         if (node.tag == .function) break @as(u32, @intCast(id));
@@ -388,11 +388,11 @@ test "structured host cleanup schemas retain source roles through replay and eve
     var module = try lower(
         \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
         \\opaque type Secret = {items: Array U32, nonce: U32}
-        \\entry const record = fn (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => @resource.scope (fn () => {nonce: 7, items: #[1, 2]}) drop (fn loan => 42)
-        \\entry const tree = fn (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => @resource.scope (fn () => #Branch (#Leaf 7, #Leaf 9)) drop (fn loan => 42)
-        \\entry const opaque_data = fn (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => @resource.scope (fn () => #Secret {items: #[1, 2], nonce: 7}) drop (fn loan => 42)
-        \\entry const owner = fn (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => @resource.acquire (fn () => {nonce: 7, items: #[1, 2]}) drop
-        \\entry const release = fn (owner: unique {items: Array U32, nonce: U32}) => @resource.release owner
+        \\entry const record = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.scope (func () => return {nonce: 7, items: #[1, 2]}) drop (func loan => return 42)
+        \\entry const tree = func (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Branch (#Leaf 7, #Leaf 9)) drop (func loan => return 42)
+        \\entry const opaque_data = func (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Secret {items: #[1, 2], nonce: 7}) drop (func loan => return 42)
+        \\entry const owner = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.acquire (func () => return {nonce: 7, items: #[1, 2]}) drop
+        \\entry const release = func (owner: unique {items: Array U32, nonce: U32}) => return @resource.release owner
     );
     defer module.deinit(a);
     try @import("frozen_core_validation.zig").validate(a, &module, .{});

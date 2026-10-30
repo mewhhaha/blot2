@@ -28,9 +28,9 @@ unannotated value.
 
 ```blot
 // Proposed: the callback must be valid independently for every a.
-const two: (forall [a] => a -> a) -> (U32, F32) = fn identity =>
+const two: (forall [a] => a -> a) -> (U32, F32) = func identity => return
   (identity 42, identity 3.0)
-const id: forall [a] => a -> a = fn value => value
+const id: forall [a] => a -> a = func value => return value
 entry const answer = two id
 ```
 
@@ -65,13 +65,13 @@ explicit repacking.
 
 ```blot
 type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => value }
-impl Flag : Render Bool = { const show = fn value => if value then 1 else 0 }
+impl Number : Render U32 = { const show = func value => return value }
+impl Flag : Render Bool = { const show = func value => return if value then 1 else 0 }
 type Item = exists [a] where { Render a } => a
 const number: Item = pack [U32] 42 as Item
-const flag: Item = pack [Bool] #True as Item
+const flag: Item = pack [Bool] true as Item
 const items: Array Item = #[number, flag]
-const show: Item -> U32 = fn item =>
+const show: Item -> U32 = func item => return
   unpack item as [a] value in Render.show value
 ```
 

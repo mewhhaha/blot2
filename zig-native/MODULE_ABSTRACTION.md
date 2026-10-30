@@ -88,8 +88,8 @@ Use ordinary constructor application and matching inside the defining module:
 
 ```blot
 opaque type Token = U32
-const make: U32 -> Token = fn value => #Token value
-const read: Token -> U32 = fn (#Token value) => value
+const make: U32 -> Token = func value => return #Token value
+const read: Token -> U32 = func (#Token value) => return value
 ```
 
 The constructor is total over exactly the checked representation. It is always
@@ -203,8 +203,8 @@ same public identity:
 // tokens.blot
 opaque type Token = U32
 private const offset = 1
-const make: U32 -> Token = fn value => #Token (value + offset)
-const read: Token -> U32 = fn (#Token value) => value
+const make: U32 -> Token = func value => return #Token (value + offset)
+const read: Token -> U32 = func (#Token value) => return value
 
 // facade.blot
 export { Token as Ticket, make, read } from "./tokens"

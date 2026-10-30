@@ -2046,4 +2046,4 @@ let cell2044: U32 = cell2045
 let cell2045: U32 = cell2046
 let cell2046: U32 = cell2047
 let cell2047: U32 = 42
-entry const answer = fn () => cell0
+entry const answer = func () => return cell0

@@ -5,13 +5,13 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const reader =
-  `const read: forall [region r] => (borrow r U32) -> U32 = fn loan => @usage.read loan
+  `const read: forall [region r] => (borrow r U32) -> U32 = func loan => return @usage.read loan
 `;
 const consumer = `import {read} from "./reader"
-const inspect = fn (owner: unique U32) => @usage.borrow owner (fn loan => read loan)
-entry const answer = fn () => inspect 42
-entry const another = fn () => inspect 7
-entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => (fn (owner: unique U32) => @usage.borrow owner (fn loan => do:
+const inspect = func (owner: unique U32) => return @usage.borrow owner (func loan => return read loan)
+entry const answer = func () => return inspect 42
+entry const another = func () => return inspect 7
+entry const ordered = func (host: Unit -> U32 ! {Foreign}) => return (func (owner: unique U32) => return @usage.borrow owner (func loan => return do:
   use offset <- host ()
   break @u32.add (read loan) offset
 )) 9
@@ -128,7 +128,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
           const bad = await compiler.build({
             sources: {
               [entry]: consumer +
-                "const escaped = fn (owner: unique U32) => @usage.borrow owner (fn loan => fn () => read loan)\n",
+                "const escaped = func (owner: unique U32) => return @usage.borrow owner (func loan => return func () => return read loan)\n",
             },
           });
           assert(!bad.success);
@@ -145,8 +145,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
           assert(recovered.success, JSON.stringify(recovered));
           assert.deepEqual(recovered.bytes, first.bytes);
           const changed = reader.replace(
-            "=> @usage.read loan",
-            "=> @u32.add (@usage.read loan) 1",
+            "=> return @usage.read loan",
+            "=> return @u32.add (@usage.read loan) 1",
           );
           const edited = await compiler.build({
             sources: { [dependency]: changed },

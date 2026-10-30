@@ -1,7 +1,7 @@
 
 type Outer is effect = { check: U32 -> U32 }
 type Inner is effect = { read: Unit -> U32 }
-const inner = fn computation => do:
+const inner = func computation => return do:
   for request in @requests computation:
     case request of
       effect Inner.read () =>
@@ -9,15 +9,15 @@ const inner = fn computation => do:
         yield value
       complete value =>
         break value
-const outer = fn computation => do:
+const outer = func computation => return do:
   for request in @requests computation:
     case request of
       effect Outer.check value =>
         break 42
       complete value =>
         break value
-entry const answer = fn () => outer (@computation (fn () => do:
-  use inner (@computation (fn () => do:
+entry const answer = func () => return outer (@computation (func () => return do:
+  use inner (@computation (func () => return do:
     use Inner.read ()
     break @panic "inner computation continued"
   ))

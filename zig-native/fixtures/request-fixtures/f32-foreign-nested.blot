@@ -1,7 +1,7 @@
 type Outer is effect = { check: F32 -> F32 }
 type Inner is effect = { read: Unit -> F32 }
-const make = fn action => @computation action
-const inner = fn selected => fn computation => do:
+const make = func action => return @computation action
+const inner = func selected => return func computation => return do:
   for request in @requests computation:
     case request of
       effect Inner.read () =>
@@ -9,28 +9,28 @@ const inner = fn selected => fn computation => do:
         yield value
       complete value =>
         break value
-const outer = fn computation => do:
+const outer = func computation => return do:
   for request in @requests computation:
     case request of
       effect Outer.check value =>
         break @f32.add value 1.0
       complete value =>
         break value
-const invoke = fn action => fn value => action value
-const retain = fn action => fn value => invoke action value
-const calculation = make (fn () => Outer.check 41.5)
+const invoke = func action => return func value => return action value
+const retain = func action => return func value => return invoke action value
+const calculation = make (func () => return Outer.check 41.5)
 const calculation_alias = calculation
-entry const constant_alias = fn () => outer calculation_alias
+entry const constant_alias = func () => return outer calculation_alias
 entry const folded = constant_alias ()
-entry const answer = fn (host: F32 -> F32 ! {Foreign}) => do:
+entry const answer = func (host: F32 -> F32 ! {Foreign}) => return do:
   let callback = retain host
-  let computation = make (fn () => do:
+  let computation = make (func () => return do:
     use selected <- callback 40.5
-    use inner selected (make (fn () => do:
+    use inner selected (make (func () => return do:
       use Inner.read ()
       break @panic "inner suffix executed after outer cancellation"
     ))
     break @panic "outer suffix executed after nested cancellation"
   )
   break outer computation
-entry const pure = fn () => 7
+entry const pure = func () => return 7

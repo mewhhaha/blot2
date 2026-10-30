@@ -8,21 +8,21 @@ let spine = "@force value";
 for (let index = 0; index < 16; index++) spine = `@u32.add (${spine}) 0`;
 const argumentSpine = spine.replaceAll("@force value", "marker");
 const library = `const marker = 2
-const twice = fn ~(value: U32) => @u32.add (${spine}) (@force value)
-const ignore = fn ~(value: U32) => do:
-  let unused = fn () => @force value
+const twice = func ~(value: U32) => return @u32.add (${spine}) (@force value)
+const ignore = func ~(value: U32) => return do:
+  let unused = func () => return @force value
   break 7
-const keep = fn ~(values: Array U32) => do:
+const keep = func ~(values: Array U32) => return do:
   let first = @force values
   let second = @force values
   break #[@array.get first 0, @array.get second 1]
-const apply = fn (host: U32 -> U32 ! {Foreign}) => @u32.add (twice (host (${argumentSpine}))) (ignore (host 999))
+const apply = func (host: U32 -> U32 ! {Foreign}) => return @u32.add (twice (host (${argumentSpine}))) (ignore (host 999))
 `;
 const source = (seed: string, prefix = "") =>
   `import {apply, keep} from "./logic"
 ${prefix}const seed = ${seed}
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => apply host
-entry const owned = fn (value: U32) => keep #[value, seed]
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return apply host
+entry const owned = func (value: U32) => return keep #[value, seed]
 `;
 
 async function observe(
@@ -109,7 +109,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
     let expected: Uint8Array<ArrayBuffer>;
     try {
       const inserted =
-        "const earlier = fn (value: F32) => @f32.add value 1.0\n";
+        "const earlier = func (value: F32) => return @f32.add value 1.0\n";
       for (
         const [text, seed, eager] of [
           [source("2"), 2, false],
@@ -128,12 +128,12 @@ for (const codegenTier of ["development", "optimized"] as const) {
           );
           if (eager) {
             dependencySource = dependencySource.replace(
-              "const ignore = fn ~(value: U32)",
-              "const ignore = fn (value: U32)",
+              "const ignore = func ~(value: U32)",
+              "const ignore = func (value: U32)",
             )
               .replace(
-                "let unused = fn () => @force value",
-                "let unused = fn () => value",
+                "let unused = func () => return @force value",
+                "let unused = func () => return value",
               );
           }
           const sources = { [entry]: text, [dependency]: dependencySource };

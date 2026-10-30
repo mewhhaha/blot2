@@ -11,9 +11,9 @@ const a = std.testing.allocator;
 
 const intrinsic_metadata_source =
     \\const seed = 2
-    \\const second = fn (values: Array U32) => @cursor.value (@cursor.advance (@array.cursor values))
-    \\const required = fn (value: U32) => @panic "retained trap"
-    \\entry const run = fn () => second #[seed, 42]
+    \\const second = func (values: Array U32) => return @cursor.value (@cursor.advance (@array.cursor values))
+    \\const required = func (value: U32) => return @panic "retained trap"
+    \\entry const run = func () => return second #[seed, 42]
 ;
 
 test "body check cache uses typed facts for ordinary intrinsics rather than a spelling allowlist through OOM" {
@@ -33,13 +33,13 @@ test "body check cache uses typed facts for ordinary intrinsics rather than a sp
 
 const shorthand_source =
     \\const seed = 2
-    \\const bundle = fn (value: U32) => fn (values: Array U32) => {value, values}
-    \\const total = fn (values: Array U32) => do:
+    \\const bundle = func (value: U32) => return func (values: Array U32) => return {value, values}
+    \\const total = func (values: Array U32) => return do:
     \\  let count = 0
     \\  for let value in values:
     \\    count := @u32.add count value
     \\  break count
-    \\entry const run = fn () => do:
+    \\entry const run = func () => return do:
     \\  let record = bundle seed #[40, 42]
     \\  break @u32.add record.value (total record.values)
 ;
@@ -60,8 +60,8 @@ test "body check cache retains shorthand owning fields and explicit ordinary arr
 }
 const text =
     \\const seed = 2
-    \\const sibling = fn (value: U32) -> U32 => @u32.add value seed
-    \\entry const run = fn (argument: U32) -> U32 => sibling argument
+    \\const sibling = func (value: U32) : U32 => return @u32.add value seed
+    \\entry const run = func (argument: U32) : U32 => return sibling argument
 ;
 const Output = struct {
     bodies: cache.Cache,
@@ -119,7 +119,7 @@ test "body check cache relocates untouched siblings across syntax types and spel
     var before = try prepare(a, text, null);
     defer before.deinit(a);
     try std.testing.expectEqual(@as(usize, 3), before.bodies.bodies.items.len);
-    const changed = "const new_spelling = fn (earlier: F32) -> F32 => @f32.add earlier 4.0\nconst seed = @u32.add 2 1\nconst sibling = fn (value: U32) -> U32 => @u32.add value seed\nentry const run = fn (argument: U32) -> U32 => sibling argument\n";
+    const changed = "const new_spelling = func (earlier: F32) : F32 => return @f32.add earlier 4.0\nconst seed = @u32.add 2 1\nconst sibling = func (value: U32) : U32 => return @u32.add value seed\nentry const run = func (argument: U32) : U32 => return sibling argument\n";
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
     var result = try compile(a, &fresh);
@@ -130,7 +130,7 @@ test "body check cache relocates untouched siblings across syntax types and spel
 test "body check cache ownership survives all allocation failures" {
     var before = try prepare(a, text, null);
     defer before.deinit(a);
-    const changed = "const seed = 3\nconst sibling = fn (value: U32) -> U32 => @u32.add value seed\nentry const run = fn (argument: U32) -> U32 => sibling argument\n";
+    const changed = "const seed = 3\nconst sibling = func (value: U32) : U32 => return @u32.add value seed\nentry const run = func (argument: U32) : U32 => return sibling argument\n";
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
     var result = try compile(a, &fresh);
@@ -149,20 +149,20 @@ fn parity(before_text: []const u8, after_text: []const u8, elaborations: usize) 
 }
 
 test "body check cache revokes type generic interface privacy and runtime reads" {
-    try parity("const seed = 2\nentry const run = fn (x: U32) => seed\nconst unrelated = 7\n", "const seed = #False\nentry const run = fn (x: U32) => seed\nconst unrelated = 7\n", 2);
-    try parity("const helper = fn (x: U32) -> U32 => x\nentry const run = fn (x: U32) -> U32 => helper x\nconst unrelated = 7\n", "const helper = fn x => x\nentry const run = fn (x: U32) -> U32 => helper x\nconst unrelated = 7\n", 2);
-    try parity(text, "private const seed = 2\nconst sibling = fn (value: U32) -> U32 => @u32.add value seed\nentry const run = fn (argument: U32) -> U32 => sibling argument\n", 2);
-    try parity(text, "let seed = 2\nconst sibling = fn (value: U32) -> U32 => @u32.add value seed\nentry const run = fn (argument: U32) -> U32 => sibling argument\n", 2);
+    try parity("const seed = 2\nentry const run = func (x: U32) => return seed\nconst unrelated = 7\n", "const seed = false\nentry const run = func (x: U32) => return seed\nconst unrelated = 7\n", 2);
+    try parity("const helper = func (x: U32) : U32 => return x\nentry const run = func (x: U32) : U32 => return helper x\nconst unrelated = 7\n", "const helper = func x => return x\nentry const run = func (x: U32) : U32 => return helper x\nconst unrelated = 7\n", 2);
+    try parity(text, "private const seed = 2\nconst sibling = func (value: U32) : U32 => return @u32.add value seed\nentry const run = func (argument: U32) : U32 => return sibling argument\n", 2);
+    try parity(text, "let seed = 2\nconst sibling = func (value: U32) : U32 => return @u32.add value seed\nentry const run = func (argument: U32) : U32 => return sibling argument\n", 2);
 }
 
 test "body check cache keeps recursive components ordinary and retains demand boundaries" {
-    const recursive = "const first = fn (n: U32) -> U32 => if @u32.eq n 0 then 4 else second (@u32.sub n 1)\nconst second = fn (n: U32) -> U32 => if @u32.eq n 0 then 5 else first (@u32.sub n 1)\nentry const run = fn (n: U32) -> U32 => first n\nconst unrelated = 7\n";
+    const recursive = "const first = func (n: U32) : U32 => return if @u32.eq n 0 then 4 else second (@u32.sub n 1)\nconst second = func (n: U32) : U32 => return if @u32.eq n 0 then 5 else first (@u32.sub n 1)\nentry const run = func (n: U32) : U32 => return first n\nconst unrelated = 7\n";
     var before = try prepare(a, recursive, null);
     defer before.deinit(a);
     var retained = try prepare(a, recursive, &before.bodies);
     defer retained.deinit(a);
     try std.testing.expect(retained.elaborations >= 2);
-    const demanded = "const force = fn ~(x: U32) -> U32 => @demand x\nentry const run = fn (n: U32) -> U32 => force n\nconst unrelated = 7\n";
+    const demanded = "const force = func ~(x: U32) : U32 => return @demand x\nentry const run = func (n: U32) : U32 => return force n\nconst unrelated = 7\n";
     try parity(demanded, demanded, 0);
 }
 
@@ -187,11 +187,11 @@ test "body check cache sparse storage and elaboration scale with admitted declar
         defer source.deinit(a);
         try source.appendSlice(a, "const seed = 2\n");
         for (0..count) |index| {
-            const declaration = try a.print("const sibling{d} = fn (x: U32) -> U32 => @u32.add x seed\n", .{index});
+            const declaration = try a.print("const sibling{d} = func (x: U32) : U32 => return @u32.add x seed\n", .{index});
             defer a.free(declaration);
             try source.appendSlice(a, declaration);
         }
-        try source.appendSlice(a, "entry const run = fn (x: U32) -> U32 => sibling0 x\n");
+        try source.appendSlice(a, "entry const run = func (x: U32) : U32 => return sibling0 x\n");
         var before = try prepare(a, source.items, null);
         defer before.deinit(a);
         source.items[13] = '3';
@@ -216,13 +216,13 @@ test "body check cache sparse storage and elaboration scale with admitted declar
 }
 
 test "body check cache owns Foreign annotations and preserves unresolved selection diagnostics" {
-    const effectful = "const invoke = fn (host: U32 -> U32 ! {Foreign}) => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\nconst unrelated = 7\n";
+    const effectful = "const invoke = func (host: U32 -> U32 ! {Foreign}) => return host 42\nentry const run = func (host: U32 -> U32 ! {Foreign}) => return invoke host\nconst unrelated = 7\n";
     var before = try prepare(a, effectful, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("invoke") != null);
     try std.testing.expect(before.bodies.find("run") != null);
     try parity(effectful, effectful, 0);
-    const selected = "const helper = fn (x: U32) -> U32 => @type.call \"add\" x 2\nentry const run = fn (x: U32) -> U32 => helper x\nconst unrelated = 7\n";
+    const selected = "const helper = func (x: U32) : U32 => return @type.call \"add\" x 2\nentry const run = func (x: U32) : U32 => return helper x\nconst unrelated = 7\n";
     var selected_before = try prepare(a, selected, null);
     defer selected_before.deinit(a);
     try std.testing.expect(selected_before.bodies.find("helper") != null);
@@ -246,7 +246,7 @@ test "body check cache exhausted syntax proof preserves ordinary checking" {
         if (index != 0) try source.appendSlice(a, ", ");
         try source.appendSlice(a, "1");
     }
-    try source.appendSlice(a, ")\nentry const run = fn (x: U32) -> U32 => x\n");
+    try source.appendSlice(a, ")\nentry const run = func (x: U32) : U32 => return x\n");
     var before = try prepare(a, source.items, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("wide") == null);
@@ -283,7 +283,7 @@ fn importedConsumerAt(allocator: A, original_name: []const u8, unit: u32, insert
         prefix = "const earlier = 7\n";
         target = 2;
     }
-    const producer_source = try allocator.print("{s}const {s} = fn (x: U32) -> U32 => x\n", .{ prefix, original_name });
+    const producer_source = try allocator.print("{s}const {s} = func (x: U32) : U32 => return x\n", .{ prefix, original_name });
     defer allocator.free(producer_source);
     var producer_tokens = try lexer.lex(allocator, producer_source);
     defer producer_tokens.deinit(allocator);
@@ -291,7 +291,7 @@ fn importedConsumerAt(allocator: A, original_name: []const u8, unit: u32, insert
     defer producer_tree.deinit(allocator);
     var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, unit, .{ .builtin_catalog = true });
     defer producer.deinit(allocator);
-    const source = "entry const run = fn (x: U32) -> U32 => exposed x\nconst untouched = 7\n";
+    const source = "entry const run = func (x: U32) : U32 => return exposed x\nconst untouched = 7\n";
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
     var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
@@ -325,11 +325,11 @@ fn replacementSource(allocator: A, count: usize, generation: usize) ![]u8 {
     defer source.deinit(allocator);
     for (0..count) |index| {
         const revision = @min(index, generation);
-        const declaration = try allocator.print("const sibling{d} = fn (x: U32) -> U32 => @u32.add x {d}\n", .{ index, revision });
+        const declaration = try allocator.print("const sibling{d} = func (x: U32) : U32 => return @u32.add x {d}\n", .{ index, revision });
         defer allocator.free(declaration);
         try source.appendSlice(allocator, declaration);
     }
-    try source.appendSlice(allocator, "entry const run = fn (x: U32) -> U32 => sibling0 x\n");
+    try source.appendSlice(allocator, "entry const run = func (x: U32) : U32 => return sibling0 x\n");
     return source.toOwnedSlice(allocator);
 }
 
@@ -386,25 +386,25 @@ test "body check cache compact chunk publication preserves previous leases under
 }
 
 test "body check cache relocates generic principal binders and independently specializes consumers" {
-    const before_text = "const identity = fn x => x\nconst box = fn x => #[x]\nentry const run = fn (x: U32) -> U32 => identity x\nentry const packed = fn (x: U32) => box x\n";
+    const before_text = "const identity = func x => return x\nconst box = func x => return #[x]\nentry const run = func (x: U32) : U32 => return identity x\nentry const packed = func (x: U32) => return box x\n";
     var before = try prepare(a, before_text, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
     try std.testing.expect(before.bodies.find("box") != null);
-    const after_text = "const earlier_spelling = fn (f: F32) -> F32 => @f32.add f 2.0\nconst identity = fn x => x\nconst box = fn x => #[x]\nentry const run = fn (x: U32) -> U32 => identity x\nentry const packed = fn (x: U32) => box x\n";
+    const after_text = "const earlier_spelling = func (f: F32) : F32 => return @f32.add f 2.0\nconst identity = func x => return x\nconst box = func x => return #[x]\nentry const run = func (x: U32) : U32 => return identity x\nentry const packed = func (x: U32) => return box x\n";
     var fresh = try prepare(a, after_text, null);
     defer fresh.deinit(a);
     var result = try compile(a, &fresh);
     defer result.deinit(a);
     try compare(a, &before.bodies, after_text, result.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, after_text, result.bytes, @as(usize, 1) });
-    try parity(before_text, "const identity = fn x => #[x]\nconst box = fn x => #[x]\nentry const run = fn (x: U32) => identity x\nentry const packed = fn (x: U32) => box x\n", 2);
+    try parity(before_text, "const identity = func x => return #[x]\nconst box = func x => return #[x]\nentry const run = func (x: U32) => return identity x\nentry const packed = func (x: U32) => return box x\n", 2);
 }
 
 test "body check cache compacts obsolete type graphs even when surviving syntax payload dominates" {
     var producer: std.ArrayList(u8) = .empty;
     defer producer.deinit(a);
-    try producer.appendSlice(a, "@[fn value => value] const supplier = fn (x: U32) => (");
+    try producer.appendSlice(a, "@[func value => return value] const supplier = func (x: U32) => return (");
     for (0..256) |index| {
         if (index != 0) try producer.appendSlice(a, ", ");
         try producer.appendSlice(a, "x");
@@ -412,9 +412,9 @@ test "body check cache compacts obsolete type graphs even when surviving syntax 
     try producer.appendSlice(a, ")\n");
     // Inflate retained syntax without creating more partial-application types.
     const padding: [16384]u8 = @splat(' ');
-    const stable = try a.print("const preserved = fn (x: U32) -> U32 => {s}@u32.add x 0\nentry const run = fn (x: U32) -> U32 => preserved x\n", .{padding});
+    const stable = try a.print("const preserved = func (x: U32) : U32 => return {s}@u32.add x 0\nentry const run = func (x: U32) : U32 => return preserved x\n", .{padding});
     defer a.free(stable);
-    const first_source = try a.print("{s}const wide = fn x => supplier x\n{s}", .{ producer.items, stable });
+    const first_source = try a.print("{s}const wide = func x => return supplier x\n{s}", .{ producer.items, stable });
     defer a.free(first_source);
     var first = try prepare(a, first_source, null);
     defer first.deinit(a);
@@ -425,7 +425,7 @@ test "body check cache compacts obsolete type graphs even when surviving syntax 
     // wide result accounts for most type projection work in that graph.
     try std.testing.expect(old.bytes() * 2 > old.owner.body_bytes);
     try std.testing.expect((removed.type_work + producer_body.type_work) * 2 > old.owner.type_work);
-    const next_source = try a.print("const wide = fn x => @u32.add x 1\n{s}", .{stable});
+    const next_source = try a.print("const wide = func x => return @u32.add x 1\n{s}", .{stable});
     defer a.free(next_source);
     var next = try prepare(a, next_source, &first.bodies);
     defer next.deinit(a);
@@ -441,11 +441,11 @@ test "body check cache compacts obsolete type graphs even when surviving syntax 
 }
 
 test "body check cache relocates symbolic callback effects without closing them" {
-    const first_source = "const apply = fn callback => fn argument => callback argument\nentry const run = fn (x: U32) -> U32 => apply (fn (y: U32) -> U32 => @u32.add y 1) x\n";
+    const first_source = "const apply = func callback => return func argument => return callback argument\nentry const run = func (x: U32) : U32 => return apply (func (y: U32) : U32 => return @u32.add y 1) x\n";
     var first = try prepare(a, first_source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("apply") != null);
-    const next_source = "const earlier_spelling = fn (z: F32) -> F32 => @f32.add z 2.0\nconst apply = fn callback => fn argument => callback argument\nentry const run = fn (x: U32) -> U32 => apply (fn (y: U32) -> U32 => @u32.add y 1) x\n";
+    const next_source = "const earlier_spelling = func (z: F32) : F32 => return @f32.add z 2.0\nconst apply = func callback => return func argument => return callback argument\nentry const run = func (x: U32) : U32 => return apply (func (y: U32) : U32 => return @u32.add y 1) x\n";
     var fresh = try prepare(a, next_source, null);
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
@@ -453,7 +453,7 @@ test "body check cache relocates symbolic callback effects without closing them"
     try compare(a, &first.bodies, next_source, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &first.bodies, next_source, expected.bytes, @as(usize, 1) });
     // Both inferred and written callback rows preserve the Foreign effect.
-    const foreign_source = "const apply = fn callback => fn argument => callback argument\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => apply host 42\n";
+    const foreign_source = "const apply = func callback => return func argument => return callback argument\nentry const run = func (host: U32 -> U32 ! {Foreign}) => return apply host 42\n";
     var foreign_fresh = try prepare(a, foreign_source, null);
     defer foreign_fresh.deinit(a);
     var foreign_expected = try compile(a, &foreign_fresh);
@@ -462,21 +462,21 @@ test "body check cache relocates symbolic callback effects without closing them"
 }
 
 test "body check cache relocates nominal identities and revokes retargeted local aliases" {
-    const original = "type Token is data = #Token U32\nconst make = fn (n: U32) => #Token n\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
+    const original = "type Token is data = #Token U32\nconst make = func (n: U32) => return #Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func (#Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var before = try prepare(a, original, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
     try std.testing.expect(before.bodies.find("run") != null);
     try std.testing.expect(before.bodies.find("make") != null);
-    const inserted = "type Earlier is data = #Earlier F32\nconst earlier_spelling = fn (f: F32) -> F32 => @f32.add f 2.0\ntype Token is data = #Token U32\nconst make = fn (n: U32) => #Token n\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
+    const inserted = "type Earlier is data = #Earlier F32\nconst earlier_spelling = func (f: F32) : F32 => return @f32.add f 2.0\ntype Token is data = #Token U32\nconst make = func (n: U32) => return #Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func (#Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var fresh = try prepare(a, inserted, null);
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
     try compare(a, &before.bodies, inserted, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
-    const alias_first = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = First\nconst identity = fn (value: Alias) -> Alias => value\nconst read = fn (#First value) => value\nentry const run = fn (n: U32) => read (identity (#First n))\n";
-    const alias_next = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = Second\nconst identity = fn (value: Alias) -> Alias => value\nconst read = fn (#Second value) => value\nentry const run = fn (n: U32) => read (identity (#Second n))\n";
+    const alias_first = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = First\nconst identity = func (value: Alias) : Alias => return value\nconst read = func (#First value) => return value\nentry const run = func (n: U32) => return read (identity (#First n))\n";
+    const alias_next = "type First is data = #First U32\ntype Second is data = #Second U32\ntype Alias = Second\nconst identity = func (value: Alias) : Alias => return value\nconst read = func (#Second value) => return value\nentry const run = func (n: U32) => return read (identity (#Second n))\n";
     try parity(alias_first, alias_next, 3);
     const private_alias = try std.mem.replaceOwned(u8, a, alias_first, "type Alias = First", "private type Alias = First");
     defer a.free(private_alias);
@@ -484,22 +484,22 @@ test "body check cache relocates nominal identities and revokes retargeted local
 }
 
 test "body check cache opaque storage roles revoke scalar to reference consumers" {
-    const original = "opaque type Token = U32\nconst make = fn (n: U32) => #Token n\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
+    const original = "opaque type Token = U32\nconst make = func (n: U32) => return #Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func (#Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var before = try prepare(a, original, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
-    const inserted = "const earlier_spelling = fn (f: F32) -> F32 => @f32.add f 2.0\nopaque type Token = U32\nconst make = fn (n: U32) => #Token n\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
+    const inserted = "const earlier_spelling = func (f: F32) : F32 => return @f32.add f 2.0\nopaque type Token = U32\nconst make = func (n: U32) => return #Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func (#Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var fresh = try prepare(a, inserted, null);
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
     try compare(a, &before.bodies, inserted, expected.bytes, 1);
-    const changed = "opaque type Token = Array U32\nconst make = fn (n: U32) => #Token #[n]\nconst identity = fn (value: Token) -> Token => value\nconst read = fn (#Token value) => value\nentry const run = fn (n: U32) => read (identity (make n))\n";
+    const changed = "opaque type Token = Array U32\nconst make = func (n: U32) => return #Token #[n]\nconst identity = func (value: Token) : Token => return value\nconst read = func (#Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     try parity(original, changed, 4);
 }
 
 test "body check cache relocates generic nominal arguments and opaque parameter recipes" {
-    const source = "opaque type Box a = a\nconst make = fn value => #Box value\nconst read = fn (#Box value) => value\nconst identity = fn value => value\nentry const unsigned = fn (value: U32) => read (identity (make value))\nentry const floating = fn (value: F32) => read (identity (make value))\nentry const reference = fn (value: U32) => read (identity (make #[value]))\n";
+    const source = "opaque type Box a = a\nconst make = func value => return #Box value\nconst read = func (#Box value) => return value\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make value))\nentry const floating = func (value: F32) => return read (identity (make value))\nentry const reference = func (value: U32) => return read (identity (make #[value]))\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("unsigned") != null);
@@ -516,7 +516,7 @@ test "body check cache relocates generic nominal arguments and opaque parameter 
 }
 
 test "body check cache relocates structural field spellings and shaped nominal arguments" {
-    const source = "opaque type Entry { head, tail } = { head: head, tail: tail }\nconst make = fn value => #Entry value\nconst read = fn (#Entry { tail }) => tail\nconst identity = fn value => value\nentry const unsigned = fn (value: U32) => read (identity (make { head: value, tail: #[value] }))\nentry const floating = fn (value: F32) => read (identity (make { head: value, tail: #[value] }))\n";
+    const source = "opaque type Entry { head, tail } = { head: head, tail: tail }\nconst make = func value => return #Entry value\nconst read = func (#Entry { tail }) => return tail\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make { head: value, tail: #[value] }))\nentry const floating = func (value: F32) => return read (identity (make { head: value, tail: #[value] }))\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("unsigned") != null);
@@ -533,7 +533,7 @@ test "body check cache relocates structural field spellings and shaped nominal a
 }
 
 test "body check cache reconstructs symbolic associated predicates in the current solver" {
-    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\nconst add = fn left => fn right => @type.call \"add\" left right\nentry const unsigned = fn (value: U32) => add value 2\nentry const floating = fn (value: F32) => add value 2.0\n";
+    const source = "const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right\nconst F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right\nconst add = func left => return func right => return @type.call \"add\" left right\nentry const unsigned = func (value: U32) => return add value 2\nentry const floating = func (value: F32) => return add value 2.0\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     const add = first.bodies.find("add") orelse return error.TestUnexpectedResult;
@@ -557,7 +557,7 @@ test "body check cache reconstructs symbolic associated predicates in the curren
 }
 
 test "body check cache consumes selected evidence and revokes candidate interface or presence edits" {
-    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nentry const run = fn (value: U32) => (fn ready => @type.call \"add\" value 2) U32.add\n";
+    const source = "const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right\nentry const run = func (value: U32) => return (func ready => return @type.call \"add\" value 2) U32.add\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     const run = first.bodies.find("run") orelse return error.TestUnexpectedResult;
@@ -575,7 +575,7 @@ test "body check cache consumes selected evidence and revokes candidate interfac
     defer a.free(body_edit);
     try parity(source, body_edit, 1);
     // A new candidate is a negative read even when U32 remains the winner.
-    const added = try a.print("const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\n{s}", .{source});
+    const added = try a.print("const F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right\n{s}", .{source});
     defer a.free(added);
     try parity(source, added, 2);
     // Changing the established candidate's parameter/result scheme revokes the
@@ -598,7 +598,7 @@ test "body check cache compacts obsolete owned field spellings under successive 
             var suffix: [4096]u8 = undefined;
             @memset(&suffix, 'x');
             const padding: [16384]u8 = @splat(' ');
-            return allocator.print("@[fn item => item] const supplier = fn (value: U32) => {{ field_{d}_{s}: value }}\nconst wide = fn value => supplier value\nconst preserved = fn (value: U32) => {s}{s}\nentry const run = fn (value: U32) => preserved value\n", .{ generation, suffix, padding, value });
+            return allocator.print("@[func item => return item] const supplier = func (value: U32) => return {{ field_{d}_{s}: value }}\nconst wide = func value => return supplier value\nconst preserved = func (value: U32) => return {s}{s}\nentry const run = func (value: U32) => return preserved value\n", .{ generation, suffix, padding, value });
         }
     };
     const initial = try Fixture.source(a, expression, 0);
@@ -624,7 +624,7 @@ test "body check cache compacts obsolete owned field spellings under successive 
 }
 
 test "body check cache revokes retargeted source operators at stable body syntax and types" {
-    const source = "infixl 60 (+) = combine\nconst combine = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst other = fn (left: U32) => fn (right: U32) => @u32.sub left right\nentry const run = fn (value: U32) => value + 2\n";
+    const source = "infixl 60 (+) = combine\nconst combine = func (left: U32) => return func (right: U32) => return @u32.add left right\nconst other = func (left: U32) => return func (right: U32) => return @u32.sub left right\nentry const run = func (value: U32) => return value + 2\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("run") != null);
@@ -676,7 +676,7 @@ test "body check cache distinguishes equal arity closed row binder and anonymous
 }
 
 test "body check cache relocates shared principal edges and reinstantiates current selection" {
-    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\nconst add = fn left => fn right => @type.call \"add\" left right\nconst forwarded = fn left => fn right => add left right\nconst alias = forwarded\nentry const unsigned = fn (value: U32) => alias value 2\nentry const floating = fn (value: F32) => alias value 2.0\n";
+    const source = "const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right\nconst F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right\nconst add = func left => return func right => return @type.call \"add\" left right\nconst forwarded = func left => return func right => return add left right\nconst alias = forwarded\nentry const unsigned = func (value: U32) => return alias value 2\nentry const floating = func (value: F32) => return alias value 2.0\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     const forwarded = before.bodies.find("forwarded") orelse return error.TestUnexpectedResult;
@@ -694,7 +694,7 @@ test "body check cache relocates shared principal edges and reinstantiates curre
     const body_edit = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(body_edit);
     try parity(source, body_edit, 1);
-    const candidate = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    const candidate = try a.print("const Bool.add = func (left: Bool) => return func (right: Bool) => return left\n{s}", .{source});
     defer a.free(candidate);
     var candidate_fresh = try prepare(a, candidate, null);
     defer candidate_fresh.deinit(a);
@@ -709,7 +709,7 @@ test "body check cache relocates shared principal edges and reinstantiates curre
 }
 
 test "body check cache recreates declared associated and representation qualifications" {
-    const source = "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right\nconst twice: a -> a where { associated \"add\" a a a } = fn value => @type.call \"add\" value value\nconst identity: a -> a where { type_rep a } = fn value => value\nentry const unsigned = fn (value: U32) => identity (twice value)\nentry const floating = fn (value: F32) => identity (twice value)\n";
+    const source = "const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right\nconst F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right\nconst twice: a -> a where { associated \"add\" a a a } = func value => return @type.call \"add\" value value\nconst identity: a -> a where { type_rep a } = func value => return value\nentry const unsigned = func (value: U32) => return identity (twice value)\nentry const floating = func (value: F32) => return identity (twice value)\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("twice") != null);
@@ -728,7 +728,7 @@ test "body check cache recreates declared associated and representation qualific
 }
 
 test "body check cache relocates applied generic annotations and revokes constructor recipes" {
-    const source = "type Box a is data = #Box a\nconst make = fn value => #Box value\nconst read = fn (#Box value) => value\nconst identity = fn (value: Box a) -> Box a => value\ntype Pair [left, right] = (left, right)\nconst shaped = fn (value: Pair [U32, F32]) -> Pair [U32, F32] => value\nconst arrayed = fn (value: Array a) -> Array a => value\nentry const run = fn (value: U32) => read (identity (make value))\nconst pair = fn (value: U32) => shaped (value, 2.0)\nentry const array = fn (value: U32) => arrayed #[value]\n";
+    const source = "type Box a is data = #Box a\nconst make = func value => return #Box value\nconst read = func (#Box value) => return value\nconst identity = func (value: Box a) : Box a => return value\ntype Pair [left, right] = (left, right)\nconst shaped = func (value: Pair [U32, F32]) : Pair [U32, F32] => return value\nconst arrayed = func (value: Array a) : Array a => return value\nentry const run = func (value: U32) => return read (identity (make value))\nconst pair = func (value: U32) => return shaped (value, 2.0)\nentry const array = func (value: U32) => return arrayed #[value]\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
@@ -746,9 +746,9 @@ test "body check cache relocates applied generic annotations and revokes constru
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const recipe_type = try std.mem.replaceOwned(u8, a, source, "#Box a", "#Box (a, U32)");
     defer a.free(recipe_type);
-    const recipe_make = try std.mem.replaceOwned(u8, a, recipe_type, "=> #Box value", "=> #Box (value, 0)");
+    const recipe_make = try std.mem.replaceOwned(u8, a, recipe_type, "=> return #Box value", "=> return #Box (value, 0)");
     defer a.free(recipe_make);
-    const recipe_edit = try std.mem.replaceOwned(u8, a, recipe_make, "fn (#Box value) => value", "fn (#Box (value, ignored)) => value");
+    const recipe_edit = try std.mem.replaceOwned(u8, a, recipe_make, "func (#Box value) => return value", "func (#Box (value, ignored)) => return value");
     defer a.free(recipe_edit);
     var changed = try prepare(a, recipe_edit, null);
     defer changed.deinit(a);
@@ -765,23 +765,23 @@ test "body check cache relocates applied generic annotations and revokes constru
 test "body check cache relocates ordinary block locals mutations joins and cases" {
     const original =
         \\const seed = 2
-        \\const branched = fn (value: U32) -> U32 => do:
+        \\const branched = func (value: U32) : U32 => return do:
         \\  let count = value
         \\  if @u32.lt value 8:
         \\    count := @u32.add self seed
         \\  else:
         \\    count := @u32.add self 1
         \\  break count
-        \\const matched = fn (value: U32) -> U32 => case value of
+        \\const matched = func (value: U32) : U32 => return case value of
         \\  0 => seed
         \\  result => @u32.add result seed
-        \\entry const run = fn (value: U32) -> U32 => matched (branched value)
+        \\entry const run = func (value: U32) : U32 => return matched (branched value)
     ;
     var before = try prepare(a, original, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("branched") != null);
     try std.testing.expect(before.bodies.find("matched") != null);
-    const prefix = "const earlier_spelling = fn (fraction: F32) => @f32.add fraction 3.0\n";
+    const prefix = "const earlier_spelling = func (fraction: F32) => return @f32.add fraction 3.0\n";
     const inserted = try std.mem.concat(a, u8, &.{ prefix, original });
     defer a.free(inserted);
     const next = try std.mem.replaceOwned(u8, a, inserted, "const seed = 2", "const seed = @u32.add 2 1");
@@ -799,7 +799,7 @@ test "body check cache relocates ordinary block locals mutations joins and cases
     var altered_output = try compile(a, &altered);
     defer altered_output.deinit(a);
     try compare(a, &before.bodies, body_edit, altered_output.bytes, 3);
-    const polymorphic = "const local_generic = fn (value: U32) => do:\n  let identity = fn item => item\n  break identity value\nentry const run = fn (value: U32) => local_generic value\n";
+    const polymorphic = "const local_generic = func (value: U32) => return do:\n  let identity = func item => return item\n  break identity value\nentry const run = func (value: U32) => return local_generic value\n";
     var ordinary = try prepare(a, polymorphic, null);
     defer ordinary.deinit(a);
     try std.testing.expect(ordinary.bodies.find("local_generic") != null);
@@ -808,10 +808,10 @@ test "body check cache relocates ordinary block locals mutations joins and cases
 test "body check cache relocates constructor cases and record pattern fields by spelling" {
     const source =
         \\type Packet is data = #Packet { head: U32, tail: Array U32 }
-        \\const make = fn (value: U32) => #Packet { head: value, tail: #[value, @u32.add value 1] }
-        \\const read = fn (packet: Packet) => case packet of
+        \\const make = func (value: U32) => return #Packet { head: value, tail: #[value, @u32.add value 1] }
+        \\const read = func (packet: Packet) => return case packet of
         \\  #Packet { tail } => tail
-        \\entry const run = fn (value: U32) => read (make value)
+        \\entry const run = func (value: U32) => return read (make value)
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -848,13 +848,13 @@ test "body check cache relocates constructor cases and record pattern fields by 
 test "body check cache relocates generic local principals and covariance rows" {
     const source =
         \\const seed = 2
-        \\const helper = fn (value: U32) -> U32 => do:
-        \\  let identity = fn item => item
-        \\  let apply = fn callback => fn argument => callback argument
+        \\const helper = func (value: U32) : U32 => return do:
+        \\  let identity = func item => return item
+        \\  let apply = func callback => return func argument => return callback argument
         \\  let fraction = identity 3.0
         \\  let whole = apply identity value
         \\  break @u32.add whole seed
-        \\entry const run = fn (value: U32) -> U32 => helper value
+        \\entry const run = func (value: U32) : U32 => return helper value
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -872,7 +872,7 @@ test "body check cache relocates generic local principals and covariance rows" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 2) });
     // A changed local template is executable source, independent of the
     // unchanged outer scalar signature and its neighboring generic local.
-    const body_edit = try std.mem.replaceOwned(u8, a, changed, "=> callback argument", "=> callback (@u32.add argument 1)");
+    const body_edit = try std.mem.replaceOwned(u8, a, changed, "=> return callback argument", "=> return callback (@u32.add argument 1)");
     defer a.free(body_edit);
     var altered = try prepare(a, body_edit, null);
     defer altered.deinit(a);
@@ -884,11 +884,11 @@ test "body check cache relocates generic local principals and covariance rows" {
 test "body check cache relocates concrete record and nominal projections by spelling" {
     const source =
         \\type Packet is data = #Packet { head: U32, tail: Array U32 }
-        \\const get = fn (value: { head: U32, tail: Array U32 }) => (value).tail
-        \\const read = fn (value: Packet) => (value).tail
-        \\const make = fn (value: U32) => #Packet { head: value, tail: #[value, @u32.add value 1] }
-        \\entry const run = fn (value: U32) => read (make value)
-        \\entry const plain = fn (value: U32) => get { head: value, tail: #[value] }
+        \\const get = func (value: { head: U32, tail: Array U32 }) => return (value).tail
+        \\const read = func (value: Packet) => return (value).tail
+        \\const make = func (value: U32) => return #Packet { head: value, tail: #[value, @u32.add value 1] }
+        \\entry const run = func (value: U32) => return read (make value)
+        \\entry const plain = func (value: U32) => return get { head: value, tail: #[value] }
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -912,7 +912,7 @@ test "body check cache relocates concrete record and nominal projections by spel
 }
 
 test "body check cache relocates dotted access paths without erasing projections" {
-    const source = "const seed = 2\nconst helper = fn (value: { head: U32, tail: F32 }) -> U32 => @u32.add value.head seed\nentry const run = fn (value: U32) -> U32 => helper { head: value, tail: 1.0 }\n";
+    const source = "const seed = 2\nconst helper = func (value: { head: U32, tail: F32 }) : U32 => return @u32.add value.head seed\nentry const run = func (value: U32) : U32 => return helper { head: value, tail: 1.0 }\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("helper") != null);
@@ -929,11 +929,11 @@ test "body check cache relocates dotted access paths without erasing projections
 test "body check cache owns chained dotted nominal paths and owning payloads" {
     const source =
         \\type Packet is data = #Packet { head: U32, nested: { tail: Array U32, marker: F32 } } | #Alternate { nested: { marker: F32, tail: Array U32 }, head: U32 }
-        \\const read = fn (value: Packet) => value.nested.tail
-        \\const get = fn (value: { head: U32, nested: { tail: Array U32, marker: F32 } }) => value.nested.tail
-        \\const make = fn value => #Packet { head: value, nested: { tail: #[value, @u32.add value 1], marker: 1.0 } }
-        \\entry const run = fn (value: U32) => read (make value)
-        \\entry const plain = fn (value: U32) => get { head: value, nested: { tail: #[value], marker: 1.0 } }
+        \\const read = func (value: Packet) => return value.nested.tail
+        \\const get = func (value: { head: U32, nested: { tail: Array U32, marker: F32 } }) => return value.nested.tail
+        \\const make = func value => return #Packet { head: value, nested: { tail: #[value, @u32.add value 1], marker: 1.0 } }
+        \\entry const run = func (value: U32) => return read (make value)
+        \\entry const plain = func (value: U32) => return get { head: value, nested: { tail: #[value], marker: 1.0 } }
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -949,7 +949,7 @@ test "body check cache owns chained dotted nominal paths and owning payloads" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
-    const changed = try std.mem.replaceOwned(u8, a, inserted, "=> #Packet", "=> #Alternate");
+    const changed = try std.mem.replaceOwned(u8, a, inserted, "=> return #Packet", "=> return #Alternate");
     defer a.free(changed);
     var altered = try prepare(a, changed, null);
     defer altered.deinit(a);
@@ -961,9 +961,9 @@ test "body check cache owns chained dotted nominal paths and owning payloads" {
 test "body check cache retains concrete dotted method paths through body edits and OOM" {
     const source =
         \\type Number is data = #Number U32
-        \\const Number.next = fn (#Number value) => @u32.add value 1
-        \\const read = fn (value: Number) => value.next
-        \\entry const run = fn (value: U32) => read (#Number value)
+        \\const Number.next = func (#Number value) => return @u32.add value 1
+        \\const read = func (value: Number) => return value.next
+        \\entry const run = func (value: U32) => return read (#Number value)
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -980,7 +980,7 @@ test "body check cache retains concrete dotted method paths through body edits a
 
 test "body check cache syntax owns parser allocations and preserves shared span synthetic ordinals" {
     const source =
-        \\const gather = fn values => do:
+        \\const gather = func values => return do:
         \\  let result = 0
         \\  for let value in values:
         \\    result := @u32.add result value
@@ -1015,8 +1015,8 @@ test "body check cache syntax owns parser allocations and preserves shared span 
 const provider_source =
     \\effect Read: Unit -> U32
     \\const seed = 2
-    \\const make = fn () => @effect.provider Read (fn () => seed)
-    \\entry const run = fn () => do (make ()):
+    \\const make = func () => return @effect.provider Read (func () => return seed)
+    \\entry const run = func () => return do (make ()):
     \\  break Read ()
 ;
 
@@ -1039,15 +1039,15 @@ const auxiliary_source =
     \\effect Read: Unit -> U32
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const seed = 2
-    \\const read = fn () => do (@effect.provider Read (fn () => seed)):
+    \\const read = func () => return do (@effect.provider Read (func () => return seed)):
     \\  break Read ()
-    \\const state = fn (initial: U32) => @effect.run State.get State.set initial (fn () => do:
+    \\const state = func (initial: U32) => return @effect.run State.get State.set initial (func () => return do:
     \\  use State.set 40
     \\  break State.get ()
     \\)
-    \\const describe = fn () => @effect.count (@effect.of read)
+    \\const describe = func () => return @effect.count (@effect.of read)
     \\const description = describe ()
-    \\const checked = fn computation => do:
+    \\const checked = func computation => return do:
     \\  let count = 0
     \\  for request in @requests computation:
     \\    case request of
@@ -1056,8 +1056,8 @@ const auxiliary_source =
     \\        yield 42
     \\      complete value =>
     \\        break @u32.add count value
-    \\const request = fn () => checked (@computation (fn () => Read ()))
-    \\entry const run = fn () => @u32.add (@product.get (state seed) 1) (@u32.add (read ()) (@u32.add (request ()) description))
+    \\const request = func () => return checked (@computation (func () => return Read ()))
+    \\entry const run = func () => return @u32.add (@product.get (state seed) 1) (@u32.add (read ()) (@u32.add (request ()) description))
 ;
 test "body check cache transports computations request state provider and reflection owners through relocation and OOM" {
     var before = try prepare(a, auxiliary_source, null);
@@ -1074,7 +1074,7 @@ test "body check cache transports computations request state provider and reflec
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("effect Earlier: F32 -> F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("effect Earlier: F32 -> F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -1086,18 +1086,18 @@ test "body check cache transports computations request state provider and reflec
 const private_auxiliary_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const seed = 2
-    \\const scoped = fn () => @effect.scope (fn (state: State U32) => do:
+    \\const scoped = func () => return @effect.scope (func (state: State U32) => return do:
     \\  let capability = state
     \\  let read = capability.get
     \\  let write = capability.set
-    \\  let local = fn () => read ()
+    \\  let local = func () => return read ()
     \\  let (successor, result) = do (@effect.state read write seed):
     \\    break local ()
     \\  break result
     \\)
-    \\const borrow = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-    \\const resource = fn () => @resource.scope (fn () => #[seed, 40]) (fn owner => ()) (fn loan => @usage.length loan)
-    \\entry const run = fn () => @u32.add (resource ()) (@u32.add (scoped ()) (borrow 40))
+    \\const borrow = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+    \\const resource = func () => return @resource.scope (func () => return #[seed, 40]) (func owner => return ()) (func loan => return @usage.length loan)
+    \\entry const run = func () => return @u32.add (resource ()) (@u32.add (scoped ()) (borrow 40))
 ;
 test "body check cache owns fresh scope aliases and local loan regions through relocation and OOM" {
     var before = try prepare(a, private_auxiliary_source, null);
@@ -1114,7 +1114,7 @@ test "body check cache owns fresh scope aliases and local loan regions through r
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("effect Earlier: F32 -> F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("effect Earlier: F32 -> F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -1126,10 +1126,10 @@ test "body check cache owns fresh scope aliases and local loan regions through r
 const rank_package_source =
     \\const seed = 2
     \\type Item = exists [a] => (a, a -> U32)
-    \\const identity: forall [a] => a -> a = fn value => value
-    \\const make: U32 -> Item = fn value => pack [U32] (value, fn number => @u32.add number 40) as Item
-    \\const read: Item -> U32 = fn item => unpack item as [a] body in (@product.get body 1) (@product.get body 0)
-    \\entry const run = fn () => read (make (identity seed))
+    \\const identity: forall [a] => a -> a = func value => return value
+    \\const make: U32 -> Item = func value => return pack [U32] (value, func number => return @u32.add number 40) as Item
+    \\const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
+    \\entry const run = func () => return read (make (identity seed))
 ;
 test "body check cache retains ordinary universal and existential owners through relocation and OOM" {
     var before = try prepare(a, rank_package_source, null);
@@ -1146,7 +1146,7 @@ test "body check cache retains ordinary universal and existential owners through
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -1158,14 +1158,14 @@ test "body check cache retains ordinary universal and existential owners through
 const selected_package_source =
     \\const seed = 2
     \\type Render a is contract = { const show: a -> U32 }
-    \\impl Number : Render U32 = { const show = fn value => value }
-    \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+    \\impl Number : Render U32 = { const show = func value => return value }
+    \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
     \\type Item = exists [a] where { Render a } => a
     \\const item: Item = pack [U32] seed as Item
-    \\const flag: Item = pack [Bool] #True as Item
-    \\const read = fn (item: Item) => unpack item as [a] value in Render.show value
-    \\const both = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
-    \\entry const run = fn () => @u32.add (read item) (both item flag)
+    \\const flag: Item = pack [Bool] true as Item
+    \\const read = func (item: Item) => return unpack item as [a] value in Render.show value
+    \\const both = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
+    \\entry const run = func () => return @u32.add (read item) (both item flag)
 ;
 test "body check cache reconstructs current selected and given package dictionaries through relocation and OOM" {
     var before = try prepare(a, selected_package_source, null);
@@ -1185,7 +1185,7 @@ test "body check cache reconstructs current selected and given package dictionar
     const work = fresh.elaborations - 5;
     try compare(a, &before.bodies, changed, expected.bytes, work);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, work });
-    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -1203,9 +1203,9 @@ test "body check cache reconstructs current selected and given package dictionar
 
 const constructor_usage_source =
     \\type Wrap a is data = #Wrap a
-    \\const token = fn () => Wrap
-    \\const identity = fn (values: unique (Array U32)) => values
-    \\entry const run = fn (values: unique (Array U32)) => identity values
+    \\const token = func () => return Wrap
+    \\const identity = func (values: unique (Array U32)) => return values
+    \\entry const run = func (values: unique (Array U32)) => return identity values
 ;
 
 test "body check cache owns type constructor recipes and ordinary unique types through relocation and OOM" {
@@ -1228,13 +1228,13 @@ test "body check cache owns type constructor recipes and ordinary unique types t
 
 const forwarded_source =
     \\const seed = 2
-    \\const U32.combine = fn (left: U32) => fn (right: U32) => @u32.add left right
-    \\const F32.combine = fn (left: F32) => fn (right: F32) => @f32.add left right
-    \\const combine = fn left => fn right => @type.call "combine" left right
+    \\const U32.combine = func (left: U32) => return func (right: U32) => return @u32.add left right
+    \\const F32.combine = func (left: F32) => return func (right: F32) => return @f32.add left right
+    \\const combine = func left => return func right => return @type.call "combine" left right
     \\const alias = combine
-    \\const partial = fn value => alias value
-    \\const apply = fn value => partial value value
-    \\entry const run = fn () => apply seed
+    \\const partial = func value => return alias value
+    \\const apply = func value => return partial value value
+    \\entry const run = func () => return apply seed
 ;
 
 test "body check cache reconstructs transitive forwarded shared requirements through aliases and OOM" {
@@ -1256,11 +1256,11 @@ const binary_demand_source =
     \\infixl 60 (**) = left
     \\infixl 60 (%%) = both
     \\const seed = 2
-    \\const right = fn (value: U32) => fn ~(other: U32) => @u32.add value (@force other)
-    \\const left = fn ~(value: U32) => fn (other: U32) => @u32.add (@force value) other
-    \\const both = fn ~(value: U32) => fn ~(other: U32) => @u32.add (@force value) (@force other)
-    \\const apply = fn (value: U32) => @u32.add (value ++ seed) (@u32.add (value ** seed) (value %% seed))
-    \\entry const run = fn (value: U32) => apply value
+    \\const right = func (value: U32) => return func ~(other: U32) => return @u32.add value (@force other)
+    \\const left = func ~(value: U32) => return func (other: U32) => return @u32.add (@force value) other
+    \\const both = func ~(value: U32) => return func ~(other: U32) => return @u32.add (@force value) (@force other)
+    \\const apply = func (value: U32) => return @u32.add (value ++ seed) (@u32.add (value ** seed) (value %% seed))
+    \\entry const run = func (value: U32) => return apply value
 ;
 
 test "body check cache owns both binary demand arguments through unchanged interfaces and OOM" {
@@ -1279,14 +1279,14 @@ test "body check cache owns both binary demand arguments through unchanged inter
 
 const residual_source =
     \\const seed = 2
-    \\const Array.count = fn values => @array.length values
-    \\const count = fn (values: Array U32) => values.count
-    \\const increment = fn record => do:
+    \\const Array.count = func values => return @array.length values
+    \\const count = func (values: Array U32) => return values.count
+    \\const increment = func record => return do:
     \\  let result = record
     \\  result.value := @u32.add self 1
     \\  break result
-    \\const merge = fn left => fn right => @record.merge left right
-    \\entry const run = fn () => do:
+    \\const merge = func left => return func right => return @record.merge left right
+    \\entry const run = func () => return do:
     \\  let first = increment {value: seed, values: #[40, 42]}
     \\  let second = merge first {extra: #[43]}
     \\  break @u32.add second.value (count second.values)
@@ -1308,15 +1308,15 @@ test "body check cache owns general record update merge and concrete array metho
 
 test "body check cache owns inferred local associated requirements" {
     const source =
-        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
-        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-        \\const twice = fn value => do:
-        \\  let local = fn amount => @type.call "add" amount amount
+        \\const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\const F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right
+        \\const Array.add = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+        \\const twice = func value => return do:
+        \\  let local = func amount => return @type.call "add" amount amount
         \\  break local value
-        \\entry const unsigned = fn (value: U32) => twice value
-        \\entry const floating = fn (value: F32) => twice value
-        \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
+        \\entry const unsigned = func (value: U32) => return twice value
+        \\entry const floating = func (value: F32) => return twice value
+        \\entry const packed = func (value: U32) => return twice #[value, @u32.add value 1]
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1335,7 +1335,7 @@ test "body check cache owns inferred local associated requirements" {
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
     try parity(source, edited, 1);
-    const candidate = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    const candidate = try a.print("const Bool.add = func (left: Bool) => return func (right: Bool) => return left\n{s}", .{source});
     defer a.free(candidate);
     var candidate_fresh = try prepare(a, candidate, null);
     defer candidate_fresh.deinit(a);
@@ -1353,12 +1353,12 @@ test "body check cache owns inferred local associated requirements" {
 test "body check cache owns local result directed requirements" {
     const source =
         \\type Number is data = #Number U32
-        \\const Number.from = fn (value: U32) => #Number value
-        \\const read = fn (#Number value) => value
-        \\const convert = fn (value: U32) -> Number => do:
-        \\  let local = fn amount => @type.result "from" amount
+        \\const Number.from = func (value: U32) => return #Number value
+        \\const read = func (#Number value) => return value
+        \\const convert = func (value: U32) : Number => return do:
+        \\  let local = func amount => return @type.result "from" amount
         \\  break local value
-        \\entry const run = fn (value: U32) => read (convert value)
+        \\entry const run = func (value: U32) => return read (convert value)
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1371,7 +1371,7 @@ test "body check cache owns local result directed requirements" {
     defer expected.deinit(a);
     try compare(a, &before.bodies, inserted, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
-    const edited = try std.mem.replaceOwned(u8, a, source, "=> #Number value", "=> #Number (@u32.add value 1)");
+    const edited = try std.mem.replaceOwned(u8, a, source, "=> return #Number value", "=> return #Number (@u32.add value 1)");
     defer a.free(edited);
     var changed = try prepare(a, edited, &before.bodies);
     defer changed.deinit(a);
@@ -1388,16 +1388,16 @@ test "body check cache owns local result directed requirements" {
 
 test "body check cache relocates declared local qualification origins" {
     const source =
-        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
-        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-        \\const twice = fn value => do:
-        \\  let identity: a -> a where { type_rep a } = fn amount => amount
-        \\  let local: a -> a where { associated "add" a a a } = fn amount => @type.call "add" amount amount
+        \\const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\const F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right
+        \\const Array.add = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+        \\const twice = func value => return do:
+        \\  let identity: a -> a where { type_rep a } = func amount => return amount
+        \\  let local: a -> a where { associated "add" a a a } = func amount => return @type.call "add" amount amount
         \\  break identity (local value)
-        \\entry const unsigned = fn (value: U32) => twice value
-        \\entry const floating = fn (value: F32) => twice value
-        \\entry const packed = fn (value: U32) => twice #[value, @u32.add value 1]
+        \\entry const unsigned = func (value: U32) => return twice value
+        \\entry const floating = func (value: F32) => return twice value
+        \\entry const packed = func (value: U32) => return twice #[value, @u32.add value 1]
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1420,13 +1420,13 @@ test "body check cache relocates declared local qualification origins" {
 test "body check cache declines large local requirement receipts without changing results" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
-    try source.appendSlice(a, "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst seed = 2\nconst many = fn (value: U32) => do:\n");
+    try source.appendSlice(a, "const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right\nconst seed = 2\nconst many = func (value: U32) => return do:\n");
     for (0..256) |index| {
-        const local = try a.print("  let local{d} = fn amount => @type.call \"add\" (@type.call \"add\" amount amount) amount\n", .{index});
+        const local = try a.print("  let local{d} = func amount => return @type.call \"add\" (@type.call \"add\" amount amount) amount\n", .{index});
         defer a.free(local);
         try source.appendSlice(a, local);
     }
-    try source.appendSlice(a, "  break @u32.add value seed\nentry const run = fn (value: U32) => many value\n");
+    try source.appendSlice(a, "  break @u32.add value seed\nentry const run = func (value: U32) => return many value\n");
     var before = try prepare(a, source.items, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("many") == null);
@@ -1443,9 +1443,9 @@ test "body check cache declines large local requirement receipts without changin
 
 test "body check cache local qualification routes require exact bounded source clauses" {
     const source =
-        \\const untouched = fn value => value
-        \\const wrapper = fn value => do:
-        \\  let local: a -> a where { type_rep a } = fn amount => amount
+        \\const untouched = func value => return value
+        \\const wrapper = func value => return do:
+        \\  let local: a -> a where { type_rep a } = func amount => return amount
         \\  break local value
     ;
     var pool: symbols.Pool = .{};
@@ -1530,7 +1530,7 @@ fn importedAnnotationConsumer(allocator: A, concrete: bool, renamed: bool, previ
     var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, 2, .{ .builtin_catalog = true });
     defer producer.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), producer.diagnostics.len);
-    const source = "entry const hold = fn (value: Imported U32) => value\n";
+    const source = "entry const hold = func (value: Imported U32) => return value\n";
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
     var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
@@ -1575,17 +1575,17 @@ test "body check cache imported annotation recipes own original heads through al
 
 test "body check cache restores shared requirements inside local principals" {
     const source =
-        \\const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right
-        \\const F32.add = fn (left: F32) => fn (right: F32) => @f32.add left right
-        \\const Array.add = fn (left: Array U32) => fn (right: Array U32) => @array.concat left right
-        \\const twice = fn value => @type.call "add" value value
-        \\const pipeline = fn value => do:
-        \\  let local = fn amount => twice amount
-        \\  let relay = fn amount => local amount
+        \\const U32.add = func (left: U32) => return func (right: U32) => return @u32.add left right
+        \\const F32.add = func (left: F32) => return func (right: F32) => return @f32.add left right
+        \\const Array.add = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
+        \\const twice = func value => return @type.call "add" value value
+        \\const pipeline = func value => return do:
+        \\  let local = func amount => return twice amount
+        \\  let relay = func amount => return local amount
         \\  break relay value
-        \\entry const unsigned = fn (value: U32) => pipeline value
-        \\entry const floating = fn (value: F32) => pipeline value
-        \\entry const packed = fn (value: U32) => pipeline #[value, @u32.add value 1]
+        \\entry const unsigned = func (value: U32) => return pipeline value
+        \\entry const floating = func (value: F32) => return pipeline value
+        \\entry const packed = func (value: U32) => return pipeline #[value, @u32.add value 1]
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1603,16 +1603,16 @@ test "body check cache restores shared requirements inside local principals" {
     const edited = try std.mem.replaceOwned(u8, a, source, "@u32.add left right", "@u32.sub left right");
     defer a.free(edited);
     try parity(source, edited, 1);
-    const added = try a.print("const Bool.add = fn (left: Bool) => fn (right: Bool) => left\n{s}", .{source});
+    const added = try a.print("const Bool.add = func (left: Bool) => return func (right: Bool) => return left\n{s}", .{source});
     defer a.free(added);
     try parity(source, added, 5);
-    const unqualified = try std.mem.replaceOwned(u8, a, source, "fn value => @type.call \"add\" value value", "fn value => value");
+    const unqualified = try std.mem.replaceOwned(u8, a, source, "func value => return @type.call \"add\" value value", "func value => return value");
     defer a.free(unqualified);
     try parity(source, unqualified, 5);
 }
 
 test "body check cache Foreign arrow receipts survive allocation failures and interface changes" {
-    const source = "const invoke = fn (host: U32 -> U32 ! {Foreign}) => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\n";
+    const source = "const invoke = func (host: U32 -> U32 ! {Foreign}) => return host 42\nentry const run = func (host: U32 -> U32 ! {Foreign}) => return invoke host\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("invoke") != null);
@@ -1630,26 +1630,26 @@ test "body check cache Foreign arrow receipts survive allocation failures and in
     const edited = try std.mem.replaceOwned(u8, a, source, "host 42", "host 43");
     defer a.free(edited);
     try parity(source, edited, 1);
-    const pure = "const invoke = fn (host: U32 -> U32 ! {}) => host 42\nentry const run = fn () => invoke (fn (value: U32) => value)\n";
+    const pure = "const invoke = func (host: U32 -> U32 ! {}) => return host 42\nentry const run = func () => return invoke (func (value: U32) => return value)\n";
     try parity(source, pure, 2);
-    const operation = "effect Read: Unit -> U32\nconst invoke = fn (host: Unit -> U32 ! {Read}) => host ()\n";
+    const operation = "effect Read: Unit -> U32\nconst invoke = func (host: Unit -> U32 ! {Read}) => return host ()\n";
     var ordinary = try prepare(a, operation, null);
     defer ordinary.deinit(a);
     try std.testing.expect(ordinary.bodies.find("invoke") != null);
 }
 
 test "body check cache owns symbolic written Foreign arrow rows" {
-    const symbolic = "const invoke: (U32 -> U32 ! {|e}) -> U32 ! {|e} = fn host => host 42\nentry const run = fn (host: U32 -> U32 ! {Foreign}) => invoke host\n";
+    const symbolic = "const invoke: (U32 -> U32 ! {|e}) -> U32 ! {|e} = func host => return host 42\nentry const run = func (host: U32 -> U32 ! {Foreign}) => return invoke host\n";
     try parity(symbolic, symbolic, 0);
 }
 
 test "body check cache owns generic array indexing through allocation failures" {
     const source =
         \\const seed = 0
-        \\const first = fn (value: Array a) => value[seed]
-        \\entry const unsigned = fn (value: U32) => first #[value, @u32.add value 1]
-        \\entry const floating = fn (value: F32) => first #[value, @f32.add value 1.0]
-        \\entry const packed = fn (value: U32) => first #[#[value], #[@u32.add value 1]]
+        \\const first = func (value: Array a) => return value[seed]
+        \\entry const unsigned = func (value: U32) => return first #[value, @u32.add value 1]
+        \\entry const floating = func (value: F32) => return first #[value, @f32.add value 1.0]
+        \\entry const packed = func (value: U32) => return first #[#[value], #[@u32.add value 1]]
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1670,7 +1670,7 @@ test "body check cache owns generic array indexing through allocation failures" 
 }
 
 test "body check cache restores generic explicit field templates" {
-    const source = "const extract = fn value => (value).item\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
+    const source = "const extract = func value => return (value).item\nentry const run = func (value: U32) => return extract {tail: 3.0, item: value}\nentry const packed = func (value: U32) => return extract {item: #[value], head: 2}\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("extract") != null);
@@ -1684,13 +1684,13 @@ test "body check cache restores generic explicit field templates" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
-    const candidate = try a.print("const U32.item = fn (value: U32) => value\n{s}", .{source});
+    const candidate = try a.print("const U32.item = func (value: U32) => return value\n{s}", .{source});
     defer a.free(candidate);
     try parity(source, candidate, 4);
 }
 
 test "body check cache restores field requirements in local principals" {
-    const source = "const extract = fn value => do:\n  let local = fn amount => (amount).item\n  break local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: value}\nentry const packed = fn (value: U32) => extract {item: #[value], head: 2}\n";
+    const source = "const extract = func value => return do:\n  let local = func amount => return (amount).item\n  break local value\nentry const run = func (value: U32) => return extract {tail: 3.0, item: value}\nentry const packed = func (value: U32) => return extract {item: #[value], head: 2}\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("extract") != null);
@@ -1707,7 +1707,7 @@ test "body check cache restores field requirements in local principals" {
 }
 
 test "body check cache restores generic dotted templates through allocation failures" {
-    const source = "const extract = fn value => value.item.count\nconst scoped = fn value => do:\n  let local = fn amount => amount.item.count\n  break local value\nentry const run = fn (value: U32) => extract {tail: 3.0, item: {count: value, ignored: 2}}\nentry const packed = fn (value: U32) => scoped {item: {ignored: 2.0, count: #[value]}, head: 2}\n";
+    const source = "const extract = func value => return value.item.count\nconst scoped = func value => return do:\n  let local = func amount => return amount.item.count\n  break local value\nentry const run = func (value: U32) => return extract {tail: 3.0, item: {count: value, ignored: 2}}\nentry const packed = func (value: U32) => return scoped {item: {ignored: 2.0, count: #[value]}, head: 2}\n";
     var before = try prepare(a, source, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("extract") != null);
@@ -1722,25 +1722,25 @@ test "body check cache restores generic dotted templates through allocation fail
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, inserted, expected.bytes, @as(usize, 1) });
     const empty: cache.Cache = .{};
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &empty, inserted, expected.bytes, fresh.elaborations });
-    const candidate = try a.print("const U32.count = fn (value: U32) => value\n{s}", .{source});
+    const candidate = try a.print("const U32.count = func (value: U32) => return value\n{s}", .{source});
     defer a.free(candidate);
     try parity(source, candidate, 5);
 }
 
 test "body check cache owns declared field principals and qualified projected receivers through OOM" {
     const source =
-        \\const first: a -> b where { field "first" a b } = fn value => value.first
-        \\const extract = fn value => (first value).count
-        \\const scoped = fn value => do:
-        \\  let local: a -> b where { field "first" a b } = fn row => row.first
+        \\const first: a -> b where { field "first" a b } = func value => return value.first
+        \\const extract = func value => return (first value).count
+        \\const scoped = func value => return do:
+        \\  let local: a -> b where { field "first" a b } = func row => return row.first
         \\  let root = local value
         \\  break root.count
-        \\const inferred = fn value => do:
+        \\const inferred = func value => return do:
         \\  let root = value.count
         \\  break root.count
-        \\entry const run = fn (value: U32) => extract { first: { count: value, tail: 2.0 }, other: 3 }
-        \\entry const packed = fn (value: U32) => scoped { other: 2.0, first: { tail: 3, count: #[value] } }
-        \\entry const plain = fn (value: U32) => inferred { count: { count: value } }
+        \\entry const run = func (value: U32) => return extract { first: { count: value, tail: 2.0 }, other: 3 }
+        \\entry const packed = func (value: U32) => return scoped { other: 2.0, first: { tail: 3, count: #[value] } }
+        \\entry const plain = func (value: U32) => return inferred { count: { count: value } }
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1763,21 +1763,21 @@ test "body check cache owns declared field principals and qualified projected re
 test "body check cache owns if let pattern scopes and predecessor joins" {
     const source =
         \\type Maybe a is data = #None | #Some a
-        \\const choose = fn (value: Maybe U32) => do:
+        \\const choose = func (value: Maybe U32) => return do:
         \\  let result = 2
         \\  if let #Some amount = value:
         \\    result := @u32.add amount 1
         \\  else:
         \\    result := 3
         \\  break result
-        \\const pack = fn (value: Maybe (Array U32)) => do:
+        \\const pack = func (value: Maybe (Array U32)) => return do:
         \\  let result = #[2]
         \\  if let #Some amount = value:
         \\    result := amount
         \\  break result
-        \\entry const run = fn (value: U32) => choose (#Some value)
-        \\entry const empty = fn () => choose #None
-        \\entry const packed = fn (value: U32) => pack (#Some #[value])
+        \\entry const run = func (value: U32) => return choose (#Some value)
+        \\entry const empty = func () => return choose #None
+        \\entry const packed = func (value: U32) => return pack (#Some #[value])
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1801,7 +1801,7 @@ test "body check cache owns if let pattern scopes and predecessor joins" {
 test "body check cache owns statement case arm suites and level joins" {
     const source =
         \\type Tri is data = #Rise | #Fall | #Still
-        \\const choose = fn (beat: Tri) => do:
+        \\const choose = func (beat: Tri) => return do:
         \\  let count = 2
         \\  case beat of
         \\    #Rise => do:
@@ -1812,7 +1812,7 @@ test "body check cache owns statement case arm suites and level joins" {
         \\      count := 9
         \\      break ()
         \\  break count
-        \\const pack = fn (beat: Tri) => do:
+        \\const pack = func (beat: Tri) => return do:
         \\  let values = #[2]
         \\  case beat of
         \\    #Rise => do:
@@ -1821,10 +1821,10 @@ test "body check cache owns statement case arm suites and level joins" {
         \\      values[0] := 7
         \\    #Still => ()
         \\  break values
-        \\entry const run = fn (value: U32) => choose #Rise
-        \\entry const fallen = fn () => choose #Fall
-        \\entry const still = fn () => choose #Still
-        \\entry const packed = fn () => pack #Fall
+        \\entry const run = func (value: U32) => return choose #Rise
+        \\entry const fallen = func () => return choose #Fall
+        \\entry const still = func () => return choose #Still
+        \\entry const packed = func () => return pack #Fall
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1846,21 +1846,21 @@ test "body check cache owns statement case arm suites and level joins" {
 test "body check cache owns pure collection unary and value pattern recipes" {
     const source =
         \\const marker = 2
-        \\const copied = fn value => @array.identity (@array.set (@array.concat (@array.prepend (@array.append #[value] 1) 2) (@array.fill 2 value)) 0 value)
-        \\const listed = fn value => @list.from_array (@array.slice (@array.from_list (@list.append [value] value)) 0 1)
-        \\const generated = fn value => @array.generate 2 (fn (index: U32) => @u32.add value index)
-        \\const projected = fn (value: U32) => @product.get (3.0, value) 1
-        \\const negative = fn (value: F32) => -value
-        \\const selected = fn (value: U32) => do:
+        \\const copied = func value => return @array.identity (@array.set (@array.concat (@array.prepend (@array.append #[value] 1) 2) (@array.fill 2 value)) 0 value)
+        \\const listed = func value => return @list.from_array (@array.slice (@array.from_list (@list.append [value] value)) 0 1)
+        \\const generated = func value => return @array.generate 2 (func (index: U32) => return @u32.add value index)
+        \\const projected = func (value: U32) => return @product.get (3.0, value) 1
+        \\const negative = func (value: F32) => return -value
+        \\const selected = func (value: U32) => return do:
         \\  if let ^marker = value:
         \\    break 1
         \\  break 0
-        \\entry const run = fn (value: U32) => copied value
-        \\entry const scalar = fn (value: U32) => @array.get (generated value) 1
-        \\entry const count = fn (value: U32) => @list.length (listed value)
-        \\entry const pair = fn (value: U32) => projected value
-        \\entry const fraction = fn (value: F32) => negative value
-        \\entry const matched = fn (value: U32) => selected value
+        \\entry const run = func (value: U32) => return copied value
+        \\entry const scalar = func (value: U32) => return @array.get (generated value) 1
+        \\entry const count = func (value: U32) => return @list.length (listed value)
+        \\entry const pair = func (value: U32) => return projected value
+        \\entry const fraction = func (value: F32) => return negative value
+        \\entry const matched = func (value: U32) => return selected value
     ;
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1895,7 +1895,7 @@ test "body check cache preserves monomorphic nominal Core ordering on a third re
         \\type Walk is data = #Walk {yaw: F32}
         \\type Flight is data = #Flight {vy: F32}
         \\type Robot is data = #Walking Walk | #Flying Flight
-        \\const encode = fn (current: Robot) => case current of
+        \\const encode = func (current: Robot) => return case current of
         \\  #Walking walk => #[walk.yaw, marker]
         \\  #Flying flight => #[flight.vy, marker]
         \\entry const schema = marker
@@ -1928,11 +1928,11 @@ const implementation_mixed =
     \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
     \\impl ScalarSource : Source U32 = {
     \\  type Item = U32,
-    \\  const first = fn value => @u32.add value 1,
+    \\  const first = func value => return @u32.add value 1,
     \\}
-    \\const unrelated = fn (value: U32) => @u32.add value 7
-    \\const selected = fn (value: U32) => Source.first value
-    \\entry const run = fn (value: U32) => @u32.add (unrelated value) (selected value)
+    \\const unrelated = func (value: U32) => return @u32.add value 7
+    \\const selected = func (value: U32) => return Source.first value
+    \\entry const run = func (value: U32) => return @u32.add (unrelated value) (selected value)
 ;
 
 test "body check cache mixed implementation module retains independent receipts" {
@@ -1972,7 +1972,7 @@ test "body check cache closed implementation calls reconstruct current proofs" {
 }
 
 test "body check cache generic contract callers retain residual requirements" {
-    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "const selected = fn (value: U32)", "const selected = fn value");
+    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "const selected = func (value: U32)", "const selected = func value");
     defer a.free(source);
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -1989,7 +1989,7 @@ test "body check cache generic contract callers retain residual requirements" {
 }
 
 test "body check cache local contract requirements own current declaration identities" {
-    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "fn (value: U32) => Source.first value", "fn (value: U32) => do:\n  let forward = fn item => Source.first item\n  break forward value");
+    const source = try std.mem.replaceOwned(u8, a, implementation_mixed, "func (value: U32) => return Source.first value", "func (value: U32) => return do:\n  let forward = func item => return Source.first item\n  break forward value");
     defer a.free(source);
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -2043,12 +2043,12 @@ const implementation_annotations =
     \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
     \\impl ScalarSource : Source U32 = {
     \\  type Item = U32,
-    \\  const first = fn value => @u32.add value 1,
+    \\  const first = func value => return @u32.add value 1,
     \\}
-    \\const identity = fn (value: Alias) -> Alias => value
-    \\const read = fn (#First value) => value
-    \\const selected = fn (value: U32) => Source.first value
-    \\entry const run = fn (value: U32) => @u32.add (read (identity (#First value))) (selected value)
+    \\const identity = func (value: Alias) : Alias => return value
+    \\const read = func (#First value) => return value
+    \\const selected = func (value: U32) => return Source.first value
+    \\entry const run = func (value: U32) => return @u32.add (read (identity (#First value))) (selected value)
 ;
 
 test "body check cache mixed implementation annotations own independent nominal recipes" {
@@ -2091,7 +2091,7 @@ test "body check cache mixed implementation aliases revoke same layout identity 
     // replaying an old alias recipe after it names the other nominal owner.
     const retarget = try std.mem.replaceOwned(u8, a, implementation_annotations, "type Alias = First", "type Alias = Second");
     defer a.free(retarget);
-    const reader = try std.mem.replaceOwned(u8, a, retarget, "fn (#First value)", "fn (#Second value)");
+    const reader = try std.mem.replaceOwned(u8, a, retarget, "func (#First value)", "func (#Second value)");
     defer a.free(reader);
     const changed = try std.mem.replaceOwned(u8, a, reader, "identity (#First value)", "identity (#Second value)");
     defer a.free(changed);
@@ -2102,7 +2102,7 @@ test "body check cache mixed implementation aliases revoke same layout identity 
 }
 
 test "body check cache mixed implementation aliases own selected associated type authority" {
-    const typed = try std.mem.replaceOwned(u8, a, implementation_mixed, "const unrelated = fn (value: U32)", "const unrelated = fn (value: Scalar)");
+    const typed = try std.mem.replaceOwned(u8, a, implementation_mixed, "const unrelated = func (value: U32)", "const unrelated = func (value: Scalar)");
     defer a.free(typed);
     const source = try std.mem.concat(a, u8, &.{ "type Scalar = Source.Item U32\n", typed });
     defer a.free(source);
@@ -2126,7 +2126,7 @@ test "body check cache mixed implementation aliases own selected associated type
 test "body check cache mixed implementation keeps ordinary associated selection receipts" {
     const associated = try std.mem.replaceOwned(u8, a, implementation_mixed, "@u32.add value 7", "@type.call \"twice\" value 7");
     defer a.free(associated);
-    const source = try std.mem.concat(a, u8, &.{ "const U32.twice = fn (value: U32) => fn (delta: U32) => @u32.add value delta\n", associated });
+    const source = try std.mem.concat(a, u8, &.{ "const U32.twice = func (value: U32) => return func (delta: U32) => return @u32.add value delta\n", associated });
     defer a.free(source);
     var before = try prepare(a, source, null);
     defer before.deinit(a);
@@ -2152,7 +2152,7 @@ test "body check cache mixed implementation keeps ordinary associated selection 
 
 const loop_source =
     \\const seed = 2
-    \\const sum = fn (limit: U32) -> U32 => do:
+    \\const sum = func (limit: U32) : U32 => return do:
     \\  let total = seed
     \\  for index in 0..limit:
     \\    for 0..2:
@@ -2166,7 +2166,7 @@ const loop_source =
     \\    let total = 42
     \\    break
     \\  break total
-    \\entry const run = fn (limit: U32) -> U32 => sum limit
+    \\entry const run = func (limit: U32) : U32 => return sum limit
 ;
 
 test "body check cache relocates ordinary loop carries and lexical break snapshots through OOM" {
@@ -2175,7 +2175,7 @@ test "body check cache relocates ordinary loop carries and lexical break snapsho
     const receipt = before.bodies.find("sum") orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(@as(usize, 4), receipt.loops.?.carries.len);
     try std.testing.expectEqual(@as(usize, 2), receipt.loops.?.exits.len);
-    const changed = "const earlier = fn (value: F32) -> F32 => @f32.add value 1.0\n" ++ loop_source;
+    const changed = "const earlier = func (value: F32) : F32 => return @f32.add value 1.0\n" ++ loop_source;
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
     var result = try compile(a, &fresh);
@@ -2183,7 +2183,7 @@ test "body check cache relocates ordinary loop carries and lexical break snapsho
     try compare(a, &before.bodies, changed, result.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, result.bytes, @as(usize, 1) });
     // Changed bounds, writes and lexical exits must elaborate normally.
-    const rewritten = "const seed = 2\nconst sum = fn (limit: U32) -> U32 => do:\n  let total = seed\n  for index in 1..limit:\n    total := @u32.add self index\n  break total\nentry const run = fn (limit: U32) -> U32 => sum limit\n";
+    const rewritten = "const seed = 2\nconst sum = func (limit: U32) : U32 => return do:\n  let total = seed\n  for index in 1..limit:\n    total := @u32.add self index\n  break total\nentry const run = func (limit: U32) : U32 => return sum limit\n";
     var rewritten_fresh = try prepare(a, rewritten, null);
     defer rewritten_fresh.deinit(a);
     var rewritten_result = try compile(a, &rewritten_fresh);
@@ -2205,7 +2205,7 @@ test "body check cache loop receipt publication releases every failed allocation
 
 const used_values =
     \\const seed = 2
-    \\const helper = fn (value: U32) -> U32 => do:
+    \\const helper = func (value: U32) : U32 => return do:
     \\  use initial <- @u32.add value seed
     \\  use initial
     \\  let result = initial
@@ -2214,7 +2214,7 @@ const used_values =
     \\    result := @u32.add self index
     \\    use snapshot
     \\  break result
-    \\entry const run = fn (value: U32) -> U32 => helper value
+    \\entry const run = func (value: U32) : U32 => return helper value
 ;
 
 fn captureUsedValues(allocator: A) !void {
@@ -2241,15 +2241,15 @@ const path_update_source =
     \\type Point is data = #Point { x: U32, y: U32 }
     \\type Bucket is data = #Bucket { points: Array Point }
     \\const seed = 2
-    \\const update = fn (index: U32) -> U32 => do:
+    \\const update = func (index: U32) : U32 => return do:
     \\  let bucket = #Bucket { points: #[#Point { y: 1, x: 10 }, #Point { y: 2, x: 20 }] }
     \\  let before = bucket
     \\  bucket.points[index].x := @u32.add self seed
     \\  break @u32.add before.points[index].x bucket.points[index].x
-    \\const replace = fn values => fn index => fn value => do:
+    \\const replace = func values => return func index => return func value => return do:
     \\  values[index] := value
     \\  break values
-    \\entry const run = fn (index: U32) -> U32 => update index
+    \\entry const run = func (index: U32) : U32 => return update index
 ;
 fn capturePathUpdates(allocator: A) !void {
     var output = try prepare(allocator, path_update_source, null);
@@ -2262,7 +2262,7 @@ test "body check cache restores mixed nominal Array updates and leaf self identi
     defer before.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), before.bodies.find("update").?.rebindings.len);
     try std.testing.expectEqual(@as(usize, 1), before.bodies.find("replace").?.rebindings.len);
-    const changed = "const earlier = fn (value: F32) => @f32.add value 1.0\n" ++ path_update_source;
+    const changed = "const earlier = func (value: F32) => return @f32.add value 1.0\n" ++ path_update_source;
     var fresh = try prepare(a, changed, null);
     defer fresh.deinit(a);
     var result = try compile(a, &fresh);
@@ -2274,11 +2274,11 @@ test "body check cache restores mixed nominal Array updates and leaf self identi
 
 const demanded_body_source =
     \\const seed = 2
-    \\const force = fn ~(value: U32) -> U32 => @demand value
-    \\const twice = fn (value: U32) => do:
-    \\  let delayed = fn ~(input: U32) => @u32.add (@force input) (@force input)
+    \\const force = func ~(value: U32) : U32 => return @demand value
+    \\const twice = func (value: U32) => return do:
+    \\  let delayed = func ~(input: U32) => return @u32.add (@force input) (@force input)
     \\  break delayed (@u32.add value seed)
-    \\entry const run = fn (value: U32) => @u32.add (force value) (twice value)
+    \\entry const run = func (value: U32) => return @u32.add (force value) (twice value)
 ;
 test "body check cache demand call reconstruction owns fresh and replayed suspension metadata through OOM" {
     var before = try prepare(a, demanded_body_source, null);
@@ -2295,7 +2295,7 @@ test "body check cache demand call reconstruction owns fresh and replayed suspen
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, result.bytes, @as(usize, 1) });
 }
 
-const user_row_source = "effect Read: Unit -> U32\nprivate const invoke = fn (host: Unit -> U32 ! {Read}) => host ()\nprivate const identity = fn (host: Unit -> U32 ! {Read}) => host\nentry const answer = 42\n";
+const user_row_source = "effect Read: Unit -> U32\nprivate const invoke = func (host: Unit -> U32 ! {Read}) => return host ()\nprivate const identity = func (host: Unit -> U32 ! {Read}) => return host\nentry const answer = 42\n";
 fn captureUserRows(allocator: A) !void {
     var output = try prepare(allocator, user_row_source, null);
     defer output.deinit(allocator);
@@ -2323,15 +2323,15 @@ test "body check cache user operation rows relocate and own all allocation failu
     try parity(user_row_source, signature, 2);
 }
 test "body check cache user operation rows keep open variables and static invocation recipes" {
-    const open = "effect Read: Unit -> U32\nconst invoke: (Unit -> U32 ! {Read |e}) -> U32 ! {Read |e} = fn host => host ()\nentry const answer = 42\n";
+    const open = "effect Read: Unit -> U32\nconst invoke: (Unit -> U32 ! {Read |e}) -> U32 ! {Read |e} = func host => return host ()\nentry const answer = 42\n";
     try parity(open, open, 0);
-    const invocation = "effect Read: Unit -> U32\nconst invoke = fn () => Read ()\n";
+    const invocation = "effect Read: Unit -> U32\nconst invoke = func () => return Read ()\n";
     var output = try prepare(a, invocation, null);
     defer output.deinit(a);
     try std.testing.expect(output.bodies.find("invoke") != null);
 }
 
-const static_operation_source = "effect Read: Unit -> U32\nconst seed = 2\nconst invoke = fn () => @u32.add (Read ()) seed\nentry const answer = 42\n";
+const static_operation_source = "effect Read: Unit -> U32\nconst seed = 2\nconst invoke = func () => return @u32.add (Read ()) seed\nentry const answer = 42\n";
 fn captureStaticOperation(allocator: A) !void {
     var output = try prepare(allocator, static_operation_source, null);
     defer output.deinit(allocator);
@@ -2353,7 +2353,7 @@ test "body check cache static operation calls restore current targets through al
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, captureStaticOperation, .{});
     const renamed = try std.mem.replaceOwned(u8, a, static_operation_source, "effect Read:", "effect Other:");
     defer a.free(renamed);
-    const shadowed = try a.print("const Read = fn () => 7\n{s}", .{renamed});
+    const shadowed = try a.print("const Read = func () => return 7\n{s}", .{renamed});
     defer a.free(shadowed);
     var changed_output = try prepare(a, shadowed, &before.bodies);
     defer changed_output.deinit(a);
@@ -2380,8 +2380,8 @@ fn importedUserBody(allocator: A, unit: u32, origin: cache.Digest, retarget: boo
     var producer = try check.checkModuleWithOptions(allocator, &producer_tree, &pool, &.{}, &.{}, unit, .{ .builtin_catalog = true });
     defer producer.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), producer.diagnostics.len);
-    var source: []const u8 = "const keep = fn (callback: Unit -> U32 ! {Alias.ask U32}) => callback\nentry const answer = 42\n";
-    if (static) source = "const keep = fn () => Alias.ask ()\nentry const answer = 42\n";
+    var source: []const u8 = "const keep = func (callback: Unit -> U32 ! {Alias.ask U32}) => return callback\nentry const answer = 42\n";
+    if (static) source = "const keep = func () => return Alias.ask ()\nentry const answer = 42\n";
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
     var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
@@ -2449,7 +2449,7 @@ test "body check cache static operation calls reject retargeted imported aliases
 }
 
 test "body check cache user operation rows traverse demand boundaries" {
-    const source = "effect Read: Unit -> U32\nconst force = fn ~(value: U32) => @force value\nconst invoke = fn (callback: Unit -> U32 ! {Read}) => force (callback ())\nentry const answer = 42\n";
+    const source = "effect Read: Unit -> U32\nconst force = func ~(value: U32) => return @force value\nconst invoke = func (callback: Unit -> U32 ! {Read}) => return force (callback ())\nentry const answer = 42\n";
     try parity(source, source, 0);
     const changed = try std.mem.replaceOwned(u8, a, source, "effect Read: Unit -> U32", "effect Read: Bool -> Bool");
     defer a.free(changed);
@@ -2492,8 +2492,8 @@ test "body check cache user operation rows reject unknown ambiguous and malforme
 
 test "body check cache user operation rows preserve unknown and malformed annotation diagnostics" {
     for ([_][]const u8{
-        "effect Read: Unit -> U32\nconst invoke = fn (callback: Unit -> U32 ! {Unknown}) => callback ()\n",
-        "effect Read: Unit -> U32\nconst invoke = fn (callback: Unit -> U32 ! {Read U32}) => callback ()\n",
+        "effect Read: Unit -> U32\nconst invoke = func (callback: Unit -> U32 ! {Unknown}) => return callback ()\n",
+        "effect Read: Unit -> U32\nconst invoke = func (callback: Unit -> U32 ! {Read U32}) => return callback ()\n",
     }) |source| {
         var pool: symbols.Pool = .{};
         defer pool.deinit(a);
@@ -2521,7 +2521,7 @@ const compound_loop_order =
     \\    other := @list.append other (@u32.add index 100)
     \\    earlier := if @u32.eq index 30 then values else earlier
     \\  break #Bundle {earlier: earlier, current: values, alias: values, other: other}
-    \\entry const run = fn () => @array.from_list grown.current
+    \\entry const run = func () => return @array.from_list grown.current
     \\entry const sibling = 1
 ;
 fn replayCompoundOrder(allocator: A, previous: *const cache.Cache, current: []const u8, expected: *const core.Module) !void {
@@ -2567,17 +2567,17 @@ const numeric_owner_source =
     \\const seed = 2
     \\const globals = #[seed, 13]
     \\const cursor = 0
-    \\const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = fn values => fn index => @proof.index values index
-    \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = fn values => fn index => fn proof => @array.get values index
-    \\const checked = fn (index: U32) => do:
+    \\const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
+    \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
+    \\const checked = func (index: U32) => return do:
     \\  let values = #[seed, 13]
     \\  let alias = values
     \\  let valid = witness alias index
     \\  break at values index valid
-    \\const late = fn (index: U32) => do:
+    \\const late = func (index: U32) => return do:
     \\  let valid = @proof.index globals cursor
     \\  break at globals cursor valid
-    \\entry const run = fn () => @u32.add (checked 0) (late 1)
+    \\entry const run = func () => return @u32.add (checked 0) (late 1)
 ;
 test "body check cache transports erased numeric contract operands and guards through relocation and OOM" {
     var before = try prepare(a, numeric_owner_source, null);
@@ -2598,7 +2598,7 @@ test "body check cache transports erased numeric contract operands and guards th
     try std.testing.expectEqual(fresh.proof_visits, reused.proof_visits);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2640,11 +2640,11 @@ test "body check cache revokes numeric consumers when only a positional proof op
 
 const tagged_owner_source =
     \\const seed = 2
-    \\const decorate = fn (value: U32) => fn () => @u32.add value seed
-    \\const outer = fn (callback: Unit -> U32) => fn () => @u32.add (callback ()) 1
+    \\const decorate = func (value: U32) => return func () => return @u32.add value seed
+    \\const outer = func (callback: Unit -> U32) => return func () => return @u32.add (callback ()) 1
     \\@[outer] @[decorate] const tagged: Unit -> U32 = 40
-    \\@[fn (value: U32) => @u32.add value 1] let started: U32 = 41
-    \\entry const run = fn () => @u32.add (tagged ()) started
+    \\@[func (value: U32) => return @u32.add value 1] let started: U32 = 41
+    \\entry const run = func () => return @u32.add (tagged ()) started
 ;
 test "body check cache retains complete ordered tag applications and their outer result through OOM" {
     var before = try prepare(a, tagged_owner_source, null);
@@ -2659,7 +2659,7 @@ test "body check cache retains complete ordered tag applications and their outer
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("const earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("const earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2671,7 +2671,7 @@ test "body check cache retains complete ordered tag applications and their outer
 const selected_scope_owner_source =
     \\const seed = 2
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
+    \\const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
     \\  let chosen = if flag then left else right
     \\  let alias = chosen
     \\  let (state, result) = do (@effect.state chosen.get chosen.set seed):
@@ -2679,7 +2679,7 @@ const selected_scope_owner_source =
     \\    break alias.get ()
     \\  break result
     \\))
-    \\entry const run = fn () => selected #True
+    \\entry const run = func () => return selected true
 ;
 test "body check cache transports selected fresh scope versions through relocation and OOM" {
     var before = try prepare(a, selected_scope_owner_source, null);
@@ -2693,7 +2693,7 @@ test "body check cache transports selected fresh scope versions through relocati
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("const earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("const earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2706,14 +2706,14 @@ const iterator_owner_source =
     \\const seed = 2
     \\type Maybe a is data = #Some a | #Nothing
     \\type Counter is data = #Counter U32
-    \\const Counter.iter = fn (cursor: Counter) => cursor
-    \\const Counter.next = fn (#Counter value) => if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
-    \\const total = fn (first: U32) => do:
+    \\const Counter.iter = func (cursor: Counter) => return cursor
+    \\const Counter.next = func (#Counter value) => return if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
+    \\const total = func (first: U32) => return do:
     \\  let result = seed
     \\  for value in #Counter first:
     \\    result := @u32.add self value
     \\  break result
-    \\entry const run = fn () => total 1
+    \\entry const run = func () => return total 1
 ;
 test "body check cache transports actual generated iterator owners through relocation and OOM" {
     var before = try prepare(a, iterator_owner_source, null);
@@ -2728,7 +2728,7 @@ test "body check cache transports actual generated iterator owners through reloc
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("const earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("const earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2741,12 +2741,12 @@ const resolver_owner_source =
     \\const seed = 2
     \\type Iteration [state,result] is data = #Continue state | #Done result
     \\type Maybe value is data = #Some value | #Nothing
-    \\const monad = fn constructor => @do.monad constructor
-    \\const Maybe.pure = fn value => #Some value
-    \\const Maybe.bind = fn candidate => fn next => case candidate of
+    \\const monad = func constructor => return @do.monad constructor
+    \\const Maybe.pure = func value => return #Some value
+    \\const Maybe.bind = func candidate => return func next => return case candidate of
     \\  #Some value => next value
     \\  #Nothing => #Nothing
-    \\const Maybe.iterate = fn initial => fn step => do:
+    \\const Maybe.iterate = func initial => return func step => return do:
     \\  let state = initial
     \\  for ever:
     \\    use candidate <- step state
@@ -2755,7 +2755,7 @@ const resolver_owner_source =
     \\    let #Some (#Continue next) = candidate else:
     \\      break #Nothing
     \\    state := next
-    \\const sequence = fn forwarded => do (monad Maybe):
+    \\const sequence = func forwarded => return do (monad Maybe):
     \\  let total = seed
     \\  for outer in 0..2:
     \\    for inner in 0..2:
@@ -2767,7 +2767,7 @@ const resolver_owner_source =
     \\        break @u32.add total 20
     \\      break
     \\  break total
-    \\entry const answer = fn () => case sequence #True of
+    \\entry const answer = func () => return case sequence true of
     \\  #Some value => value
     \\  #Nothing => 0
 ;
@@ -2786,7 +2786,7 @@ test "body check cache transports resolver joins completions and nested iterate 
     const ordinary = fresh.elaborations - before.bodies.bodies.items.len + 1;
     try compare(a, &before.bodies, changed, expected.bytes, ordinary);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compareChecked, .{ &before.bodies, changed, &fresh.module, ordinary });
-    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2806,8 +2806,8 @@ fn compareChecked(allocator: A, previous: *const cache.Cache, source: []const u8
 const local_generation_owner_source =
     \\const seed = 2
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-    \\  let choose = fn () => if flag then left else right
+    \\const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+    \\  let choose = func () => return if flag then left else right
     \\  let chosen = choose ()
     \\  let alias = chosen
     \\  let (state, result) = do (@effect.state chosen.get chosen.set seed):
@@ -2815,7 +2815,7 @@ const local_generation_owner_source =
     \\    break alias.get ()
     \\  break result
     \\))
-    \\entry const run = fn () => selected #True
+    \\entry const run = func () => return selected true
 ;
 test "body check cache transports local invocation generation owners and fresh ordinals through relocation and OOM" {
     var before = try prepare(a, local_generation_owner_source, null);
@@ -2830,7 +2830,7 @@ test "body check cache transports local invocation generation owners and fresh o
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compare, .{ &before.bodies, changed, expected.bytes, @as(usize, 1) });
-    const inserted = try a.print("const earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("const earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);
@@ -2841,15 +2841,15 @@ test "body check cache transports local invocation generation owners and fresh o
 
 const task_view_owner_source =
     \\const seed = 2
-    \\const partition = fn (owner: unique (Array U32)) => do:
-    \\  let (owner, result) = @task.split owner ((0, 2), (2, 4)) (fn views => do:
+    \\const partition = func (owner: unique (Array U32)) => return do:
+    \\  let (owner, result) = @task.split owner ((0, 2), (2, 4)) (func views => return do:
     \\    let (left, right) = views
-    \\    break @task.scope (fn group => do:
-    \\      let first = @task.spawn group (fn () => @u32.add seed (@task.read left 0))
-    \\      let second = @task.spawn group (fn () => @task.read right 0)
+    \\    break @task.scope (func group => return do:
+    \\      let first = @task.spawn group (func () => return @u32.add seed (@task.read left 0))
+    \\      let second = @task.spawn group (func () => return @task.read right 0)
     \\      break @u32.add (@task.join first) (@task.join second)))
     \\  break result
-    \\entry const view = fn (owner: unique (Array U32)) => partition owner
+    \\entry const view = func (owner: unique (Array U32)) => return partition owner
 ;
 test "body check cache transports actual task view binding versions through relocation and OOM" {
     var before = try prepare(a, task_view_owner_source, null);
@@ -2864,7 +2864,7 @@ test "body check cache transports actual task view binding versions through relo
     defer expected.deinit(a);
     try compare(a, &before.bodies, changed, expected.bytes, 1);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compareChecked, .{ &before.bodies, changed, &fresh.module, @as(usize, 1) });
-    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = fn (unrelated: F32) => unrelated\n{s}", .{changed});
+    const inserted = try a.print("type Earlier is data = #Earlier F32\nconst earlier = func (unrelated: F32) => return unrelated\n{s}", .{changed});
     defer a.free(inserted);
     var fresh_inserted = try prepare(a, inserted, null);
     defer fresh_inserted.deinit(a);

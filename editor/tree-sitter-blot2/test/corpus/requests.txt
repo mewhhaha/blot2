@@ -2,8 +2,8 @@
 Request handler clauses and contextual complete
 ==================
 
-const complete = fn complete => complete
-const checked = fn computation => do:
+const complete = func complete => return complete
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -21,6 +21,7 @@ const checked = fn computation => do:
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (identifier)
   (function_binding
     (binding_keyword)
@@ -29,6 +30,7 @@ const checked = fn computation => do:
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (keyword)
   (separator)
   (keyword)
@@ -58,7 +60,7 @@ const checked = fn computation => do:
 Closed generic operation and completion break
 ==================
 
-const counted = fn computation => do:
+const counted = func computation => return do:
   for request in @requests computation:
     case request of
       effect (Reader.ask U32) () =>
@@ -77,6 +79,7 @@ const counted = fn computation => do:
     (lambda_header
       (identifier)))
   (operator)
+  (keyword)
   (keyword)
   (separator)
   (keyword)

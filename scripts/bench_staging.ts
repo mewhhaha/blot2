@@ -48,7 +48,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const entrySource = (seed: number) =>
           `import {generated, build} from "./producer"
 const first = build ${seed}
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let value = 100
   let left = ${staged ? "@code.emit generated" : "generated"}
   let right = ${staged ? "@code.emit first" : "first"}
@@ -57,11 +57,11 @@ entry const answer = fn () => do:
 `;
         const library = (value: number, step: number) =>
           `opaque type Token = U32
-const make = fn () => #Token ${value}
-const read = fn (value: Token) => case value of
+const make = func () => return #Token ${value}
+const read = func (value: Token) => return case value of
   #Token number => number
 const generated = ${staged ? "@code.quote (read (make ()))" : "read (make ())"}
-const build = fn (value: U32) => ${
+const build = func (value: U32) => return ${
             staged
               ? `@code.quote (@u32.add (@code.lift value) ${step})`
               : `@u32.add value ${step}`

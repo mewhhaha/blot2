@@ -7,9 +7,9 @@ const core = @import("../check/core.zig");
 const evaluator = @import("core_eval.zig");
 const backend = @import("../backend/core_backend.zig");
 const sources = [_][]const u8{
-    "entry const answer=do:\n  let minus=fn left=>fn right=>@u32.sub left right\n  break 50 `minus` 8\n",
-    "infixl 60 (+)=combine\nconst combine=fn left=>fn right=>@u32.sub left right\nentry const answer=do:\n  let combine=fn left=>fn right=>@u32.add left right\n  break 50+8\n",
-    "infixl 60 `combine`\nconst combine=fn left=>fn right=>@u32.add left right\nentry const answer=do:\n  let combine=fn left=>fn right=>@u32.sub left right\n  break 50 `combine` 8\n",
+    "entry const answer=do:\n  let minus=func left=> return func right=> return @u32.sub left right\n  break 50 `minus` 8\n",
+    "infixl 60 (+)=combine\nconst combine=func left=> return func right=> return @u32.sub left right\nentry const answer=do:\n  let combine=func left=> return func right=> return @u32.add left right\n  break 50+8\n",
+    "infixl 60 `combine`\nconst combine=func left=> return func right=> return @u32.add left right\nentry const answer=do:\n  let combine=func left=> return func right=> return @u32.sub left right\n  break 50 `combine` 8\n",
 };
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     var tokens = try lexer.lex(allocator, source);

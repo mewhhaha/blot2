@@ -6,14 +6,14 @@ const executable = Deno.args[0] ??
   new URL("../zig-out-dev/bin/blotc", import.meta.url).pathname;
 const library = (value: number) =>
   `type Item = exists [a] => (a, a -> U32)
-const read: Item -> U32 = fn item => unpack item as [a] value in (@product.get value 1) (@product.get value 0)
-const generated = @code.quote (fn (flag: Bool) -> Item ! {} => if flag then pack [U32] (${value}, fn number => number) as Item else pack [Bool] (flag, fn truth => if truth then 9 else 7) as Item)
-const sealed = @code.quote (pack [U32] (${value}, fn number => number) as Item)
+const read: Item -> U32 = func item => return unpack item as [a] value in (@product.get value 1) (@product.get value 0)
+const generated = @code.quote (func (flag: Bool) : Item ! {} => return if flag then pack [U32] (${value}, func number => return number) as Item else pack [Bool] (flag, func truth => return if truth then 9 else 7) as Item)
+const sealed = @code.quote (pack [U32] (${value}, func number => return number) as Item)
 const shape = (@code.describe sealed).result
 `;
 const consumer = `import {generated, read, shape} from "./producer"
 const same = @descriptor.same shape shape
-entry const answer = fn (flag: Bool) => read ((@code.emit generated) flag)
+entry const answer = func (flag: Bool) => return read ((@code.emit generated) flag)
 `;
 async function observe(bytes: Uint8Array<ArrayBuffer>, expected: number) {
   for (const asynchronous of [false, true]) {

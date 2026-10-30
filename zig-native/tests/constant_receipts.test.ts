@@ -15,8 +15,8 @@ const grown: List U32 = do:
     values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
   break values
 const later = @list.prepend (@list.append grown 99) 100
-entry const first = fn () => @array.from_list grown
-entry const following = fn () => @array.from_list later
+entry const first = func () => return @array.from_list grown
+entry const following = func () => return @array.from_list later
 entry const sibling = ${sibling}
 `;
   const options = {
@@ -98,14 +98,14 @@ Deno.test("constant receipts retain qualified scalar and owning graphs with fres
   const source = (seed = "2", element = "40") =>
     `const seed = ${seed}
 const expensive: U32 where { type_rep U32 } = do:
-  let local = fn value => value
+  let local = func value => return value
   break ${expression}
 const collection = #[${
       Array.from({ length: 80 }, () => `@u32.add 0 (@u32.add 0 ${element})`)
         .join(", ")
     }]
-entry const run = fn (value: U32) => @u32.add value (@u32.add expensive seed)
-entry const owning = fn () => collection
+entry const run = func (value: U32) => return @u32.add value (@u32.add expensive seed)
+entry const owning = func () => return collection
 `;
   const options = { executable, entry, prelude: null };
   const retained = await createZigProjectCompiler(options);
@@ -181,7 +181,7 @@ Deno.test("subfloor scalars stay ordinary while compound graphs replay exact val
     compound = `@u32.add 1 (${compound})`;
   }
   const source = (sibling: number) =>
-    `const small = ${small}\nconst compound = #[{ value: ${compound} }]\nentry const run = fn () => small\nentry const count = fn () => @array.length compound\nentry const sibling = ${sibling}\n`;
+    `const small = ${small}\nconst compound = #[{ value: ${compound} }]\nentry const run = func () => return small\nentry const count = func () => return @array.length compound\nentry const sibling = ${sibling}\n`;
   const options = {
     executable,
     entry,
@@ -241,7 +241,7 @@ Deno.test("enclosing constant member judgments retain exact executed authority i
   const library = "";
   await Deno.writeTextFile(
     prelude,
-    library + "\nconst Array.count = fn values => @array.length values\n",
+    library + "\nconst Array.count = func values => return @array.length values\n",
   );
   const source = (
     sibling = "1",
@@ -264,10 +264,10 @@ Deno.test("enclosing constant member judgments retain exact executed authority i
     if (alias) prefix = "const alias: Array U32 = #[]\n";
     return {
       [prelude]:
-        `${library}\nconst seed = ${seed}\nconst Array.count = fn values => ${method}\n`,
+        `${library}\nconst seed = ${seed}\nconst Array.count = func values => return ${method}\n`,
       [entry]: `${prefix}entry const warm: U32 = #[].count
 entry const enclosing: U32 = ${expression}
-entry const run = fn () => enclosing
+entry const run = func () => return enclosing
 entry const sibling = ${sibling}
 `,
     };
@@ -361,13 +361,13 @@ Deno.test("compound receipts preserve ready nominal aliases, captured callbacks 
     return `data Box = #Box { value: U32 }
 const seed = ${seed}
 const ready = #Box { value: seed }
-${qualifier}const warmed = fn () => ready.value
+${qualifier}const warmed = func () => return ready.value
 const compound = do:
   let cost = ${cost}
-  break { first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost ${delta}) }
-entry const run = fn (value: U32) => compound.callback value
-entry const answer = fn () => compound.first.value
-entry const count = fn () => @array.length compound.values
+  break { first: ready, second: ready, values: #[ready, ready], answer: cost, callback: func (value: U32) => return @u32.add value (@u32.add cost ${delta}) }
+entry const run = func (value: U32) => return compound.callback value
+entry const answer = func () => return compound.first.value
+entry const count = func () => return @array.length compound.values
 entry const sibling = ${sibling}
 `;
   };
@@ -460,13 +460,13 @@ const grown = do:
   break #Bundle { earlier: earlier, current: values, alias: values, other: other, answer: seed }
 const later = @list.prepend (@list.append grown.current 99) 100
 const branched = @list.append grown.earlier 200
-entry const first = fn () => @array.from_list grown.current
-entry const alias = fn () => @array.from_list grown.alias
-entry const old = fn () => @array.from_list grown.earlier
-entry const other = fn () => @array.from_list grown.other
-entry const following = fn () => @array.from_list later
-entry const branch = fn () => @array.from_list branched
-entry const answer = fn () => grown.answer
+entry const first = func () => return @array.from_list grown.current
+entry const alias = func () => return @array.from_list grown.alias
+entry const old = func () => return @array.from_list grown.earlier
+entry const other = func () => return @array.from_list grown.other
+entry const following = func () => return @array.from_list later
+entry const branch = func () => return @array.from_list branched
+entry const answer = func () => return grown.answer
 entry const sibling = ${sibling}
 `;
   try {
@@ -582,15 +582,15 @@ Deno.test("receipt closure templates preserve deferred global and capture edits 
   ) => `
 const global = ${global}
 const capture = ${capture}
-const delayed = fn ~(value: U32) => @demand value
-const named = fn (value: U32) => @u32.add (delayed value) (@u32.add global ${body})
+const delayed = func ~(value: U32) => return @demand value
+const named = func (value: U32) => return @u32.add (delayed value) (@u32.add global ${body})
 const saved = do:
   let cost = ${cost}
   let captured = capture
-  break { named: named, anonymous: fn (value: U32) => @u32.add (delayed value) (@u32.add global ${delta}), captured: fn (value: U32) => @u32.add (delayed value) (@u32.add cost captured) }
-entry const run_named = fn (value: U32) => saved.named value
-entry const run_anonymous = fn (value: U32) => saved.anonymous value
-entry const run_captured = fn (value: U32) => saved.captured value
+  break { named: named, anonymous: func (value: U32) => return @u32.add (delayed value) (@u32.add global ${delta}), captured: func (value: U32) => return @u32.add (delayed value) (@u32.add cost captured) }
+entry const run_named = func (value: U32) => return saved.named value
+entry const run_anonymous = func (value: U32) => return saved.anonymous value
+entry const run_captured = func (value: U32) => return saved.captured value
 entry const sibling = ${sibling}
 `;
   try {
@@ -685,15 +685,15 @@ Deno.test("ordinary compound receipts remain reusable beside erased generative h
   }
   const source = (sibling: string, answer: number) => `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag then left else right
-const hidden = fn () => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-  let picked = choose #True left right
-  let deferred = fn () => picked.get ()
+const choose = func flag => return func (left: State a) => return func (right: State a) => return if flag then left else right
+const hidden = func () => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+  let picked = choose true left right
+  let deferred = func () => return picked.get ()
   break ${answer}
 ))
 const expensive = #[{answer: ${expression}}]
-entry const value = fn () => (@array.get expensive 0).answer
-entry const selected = fn () => hidden ()
+entry const value = func () => return (@array.get expensive 0).answer
+entry const selected = func () => return hidden ()
 entry const sibling = ${sibling}
 `;
   try {
@@ -764,12 +764,12 @@ Deno.test("constant solver judgments preserve mapped rows archives recovery and 
   const entry = `${directory}/main.blot`;
   const library = `${directory}/helpers.blot`;
   const archive = `${directory}/helpers.blotdep`;
-  const helper = "const identity = fn value => value\n";
+  const helper = "const identity = func value => return value\n";
   const source = (seed = "2", answer = "35") => `
 import {identity} from "./helpers"
 const seed = ${seed}
 const answer = do:
-  let callback = fn () => ${answer}
+  let callback = func () => return ${answer}
   let generic = identity
   let nested = {callback, value: generic 7}
   let selected: U32 where { type_rep U32 } = nested.callback ()
@@ -777,7 +777,7 @@ const answer = do:
   for index in 0..256:
     cost := @u32.add self 1
   break {selected, cost, value: nested.value}
-entry const run = fn () => @u32.add answer.selected (@u32.add answer.cost answer.value)
+entry const run = func () => return @u32.add answer.selected (@u32.add answer.cost answer.value)
 entry const unrelated = seed
 `;
   try {
@@ -822,7 +822,7 @@ entry const unrelated = seed
           [
             "4",
             "36",
-            "const identity = fn (value: U32) => @u32.add value 1\n",
+            "const identity = func (value: U32) => return @u32.add value 1\n",
             false,
           ],
           ["2", "35", helper, false],
@@ -917,13 +917,13 @@ Deno.test("immutable package witnesses dictionaries and proof temporaries retain
     let cost = value;
     for (let index = 0; index < 80; index++) cost = `@u32.add 1 (${cost})`;
     return `type Render a is contract = { const show: a -> U32 }
-impl Number : Render U32 = { const show = fn value => @u32.add value ${increment} }
+impl Number : Render U32 = { const show = func value => return @u32.add value ${increment} }
 type Item = exists [a] where { Render a } => a
 const packet = pack [U32] (${cost}) as Item
 const alias = packet
 const packets = #[packet, alias]
-const read = fn (item: Item) => unpack item as [a] value in Render.show value
-const result = fn () => @u32.add (read packet) (read (@array.get packets 1))
+const read = func (item: Item) => return unpack item as [a] value in Render.show value
+const result = func () => return @u32.add (read packet) (read (@array.get packets 1))
 `;
   };
   const consumer = (seed = "2", limit = "1") =>
@@ -933,7 +933,7 @@ const limit = ${limit}
 const checked = do:
   let valid = @proof.lt 0 limit
   break 0
-entry const run = fn () => result ()
+entry const run = func () => return result ()
 entry const unrelated = @u32.add seed checked
 `;
   try {

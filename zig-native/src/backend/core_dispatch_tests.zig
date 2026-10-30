@@ -10,10 +10,10 @@ const a = std.testing.allocator;
 const source =
     \\infixl 60 (+) = _fixity_add
     \\type Point is data = #Point { x: U32 }
-    \\const Point.add = fn (left: Point) => fn (right: U32) => @u32.add left.x right
-    \\const combine = fn left => fn right => left + right
-    \\entry const run = fn (value: U32) -> U32 => combine (#Point { x: value }) 22
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
+    \\const combine = func left => return func right => return left + right
+    \\entry const run = func (value: U32) : U32 => return combine (#Point { x: value }) 22
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 const Fixture = struct {
     tree: ast.Tree,
@@ -85,10 +85,10 @@ test "literal type calls retain arbitrary associated member identities without s
     var fixture = try Fixture.initSource(
         \\infixl 60 (+) = _fixity_add
         \\type Point is data = #Point { x: U32 }
-        \\const Point.merge = fn (left: Point) => fn (right: U32) => @u32.add left.x right
-        \\const combine = fn left => fn right => @type.call "merge" left right
-        \\entry const run = fn (value: U32) -> U32 => combine (#Point { x: value }) 22
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const Point.merge = func (left: Point) => return func (right: U32) => return @u32.add left.x right
+        \\const combine = func left => return func right => return @type.call "merge" left right
+        \\entry const run = func (value: U32) : U32 => return combine (#Point { x: value }) 22
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     const generic = fixture.binding("combine");
     var module = try fixture.lower(a);

@@ -6,12 +6,12 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const local = fn (value: a) => @effect.scope (fn (s: State a) => do:
+const local = func (value: a) => return @effect.scope (func (s: State a) => return do:
   let (state, result) = do (@effect.state s.get s.set value):
     break s.get ()
   break result
 )
-const pair = fn (value: a) => @effect.scope (fn (left: State a) => @effect.scope (fn (right: State a) => do:
+const pair = func (value: a) => return @effect.scope (func (left: State a) => return @effect.scope (func (right: State a) => return do:
   let (outer, result) = do (@effect.state left.get left.set value):
     use nested <- do (@effect.state right.get right.set value):
       use a <- left.get ()
@@ -24,10 +24,10 @@ const pair = fn (value: a) => @effect.scope (fn (left: State a) => @effect.scope
 `;
 const main = `
 import {local, pair} from "./library"
-entry const integer = fn () => local 7
-entry const fraction = fn () => local 1.5
-entry const integers = fn () => pair 7
-entry const fractions = fn () => pair 1.5
+entry const integer = func () => return local 7
+entry const fraction = func () => return local 1.5
+entry const integers = func () => return pair 7
+entry const fractions = func () => return pair 1.5
 `;
 
 Deno.test("symbolic scoped factories preserve source dependency and retained specialization identity", async () => {

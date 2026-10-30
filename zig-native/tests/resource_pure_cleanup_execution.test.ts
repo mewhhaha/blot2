@@ -3,18 +3,18 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `const drop: cleanup ((unique U32) -> Unit) = fn owner => do:
+const library = `const drop: cleanup ((unique U32) -> Unit) = func owner => return do:
   for index in 0..3:
     let value = index
   break ()
-const consume = fn (owner: unique U32) => drop owner
+const consume = func (owner: unique U32) => return drop owner
 `;
 const source = `import {consume} from "./cleanup"
-entry const answer = fn () => do:
-  let adapter: cleanup ((unique U32) -> Unit) = fn owner => ()
-  use owner <- @resource.acquire (fn () => 9) (fn value => ())
+entry const answer = func () => return do:
+  let adapter: cleanup ((unique U32) -> Unit) = func owner => return ()
+  use owner <- @resource.acquire (func () => return 9) (func value => return ())
   let ignored = adapter owner
-  use other <- @resource.acquire (fn () => 11) (fn value => ())
+  use other <- @resource.acquire (func () => return 11) (func value => return ())
   let result = consume other
   break 42
 `;

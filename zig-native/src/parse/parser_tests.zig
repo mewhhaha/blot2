@@ -22,8 +22,53 @@ fn clean(source: []const u8) !void {
     for (tree.spans.items) |span| try std.testing.expect(span.start <= span.end and span.end <= source.len);
 }
 
+fn stagedSurface(allocator: std.mem.Allocator) !void {
+    const source =
+        \\type Choice is data = $Some U32 | $None
+        \\const run = func value => return value
+        \\const staged = #run run 42
+        \\entry const answer = func () => return case $Some staged of
+        \\  $Some value => value
+        \\  $None => 0
+        \\entry const flag = true
+        \\const apply = func f -> x => return f $ x
+        \\const values = #[1, 2]
+        \\const linked = [1, 2]
+        \\const block = #do:
+        \\  let value = 40
+        \\  break @u32.add value 2
+        \\const qualified = $run.Some 42
+        \\const legacy_qualified = #run.Some 42
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expect(tree.has_typed_staging);
+    const body = tree.valueDecl(tree.roots.items[2]).body;
+    const run = tree.node(body);
+    try std.testing.expectEqual(ast.Tag.apply, run.tag);
+    try std.testing.expectEqualStrings("@code.evaluate", pool.get(tree.node(run.a).a));
+    const block = tree.node(tree.valueDecl(tree.roots.items[8]).body);
+    try std.testing.expectEqual(ast.Tag.apply, block.tag);
+    try std.testing.expectEqualStrings("@code.evaluate", pool.get(tree.node(block.a).a));
+    try std.testing.expectEqual(ast.Tag.block, tree.node(block.b).tag);
+    var array = false;
+    var list = false;
+    for (tree.nodes.items) |node| if (node.tag == .array) {
+        if (node.c == 0) array = true else list = true;
+    };
+    try std.testing.expect(array and list);
+}
+
+test "dollar constructors and run staging preserve list arrays and spaced dollar application through OOM" {
+    try stagedSurface(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, stagedSurface, .{});
+}
+
 test "multi-parameter lambda sugar lowers to a curried chain with the result on the final stage" {
-    const source = "const combine = fn (first: U32) (second: U32) -> U32 => @u32.add first second\n";
+    const source = "const combine = func (first: U32) -> (second: U32) : U32 => return @u32.add first second\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(std.testing.allocator);
     var tree = try parsed(std.testing.allocator, source, &pool);
@@ -39,8 +84,26 @@ test "multi-parameter lambda sugar lowers to a curried chain with the result on 
     try std.testing.expectEqual(ast.Tag.parameter, tree.node(inner.a).tag);
 }
 
+test "functions require explicit return and reject whitespace separated parameters" {
+    for ([_][]const u8{
+        "const identity = fn x => return x\n",
+        "const identity = func x => x\n",
+        "const add = func x y => return @u32.add x y\n",
+        "const typed = func (x: U32) -> U32 => return x\n",
+    }) |source| {
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(std.testing.allocator);
+        var tree = try parsed(std.testing.allocator, source, &pool);
+        defer tree.deinit(std.testing.allocator);
+        try std.testing.expect(tree.diagnostics.items.len != 0);
+    }
+    try clean("const identity = func x => return x\n");
+    try clean("const identity = func x => do:\n  return x\n");
+    try clean("const add = func x -> y => return @u32.add x y\n");
+}
+
 fn curriedParameterAllocation(allocator: std.mem.Allocator) !void {
-    const source = "const ninth = fn a b c d e f g h i => i\n";
+    const source = "const ninth = func a -> b -> c -> d -> e -> f -> g -> h -> i => return i\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     var tree = try parsed(allocator, source, &pool);
@@ -59,7 +122,7 @@ test "long curried parameter lists release fallback storage through allocation f
 
 test "return exits a function while break value finishes a do and bare break exits a loop" {
     const source =
-        \\const choose = fn flag => do:
+        \\const choose = func flag => return do:
         \\  let value = do:
         \\    if flag:
         \\      return 7
@@ -88,7 +151,7 @@ test "return exits a function while break value finishes a do and bare break exi
 }
 
 test "spread temporaries preserve the surrounding collection type" {
-    const source = "entry const main = fn (n: U32) => #[#[n], ...#[#[1]]]\n";
+    const source = "entry const main = func (n: U32) => return #[#[n], ...#[#[1]]]\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(std.testing.allocator);
     var tree = try parsed(std.testing.allocator, source, &pool);
@@ -105,12 +168,12 @@ test "spread temporaries preserve the surrounding collection type" {
 
 fn numericProofSyntax(allocator: std.mem.Allocator) !void {
     const source =
-        \\const at: (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = fn values => fn index => fn proof => @array.get values index
-        \\const bounded: (values: List U32) -> (index: U32) -> (@proof.U32Lt index (@list.length values)) -> U32 = fn values => fn index => fn proof => index
-        \\const zero: (value: U32) -> (@proof.U32Eq value 0) -> U32 = fn value => fn proof => value
-        \\const fits: (@proof.U32AddFits 4294967295 0) -> U32 = fn proof => 0
-        \\const subtracts: (@proof.U32SubFits 1 0) -> U32 = fn proof => 1
-        \\const inclusive: (@proof.U32Le 1 1) -> U32 = fn proof => 1
+        \\const at: (values: Array a) -> (index: U32) -> (@proof.Index values index) -> a = func values => return func index => return func proof => return @array.get values index
+        \\const bounded: (values: List U32) -> (index: U32) -> (@proof.U32Lt index (@list.length values)) -> U32 = func values => return func index => return func proof => return index
+        \\const zero: (value: U32) -> (@proof.U32Eq value 0) -> U32 = func value => return func proof => return value
+        \\const fits: (@proof.U32AddFits 4294967295 0) -> U32 = func proof => return 0
+        \\const subtracts: (@proof.U32SubFits 1 0) -> U32 = func proof => return 1
+        \\const inclusive: (@proof.U32Le 1 1) -> U32 = func proof => return 1
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
@@ -177,7 +240,7 @@ test "contract members preserve abstract equations signatures and ordinary predi
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, contractMemberSyntax, .{});
     for ([_][]const u8{
         "const value: U32 where { type Item = U32 } = 42\n",
-        "type Source s is contract = { const first = fn value => value }\n",
+        "type Source s is contract = { const first = func value => return value }\n",
         "type Source s is contract = { type Item x = x }\n",
     }) |source| {
         var pool: symbols.Pool = .{};
@@ -231,7 +294,7 @@ test "imports preserve aliases decoded paths and literal source spans" {
 }
 test "spark and receive lower to checked task operations with bounded syntax" {
     const source =
-        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\entry const answer = func () => return @task.scope (func group => return do:
         \\  let pending = *(work 42)
         \\  return |pending|)
     ;
@@ -250,7 +313,7 @@ test "spark and receive lower to checked task operations with bounded syntax" {
     try std.testing.expectEqual(@as(usize, 1), spawns);
     try std.testing.expectEqual(@as(usize, 1), joins);
     for ([_]struct { source: []const u8, code: ast.Code }{
-        .{ .source = "entry const value = fn () => @task.scope (fn group => do:\n  return *(work))\n", .code = .task_spark_call },
+        .{ .source = "entry const value = func () => return @task.scope (func group => return do:\n  return *(work))\n", .code = .task_spark_call },
     }) |case| {
         var rejected = try parsed(std.testing.allocator, case.source, &pool);
         defer rejected.deinit(std.testing.allocator);
@@ -262,7 +325,7 @@ test "spark and receive lower to checked task operations with bounded syntax" {
 test "spark syntax leaves task region selection to checking" {
     var pool: symbols.Pool = .{};
     defer pool.deinit(std.testing.allocator);
-    var tree = try parsed(std.testing.allocator, "const start = fn value => *(work value)\n", &pool);
+    var tree = try parsed(std.testing.allocator, "const start = func value => return *(work value)\n", &pool);
     defer tree.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
     var regions: usize = 0;
@@ -276,7 +339,7 @@ test "spark syntax leaves task region selection to checking" {
 
 test "spark binds call arguments before creating the child" {
     const source =
-        \\entry const answer = fn () => @task.scope (fn group => do:
+        \\entry const answer = func () => return @task.scope (func group => return do:
         \\  let pending = *(combine (first 1) (second 2))
         \\  return |pending|)
     ;
@@ -319,7 +382,7 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
     try clean(
         \\type Pair [a, b] is data = #Pair (a, b)
         \\type Counter a is effect = { advance: a -> a }
-        \\const run = fn (value: Pair [U32, Bool]) -> U32 => do:
+        \\const run = func (value: Pair [U32, Bool]) : U32 => return do:
         \\  let #Pair (number, flag) = value else:
         \\    break 0
         \\  if let #Some next = #Some number:
@@ -330,7 +393,7 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
         \\    if index > 3:
         \\      break
         \\  break if flag then number else 0
-        \\const handle = fn computation => do:
+        \\const handle = func computation => return do:
         \\  for request in computation:
         \\    case request of
         \\      effect (Counter.advance U32) number =>
@@ -342,7 +405,7 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
 }
 
 test "type witnesses anonymous constructor records and array arguments remain distinct" {
-    try clean("const witness = function :U32\nconst anonymous = #{ field: 2 }\nconst run = fn () => do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
+    try clean("const witness = function :U32\nconst anonymous = #{ field: 2 }\nconst run = func () => return do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
 }
 
 test "argument projections and adjacent indexes bind before application" {
@@ -382,7 +445,7 @@ test "argument projections and adjacent indexes bind before application" {
 test "qualified names intern member identities before semantic checking" {
     var pool: symbols.Pool = .{};
     defer pool.deinit(std.testing.allocator);
-    var tree = try parsed(std.testing.allocator, "const Point.add = fn left => fn right => left\nconst value = namespace.Point.add\n", &pool);
+    var tree = try parsed(std.testing.allocator, "const Point.add = func left => return func right => return left\nconst value = namespace.Point.add\n", &pool);
     defer tree.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
     try std.testing.expect(pool.lookup("Point") != null);
@@ -432,7 +495,7 @@ test "nested witness atoms stop at a diagnostic rather than overflowing the stac
 fn allocationScenario(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    var tree = try parsed(allocator, "import { answer as value } from \"./module.blot\"\ninfixl 60 (++) = combine\nentry const compute = fn (value: U32) => do:\n  let next = value ++ 2 * 3\n  if next > 0:\n    break next\n  break 0\n", &pool);
+    var tree = try parsed(allocator, "import { answer as value } from \"./module.blot\"\ninfixl 60 (++) = combine\nentry const compute = func (value: U32) => return do:\n  let next = value ++ 2 * 3\n  if next > 0:\n    break next\n  break 0\n", &pool);
     defer tree.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
 }
@@ -469,25 +532,16 @@ fn corpusDirectory(path: []const u8) !struct { files: usize, errors: usize } {
     return .{ .files = count, .errors = errors };
 }
 
-test "real examples standard library and gdev surface grammar parse completely" {
+test "repository examples and standard library surface grammar parse completely" {
     var examples = try corpusDirectory("examples");
     if (examples.files == 0) examples = try corpusDirectory("../examples");
     if (examples.files == 0) return error.SkipZigTest;
     var standard = try corpusDirectory("std");
     if (standard.files == 0) standard = try corpusDirectory("../std");
-    var game = try corpusDirectory("../gdev/packages");
-    const game_source = try corpusDirectory("../gdev/src");
-    game.files += game_source.files;
-    game.errors += game_source.errors;
-    if (game.files == 0) {
-        game = try corpusDirectory("../../gdev/packages");
-        const alternative = try corpusDirectory("../../gdev/src");
-        game.files += alternative.files;
-        game.errors += alternative.errors;
-    }
+    // External consumers migrate independently of this compiler's syntax.
+    // The default corpus must be reproducible from this repository alone.
     try std.testing.expect(examples.files >= 10 and standard.files >= 3);
-    if (game.files != 0) try std.testing.expect(game.files >= 20);
-    try std.testing.expectEqual(@as(usize, 0), examples.errors + standard.errors + game.errors);
+    try std.testing.expectEqual(@as(usize, 0), examples.errors + standard.errors);
 }
 
 test "every executable guide block parses independently" {
@@ -513,10 +567,10 @@ fn implementationSyntax(allocator: std.mem.Allocator) !void {
     const source =
         \\private impl ArraySource a : Source (Array a) where { Type_rep a } = {
         \\  type Item = a,
-        \\  const first: (Array a) -> a = fn values => @array.get values 0,
+        \\  const first: (Array a) -> a = func values => return @array.get values 0,
         \\}
         \\impl Pair (a, b) => type c : Combined (a, b) c = {}
-        \\const impl = fn impl => impl
+        \\const impl = func impl => return impl
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
@@ -558,10 +612,10 @@ test "implementation contextual headers retain explicit parameters heads prerequ
 fn usageQualifierSyntax(a: std.mem.Allocator) !void {
     const source =
         \\const unique = 1
-        \\const f: once (borrow r U32 -> shared U32) = fn x => x
-        \\const g: cleanup (unique U32 -> Unit) = fn x => ()
+        \\const f: once (borrow r U32 -> shared U32) = func x => return x
+        \\const g: cleanup (unique U32 -> Unit) = func x => return ()
         \\const h: borrow_mut r [U32] = unique
-        \\const i: many (U32 -> U32) = fn x => x
+        \\const i: many (U32 -> U32) = func x => return x
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -595,7 +649,7 @@ test "usage qualifiers own grouped arrows and loan regions without reserving val
 fn typedStagingSyntax(allocator: std.mem.Allocator) !void {
     const source =
         \\const code = 1
-        \\const descriptor = fn code => code
+        \\const descriptor = func code => return code
         \\const left: code [U32, row {}] = @code.quote 40
         \\const shape: descriptor (code [U32, row {Foreign}]) = @code.describe left
         \\type Generator = forall [row e] => code [U32, row e]
@@ -637,13 +691,13 @@ test "typed staging syntax owns result rows and descriptors without reserving va
 
 fn quantifiedPackageSyntax(a: std.mem.Allocator) !void {
     const source =
-        \\const forall = fn pack => pack
+        \\const forall = func pack => return pack
         \\type Id = forall [a] => a -> a
         \\type Borrower = forall [a, row e, region r] => borrow r a -> a ! {| e}
         \\type Item = exists [a] where { Render a } => a
         \\const make = pack [U32] 42 as Item
-        \\const read = fn item => unpack item as [a] value in Render.show value
-        \\const plain = fn unpack => unpack 1
+        \\const read = func item => return unpack item as [a] value in Render.show value
+        \\const plain = func unpack => return unpack 1
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -697,7 +751,7 @@ fn dollarApplication(allocator: std.mem.Allocator) !void {
     try std.testing.expectEqual(ast.Tag.apply, tree.node(root.a).tag);
     try std.testing.expectEqual(ast.Tag.group, tree.node(root.b).tag);
     try std.testing.expectEqual(ast.Tag.apply, tree.node(tree.node(root.b).a).tag);
-    var custom = try parsed(allocator, "infixr 0 ($) = choose\nconst choose = fn a b => a\nconst answer = 1 $ 2\n", &pool);
+    var custom = try parsed(allocator, "infixr 0 ($) = choose\nconst choose = func a -> b => return a\nconst answer = 1 $ 2\n", &pool);
     defer custom.deinit(allocator);
     try std.testing.expectEqual(@as(usize, 0), custom.diagnostics.items.len);
     try std.testing.expectEqual(ast.Tag.binary, custom.node(custom.valueDecl(custom.roots.items[2]).body).tag);
@@ -706,4 +760,38 @@ fn dollarApplication(allocator: std.mem.Allocator) !void {
 test "default dollar groups application while explicit fixities retain operator dispatch through OOM" {
     try dollarApplication(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, dollarApplication, .{});
+}
+
+test "boolean words are literal patterns and logical precedence is fixed" {
+    const source =
+        \\entry const value = true or false and false
+        \\entry const classify = func (value: Bool) => return case value of
+        \\  true => 1
+        \\  false => 0
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    const outer = tree.node(tree.valueDecl(tree.roots.items[0]).body);
+    try std.testing.expectEqual(ast.Tag.binary, outer.tag);
+    try std.testing.expectEqualStrings("or", pool.get(outer.a));
+    const inner = tree.node(outer.c);
+    try std.testing.expectEqual(ast.Tag.binary, inner.tag);
+    try std.testing.expectEqualStrings("and", pool.get(inner.a));
+    for ([_][]const u8{
+        "const and = 1\n",
+        "const or = 1\n",
+        "const true = 1\n",
+        "const false = 1\n",
+        "infixl 50 (and) = combine\n",
+        "infixl 50 (or) = combine\n",
+        "entry const value = #true\n",
+        "entry const value = $false\n",
+    }) |invalid| {
+        var rejected = try parsed(std.testing.allocator, invalid, &pool);
+        defer rejected.deinit(std.testing.allocator);
+        try std.testing.expect(rejected.diagnostics.items.len != 0);
+    }
 }

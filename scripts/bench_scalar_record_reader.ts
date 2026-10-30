@@ -14,9 +14,9 @@ const [baseline, candidate, directory] = Deno.args.map((path) => resolve(path));
 await Deno.mkdir(directory);
 const input = `${directory}/main.blot`;
 const source =
-  `const calculate = fn (args: { a: U32, b: U32, c: U32, d: U32 }) =>
+  `const calculate = func (args: { a: U32, b: U32, c: U32, d: U32 }) => return
   @u32.add (@u32.mul args.a args.b) (@u32.mul args.c args.d)
-entry const answer = fn (value: U32) => calculate { d: 4, c: 3, b: 2, a: value }
+entry const answer = func (value: U32) => return calculate { d: 4, c: 3, b: 2, a: value }
 `;
 await Deno.writeTextFile(input, source);
 const paths = [`${directory}/baseline.wasm`, `${directory}/candidate.wasm`];

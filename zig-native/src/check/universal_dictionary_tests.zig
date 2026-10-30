@@ -6,7 +6,7 @@ const check = @import("check.zig");
 const A = std.mem.Allocator;
 const source =
     \\type Render a is contract = { const show: a -> U32 }
-    \\const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
+    \\const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
 ;
 fn checkIntroduction(a: A) !void {
     var pool: symbols.Pool = .{};
@@ -59,9 +59,9 @@ test "universal predicate introductions own lexical method givens through comple
 fn checkCalls(a: A) !void {
     const text =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
-        \\entry const answer: U32 -> U32 = fn value => render value
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
+        \\entry const answer: U32 -> U32 = func value => return render value
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
@@ -86,10 +86,10 @@ test "universal predicate eliminations independently discharge caller evidence t
 fn checkImplementationGivens(a: A) !void {
     const text =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
-        \\const render: forall [a] where { Render a } => a -> U32 = fn value => Render.show value
-        \\const forward: forall [a] where { Render a } => a -> U32 = fn value => render value
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
+        \\const render: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
+        \\const forward: forall [a] where { Render a } => a -> U32 = func value => return render value
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);

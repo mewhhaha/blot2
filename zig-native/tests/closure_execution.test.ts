@@ -2,10 +2,10 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("runtime nested closures capture immutable lexical versions transitively", async () => {
   await compileAndRun(`
-const add = fn (left: U32) => fn (right: U32) => left + right
-entry const snapshot = fn (input: U32) -> U32 => do:
+const add = func (left: U32) => return func (right: U32) => return left + right
+entry const snapshot = func (input: U32) : U32 => return do:
   let saved = input
-  let nested = fn (first: U32) => fn (second: U32) => saved + first + second
+  let nested = func (first: U32) => return func (second: U32) => return saved + first + second
   saved := 0
   let partial = add input
   let inner = nested 1
@@ -18,10 +18,10 @@ entry const snapshot = fn (input: U32) -> U32 => do:
 
 Deno.test("runtime partial named and higher-order calls share generic U32 and F32 bodies", async () => {
   await compileAndRun(`
-const combine = fn left => fn right => left + right
-const apply = fn callable => fn value => callable value
-entry const integer = fn (value: U32) -> U32 => apply (combine value) 22
-entry const floating = fn (value: F32) -> F32 => apply (combine value) 1.5
+const combine = func left => return func right => return left + right
+const apply = func callable => return func value => return callable value
+entry const integer = func (value: U32) : U32 => return apply (combine value) 22
+entry const floating = func (value: F32) : F32 => return apply (combine value) 1.5
 `, guest => {
     equal(guest.call("integer", 20), 42);
     equal(guest.call("integer", 0xffffffff), 21);
@@ -32,12 +32,12 @@ entry const floating = fn (value: F32) -> F32 => apply (combine value) 1.5
 Deno.test("runtime first-class constructors and local closure pattern bindings retain typed payloads", async () => {
   await compileAndRun(`
 type Box value is data = #Box value
-entry const boxed = fn (input: U32) -> U32 => do:
+entry const boxed = func (input: U32) : U32 => return do:
   let wrap = #Box
-  let choose = fn box -> U32 => case box of
+  let choose = func box : U32 => return case box of
     #Box value => value + input
   break choose (wrap 21)
-entry const direct = fn (value: U32) -> U32 => (fn (argument: U32) => argument + 1) value
+entry const direct = func (value: U32) : U32 => return (func (argument: U32) => return argument + 1) value
 `, guest => {
     equal(guest.call("boxed", 21), 42);
     equal(guest.call("boxed", 0), 21);

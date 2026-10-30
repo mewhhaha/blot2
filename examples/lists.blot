@@ -5,6 +5,6 @@ const packed: Array U32 = #[1, 2, 3]
 const longer = [0, ...values, 4]
 const squares = [x * x | x <- longer, x > 1]
 
-entry const answer = fn () => list.fold_left U32.add 0 squares
-entry const as_array = fn () => Array.from_list longer
-entry const pairs = fn () => #[x * 10 + y | x <- values, y <- packed]
+entry const answer = func () => return list.fold_left U32.add 0 squares
+entry const as_array = func () => return Array.from_list longer
+entry const pairs = func () => return #[x * 10 + y | x <- values, y <- packed]

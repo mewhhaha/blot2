@@ -1,12 +1,26 @@
-# Guest ABI 2: numeric arrays and explicit host capabilities
+# Guest ABI: numeric arrays and explicit host capabilities
+
+The data-stack backend emits ABI **8**, including modules with scalar-only
+exports. Its manifest uses the function/constant layout described below for ABI
+2, with the version byte changed to 8. Numeric arrays cross the boundary as
+copied packets through `blot:allocate`/`blot:reset`; those functions do not own
+application pools. Ordinary `Foreign` callbacks and JSPI remain supported. ABI 8
+has no counted ownership hooks, resource adapters, cleanup schemas or language
+tasks. Hosts reject a module that combines this version with those extensions.
+Pen native metadata version 2 requires older packages to be rebuilt.
+
+During the compiler migration, ordinary programs can still emit earlier
+profiles. The sections below document those existing profiles as well as the
+shared scalar, packet and callback representation. Unconditional data-stack
+dispatch and removal of the earlier profiles remain task 120.
 
 This is the implemented host boundary. See
 [the executable host example](../examples/host_io.blot).
 
 ```blot
-entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
+entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
-  break next
+  return next
 ```
 
 ```ts
@@ -91,8 +105,8 @@ symbolic function bodies do not acquire hard-coded import indices.
 ## Copied numeric arrays
 
 ```blot
-const advance = fn (positions: Array F32) => @array.set positions 0 42.0
-const packet = fn (count: U32) => @array.fill count 0.0
+const advance = func (positions: Array F32) => return @array.set positions 0 42.0
+const packet = func (count: U32) => return @array.fill count 0.0
 ```
 
 ```ts

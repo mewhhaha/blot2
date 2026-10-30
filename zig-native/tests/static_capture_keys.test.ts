@@ -15,16 +15,16 @@ Deno.test("closure keys distinguish equal-shaped static captures and reuse compl
   };
   const declarations =
     `type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
-const identity = fn value => value
-const first = #Pack { unused: identity, selected: fn (value: U32) => value + 1 }
-const second = #Pack { unused: identity, selected: fn (value: U32) => value + 10 }
-const invoke = fn callback => callback 2
-const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
+const identity = func value => return value
+const first = #Pack { unused: identity, selected: func (value: U32) => return value + 1 }
+const second = #Pack { unused: identity, selected: func (value: U32) => return value + 10 }
+const invoke = func callback => return callback 2
+const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
   let #Pack { selected } = packed
   break selected (value + extra))
 `;
   const main = `import { first, second, capture } from "./library"
-entry const answer = fn (value: U32) => capture first value * 1000 + capture second value + 0
+entry const answer = func (value: U32) => return capture first value * 1000 + capture second value + 0
 `;
   const compiler = await createZigProjectCompiler(options);
   try {

@@ -486,7 +486,7 @@ pub fn query(a: Allocator, io: std.Io, entry: []const u8, snapshot: *inputs.Snap
 
 fn queryLaw(a: Allocator) !void {
     var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
-        .{ .path = "/editor/main.blot", .contents = "import * as lib from \"./library\"\nconst work = fn (value: F32) -> F32 => val\n" },
+        .{ .path = "/editor/main.blot", .contents = "import * as lib from \"./library\"\nconst work = func (value: F32) : F32 => return val\n" },
         .{ .path = "/editor/library.blot", .contents = "const hidden = 99\n" },
     });
     defer snapshot.deinit();
@@ -510,12 +510,12 @@ fn find(result: Result, insertion: []const u8) ?Item {
 test "editor completion follows named aliases namespace boundaries fields constructors and types" {
     const a = std.testing.allocator;
     const cases = [_]struct { text: []const u8, offered: []const u8, absent: []const u8, match: fitting.Match }{
-        .{ .text = "import { value as renamed } from \"./library\"\nconst work = fn () -> F32 => ren", .offered = "renamed", .absent = "value", .match = .exact },
-        .{ .text = "import * as lib from \"./library\"\nconst work = fn () -> F32 => lib.", .offered = "value", .absent = "lib", .match = .exact },
-        .{ .text = "type Point = { x: U32, y: F32 }\nconst work = fn (point: Point) -> F32 => point.", .offered = "y", .absent = "point", .match = .exact },
+        .{ .text = "import { value as renamed } from \"./library\"\nconst work = func () : F32 => return ren", .offered = "renamed", .absent = "value", .match = .exact },
+        .{ .text = "import * as lib from \"./library\"\nconst work = func () : F32 => return lib.", .offered = "value", .absent = "lib", .match = .exact },
+        .{ .text = "type Point = { x: U32, y: F32 }\nconst work = func (point: Point) : F32 => return point.", .offered = "y", .absent = "point", .match = .exact },
         .{ .text = "import * as lib from \"./library\"\nconst work: lib.Choice = #lib.", .offered = "Chosen", .absent = "#Chosen", .match = .exact },
-        .{ .text = "const work: F = 1.0", .offered = "F32", .absent = "#False", .match = .exact },
-        .{ .text = "type U32 = F32\nconst work: U = 1", .offered = "U32", .absent = "#False", .match = .exact },
+        .{ .text = "const work: F = 1.0", .offered = "F32", .absent = "false", .match = .exact },
+        .{ .text = "type U32 = F32\nconst work: U = 1", .offered = "U32", .absent = "false", .match = .exact },
     };
     for (cases) |case| {
         var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
@@ -537,10 +537,10 @@ test "editor completion follows named aliases namespace boundaries fields constr
 
 test "module abstraction completion keeps source origins without exposing constructors or fields" {
     const a = std.testing.allocator;
-    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = fn value => #Token { secret: value }\n";
+    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = func value => return #Token { secret: value }\n";
     for ([_][]const u8{
         "import * as lib from \"./library\"\nconst work = lib.",
-        "import {Token} from \"./library\"\nconst work = fn (value: Token) => value.",
+        "import {Token} from \"./library\"\nconst work = func (value: Token) => return value.",
         "opaque type Token = U32\nconst work = To",
     }, 0..) |text, index| {
         var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
@@ -633,7 +633,7 @@ test "editor text-token queries still enforce opened project membership" {
 }
 
 fn selfLaw(a: Allocator) !void {
-    const text = "const work = fn (value: U32) => do:\n  value := @hole";
+    const text = "const work = func (value: U32) => return do:\n  value := @hole";
     var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{.{ .path = "/editor/main.blot", .contents = text }});
     defer snapshot.deinit();
     const result = try query(a, std.testing.io, "/editor/main.blot", &snapshot, "/editor/main.blot", @intCast(text.len));

@@ -208,7 +208,7 @@ export async function formatSource(source: string): Promise<string> {
         tightAfter.add(Number(node.offset));
         witness.add(Number(node.offset));
       }
-      if (node.kind === "prefix_expression") {
+      if (node.kind === "prefix_expression" || node.kind === "storage_type") {
         for (const child of nested) {
           if (child.field === "operator") tightAfter.add(Number(child.offset));
         }
@@ -275,7 +275,8 @@ export async function formatSource(source: string): Promise<string> {
         } else if (value === ".") space = !adjacent;
         else if (
           previous.text === "." || previous.text === "~" ||
-          previous.text === "#" || previous.text === "..."
+          previous.text === "#" || previous.text === "..." ||
+          (previous.text === "$" && adjacent && /^[A-Za-z_]/.test(value))
         ) space = false;
         else if (tightAfter.has(previous.start)) space = false;
         else if (tightBefore.has(token.span.start)) space = false;

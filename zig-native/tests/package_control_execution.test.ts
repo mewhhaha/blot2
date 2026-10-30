@@ -8,9 +8,9 @@ const fixture = await Deno.readTextFile(
   new URL("../fixtures/package/ordinary-control.blot", import.meta.url),
 );
 const source = `${fixture}
-entry const control = fn (seed: U32) => @u32.add (choose (loop seed)) (update seed)
-entry const requested = fn (host: U32 -> U32 ! {Foreign}) => request host
-entry const delayed = fn (host: U32 -> U32 ! {Foreign}) => demand (host 2)
+entry const control = func (seed: U32) => return @u32.add (choose (loop seed)) (update seed)
+entry const requested = func (host: U32 -> U32 ! {Foreign}) => return request host
+entry const delayed = func (host: U32 -> U32 ! {Foreign}) => return demand (host 2)
 `;
 Deno.test("portable ordinary control executes request carries patterns updates and demand once after checkpoint restart", async () => {
   const directory = await Deno.makeTempDir();

@@ -9,15 +9,15 @@ const executable = Deno.args[0] ??
 Deno.test("dynamic demand branch joins preserve first-use effects and skip traps", async () => {
   await compileAndRun(
     `
-const exclusive = fn (condition: Bool) => fn ~(value: U32) =>
+const exclusive = func (condition: Bool) => return func ~(value: U32) => return
   if condition then @demand value else @demand value
-const sequence = fn (condition: Bool) => fn ~(value: U32) =>
+const sequence = func (condition: Bool) => return func ~(value: U32) => return
   @u32.add (if condition then @demand value else 0) (@demand value)
-const skip = fn ~(value: U32) => if #False then @demand value else 42
-entry const left = fn (host: U32 -> U32 ! {Foreign}) => exclusive #True (host 21)
-entry const right = fn (host: U32 -> U32 ! {Foreign}) => exclusive #False (host 21)
-entry const repeated = fn (host: U32 -> U32 ! {Foreign}) => sequence #True (host 21)
-entry const skipped = fn (x: U32) => skip (@u32.div 1 x)
+const skip = func ~(value: U32) => return if false then @demand value else 42
+entry const left = func (host: U32 -> U32 ! {Foreign}) => return exclusive true (host 21)
+entry const right = func (host: U32 -> U32 ! {Foreign}) => return exclusive false (host 21)
+entry const repeated = func (host: U32 -> U32 ! {Foreign}) => return sequence true (host 21)
+entry const skipped = func (x: U32) => return skip (@u32.div 1 x)
 `,
     (guest) => {
       const calls: number[] = [];
@@ -43,14 +43,14 @@ entry const skipped = fn (x: U32) => skip (@u32.div 1 x)
 function body(right: boolean): string {
   let expression = "if condition then @demand value else 42";
   if (right) expression = "if condition then 42 else @demand value";
-  return `const leaf = fn (condition: Bool) => fn ~(value: U32) => ${expression}\nconst forward = fn (condition: Bool) => fn ~(value: U32) => leaf condition (@demand value)\n`;
+  return `const leaf = func (condition: Bool) => return func ~(value: U32) => return ${expression}\nconst forward = func (condition: Bool) => return func ~(value: U32) => return leaf condition (@demand value)\n`;
 }
 Deno.test("imported demand summaries follow branch moves with stable types and recover after failed revisions", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source =
-    'import { forward } from "./library"\nentry const run = fn (x: U32) => forward (@u32.eq x 0) (@u32.div 100 x)\n';
+    'import { forward } from "./library"\nentry const run = func (x: U32) => return forward (@u32.eq x 0) (@u32.div 100 x)\n';
   const options = {
     executable,
     entry,

@@ -47,16 +47,16 @@ fn explainedEmission(a: std.mem.Allocator, module: *const core.Module) !void {
 test "demand decisions report actual storage and preserve output through OOM" {
     const allocator = std.testing.allocator;
     var module = try lower(allocator,
-        \\const ignore = fn ~(value: U32) => 42
-        \\const once = fn ~(value: U32) => @demand value
-        \\const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-        \\const stored = fn ~(value: U32) => fn () => @demand value
-        \\const unknown = fn (next: ~U32 -> U32) => fn ~(value: U32) => next (@demand value)
-        \\entry const eliminated = fn (value: U32) => ignore value
-        \\entry const direct = fn (value: U32) => once value
-        \\entry const memo = fn (value: U32) => twice value
-        \\entry const escape = fn (value: U32) => (stored value) ()
-        \\entry const indirect = fn (value: U32) => unknown once value
+        \\const ignore = func ~(value: U32) => return 42
+        \\const once = func ~(value: U32) => return @demand value
+        \\const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+        \\const stored = func ~(value: U32) => return func () => return @demand value
+        \\const unknown = func (next: ~U32 -> U32) => return func ~(value: U32) => return next (@demand value)
+        \\entry const eliminated = func (value: U32) => return ignore value
+        \\entry const direct = func (value: U32) => return once value
+        \\entry const memo = func (value: U32) => return twice value
+        \\entry const escape = func (value: U32) => return (stored value) ()
+        \\entry const indirect = func (value: U32) => return unknown once value
     );
     defer module.deinit(allocator);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -74,14 +74,14 @@ test "demand decisions report actual storage and preserve output through OOM" {
 test "known callback type and row specialization releases every allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const read = fn ~value => do:
-        \\  let identity = fn item => item
-        \\  let callback = fn () => identity (@demand value)
+        \\const read = func ~value => return do:
+        \\  let identity = func item => return item
+        \\  let callback = func () => return identity (@demand value)
         \\  use first <- callback ()
         \\  use callback ()
         \\  break first
-        \\entry const integer = fn (value: U32) => read value
-        \\entry const floating = fn (value: F32) => read value
+        \\entry const integer = func (value: U32) => return read value
+        \\entry const floating = func (value: F32) => return read value
     );
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -93,17 +93,17 @@ test "known callback type and row specialization releases every allocation failu
 test "known local callbacks preserve one creation memo through aliases and loops" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const repeat = fn (count: U32) => fn ~(value: U32) => do:
-        \\  let read = fn (extra: U32) => @u32.add (@demand value) extra
+        \\const repeat = func (count: U32) => return func ~(value: U32) => return do:
+        \\  let read = func (extra: U32) => return @u32.add (@demand value) extra
         \\  let alias = read
-        \\  let second = fn (extra: U32) => @u32.add (@demand value) extra
+        \\  let second = func (extra: U32) => return @u32.add (@demand value) extra
         \\  let total = 0
         \\  for i in 0..count:
         \\    use left <- alias i
         \\    use right <- second i
         \\    total := @u32.add self (@u32.add left right)
         \\  break total
-        \\entry const run = fn (count: U32) => repeat count 21
+        \\entry const run = func (count: U32) => return repeat count 21
     );
     defer module.deinit(a);
     var admitted = false;
@@ -122,7 +122,7 @@ test "known local callbacks preserve one creation memo through aliases and loops
 test "local memo proof admits structured loops and aliases without mutating Core" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const sum = fn (count: U32) => fn ~(value: U32) => do:
+        \\const sum = func (count: U32) => return func ~(value: U32) => return do:
         \\  let first = value
         \\  let second = first
         \\  let total = 0
@@ -132,7 +132,7 @@ test "local memo proof admits structured loops and aliases without mutating Core
         \\    else:
         \\      total := @u32.add self (@demand first)
         \\  break total
-        \\entry const run = fn (count: U32) => sum count 21
+        \\entry const run = func (count: U32) => return sum count 21
     );
     defer module.deinit(a);
     var admitted = false;
@@ -150,9 +150,9 @@ test "local memo proof admits structured loops and aliases without mutating Core
 test "local memo structured proof retains conservative escape and provider fallback" {
     const a = std.testing.allocator;
     for ([_][]const u8{
-        "const delay = fn ~(value: U32) => do:\n  break value\nentry const run = 42\n",
-        "const keep = fn ~(value: U32) => { callback: fn () => @demand value }\nentry const run = 42\n",
-        "type Tick is effect = { read: Unit -> U32 }\nconst scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 1)):\n  break @demand value\nentry const run = 42\n",
+        "const delay = func ~(value: U32) => return do:\n  break value\nentry const run = 42\n",
+        "const keep = func ~(value: U32) => return { callback: func () => return @demand value }\nentry const run = 42\n",
+        "type Tick is effect = { read: Unit -> U32 }\nconst scoped = func ~(value: U32) => return do (@effect.provider Tick.read (func () => return 1)):\n  break @demand value\nentry const run = 42\n",
     }) |source| {
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -167,9 +167,9 @@ test "local memo structured proof exhaustion preserves ordinary emission" {
     const a = std.testing.allocator;
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
-    try text.appendSlice(a, "const many = fn ~(value: U32) => do:\n  let total = @demand value\n");
+    try text.appendSlice(a, "const many = func ~(value: U32) => return do:\n  let total = @demand value\n");
     for (0..100) |_| try text.appendSlice(a, "  total := @u32.add self 1\n");
-    try text.appendSlice(a, "  break total\nentry const run = fn (value: U32) => many value\n");
+    try text.appendSlice(a, "  break total\nentry const run = func (value: U32) => return many value\n");
     var module = try lower(a, text.items);
     defer module.deinit(a);
     for (module.bodies) |*body| try std.testing.expect(demand.Plan.init(&module, body) == null);
@@ -181,12 +181,12 @@ test "local memo structured proof exhaustion preserves ordinary emission" {
 test "local memo List cleanup snapshots and managed loop roots release every allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const walk = fn (rows: List U32) => fn ~(value: U32) => do:
+        \\const walk = func (rows: List U32) => return func ~(value: U32) => return do:
         \\  let total = 0
         \\  for row in rows:
         \\    total := @u32.add self (@u32.add row (@demand value))
         \\  break total
-        \\const cache = fn (count: U32) => fn ~(value: Array U32) => do:
+        \\const cache = func (count: U32) => return func ~(value: Array U32) => return do:
         \\  let i = 0
         \\  for ever:
         \\    let pressure = @array.fill 1024 i
@@ -194,8 +194,8 @@ test "local memo List cleanup snapshots and managed loop roots release every all
         \\    i := @u32.add (@array.get pressure 0) 1
         \\    if @u32.eq i count:
         \\      break cached
-        \\entry const lists = fn (count: U32) => walk (@list.fill count 42) 21
-        \\entry const arrays = fn (count: U32) => cache count #[21, 22, 23]
+        \\entry const lists = func (count: U32) => return walk (@list.fill count 42) 21
+        \\entry const arrays = func (count: U32) => return cache count #[21, 22, 23]
     );
     defer module.deinit(a);
     var admitted: usize = 0;
@@ -212,13 +212,13 @@ test "local memo List cleanup snapshots and managed loop roots release every all
 test "demand forwarding bounds nested proofs and preserves immutable Core under allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-        \\const forward = fn ~(value: U32) => twice (@demand value)
-        \\const many = fn ~(value: U32) => @u32.add (forward (@demand value)) (twice (@demand value))
-        \\const ignore = fn ~(value: U32) => 42
-        \\const discard = fn ~(value: U32) => ignore (@demand value)
-        \\entry const run = fn (value: U32) => many value
-        \\entry const skip = fn (value: U32) => discard (@u32.div 1 value)
+        \\const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+        \\const forward = func ~(value: U32) => return twice (@demand value)
+        \\const many = func ~(value: U32) => return @u32.add (forward (@demand value)) (twice (@demand value))
+        \\const ignore = func ~(value: U32) => return 42
+        \\const discard = func ~(value: U32) => return ignore (@demand value)
+        \\entry const run = func (value: U32) => return many value
+        \\entry const skip = func (value: U32) => return discard (@u32.div 1 value)
     );
     defer module.deinit(a);
     var forwarded: usize = 0;
@@ -236,7 +236,7 @@ test "demand forwarding bounds nested proofs and preserves immutable Core under 
 test "recursive demand forwarding declines its bounded inline proof" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\const recursive: ~U32 -> U32 = fn ~(value: U32) => recursive (@demand value)
+        \\const recursive: ~U32 -> U32 = func ~(value: U32) => return recursive (@demand value)
         \\entry const unused = 42
     );
     defer module.deinit(a);
@@ -249,11 +249,11 @@ test "recursive demand forwarding declines its bounded inline proof" {
 test "recursive demand headers preserve inferred curried and mutual forwarding" {
     const a = std.testing.allocator;
     for ([_][]const u8{
-        "const recursive = fn ~(value: U32) => recursive (@demand value)\nentry const unused = 42\n",
-        "const recursive = fn ~value => recursive (@demand value)\nentry const unused = 42\n",
-        "const recursive = fn (count: U32) => fn ~(value: U32) => if @u32.eq count 0 then @demand value else recursive (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => recursive count 42\n",
-        "const even = fn (count: U32) => fn ~value => if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd = fn (count: U32) => fn ~value => if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => even count 42\n",
-        "const even: U32 -> ~U32 -> U32 = fn count => fn ~value => if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd: U32 -> ~U32 -> U32 = fn count => fn ~value => if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => even count 42\n",
+        "const recursive = func ~(value: U32) => return recursive (@demand value)\nentry const unused = 42\n",
+        "const recursive = func ~value => return recursive (@demand value)\nentry const unused = 42\n",
+        "const recursive = func (count: U32) => return func ~(value: U32) => return if @u32.eq count 0 then @demand value else recursive (@u32.sub count 1) (@demand value)\nentry const run = func (count: U32) => return recursive count 42\n",
+        "const even = func (count: U32) => return func ~value => return if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd = func (count: U32) => return func ~value => return if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = func (count: U32) => return even count 42\n",
+        "const even: U32 -> ~U32 -> U32 = func count => return func ~value => return if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd: U32 -> ~U32 -> U32 = func count => return func ~value => return if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = func (count: U32) => return even count 42\n",
     }) |source| {
         var module = try lower(a, source);
         defer module.deinit(a);
@@ -263,7 +263,7 @@ test "recursive demand headers preserve inferred curried and mutual forwarding" 
 
 fn recursiveHeaderOwnership(a: std.mem.Allocator) !void {
     var module = try lower(a,
-        \\const recursive = fn ~value => recursive (@demand value)
+        \\const recursive = func ~value => return recursive (@demand value)
         \\entry const unused = 42
     );
     defer module.deinit(a);

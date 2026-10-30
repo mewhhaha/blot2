@@ -8,12 +8,12 @@ const header = "type Public a is contract = {type_rep a}\n";
 for (const usedContract of [false, true]) {
   const body = "opaque type Token = U32\n" +
     (usedContract
-      ? "const keep: a -> a where {Public a} = fn value => value\n"
+      ? "const keep: a -> a where {Public a} = func value => return value\n"
       : "") +
     (usedContract
-      ? "const make: U32 -> Token = fn value => #Token (keep value)\n"
-      : "const make: U32 -> Token = fn value => #Token value\n") +
-    "const read: Token -> U32 = fn (#Token value) => value\n";
+      ? "const make: U32 -> Token = func value => return #Token (keep value)\n"
+      : "const make: U32 -> Token = func value => return #Token value\n") +
+    "const read: Token -> U32 = func (#Token value) => return value\n";
   const initial = header + body;
   const variants = [
     initial,
@@ -34,11 +34,11 @@ for (const usedContract of [false, true]) {
         await Deno.writeTextFile(producer, initial);
         await Deno.writeTextFile(
           directory + "/bridge.blot",
-          'import {make, read} from "./tokens"\nexport {Public} from "./tokens"\nconst consume: U32 -> U32 = fn value => read (make value)\n',
+          'import {make, read} from "./tokens"\nexport {Public} from "./tokens"\nconst consume: U32 -> U32 = func value => return read (make value)\n',
         );
         await Deno.writeTextFile(
           entry,
-          'import {Public, consume} from "./bridge"\nentry const answer: U32 -> U32 = fn value => consume value\n',
+          'import {Public, consume} from "./bridge"\nentry const answer: U32 -> U32 = func value => return consume value\n',
         );
         const packed = await new Deno.Command(executable, {
           args: ["dependencies", entry, bundle, "--prelude", "none"],

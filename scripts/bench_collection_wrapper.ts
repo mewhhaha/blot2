@@ -16,8 +16,8 @@ const entry = `${directory}/main.blot`;
 const source = `
 import * as array from "std/array"
 const replace = array.replace
-const wrapped = fn index value values => replace index value values
-entry const update = fn count => do:
+const wrapped = func index -> value -> values => return replace index value values
+entry const update = func count => return do:
   let values = array.fill count 0
   for index in 0..count:
     values := wrapped index (index + 1) values

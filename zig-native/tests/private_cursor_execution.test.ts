@@ -27,8 +27,8 @@ Deno.test("private packed cursor versions preserve every row width and raw F32 o
       }
       await compileAndRun(
         `
-entry const run = fn (count: U32) => do:
-  let rows = @list.generate count (fn i => ${value})
+entry const run = func (count: U32) => return do:
+  let rows = @list.generate count (func i => return ${value})
   let cursor = @list.cursor rows
   let total = 0.0
   for i in 0..count:
@@ -36,7 +36,7 @@ entry const run = fn (count: U32) => do:
     total := @f32.add self (${sum})
     cursor := @cursor.advance self
   break total
-entry const probe = fn (seed: U32) => #[seed]
+entry const probe = func (seed: U32) => return #[seed]
 `,
         (guest) => {
           for (const count of [0, 1, 14, 15, 16, 243, 244, 245, 1000]) {
@@ -64,8 +64,8 @@ entry const probe = fn (seed: U32) => #[seed]
 Deno.test("private cursor carriers root actual collections across pressure and keep old forks", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
-  let values = @list.generate 1000 (fn i => {x: i, y: @u32.add i 8192})
+entry const run = func (count: U32) => return do:
+  let values = @list.generate 1000 (func i => return {x: i, y: @u32.add i 8192})
   let cursor = @list.cursor values
   let original = cursor
   let right = @cursor.advance original
@@ -80,7 +80,7 @@ entry const run = fn (count: U32) => do:
     cursor := @cursor.advance self
     right := @cursor.advance self
     index := @u32.add self 1
-entry const probe = fn (seed: U32) => #[seed]
+entry const probe = func (seed: U32) => return #[seed]
 `,
     (guest) => {
       for (const count of [0, 1, 120, 121, 122, 243, 500, 999]) {
@@ -102,14 +102,14 @@ entry const probe = fn (seed: U32) => #[seed]
 Deno.test("published packed cursors and nested advances keep heap snapshot semantics", async () => {
   await compileAndRun(
     `
-entry const run = fn (count: U32) => do:
-  let values = @list.generate 600 (fn i => {x: i, bits: 8192})
+entry const run = func (count: U32) => return do:
+  let values = @list.generate 600 (func i => return {x: i, bits: 8192})
   let first = @list.cursor values
   let cursor = first
   for index in 0..count:
     cursor := @cursor.advance self
   let readers = #[first, cursor]
-  let selected = fn () => (@cursor.value cursor).x
+  let selected = func () => return (@cursor.value cursor).x
   let index = 0
   for ever:
     if @u32.eq index 32:
@@ -134,8 +134,8 @@ entry const run = fn (count: U32) => do:
 Deno.test("private cursor snapshots survive JSPI suspension rejection and rebind", async () => {
   await compileAndRun(
     `
-entry const run = fn (host: U32 -> U32 ! {Foreign}) => do:
-  let values = @list.generate 600 (fn i => {x: i, y: @u32.add i 8192})
+entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
+  let values = @list.generate 600 (func i => return {x: i, y: @u32.add i 8192})
   let cursor = @list.cursor values
   let original = cursor
   let total = 0

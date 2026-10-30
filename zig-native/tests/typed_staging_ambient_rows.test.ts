@@ -12,16 +12,16 @@ const generated = @code.quote (do:
   break @u32.add first 2)
 `;
 const source = `import {Read, plain, generated} from "./producer"
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return do:
   use ignored <- host 0
-  let provider = @effect.provider Read (fn () => host 40)
+  let provider = @effect.provider Read (func () => return host 40)
   break do provider:
     break @code.emit generated
-entry const pure = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const pure = func (host: U32 -> U32 ! {Foreign}) => return do:
   use ignored <- host 0
   break @code.emit plain
 entry const checked: U32 = @code.run plain
-entry const snapshot = fn (value: U32) => #[value]
+entry const snapshot = func (value: U32) => return #[value]
 `;
 
 function hostFailure(error: unknown): boolean {

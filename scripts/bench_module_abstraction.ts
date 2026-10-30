@@ -15,53 +15,53 @@ const cases = [
     name: "scalar",
     count: 100000,
     plain:
-      "type Token = F32\nconst make: F32 -> Token = fn value => value\nconst read: Token -> F32 = fn value => value\n",
+      "type Token = F32\nconst make: F32 -> Token = func value => return value\nconst read: Token -> F32 = func value => return value\n",
     opaque:
-      "opaque type Token = F32\nconst make: F32 -> Token = fn value => #Token value\nconst read: Token -> F32 = fn (#Token value) => value\n",
+      "opaque type Token = F32\nconst make: F32 -> Token = func value => return #Token value\nconst read: Token -> F32 = func (#Token value) => return value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  break sum\n",
+      "entry const run = func (count: U32) => return do:\n  let sum = 0.0\n  for index in 0..count:\n    sum := @f32.add self (read (make (@u32.to_f32 index)))\n  break sum\n",
     expected: Math.fround(4999890432),
   },
   {
     name: "reference",
     count: 16384,
     plain:
-      "type Token = Array U32\nconst make: Array U32 -> Token = fn value => value\nconst read: Token -> Array U32 = fn value => value\n",
+      "type Token = Array U32\nconst make: Array U32 -> Token = func value => return value\nconst read: Token -> Array U32 = func value => return value\n",
     opaque:
-      "opaque type Token = Array U32\nconst make: Array U32 -> Token = fn value => #Token value\nconst read: Token -> Array U32 = fn (#Token value) => value\n",
+      "opaque type Token = Array U32\nconst make: Array U32 -> Token = func value => return #Token value\nconst read: Token -> Array U32 = func (#Token value) => return value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  break @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
+      "entry const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  break @u32.add (@array.length alias) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {
     name: "generic_record",
     count: 16384,
     plain:
-      "type Box a = { value: a }\nconst make: a -> Box a = fn value => { value }\nconst read: Box a -> a = fn box => box.value\n",
+      "type Box a = { value: a }\nconst make: a -> Box a = func value => return { value }\nconst read: Box a -> a = func box => return box.value\n",
     opaque:
-      "opaque type Box a = { value: a }\nconst make: a -> Box a = fn value => #Box { value }\nconst read: Box a -> a = fn (#Box box) => box.value\n",
+      "opaque type Box a = { value: a }\nconst make: a -> Box a = func value => return #Box { value }\nconst read: Box a -> a = func (#Box box) => return box.value\n",
     body:
-      "entry const run = fn (count: U32) => do:\n  let original = @array.generate count (fn index => index)\n  let alias = read (make original)\n  original[0] := count\n  break @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
+      "entry const run = func (count: U32) => return do:\n  let original = @array.generate count (func index => return index)\n  let alias = read (make original)\n  original[0] := count\n  break @u32.add (@u32.add (@array.length alias) alias[0]) (@array.get original (@u32.sub count 1))\n",
     expected: 32767,
   },
   {
     name: "floating_identity",
     count: 42,
     plain:
-      "type Token = F32\nconst make: F32 -> Token = fn value => value\nconst read: Token -> F32 = fn value => value\n",
+      "type Token = F32\nconst make: F32 -> Token = func value => return value\nconst read: Token -> F32 = func value => return value\n",
     opaque:
-      "opaque type Token = F32\nconst make: F32 -> Token = fn value => #Token value\nconst read: Token -> F32 = fn (#Token value) => value\n",
-    body: "entry const run = fn (value: F32) => read (make value)\n",
+      "opaque type Token = F32\nconst make: F32 -> Token = func value => return #Token value\nconst read: Token -> F32 = func (#Token value) => return value\n",
+    body: "entry const run = func (value: F32) => return read (make value)\n",
     expected: 42,
   },
   {
     name: "unsigned_identity",
     count: 42,
     plain:
-      "type Token = U32\nconst make: U32 -> Token = fn value => value\nconst read: Token -> U32 = fn value => value\n",
+      "type Token = U32\nconst make: U32 -> Token = func value => return value\nconst read: Token -> U32 = func value => return value\n",
     opaque:
-      "opaque type Token = U32\nconst make: U32 -> Token = fn value => #Token value\nconst read: Token -> U32 = fn (#Token value) => value\n",
-    body: "entry const run = fn (value: U32) => read (make value)\n",
+      "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n",
+    body: "entry const run = func (value: U32) => return read (make value)\n",
     expected: 42,
   },
 ];

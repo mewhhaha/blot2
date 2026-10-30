@@ -1,4 +1,4 @@
-const keep = fn () => fn value => fn () => value
+const keep = func () => return func value => return func () => return value
 const integer = keep () 42
 const floating = keep () 1.75
 entry const answer: Unit -> U32 = integer

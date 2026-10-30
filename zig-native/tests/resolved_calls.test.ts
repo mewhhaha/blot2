@@ -16,30 +16,30 @@ const prelude = `${repo}std/prelude.blot`;
 // by typed_path_execution.test.ts.
 const program = (offset: number) => `
 type Vec is data = #Vec U32
-const Vec.add = fn (left: Vec) => do:
+const Vec.add = func (left: Vec) => return do:
   let #Vec x = left
-  break fn (right: Vec) -> Vec => do:
+  break func (right: Vec) : Vec => return do:
     let #Vec y = right
     break #Vec (x + y + ${offset})
-const adder = fn (x: U32) => do:
-  break fn (y: U32) -> U32 => x + y + ${offset}
-const twice = fn (f: U32 -> U32) => fn (x: U32) -> U32 => f (f x)
-const shift = (fn (k: U32) => fn (y: U32) -> U32 => y + k) ${offset + 3}
+const adder = func (x: U32) => return do:
+  break func (y: U32) : U32 => return x + y + ${offset}
+const twice = func (f: U32 -> U32) => return func (x: U32) : U32 => return f (f x)
+const shift = (func (k: U32) => return func (y: U32) : U32 => return y + k) ${offset + 3}
 const try = monad Maybe
-const both = fn left => fn right => do try:
+const both = func left => return func right => return do try:
   use first <- left
   use second <- right
   break first + second
-entry const named_over = fn (v: U32) -> U32 => adder v 2
-entry const indirect = fn (v: U32) -> U32 => twice (fn (y: U32) => y + 3) v
-entry const closure_constant = fn (v: U32) -> U32 => twice shift v
-entry const operator = fn (v: U32) -> U32 => do:
+entry const named_over = func (v: U32) : U32 => return adder v 2
+entry const indirect = func (v: U32) : U32 => return twice (func (y: U32) => return y + 3) v
+entry const closure_constant = func (v: U32) : U32 => return twice shift v
+entry const operator = func (v: U32) : U32 => return do:
   let #Vec total = #Vec v + #Vec 5
   break total
-entry const resolver = fn (v: U32) -> U32 => Maybe.unwrap_or 0 (both (#Some v) (#Some 1))
-entry const captured = fn (v: U32) -> U32 => do:
-  let step = fn (y: U32) => y * 2
-  let apply = fn (g: U32 -> U32) => g v
+entry const resolver = func (v: U32) : U32 => return Maybe.unwrap_or 0 (both (#Some v) (#Some 1))
+entry const captured = func (v: U32) : U32 => return do:
+  let step = func (y: U32) => return y * 2
+  let apply = func (g: U32 -> U32) => return g v
   break apply step + adder 1 1
 `;
 Deno.test("prepared calls of every shape execute and follow edits", async () => {

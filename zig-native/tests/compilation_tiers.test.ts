@@ -8,16 +8,16 @@ Deno.test("compilation tiers and machine sharing preserve calls, captures, traps
   const executable = Deno.args[0] ??
     new URL("../zig-out/bin/blotc", import.meta.url);
   const source = (increment: number) => `
-const left = fn (value: U32) => @u32.add (@u32.mul value 3) (@u32.div value 2)
-const right = fn (value: U32) => @u32.add (@u32.mul value 3) (@u32.div value ${increment})
-const make = fn (offset: U32) => fn (value: U32) => @u32.add offset (@u32.mul value 2)
-entry const direct = fn value => @u32.add (left value) (right value)
-entry const indirect = fn (value: U32) => do:
+const left = func (value: U32) => return @u32.add (@u32.mul value 3) (@u32.div value 2)
+const right = func (value: U32) => return @u32.add (@u32.mul value 3) (@u32.div value ${increment})
+const make = func (offset: U32) => return func (value: U32) => return @u32.add offset (@u32.mul value 2)
+entry const direct = func value => return @u32.add (left value) (right value)
+entry const indirect = func (value: U32) => return do:
   let selected = if @u32.eq value 8 then left else right
   break selected value
-entry const captured = fn value => (make 1) value
-entry const other = fn value => (make 7) value
-entry const trap = fn value => @u32.div 10 value
+entry const captured = func value => return (make 1) value
+entry const other = func value => return (make 7) value
+entry const trap = func value => return @u32.div 10 value
 `;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {
@@ -74,7 +74,7 @@ entry const trap = fn value => @u32.div 10 value
             }
           }
           const invalid = await compiler.build({
-            sources: { [entry]: "entry const answer: U32 = #True\n" },
+            sources: { [entry]: "entry const answer: U32 = true\n" },
           });
           assert(!invalid.success);
           const corrected = await compiler.build({

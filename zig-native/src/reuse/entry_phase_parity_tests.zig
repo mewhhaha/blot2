@@ -11,14 +11,14 @@ const a = std.testing.allocator;
 const declarations =
     \\type Box is data = #Box U32
     \\type Tick is effect = Unit -> Unit
-    \\const Box.read: Box -> U32 ! {Tick} where {} = fn (value: Box) => value.read
+    \\const Box.read: Box -> U32 ! {Tick} where {} = func (value: Box) => return value.read
     \\
 ;
-const missing_entry = declarations ++ "entry const selected: Box -> U32 = fn value => value.read\nentry const answer = 42\n";
-const pure_entry = "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = fn (value: Box) => value.read\nentry const selected: Box -> U32 = fn value => value.read\nentry const answer = 42\n";
-const literal_entry = declarations ++ "entry const selected: Box -> U32 = fn value => 42\nentry const answer = 42\n";
-const abi_caller = declarations ++ "entry const selected: Unit -> U32 = fn () => (#Box 1).read\nentry const answer = 42\n";
-const called_entry = declarations ++ "entry const selected: Box -> U32 = fn value => value.read\nentry const answer: Unit -> U32 = fn () => selected (#Box 1)\n";
+const missing_entry = declarations ++ "entry const selected: Box -> U32 = func value => return value.read\nentry const answer = 42\n";
+const pure_entry = "type Box is data = #Box U32\nconst Box.read: Box -> U32 where {} = func (value: Box) => return value.read\nentry const selected: Box -> U32 = func value => return value.read\nentry const answer = 42\n";
+const literal_entry = declarations ++ "entry const selected: Box -> U32 = func value => return 42\nentry const answer = 42\n";
+const abi_caller = declarations ++ "entry const selected: Unit -> U32 = func () => return (#Box 1).read\nentry const answer = 42\n";
+const called_entry = declarations ++ "entry const selected: Box -> U32 = func value => return value.read\nentry const answer: Unit -> U32 = func () => return selected (#Box 1)\n";
 const generic_message = "entry `selected` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool";
 
 fn lower(source: []const u8) !core.Module {
@@ -46,8 +46,8 @@ fn missingScenario(allocator: std.mem.Allocator, module: *const core.Module) !vo
     var result = try backend.compile(allocator, &.{module.*}, 1);
     defer result.deinit(allocator);
     try std.testing.expectEqual(backend.Code.entry_type, result.diagnostic.?.code);
-    try std.testing.expectEqual(@as(u32, 152), result.diagnostic.?.span.start);
-    try std.testing.expectEqual(@as(u32, 152), result.diagnostic.?.span.end);
+    try std.testing.expectEqual(@as(u32, 161), result.diagnostic.?.span.start);
+    try std.testing.expectEqual(@as(u32, 161), result.diagnostic.?.span.end);
     try std.testing.expectEqualStrings(generic_message, result.diagnostic.?.message());
     try std.testing.expectEqual(@as(usize, 0), result.constant_steps);
     try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
@@ -125,7 +125,7 @@ test "entry phase discarded nominal attempt publishes no facts and valid caller 
     defer module.deinit(a);
     try attemptThenDemand(a, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, attemptThenDemand, .{&module});
-    for ([_][]const u8{ abi_caller, called_entry, declarations ++ "entry const ignored: Box -> U32 = fn value => 42\nentry const selected: Unit -> U32 = fn () => (#Box 1).read\n" }) |source| {
+    for ([_][]const u8{ abi_caller, called_entry, declarations ++ "entry const ignored: Box -> U32 = func value => return 42\nentry const selected: Unit -> U32 = func () => return (#Box 1).read\n" }) |source| {
         var caller = try lower(source);
         defer caller.deinit(a);
         var result = try backend.compile(a, &.{caller}, 1);
@@ -137,7 +137,7 @@ test "entry phase discarded nominal attempt publishes no facts and valid caller 
 }
 
 test "entry phase type witnesses and physical collection limits remain authoritative" {
-    var witness = try lower("type Box is data = #Box U32\nentry const selected: Box -> Bool = fn value => @type.same (@panic \"left\") (@panic \"right\")\nentry const answer = 42\n");
+    var witness = try lower("type Box is data = #Box U32\nentry const selected: Box -> Bool = func value => return @type.same (@panic \"left\") (@panic \"right\")\nentry const answer = 42\n");
     defer witness.deinit(a);
     var result = try backend.compile(a, &.{witness}, 1);
     defer result.deinit(a);
@@ -160,7 +160,7 @@ test "entry phase type witnesses and physical collection limits remain authorita
 }
 
 test "entry phase ordinary initial type failures survive unsupported nominal entry shape" {
-    const source = "type Box is data = #Box U32\nentry const selected: Box -> U32 = fn value => @u32.add 1 1.0\nentry const answer = 42\n";
+    const source = "type Box is data = #Box U32\nentry const selected: Box -> U32 = func value => return @u32.add 1 1.0\nentry const answer = 42\n";
     var tokens = try lexer.lex(a, source);
     defer tokens.deinit(a);
     var names: symbols.Pool = .{};
@@ -175,8 +175,8 @@ test "entry phase ordinary initial type failures survive unsupported nominal ent
 
 test "entry phase source identity and forward declaration order determine discarded selection" {
     const controls = [_]struct { source: []const u8, point: u32, message: []const u8 }{
-        .{ .source = "type Box is data = #Box U32\ntype Tick is effect = Unit -> Unit\nentry const selected: Box -> U32 = fn value => value.read\nconst Box.read: Box -> U32 ! {Tick} where {} = fn (value: Box) => value.read\nentry const answer = 42\n", .point = 75, .message = "entry `selected` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
-        .{ .source = "type Parcel is data = #Parcel F32\ntype Move is effect = Unit -> Unit\nentry const unpack: Parcel -> F32 = fn parcel => parcel.unpack\nconst Parcel.unpack: Parcel -> F32 ! {Move} where {} = fn (parcel: Parcel) => parcel.unpack\nentry const answer = 42\n", .point = 81, .message = "entry `unpack` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
+        .{ .source = "type Box is data = #Box U32\ntype Tick is effect = Unit -> Unit\nentry const selected: Box -> U32 = func value => return value.read\nconst Box.read: Box -> U32 ! {Tick} where {} = func (value: Box) => return value.read\nentry const answer = 42\n", .point = 75, .message = "entry `selected` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
+        .{ .source = "type Parcel is data = #Parcel F32\ntype Move is effect = Unit -> Unit\nentry const unpack: Parcel -> F32 = func parcel => return parcel.unpack\nconst Parcel.unpack: Parcel -> F32 ! {Move} where {} = func (parcel: Parcel) => return parcel.unpack\nentry const answer = 42\n", .point = 81, .message = "entry `unpack` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
     };
     for (controls) |control| {
         var module = try lower(control.source);
@@ -192,7 +192,7 @@ test "entry phase source identity and forward declaration order determine discar
 }
 
 test "source interface inference does not consume the executed expression depth budget" {
-    var module = try lower("const leaf = fn value => @u32.add value 1\nconst middle = fn value => leaf value\nentry const answer = fn (value: U32) => middle value\n");
+    var module = try lower("const leaf = func value => return @u32.add value 1\nconst middle = func value => return leaf value\nentry const answer = func (value: U32) => return middle value\n");
     defer module.deinit(a);
     var session = try eval.Session.init(a, &.{module});
     defer session.deinit();

@@ -5,14 +5,14 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = (seed: number) => `
-const a = fn value => @u32.add value ${seed}
-const b = fn value => @u32.add value 2
-const c = fn value => @u32.add value 3
-const d = fn value => @u32.add value 4
-const even: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
-const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else even (@u32.sub value 1)
-entry const run: U32 -> U32 = fn value => @u32.add (@u32.add (a value) (b value)) (@u32.add (c value) (d value))
-entry const recursive: U32 -> U32 = fn value => even value
+const a = func value => return @u32.add value ${seed}
+const b = func value => return @u32.add value 2
+const c = func value => return @u32.add value 3
+const d = func value => return @u32.add value 4
+const even: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
+const odd: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else even (@u32.sub value 1)
+entry const run: U32 -> U32 = func value => return @u32.add (@u32.add (a value) (b value)) (@u32.add (c value) (d value))
+entry const recursive: U32 -> U32 = func value => return even value
 `;
 
 Deno.test("private semantic workers preserve fresh retained edited restart Wasm and failed source diagnostics", async () => {

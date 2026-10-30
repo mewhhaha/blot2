@@ -35,7 +35,9 @@ export default grammar({
         $.forward_break,
         $.declaration_tag,
         $.constructor_reference,
+        $.dollar_constructor,
         $.constructor_marker,
+        $.staging_marker,
         $.where_clause,
         $.contract_header,
         $.implementation_header,
@@ -89,7 +91,6 @@ export default grammar({
           optional($.binding_annotation),
           alias("=", $.operator),
           choice($.lambda_header, $.grouped_lambda),
-          repeat(field("parameter", $._parameter)),
         )),
       ),
 
@@ -115,8 +116,9 @@ export default grammar({
       prec.right(
         2,
         seq(
-          "fn",
-          repeat1(field("parameter", $._parameter)),
+          "func",
+          field("parameter", $._parameter),
+          repeat(seq("->", field("parameter", $._parameter))),
         ),
       ),
 
@@ -227,7 +229,7 @@ export default grammar({
       ),
 
     // Highlight the contextual clause without treating `where` as a global
-    // keyword: `const where` and `fn where =>` remain ordinary identifiers.
+    // keyword: `const where` and `func where =>` remain ordinary identifiers.
     where_clause: ($) => prec(4, seq("where", $.braced)),
     contract_header: ($) => prec(4, seq("is", "contract", "=")),
     implementation_header: ($) =>
@@ -296,6 +298,9 @@ export default grammar({
     forward_break: (_) => seq("break", "$"),
 
     constructor_marker: (_) => prec(-1, "#"),
+    dollar_constructor: (_) =>
+      token(/\$[A-Za-z_][A-Za-z_0-9]*(\.[A-Za-z_][A-Za-z_0-9]*)*/),
+    staging_marker: (_) => token(prec(3, choice("#run", "#do"))),
     constructor_reference: ($) =>
       prec.right(
         2,
@@ -305,7 +310,7 @@ export default grammar({
             field("qualifier", choice($.identifier, $.type_identifier)),
             ".",
           )),
-          field("name", choice($.type_identifier, $.boolean)),
+          field("name", $.type_identifier),
         ),
       ),
 
@@ -359,7 +364,7 @@ export default grammar({
         /[0-9](_?[0-9])*(\.[0-9](_?[0-9])*([eE][+-]?[0-9](_?[0-9])*)?|[eE][+-]?[0-9](_?[0-9])*)/,
       ),
     integer: (_) => token(/0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*/),
-    boolean: (_) => choice("True", "False"),
+    boolean: (_) => choice("true", "false"),
     self: (_) => "self",
     intrinsic: (_) =>
       token(/@[a-z_][a-z0-9_]*(\.([a-z_][a-z0-9_]*|[A-Z][A-Za-z0-9_]*))*/),
@@ -375,7 +380,7 @@ export default grammar({
         "impl",
       ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
-    operator: (_) => choice(":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
+    operator: (_) => choice("and", "or", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(

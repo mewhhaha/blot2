@@ -17,14 +17,14 @@ hooks would not satisfy this boundary.
 ```blot
 type Reader a is effect = { ask: Unit -> a }
 
-const read_twice = fn () => do:
+const read_twice = func () => return do:
   use left <- Reader.ask U32 ()
   use right <- Reader.ask U32 ()
   break left + right
 
-const reader = @effect.provider (Reader.ask U32) (fn () => 21)
+const reader = @effect.provider (Reader.ask U32) (func () => return 21)
 
-const answer = fn () => do reader:
+const answer = func () => return do reader:
   use value <- read_twice ()
   break value
 
@@ -71,7 +71,7 @@ the function with `return value`:
 ```blot
 type Validate is effect = { check: U32 -> U32 }
 
-const checked = fn computation => do:
+const checked = func computation => return do:
   for request in @requests computation:
     case request of
       effect Validate.check value =>
@@ -81,7 +81,7 @@ const checked = fn computation => do:
       complete value =>
         break value
 
-entry const answer = fn () => checked (@computation (fn () => do:
+entry const answer = func () => return checked (@computation (func () => return do:
   use left <- Validate.check 40
   use right <- Validate.check 2
   break left + right
@@ -126,7 +126,7 @@ type State a is effect = {
   set: a -> Unit
 }
 
-const advance = fn initial => do:
+const advance = func initial => return do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) initial):
     use value <- State.get U32 ()
     use State.set U32 (value + 1)
@@ -157,15 +157,15 @@ type State a is effect = {
   set: a -> Unit
 }
 type Counter is data = #Counter U32
-const get = fn (witness: p -> a) -> a => State.get ()
-const set = fn value => State.set value
+const get = func (witness: p -> a) : a => return State.get ()
+const set = func value => return State.set value
 
-const advance = fn () => do:
+const advance = func () => return do:
   use counter <- get #Counter
   let #Counter value = counter
   break set (#Counter (value + 1))
 
-const answer = fn () => do:
+const answer = func () => return do:
   let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) advance
   break next
 ```
@@ -202,9 +202,9 @@ handwritten application World record or runtime type registry.
 
 The gdev library's `get`, `previous`, `components`, `previous_components`,
 column replacement and query functions require a unary constructor/function
-witness; use `(fn () => Idle)` for a nullary constructor. Component access
-requires `at entity action` or a query scope. Missing current components trap;
-individual `previous` falls back to the current component when no snapshot
+witness; use `(func () => return Idle)` for a nullary constructor. Component
+access requires `at entity action` or a query scope. Missing current components
+trap; individual `previous` falls back to the current component when no snapshot
 exists. Bulk `previous_components` preserves missing entries as `Nothing`, and
 bulk access masks removed entities. Queries are explicit library calls; system
 registration does not infer queries from a callback's effects.
@@ -232,7 +232,7 @@ module's only exports. The boundary accepts one scalar or numeric-array callback
 and returns a scalar or numeric array. For example:
 
 ```blot
-entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
+entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
   use next <- advance 41
   break next
 ```

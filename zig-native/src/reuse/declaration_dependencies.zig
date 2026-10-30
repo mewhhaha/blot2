@@ -150,7 +150,7 @@ const Capture = struct {
                             try self.reference(self.module.call(id).target, id);
                             try self.nodes(self.module.children(id));
                         },
-                        .task, .block, .suite, .product, .record, .array, .array_op => try self.nodes(self.module.children(id)),
+                        .task, .block, .suite, .product, .record, .array, .array_op, .storage => try self.nodes(self.module.children(id)),
                         .resource_scope, .if_value, .if_stmt, .state_provider => {
                             try self.node(n.c);
                             try self.node(n.b);

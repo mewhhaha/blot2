@@ -54,10 +54,17 @@ pub const Code = enum {
     cross_stage_authority,
     staging_budget,
 
+    storage_unsupported,
+    storage_borrow_conflict,
+    storage_escape,
+
     /// The public message. `detail` carries the producer's more specific text
     /// when it has one; a panic message is always the detail.
     pub fn message(self: Code, detail: []const u8) []const u8 {
         return switch (self) {
+            .storage_unsupported => if (detail.len != 0) detail else "This program exceeds the current scoped-storage profile",
+            .storage_borrow_conflict => if (detail.len != 0) detail else "This storage operation could invalidate a borrow",
+            .storage_escape => if (detail.len != 0) detail else "Borrowed storage cannot escape its owner",
             .const_panic => detail,
             .cycle => "Compile-time constant dependencies contain a cycle",
             .constant_fuel => "Constant evaluation exceeded its operation or nesting budget",

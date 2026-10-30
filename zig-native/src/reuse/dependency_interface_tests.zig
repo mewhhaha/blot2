@@ -18,14 +18,14 @@ const slots_api = @import("dependency_symbol_slots.zig");
 
 const producer_source =
     \\data Box a = #Box { value: a }
-    \\const Box.get = fn receiver => receiver.value
+    \\const Box.get = func receiver => return receiver.value
     \\type Cell a is effect = { get: Unit -> a, set: a -> Unit }
-    \\const identity = fn value => value
-    \\const qualified: a -> a where { type_rep a } = fn value => value
-    \\const reader = @effect.provider (Cell.get U32) (fn () => 41)
+    \\const identity = func value => return value
+    \\const qualified: a -> a where { type_rep a } = func value => return value
+    \\const reader = @effect.provider (Cell.get U32) (func () => return 41)
 ;
 const consumer_source =
-    \\entry const answer: Unit -> U32 = fn () => do reader:
+    \\entry const answer: Unit -> U32 = func () => return do reader:
     \\  use value <- Cell.get U32 ()
     \\  break @u32.add (qualified (identity (#Box { value: value }).get)) 1
 ;
@@ -82,11 +82,11 @@ test "frozen principal imports share exact ordinary scheme and catalog rules" {
 const prelude_source = @import("fixtures").source("dependency-fixtures/prelude.blot");
 fn rankPublication(a: std.mem.Allocator) !void {
     const bytes = try artifact(a,
-        \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = fn identity => fn value => (identity value, identity (@u32.to_f32 value))
+        \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = func identity => return func value => return (identity value, identity (@u32.to_f32 value))
     );
     defer a.free(bytes);
     var compiled = try consume(a, bytes,
-        \\entry const answer: U32 -> U32 = fn value => @product.get (two (fn item => item) value) 0
+        \\entry const answer: U32 -> U32 = func value => return @product.get (two (func item => return item) value) 0
     );
     defer compiled.deinit(a);
     try std.testing.expect(compiled.diagnostic == null);
@@ -100,8 +100,8 @@ test "portable identity publication owns every producer and consumer allocation 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rankPublication, .{});
 }
 const rank_identity_source =
-    \\const id: forall [a] => a -> a = fn value => value
-    \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = fn identity => fn value => (identity value, identity (@u32.to_f32 value))
+    \\const id: forall [a] => a -> a = func value => return value
+    \\const two: (forall [a] => a -> a) -> U32 -> (U32, F32) = func identity => return func value => return (identity value, identity (@u32.to_f32 value))
 ;
 
 test "portable identity binder owners reject ordinal sort and distinct owner reuse" {
@@ -175,22 +175,22 @@ const key: format.Key = .{ .compiler = @as([32]u8, @splat(1)), .settings = @as([
 
 const rank_array_source =
     \\effect Hidden: Unit -> Unit
-    \\const hidden = fn () => Hidden ()
-    \\const id: forall [a] => a -> a = fn value => value
-    \\const array: (forall [a] => a -> a) -> Array U32 -> Array U32 = fn identity => fn values => identity values
-    \\const floating: (forall [a] => a -> a) -> Array F32 -> Array F32 = fn identity => fn values => identity values
-    \\const list: (forall [a] => a -> a) -> List U32 -> List U32 = fn identity => fn values => identity values
-    \\const floating_list: (forall [a] => a -> a) -> List F32 -> List F32 = fn identity => fn values => identity values
+    \\const hidden = func () => return Hidden ()
+    \\const id: forall [a] => a -> a = func value => return value
+    \\const array: (forall [a] => a -> a) -> Array U32 -> Array U32 = func identity => return func values => return identity values
+    \\const floating: (forall [a] => a -> a) -> Array F32 -> Array F32 = func identity => return func values => return identity values
+    \\const list: (forall [a] => a -> a) -> List U32 -> List U32 = func identity => return func values => return identity values
+    \\const floating_list: (forall [a] => a -> a) -> List F32 -> List F32 = func identity => return func values => return identity values
 ;
 test "portable numeric collection identity owns witnesses after producer teardown" {
     const a = std.testing.allocator;
     const bytes = try artifact(a, rank_array_source);
     defer a.free(bytes);
     var compiled = try consume(a, bytes,
-        \\entry const answer = fn (value: U32) => array id #[value, 42]
-        \\entry const fraction = fn (value: F32) => floating (fn item => item) #[value, 2.5]
-        \\entry const listed = fn (value: U32) => @array.from_list (list id [value, 42])
-        \\entry const listed_fraction = fn (value: F32) => @array.from_list (floating_list (fn item => item) [value, 2.5])
+        \\entry const answer = func (value: U32) => return array id #[value, 42]
+        \\entry const fraction = func (value: F32) => return floating (func item => return item) #[value, 2.5]
+        \\entry const listed = func (value: U32) => return @array.from_list (list id [value, 42])
+        \\entry const listed_fraction = func (value: F32) => return @array.from_list (floating_list (func item => return item) [value, 2.5])
     );
     defer compiled.deinit(a);
     try std.testing.expect(compiled.diagnostic == null);
@@ -299,9 +299,9 @@ test "compiled generic prelude imports after every frontend owner is released" {
     const bytes = try artifact(a, prelude_source);
     defer a.free(bytes);
     for ([_][]const u8{
-        "entry const answer: Unit -> U32 = fn () => 40 + 2\n",
-        "entry const answer: Unit -> F32 = fn () => 40.0 + 2.5\n",
-        "entry const answer: Unit -> U32 = fn () => (fn value => value) 42\n",
+        "entry const answer: Unit -> U32 = func () => return 40 + 2\n",
+        "entry const answer: Unit -> F32 = func () => return 40.0 + 2.5\n",
+        "entry const answer: Unit -> U32 = func () => return (func value => return value) 42\n",
     }) |source| {
         var compiled = try consume(a, bytes, source);
         defer compiled.deinit(a);
@@ -314,7 +314,7 @@ test "compiled generic prelude imports after every frontend owner is released" {
 
 test "duplicate dictionary admission leaves caller symbols and artifact unchanged" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "const alpha=fn value=>value\nconst zebra=fn value=>value\n");
+    const bytes = try artifact(a, "const alpha=func value=> return value\nconst zebra=func value=> return value\n");
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
     defer format.deinit(a, &frozen);
@@ -340,7 +340,7 @@ test "duplicate dictionary admission leaves caller symbols and artifact unchange
 }
 
 fn freezeScenario(allocator: std.mem.Allocator) !void {
-    const bytes = try artifact(allocator, "const identity=fn value=>value\nconst qualified: a -> a where {type_rep a}=fn value=>value\n");
+    const bytes = try artifact(allocator, "const identity=func value=> return value\nconst qualified: a -> a where {type_rep a}=func value=> return value\n");
     defer allocator.free(bytes);
 }
 
@@ -368,16 +368,16 @@ fn relinkScenario(allocator: std.mem.Allocator, bytes: []const u8) !void {
 
 test "relink publication is atomic through every allocation failure" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "const identity=fn value=>value\n");
+    const bytes = try artifact(a, "const identity=func value=> return value\n");
     defer a.free(bytes);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, relinkScenario, .{bytes});
 }
 
 test "frozen import preserves closed explicit obligations instead of erasing proof" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "const qualified: a -> a where {type_rep a, associated \"missing\" Bool Bool Bool}=fn value=>value\n");
+    const bytes = try artifact(a, "const qualified: a -> a where {type_rep a, associated \"missing\" Bool Bool Bool}=func value=> return value\n");
     defer a.free(bytes);
-    var compiled = try consume(a, bytes, "entry const answer: Unit -> U32=fn()=>qualified 42\n");
+    var compiled = try consume(a, bytes, "entry const answer: Unit -> U32=func()=> return qualified 42\n");
     defer compiled.deinit(a);
     try std.testing.expect(compiled.diagnostic == null);
     try std.testing.expect(compiled.compiled.diagnostic != null);
@@ -396,9 +396,9 @@ test "loaded dependency principal Core and rows remain immutable across distinct
     const before = try format.encode(a, key, frozen);
     defer a.free(before);
     for ([_][]const u8{
-        "entry const answer: Unit -> U32 = fn () => identity (40 + 2)\n",
-        "entry const answer: Unit -> F32 = fn () => identity (40.0 + 2.5)\n",
-        "entry const answer: Unit -> U32 = fn () => do:\n  let #Some value = #Some 42 else:\n    break 0\n  break value\n",
+        "entry const answer: Unit -> U32 = func () => return identity (40 + 2)\n",
+        "entry const answer: Unit -> F32 = func () => return identity (40.0 + 2.5)\n",
+        "entry const answer: Unit -> U32 = func () => return do:\n  let #Some value = #Some 42 else:\n    break 0\n  break value\n",
     }) |source| {
         var compiled = try consumer_api.compile(a, source, &pool, &frozen.modules[0]);
         defer compiled.deinit(a);
@@ -412,7 +412,7 @@ test "loaded dependency principal Core and rows remain immutable across distinct
 
 test "shared symbol slots relocate once and conflicting type roles are rejected" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "data Pair = #Pair {x: U32,y: U32}\nconst identity=fn value=>value\n");
+    const bytes = try artifact(a, "data Pair = #Pair {x: U32,y: U32}\nconst identity=func value=> return value\n");
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
     defer format.deinit(a, &frozen);
@@ -440,7 +440,7 @@ test "shared symbol slots relocate once and conflicting type roles are rejected"
 
 test "artifact provenance and dictionary failures stay explicit" {
     const a = std.testing.allocator;
-    const source = "const identity=fn value=>value\n";
+    const source = "const identity=func value=> return value\n";
     const bytes = try artifact(a, source);
     defer a.free(bytes);
     var changed = key;
@@ -451,7 +451,7 @@ test "artifact provenance and dictionary failures stay explicit" {
     }
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
     defer format.deinit(a, &frozen);
-    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, "const identity=fn value=>42\n", "std/prelude.blot"));
+    try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, "const identity=func value=> return 42\n", "std/prelude.blot"));
     try std.testing.expectError(error.InvalidArtifact, admission.validatePrelude(a, &frozen, source, "different/prelude.blot"));
     frozen.modules[0].interface.bindings[1].scheme.variables = .{ .start = std.math.maxInt(u32), .len = 1 };
     try std.testing.expectError(error.InvalidArtifact, validation.validate(&frozen.modules[0].interface, frozen.symbols.len, 1));
@@ -459,7 +459,7 @@ test "artifact provenance and dictionary failures stay explicit" {
 
 test "empty and Unicode dictionary values remain exact while builtin and source units stay distinct" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "const empty=fn()=>@panic \"\"\nconst unicode=fn()=>@panic \"π😀\"\nconst identity=fn value=>value\n");
+    const bytes = try artifact(a, "const empty=func()=> return @panic \"\"\nconst unicode=func()=> return @panic \"π😀\"\nconst identity=func value=> return value\n");
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
     defer format.deinit(a, &frozen);
@@ -472,14 +472,14 @@ test "empty and Unicode dictionary values remain exact while builtin and source 
     try std.testing.expectEqual(@as(u32, 0), frozen.modules[0].interface.graph.operations[1].identity.unit);
     try std.testing.expectEqual(@as(u32, 0), frozen.modules[0].core.types.operations[1].identity.unit);
     try std.testing.expectEqual(@as(u32, 2), frozen.modules[0].core.unit);
-    var compiled = try consumer_api.compile(a, "entry const answer:Unit->U32=fn()=>identity 42\n", &pool, &frozen.modules[0]);
+    var compiled = try consumer_api.compile(a, "entry const answer:Unit->U32=func()=> return identity 42\n", &pool, &frozen.modules[0]);
     defer compiled.deinit(a);
     try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
 }
 
 test "principal type operation and pattern cycles decline before import" {
     const a = std.testing.allocator;
-    const source = "data Box a=#Box {value:a}\ntype Named {input, output} is effect = input -> output\nconst identity=fn value=>value\n";
+    const source = "data Box a=#Box {value:a}\ntype Named {input, output} is effect = input -> output\nconst identity=func value=> return value\n";
     const bytes = try artifact(a, source);
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
@@ -515,12 +515,12 @@ test "fresh cached consumers release every owner on success rejection and alloca
     const bytes = try artifact(a, producer_source);
     defer a.free(bytes);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, consumerScenario, .{ bytes, consumer_source });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, consumerScenario, .{ bytes, "entry const answer:Unit->U32=fn()=>missing\n" });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, consumerScenario, .{ bytes, "entry const answer:Unit->U32=func()=> return missing\n" });
 }
 
 test "decoded malformed Core declines before symbols or interface are published" {
     const a = std.testing.allocator;
-    const source = "const identity=fn value=>value\n";
+    const source = "const identity=func value=> return value\n";
     const bytes = try artifact(a, source);
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
@@ -539,10 +539,10 @@ test "decoded malformed Core declines before symbols or interface are published"
 const abstraction_producer =
     \\opaque type Token = U32
     \\private const offset = 1
-    \\const make: U32 -> Token = fn value => #Token (@u32.add value offset)
-    \\const read: Token -> U32 = fn (#Token value) => value
+    \\const make: U32 -> Token = func value => return #Token (@u32.add value offset)
+    \\const read: Token -> U32 = func (#Token value) => return value
 ;
-const abstraction_consumer = "entry const answer = fn (value: U32) => read (make value)\n";
+const abstraction_consumer = "entry const answer = func (value: U32) => return read (make value)\n";
 
 test "module abstraction compiled principal has no opaque representation or private binding" {
     const a = std.testing.allocator;
@@ -621,8 +621,8 @@ const associated_producer =
     \\type Callable f is contract = { type Run = f }
     \\type Signature s is contract = { const first: Callable.Run (s -> U32) }
     \\type Alias b = Identity.Item b
-    \\const helper: b -> b = fn value => value
-    \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = fn value => value
+    \\const helper: b -> b = func value => return value
+    \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
 ;
 fn associatedAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
     var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
@@ -753,7 +753,7 @@ test "associated declared row recipe admission rejects shifted positions and nam
 
 const implementation_producer =
     \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-    \\impl ArraySource a : Source (Array a) = { type Item = a, const first = fn values => @array.get values 0 }
+    \\impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
 ;
 fn implementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
     var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
@@ -818,8 +818,8 @@ test "implementation portable admission rejects forged equations targets and bin
 
 const selected_implementation_producer =
     \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
-    \\impl Scalar : Source U32 = { type Item = U32, const first = fn value => value }
-    \\impl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = fn values => Source.first (@array.get values 0) }
+    \\impl Scalar : Source U32 = { type Item = U32, const first = func value => return value }
+    \\impl ArraySource a : Source (Array a) where { Source a } = { type Item = Source.Item a, const first = func values => return Source.first (@array.get values 0) }
     \\const answer: U32 = Source.first #[42]
 ;
 fn selectedImplementationAdmissionLaw(allocator: std.mem.Allocator, bytes: []const u8) !void {
@@ -855,7 +855,7 @@ test "implementation portable complete proofs reject forged roots targets and mi
 
 const legacy_implementation_producer =
     \\type Token is data = #Token U32
-    \\const Token.add = fn (left: Token) => fn (right: Token) => left
+    \\const Token.add = func (left: Token) => return func (right: Token) => return left
     \\type Source s is contract = { associated "add" s s s ! {}, type Item }
     \\impl TokenSource : Source Token = { type Item = U32 }
     \\const answer: (Source.Item Token) = 42
@@ -888,7 +888,7 @@ test "implementation portable legacy prerequisite certificates retain selected t
 
 const inferred_legacy_implementation_producer =
     \\type Token is data = #Token U32
-    \\const Token.add = fn (left: Token) => fn (right: Token) => left
+    \\const Token.add = func (left: Token) => return func (right: Token) => return left
     \\type Source s is contract = { associated "add" s s s, type Item }
     \\impl TokenSource : Source Token = { type Item = U32 }
     \\const answer: (Source.Item Token) = 42
@@ -994,7 +994,7 @@ test "implementation compiled rejection preserves prerequisite facts and omits u
 }
 
 fn compiledWitnessImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
-    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token (fn () -> U32 => 7))\n");
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token (func () : U32 => return 7))\n");
     defer compiled.deinit(allocator);
     if (compiled.diagnostic) |issue| std.debug.print("compiled witness frontend {s} at {d}: {s}\n", .{ issue.code, issue.start, issue.message });
     if (compiled.compiled.diagnostic) |issue| std.debug.print("compiled witness backend {s}\n", .{@tagName(issue.code)});
@@ -1010,7 +1010,7 @@ test "implementation compiled witness prerequisites derive closed local results 
 }
 
 fn compiledSymbolicImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
-    var compiled = try consume(allocator, bytes, "entry const answer = @product.get (@effect.run State.get State.set 42 (fn () => Callable.keep read ())) 1\n");
+    var compiled = try consume(allocator, bytes, "entry const answer = @product.get (@effect.run State.get State.set 42 (func () => return Callable.keep read ())) 1\n");
     defer compiled.deinit(allocator);
     if (compiled.diagnostic) |issue| std.debug.print("compiled symbolic frontend {s}\n", .{issue.code});
     if (compiled.compiled.diagnostic) |issue| std.debug.print("compiled symbolic backend {s}\n", .{@tagName(issue.code)});
@@ -1027,8 +1027,8 @@ test "implementation compiled symbolic operation heads preserve selected method 
 
 const paired_capability_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const first = fn (left: State a) => fn (right: State b) => left.get ()
-    \\const second = fn (left: State a) => fn (right: State b) => right.get ()
+    \\const first = func (left: State a) => return func (right: State b) => return left.get ()
+    \\const second = func (left: State a) => return func (right: State b) => return right.get ()
 ;
 test "scoped paired public claims admit the maximum and reject forged selected binders" {
     const a = std.testing.allocator;
@@ -1119,9 +1119,9 @@ test "scoped selected symbolic factories publish owned dependency graphs" {
 }
 
 const parameter_footprint_producer =
-    \\const pack = fn first => fn second => fn third => (third, (first, second), first)
-    \\const keep = fn unused => fn retained => (retained, 42)
-    \\const grouped = fn first => (fn second => (first, second))
+    \\const pack = func first => return func second => return func third => return (third, (first, second), first)
+    \\const keep = func unused => return func retained => return (retained, 42)
+    \\const grouped = func first => return (func second => return (first, second))
 ;
 fn parameterFootprintArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, parameter_footprint_producer);
@@ -1159,7 +1159,7 @@ test "pure product footprint claims survive artifact ownership and reject forged
 
 const parameter_invocation_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const invoke = fn (left: State a) => fn (right: State b) => fn (callback: Unit -> U32 ! {left.get, right.get | e}) => callback ()
+    \\const invoke = func (left: State a) => return func (right: State b) => return func (callback: Unit -> U32 ! {left.get, right.get | e}) => return callback ()
 ;
 fn parameterInvocationArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, parameter_invocation_producer);
@@ -1200,7 +1200,7 @@ test "Unit callback footprint claims survive artifacts and reject forged invocat
 }
 
 const record_footprint_producer =
-    \\const pack = fn first => fn second => {selected: second, nested: {first}, repeated: first}
+    \\const pack = func first => return func second => return {selected: second, nested: {first}, repeated: first}
 ;
 fn recordFootprintArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, record_footprint_producer);
@@ -1236,8 +1236,8 @@ test "record footprint claims survive owned artifacts and reject forged retained
 
 const member_closure_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const read = fn unused => fn (state: State a) => fn () => state.get ()
-    \\const ordinary = fn (record: {get: Unit -> U32}) => fn () => record.get ()
+    \\const read = func unused => return func (state: State a) => return func () => return state.get ()
+    \\const ordinary = func (record: {get: Unit -> U32}) => return func () => return record.get ()
 ;
 fn memberClosureArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, member_closure_producer);
@@ -1277,13 +1277,13 @@ test "member closure capture recipes survive owned artifacts and reject forged c
 
 const callable_container_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const keep = fn unused => fn (state: State a) => {callbacks: #[(fn () => state.get ())]}
-    \\const alias = fn unused => fn retained => do:
+    \\const keep = func unused => return func (state: State a) => return {callbacks: #[(func () => return state.get ())]}
+    \\const alias = func unused => return func retained => return do:
     \\  let version = retained
     \\  break {nested: #[version]}
     \\opaque type Wrapper a = a
-    \\const wrap = fn unused => fn retained => #Wrapper retained
-    \\const unwrap = fn unused => fn wrapped => case wrapped of
+    \\const wrap = func unused => return func retained => return #Wrapper retained
+    \\const unwrap = func unused => return func wrapped => return case wrapped of
     \\  #Wrapper retained => retained
 ;
 fn callableContainerArtifactLaw(allocator: std.mem.Allocator) !void {
@@ -1327,12 +1327,12 @@ test "callable container footprint artifacts reject coordinated capture removal"
 
 const precise_result_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const bundle = fn (discarded: State a) => fn (retained: State a) => {discarded: fn () => discarded.get (), retained: fn () => retained.get ()}
-    \\const select = fn value => value.retained
-    \\const operation = fn (state: State a) => state.get
-    \\const take_second = fn (values: (a, b)) => @product.get values 1
-    \\const take_array = fn values => @array.get values 1
-    \\const take_at = fn values => fn index => @array.get values index
+    \\const bundle = func (discarded: State a) => return func (retained: State a) => return {discarded: func () => return discarded.get (), retained: func () => return retained.get ()}
+    \\const select = func value => return value.retained
+    \\const operation = func (state: State a) => return state.get
+    \\const take_second = func (values: (a, b)) => return @product.get values 1
+    \\const take_array = func values => return @array.get values 1
+    \\const take_at = func values => return func index => return @array.get values index
 ;
 test "owned result path artifacts reject coordinated selector forgery with unchanged masks" {
     const a = std.testing.allocator;
@@ -1370,15 +1370,15 @@ test "owned result path artifacts reject coordinated selector forgery with uncha
 
 const nullary_shape_producer =
     \\type Maybe a is data = #Some a | #None
-    \\const absent = fn value => case value of
+    \\const absent = func value => return case value of
     \\  #Some payload => payload
     \\  #None => #None
 ;
 
 const text_shape_producer =
-    \\const unicode = fn unused => "世界🙂"
-    \\const empty = fn unused => ""
-    \\const escaped = fn unused => "\n\t"
+    \\const unicode = func unused => return "世界🙂"
+    \\const empty = func unused => return ""
+    \\const escaped = func unused => return "\n\t"
 ;
 fn textShapeArtifactLaw(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
@@ -1448,7 +1448,7 @@ test "owned result shapes retain nullary constructor wrappers at immutable admis
 
 test "usage captured once factory keeps its ownership boundary in portable Core" {
     const a = std.testing.allocator;
-    const source = "const capture = fn (owner: unique U32) -> once (Unit -> unique U32) => fn () => owner\n";
+    const source = "const capture = func (owner: unique U32) : once (Unit -> unique U32) => return func () => return owner\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -1470,7 +1470,7 @@ test "capability import keeps producer graph ordinal distinct from relocated ext
     const a = std.testing.allocator;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
-    const producer = "const project = fn record => record.left\nconst constant = fn () => 7\n";
+    const producer = "const project = func record => return record.left\nconst constant = func () => return 7\n";
     var tokens = try lexer.lex(a, producer);
     defer tokens.deinit(a);
     var tree = try parser.parse(a, producer, tokens.tokens.items, &pool);
@@ -1502,7 +1502,7 @@ test "capability import keeps producer graph ordinal distinct from relocated ext
 
 test "grouped pure product footprint headers match exact curried Core and reject coordinated shorter claims" {
     const a = std.testing.allocator;
-    const source = "const grouped = fn first => ((fn second => (fn first => {kept: second, shadow: first})))\n";
+    const source = "const grouped = func first => return ((func second => return (func first => return {kept: second, shadow: first})))\n";
     const bytes = try artifact(a, source);
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
@@ -1525,8 +1525,8 @@ test "grouped pure product footprint headers match exact curried Core and reject
 test "grouped callable footprint boundaries preserve once-qualified returned captures" {
     const a = std.testing.allocator;
     const cases = [_][]const u8{
-        "const capture = fn (owner: unique U32) -> once (U32 -> unique U32) => (fn (unused: U32) => owner)\n",
-        "const capture: (unique U32) -> once (U32 -> unique U32) = fn (owner: unique U32) -> once (U32 -> unique U32) => (fn (unused: U32) => owner)\n",
+        "const capture = func (owner: unique U32) : once (U32 -> unique U32) => return (func (unused: U32) => return owner)\n",
+        "const capture: (unique U32) -> once (U32 -> unique U32) = func (owner: unique U32) : once (U32 -> unique U32) => return (func (unused: U32) => return owner)\n",
     };
     for (cases) |source| {
         const bytes = try artifact(a, source);
@@ -1544,11 +1544,11 @@ test "grouped callable footprint boundaries preserve once-qualified returned cap
 
 const deferred_block_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const fields = fn (discarded: State a) => fn (retained: State a) => do:
-    \\  let dropped = fn () => do:
+    \\const fields = func (discarded: State a) => return func (retained: State a) => return do:
+    \\  let dropped = func () => return do:
     \\    let alias = discarded
     \\    break alias.get ()
-    \\  let kept = fn () => do:
+    \\  let kept = func () => return do:
     \\    let alias = retained
     \\    break case (alias, 1) of
     \\      (cell, number) => cell.get ()
@@ -1605,9 +1605,9 @@ test "deferred block and pattern captures prove exact public result paths under 
 
 const scoped_constructor_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const provider = fn unused => fn (state: State a) => fn implementation => @effect.provider state.get implementation
-    \\const state = fn unused => fn (state: State a) => fn initial => @effect.state state.get state.set initial
-    \\const computation = fn unused => fn action => @computation action
+    \\const provider = func unused => return func (state: State a) => return func implementation => return @effect.provider state.get implementation
+    \\const state = func unused => return func (state: State a) => return func initial => return @effect.state state.get state.set initial
+    \\const computation = func unused => return func action => return @computation action
 ;
 fn scopedConstructorArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, scoped_constructor_producer);
@@ -1641,19 +1641,19 @@ test "scoped constructor recipes retain operation implementation and initial cel
 
 const generative_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const choose = fn flag => fn (left: State a) => fn (right: State a) => if flag then left else right
-    \\const forward = fn flag => fn (left: State a) => fn (right: State a) => choose flag left right
-    \\const freeze = fn value => fn () => value
-    \\const bundle = fn flag => fn (left: State a) => fn (right: State a) => fn initial => do:
+    \\const choose = func flag => return func (left: State a) => return func (right: State a) => return if flag then left else right
+    \\const forward = func flag => return func (left: State a) => return func (right: State a) => return choose flag left right
+    \\const freeze = func value => return func () => return value
+    \\const bundle = func flag => return func (left: State a) => return func (right: State a) => return func initial => return do:
     \\  let selected = forward flag left right
-    \\  break {cell: selected, read: fn () => selected.get (), provider: @effect.state selected.get selected.set initial}
+    \\  break {cell: selected, read: func () => return selected.get (), provider: @effect.state selected.get selected.set initial}
 ;
 const returned_generative_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const staged = fn (left: State a) => fn (middle: State a) => do:
-    \\  let first = if #True then left else middle
-    \\  break fn () => {first: first, second: if #False then left else middle}
-    \\const returned_forward = fn (left: State a) => fn (right: State a) => staged left right
+    \\const staged = func (left: State a) => return func (middle: State a) => return do:
+    \\  let first = if true then left else middle
+    \\  break func () => return {first: first, second: if false then left else middle}
+    \\const returned_forward = func (left: State a) => return func (right: State a) => return staged left right
 ;
 fn generativeInvalid(allocator: std.mem.Allocator, frozen: *const D.FrozenDependency, source: []const u8) !void {
     if (admission.validatePrelude(allocator, frozen, source, "std/prelude.blot")) |_| {
@@ -1762,11 +1762,11 @@ test "generative invocation artifacts own the declaring arrow independently thro
 fn packagePublication(a: std.mem.Allocator) !void {
     const bytes = try artifact(a,
         \\type Item = exists [a, b] => (a, a -> b, b -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item
-        \\const read: Item -> U32 = fn item => unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+        \\const make: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item
+        \\const read: Item -> U32 = func item => return unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
     );
     defer a.free(bytes);
-    var compiled = try consume(a, bytes, "entry const answer: U32 -> U32 = fn value => read (make value)\n");
+    var compiled = try consume(a, bytes, "entry const answer: U32 -> U32 = func value => return read (make value)\n");
     defer compiled.deinit(a);
     try std.testing.expect(compiled.diagnostic == null);
     try std.testing.expect(compiled.compiled.diagnostic == null);
@@ -1780,8 +1780,8 @@ test "portable package adapters reject witnesses primitives and foreign opening 
     const a = std.testing.allocator;
     const source =
         \\type Item = exists [a, b] => (a, a -> b, b -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item
-        \\const read: Item -> U32 = fn item => unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+        \\const make: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item
+        \\const read: Item -> U32 = func item => return unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
     ;
     const bytes = try artifact(a, source);
     defer a.free(bytes);
@@ -1835,7 +1835,7 @@ test "returned invocation binders retain declaring arrows and captured versions 
 
 const pattern_capture_producer =
     \\type Application is data = #Application {reset: Unit -> U32}
-    \\const reset_scoped = fn application => fn () => do:
+    \\const reset_scoped = func application => return func () => return do:
     \\  let #Application {reset} = application
     \\  break reset ()
 ;
@@ -1873,12 +1873,12 @@ test "nominal pattern initializers retain exact deferred captures independently 
 
 const formal_generative_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const call = fn callback => callback ()
-    \\const staged = fn (left: State a) => fn (right: State a) => fn () => if #True then left else right
-    \\const exercise = fn (left: State a) => fn (right: State a) => do:
+    \\const call = func callback => return callback ()
+    \\const staged = func (left: State a) => return func (right: State a) => return func () => return if true then left else right
+    \\const exercise = func (left: State a) => return func (right: State a) => return do:
     \\  let maker = staged left right
     \\  break call maker
-    \\const ordinary = fn () => 42
+    \\const ordinary = func () => return 42
 ;
 fn formalGenerativeValidation(allocator: std.mem.Allocator, bytes: []const u8) !void {
     var frozen = try format.decode(D.FrozenDependency, allocator, bytes, key);
@@ -1971,16 +1971,16 @@ test "formal Unit callback invocations independently own fresh results and execu
 
 const projected_generative_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const call = fn callback => callback ()
-    \\const staged = fn (left: State a) => fn (right: State a) => fn () => if #True then left else right
-    \\const exercise = fn (left: State a) => fn (right: State a) => do:
+    \\const call = func callback => return callback ()
+    \\const staged = func (left: State a) => return func (right: State a) => return func () => return if true then left else right
+    \\const exercise = func (left: State a) => return func (right: State a) => return do:
     \\  let maker = staged left right
-    \\  let container = {nested: {maker: maker, ordinary: fn () => 42}, unused: 99}
+    \\  let container = {nested: {maker: maker, ordinary: func () => return 42}, unused: 99}
     \\  let alias = container
     \\  break call alias.nested.maker
-    \\const product = fn (left: State a) => fn (right: State a) => do:
+    \\const product = func (left: State a) => return func (right: State a) => return do:
     \\  let maker = staged left right
-    \\  let container = (maker, fn () => 42)
+    \\  let container = (maker, func () => return 42)
     \\  let alias = container
     \\  break call (@product.get alias 0)
 ;
@@ -2115,13 +2115,13 @@ test "projected invocation owns executable record and product callbacks through 
 
 const input_invocation_producer =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-    \\const invoke = fn cell => fn callback => callback cell
-    \\const read = fn (cell: State a) => invoke cell (fn (actual: State a) => actual.get ())
-    \\const choose = fn (left: State a) => fn (right: State a) => invoke left (fn (unused: State a) => if #True then left else right)
-    \\const identity = fn (cell: State a) => invoke cell (fn actual => actual)
-    \\const scoped = fn () => @effect.scope (fn (cell: State U32) => do:
+    \\const invoke = func cell => return func callback => return callback cell
+    \\const read = func (cell: State a) => return invoke cell (func (actual: State a) => return actual.get ())
+    \\const choose = func (left: State a) => return func (right: State a) => return invoke left (func (unused: State a) => return if true then left else right)
+    \\const identity = func (cell: State a) => return invoke cell (func actual => return actual)
+    \\const scoped = func () => return @effect.scope (func (cell: State U32) => return do:
     \\  use handled <- do (@effect.state cell.get cell.set 42):
-    \\    break invoke cell (fn (actual: State U32) => if #True then actual.get () else 0)
+    \\    break invoke cell (func (actual: State U32) => return if true then actual.get () else 0)
     \\  let (state, value) = handled
     \\  break value
     \\)
@@ -2202,9 +2202,9 @@ test "typed input invocation independently reconstructs callback no store author
 test "principal reference bounds preserve quantified row callback producers" {
     const a = std.testing.allocator;
     const source =
-        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
-        \\const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = fn apply => fn value => (apply ((fn item => item), value), apply ((fn item => item), @u32.to_f32 value))
-        \\const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = fn pair => (@product.get pair 0) (@product.get pair 1, 42)
+        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
+        \\const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = func apply => return func value => return (apply ((func item => return item), value), apply ((func item => return item), @u32.to_f32 value))
+        \\const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = func pair => return (@product.get pair 0) (@product.get pair 1, 42)
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);

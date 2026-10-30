@@ -7,17 +7,17 @@ Deno.test("optimizer dependency edits and restored checkpoints keep executed cal
   const entry = `${directory}/main.blot`;
   const helper = `${directory}/helper.blot`;
   const program = `import * as helper from "./helper"
-entry const run = fn count => helper.left count + helper.right count
+entry const run = func count => return helper.left count + helper.right count
 `;
   const sources = (bias: number) => ({
     [entry]: program,
-    [helper]: `const leaf = fn value => value + ${bias}
-const left = fn count => do:
+    [helper]: `const leaf = func value => return value + ${bias}
+const left = func count => return do:
   let total = 0
   for value in 0..count:
     total := self + leaf value
   break total
-const right = fn count => do:
+const right = func count => return do:
   let total = 0
   for value in 0..count:
     total := self + value * 7

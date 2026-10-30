@@ -2,7 +2,7 @@
 Curried parameter lists remain one function header
 ==================
 
-const add = fn (left: U32) (right: U32) => left + right
+const add = func (left: U32) -> (right: U32) => return left + right
 
 ---
 
@@ -15,12 +15,13 @@ const add = fn (left: U32) (right: U32) => left + right
       (parenthesized
         (identifier)
         (separator)
-        (type_identifier)))
-    (parenthesized
-      (identifier)
-      (separator)
-      (type_identifier)))
+        (type_identifier))
+      (parenthesized
+        (identifier)
+        (separator)
+        (type_identifier))))
   (operator)
+  (keyword)
   (identifier)
   (operator)
   (identifier))

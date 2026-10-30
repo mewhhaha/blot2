@@ -4,14 +4,14 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const producer =
-  `const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
-const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = fn apply => fn value => (apply ((fn item => item), value), apply ((fn item => item), @u32.to_f32 value))
-const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = fn pair => (@product.get pair 0) (@product.get pair 1, 42)
+  `const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
+const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = func apply => return func value => return (apply ((func item => return item), value), apply ((func item => return item), @u32.to_f32 value))
+const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = func pair => return (@product.get pair 0) (@product.get pair 1, 42)
 `;
 const consumer = `import {apply, both, foreign_apply} from "./identity"
-entry const whole = fn (value: U32) => @product.get (both apply value) 0
-entry const fraction = fn (value: U32) => @product.get (both apply value) 1
-entry const host = fn (callback: U32 -> U32 ! {Foreign}) => foreign_apply (apply, callback)
+entry const whole = func (value: U32) => return @product.get (both apply value) 0
+entry const fraction = func (value: U32) => return @product.get (both apply value) 1
+entry const host = func (callback: U32 -> U32 ! {Foreign}) => return foreign_apply (apply, callback)
 `;
 async function run(bytes: Uint8Array<ArrayBuffer>) {
   for (const asynchronous of [false, true]) {
@@ -123,10 +123,10 @@ Deno.test("quantified row carriers preserve independent pure and Foreign instant
         checkpoint = await archive.exportCheckpoint();
         for (
           const failed of [
-            consumer.replace("both apply value", "both (fn pair => 42) value"),
+            consumer.replace("both apply value", "both (func pair => return 42) value"),
             consumer.replace(
               "both apply value",
-              "both (fn (pair: ((U32 -> U32), U32)) => @product.get pair 1) value",
+              "both (func (pair: ((U32 -> U32), U32)) => return @product.get pair 1) value",
             ),
           ]
         ) {

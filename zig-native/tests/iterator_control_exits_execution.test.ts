@@ -3,10 +3,10 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const program = `import * as iter from "std/iter"
-entry const strict = fn count => iter.fold_left (fn total => fn pair => do:
+entry const strict = func count => return iter.fold_left (func total => return func pair => return do:
   let (left, right) = pair
   break total + left + right) 0 (iter.zip_strict (iter.range 0 count) (iter.range 0 count))
-entry const alternatives = fn input => do:
+entry const alternatives = func input => return do:
   let mode = input / 8192
   let count = input % 8192
   let total = 0
@@ -33,7 +33,7 @@ entry const alternatives = fn input => do:
     if let #Some (left, right) = selected:
       total := self + left + right
   break total
-entry const snapshots = fn count => do:
+entry const snapshots = func count => return do:
   let previous = {value: 41}
   let total = 0
   for index in 0..count:

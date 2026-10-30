@@ -5,9 +5,9 @@ Deno.test("runtime scalar exports initialize dependency order once and retain th
 entry let integer: U32 = @u32.add base 2
 let base: U32 = 40
 entry let floating: F32 = @f32.add 1.25 2.5
-entry let enabled: Bool = #True
+entry let enabled: Bool = true
 entry let empty: Unit = ()
-entry const use_values = fn () => @u32.add integer base
+entry const use_values = func () => return @u32.add integer base
 const unused = @panic "unused const"
 let unused_runtime = @panic "unused initializer"
 `, guest => {
@@ -30,7 +30,7 @@ let second = 20
 let values = @array.fill 3 first
 type Point is data = #Point { x: U32, y: U32 }
 let point = #Point { y: second, x: first }
-entry const run = fn (amount: U32) -> U32 => do:
+entry const run = func (amount: U32) : U32 => return do:
   let changed = @array.set values 0 amount
   break @u32.add point.x (@u32.add (@array.get values 0) (@array.get changed 0))
 `, guest => {
@@ -39,12 +39,12 @@ entry const run = fn (amount: U32) -> U32 => do:
 });
 
 Deno.test("startup cycles retain original branches and metadata after all ordinary entry constants", async () => {
-  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = fn ~value => value\nentry const answer = fn () => @u32.add base (@force (delay saved))\n`, guest => equal(guest.call("answer", null), 42));
+  await compileAndRun(`let base = 1\nconst saved = 41\nconst delay = func ~value => return value\nentry const answer = func () => return @u32.add base (@force (delay saved))\n`, guest => equal(guest.call("answer", null), 42));
   const cycle = `let first: U32 = second\nlet second = first\n`;
-  await compileExpectedFailure(cycle + `entry const answer = if #True then 42 else first\n`, "initialization_cycle");
-  await compileExpectedFailure(cycle + `const read: Unit -> U32 = fn () => first\nentry const answer = @effect.count (@effect.of read)\n`, "initialization_cycle");
-  await compileExpectedFailure(cycle + `entry const answer: Unit -> U32 = fn () => first\nentry const bad: U32 = @panic "later"\n`, "const_panic", "later");
-  await compileExpectedFailure(cycle + `let saved = 42\nentry const answer: Unit -> U32 = fn () => first\nentry const bad = saved\n`, "const_runtime_dependency");
+  await compileExpectedFailure(cycle + `entry const answer = if true then 42 else first\n`, "initialization_cycle");
+  await compileExpectedFailure(cycle + `const read: Unit -> U32 = func () => return first\nentry const answer = @effect.count (@effect.of read)\n`, "initialization_cycle");
+  await compileExpectedFailure(cycle + `entry const answer: Unit -> U32 = func () => return first\nentry const bad: U32 = @panic "later"\n`, "const_panic", "later");
+  await compileExpectedFailure(cycle + `let saved = 42\nentry const answer: Unit -> U32 = func () => return first\nentry const bad = saved\n`, "const_runtime_dependency");
   await compileAndRun(cycle + `entry const answer = 42\n`, guest => equal(guest.read("answer"), 42));
-  await compileAndRun(`let first: U32 = @u32.add second 1\nlet second = 41\nentry const answer = if #True then 42 else first\n`, guest => equal(guest.read("answer"), 42));
+  await compileAndRun(`let first: U32 = @u32.add second 1\nlet second = 41\nentry const answer = if true then 42 else first\n`, guest => equal(guest.read("answer"), 42));
 });

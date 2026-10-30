@@ -6,7 +6,7 @@ const check = @import("check.zig");
 
 fn generatorOrigins(allocator: std.mem.Allocator) !void {
     const source =
-        \\const make = fn (divisor: U32) => @code.quote (@u32.div 42 (@code.lift divisor))
+        \\const make = func (divisor: U32) => return @code.quote (@u32.div 42 (@code.lift divisor))
         \\const first = make 1
         \\const second = make 0
         \\const choices = {good: first, bad: second}
@@ -83,9 +83,9 @@ fn composition(allocator: std.mem.Allocator) !void {
         \\const right: code [U32, row {}] = @code.quote 2
         \\const answer = @code.quote (@u32.add (@code.splice left) (@code.splice right))
         \\const checked_answer: U32 = @code.run answer
-        \\const make = fn (value: U32) => @code.quote (@u32.add (@code.lift value) 1)
-        \\const future = @code.quote (fn (value: U32) => @u32.add value 1)
-        \\const shape = @code.describe (@code.quote {left: 1, right: #True})
+        \\const make = func (value: U32) => return @code.quote (@u32.add (@code.lift value) 1)
+        \\const future = @code.quote (func (value: U32) => return @u32.add value 1)
+        \\const shape = @code.describe (@code.quote {left: 1, right: true})
         \\const fields = @descriptor.fields shape.result
         \\const same: Bool = @descriptor.same fields.left (@code.describe left).result
     , null);
@@ -96,25 +96,25 @@ test "typed staging checks owned shapes stage locals and explicit composition th
 }
 test "typed staging rejects bare earlier values malformed shapes and authority crossing" {
     const a = std.testing.allocator;
-    try law(a, "const bad = fn (value: U32) => @code.quote value", .stage_unavailable);
+    try law(a, "const bad = func (value: U32) => return @code.quote value", .stage_unavailable);
     try law(a, "const value = 1\nconst bad = @code.quote value", .stage_unavailable);
     try law(a, "const bad = @code.splice (@code.quote 1)", .stage_unavailable);
     try law(a, "const bad = @code.lift 1", .stage_unavailable);
     try law(a, "const bad = @code.emit 1", .code_shape_mismatch);
     try law(a, "const bad: code [Bool, row {}] = @code.quote 1", .type_mismatch);
-    try law(a, "const bad = @code.quote (@u32.add (@code.splice (@code.quote #True)) 1)", .type_mismatch);
-    try law(a, "const bad = fn callback => @code.quote (@code.lift callback)", .cross_stage_authority);
+    try law(a, "const bad = @code.quote (@u32.add (@code.splice (@code.quote true)) 1)", .type_mismatch);
+    try law(a, "const bad = func callback => return @code.quote (@code.lift callback)", .cross_stage_authority);
     try law(a, "const bad = @descriptor.fields (@code.describe (@code.quote 1)).result", .descriptor_private);
 }
 
 fn spliceUsageShape(allocator: std.mem.Allocator) !void {
     try law(allocator,
-        \\const generated = @code.quote (fn (value: U32) => value)
-        \\const accepted = @code.quote ((fn (callback: U32 -> U32) => callback 42) (@code.splice generated))
+        \\const generated = @code.quote (func (value: U32) => return value)
+        \\const accepted = @code.quote ((func (callback: U32 -> U32) => return callback 42) (@code.splice generated))
     , null);
     try law(allocator,
-        \\const generated = @code.quote (fn (value: unique U32) => value)
-        \\const bad = @code.quote ((fn (callback: U32 -> U32) => callback 42) (@code.splice generated))
+        \\const generated = @code.quote (func (value: unique U32) => return value)
+        \\const bad = @code.quote ((func (callback: U32 -> U32) => return callback 42) (@code.splice generated))
     , .type_mismatch);
 }
 test "typed staging rejects a spliced callable with a different usage shape through OOM" {
@@ -124,7 +124,7 @@ test "typed staging rejects a spliced callable with a different usage shape thro
 
 fn liveSkolemLift(allocator: std.mem.Allocator) !void {
     try law(allocator,
-        \\const bad: forall [a] => a -> code [a, row {}] = fn value => @code.quote (@code.lift value)
+        \\const bad: forall [a] => a -> code [a, row {}] = func value => return @code.quote (@code.lift value)
     , .cross_stage_authority);
 }
 test "typed staging refuses a lifted live skolem before code publication through OOM" {
@@ -136,8 +136,8 @@ test "typed staging nominal descriptors expose only common public constructor fi
     const source =
         \\data Packet a = #Packet {payload: a, flag: Bool}
         \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
-        \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: #True})).result
-        \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: #True})).result
+        \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: true})).result
+        \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: true})).result
         \\const scalar = (@code.describe (@code.quote 1)).result
         \\const answer = if @descriptor.same packet.payload scalar then if @descriptor.same choice.shared scalar then 42 else 0 else 0
     ;
@@ -194,7 +194,7 @@ test "typed staging owns composed graphs after frontend teardown through OOM" {
 
 fn nestedEvaluation(allocator: std.mem.Allocator) !void {
     const source =
-        \\const make = fn (value: U32) => @code.quote (@code.quote (@u32.add (@code.lift (@code.lift value)) 2))
+        \\const make = func (value: U32) => return @code.quote (@code.quote (@u32.add (@code.lift (@code.lift value)) 2))
         \\const outer = make 40
         \\const inner = @code.run outer
         \\const answer: U32 = @code.run inner
@@ -208,7 +208,7 @@ test "nested typed staging owns earlier lifts through frontend teardown and ever
 
 fn callableDescriptors(allocator: std.mem.Allocator) !void {
     const source =
-        \\const make = fn (step: U32) => @code.quote (fn (value: U32) => do:
+        \\const make = func (step: U32) => return @code.quote (func (value: U32) => return do:
         \\  let step = @u32.add value (@code.lift step)
         \\  let value = 1
         \\  break @u32.add step value)
@@ -226,8 +226,8 @@ test "typed staging callable descriptors retain their exact closure row certific
 test "typed staging callable descriptors preserve declared operation effects" {
     try evaluatedSource(std.testing.allocator,
         \\effect Read: Unit -> U32
-        \\const effectful = @code.quote (fn () => Read ())
-        \\const pure = @code.quote (fn () => 42)
+        \\const effectful = @code.quote (func () => return Read ())
+        \\const pure = @code.quote (func () => return 42)
         \\const same = @descriptor.same (@code.describe effectful).result (@code.describe pure).result
         \\const answer: U32 = if same then 0 else 42
     );
@@ -239,18 +239,18 @@ fn ambientStagingRows(allocator: std.mem.Allocator) !void {
         \\const spliced = @code.quote (do:
         \\  use @array.length #[1]
         \\  break @code.splice generated)
-        \\entry const answer = fn (host: Unit -> Unit ! {Foreign}) => do:
+        \\entry const answer = func (host: Unit -> Unit ! {Foreign}) => return do:
         \\  use host ()
         \\  break @code.emit spliced
     , null);
     try law(allocator,
         \\effect Read: Unit -> U32
         \\const generated: code [U32, row {Read}] = @code.quote (Read ())
-        \\const broader: Unit -> U32 ! {Read, Foreign} = fn () => Read ()
+        \\const broader: Unit -> U32 ! {Read, Foreign} = func () => return Read ()
         \\const composed: code [U32, row {Read, Foreign}] = @code.quote (do:
         \\  use ignored <- broader ()
         \\  break @code.splice generated)
-        \\entry const answer = fn (host: Unit -> U32 ! {Foreign}) => do:
+        \\entry const answer = func (host: Unit -> U32 ! {Foreign}) => return do:
         \\  let provider = @effect.provider Read host
         \\  break do provider:
         \\    break @code.emit generated
@@ -262,7 +262,7 @@ test "typed staging contributes latent rows without closing the surrounding ambi
 }
 test "typed staging row widening retains missing handlers callback rows and pure run restrictions" {
     const a = std.testing.allocator;
-    try law(a, "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\nentry const answer: Unit -> U32 ! {} = fn () => @code.emit generated", .effect_mismatch);
+    try law(a, "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\nentry const answer: Unit -> U32 ! {} = func () => return @code.emit generated", .effect_mismatch);
     try law(a, "effect Read: Unit -> U32\nconst generated = @code.quote (Read ())\nconst answer = @code.run generated", .const_effect);
-    try law(a, "const generated = @code.quote (fn (host: Unit -> Unit ! {Foreign}) => host ())\nconst emitted = @code.run generated\nconst pure: (Unit -> Unit ! {}) -> Unit = emitted", .effect_mismatch);
+    try law(a, "const generated = @code.quote (func (host: Unit -> Unit ! {Foreign}) => return host ())\nconst emitted = @code.run generated\nconst pure: (Unit -> Unit ! {}) -> Unit = emitted", .effect_mismatch);
 }

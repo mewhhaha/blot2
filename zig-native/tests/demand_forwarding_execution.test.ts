@@ -23,16 +23,16 @@ function sections(bytes: Uint8Array): Set<number> {
 }
 
 const forwardedSource = `
-const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-const forward = fn ~(value: U32) => twice (@demand value)
-const many = fn ~(value: U32) => @u32.add (forward (@demand value)) (twice (@demand value))
-const ignore = fn ~(value: U32) => 42
-const discard = fn ~(value: U32) => ignore (@demand value)
-const choose = fn (skip: Bool) => fn ~(value: U32) => if skip then 9 else @demand value
-const guarded = fn (skip: Bool) => fn ~(value: U32) => choose skip (@demand value)
-entry const run = fn (value: U32) => many value
-entry const skip = fn (value: U32) => discard (@u32.div 1 value)
-entry const guard = fn (value: U32) => guarded (@u32.eq value 0) (@u32.div 100 value)
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+const forward = func ~(value: U32) => return twice (@demand value)
+const many = func ~(value: U32) => return @u32.add (forward (@demand value)) (twice (@demand value))
+const ignore = func ~(value: U32) => return 42
+const discard = func ~(value: U32) => return ignore (@demand value)
+const choose = func (skip: Bool) => return func ~(value: U32) => return if skip then 9 else @demand value
+const guarded = func (skip: Bool) => return func ~(value: U32) => return choose skip (@demand value)
+entry const run = func (value: U32) => return many value
+entry const skip = func (value: U32) => return discard (@u32.div 1 value)
+entry const guard = func (value: U32) => return guarded (@u32.eq value 0) (@u32.div 100 value)
 `;
 
 Deno.test("local demand forwarding uses control flow and locals without heap cells", async () => {
@@ -55,8 +55,8 @@ for (const asynchronous of [false, true]) {
   Deno.test(`forwarded demand effects run once at the first use (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       `${forwardedSource}
-entry const effectful = fn (host: U32 -> U32 ! {Foreign}) => many (host 21)
-entry const ignored = fn (host: U32 -> U32 ! {Foreign}) => discard (host 0)
+entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return many (host 21)
+entry const ignored = func (host: U32 -> U32 ! {Foreign}) => return discard (host 0)
 `,
       async (guest) => {
         const calls: number[] = [];
@@ -103,9 +103,9 @@ entry const ignored = fn (host: U32 -> U32 ! {Foreign}) => discard (host 0)
 Deno.test("indirect demand forwarding retains the shared cell fallback", async () => {
   await compileAndRun(
     `
-const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
-const forward = fn (next: ~U32 -> U32) => fn ~(value: U32) => next (@demand value)
-entry const run = fn (value: U32) => forward twice value
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
+const forward = func (next: ~U32 -> U32) => return func ~(value: U32) => return next (@demand value)
+entry const run = func (value: U32) => return forward twice value
 `,
     (guest, bytes) => {
       for (const value of [0, 21, 0xFFFFFFFF]) {
@@ -122,11 +122,11 @@ entry const run = fn (value: U32) => forward twice value
 function librarySource(factor: number): string {
   const demand = "(@demand value)";
   const expression = factor === 0
-    ? "#True"
+    ? "true"
     : factor === 2
     ? `@u32.add ${demand} ${demand}`
     : `@u32.add (@u32.add ${demand} ${demand}) ${demand}`;
-  return `const twice = fn ~(value: U32) => ${expression}\nconst forward = fn ~(value: U32) => twice (@demand value)\n`;
+  return `const twice = func ~(value: U32) => return ${expression}\nconst forward = func ~(value: U32) => return twice (@demand value)\n`;
 }
 
 Deno.test("forwarding dependencies follow helper edits through checkpoints and failed revisions", async () => {
@@ -143,7 +143,7 @@ Deno.test("forwarding dependencies follow helper edits through checkpoints and f
   try {
     await Deno.writeTextFile(
       entry,
-      'import { forward } from "./library"\nentry const run = fn (value: U32) -> U32 => forward value\n',
+      'import { forward } from "./library"\nentry const run = func (value: U32) : U32 => return forward value\n',
     );
     await Deno.writeTextFile(library, librarySource(2));
     const packed = await new Deno.Command(executable, {

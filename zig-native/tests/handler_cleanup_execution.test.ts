@@ -5,7 +5,7 @@ Deno.test("private effect frames are released between raw calls without a collec
   await compileAndRun(
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-entry const exercise = fn (input: Array U32) => do:
+entry const exercise = func (input: Array U32) => return do:
   let seed = input[0]
   let provider = @effect.state (State.get U32) (State.set U32) seed
   let (state, value) = do provider:
@@ -13,7 +13,7 @@ entry const exercise = fn (input: Array U32) => do:
     use current <- State.get U32 ()
     break current
   break state + value
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     async (_, bytes) => {
       // Deliberately bypass the guest wrapper's per-call arena reset. There is
@@ -47,17 +47,17 @@ Deno.test("an escaping State payload survives private frame cleanup and later st
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 type Thunk is data = #Thunk (Unit -> U32)
-const make = fn (seed: U32) => do:
-  let provider = @effect.state (State.get Thunk) (State.set Thunk) (#Thunk (fn () => seed))
+const make = func (seed: U32) => return do:
+  let provider = @effect.state (State.get Thunk) (State.set Thunk) (#Thunk (func () => return seed))
   let (state, result) = do provider:
-    use State.set Thunk (#Thunk (fn () => seed + 1))
+    use State.set Thunk (#Thunk (func () => return seed + 1))
     break seed
   break state
-entry const exercise = fn (seed: U32) => do:
+entry const exercise = func (seed: U32) => return do:
   let #Thunk first = make seed
   let #Thunk second = make (seed + 40)
   break first () + second ()
-entry const memory = fn () -> Array U32 => #[]
+entry const memory = func () : Array U32 => return #[]
 `,
     (guest) => {
       equal(guest.call("exercise", 1), 44);

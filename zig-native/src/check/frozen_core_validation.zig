@@ -189,7 +189,7 @@ const Bounds = struct {
         try require(value.decl != 0);
         if (value.unit == std.math.maxInt(u32)) {
             // Compiler-owned State/read/write, reflection, Computation and Decision identities.
-            return require((value.decl >= 1 and value.decl <= 6) or @import("task_types.zig").isIdentity(value.unit, value.decl));
+            return require((value.decl >= 1 and value.decl <= 6) or @import("task_types.zig").isIdentity(value.unit, value.decl) or @import("storage_types.zig").identity(value.unit, value.decl) != null);
         }
         _ = try self.owner(value.unit);
         if (value.unit != 0 and value.decl & T.opaque_name_bit != 0) try self.symbol(value.decl & ~T.opaque_name_bit, false);
@@ -858,6 +858,7 @@ const Bounds = struct {
             try self.span(.{ .start = value.diagnostic_point, .end = value.diagnostic_point });
             try self.identity(value.nominal, true);
             try self.symbol(value.field, true);
+            if (value.field != 0) try require(self.m.fieldSpelling(value.field) != null);
             try self.ty(value.source_type);
             try self.ty(value.result_type);
             try range(self.m.projection_variants.len, value.variants.start, value.variants.len);
@@ -1192,6 +1193,12 @@ const Bounds = struct {
                     try self.node(value.c, true);
                 },
                 .update => try index(self.m.updates.len, value.a),
+                .storage => {
+                    const ops = @import("storage_ops.zig");
+                    const op = std.enums.fromInt(ops.Op, value.c) orelse return error.InvalidArtifact;
+                    try require(value.op == .none and value.b == ops.arity(op));
+                    try self.listNodes(.{ .start = value.a, .len = value.b });
+                },
                 .array_op => {
                     const op = std.enums.fromInt(core.ArrayOp, value.c) orelse return error.InvalidArtifact;
                     try require(value.b == try arrayArity(op));
@@ -1409,7 +1416,7 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
     }
     for (m.operation_values) |o| try mark(type_roles, o.arguments.start, o.arguments.len, .type_);
     for (m.nodes) |n| switch (n.tag) {
-        .task, .block, .suite, .product, .array, .array_op => try mark(core_roles, n.a, n.b, .node),
+        .task, .block, .suite, .product, .array, .array_op, .storage => try mark(core_roles, n.a, n.b, .node),
         .record => {
             try mark(core_roles, n.a, n.b, .node);
             try mark(core_roles, n.c, n.b, .destination);
@@ -1537,7 +1544,7 @@ pub const Graph = struct {
                         2 => self.vertex(.node, v.c),
                         else => null,
                     },
-                    .task, .block, .suite, .product, .record, .array, .array_op => if (slot < v.b) self.vertex(.node, m.extra[v.a + slot]) else null,
+                    .task, .block, .suite, .product, .record, .array, .array_op, .storage => if (slot < v.b) self.vertex(.node, m.extra[v.a + slot]) else null,
                     .call, .contract_method, .break_ => if (slot < v.c) self.vertex(.node, m.extra[v.b + slot]) else null,
                     .bind, .construct => if (slot == 0) self.vertex(.node, v.b) else null,
                     .package_unpack => switch (slot) {
@@ -1744,6 +1751,7 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
                     const id: core.Id = @intCast(top.vertex - node_start);
                     const n = m.nodes[id];
                     const quote = n.tag == .staging and n.c == @backingInt(@import("typed_staging.zig").Op.quote);
+                    const evaluate = n.tag == .staging and n.c == @backingInt(@import("typed_staging.zig").Op.evaluate);
                     var future_reference = n.tag == .reference and current_stage != 0;
                     if (future_reference) {
                         const reference = m.reference(id);
@@ -1752,7 +1760,7 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
                             future_reference = kind != .parameter and kind != .local;
                         }
                     }
-                    if (quote or future_reference or (n.tag == .call and current_stage != 0)) {
+                    if (quote or evaluate or future_reference or (n.tag == .call and current_stage != 0)) {
                         var closed_rows = body.closed_rows;
                         var owner_depth = depth;
                         while (owner_depth != 0) {
@@ -1766,6 +1774,11 @@ fn stagingScopes(graph: Graph, context: Context, scratch: Scratch, allocator: ?s
                         }
                         if (quote) {
                             @import("staging_core.zig").quoteEffectsContextWorkspace(m, context.units, n, closed_rows, &remaining, workspace) catch |err| {
+                                if (workspace) |owner| if (owner.oom) return error.OutOfMemory;
+                                return err;
+                            };
+                        } else if (evaluate) {
+                            @import("staging_core.zig").evaluateEffects(m, context.units, n, closed_rows, &remaining, workspace) catch |err| {
                                 if (workspace) |owner| if (owner.oom) return error.OutOfMemory;
                                 return err;
                             };
@@ -2004,6 +2017,7 @@ pub fn validateWithScratch(module: *const core.Module, context: Context, scratch
     try cycles(graph, scratch);
     try @import("task_core.zig").validateContext(module, context.units);
     try @import("staging_core.zig").shapes(module);
+    try @import("storage_core.zig").validate(module);
     stagingScopes(graph, context, scratch, null, null) catch return error.InvalidArtifact;
     var remaining: usize = 1_000_000;
     try associatedScopes(graph, scratch, &remaining);
@@ -2033,6 +2047,7 @@ pub fn validateWithBudget(allocator: std.mem.Allocator, module: *const core.Modu
         return err;
     };
     try @import("staging_core.zig").shapes(module);
+    try @import("storage_core.zig").validate(module);
     try stagingScopes(graph, context, .{ .colors = colors, .path = path }, allocator, &equations);
     try associatedScopes(graph, .{ .colors = colors, .path = path }, remaining);
     try @import("../eval/implementation_admission.zig").scopes(allocator, &module.types, module, module.obligations, remaining);

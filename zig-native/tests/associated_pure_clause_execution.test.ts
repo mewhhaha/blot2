@@ -5,14 +5,14 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = (offset: number, effect = "") =>
-  `const identity: forall [a] => a -> a = fn value => value
+  `const identity: forall [a] => a -> a = func value => return value
 type Number is data = #Number U32
-const Number.add = fn (#Number left) => fn (#Number right) => do:
+const Number.add = func (#Number left) => return func (#Number right) => return do:
 ${effect}  break #Number (@u32.add (@u32.add left right) ${offset})
-const twice: a -> a where {associated "add" a a a} = fn value => @type.call "add" value value
+const twice: a -> a where {associated "add" a a a} = func value => return @type.call "add" value value
 const alias = twice
-const generic = fn value => alias value
-const answer = fn () => case generic (#Number 21) of
+const generic = func value => return alias value
+const answer = func () => return case generic (#Number 21) of
   #Number value => identity value
 `;
 
@@ -23,7 +23,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
     const producer = `${directory}/logic.blot`;
     const archive = `${directory}/logic.blotdep`;
     const main =
-      'import {answer} from "./logic"\nentry const probe = fn () => answer ()\n';
+      'import {answer} from "./logic"\nentry const probe = func () => return answer ()\n';
     await Deno.writeTextFile(entry, main);
     await Deno.writeTextFile(producer, library(0));
     const options = {
@@ -80,7 +80,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
                   ...sources,
                   [producer]: library(
                     offset,
-                    "  use owner <- @resource.acquire (fn () => ()) (fn value => ())\n  use @resource.release owner\n",
+                    "  use owner <- @resource.acquire (func () => return ()) (func value => return ())\n  use @resource.release owner\n",
                   ),
                 },
               });

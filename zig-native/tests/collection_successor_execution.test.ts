@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
-const source = `const progress = fn count => fn values => do:
+const source = `const progress = func count => return func values => return do:
   let original = values.iter
   let cursor = original
   let index = 0
@@ -15,14 +15,14 @@ const source = `const progress = fn count => fn values => do:
     cursor := rest
     index := self + 1
   break (original, cursor, index)
-const inspect = fn count => fn values => do:
+const inspect = func count => return func values => return do:
   let (original, rest, index) = progress count values
   if @cursor.has rest:
     break #[index, @cursor.value original, @cursor.value rest]
   break #[index, 999, 999]
-entry const arrays = fn (count: U32) => inspect count (@array.generate 700 identity)
-entry const lists = fn (count: U32) => inspect count (@list.generate 700 identity)
-entry const redirected = fn (count: U32) => do:
+entry const arrays = func (count: U32) => return inspect count (@array.generate 700 identity)
+entry const lists = func (count: U32) => return inspect count (@list.generate 700 identity)
+entry const redirected = func (count: U32) => return do:
   let cursor = (@list.generate 700 identity).iter
   let index = 0
   for ever:
@@ -35,8 +35,8 @@ entry const redirected = fn (count: U32) => do:
     cursor := rest
     index := self + 1
   break #[index, @cursor.value cursor]
-entry const references = fn (count: U32) => do:
-  let values = @list.generate 700 (fn index => #[index, index + 1])
+entry const references = func (count: U32) => return do:
+  let values = @list.generate 700 (func index => return #[index, index + 1])
   let original = values.iter
   let cursor = original
   let saved = #[999]
@@ -55,9 +55,9 @@ entry const references = fn (count: U32) => do:
       @panic "pressure"
   let again = @cursor.value original
   break #[index, saved[0], again[0], again[1]]
-entry const captured = fn (count: U32) => do:
+entry const captured = func (count: U32) => return do:
   let original = (@list.generate 700 identity).iter
-  let read = fn () => @cursor.value original
+  let read = func () => return @cursor.value original
   let cursor = original
   let index = 0
   for ever:
@@ -69,8 +69,8 @@ entry const captured = fn (count: U32) => do:
     cursor := rest
     index := self + 1
   break read () + @cursor.value cursor
-const observe = fn (cursor: Cursor (List U32)) => @cursor.value cursor
-entry const unknown = fn (count: U32) => do:
+const observe = func (cursor: Cursor (List U32)) => return @cursor.value cursor
+entry const unknown = func (count: U32) => return do:
   let cursor = (@list.generate 700 identity).iter
   let total = 0
   let index = 0
@@ -84,7 +84,7 @@ entry const unknown = fn (count: U32) => do:
     cursor := rest
     index := self + 1
   break total
-entry const suspend = fn (host: U32 -> U32 ! {Foreign}) => do:
+entry const suspend = func (host: U32 -> U32 ! {Foreign}) => return do:
   let original = (@list.generate 700 identity).iter
   let cursor = original
   let total = 0

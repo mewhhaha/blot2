@@ -13,13 +13,13 @@ Deno.test("lexical summary captures preserve snapshots aliases demands and provi
   const declarations = `type Box is data = #Box { value: U32 }
 type Tick is effect = Unit -> U32
 type Other is effect = Unit -> U32
-const make: U32 -> (U32 -> U32 ! {}) = fn amount => fn value => @u32.add amount value
-const boxes = fn left => fn right => fn (value: U32) => @u32.add value (@u32.add left.value right.value)
-const nested = fn callback => fn (value: U32) => callback value
-const delayed = fn ~(value: U32) => fn () => @force value
-const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = fn implementation => do:
+const make: U32 -> (U32 -> U32 ! {}) = func amount => return func value => return @u32.add amount value
+const boxes = func left => return func right => return func (value: U32) => return @u32.add value (@u32.add left.value right.value)
+const nested = func callback => return func (value: U32) => return callback value
+const delayed = func ~(value: U32) => return func () => return @force value
+const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = func implementation => return do:
   let provider = @effect.provider Tick implementation
-  break fn () => do provider:
+  break func () => return do provider:
     use result <- Tick ()
     break result
 `;
@@ -29,7 +29,7 @@ const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = fn implementation => 
     invalid: false | "capture" | "provider" | "body",
   ) =>
     `import * as library from "./library"
-const first = library.make ${invalid === "capture" ? "#True" : amount}
+const first = library.make ${invalid === "capture" ? "true" : amount}
 const other = library.make ${amount + 1}
 const box = #library.Box { value: ${amount} }
 const pair = library.boxes box ${
@@ -37,17 +37,17 @@ const pair = library.boxes box ${
     }
 const transformed = library.nested (library.make ${amount + 2})
 const deferred = library.delayed (@u32.add ${amount} 2)
-const provider = library.provided (fn () => ${
+const provider = library.provided (func () => return ${
       invalid === "provider" ? "library.Other ()" : amount + 3
     })
-entry const captured = fn (value: U32) => @u32.add (first value) (other value)
-entry const aliases = fn (value: U32) => pair value
-entry const callback = fn (value: U32) => transformed ${
-      invalid === "body" ? "#True" : "value"
+entry const captured = func (value: U32) => return @u32.add (first value) (other value)
+entry const aliases = func (value: U32) => return pair value
+entry const callback = func (value: U32) => return transformed ${
+      invalid === "body" ? "true" : "value"
     }
-entry const demand = fn () => deferred ()
-entry const handled = fn () => provider ()
-entry const snapshots = fn (start: U32) => do:
+entry const demand = func () => return deferred ()
+entry const handled = func () => return provider ()
+entry const snapshots = func (start: U32) => return do:
   let value = start
   let before = library.make value
   value := @u32.add self 10

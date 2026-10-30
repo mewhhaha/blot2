@@ -1,9 +1,9 @@
 import * as array from "std/array"
-entry const run = fn (seed: U32) -> U32 => do:
+entry const run = func (seed: U32) : U32 => return do:
   let count = 16384 + seed % 1024
-  let prime = array.fill count #True
-  prime[0] := #False
-  prime[1] := #False
+  let prime = array.fill count true
+  prime[0] := false
+  prime[1] := false
   let factor = 2
   for ever:
     if Bool.not (factor * factor < count):
@@ -13,7 +13,7 @@ entry const run = fn (seed: U32) -> U32 => do:
       for ever:
         if Bool.not (index < count):
           break
-        prime[index] := #False
+        prime[index] := false
         index := self + factor
     factor := self + 1
   let total = 0

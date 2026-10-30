@@ -3,24 +3,24 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const extra = `
-entry const captured_choice = fn (choice: U32) => do:
+entry const captured_choice = func (choice: U32) => return do:
   let offset = choice + 9
-  let read = if choice % 2 == 0 then (fn (row: Row) -> U32 => row.count + offset) else (fn (row: Row) -> U32 => row.id * offset)
+  let read = if choice % 2 == 0 then (func (row: Row) : U32 => return row.count + offset) else (func (row: Row) : U32 => return row.id * offset)
   let rows = array.generate 32 make_row
   let total = 0
   for row in rows:
     total := self + read row
   break total
-entry const saved_choice = fn (choice: U32) => do:
-  let take = if choice % 2 == 0 then (fn (row: Row) -> Row => row) else (fn (row: Row) -> Row => make_row (row.id + 100))
+entry const saved_choice = func (choice: U32) => return do:
+  let take = if choice % 2 == 0 then (func (row: Row) : Row => return row) else (func (row: Row) : Row => return make_row (row.id + 100))
   let rows = array.generate 32 make_row
   let saved = make_row 0
   for row in rows:
     saved := take row
   rows[31].count := 999
   break saved.count
-entry const unknown_choice = fn (choice: U32) => do:
-  let readers = #[(fn (row: Row) -> U32 => row.count + 3), (fn (row: Row) -> U32 => row.id + 7)]
+entry const unknown_choice = func (choice: U32) => return do:
+  let readers = #[(func (row: Row) : U32 => return row.count + 3), (func (row: Row) : U32 => return row.id + 7)]
   let read = readers[choice % 2]
   let rows = array.generate 32 make_row
   let total = 0
@@ -28,8 +28,8 @@ entry const unknown_choice = fn (choice: U32) => do:
     total := self + read row
   break total
 type Vector is data = #Vector {x: F32, y: F32}
-entry const selected_bits = fn (seed: F32) => do:
-  let read = if seed == 0.0 then (fn (value: Vector) -> F32 => value.x) else (fn (value: Vector) -> F32 => value.y)
+entry const selected_bits = func (seed: F32) => return do:
+  let read = if seed == 0.0 then (func (value: Vector) : F32 => return value.x) else (func (value: Vector) : F32 => return value.y)
   let values = array.fill 2 (#Vector {x: seed, y: seed})
   let result = 0.0
   for value in values:

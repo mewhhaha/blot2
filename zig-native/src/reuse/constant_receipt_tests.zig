@@ -16,12 +16,12 @@ fn callableConstantSource(sibling: []const u8, changed: bool, cursor: bool) ![]u
         a.free(expression);
         expression = next;
     }
-    var output: []const u8 = "fn (value: U32) => @u32.add value cost";
-    var entry: []const u8 = "entry const run = fn (value: U32) => expensive value";
-    if (changed) output = "fn (value: U32) => @u32.sub value cost";
+    var output: []const u8 = "func (value: U32) => return @u32.add value cost";
+    var entry: []const u8 = "entry const run = func (value: U32) => return expensive value";
+    if (changed) output = "func (value: U32) => return @u32.sub value cost";
     if (cursor) {
         output = "@array.cursor #[cost, 2]";
-        entry = "entry const run = fn (value: U32) => @u32.add value (@cursor.value expensive)";
+        entry = "entry const run = func (value: U32) => return @u32.add value (@cursor.value expensive)";
     }
     return a.print("const seed = {s}\nconst expensive = do:\n  let cost = {s}\n  break {s}\n{s}\nentry const unrelated = seed\n", .{ sibling, expression, output, entry });
 }
@@ -98,7 +98,7 @@ fn makeSource(seed: []const u8, input: []const u8) ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const seed = {s}\nconst expensive = {s}\nentry const run = fn (value: U32) => @u32.add value (@u32.add expensive seed)\n", .{ seed, expression });
+    return a.print("const seed = {s}\nconst expensive = {s}\nentry const run = func (value: U32) => return @u32.add value (@u32.add expensive seed)\n", .{ seed, expression });
 }
 fn replay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result, hits: usize) !void {
     var result = try fixture.compile(allocator, previous, true);
@@ -170,7 +170,7 @@ fn graphSource(seed: []const u8, sibling: []const u8) ![]u8 {
         \\const first = #[{s}, 11]
         \\const middle = #[@u32.add seed ({s}), seed]
         \\const last = #[{s}, 12]
-        \\entry const run = fn () => @u32.add seed (@u32.add (@array.get first 0) (@u32.add (@array.get middle 0) (@array.get last 0)))
+        \\entry const run = func () => return @u32.add seed (@u32.add (@array.get first 0) (@u32.add (@array.get middle 0) (@array.get last 0)))
         \\entry const sibling = {s}
         \\
     , .{ seed, expression, expression, expression, sibling });
@@ -216,8 +216,8 @@ fn growingSource(sibling: []const u8) ![]u8 {
         \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
         \\  break values
         \\const later = @list.prepend (@list.append grown 99) 100
-        \\entry const first = fn () => @array.from_list grown
-        \\entry const following = fn () => @array.from_list later
+        \\entry const first = func () => return @array.from_list grown
+        \\entry const following = func () => return @array.from_list later
         \\entry const sibling = {s}
         \\
     , .{sibling});
@@ -297,7 +297,7 @@ test "constant receipts omit inaccessible growth frontiers from old versions and
             \\  let later = @list.append first 7
             \\  break {s}
             \\const following = {s}
-            \\entry const run = fn () => {s}
+            \\entry const run = func () => return {s}
             \\entry const sibling = 1
             \\
         , .{ expression, outcome, following, use });
@@ -378,7 +378,7 @@ test "constant receipts preserve tight source and allocation limits after a hit"
     const start = std.mem.find(u8, original, "const expensive = ").?;
     const end = std.mem.find(u8, original[start..], "\n").? + start;
     const initializer = original[start..end];
-    const conditional = try a.print("const flag = 0\n{s}\nconst seed = if @u32.eq flag 0 then 3 else {s}\nentry const run = fn (value: U32) => @u32.add value (@u32.add expensive seed)\n", .{ initializer, seed });
+    const conditional = try a.print("const flag = 0\n{s}\nconst seed = if @u32.eq flag 0 then 3 else {s}\nentry const run = func (value: U32) => return @u32.add value (@u32.add expensive seed)\n", .{ initializer, seed });
     defer a.free(conditional);
     const edited = try a.dupe(u8, conditional);
     defer a.free(edited);
@@ -413,7 +413,7 @@ test "constant receipts invalidate executed closed callees and retain ordinary c
     defer a.free(expression_source);
     const start = std.mem.find(u8, expression_source, "const expensive = ").? + "const expensive = ".len;
     const end = std.mem.find(u8, expression_source[start..], "\n").? + start;
-    const source = try a.print("const seed = 2\nconst helper: U32 -> U32 = fn (value: U32) => {s}\nconst expensive = helper 1\nentry const run = fn (value: U32) => @u32.add value (@u32.add expensive seed)\n", .{expression_source[start..end]});
+    const source = try a.print("const seed = 2\nconst helper: U32 -> U32 = func (value: U32) => return {s}\nconst expensive = helper 1\nentry const run = func (value: U32) => return @u32.add value (@u32.add expensive seed)\n", .{expression_source[start..end]});
     defer a.free(source);
     var before = try Fixture.init(source);
     defer before.deinit();
@@ -476,7 +476,7 @@ test "constant receipts invalidate executed closed callees and retain ordinary c
 test "constant receipts retain value work after the ordinary principal prepass" {
     const plain = try makeSource("2", "1");
     defer a.free(plain);
-    const qualified = try std.mem.replaceOwned(u8, a, plain, "const expensive =", "const expensive: U32 where { type_rep U32 } = do:\n  let local = fn value => value\n  break");
+    const qualified = try std.mem.replaceOwned(u8, a, plain, "const expensive =", "const expensive: U32 where { type_rep U32 } = do:\n  let local = func value => return value\n  break");
     defer a.free(qualified);
     var before = try Fixture.init(qualified);
     defer before.deinit();
@@ -537,7 +537,7 @@ fn memberSource(sibling: []const u8) ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const Array.count = fn values => {s}\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\nentry const sibling = {s}\n", .{ expression, sibling });
+    return a.print("const Array.count = func values => return {s}\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\nentry const sibling = {s}\n", .{ expression, sibling });
 }
 
 test "constant receipt array member judgments own ready methods and publications" {
@@ -557,7 +557,7 @@ test "constant receipt array member judgments own ready methods and publications
     defer expected.deinit(a);
     try memberReplay(a, &after, &initial, &expected);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, memberReplay, .{ &after, &initial, &expected });
-    var changed = try Fixture.init("const Array.count = fn values => @u32.add 1 (@array.length values)\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\nentry const sibling = 2\n");
+    var changed = try Fixture.init("const Array.count = func values => return @u32.add 1 (@array.length values)\nentry const warm: U32 = #[].count\nentry const result: U32 = #[].count\nentry const sibling = 2\n");
     defer changed.deinit();
     var ordinary = try changed.compile(a, null, false);
     defer ordinary.deinit(a);
@@ -587,7 +587,7 @@ fn compoundSource(sibling: []const u8) ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const compound = #[{{ value: {s} }}]\nentry const owned = fn () => @array.length compound\nentry const sibling = {s}\n", .{ expression, sibling });
+    return a.print("const compound = #[{{ value: {s} }}]\nentry const owned = func () => return @array.length compound\nentry const sibling = {s}\n", .{ expression, sibling });
 }
 test "constant receipts replay compound graphs with exact fuel and allocation ownership" {
     const original = try compoundSource("1");
@@ -632,7 +632,7 @@ fn smallScalarSource(sibling: []const u8) ![]u8 {
         a.free(expression);
         expression = next;
     }
-    return a.print("const small = {s}\nentry const run = fn () => small\nentry const sibling = {s}\n", .{ expression, sibling });
+    return a.print("const small = {s}\nentry const run = func () => return small\nentry const sibling = {s}\n", .{ expression, sibling });
 }
 fn smallScalarReplay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result) !void {
     var result = try fixture.compile(allocator, previous, true);
@@ -688,7 +688,7 @@ fn enclosingSource(sibling: []const u8, seed: []const u8, delta: []const u8, rec
         a.free(expression);
         expression = next;
     }
-    return a.print("const seed = {s}\nconst Array.count = fn values => {s}\nentry const warm: U32 = #[].count\nentry const enclosing: U32 = {s}\nentry const sibling = {s}\n", .{ seed, method, expression, sibling });
+    return a.print("const seed = {s}\nconst Array.count = func values => return {s}\nentry const warm: U32 = #[].count\nentry const enclosing: U32 = {s}\nentry const sibling = {s}\n", .{ seed, method, expression, sibling });
 }
 fn enclosingReplay(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result) !void {
     var result = try fixture.compile(allocator, previous, true);
@@ -898,13 +898,13 @@ fn compoundAliasesSource(sibling: []const u8, seed: []const u8, delta: []const u
         \\data Box = #Box {{ value: U32 }}
         \\const seed = {s}
         \\const ready = #Box {{ value: seed }}
-        \\entry const warmed = fn () => ready.value
+        \\entry const warmed = func () => return ready.value
         \\const compound = do:
         \\  let cost = {s}
-        \\  break {{ first: ready, second: ready, values: #[ready, ready], answer: cost, callback: fn (value: U32) => @u32.add value (@u32.add cost {s}) }}
-        \\entry const run = fn (value: U32) => compound.callback value
-        \\entry const answer = fn () => compound.first.value
-        \\entry const count = fn () => @array.length compound.values
+        \\  break {{ first: ready, second: ready, values: #[ready, ready], answer: cost, callback: func (value: U32) => return @u32.add value (@u32.add cost {s}) }}
+        \\entry const run = func (value: U32) => return compound.callback value
+        \\entry const answer = func () => return compound.first.value
+        \\entry const count = func () => return @array.length compound.values
         \\entry const sibling = {s}
         \\
     , .{ seed, expression, delta, sibling });
@@ -982,11 +982,11 @@ fn compoundGrowthSource(sibling: []const u8, seed: []const u8) ![]u8 {
         \\  break #Bundle {{ earlier: earlier, current: values, alias: values, other: other, answer: seed }}
         \\const later = @list.prepend (@list.append grown.current 99) 100
         \\const branched = @list.append grown.earlier 200
-        \\entry const first = fn () => @array.from_list grown.current
-        \\entry const old = fn () => @array.from_list grown.earlier
-        \\entry const following = fn () => @array.from_list later
-        \\entry const branch = fn () => @array.from_list branched
-        \\entry const answer = fn () => grown.answer
+        \\entry const first = func () => return @array.from_list grown.current
+        \\entry const old = func () => return @array.from_list grown.earlier
+        \\entry const following = func () => return @array.from_list later
+        \\entry const branch = func () => return @array.from_list branched
+        \\entry const answer = func () => return grown.answer
         \\entry const sibling = {s}
         \\
     , .{ seed, sibling });
@@ -1113,7 +1113,7 @@ test "compound demand receipts retain cumulative limits retry rollback and sourc
 }
 
 fn queryBarrierSource(seed: []const u8, increment: []const u8) ![]u8 {
-    return a.print("const Array.count = fn values => @u32.add (@array.length values) {s}\nconst seed = {s}\nconst bundle = do:\n  let first = #[].count\n  let second = #[].count\n  let cost = 1\n  for index in 0..256:\n    cost := @u32.add self 1\n  break {{first, second, cost}}\nentry const run = fn () => @u32.add bundle.first (@u32.add bundle.second bundle.cost)\nentry const unrelated = seed\n", .{ increment, seed });
+    return a.print("const Array.count = func values => return @u32.add (@array.length values) {s}\nconst seed = {s}\nconst bundle = do:\n  let first = #[].count\n  let second = #[].count\n  let cost = 1\n  for index in 0..256:\n    cost := @u32.add self 1\n  break {{first, second, cost}}\nentry const run = func () => return @u32.add bundle.first (@u32.add bundle.second bundle.cost)\nentry const unrelated = seed\n", .{ increment, seed });
 }
 fn replayQueryBarriers(allocator: std.mem.Allocator, fixture: *const Fixture, previous: *const backend.Result, expected: *const backend.Result) !void {
     var result = try fixture.compile(allocator, previous, true);
@@ -1173,9 +1173,9 @@ fn queryBarrierRecovery(allocator: std.mem.Allocator, fixture: *const Fixture, p
 fn frameJudgmentSource(seed: []const u8, value: []const u8) ![]u8 {
     return a.print(
         \\const seed = {s}
-        \\const identity = fn value => value
+        \\const identity = func value => return value
         \\const answer = do:
-        \\  let callback = fn () => {s}
+        \\  let callback = func () => return {s}
         \\  let generic = identity
         \\  let nested = {{callback, value: generic 7}}
         \\  let selected: U32 where {{ type_rep U32 }} = nested.callback ()
@@ -1183,7 +1183,7 @@ fn frameJudgmentSource(seed: []const u8, value: []const u8) ![]u8 {
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
         \\  break {{selected, cost, value: nested.value}}
-        \\entry const run = fn () => @u32.add answer.selected (@u32.add answer.cost answer.value)
+        \\entry const run = func () => return @u32.add answer.selected (@u32.add answer.cost answer.value)
         \\entry const unrelated = seed
         \\
     , .{ seed, value });
@@ -1311,7 +1311,7 @@ fn immutableTemporarySource(seed: []const u8, bound: []const u8) ![]u8 {
         \\  let valid = @proof.lt 0 limit
         \\  let cost = {s}
         \\  break @u32.add cost selected
-        \\entry const run = fn () => answer
+        \\entry const run = func () => return answer
         \\entry const unrelated = seed
         \\
     , .{ seed, bound, cost });
@@ -1354,11 +1354,11 @@ fn retainedPackageSource(seed: []const u8, payload: []const u8) ![]u8 {
     }
     return a.print(
         \\type Render a is contract = {{ const show: a -> U32 }}
-        \\impl Number : Render U32 = {{ const show = fn value => value }}
+        \\impl Number : Render U32 = {{ const show = func value => return value }}
         \\type Item = exists [a] where {{ Render a }} => a
         \\const seed = {s}
         \\const packet = pack [U32] ({s}) as Item
-        \\entry const run = fn () => unpack packet as [a] value in Render.show value
+        \\entry const run = func () => return unpack packet as [a] value in Render.show value
         \\entry const unrelated = seed
         \\
     , .{ seed, cost });
@@ -1451,7 +1451,7 @@ test "constant receipts retain closed existential data and selected dictionary c
     var fresh = try changed.compile(a, null, false);
     defer fresh.deinit(a);
     try replayGraphs(a, &changed, &initial, &fresh, 0);
-    const changed_method = try std.mem.replaceOwned(u8, a, edited, "fn value => value", "fn value => @u32.add value 1");
+    const changed_method = try std.mem.replaceOwned(u8, a, edited, "func value => return value", "func value => return @u32.add value 1");
     defer a.free(changed_method);
     var method = try Fixture.init(changed_method);
     defer method.deinit();
@@ -1470,11 +1470,11 @@ fn retainedQuantifierSource(seed: []const u8) ![]u8 {
         cost = next;
     }
     return a.print(
-        \\const choose: forall [a] => a -> a = fn value => value
-        \\const concrete = fn (value: U32) => @u32.add value 1
+        \\const choose: forall [a] => a -> a = func value => return value
+        \\const concrete = func (value: U32) => return @u32.add value 1
         \\const seed = {s}
         \\const packet = {{choose, cost: {s}}}
-        \\entry const run = fn () => packet.choose packet.cost
+        \\entry const run = func () => return packet.choose packet.cost
         \\entry const unrelated = seed
         \\
     , .{ seed, cost });
@@ -1522,29 +1522,29 @@ fn quantifiedFieldSource(seed: []const u8) ![]u8 {
     return a.print(
         \\type Maybe a is data = #Some a | #None
         \\type Render a is contract = {{ const show: a -> U32 }}
-        \\impl Number : Render U32 = {{ const show = fn value => @u32.add value 1 }}
-        \\impl Flag : Render Bool = {{ const show = fn value => if value then 7 else 9 }}
-        \\const choose: forall [a] => a -> a = fn value => value
-        \\const make: U32 -> (forall [a] => a -> a) = fn captured => fn item => do:
+        \\impl Number : Render U32 = {{ const show = func value => return @u32.add value 1 }}
+        \\impl Flag : Render Bool = {{ const show = func value => return if value then 7 else 9 }}
+        \\const choose: forall [a] => a -> a = func value => return value
+        \\const make: U32 -> (forall [a] => a -> a) = func captured => return func item => return do:
         \\  let ignored = @u32.add captured 1
         \\  break item
-        \\const show: forall [a] where {{ Render a }} => a -> U32 = fn value => Render.show value
+        \\const show: forall [a] where {{ Render a }} => a -> U32 = func value => return Render.show value
         \\const wrap: forall [a] => a -> Maybe a = #Some
-        \\const apply: forall [a, row e] => ((a -> a ! {{|e}}), a) -> a ! {{|e}} = fn pair => (@product.get pair 0) (@product.get pair 1)
-        \\const concrete = fn (value: U32) => @u32.add value 1
+        \\const apply: forall [a, row e] => ((a -> a ! {{|e}}), a) -> a ! {{|e}} = func pair => return (@product.get pair 0) (@product.get pair 1)
+        \\const concrete = func (value: U32) => return @u32.add value 1
         \\const seed = {s}
         \\const packet = do:
         \\  let cost = 35
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
         \\  break {{choose, other: make 35, show, wrap, apply, cost}}
-        \\entry const run = fn () => packet.choose packet.cost
-        \\entry const fraction = fn () => packet.other 3.5
-        \\entry const shown = fn () => @u32.add (packet.show 35) (packet.show #True)
-        \\entry const wrapped = fn () => case packet.wrap packet.cost of
+        \\entry const run = func () => return packet.choose packet.cost
+        \\entry const fraction = func () => return packet.other 3.5
+        \\entry const shown = func () => return @u32.add (packet.show 35) (packet.show true)
+        \\entry const wrapped = func () => return case packet.wrap packet.cost of
         \\  #Some value => value
         \\  #None => 0
-        \\entry const host = fn (callback: U32 -> U32 ! {{Foreign}}) => packet.apply (callback, packet.cost)
+        \\entry const host = func (callback: U32 -> U32 ! {{Foreign}}) => return packet.apply (callback, packet.cost)
         \\entry const unrelated = seed
         \\
     , .{seed});
@@ -1574,16 +1574,16 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     \\  let cost = @effect.count metadata
     , .hits = 1, .changed_hits = 1 },
     .{ .body =
-    \\  let provider = @effect.provider Read (fn () => base)
+    \\  let provider = @effect.provider Read (func () => return base)
     \\  let cost = base
     , .hits = 1 },
     .{ .body =
-    \\  let cost = do (@effect.provider Read (fn () => base)):
+    \\  let cost = do (@effect.provider Read (func () => return base)):
     \\    break base
     , .hits = 1 },
     .{ .body =
     \\  let cost = base
-    \\  for request in @requests (@computation (fn () => base)):
+    \\  for request in @requests (@computation (func () => return base)):
     \\    case request of
     \\      effect Read () =>
     \\        yield base
@@ -1598,10 +1598,10 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     \\    #Box value => value
     , .hits = 1 },
     .{ .body =
-    \\  let (_, cost) = @state.run base (fn () => base)
+    \\  let (_, cost) = @state.run base (func () => return base)
     , .hits = 0 },
     .{ .body =
-    \\  let cost = do (@effect.provider Read (fn () => base)):
+    \\  let cost = do (@effect.provider Read (func () => return base)):
     \\    use result <- Read ()
     \\    break result
     , .hits = 0 },
@@ -1611,7 +1611,7 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     \\  let again = @force pending
     , .hits = 0 },
     .{ .body =
-    \\  let cost = @effect.scope (fn (state: State U32) => base)
+    \\  let cost = @effect.scope (func (state: State U32) => return base)
     , .hits = 0 },
     .{ .body =
     \\  let cost = @code.run (@code.quote (@code.lift base))
@@ -1621,17 +1621,17 @@ fn temporarySource(seed: []const u8, base: []const u8, body: []const u8) ![]u8 {
     return a.print(
         \\effect Read: Unit -> U32
         \\type State a is effect = {{get: Unit -> a, set: a -> Unit}}
-        \\const described: Unit -> U32 ! {{Read}} = fn () => Read ()
+        \\const described: Unit -> U32 ! {{Read}} = func () => return Read ()
         \\type Box a is data = #Box a
-        \\const Box.pure = fn (value: U32) => #Box value
-        \\const delayed = fn ~value => value
+        \\const Box.pure = func (value: U32) => return #Box value
+        \\const delayed = func ~value => return value
         \\const base = {s}
         \\const expensive = do:
         \\{s}
         \\  for index in 0..256:
         \\    cost := @u32.add self 1
         \\  break cost
-        \\entry const answer = fn () => expensive
+        \\entry const answer = func () => return expensive
         \\entry const sibling = {s}
         \\
     , .{ base, body, seed });

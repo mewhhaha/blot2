@@ -1,4 +1,4 @@
-const gcd = fn (a: U32) (b: U32) -> U32 => do:
+const gcd = func (a: U32) -> (b: U32) : U32 => return do:
   let left = a
   let right = b
   for ever:
@@ -8,7 +8,7 @@ const gcd = fn (a: U32) (b: U32) -> U32 => do:
     left := right
     right := remainder
   break left
-entry const run = fn (seed: U32) -> U32 => do:
+entry const run = func (seed: U32) : U32 => return do:
   let total = 0
   for index in 0..4096:
     total := self + gcd (seed + index * 7919) (index * 104729 + 1)

@@ -3,13 +3,13 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = "const store = fn setter => fn value => setter value\n";
+const library = "const store = func setter => return func value => return setter value\n";
 const source = `import {store} from "./library"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
-entry const answer = fn (seed: U32) => @effect.scope (fn (s: State U32) => do:
-  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    use store Box.set (fn () => do:
+entry const answer = func (seed: U32) => return @effect.scope (func (s: State U32) => return do:
+  let (stored, result) = do (@effect.state Box.get Box.set (func () => return 0)):
+    use store Box.set (func () => return do:
       let (state, value) = do (@effect.state s.get s.set seed):
         break s.get ()
       break value
@@ -81,10 +81,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
           const older = `import {store} from "./library"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 type Box is effect = {get: Unit -> (Unit -> U32), set: (Unit -> U32) -> Unit}
-entry const answer = fn () => do:
-  let (stored, result) = do (@effect.state Box.get Box.set (fn () => 0)):
-    break @effect.scope (fn (s: State U32) => do:
-      use store Box.set (fn () => do:
+entry const answer = func () => return do:
+  let (stored, result) = do (@effect.state Box.get Box.set (func () => return 0)):
+    break @effect.scope (func (s: State U32) => return do:
+      use store Box.set (func () => return do:
         let (state, value) = do (@effect.state s.get s.set 42):
           break s.get ()
         break value
@@ -94,8 +94,8 @@ entry const answer = fn () => do:
   break result
 `;
           const ordinary = source.replace(
-            "@effect.state Box.get Box.set (fn () => 0)",
-            "@effect.provider Box.set (fn value => ())",
+            "@effect.state Box.get Box.set (func () => return 0)",
+            "@effect.provider Box.set (func value => return ())",
           ).replace("let (stored, result) =", "let result =");
           for (const invalid of [older, ordinary]) {
             const rejected = await compiler.build({

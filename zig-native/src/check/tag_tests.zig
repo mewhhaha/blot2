@@ -11,19 +11,19 @@ const a = std.testing.allocator;
 const source =
     \\infixl 60 (+) = _fixity_add
     \\infixl 70 (*) = _fixity_mul
-    \\const add = fn amount => fn value => value + amount
-    \\const twice = fn value => value * 2
+    \\const add = func amount => return func value => return value + amount
+    \\const twice = func value => return value * 2
     \\@[add 1]
     \\@[twice]
     \\entry const answer: U32 = 20
-    \\@[fn function => fn value => function value + 1]
-    \\entry const next: U32 -> U32 = fn (value: U32) => value
-    \\@[fn function => function 41]
-    \\entry const reduced: U32 = fn (value: U32) => value + 1
-    \\@[fn value => @panic "unreachable"]
+    \\@[func function => return func value => return function value + 1]
+    \\entry const next: U32 -> U32 = func (value: U32) => return value
+    \\@[func function => return function 41]
+    \\entry const reduced: U32 = func (value: U32) => return value + 1
+    \\@[func value => return @panic "unreachable"]
     \\const unused: U32 = 1
-    \\const _fixity_add = fn left => fn right => @u32.add left right
-    \\const _fixity_mul = fn left => fn right => @u32.mul left right
+    \\const _fixity_add = func left => return func right => return @u32.add left right
+    \\const _fixity_mul = func left => return func right => return @u32.mul left right
 ;
 fn lower(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     var tokens = try lexer.lex(allocator, text);
@@ -73,17 +73,17 @@ test "tag checking lowering and backend ownership survives every allocation fail
 test "tag and original initializer diagnostics retain their distinct source ownership" {
     const cases = [_]struct { text: []const u8, code: check.Code, marker: []const u8 }{
         .{ .text = "@[1] entry const answer=42\n", .code = .type_mismatch, .marker = "@[" },
-        .{ .text = "@[fn value=>value]\n@[1] entry const answer=42\n", .code = .type_mismatch, .marker = "@[1]" },
-        .{ .text = "@[fn value=>@u32.add #True 1] entry const answer=42\n", .code = .type_mismatch, .marker = "@[" },
-        .{ .text = "@[fn value=>value] entry const answer=answer\n", .code = .recursive_tag, .marker = "@[" },
+        .{ .text = "@[func value=> return value]\n@[1] entry const answer=42\n", .code = .type_mismatch, .marker = "@[1]" },
+        .{ .text = "@[func value=> return @u32.add true 1] entry const answer=42\n", .code = .type_mismatch, .marker = "@[" },
+        .{ .text = "@[func value=> return value] entry const answer=answer\n", .code = .recursive_tag, .marker = "@[" },
         .{ .text = "@[answer] entry const answer:U32=42\n", .code = .recursive_tag, .marker = "@[" },
-        .{ .text = "@[fn value=>value] entry const answer=fn ()=>answer ()\n", .code = .recursive_tag, .marker = "@[" },
-        .{ .text = "@[fn value=>case value of\n  #True=>1]\nentry const answer:U32=#True\n", .code = .non_exhaustive_match, .marker = "@[" },
-        .{ .text = "@[fn value=>value]\nentry const answer:U32=case #True of\n  #True=>1\n", .code = .non_exhaustive_match, .marker = "case" },
-        .{ .text = "@[fn value=>#True] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "U32" },
-        .{ .text = "const expected=(1,2)\n@[fn value=>case value of\n  ^expected=>1\n  _=>0] entry const answer=expected\n", .code = .value_pattern_type, .marker = "@[" },
-        .{ .text = "const expected=(1,2)\n@[fn value=>value] entry const answer=case expected of\n  ^expected=>1\n  _=>0\n", .code = .value_pattern_type, .marker = "case" },
-        .{ .text = "@[fn ~value=>@force value] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "@[" },
+        .{ .text = "@[func value=> return value] entry const answer=func ()=> return answer ()\n", .code = .recursive_tag, .marker = "@[" },
+        .{ .text = "@[func value=> return case value of\n  true=>1]\nentry const answer:U32=true\n", .code = .non_exhaustive_match, .marker = "@[" },
+        .{ .text = "@[func value=> return value]\nentry const answer:U32=case true of\n  true=>1\n", .code = .non_exhaustive_match, .marker = "case" },
+        .{ .text = "@[func value=> return true] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "U32" },
+        .{ .text = "const expected=(1,2)\n@[func value=> return case value of\n  ^expected=>1\n  _=>0] entry const answer=expected\n", .code = .value_pattern_type, .marker = "@[" },
+        .{ .text = "const expected=(1,2)\n@[func value=> return value] entry const answer=case expected of\n  ^expected=>1\n  _=>0\n", .code = .value_pattern_type, .marker = "case" },
+        .{ .text = "@[func ~value=> return @force value] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "@[" },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(a, item.text);

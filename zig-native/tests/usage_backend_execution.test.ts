@@ -5,21 +5,21 @@ import { GuestError, instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const source = `
-const unit = fn (owner: unique Unit) => @usage.borrow owner (fn loan => @usage.read loan)
-const float = fn (owner: unique F32) => @usage.borrow_mut owner (fn loan => @f32.add (@usage.read loan) (@usage.read loan))
-const captured = fn (callback: once (Unit -> U32 ! {Foreign})) => do:
-  let owner = (fn (value: unique U32) => value) 9
-  break @usage.borrow owner (fn loan => @u32.add (@usage.read loan) (callback ()))
-const payload = fn (owner: unique U32) => @usage.borrow owner (fn loan => @array.fill 1024 (@usage.read loan))
-entry const buffer = fn () => payload 9
-entry const empty = fn () => unit ()
-entry const fraction = fn () => float 1.25
-entry const answer = fn (host: Unit -> U32 ! {Foreign}) => captured (fn () => host ())
-entry const ordered = fn (host: Unit -> U32 ! {Foreign}) => do:
-  let create = fn () => do:
+const unit = func (owner: unique Unit) => return @usage.borrow owner (func loan => return @usage.read loan)
+const float = func (owner: unique F32) => return @usage.borrow_mut owner (func loan => return @f32.add (@usage.read loan) (@usage.read loan))
+const captured = func (callback: once (Unit -> U32 ! {Foreign})) => return do:
+  let owner = (func (value: unique U32) => return value) 9
+  break @usage.borrow owner (func loan => return @u32.add (@usage.read loan) (callback ()))
+const payload = func (owner: unique U32) => return @usage.borrow owner (func loan => return @array.fill 1024 (@usage.read loan))
+entry const buffer = func () => return payload 9
+entry const empty = func () => return unit ()
+entry const fraction = func () => return float 1.25
+entry const answer = func (host: Unit -> U32 ! {Foreign}) => return captured (func () => return host ())
+entry const ordered = func (host: Unit -> U32 ! {Foreign}) => return do:
+  let create = func () => return do:
     use ignored <- host ()
-    break (fn (value: unique U32) => value) 9
-  break @usage.borrow (create ()) (fn loan => @u32.add (@usage.read loan) (host ()))
+    break (func (value: unique U32) => return value) 9
+  break @usage.borrow (create ()) (func loan => return @u32.add (@usage.read loan) (host ()))
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -42,7 +42,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
       const unresolved = await compiler.build({
         sources: {
           [entry]: source +
-            "\nentry const unknown: forall [a] => a -> a = fn value => value\n",
+            "\nentry const unknown: forall [a] => a -> a = func value => return value\n",
         },
       });
       assert(!unresolved.success);

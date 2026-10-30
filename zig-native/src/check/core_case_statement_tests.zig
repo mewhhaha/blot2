@@ -10,7 +10,7 @@ const a = std.testing.allocator;
 // The second arm leaves `count` alone; the third keeps its own local.
 const source =
     \\type Tri is data = #Rise | #Fall | #Still
-    \\entry const run = fn (n: U32) -> U32 => do:
+    \\entry const run = func (n: U32) : U32 => return do:
     \\  let beat = if @u32.eq n 0 then #Fall else if @u32.eq n 1 then #Rise else #Still
     \\  let count = 0
     \\  case beat of
@@ -122,7 +122,7 @@ test "statement case arms carry rebinding through one binary merge per nested le
 test "statement case arms reject a nested return but end at a direct one" {
     const nested =
         \\type Beat is data = #Up | #Down
-        \\entry const run = fn (n: U32) -> U32 => do:
+        \\entry const run = func (n: U32) : U32 => return do:
         \\  let beat = if @u32.lt 0 n then #Up else #Down
         \\  let count = 0
         \\  case beat of
@@ -145,14 +145,14 @@ test "statement case arms reject a nested return but end at a direct one" {
 
 test "a plain nested do keeps its scope and an arm local stays dead" {
     inline for (.{
-        \\entry const run = fn (n: U32) -> U32 => do:
+        \\entry const run = func (n: U32) : U32 => return do:
         \\  let count = n
         \\  do:
         \\    count := @u32.add self 1
         \\  break count
         ,
         \\type Maybe a is data = #None | #Some a
-        \\entry const run = fn (n: U32) -> U32 => do:
+        \\entry const run = func (n: U32) : U32 => return do:
         \\  let count = 0
         \\  case #Some n of
         \\    #Some value => do:

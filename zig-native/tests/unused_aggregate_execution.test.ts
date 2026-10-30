@@ -8,14 +8,14 @@ for (const asynchronous of [false, true]) {
     await compileAndRun(
       `
 data Maybe a = #Some a | #Nothing
-const identity = fn value => value
+const identity = func value => return value
 const empty = #Nothing
 const nested = #Some (#Some 42)
 const reference = identity
 const constructor = #Some
-const closure = (fn captured => fn value => @u32.add captured value) 2
-entry const answer = fn () => closure 40
-entry const probe = fn () => do:
+const closure = (func captured => return func value => return @u32.add captured value) 2
+entry const answer = func () => return closure 40
+entry const probe = func () => return do:
   let kept = (empty, nested, reference, constructor)
   break 0
 `,
@@ -35,18 +35,18 @@ for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate eager-order (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       `data Count value = #Count value
-const witness = fn () -> Count U32 => @panic "witness ran"
-const identity = fn value => value
-const keep = fn ~value => fn () => @force value
-const mark = fn (digit: U32) => do:
+const witness = func () : Count U32 => return @panic "witness ran"
+const identity = func value => return value
+const keep = func ~value => return func () => return @force value
+const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
   break @u32.to_f32 digit
-entry const answer = fn () => do:
-  let (#Count count, _) = @state.run (#Count 0) (fn () => do:
+entry const answer = func () => return do:
+  let (#Count count, _) = @state.run (#Count 0) (func () => return do:
     let delayed = keep (mark 7)
-    use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), fn () => @panic "unused body ran"))
+    use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), func () => return @panic "unused body ran"))
     break ()
   )
   break count
@@ -75,23 +75,23 @@ for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate implicit-uses (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       `data Box = #Box (U32, U32)
-entry const capture = fn () => do:
+entry const capture = func () => return do:
   let kept = (40, 2)
-  let use_it = fn () => @u32.add (@product.get kept 0) (@product.get kept 1)
+  let use_it = func () => return @u32.add (@product.get kept 0) (@product.get kept 1)
   break use_it ()
-entry const carry = fn () => do:
+entry const carry = func () => return do:
   let kept = (40, 2)
   for index in 0..2:
     kept := (@u32.add (@product.get kept 0) 1, 0)
   break @product.get kept 0
-entry const merged = fn (flag: Bool) => do:
+entry const merged = func (flag: Bool) => return do:
   let kept = (0, 0)
   if flag:
     kept := (40, 2)
   else:
     kept := (20, 22)
   break @u32.add (@product.get kept 0) (@product.get kept 1)
-entry const value_pattern = fn () => do:
+entry const value_pattern = func () => return do:
   let needle = 41
   let unused = (0, 0)
   break case 41 of
@@ -120,22 +120,22 @@ for (const asynchronous of [false, true]) {
     await compileAndRun(
       `data Count value = #Count value
 type Stop is effect = { read: Unit -> U32 }
-const witness = fn () -> Count U32 => @panic "witness ran"
-const identity = fn value => value
-const mark = fn (digit: U32) => do:
+const witness = func () : Count U32 => return @panic "witness ran"
+const identity = func value => return value
+const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
   let #Count old = previous
   use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
   break digit
-const handled = fn computation => do:
+const handled = func computation => return do:
   for request in @requests computation:
     case request of
       effect Stop.read () =>
         break 40
       complete value =>
         break value
-entry const answer = fn () => do:
-  let (#Count count, value) = @state.run (#Count 0) (fn () => handled (@computation (fn () => do:
+entry const answer = func () => return do:
+  let (#Count count, value) = @state.run (#Count 0) (func () => return handled (@computation (func () => return do:
     use ignored <- (identity, (mark 1, Stop.read (), mark 2))
     break 0
   )))
@@ -164,9 +164,9 @@ entry const folded = answer ()
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate generate-panic (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
-      `const identity = fn value => value
-entry const answer = fn (length: U32) => do:
-  let ignored = (identity, @array.generate length (fn (index: U32) -> U32 => @panic "callback ran"))
+      `const identity = func value => return value
+entry const answer = func (length: U32) => return do:
+  let ignored = (identity, @array.generate length (func (index: U32) : U32 => return @panic "callback ran"))
   break 42
 `,
       async (guest) => {
@@ -191,9 +191,9 @@ entry const answer = fn (length: U32) => do:
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate runtime-panic (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
-      `const identity = fn value => value
-entry const answer = fn (value: U32) => do:
-  let ignored = (identity, (fn input => @panic "runtime operand") value, @u32.div 1 0)
+      `const identity = func value => return value
+entry const answer = func (value: U32) => return do:
+  let ignored = (identity, (func input => return @panic "runtime operand") value, @u32.div 1 0)
   break 0
 `,
       async (guest) => {
@@ -216,9 +216,9 @@ entry const answer = fn (value: U32) => do:
 Deno.test("unused aggregate retains panic-order", async () => {
   await compileExpectedFailure(
     `data Maybe a = #Some a | #Nothing
-const identity = fn value => value
+const identity = func value => return value
 const bad = @panic "constant operand"
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let ignored = (identity, bad)
   break 0
 `,
@@ -227,11 +227,11 @@ entry const answer = fn () => do:
 });
 Deno.test("unused aggregate retains initializer-panic", async () => {
   await compileExpectedFailure(
-    `const identity = fn value => value
+    `const identity = func value => return value
 const failing = do:
   let ignored = (1, 2)
   break @panic "constant initializer ran"
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let ignored = (identity, failing)
   break 0
 `,
@@ -240,7 +240,7 @@ entry const answer = fn () => do:
 });
 Deno.test("unused aggregate retains explicit-qualifier", async () => {
   await compileExpectedFailure(
-    `entry const answer = fn () => do:
+    `entry const answer = func () => return do:
   let ignored: (U32, U32) where { associated "missing" Bool Bool Bool } = (40, 2)
   break 0
 `,
@@ -249,10 +249,10 @@ Deno.test("unused aggregate retains explicit-qualifier", async () => {
 });
 Deno.test("unused aggregate retains deferred-body proof rejection", async () => {
   await compileExpectedFailure(
-    `const identity = fn value => value
-const missing = fn value => value.no_such_member
-entry const answer = fn () => do:
-  let unused = (missing, identity, fn input => input.no_such_member)
+    `const identity = func value => return value
+const missing = func value => return value.no_such_member
+entry const answer = func () => return do:
+  let unused = (missing, identity, func input => return input.no_such_member)
   break 42
 entry const folded = answer ()
 `,
@@ -261,9 +261,9 @@ entry const folded = answer ()
 });
 Deno.test("unused aggregate retains deferred-anonymous proof rejection", async () => {
   await compileExpectedFailure(
-    `const identity = fn value => value
-entry const answer = fn () => do:
-  let unused = (identity, fn value => value.no_such_member)
+    `const identity = func value => return value
+entry const answer = func () => return do:
+  let unused = (identity, func value => return value.no_such_member)
   break 42
 `,
     "constant_expression",
@@ -271,10 +271,10 @@ entry const answer = fn () => do:
 });
 Deno.test("unused aggregate retains deferred-alias proof rejection", async () => {
   await compileExpectedFailure(
-    `const identity = fn value => value
-const missing = fn value => value.no_such_member
+    `const identity = func value => return value
+const missing = func value => return value.no_such_member
 const packed = (identity, missing)
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let unused = (identity, packed)
   break 42
 `,

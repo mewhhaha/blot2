@@ -5,10 +5,10 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const source = `
-const make = fn () => fn holder => holder.value
+const make = func () => return func holder => return holder.value
 const read = make ()
-const apply = fn getter => fn holder => getter holder
-entry const run = fn (count: U32) => do:
+const apply = func getter => return func holder => return getter holder
+entry const run = func (count: U32) => return do:
   let holder = { bits: 65568, floating: -0.0, value: #[7, 42] }
   let alias = apply read holder
   holder.value := #[90, 91]
@@ -17,9 +17,9 @@ entry const run = fn (count: U32) => do:
     if pressure[8191] != index:
       @panic "lost pressure"
   break #[alias[0], alias[1], holder.value[0]]
-entry const bits = fn () => apply (fn holder => holder.bits) { bits: 65568, value: #[99] }
-entry const floating = fn () => apply (fn holder => holder.floating) { floating: -0.0, value: #[99] }
-entry const failed = fn (host: Array U32 -> Unit ! {Foreign}) => do:
+entry const bits = func () => return apply (func holder => return holder.bits) { bits: 65568, value: #[99] }
+entry const floating = func () => return apply (func holder => return holder.floating) { floating: -0.0, value: #[99] }
+entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
   let holder = { value: #[7, 42] }
   let alias = apply read holder
   holder.value := #[90, 91]
@@ -43,8 +43,8 @@ Deno.test("checked getter results survive field replacement suspension failure a
         });
         try {
           const edited = source.replace(
-            "holder => holder.value",
-            "holder => @array.set holder.value 0 (holder.value[0] + 1)",
+            "holder => return holder.value",
+            "holder => return @array.set holder.value 0 (holder.value[0] + 1)",
           );
           for (const [revision, text] of [source, edited, source].entries()) {
             const built = await compiler.build({ sources: { [entry]: text } });

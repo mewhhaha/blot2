@@ -26,24 +26,24 @@ const source =
     \\infixl 60 (+) = _fixity_add
     \\type Box a is data = #Box {value: a}
     \\type Signal a is effect = { get: Unit -> a }
-    \\const twice: a -> a where { associated "add" a a a } = fn value => value + value
-    \\const first: a -> b where { field "value" a b } = fn box => box.value
-    \\const bind: a -> b where { receiver "plus" a Unit b } = fn box => box.plus
-    \\const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
+    \\const twice: a -> a where { associated "add" a a a } = func value => return value + value
+    \\const first: a -> b where { field "value" a b } = func box => return box.value
+    \\const bind: a -> b where { receiver "plus" a Unit b } = func box => return box.plus
+    \\const replace: a -> b -> c where { update "value" a b c } = func box => return func value => return do:
     \\  let current = box
     \\  current.value := value
     \\  break current
-    \\const read: Unit -> a ! {| e} where { operation Signal.get a } = fn () => Signal.get a ()
-    \\const identity: a -> a where { type_rep a } = fn value => value
+    \\const read: Unit -> a ! {| e} where { operation Signal.get a } = func () => return Signal.get a ()
+    \\const identity: a -> a where { type_rep a } = func value => return value
     \\let started: U32 where { effect_rep ! {} } = 7
-    \\const narrow: U32 -> U32 where { associated "add" U32 U32 b } = fn value => value
-    \\const unknown: a -> a where { associated "missing" a a a } = fn value => value
-    \\entry const answer = fn () => do:
+    \\const narrow: U32 -> U32 where { associated "add" U32 U32 b } = func value => return value
+    \\const unknown: a -> a where { associated "missing" a a a } = func value => return value
+    \\entry const answer = func () => return do:
     \\  let represented: U32 where { type_rep U32 } = 42
-    \\  let choose: a -> a where { type_rep a } = fn value => value
+    \\  let choose: a -> a where { type_rep a } = func value => return value
     \\  let first = choose represented
     \\  break @u32.add (choose first) (@f32.to_u32 (choose 0.0))
-    \\const _fixity_add = fn left => fn right => @type.call "add" left right
+    \\const _fixity_add = func left => return func right => return @type.call "add" left right
 ;
 
 fn qualifiedSchemes(allocator: std.mem.Allocator) !void {
@@ -94,7 +94,7 @@ fn pureInvocationClause(allocator: std.mem.Allocator) !void {
         const program = try std.mem.concat(allocator, u8, &.{
             "const twice: a -> a where { associated \"add\" a a a",
             row,
-            " } = fn value => @type.call \"add\" value value\n",
+            " } = func value => return @type.call \"add\" value value\n",
         });
         defer allocator.free(program);
         var tokens = try lexer.lex(allocator, program);
@@ -130,17 +130,17 @@ fn rejectionLaws(allocator: std.mem.Allocator) !void {
         .{ .source = "entry const answer: U32 where { associated \"add\" U32 U32 } = 42\n", .code = .invalid_constraint, .marker = "associated" },
         .{ .source = "entry const answer: U32 where { type_rep \"add\" U32 } = 42\n", .code = .invalid_constraint, .marker = "type_rep" },
         .{ .source = "entry const answer: U32 where { field \"x\" U32 U32 ! {} } = 42\n", .code = .invalid_constraint, .marker = "field" },
-        .{ .source = "entry const answer = fn (callback: U32 -> U32 where {}) => 42\n", .code = .higher_rank_constraint, .marker = "where" },
-        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where {} = fn value => value + value\nentry const answer = 42\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .missing_predicate, .marker = "+ value" },
-        .{ .source = "const first: a -> b where {} = fn value => value.field\nentry const answer = 42\n", .code = .missing_predicate, .marker = "field" },
-        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"sub\" a a a } = fn value => value + value\nentry const answer = 42\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .missing_predicate, .marker = "+ value" },
-        .{ .source = "const identity: e -> e where { effect_rep ! {| e} } = fn value => value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e}" },
+        .{ .source = "entry const answer = func (callback: U32 -> U32 where {}) => return 42\n", .code = .higher_rank_constraint, .marker = "where" },
+        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where {} = func value => return value + value\nentry const answer = 42\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n", .code = .missing_predicate, .marker = "+ value" },
+        .{ .source = "const first: a -> b where {} = func value => return value.field\nentry const answer = 42\n", .code = .missing_predicate, .marker = "field" },
+        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"sub\" a a a } = func value => return value + value\nentry const answer = 42\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n", .code = .missing_predicate, .marker = "+ value" },
+        .{ .source = "const identity: e -> e where { effect_rep ! {| e} } = func value => return value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e}" },
         .{ .source = "type Signal a is effect = { get: Unit -> a }\nentry const answer: U32 where { operation Signal.get } = 42\n", .code = .effect_arity, .marker = "where" },
         .{ .source = "type Reader is effect = { get: Unit -> U32 }\nentry const answer: U32 where { operation Reader.get } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "type Signal a is effect = { get: Unit -> a }\nentry const answer: U32 where { operation (Signal.get) U32 } = 42\n", .code = .invalid_constraint, .marker = "operation" },
         .{ .source = "entry const answer: U32 where { effect_rep ! {Missing} } = 42\n", .code = .unknown_effect, .marker = "effect_rep" },
-        .{ .source = "const replace: a -> b -> c where {} = fn box => fn value => do:\n  let current = box\n  current.value := value\n  break current\nentry const answer = 42\n", .code = .missing_predicate, .marker = ".value" },
-        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"add\" a a a } = fn value => value + value\nentry const answer = fn () => do:\n  let selected = case #True of\n    #True => twice\n    #False => twice\n  break @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\nconst _fixity_add = fn left => fn right => @type.call \"add\" left right\n", .code = .type_mismatch, .marker = "selected 1.5" },
+        .{ .source = "const replace: a -> b -> c where {} = func box => return func value => return do:\n  let current = box\n  current.value := value\n  break current\nentry const answer = 42\n", .code = .missing_predicate, .marker = ".value" },
+        .{ .source = "infixl 60 (+) = _fixity_add\nconst twice: a -> a where { associated \"add\" a a a } = func value => return value + value\nentry const answer = func () => return do:\n  let selected = case true of\n    true => twice\n    false => twice\n  break @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n", .code = .type_mismatch, .marker = "selected 1.5" },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(allocator, item.source);
@@ -168,15 +168,15 @@ fn recursiveLaws(allocator: std.mem.Allocator) !void {
     for ([_][]const u8{ "", "associated \"add\" a a a" }) |clause| {
         const text = try allocator.print(
             \\infixl 60 (+) = _fixity_add
-            \\const first: a -> a = fn value => do:
+            \\const first: a -> a = func value => return do:
             \\  let alias: a -> a where {{ {s} }} = second
             \\  break alias value
-            \\const second: a -> a = fn value => third value
-            \\const third: a -> a = fn value => case #True of
-            \\  #True => value + value
-            \\  #False => first value
-            \\entry const answer = fn () => first 21
-            \\const _fixity_add = fn left => fn right => @type.call "add" left right
+            \\const second: a -> a = func value => return third value
+            \\const third: a -> a = func value => return case true of
+            \\  true => value + value
+            \\  false => first value
+            \\entry const answer = func () => return first 21
+            \\const _fixity_add = func left => return func right => return @type.call "add" left right
         , .{clause});
         defer allocator.free(text);
         var tokens = try lexer.lex(allocator, text);
@@ -224,8 +224,8 @@ fn importedSchemes(allocator: std.mem.Allocator, loaded: *project.Project) !void
 test "imported qualified schemes preserve both numeric namespaces and exact predicate row identity" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "library.blot", .data = "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = fn callback => callback ()\n" });
-    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import { invoke } from \"./library\"\nentry const answer = fn () => invoke (fn () => 42)\n" });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "library.blot", .data = "const invoke: (Unit -> a ! {| e}) -> a ! {| e} where { type_rep a, effect_rep ! {| e} } = func callback => return callback ()\n" });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import { invoke } from \"./library\"\nentry const answer = func () => return invoke (func () => return 42)\n" });
     const path = try tmp.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var loaded = try project.load(a, std.testing.io, path, .{});
@@ -237,13 +237,13 @@ test "imported qualified schemes preserve both numeric namespaces and exact pred
 fn ownedTemplateLaws(allocator: std.mem.Allocator) !void {
     const text =
         \\infixl 60 (+) = _fixity_add
-        \\const twice: a -> a where { associated "add" a a a } = fn value => value + value
+        \\const twice: a -> a where { associated "add" a a a } = func value => return value + value
         \\const alias = twice
-        \\entry const answer = fn () => do:
+        \\entry const answer = func () => return do:
         \\  let local = alias
         \\  let integer = local 20
         \\  break @u32.add integer (@f32.to_u32 (local 1.0))
-        \\const _fixity_add = fn left => fn right => @type.call "add" left right
+        \\const _fixity_add = func left => return func right => return @type.call "add" left right
     ;
     var tokens = try lexer.lex(allocator, text);
     defer tokens.deinit(allocator);
@@ -276,12 +276,12 @@ test "local template requirements move into their scheme and concrete uses retai
 fn changingUpdateLaws(allocator: std.mem.Allocator) !void {
     const text =
         \\type Box (a, b) is data = #Box { value: a, keep: b }
-        \\const change = fn (box: Box (U32, Bool)) => do:
+        \\const change = func (box: Box (U32, Bool)) => return do:
         \\  let current = box
         \\  current.value := 42.0
         \\  break current
-        \\entry const answer = fn () => do:
-        \\  let #Box {value, keep} = change (#Box {value: 20, keep: #True})
+        \\entry const answer = func () => return do:
+        \\  let #Box {value, keep} = change (#Box {value: 20, keep: true})
         \\  break @f32.to_u32 value
     ;
     var tokens = try lexer.lex(allocator, text);

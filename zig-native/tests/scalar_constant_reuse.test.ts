@@ -14,8 +14,8 @@ Deno.test("retained callers validate scalar constants through edits errors and r
   const source = (offset: string, other: number) =>
     `const offset = ${offset}
 const other = ${other}
-entry const answer = fn (x: U32) => @u32.add (@u32.add x offset) (@u32.add offset x)
-entry const unrelated = fn () => other
+entry const answer = func (x: U32) => return @u32.add (@u32.add x offset) (@u32.add offset x)
+entry const unrelated = func () => return other
 `;
   const retained = await createZigProjectCompiler(options);
   let reused = 0;
@@ -74,9 +74,9 @@ Deno.test("runtime body cutoff rebuilds executable and staged results through fa
     prelude: null,
   };
   const main = `import * as values from "./values"
-const unused = fn (value: U32) => @u32.sub (@u32.div value 1) 1
-entry const warm = fn (value: U32) => values.adjust value
-entry const answer = fn (value: U32) => @u32.add (values.adjust value) 40
+const unused = func (value: U32) => return @u32.sub (@u32.div value 1) 1
+entry const warm = func (value: U32) => return values.adjust value
+entry const answer = func (value: U32) => return @u32.add (values.adjust value) 40
 entry const folded: U32 = values.adjust 20
 `;
   const retained = await createZigProjectCompiler(options);
@@ -90,7 +90,7 @@ entry const folded: U32 = values.adjust 20
       const sources = {
         [entry]: main,
         [dependency]:
-          `const adjust = fn (value: U32) => @u32.${op} value ${amount}\n`,
+          `const adjust = func (value: U32) => return @u32.${op} value ${amount}\n`,
       };
       const result = await retained.build({ sources });
       const fresh = await createZigProjectCompiler(options);

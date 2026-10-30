@@ -6,7 +6,7 @@ const parser = @import("../parse/parser.zig");
 const targets = @import("loop_targets.zig");
 const a = std.testing.allocator;
 const source =
-    \\const run = fn values => do:
+    \\const run = func values => return do:
     \\  for iterator in values:
     \\    before := 1
     \\    let before = 99
@@ -14,7 +14,7 @@ const source =
     \\    let local = 0
     \\    local := 1
     \\    iterator := 2
-    \\    if #True:
+    \\    if true:
     \\      branch := 3
     \\      let other = 0
     \\      other := 4
@@ -49,7 +49,7 @@ const source =
     \\    let ignored = do:
     \\      separate := 15
     \\      break 0
-    \\    let closure = fn () => do:
+    \\    let closure = func () => return do:
     \\      separate_closure := 16
     \\      break 0
     \\  break 0

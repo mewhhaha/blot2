@@ -1,6 +1,6 @@
 
 type Counter is effect = { next: Unit -> U32 }
-const count = fn computation => do:
+const count = func computation => return do:
   let current = 0
   for request in @requests computation:
     case request of
@@ -9,7 +9,7 @@ const count = fn computation => do:
         yield current
       complete () =>
         break current
-entry const answer = fn limit => count (@computation (fn () => do:
+entry const answer = func limit => return count (@computation (func () => return do:
   for index in 0 .. limit:
     use Counter.next ()
   break ()

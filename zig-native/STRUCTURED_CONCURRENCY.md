@@ -26,16 +26,16 @@ checking, including when its source name is shadowed. It evaluates the callable
 and arguments in the parent and invokes them in the child. Nested ordinary
 helpers do not yet infer their caller's group.
 
-`const scope = fn body => @task.scope body` accepts a once callback universally
+`const scope = func body => return @task.scope body` accepts a once callback universally
 quantified over a fresh region; its result cannot contain that region. Ordinary
 relays, currying, identity forwarding and renamed imports preserve that scope
-contract. `const spawn = fn group => fn action => @task.spawn group action` also
+contract. `const spawn = func group => return func action => return @task.spawn group action` also
 works through direct aliases, imports and stored partial calls. Its exact body
 is validated, and each completed call checks the actual action's captures
 against the selected group's lifetime. Arbitrary higher-order transport of spawn
 helpers requires further transfer evidence and remains rejected.
 
-`const await = fn source => |source|` is an ordinary helper for either one task
+`const await = func source => return |source|` is an ordinary helper for either one task
 receiver or a tuple of task receivers. Its checked contract passes through
 global aliases and imports. `|(left, right)|`, a stored tuple and `await pair`
 have the same collect-all behavior: admit all dependencies together, retain
@@ -47,13 +47,13 @@ helpers currently require a direct receive body or an alias of one.
 
 ```blot
 // Pure sibling tasks.
-const scope = fn body => @task.scope body
-const spawn = fn group => fn action => @task.spawn group action
-const await = fn source => |source|
-entry const sum = fn () => scope (fn group => do:
+const scope = func body => return @task.scope body
+const spawn = func group => return func action => return @task.spawn group action
+const await = func source => return |source|
+entry const sum = func () => return scope (func group => return do:
   let here = spawn group
-  let left = here (fn () => 20)
-  let right = here (fn () => 22)
+  let left = here (func () => return 20)
+  let right = here (func () => return 22)
   let (first, second) = await (left, right)
   return @u32.add first second)
 ```

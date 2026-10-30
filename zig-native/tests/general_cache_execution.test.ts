@@ -3,13 +3,13 @@ import { createCompiler, instantiateGuest } from "../../mod.ts";
 
 const declarations = `
 type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
-const identity = fn value => value
-const packed = #Pack { unused: identity, selected: fn (value: U32) => value + 1 }
-const invoke = fn callback => callback 1
-const capture = fn packed => fn (value: U32) => invoke (fn extra => do:
+const identity = func value => return value
+const packed = #Pack { unused: identity, selected: func (value: U32) => return value + 1 }
+const invoke = func callback => return callback 1
+const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
   let #Pack { selected } = packed
   break selected (value + extra))
-const work = fn (value: U32) => do:
+const work = func (value: U32) => return do:
   let total = 0
   for i in 0..value:
     total := total + capture packed i
@@ -18,7 +18,7 @@ const unrelated = 10
 `;
 const main = `import * as lib from "./lib"
 const offset = 10
-entry const answer = fn (value: U32) => lib.work value + offset
+entry const answer = func (value: U32) => return lib.work value + offset
 `;
 
 Deno.test("retained code validates static capture graphs and per-body inline dependencies", async () => {
@@ -100,12 +100,12 @@ for (const codegenTier of ["optimized", "development"] as const) {
     };
     const compiler = await createCompiler(options);
     const captured =
-      "const choose = fn amount => fn (value: U32) => value + amount\n" +
+      "const choose = func amount => return func (value: U32) => return value + amount\n" +
       declarations.replace(
-        "selected: fn (value: U32) => value + 1",
+        "selected: func (value: U32) => return value + 1",
         "selected: choose 1",
       );
-    const moved = "const earlier = fn (value: U32) => value + 2\n" + captured;
+    const moved = "const earlier = func (value: U32) => return value + 2\n" + captured;
     try {
       const revisions = [
         [captured, main, 75, false, false],
@@ -203,16 +203,16 @@ Deno.test("editing an unrelated function preserves callers of an inlined body", 
   };
   const compiler = await createCompiler(options);
   const lib =
-    `const select = fn (a: Bool) => fn ~(b: U32) => if a then @demand b else 0
-const work = fn (count: U32) => do:
+    `const select = func (a: Bool) => return func ~(b: U32) => return if a then @demand b else 0
+const work = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
-    total := total + select #True i
+    total := total + select true i
   break total
-const unrelated = fn (x: U32) => x + 1
+const unrelated = func (x: U32) => return x + 1
 `;
   const main =
-    'import * as lib from "./lib"\nentry const answer = fn (count: U32) => lib.work count\n';
+    'import * as lib from "./lib"\nentry const answer = func (count: U32) => return lib.work count\n';
   try {
     for (
       const [text, answer, reuse] of [

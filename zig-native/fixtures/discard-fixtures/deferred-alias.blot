@@ -1,6 +1,6 @@
-const identity = fn value => value
-const missing = fn value => value.no_such_member
+const identity = func value => return value
+const missing = func value => return value.no_such_member
 const packed = (identity, missing)
-entry const answer = fn () => do:
+entry const answer = func () => return do:
   let unused = (identity, packed)
   break 42

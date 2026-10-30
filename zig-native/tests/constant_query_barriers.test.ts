@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const method = (increment = 0) =>
-  `const Array.count = fn values => @u32.add (@array.length values) ${increment}\n`;
+  `const Array.count = func values => return @u32.add (@array.length values) ${increment}\n`;
 const program = (seed: string) =>
   `const seed = ${seed}
 const bundle = do:
@@ -15,7 +15,7 @@ const bundle = do:
   for index in 0..256:
     cost := @u32.add self 1
   break {first, second, cost}
-entry const run = fn () => @u32.add bundle.first (@u32.add bundle.second bundle.cost)
+entry const run = func () => return @u32.add bundle.first (@u32.add bundle.second bundle.cost)
 entry const unrelated = seed
 `;
 

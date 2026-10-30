@@ -9,71 +9,71 @@ const project_check = @import("project_check.zig");
 const a = std.testing.allocator;
 const Case = struct { source: []const u8, code: ?check.Code, point: u32 = 0, exact_span: bool = true };
 const cases = [_]Case{
-    .{ .source = "const invalid = fn value => do:\n  let (#True, selected) = value\n  break selected\n", .code = .non_exhaustive_match, .point = 34 }, // original-151
-    .{ .source = "const invalid = fn () => do:\n  let (first, second, third) = (1, 2)\n  break first\n", .code = .product_arity, .point = 31 }, // original-153
-    .{ .source = "data Pair = #Pair U32\nconst invalid = fn value => case value of\n  #Pair {} => 0\n", .code = .record_constructor, .point = 67 }, // original-158
+    .{ .source = "const invalid = func value => return do:\n  let (true, selected) = value\n  break selected\n", .code = .non_exhaustive_match, .point = 43 }, // original-151
+    .{ .source = "const invalid = func () => return do:\n  let (first, second, third) = (1, 2)\n  break first\n", .code = .product_arity, .point = 40 }, // original-153
+    .{ .source = "data Pair = #Pair U32\nconst invalid = func value => return case value of\n  #Pair {} => 0\n", .code = .record_constructor, .point = 76 }, // original-158
     .{ .source = "data Pair = #Pair { x: U32, x: U32 }\n", .code = .duplicate_record_field, .point = 28 }, // original-171
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = fn () => #Pair { x: 1 }\n", .code = .missing_record_field, .point = 60 }, // original-172
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = fn () => #Pair { x: 1, y: 2, z: 3 }\n", .code = .unknown_record_field, .point = 79 }, // original-173
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = fn () => #Pair { x: 1, y: 2, x: 3 }\n", .code = .duplicate_record_field, .point = 79 }, // original-174
-    .{ .source = "data Box = #Box U32\nconst make = fn () => #Box { x: 1 }\n", .code = .record_constructor, .point = 43 }, // original-175
-    .{ .source = "const make = fn value => #value { x: 1 }\n", .code = .record_constructor, .point = 26 }, // original-176
-    .{ .source = "pub const answer = fn () => 42", .code = .unknown_modifier, .point = 0 }, // original-317
-    .{ .source = "pub let answer = fn () => 42", .code = .unknown_modifier, .point = 0 }, // original-318
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { absent: missing }\n", .code = .unknown_record_field, .point = 90 }, // unknown-before-value
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { x: 1, x: missing }\n", .code = .duplicate_record_field, .point = 96 }, // duplicate-before-value
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { x: missing }\n", .code = .unknown_value, .point = 93 }, // missing-after-value
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { x: missing, absent: 2 }\n", .code = .unknown_value, .point = 93 }, // unknown-after-value
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair {}\n", .code = .missing_record_field, .point = 83 }, // allmissing
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { y: 2, x: 1 }\n", .code = null, .point = 0 }, // reordered-positive
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = fn () => #Pair { y, x }\n", .code = null, .point = 0 }, // shorthand-positive
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = func () => return #Pair { x: 1 }\n", .code = .missing_record_field, .point = 69 }, // original-172
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = func () => return #Pair { x: 1, y: 2, z: 3 }\n", .code = .unknown_record_field, .point = 88 }, // original-173
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst make = func () => return #Pair { x: 1, y: 2, x: 3 }\n", .code = .duplicate_record_field, .point = 88 }, // original-174
+    .{ .source = "data Box = #Box U32\nconst make = func () => return #Box { x: 1 }\n", .code = .record_constructor, .point = 52 }, // original-175
+    .{ .source = "const make = func value => return #value { x: 1 }\n", .code = .record_constructor, .point = 35 }, // original-176
+    .{ .source = "pub const answer = func () => return 42", .code = .unknown_modifier, .point = 0 }, // original-317
+    .{ .source = "pub let answer = func () => return 42", .code = .unknown_modifier, .point = 0 }, // original-318
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { absent: missing }\n", .code = .unknown_record_field, .point = 99 }, // unknown-before-value
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { x: 1, x: missing }\n", .code = .duplicate_record_field, .point = 105 }, // duplicate-before-value
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { x: missing }\n", .code = .unknown_value, .point = 102 }, // missing-after-value
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { x: missing, absent: 2 }\n", .code = .unknown_value, .point = 102 }, // unknown-after-value
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair {}\n", .code = .missing_record_field, .point = 92 }, // allmissing
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { y: 2, x: 1 }\n", .code = null, .point = 0 }, // reordered-positive
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst x=1\nconst y=2\nconst invalid = func () => return #Pair { y, x }\n", .code = null, .point = 0 }, // shorthand-positive
     .{ .source = "data Pair = #Pair { x: Missing, x: U32 }\n", .code = .duplicate_record_field, .point = 32 }, // declaration-duplicate-vs-type
     .{ .source = "data Pair = #Pair { x: U32, x: U32 }\nentry const answer=1+2\n", .code = .duplicate_record_field, .point = 28 }, // declaration-duplicate-vs-operator
     .{ .source = "infixl 300 (+) = missing\ndata Pair = #Pair { x: U32, x: U32 }\n", .code = .duplicate_record_field, .point = 53 }, // declaration-duplicate-vs-fixity
     .{ .source = "const repeated=1\nconst repeated=2\ndata Pair = #Pair { x: U32, x: U32 }\n", .code = .duplicate_record_field, .point = 62 }, // declaration-duplicate-vs-duplicate-name
-    .{ .source = "data Box=#Box U32\nconst invalid=fn()=>#Box { x: missing }\n", .code = .record_constructor, .point = 39 }, // nonrecord-target-before-value
-    .{ .source = "data Empty=#Empty\nconst invalid=fn()=>#Empty {}\n", .code = .record_constructor, .point = 39 }, // nullary-record-value
-    .{ .source = "data Empty=#Empty {}\nentry const answer=fn()=>case #Empty {} of\n  #Empty {} => 42\n", .code = null, .point = 0 }, // empty-record-value
-    .{ .source = "data Pair=#Pair ({x:U32,y:U32})\nentry const answer=fn()=>case #Pair {x:20,y:22} of\n  #Pair {x,y}=>@u32.add x y\n", .code = .record_constructor, .point = 63 }, // grouped-record-value
-    .{ .source = "const target=fn x=>x\nconst invalid=fn()=>#target {x:1}\n", .code = .record_constructor, .point = 42 }, // ordinary-target-record
-    .{ .source = "const invalid=fn()=>#Missing {x:missing}\n", .code = .unknown_constructor, .point = 21 }, // missing-ctor-before-value
-    .{ .source = "data Box=#Box U32\nconst invalid=fn value=>case value of\n  #Box {x}=>missing\n", .code = .record_constructor, .point = 59 }, // nonrecord-pattern-before-body
-    .{ .source = "data Empty=#Empty\nconst invalid=fn value=>case value of\n  #Empty {}=>0\n", .code = .record_constructor, .point = 59 }, // nullary-record-pattern
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst invalid=fn value=>case value of\n  #Pair {z:^missing}=>0\n", .code = .unknown_record_field, .point = 84 }, // unknown-pattern-before-name
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst invalid=fn value=>case value of\n  #Pair {x, x:^missing}=>0\n", .code = .duplicate_record_field, .point = 87 }, // duplicate-pattern-before-name
-    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nentry const answer=fn()=>case #Pair {x:42,y:0} of\n  #Pair {x}=>x\n", .code = null, .point = 0 }, // missing-pattern-fields-positive
+    .{ .source = "data Box=#Box U32\nconst invalid=func()=> return #Box { x: missing }\n", .code = .record_constructor, .point = 49 }, // nonrecord-target-before-value
+    .{ .source = "data Empty=#Empty\nconst invalid=func()=> return #Empty {}\n", .code = .record_constructor, .point = 49 }, // nullary-record-value
+    .{ .source = "data Empty=#Empty {}\nentry const answer=func()=> return case #Empty {} of\n  #Empty {} => 42\n", .code = null, .point = 0 }, // empty-record-value
+    .{ .source = "data Pair=#Pair ({x:U32,y:U32})\nentry const answer=func()=> return case #Pair {x:20,y:22} of\n  #Pair {x,y}=>@u32.add x y\n", .code = .record_constructor, .point = 73 }, // grouped-record-value
+    .{ .source = "const target=func x=> return x\nconst invalid=func()=> return #target {x:1}\n", .code = .record_constructor, .point = 62 }, // ordinary-target-record
+    .{ .source = "const invalid=func()=> return #Missing {x:missing}\n", .code = .unknown_constructor, .point = 31 }, // missing-ctor-before-value
+    .{ .source = "data Box=#Box U32\nconst invalid=func value=> return case value of\n  #Box {x}=>missing\n", .code = .record_constructor, .point = 69 }, // nonrecord-pattern-before-body
+    .{ .source = "data Empty=#Empty\nconst invalid=func value=> return case value of\n  #Empty {}=>0\n", .code = .record_constructor, .point = 69 }, // nullary-record-pattern
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst invalid=func value=> return case value of\n  #Pair {z:^missing}=>0\n", .code = .unknown_record_field, .point = 94 }, // unknown-pattern-before-name
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nconst invalid=func value=> return case value of\n  #Pair {x, x:^missing}=>0\n", .code = .duplicate_record_field, .point = 97 }, // duplicate-pattern-before-name
+    .{ .source = "data Pair = #Pair { x: U32, y: U32 }\nentry const answer=func()=> return case #Pair {x:42,y:0} of\n  #Pair {x}=>x\n", .code = null, .point = 0 }, // missing-pattern-fields-positive
     .{ .source = "pub const invalid=missing\n", .code = .unknown_modifier, .point = 0 }, // modifier-vs-missing
     .{ .source = "pub const repeated=1\nconst repeated=2\n", .code = .duplicate_name, .point = 0 }, // modifier-vs-duplicate
     .{ .source = "pub const invalid=1+2\n", .code = .unknown_modifier, .point = 0 }, // modifier-vs-operator
     .{ .source = "pub const first=42\nconst second=missing\n", .code = .unknown_value, .point = 32 }, // modifier-declarations-order
     .{ .source = "const first=missing\npub const second=42\n", .code = .unknown_modifier, .point = 20 }, // modifier-last
-    .{ .source = "const invalid=fn value=>do:\n  let #True=value\n  break 42\n", .code = .non_exhaustive_match, .point = 30 }, // refutable-bool
-    .{ .source = "data Maybe a=#Some a|#None\nconst invalid=fn()=>do:\n  let #Some value=#Some 42\n  break value\n", .code = .non_exhaustive_match, .point = 53 }, // refutable-constructor
-    .{ .source = "const invalid=fn()=>do:\n  let #True=42\n  break 0\n", .code = .type_mismatch, .point = 26 }, // refutable-type-failure
-    .{ .source = "const invalid=fn()=>do:\n  let value=42 else:\n    0\n  break value\n", .code = .guard_fallthrough, .point = 26 }, // guard-irrefutable
-    .{ .source = "const invalid=fn()=>do:\n  let #True=42 else:\n    0\n  break 0\n", .code = .type_mismatch, .point = 26 }, // guard-type-failure
-    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    break 0\n  break value\n", .code = null, .point = 0 }, // guard-positive
-    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=fn()=>do:\n  let #Some value=#Some 42 else:\n    @panic \"unreachable\"\n  break value\n", .code = null, .point = 0 }, // guard-panic-positive
-    .{ .source = "const invalid=fn()=>do:\n  let (#True, second, third)=(1,2)\n  break second\n", .code = .product_arity, .point = 26 }, // product-count-versus-element
-    .{ .source = "const invalid=fn()=>do:\n  let ((first,second,third),fourth)=((1,2),3)\n  break first\n", .code = .product_arity, .point = 26 }, // product-nested-count
-    .{ .source = "const invalid=fn (value:(U32,U32))=>do:\n  let (first,second,third)=value\n  break first\n", .code = .product_arity, .point = 42 }, // product-annotated-count
-    .{ .source = "const invalid=fn()=>do:\n  let (first,second)=()\n  break first\n", .code = .type_mismatch, .point = 26 }, // product-unit-type-mismatch
-    .{ .source = "entry const answer=fn()=>do:\n  let (first,second)=(20,22)\n  break @u32.add first second\n", .code = null, .point = 0 }, // product-positive
-    .{ .source = "const invalid=fn()=>do:\n  let identity=fn value=>value else:\n    break 0\n  let first=identity 1\n  let second=identity 1.5\n  break 0\n", .code = .type_mismatch, .point = 110, .exact_span = false }, // guard-binder-monomorphic
-    .{ .source = "entry const answer=fn()=>do:\n  let identity=fn value=>value\n  let first=identity 42\n  let second=identity 1.5\n  break first\n", .code = null, .point = 0 }, // plain-binder-polymorphic
+    .{ .source = "const invalid=func value=> return do:\n  let true=value\n  break 42\n", .code = .non_exhaustive_match, .point = 40 }, // refutable-bool
+    .{ .source = "data Maybe a=#Some a|#None\nconst invalid=func()=> return do:\n  let #Some value=#Some 42\n  break value\n", .code = .non_exhaustive_match, .point = 63 }, // refutable-constructor
+    .{ .source = "const invalid=func()=> return do:\n  let true=42\n  break 0\n", .code = .type_mismatch, .point = 36 }, // refutable-type-failure
+    .{ .source = "const invalid=func()=> return do:\n  let value=42 else:\n    0\n  break value\n", .code = .guard_fallthrough, .point = 36 }, // guard-irrefutable
+    .{ .source = "const invalid=func()=> return do:\n  let true=42 else:\n    0\n  break 0\n", .code = .type_mismatch, .point = 36 }, // guard-type-failure
+    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=func()=> return do:\n  let #Some value=#Some 42 else:\n    break 0\n  break value\n", .code = null, .point = 0 }, // guard-positive
+    .{ .source = "data Maybe a=#Some a|#None\nentry const answer=func()=> return do:\n  let #Some value=#Some 42 else:\n    @panic \"unreachable\"\n  break value\n", .code = null, .point = 0 }, // guard-panic-positive
+    .{ .source = "const invalid=func()=> return do:\n  let (true, second, third)=(1,2)\n  break second\n", .code = .product_arity, .point = 36 }, // product-count-versus-element
+    .{ .source = "const invalid=func()=> return do:\n  let ((first,second,third),fourth)=((1,2),3)\n  break first\n", .code = .product_arity, .point = 36 }, // product-nested-count
+    .{ .source = "const invalid=func (value:(U32,U32))=> return do:\n  let (first,second,third)=value\n  break first\n", .code = .product_arity, .point = 52 }, // product-annotated-count
+    .{ .source = "const invalid=func()=> return do:\n  let (first,second)=()\n  break first\n", .code = .type_mismatch, .point = 36 }, // product-unit-type-mismatch
+    .{ .source = "entry const answer=func()=> return do:\n  let (first,second)=(20,22)\n  break @u32.add first second\n", .code = null, .point = 0 }, // product-positive
+    .{ .source = "const invalid=func()=> return do:\n  let identity=func value=> return value else:\n    break 0\n  let first=identity 1\n  let second=identity 1.5\n  break 0\n", .code = .type_mismatch, .point = 130, .exact_span = false }, // guard-binder-monomorphic
+    .{ .source = "entry const answer=func()=> return do:\n  let identity=func value=> return value\n  let first=identity 42\n  let second=identity 1.5\n  break first\n", .code = null, .point = 0 }, // plain-binder-polymorphic
     .{ .source = "data Pair=#Pair {x:U32,x:U32}\nconst repeated=1\nconst repeated=2\n", .code = .duplicate_name, .point = 30 }, // declaration-duplicate-name-later
     .{ .source = "data Pair=#Pair ({x:U32,x:U32})\n", .code = .duplicate_type_field, .point = 17 }, // grouped-declaration-duplicate
-    .{ .source = "data Pair=#Pair {x:U32,y:U32}\nconst invalid=fn()=>#Pair {z}\n", .code = .unknown_record_field, .point = 57 }, // shorthand-missing-field-before-missing-value
-    .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=fn()=>case #Pair {x:20,y:22} of\n  #Pair {x,y}=>@u32.add x y\n", .code = null, .point = 0 }, // record-type-field-label-not-global
-    .{ .source = "const invalid=fn ns=>#ns.Pair {x:1}\n", .code = .unknown_constructor, .point = 22 }, // local-record-qualified-root
-    .{ .source = "const invalid=fn ns=>fn value=>case value of\n  #ns.Pair {x}=>0\n", .code = .unknown_constructor, .point = 48 }, // record-pattern-local-qualified-root
-    .{ .source = "const invalid=fn()=>#U32 {}\n", .code = .unknown_constructor, .point = 21 }, // target primitive_type
-    .{ .source = "const invalid=fn()=>#Unit {}\n", .code = .unknown_constructor, .point = 21 }, // target unit_type
-    .{ .source = "data Box=#Other U32\nconst invalid=fn()=>#Box {}\n", .code = .unknown_constructor, .point = 41 }, // target header_without_constructor
-    .{ .source = "data Box a=#Other a\nconst invalid=fn()=>#Box {}\n", .code = .unknown_constructor, .point = 41 }, // target generic_header_without_constructor
-    .{ .source = "type Input is effect={get:Unit->U32}\nconst invalid=fn()=>#Input {}\n", .code = .record_constructor, .point = 58 }, // target grouped_effect_family
-    .{ .source = "type Read is effect=Unit->U32\nconst invalid=fn()=>#Read {}\n", .code = .record_constructor, .point = 51 }, // target callable_effect
-    .{ .source = "const U32=42\nconst invalid=fn()=>#U32 {}\n", .code = .record_constructor, .point = 34 }, // target explicit_global_primitive_name
+    .{ .source = "data Pair=#Pair {x:U32,y:U32}\nconst invalid=func()=> return #Pair {z}\n", .code = .unknown_record_field, .point = 67 }, // shorthand-missing-field-before-missing-value
+    .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=func()=> return case #Pair {x:20,y:22} of\n  #Pair {x,y}=>@u32.add x y\n", .code = null, .point = 0 }, // record-type-field-label-not-global
+    .{ .source = "const invalid=func ns=> return #ns.Pair {x:1}\n", .code = .unknown_constructor, .point = 32 }, // local-record-qualified-root
+    .{ .source = "const invalid=func ns=> return func value=> return case value of\n  #ns.Pair {x}=>0\n", .code = .unknown_constructor, .point = 68 }, // record-pattern-local-qualified-root
+    .{ .source = "const invalid=func()=> return #U32 {}\n", .code = .unknown_constructor, .point = 31 }, // target primitive_type
+    .{ .source = "const invalid=func()=> return #Unit {}\n", .code = .unknown_constructor, .point = 31 }, // target unit_type
+    .{ .source = "data Box=#Other U32\nconst invalid=func()=> return #Box {}\n", .code = .unknown_constructor, .point = 51 }, // target header_without_constructor
+    .{ .source = "data Box a=#Other a\nconst invalid=func()=> return #Box {}\n", .code = .unknown_constructor, .point = 51 }, // target generic_header_without_constructor
+    .{ .source = "type Input is effect={get:Unit->U32}\nconst invalid=func()=> return #Input {}\n", .code = .record_constructor, .point = 68 }, // target grouped_effect_family
+    .{ .source = "type Read is effect=Unit->U32\nconst invalid=func()=> return #Read {}\n", .code = .record_constructor, .point = 61 }, // target callable_effect
+    .{ .source = "const U32=42\nconst invalid=func()=> return #U32 {}\n", .code = .record_constructor, .point = 44 }, // target explicit_global_primitive_name
 };
 fn scenario(allocator: std.mem.Allocator, case: Case) !void {
     var tokens = try lexer.lex(allocator, case.source);
@@ -148,9 +148,9 @@ test "imported record kind remains owned across frontend teardown and every allo
     const path = try tmp.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     const imported = [_]Case{
-        .{ .source = "import * as shape from \"./producer\"\nentry const answer=fn()=>case #shape.Empty {} of\n  #shape.Empty {}=>42\n", .code = null },
-        .{ .source = "import * as shape from \"./producer\"\nentry const answer=fn()=>#shape.Nullary {}\n", .code = .record_constructor, .point = 62 },
-        .{ .source = "import * as shape from \"./producer\"\nentry const answer=fn()=>#shape.Pair {x:42}\n", .code = .missing_record_field, .point = 62 },
+        .{ .source = "import * as shape from \"./producer\"\nentry const answer=func()=> return case #shape.Empty {} of\n  #shape.Empty {}=>42\n", .code = null },
+        .{ .source = "import * as shape from \"./producer\"\nentry const answer=func()=> return #shape.Nullary {}\n", .code = .record_constructor, .point = 72 },
+        .{ .source = "import * as shape from \"./producer\"\nentry const answer=func()=> return #shape.Pair {x:42}\n", .code = .missing_record_field, .point = 72 },
     };
     for (imported) |case| {
         try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = case.source });

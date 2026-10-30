@@ -25,7 +25,7 @@ Deno.test("native asset modules execute retained edits rejection recovery and co
   const directory = await Deno.makeTempDir();
   const entry = directory + "/main.blot";
   const source =
-    'import * as config from "./config.json"\nentry const answer = fn () => @u32.add (config.value).offset (config.value).items[1].value\n';
+    'import * as config from "./config.json"\nentry const answer = func () => return @u32.add (config.value).offset (config.value).items[1].value\n';
   const original = '{"offset":20,"items":[{"value":10},{"value":22}]}';
   const compiler = await createCompiler({
     executable,
@@ -84,7 +84,7 @@ Deno.test("native references publish deterministic handles and independent binar
   const directory = await Deno.makeTempDir();
   const entry = directory + "/main.blot";
   const source =
-    'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nentry const answer = fn () => do:\n  let #a.Content handle = a.content\n  break handle\n';
+    'import * as a from "./a.bin"\nimport * as b from "./b.bin"\nentry const answer = func () => return do:\n  let #a.Content handle = a.content\n  break handle\n';
   const compiler = await createCompiler({
     executable,
     entry,
@@ -294,7 +294,7 @@ Deno.test("native roots discover four readers and refresh membership before reta
   );
   await Deno.writeTextFile(
     entry,
-    'import * as catalog from "./assets/catalog.json"\nimport * as words from "./text.json"\nimport * as tunes from "./tunables.json"\nimport * as shader from "./assets/shader.wgsl"\nentry const answer = fn () => @u32.add (catalog.meshes).other (words.text).word[0]\nentry const tune = fn () => @product.get (tunes.tunables).camera_zoom 1\nentry const factor = fn () => shader.factor\n',
+    'import * as catalog from "./assets/catalog.json"\nimport * as words from "./text.json"\nimport * as tunes from "./tunables.json"\nimport * as shader from "./assets/shader.wgsl"\nentry const answer = func () => return @u32.add (catalog.meshes).other (words.text).word[0]\nentry const tune = func () => return @product.get (tunes.tunables).camera_zoom 1\nentry const factor = func () => return shader.factor\n',
   );
   const compiler = await createCompiler({
     executable,
@@ -314,7 +314,7 @@ Deno.test("native roots discover four readers and refresh membership before reta
     equal(edited.assetStats?.parsed, 1);
     equal(edited.assetStats?.reused, 3);
     const bad = directory + "/assets/new.wgsl";
-    await Deno.writeTextFile(bad, "fn broken {");
+    await Deno.writeTextFile(bad, "func broken {");
     const failed = await compiler.build();
     ok(!failed.success);
     equal(failed.revision, edited.revision);

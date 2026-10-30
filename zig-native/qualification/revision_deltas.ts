@@ -28,52 +28,52 @@ type Pair is data = #Pair { left: U32, right: U32 }
 const pair = #Pair { left: 20, right: 22 }
 const aliased = (table, table)
 const other = 0
-entry const pick = fn (i: U32) => table[i]
-entry const first = fn () => do:
+entry const pick = func (i: U32) => return table[i]
+entry const first = func () => return do:
   let #Pair { left, right } = pair
   break @u32.add left right
-entry const sum_alias = fn (i: U32) => do:
+entry const sum_alias = func (i: U32) => return do:
   let (left, right) = aliased
   break @u32.add left[i] right[i]
-entry const from_dep = fn (i: U32) => dep.shared[i]
-entry const unrelated = fn () => other
+entry const from_dep = func (i: U32) => return dep.shared[i]
+entry const unrelated = func () => return other
 `);
 await Deno.writeTextFile(`${aggregateDirectory}/witness.blot`, `type Reader a is effect = { ask: Unit -> a }
-const reader = fn value => @effect.provider (Reader.ask U32) (fn () => value)
+const reader = func value => return @effect.provider (Reader.ask U32) (func () => return value)
 const forty = reader 40
 const other = 0
-entry const answer = fn () => do forty:
+entry const answer = func () => return do forty:
   use value <- Reader.ask U32 ()
   break @u32.add value 1
-entry const plain = fn (x: U32) => @u32.add x 2
-entry const unrelated = fn () => other
+entry const plain = func (x: U32) => return @u32.add x 2
+entry const unrelated = func () => return other
 `);
 // An effectful entry beside an unchanged imported module: before task 023 a
 // literal inside a function body disabled retained reuse for every module.
-await Deno.writeTextFile(`${aggregateDirectory}/math.blot`, `const square = fn (x: U32) -> U32 => @u32.add x x
-const sum = fn (n: U32) -> U32 => do:
+await Deno.writeTextFile(`${aggregateDirectory}/math.blot`, `const square = func (x: U32) : U32 => return @u32.add x x
+const sum = func (n: U32) : U32 => return do:
   let total = 0
   for i in 0..n:
     total := @u32.add self i
   break total
 const table: Array U32 = #[1, 2, 3, 4]
-const pick = fn (i: U32) -> U32 => table[i]
+const pick = func (i: U32) : U32 => return table[i]
 `);
 await Deno.writeTextFile(`${aggregateDirectory}/effects.blot`, `import * as math from "./math"
 type Reader a is effect = { ask: Unit -> a }
 const floor_half_extent: F32 = 60.0
-const reader = fn value => @effect.provider (Reader.ask F32) (fn () => value)
+const reader = func value => return @effect.provider (Reader.ask F32) (func () => return value)
 const extent = reader floor_half_extent
-entry const reach = fn (x: F32) -> F32 => do extent:
+entry const reach = func (x: F32) : F32 => return do extent:
   use limit <- Reader.ask F32 ()
   break @f32.add x limit
-entry const scale = fn (x: F32) -> F32 => @f32.add x 2.5
-entry const area = fn (w: U32) -> U32 => math.square w
-entry const total = fn (n: U32) -> U32 => math.sum n
-entry const pick = fn (i: U32) -> U32 => math.pick i
+entry const scale = func (x: F32) : F32 => return @f32.add x 2.5
+entry const area = func (w: U32) : U32 => return math.square w
+entry const total = func (n: U32) : U32 => return math.sum n
+entry const pick = func (i: U32) : U32 => return math.pick i
 `);
 // The same shape over a larger unchanged import of forty looping functions.
-await Deno.writeTextFile(`${aggregateDirectory}/large.blot`, Array.from({ length: 40 }, (_, k) => `const f${k} = fn (n: U32) -> U32 => do:
+await Deno.writeTextFile(`${aggregateDirectory}/large.blot`, Array.from({ length: 40 }, (_, k) => `const f${k} = func (n: U32) : U32 => return do:
   let total = ${k}
   for i in 0..n:
     total := @u32.add self (@u32.add i ${k})
@@ -83,13 +83,13 @@ await Deno.writeTextFile(`${aggregateDirectory}/large.blot`, Array.from({ length
 `).join(""));
 await Deno.writeTextFile(`${aggregateDirectory}/effects_large.blot`, `import * as large from "./large"
 type Reader a is effect = { ask: Unit -> a }
-const reader = fn value => @effect.provider (Reader.ask F32) (fn () => value)
+const reader = func value => return @effect.provider (Reader.ask F32) (func () => return value)
 const extent = reader 60.0
-entry const reach = fn (x: F32) -> F32 => do extent:
+entry const reach = func (x: F32) : F32 => return do extent:
   use limit <- Reader.ask F32 ()
   break @f32.add x limit
-entry const scale = fn (x: F32) -> F32 => @f32.add x 2.5
-` + Array.from({ length: 40 }, (_, k) => `entry const call${k} = fn (n: U32) -> U32 => large.f${k} n\n`).join(""));
+entry const scale = func (x: F32) : F32 => return @f32.add x 2.5
+` + Array.from({ length: 40 }, (_, k) => `entry const call${k} = func (n: U32) : U32 => return large.f${k} n\n`).join(""));
 const workloads = [
   { name: "effect-large-import", path: `${aggregateDirectory}/effects_large.blot`, search: "x 2.5", replace: "x 3.5" },
   { name: "effect-body-literal", path: `${aggregateDirectory}/effects.blot`, search: "x 2.5", replace: "x 3.5" },
@@ -104,7 +104,7 @@ const workloads = [
   { name: "ecs-body-swap", file: "ecs", search: "total := self + x + y", replace: "total := self + y + x" },
   { name: "ecs-body-grow", file: "ecs", search: "x: x + vx * seconds", replace: "x: x + vx * seconds + 0.0" },
   { name: "lists-body-grow", file: "lists", search: "[1, 2, 3]", replace: "[1, 2, 3, 4]" },
-  { name: "syntax-body-grow", file: "syntax", search: "if left then @demand right else #False", replace: "if left then (@demand right) && left else #False" },
+  { name: "syntax-body-grow", file: "syntax", search: "if left then @demand right else false", replace: "if left then (@demand right) && left else false" },
   { name: "generic-effects-literal", file: "generic_effects", search: "reader 40", replace: "reader 41" },
   { name: "requests-body", file: "requests", search: "if value == 0", replace: "if value == 1" },
   { name: "arrays-import", file: "arrays", search: 'import * as array from "std/array"', replace: 'import * as array from "std/array"\nimport * as path from "std/path"' },

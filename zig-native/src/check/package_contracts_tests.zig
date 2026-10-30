@@ -262,9 +262,9 @@ test "package covariant row views require whole owned endpoint proof and preserv
 fn ownedCore(allocator: std.mem.Allocator) !void {
     const source =
         \\type Item = exists [a, b] => (a, a -> b, b -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32, F32] (value, fn number => @u32.to_f32 number, fn number => @f32.to_u32 number) as Item
-        \\const read: Item -> U32 = fn item => unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
-        \\entry const answer: U32 -> U32 = fn value => read (make value)
+        \\const make: U32 -> Item = func value => return pack [U32, F32] (value, func number => return @u32.to_f32 number, func number => return @f32.to_u32 number) as Item
+        \\const read: Item -> U32 = func item => return unpack item as [a, b] body in (@product.get body 2) ((@product.get body 1) (@product.get body 0))
+        \\entry const answer: U32 -> U32 = func value => return read (make value)
     ;
     const a = allocator;
     var tokens = try lexer.lex(a, source);
@@ -350,19 +350,19 @@ fn checkSource(source: []const u8, accepted: bool) !void {
 test "opened package operations retain exact owned rows under larger ambients and pure parameters" {
     try checkSource(
         \\type Item = exists [a] => (a, a -> U32)
-        \\const read: Item -> U32 ! {Foreign} = fn item => unpack item as [a] body in (fn (operation: a -> U32) => operation (@product.get body 0)) (@product.get body 1)
+        \\const read: Item -> U32 ! {Foreign} = func item => return unpack item as [a] body in (func (operation: a -> U32) => return operation (@product.get body 0)) (@product.get body 1)
     , true);
     try checkSource(
         \\type Item = exists [a] => (a, a -> U32)
-        \\const read: Item -> U32 ! {Foreign} = fn item => unpack item as [a] body in (fn (operation: a -> U32 ! {Foreign}) => operation (@product.get body 0)) (@product.get body 1)
+        \\const read: Item -> U32 ! {Foreign} = func item => return unpack item as [a] body in (func (operation: a -> U32 ! {Foreign}) => return operation (@product.get body 0)) (@product.get body 1)
     , true);
     try checkSource(
         \\type Item = exists [a] => (a, a -> U32 ! {Foreign})
-        \\const read: Item -> U32 = fn item => unpack item as [a] body in (fn (operation: a -> U32) => operation (@product.get body 0)) (@product.get body 1)
+        \\const read: Item -> U32 = func item => return unpack item as [a] body in (func (operation: a -> U32) => return operation (@product.get body 0)) (@product.get body 1)
     , false);
     try checkSource(
         \\type Item = exists [a] => (a, a -> U32)
-        \\const wrong = fn (operation: U32 -> U32 ! {Foreign}) => pack [U32] (42, operation) as Item
+        \\const wrong = func (operation: U32 -> U32 ! {Foreign}) => return pack [U32] (42, operation) as Item
     , false);
 }
 
@@ -387,11 +387,11 @@ fn lowerSource(a: std.mem.Allocator, source: []const u8) !core.Module {
 
 fn selectedScopeOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\const identity: forall [a] => a -> a = fn value => value
+        \\const identity: forall [a] => a -> a = func value => return value
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const separate = fn () => @effect.scope (fn (other: State U32) => 0)
-        \\const selected = fn (flag: Bool) => @effect.scope (fn (left: State U32) => @effect.scope (fn (right: State U32) => do:
-        \\  let choose = fn () => if flag then left else right
+        \\const separate = func () => return @effect.scope (func (other: State U32) => return 0)
+        \\const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
+        \\  let choose = func () => return if flag then left else right
         \\  let chosen = choose ()
         \\  let alias = chosen
         \\  let (_, result) = do (@effect.state chosen.get chosen.set 1):
@@ -399,7 +399,7 @@ fn selectedScopeOwners(allocator: std.mem.Allocator) !void {
         \\    break alias.get ()
         \\  break result
         \\))
-        \\entry const answer = fn (flag: Bool) => identity (selected flag)
+        \\entry const answer = func (flag: Bool) => return identity (selected flag)
     );
     defer module.deinit(allocator);
     try validatePortable(allocator, &module);
@@ -447,10 +447,10 @@ test "portable selected Scope requires both actual lexical choices through OOM" 
 
 const qualified_package_source =
     \\type Item = exists [a] => (unique a, (unique a) -> U32)
-    \\const read: (unique U32) -> U32 = fn hidden => @usage.borrow hidden (fn loan => @usage.read loan)
-    \\const make = fn (owner: unique U32) => pack [U32] (owner, read) as Item
-    \\entry const answer = fn () => do:
-    \\  use owner <- @resource.acquire (fn () => 42) (fn released => ())
+    \\const read: (unique U32) -> U32 = func hidden => return @usage.borrow hidden (func loan => return @usage.read loan)
+    \\const make = func (owner: unique U32) => return pack [U32] (owner, read) as Item
+    \\entry const answer = func () => return do:
+    \\  use owner <- @resource.acquire (func () => return 42) (func released => return ())
     \\  break unpack (make owner) as [a] value in do:
     \\    let (hidden, operation) = value
     \\    break operation hidden
@@ -493,9 +493,9 @@ test "package immutable result footprint sees hidden closure references despite 
     const a = std.testing.allocator;
     var module = try lowerSource(a,
         \\type Item = exists [a] => a
-        \\const identity: Item -> (U32 -> U32) = fn item => unpack item as [a] hidden in do:
+        \\const identity: Item -> (U32 -> U32) = func item => return unpack item as [a] hidden in do:
         \\  let observed = hidden
-        \\  break fn (value: U32) => do:
+        \\  break func (value: U32) => return do:
         \\    let ignored = 42
         \\    break value
     );
@@ -529,7 +529,7 @@ test "package lexical resealing discharges only witnessed abstract identities" {
     const a = std.testing.allocator;
     var module = try lowerSource(a,
         \\type Item = exists [a] => a
-        \\const reseal: Item -> Item = fn item => unpack item as [a] value in pack [a] value as Item
+        \\const reseal: Item -> Item = func item => return unpack item as [a] value in pack [a] value as Item
     );
     defer module.deinit(a);
     const context = .{ .units = &[_]*const core.Module{&module} };
@@ -552,9 +552,9 @@ test "package sealing proves latent captured identity even when result types are
     var module = try lowerSource(a,
         \\type Item = exists [a] => a
         \\type Callback = exists [b] => U32 -> U32
-        \\const hide: Item -> Callback = fn item => unpack item as [a] hidden in do:
+        \\const hide: Item -> Callback = func item => return unpack item as [a] hidden in do:
         \\  let observed = hidden
-        \\  break pack [U32] (fn (value: U32) => do:
+        \\  break pack [U32] (func (value: U32) => return do:
         \\    let ignored = 42
         \\    break value) as Callback
     );
@@ -638,7 +638,7 @@ test "canonical package body walking shares admission budget across a forged DAG
 test "foreign package body observations decline validation context reuse" {
     const a = std.testing.allocator;
     const V = @import("frozen_core_validation.zig");
-    var ordinary = try lowerSource(a, "entry const answer: U32 -> U32 = fn value => value\n");
+    var ordinary = try lowerSource(a, "entry const answer: U32 -> U32 = func value => return value\n");
     defer ordinary.deinit(a);
     const stable: V.Context = .{ .units = &.{&ordinary} };
     var ordinary_image = try V.ContextImage.capture(a, stable, stable.units);
@@ -654,7 +654,7 @@ test "foreign package body observations decline validation context reuse" {
     try std.testing.expect(ordinary_image.matches(stable, stable.units));
     var producer = try lowerSource(a,
         \\type Item = exists [a] => (a, a -> U32)
-        \\const make: U32 -> Item = fn value => pack [U32] (value, fn number => @u32.add number 1) as Item
+        \\const make: U32 -> Item = func value => return pack [U32] (value, func number => return @u32.add number 1) as Item
     );
     defer producer.deinit(a);
     producer.unit = 2;
@@ -715,7 +715,7 @@ test "package Foreign row closure belongs to exact body certificates" {
 fn rejectDictionaryModule(allocator: std.mem.Allocator, module: *const core.Module) !void {
     @import("frozen_core_validation.zig").validate(allocator, module, .{}) catch |err| {
         if (err == error.OutOfMemory) return error.OutOfMemory;
-        try std.testing.expectEqual(error.InvalidArtifact, err);
+        if (err != error.InvalidArtifact) return err;
         return;
     };
     try std.testing.expect(false);
@@ -724,13 +724,13 @@ fn rejectDictionaryModule(allocator: std.mem.Allocator, module: *const core.Modu
 fn predicatePackSelection(allocator: std.mem.Allocator) !void {
     const source =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
         \\type Item = exists [a] where { Render a } => a
         \\const item: Item = pack [U32] 42 as Item
-        \\const flag: Item = pack [Bool] #True as Item
-        \\const read = fn (item: Item) => unpack item as [a] value in Render.show value
-        \\const both = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
+        \\const flag: Item = pack [Bool] true as Item
+        \\const read = func (item: Item) => return unpack item as [a] value in Render.show value
+        \\const both = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in @u32.add (Render.show x) (Render.show y)
         \\const answer: U32 = @u32.add (read item) (both item flag)
     ;
     var tokens = try lexer.lex(allocator, source);
@@ -853,20 +853,20 @@ test "predicate package packing records the exact checked dictionary and callabl
 
 fn structuralRankModule(allocator: std.mem.Allocator) !void {
     const source =
-        \\const first: forall [a, b] => (a, b) -> a = fn value => @product.get value 0
-        \\const twice: forall [a] => a -> (a, a) = fn value => (value, value)
+        \\const first: forall [a, b] => (a, b) -> a = func value => return @product.get value 0
+        \\const twice: forall [a] => a -> (a, a) = func value => return (value, value)
         \\const twice_alias: forall [a] => a -> (a, a) = twice
-        \\const record: forall [a] => a -> {value: a} = fn value => {value: value}
-        \\const head: forall [a] => Array a -> a = fn values => @array.get values 0
-        \\entry const array_head = fn (value: U32) => head #[value, 42]
-        \\const keep: forall [a] => a -> (forall [b] => b -> a) = fn first => fn second => first
-        \\entry const held = fn (value: U32) => (keep value) #True
-        \\const pass: (forall [a] => (Bool, a) -> U32) -> U32 = fn recurse => recurse (#False, 42)
-        \\const recursive: forall [a] => (Bool, a) -> U32 = fn pair => if @product.get pair 0 then pass recursive else 0
-        \\entry const recursive_call = fn (value: U32) => recursive (#True, value)
-        \\entry const whole = fn (value: U32) => first (value, #True)
-        \\entry const fraction = fn (value: F32) => @product.get (twice_alias value) 1
-        \\entry const stored = fn (value: U32) => (record value).value
+        \\const record: forall [a] => a -> {value: a} = func value => return {value: value}
+        \\const head: forall [a] => Array a -> a = func values => return @array.get values 0
+        \\entry const array_head = func (value: U32) => return head #[value, 42]
+        \\const keep: forall [a] => a -> (forall [b] => b -> a) = func first => return func second => return first
+        \\entry const held = func (value: U32) => return (keep value) true
+        \\const pass: (forall [a] => (Bool, a) -> U32) -> U32 = func recurse => return recurse (false, 42)
+        \\const recursive: forall [a] => (Bool, a) -> U32 = func pair => return if @product.get pair 0 then pass recursive else 0
+        \\entry const recursive_call = func (value: U32) => return recursive (true, value)
+        \\entry const whole = func (value: U32) => return first (value, true)
+        \\entry const fraction = func (value: F32) => return @product.get (twice_alias value) 1
+        \\entry const stored = func (value: U32) => return (record value).value
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -927,10 +927,10 @@ test "dictionary composed endpoint substitution preserves structural goals and e
 
 fn sortedRowModule(allocator: std.mem.Allocator) !void {
     const source =
-        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => (@product.get pair 0) (@product.get pair 1)
-        \\const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = fn apply => fn value => (apply ((fn item => item), value), apply ((fn item => item), @u32.to_f32 value))
-        \\const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = fn pair => (@product.get pair 0) (@product.get pair 1, 42)
-        \\entry const host = fn (callback: U32 -> U32 ! {Foreign}) => foreign_apply (apply, callback)
+        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
+        \\const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = func apply => return func value => return (apply ((func item => return item), value), apply ((func item => return item), @u32.to_f32 value))
+        \\const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = func pair => return (@product.get pair 0) (@product.get pair 1, 42)
+        \\entry const host = func (callback: U32 -> U32 ! {Foreign}) => return foreign_apply (apply, callback)
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1042,12 +1042,12 @@ test "parametric row matching searches distinct generic operation arguments with
 fn dictionaryPublication(allocator: std.mem.Allocator) !void {
     const source =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
         \\type Future = forall [a, row e] where { Render (a -> a ! {|e}) } => Unit -> Unit
         \\type Item = exists [a] where { Render a } => a
-        \\const make: Bool -> Item = fn flag => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-        \\const read = fn (item: Item) => unpack item as [a] value in Render.show value
+        \\const make: Bool -> Item = func flag => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+        \\const read = func (item: Item) => return unpack item as [a] value in Render.show value
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1103,20 +1103,20 @@ fn rejectStoredCapture(allocator: std.mem.Allocator, module: *core.Module, closu
 }
 fn inferredSchemeModule(allocator: std.mem.Allocator) !void {
     const source =
-        \\const identity = fn value => value
-        \\const apply = fn callback => fn value => callback value
-        \\const forget = fn value => do:
-        \\  break fn (unit: Unit) => @u32.add 40 2
+        \\const identity = func value => return value
+        \\const apply = func callback => return func value => return callback value
+        \\const forget = func value => return do:
+        \\  break func (unit: Unit) => return @u32.add 40 2
         \\const annotated: forall [a] => a -> a = identity
-        \\const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = fn pair => apply (@product.get pair 0) (@product.get pair 1)
+        \\const through: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return apply (@product.get pair 0) (@product.get pair 1)
         \\type Item = exists [a] => (a, a -> U32)
-        \\const make = fn (value: U32) => pack [U32] (value, identity) as Item
-        \\const read = fn (item: Item) => unpack item as [a] value in (@product.get value 1) (identity (@product.get value 0))
-        \\const discard = fn (item: Item) => unpack item as [a] value in forget (@product.get value 0)
-        \\entry const forgotten = fn (value: U32) => (discard (make value)) ()
-        \\entry const answer = fn (value: U32) => read (make value)
-        \\entry const whole = fn (value: U32) => annotated (apply identity value)
-        \\entry const host = fn (callback: U32 -> U32 ! {Foreign}) => through (callback, 42)
+        \\const make = func (value: U32) => return pack [U32] (value, identity) as Item
+        \\const read = func (item: Item) => return unpack item as [a] value in (@product.get value 1) (identity (@product.get value 0))
+        \\const discard = func (item: Item) => return unpack item as [a] value in forget (@product.get value 0)
+        \\entry const forgotten = func (value: U32) => return (discard (make value)) ()
+        \\entry const answer = func (value: U32) => return read (make value)
+        \\entry const whole = func (value: U32) => return annotated (apply identity value)
+        \\entry const host = func (callback: U32 -> U32 ! {Foreign}) => return through (callback, 42)
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1261,19 +1261,19 @@ test "closed dictionary signatures retain the exact opening goal footprint until
 fn sourceDictionaryCaptureScenario(allocator: std.mem.Allocator) !void {
     const prefix =
         "type Tag a is contract = { const read: Unit -> U32 }\n" ++
-        "impl Number : Tag U32 = { const read = fn unit => 42 }\n" ++
+        "impl Number : Tag U32 = { const read = func unit => return 42 }\n" ++
         "type Item = exists [a] where { Tag a } => Unit\n" ++
         "type Sealed = exists [b] => Unit -> U32\n";
     const cases = [_]struct { body: []const u8, escapes: bool }{
         .{ .body = "Tag.read ()", .escapes = false },
         .{ .body = "Tag.read", .escapes = true },
-        .{ .body = "fn (unit: Unit) => Tag.read unit", .escapes = true },
+        .{ .body = "func (unit: Unit) => return Tag.read unit", .escapes = true },
         .{ .body = "(Tag.read, 7)", .escapes = true },
         .{ .body = "pack [U32] Tag.read as Sealed", .escapes = true },
         .{ .body = "pack [a] Tag.read as Sealed", .escapes = false },
     };
     for (cases) |case| {
-        const source = try std.mem.concat(allocator, u8, &.{ prefix, "const keep = fn (item: Item) => unpack item as [a] value in ", case.body, "\n" });
+        const source = try std.mem.concat(allocator, u8, &.{ prefix, "const keep = func (item: Item) => return unpack item as [a] value in ", case.body, "\n" });
         defer allocator.free(source);
         var tokens = try lexer.lex(allocator, source);
         defer tokens.deinit(allocator);
@@ -1305,7 +1305,7 @@ fn associatedPackProjectionScenario(allocator: std.mem.Allocator) !void {
         \\impl Flag : Source Bool = { type Item = Bool }
         \\type Item = exists [a] where { Source a } => a
         \\const item: Item = pack [U32] 42 as Item
-        \\const flag: Item = pack [Bool] #True as Item
+        \\const flag: Item = pack [Bool] true as Item
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -1355,11 +1355,11 @@ test "associated package representation uses only the exact pack selected type m
 fn closedDictionaryCoreCaptureScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Tag a is contract = { const read: Unit -> U32 }
-        \\impl Number : Tag U32 = { const read = fn unit => 42 }
+        \\impl Number : Tag U32 = { const read = func unit => return 42 }
         \\type Item = exists [a] where { Tag a } => Unit
         \\type Sealed = exists [b] => Unit -> U32
         \\const item: Item = pack [U32] () as Item
-        \\const keep = fn (item: Item) => unpack item as [a] value in pack [a] Tag.read as Sealed
+        \\const keep = func (item: Item) => return unpack item as [a] value in pack [a] Tag.read as Sealed
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -1386,13 +1386,13 @@ test "immutable closed dictionary captures require exact goal witness resealing 
 fn dictionaryResealingScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
         \\type Item = exists [a] where { Render a } => a
-        \\const make = fn (flag: Bool) => if flag then pack [U32] 42 as Item else pack [Bool] #True as Item
-        \\const reseal = fn (item: Item) => unpack item as [a] value in pack [a] value as Item
-        \\const choose = fn (left: Item) => fn (right: Item) => unpack left as [a] x in unpack right as [b] y in pack [b] y as Item
-        \\const seal: forall [a] where { Render a } => a -> Item = fn value => pack [a] value as Item
+        \\const make = func (flag: Bool) => return if flag then pack [U32] 42 as Item else pack [Bool] true as Item
+        \\const reseal = func (item: Item) => return unpack item as [a] value in pack [a] value as Item
+        \\const choose = func (left: Item) => return func (right: Item) => return unpack left as [a] x in unpack right as [b] y in pack [b] y as Item
+        \\const seal: forall [a] where { Render a } => a -> Item = func value => return pack [a] value as Item
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1445,16 +1445,16 @@ test "dictionary resealing preserves exact opening and universal evidence throug
 fn ordinaryPredicateSchemeScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Identity = forall [a] => a -> a
-        \\const identity: Identity = fn value => value
+        \\const identity: Identity = func value => return value
         \\type Point is data = #Point { x: U32 }
-        \\const Point.add = fn (left: Point) => fn (right: U32) => @u32.add left.x right
-        \\const Point.from = fn (value: U32) => #Point {x: value}
-        \\const convert: a -> b where { result "from" a b } = fn value => @type.result "from" value
+        \\const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
+        \\const Point.from = func (value: U32) => return #Point {x: value}
+        \\const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
         \\const converted: Point = convert 20
-        \\const combine = fn left => fn right => @type.call "add" left right
-        \\const represented: a -> a where { type_rep a } = fn value => value
-        \\const field = fn value => value.x
-        \\const forward = fn value => combine value 22
+        \\const combine = func left => return func right => return @type.call "add" left right
+        \\const represented: a -> a where { type_rep a } = func value => return value
+        \\const field = func value => return value.x
+        \\const forward = func value => return combine value 22
         \\const answer = forward (#Point { x: represented (field {x: 20}) })
         \\const named = field (#Point {x: 7})
     ;
@@ -1504,12 +1504,12 @@ test "ordinary inferred predicate schemes coexist with annotated universal bodie
 fn inferredGoalForwardingScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Render a is contract = { const show: a -> U32 }
-        \\impl Number : Render U32 = { const show = fn value => value }
-        \\impl Flag : Render Bool = { const show = fn value => if value then 7 else 9 }
-        \\const helper = fn value => Render.show value
-        \\const render: forall [a] where { Render a } => a -> U32 = fn value => helper value
-        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = fn callback => @u32.add (callback 42) (callback #True)
-        \\entry const answer = fn () => both render
+        \\impl Number : Render U32 = { const show = func value => return value }
+        \\impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
+        \\const helper = func value => return Render.show value
+        \\const render: forall [a] where { Render a } => a -> U32 = func value => return helper value
+        \\const both: (forall [a] where { Render a } => a -> U32) -> U32 = func callback => return @u32.add (callback 42) (callback true)
+        \\entry const answer = func () => return both render
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -1565,12 +1565,12 @@ test "ordinary scheme publication preserves a bijection of variables rows and go
 
 fn ordinaryRightOwnerScenario(allocator: std.mem.Allocator) !void {
     const source =
-        \\const identity: forall [a] => a -> a = fn value => value
+        \\const identity: forall [a] => a -> a = func value => return value
         \\type Left is data = #Left {value: U32}
         \\type Right is data = #Right {value: U32}
-        \\const Left.add = fn (left: Left) => fn (right: U32) => @u32.add left.value right
-        \\const Right.add = fn (left: Left) => fn (right: Right) => @u32.add left.value right.value
-        \\const combine = fn left => fn right => @type.call "add" left right
+        \\const Left.add = func (left: Left) => return func (right: U32) => return @u32.add left.value right
+        \\const Right.add = func (left: Left) => return func (right: Right) => return @u32.add left.value right.value
+        \\const combine = func left => return func right => return @type.call "add" left right
         \\const answer = identity (combine (#Left {value: 20}) (#Right {value: 22}))
     ;
     var module = try lowerSource(allocator, source);
@@ -1593,9 +1593,9 @@ test "ordinary associated assumptions retry the right owner without retaining fa
 fn openingWithinUniversalScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Item = exists [b] => (b, b -> U32)
-        \\const make = fn value => pack [U32] (value, fn (payload: U32) => payload) as Item
-        \\const read: forall [a] => a -> Item -> U32 = fn ignored => fn item => unpack item as [b] value in (@product.get value 1) (@product.get value 0)
-        \\entry const answer = fn () => read #True (make 42)
+        \\const make = func value => return pack [U32] (value, func (payload: U32) => return payload) as Item
+        \\const read: forall [a] => a -> Item -> U32 = func ignored => return func item => return unpack item as [b] value in (@product.get value 1) (@product.get value 0)
+        \\entry const answer = func () => return read true (make 42)
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -1627,14 +1627,14 @@ test "universal bodies retain exact nested existential opening ownership through
 fn ordinaryProjectionScopeScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
+        \\impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
         \\type Package = exists [a] where { Source a } => a
-        \\const make = fn (value: U32) => pack [U32] value as Package
-        \\const read = fn (item: Package) => unpack item as [a] value in Source.show value (Source.get value)
-        \\const calculate = fn (value: U32) => read (make value)
-        \\const identity: forall [a] => a -> a = fn value => value
-        \\const keep: a -> (Source.Item a) -> (Source.Item a) where { Source a } = fn witness => fn value => value
-        \\const carried = fn (value: U32) => keep value value
+        \\const make = func (value: U32) => return pack [U32] value as Package
+        \\const read = func (item: Package) => return unpack item as [a] value in Source.show value (Source.get value)
+        \\const calculate = func (value: U32) => return read (make value)
+        \\const identity: forall [a] => a -> a = func value => return value
+        \\const keep: a -> (Source.Item a) -> (Source.Item a) where { Source a } = func witness => return func value => return value
+        \\const carried = func (value: U32) => return keep value value
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1775,13 +1775,13 @@ fn rejectAssociatedPayloadMutants(allocator: std.mem.Allocator, module: *core.Mo
 fn associatedPayloadPackScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
-        \\impl Number : Source U32 = { type Item = U32, const get = fn value => value, const show = fn owner => fn value => value }
+        \\impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
         \\type Package = exists [a] where { Source a } => (a, Source.Item a)
-        \\const make = fn (value: U32) => pack [U32] (value, value) as Package
-        \\const reseal = fn (item: Package) => unpack item as [a] value in pack [a] value as Package
-        \\const seal: forall [a] where { Source a } => a -> (Source.Item a) -> Package = fn value => fn item => pack [a] (value, item) as Package
-        \\const read = fn (item: Package) => unpack item as [a] value in Source.show (@product.get value 0) (@product.get value 1)
-        \\entry const answer = fn () => read (make 42)
+        \\const make = func (value: U32) => return pack [U32] (value, value) as Package
+        \\const reseal = func (item: Package) => return unpack item as [a] value in pack [a] value as Package
+        \\const seal: forall [a] where { Source a } => a -> (Source.Item a) -> Package = func value => return func item => return pack [a] (value, item) as Package
+        \\const read = func (item: Package) => return unpack item as [a] value in Source.show (@product.get value 0) (@product.get value 1)
+        \\entry const answer = func () => return read (make 42)
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1817,8 +1817,8 @@ fn associatedPayloadRejectionScenario(allocator: std.mem.Allocator) !void {
     const prefix = "type Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = U32 }\n";
     for ([_][]const u8{
         "type Package = exists [a] => (a, Source.Item a)\nconst bad = pack [U32] (1,42) as Package\n",
-        "type Package = exists [a] where {Source a} => (a, Source.Item a)\nconst bad = pack [U32] (1,#True) as Package\n",
-        "type Package = exists [a] where {Source a} => (a, Source.Item a)\nconst bad = pack [Bool] (#True,42) as Package\n",
+        "type Package = exists [a] where {Source a} => (a, Source.Item a)\nconst bad = pack [U32] (1,true) as Package\n",
+        "type Package = exists [a] where {Source a} => (a, Source.Item a)\nconst bad = pack [Bool] (true,42) as Package\n",
     }) |body| {
         const source = try std.mem.concat(allocator, u8, &.{ prefix, body });
         defer allocator.free(source);
@@ -1921,7 +1921,7 @@ fn unusedImportedRows(allocator: std.mem.Allocator, producer: *const core.Module
     try @import("package_core.zig").executable(&consumer, context);
 }
 fn rankCoexistenceScenario(allocator: std.mem.Allocator, body: []const u8) !void {
-    const source = try std.mem.concat(allocator, u8, &.{ "const identity: forall [a] => a -> a = fn value => value\n", body });
+    const source = try std.mem.concat(allocator, u8, &.{ "const identity: forall [a] => a -> a = func value => return value\n", body });
     defer allocator.free(source);
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1955,7 +1955,7 @@ test "rank interfaces coexist with closed effectful future code through complete
     const source =
         \\effect Read: Unit -> U32
         \\const future = @code.quote (Read ())
-        \\entry const answer = fn () => identity 42
+        \\entry const answer = func () => return identity 42
     ;
     try rankCoexistenceScenario(std.testing.allocator, source);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, rankCoexistenceScenario, .{source});
@@ -1965,11 +1965,11 @@ test "rank interfaces retain handlers for effectful typed code through complete 
     const source =
         \\effect Read: Unit -> U32
         \\const future = @code.quote (Read ())
-        \\const provider = @effect.provider Read (fn () => 42)
+        \\const provider = @effect.provider Read (func () => return 42)
         \\effect Write: Unit -> Unit
-        \\const writer = @effect.provider Write (fn () => ())
-        \\entry const answer = fn () => do provider:
-        \\  let deferred = fn () => Read ()
+        \\const writer = @effect.provider Write (func () => return ())
+        \\entry const answer = func () => return do provider:
+        \\  let deferred = func () => return Read ()
         \\  use value <- @code.emit future
         \\  break value
     ;
@@ -1980,11 +1980,11 @@ test "rank interfaces retain handlers for effectful typed code through complete 
 test "rank call views preserve separately evaluated operation arguments through complete OOM" {
     const source =
         \\effect Read: Unit -> U32
-        \\const pass = fn value => identity value
-        \\const invoke = fn () => identity (Read ())
+        \\const pass = func value => return identity value
+        \\const invoke = func () => return identity (Read ())
         \\const future = @code.quote (invoke ())
-        \\const provider = @effect.provider Read (fn () => 42)
-        \\entry const answer = fn () => do provider:
+        \\const provider = @effect.provider Read (func () => return 42)
+        \\entry const answer = func () => return do provider:
         \\  use value <- @code.emit future
         \\  break value
     ;
@@ -1995,14 +1995,14 @@ test "rank call views preserve separately evaluated operation arguments through 
 fn rankHandlerCaptureScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Tag a is contract = { const read: Unit -> U32 }
-        \\impl Number : Tag U32 = { const read = fn unit => 42 }
+        \\impl Number : Tag U32 = { const read = func unit => return 42 }
         \\type Item = exists [a] where { Tag a } => Unit
         \\type Sealed = exists [b] => Unit -> U32
         \\effect Tick: Unit -> Unit
-        \\const provider = @effect.provider Tick (fn () => ())
+        \\const provider = @effect.provider Tick (func () => return ())
         \\const copy = provider
         \\const item: Item = pack [U32] () as Item
-        \\const keep = fn (item: Item) => unpack item as [a] value in pack [a] Tag.read as Sealed
+        \\const keep = func (item: Item) => return unpack item as [a] value in pack [a] Tag.read as Sealed
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -2048,9 +2048,9 @@ test "rank handler results preserve closed dictionary capture footprints through
 fn effectfulScalarActionScenario(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
         \\effect Read: Unit -> U32
-        \\const action = fn () => Read ()
-        \\const declared: Unit -> U32 ! {Foreign} = fn () => 42
-        \\const factory = fn (seed: U32) => fn () => seed
+        \\const action = func () => return Read ()
+        \\const declared: Unit -> U32 ! {Foreign} = func () => return 42
+        \\const factory = func (seed: U32) => return func () => return seed
     );
     defer module.deinit(allocator);
     var actions: usize = 0;
@@ -2208,17 +2208,17 @@ test "exact Foreign inference views publish only complete endpoints and preserve
 
 const named_ordinary_owner_source =
     \\type Maybe a is data = #Some a | #Nothing
-    \\const identity: forall [a] => a -> a = fn value => value
-    \\const same = fn left => fn right => @type.same left right
-    \\const inspect = fn (candidate: Maybe U32) => do:
+    \\const identity: forall [a] => a -> a = func value => return value
+    \\const same = func left => return func right => return @type.same left right
+    \\const inspect = func (candidate: Maybe U32) => return do:
     \\  let #Some value = candidate else:
     \\    break 0
     \\  if let #Some extra = candidate:
     \\    use same value extra
     \\  break value
-    \\const helper = fn (value: U32) => inspect (#Some value)
-    \\const generated = @code.quote (fn (value: U32) => helper value)
-    \\entry const run = fn (value: U32) => @task.scope (fn group => @task.join (@task.spawn group (fn () => helper value)))
+    \\const helper = func (value: U32) => return inspect (#Some value)
+    \\const generated = @code.quote (func (value: U32) => return helper value)
+    \\entry const run = func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value)))
 ;
 fn namedOrdinaryOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator, named_ordinary_owner_source);
@@ -2284,9 +2284,9 @@ test "ordinary type witnesses reject opened abstract representation through OOM"
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
         \\type Item = exists [a] => a
-        \\const inspect = fn (item: Item) => unpack item as [a] value in do:
+        \\const inspect = func (item: Item) => return unpack item as [a] value in do:
         \\  let ignored = value
-        \\  break @type.same 0 (fn () => 1)
+        \\  break @type.same 0 (func () => return 1)
     );
     defer module.deinit(allocator);
     try packageWorkspace(allocator, &module);
@@ -2313,8 +2313,8 @@ test "generic cursor primitives require actual collection predicates and element
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
         \\type Maybe a is data = #Some a | #Nothing
-        \\const identity: forall [a] => a -> a = fn value => value
-        \\const next = fn cursor => if @cursor.has cursor then #Some (@cursor.value cursor, @cursor.advance cursor) else #Nothing
+        \\const identity: forall [a] => a -> a = func value => return value
+        \\const next = func cursor => return if @cursor.has cursor then #Some (@cursor.value cursor, @cursor.advance cursor) else #Nothing
     );
     defer module.deinit(allocator);
     try packageWorkspace(allocator, &module);
@@ -2378,4 +2378,703 @@ test "validation bounds receipts retain exact context and never publish failed c
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &invalid_units }));
     try std.testing.expectEqual(@as(usize, 1), workspace.bounds_count);
     try std.testing.expect(!workspace.proved(&module));
+}
+
+test "callback field selection preserves latent effects and invocation cannot erase them" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\effect Read: Unit -> U32
+        \\const pick = func stages => return stages.route
+        \\const action = func () => return Read ()
+        \\const selected: Unit -> U32 ! {Read} = pick {route: action}
+        \\const pure: Unit -> U32 = func () => return 0
+        \\const invoke: Unit -> U32 ! {Read} = func () => return selected ()
+    );
+    defer module.deinit(allocator);
+    validatePortable(allocator, &module) catch return error.CallbackSelectionRejected;
+    // The getter remains pure, but its result keeps the callback's effect row.
+    // Erasing that row from the actual invocation's public contract is invalid.
+    var pure_type: T.Id = 0;
+    var invoked: ?usize = null;
+    for (module.bodies, 0..) |body, index| {
+        if (std.mem.eql(u8, module.name(body.declaration_name), "pure")) pure_type = body.scheme.root;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "invoke")) invoked = index;
+    }
+    if (pure_type == 0 or invoked == null) return error.CallbackInvocationBodyMissing;
+    const body = &module.bodies[invoked.?];
+    const binding = &module.bindings[body.binding];
+    const original_body = body.*;
+    const original_binding = binding.*;
+    defer body.* = original_body;
+    defer binding.* = original_binding;
+    // Forge just the invoker's declaration, leaving the callback and the real
+    // call edge's effect row intact. Shared interned types must stay untouched.
+    body.scheme.root = pure_type;
+    binding.ty = pure_type;
+    binding.scheme.root = pure_type;
+    var remaining: usize = 65_536;
+    @import("package_core.zig").checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator) catch |err| {
+        if (err != error.InvalidArtifact) return err;
+        return;
+    };
+    return error.CallbackInvocationErasureAccepted;
+}
+
+test "source collection prerequisites admit owned readers but reject Ref and Link" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\const first = func cursor => return @cursor.value cursor
+        \\const grown = func (items: Cursor (GrowArray U32)) => return first items
+        \\const resized = func (items: Cursor (ResizeArray U32)) => return first items
+        \\const viewed = func (items: Cursor (&[U32])) => return first items
+        \\const direct = func (items: Cursor (ResizeArray U32)) => return @cursor.value items
+    );
+    defer module.deinit(allocator);
+    const package = @import("package_core.zig");
+    for (module.bodies) |body| {
+        var remaining: usize = 65_536;
+        if (module.binding(body.binding).kind != .global) continue;
+        try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+    }
+    var changed = false;
+    for (module.bodies) |body| {
+        if (!std.mem.eql(u8, module.name(body.declaration_name), "resized")) continue;
+        const function = module.types.node(body.scheme.root);
+        const reader = module.types.node(function.a).a;
+        const original = module.types.nodes[reader];
+        try std.testing.expect(original.tag == .nominal);
+        inline for (.{ @import("storage_types.zig").Kind.ref, @import("storage_types.zig").Kind.link }) |kind| {
+            module.types.nodes[reader].b = @backingInt(kind);
+            defer module.types.nodes[reader] = original;
+            var remaining: usize = 65_536;
+            try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator));
+        }
+        changed = true;
+    }
+    try std.testing.expect(changed);
+}
+
+test "source nominal fields instantiate only the constructor owned binders" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\type Box a is data = $Box {value: a}
+        \\const read = func boxed => return boxed.value
+        \\const unbox = func (boxed: Box U32): U32 => return read boxed
+    );
+    defer module.deinit(allocator);
+    const package = @import("package_core.zig");
+    var target: core.BindingId = 0;
+    for (module.bodies) |body| {
+        if (std.mem.eql(u8, module.name(body.declaration_name), "unbox")) target = body.binding;
+        var remaining: usize = 65_536;
+        if (module.binding(body.binding).kind != .global) continue;
+        try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+    }
+    try std.testing.expect(target != 0);
+    var mutated = false;
+    for (module.constructors) |*constructor| {
+        if (constructor.scheme.variables.len == 0) continue;
+        const saved = constructor.scheme.variables;
+        constructor.scheme.variables = .{};
+        defer constructor.scheme.variables = saved;
+        // The same type variable node without this constructor's ownership
+        // must not be treated as an instantiable payload witness.
+        var remaining: usize = 65_536;
+        try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, target, .{}, &remaining, allocator));
+        mutated = true;
+        break;
+    }
+    try std.testing.expect(mutated);
+}
+
+test "source SIMD authority preserves exact catalog lanes and comparison masks" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\type Words = (U32, U32, U32, U32)
+        \\type Floats = (F32, F32, F32, F32)
+        \\const xor = func (left: Words) -> (right: Words): Words => return @simd.u32x4.bit_xor left right
+        \\const compare = func (left: Floats) -> (right: Floats): Words => return @simd.f32x4.lt left right
+    );
+    defer module.deinit(allocator);
+    const package = @import("package_core.zig");
+    var target: core.BindingId = 0;
+    for (module.bodies) |body| {
+        if (module.binding(body.binding).kind != .global) continue;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "xor")) target = body.binding;
+        var remaining: usize = 65_536;
+        try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+    }
+    try std.testing.expect(target != 0);
+    const arrow = module.types.node(module.binding(target).scheme.root);
+    const vector_type = module.types.node(arrow.a);
+    try std.testing.expect(vector_type.tag == .product and vector_type.b == 4);
+    const saved = module.types.extra[vector_type.a + 2];
+    module.types.extra[vector_type.a + 2] = T.f32_type;
+    defer module.types.extra[vector_type.a + 2] = saved;
+    // Equal aggregate widths and shared input/output aliases cannot authorize
+    // a mixed F32 lane in a U32 vector operation.
+    var remaining: usize = 65_536;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, target, .{}, &remaining, allocator));
+}
+
+test "compile scoped source proofs reuse completed bodies without lending caller effect authority" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\effect Read: Unit -> U32
+        \\const read = func () => return Read ()
+        \\const good: Unit -> U32 ! {Read} = func () => return read ()
+        \\const extra: Unit -> U32 ! {Read} = func () => return read ()
+        \\const invoke: Unit -> U32 ! {Read} = func () => return extra ()
+        \\const pure: Unit -> U32 = func () => return 42
+    );
+    defer module.deinit(allocator);
+    var good: core.BindingId = 0;
+    var invoke: core.BindingId = 0;
+    var pure_type: T.Id = 0;
+    for (module.bodies) |body| {
+        const name = module.name(body.declaration_name);
+        if (std.mem.eql(u8, name, "good")) good = body.binding;
+        if (std.mem.eql(u8, name, "invoke")) invoke = body.binding;
+        if (std.mem.eql(u8, name, "pure")) pure_type = body.scheme.root;
+    }
+    try std.testing.expect(good != 0 and invoke != 0 and pure_type != 0);
+    // Construct the negative immutable environment before the cache exists.
+    // The real call to extra/read still performs Read; only this declaration
+    // falsely claims a pure ambient.
+    module.bindings[invoke].ty = pure_type;
+    module.bindings[invoke].scheme.root = pure_type;
+    for (module.bodies) |*body| if (body.binding == invoke) {
+        body.scheme.root = pure_type;
+    };
+    const package = @import("package_core.zig");
+    var cache = try package.SourceProofCache.init(allocator, &.{&module});
+    defer cache.deinit();
+    var remaining: usize = 65_536;
+    try package.checkedInterfaceBodyCached(&cache, &module, good, &remaining, null, null);
+    const completed = cache.completed.count();
+    try std.testing.expect(completed >= 2);
+    const after_first = remaining;
+    try package.checkedInterfaceBodyCached(&cache, &module, good, &remaining, null, null);
+    try std.testing.expectEqual(after_first, remaining);
+    try std.testing.expectEqual(completed, cache.completed.count());
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBodyCached(&cache, &module, invoke, &remaining, null, null));
+    // A failed root may validate extra locally, but publishes no new claims.
+    try std.testing.expectEqual(completed, cache.completed.count());
+    var different_view = module;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBodyCached(&cache, &different_view, good, &remaining, null, null));
+    try immutableUsageFactScenario(allocator);
+    try moduleSourceBudgetScenario(allocator);
+}
+
+fn moduleSourceBudgetScenario(allocator: std.mem.Allocator) !void {
+    var module = try lowerSource(allocator,
+        \\const first = func () => return 42
+        \\const second = func () => return 43
+    );
+    defer module.deinit(allocator);
+    var first: core.BindingId = 0;
+    var second: core.BindingId = 0;
+    for (module.bodies) |body| {
+        if (std.mem.eql(u8, module.name(body.declaration_name), "first")) first = body.binding;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "second")) second = body.binding;
+    }
+    try std.testing.expect(first != 0 and second != 0);
+    var peer = module;
+    peer.unit = 2;
+    const package = @import("package_core.zig");
+    const units = &[_]*const core.Module{ &module, &peer };
+    var global = try package.SourceProofCache.init(allocator, units);
+    defer global.deinit();
+    var remaining: usize = 65_536;
+    try package.checkedInterfaceBodyCached(&global, &module, first, &remaining, null, null);
+    const cost = 65_536 - remaining;
+    try std.testing.expect(cost != 0 and global.remainingTotal() == null);
+    var cache = try package.SourceProofCache.initWithModuleBudget(allocator, units, cost);
+    defer cache.deinit();
+    try std.testing.expectEqual(cost * 2, cache.remainingTotal().?);
+    // The explicit-global API remains separate; opt-in counters are shared
+    // across this module's roots and cannot borrow the peer's allowance.
+    remaining = 1;
+    try package.checkedInterfaceBodyCached(&cache, &module, first, &remaining, null, null);
+    try std.testing.expectEqual(@as(usize, 1), remaining);
+    try std.testing.expectEqual(@as(usize, 0), cache.moduleRemaining(module.unit).?);
+    try std.testing.expect(cache.exhaustedUnit() == null);
+    try package.checkedInterfaceBodyCached(&cache, &module, first, &remaining, null, null);
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBodyCached(&cache, &module, second, &remaining, null, null));
+    try std.testing.expectEqual(module.unit, cache.exhaustedUnit().?);
+    try std.testing.expectEqual(cost, cache.moduleRemaining(peer.unit).?);
+    try package.checkedInterfaceBodyCached(&cache, &peer, first, &remaining, null, null);
+    try std.testing.expect(cache.exhaustedUnit() == null);
+    try std.testing.expectEqual(@as(usize, 0), cache.remainingTotal().?);
+}
+
+fn immutableUsageFactScenario(allocator: std.mem.Allocator) !void {
+    var module = try lowerSource(allocator, "const value: U32 = 42");
+    defer module.deinit(allocator);
+    const package = @import("package_core.zig");
+    var cache = try package.SourceProofCache.init(allocator, &.{&module});
+    defer cache.deinit();
+    var remaining: usize = 65_536;
+    // Immutable structural facts are reusable; a mutable solver type graph
+    // with the same unit and root ID must compute its own different answer.
+    try std.testing.expect(!try cache.containsUsage(&module, T.u32_type, &remaining));
+    const fact_count = cache.usage_facts.count();
+    const nodes = try allocator.dupe(T.Node, module.types.nodes);
+    defer allocator.free(nodes);
+    nodes[T.u32_type] = .{ .tag = .usage, .a = T.unit, .b = @backingInt(T.UsageKind.unique) };
+    const mutable_view: core.Module = .{
+        .unit = module.unit,
+        .types = .{ .nodes = nodes, .extra = module.types.extra },
+        .nominals = module.nominals,
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    try std.testing.expect(try cache.containsUsage(&mutable_view, T.u32_type, &remaining));
+    try std.testing.expectEqual(fact_count, cache.usage_facts.count());
+    try std.testing.expect(!try cache.containsUsage(&module, T.u32_type, &remaining));
+}
+
+test "source imported callee assumptions preserve exact producer and public arguments" {
+    const allocator = std.testing.allocator;
+    var producer = try lowerSource(allocator,
+        \\const combine = func x => return func y => return @type.call "add" x y
+        \\const other = func x => return func y => return @type.call "mul" x y
+        \\const wrapper = func x => return combine x x
+    );
+    defer producer.deinit(allocator);
+    var combine: core.BindingId = 0;
+    var other: core.BindingId = 0;
+    var wrapper: core.BindingId = 0;
+    for (producer.bodies) |body| {
+        const name = producer.name(body.declaration_name);
+        if (std.mem.eql(u8, name, "combine")) combine = body.binding;
+        if (std.mem.eql(u8, name, "other")) other = body.binding;
+        if (std.mem.eql(u8, name, "wrapper")) wrapper = body.binding;
+    }
+    try std.testing.expect(combine != 0 and other != 0 and wrapper != 0);
+    var consumer = producer;
+    consumer.unit = 2;
+    consumer.bindings = try allocator.dupe(core.Binding, producer.bindings);
+    defer allocator.free(consumer.bindings);
+    consumer.calls = try allocator.dupe(core.CallInfo, producer.calls);
+    defer allocator.free(consumer.calls);
+    consumer.references = try allocator.dupe(core.BindingRef, producer.references);
+    defer allocator.free(consumer.references);
+    consumer.obligations = try allocator.dupe(core.Obligation, producer.obligations);
+    defer allocator.free(consumer.obligations);
+    consumer.bindings[combine].kind = .external;
+    consumer.bindings[combine].target = .{ .unit = producer.unit, .binding = combine };
+    for (consumer.calls) |*call| if (call.target.unit == 0 and call.target.binding == combine) {
+        call.target.unit = producer.unit;
+    };
+    for (consumer.references) |*reference| if (reference.unit == 0 and reference.binding == combine) {
+        reference.unit = producer.unit;
+    };
+    for (consumer.obligations) |*goal| if (goal.kind == .callee_use and goal.identity.decl == combine) {
+        goal.identity.unit = consumer.unit;
+    };
+    const package = @import("package_core.zig");
+    const context = .{ .units = &[_]*const core.Module{ &producer, &consumer } };
+    var remaining: usize = 65_536;
+    try package.checkedInterfaceBody(&consumer, wrapper, context, &remaining, allocator);
+    consumer.bindings[combine].target.binding = other;
+    remaining = 65_536;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&consumer, wrapper, context, &remaining, allocator));
+    consumer.bindings[combine].target.binding = combine;
+    const selected: usize = for (consumer.obligations, 0..) |goal, index| {
+        if (goal.kind == .callee_use and goal.identity.decl == combine) break index;
+    } else return error.TestUnexpectedResult;
+    const pack = consumer.types.node(consumer.obligations[selected].ty);
+    try std.testing.expect(pack.tag == .product and pack.b != 0);
+    const original_types = consumer.types;
+    const wrong_nodes = try allocator.alloc(T.Node, original_types.nodes.len + 1);
+    defer allocator.free(wrong_nodes);
+    @memcpy(wrong_nodes[0..original_types.nodes.len], original_types.nodes);
+    const wrong_extra = try allocator.alloc(T.Id, original_types.extra.len + pack.b);
+    defer allocator.free(wrong_extra);
+    @memcpy(wrong_extra[0..original_types.extra.len], original_types.extra);
+    @memcpy(wrong_extra[original_types.extra.len..], original_types.list(.{ .start = pack.a, .len = pack.b }));
+    wrong_extra[original_types.extra.len] = T.f32_type;
+    wrong_nodes[original_types.nodes.len] = .{ .tag = .product, .a = @intCast(original_types.extra.len), .b = pack.b };
+    consumer.types = .{
+        .nodes = wrong_nodes,
+        .extra = wrong_extra,
+        .effects = original_types.effects,
+        .operations = original_types.operations,
+        .quantifier_goals = original_types.quantifier_goals,
+        .quantifier_obligations = original_types.quantifier_obligations,
+    };
+    consumer.obligations[selected].ty = @intCast(original_types.nodes.len);
+    remaining = 65_536;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&consumer, wrapper, context, &remaining, allocator));
+}
+
+test "source policy call results establish exact callback rows before their use" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\const policy = func (seed: U32) => return {run: func (value: U32) => return @u32.add seed value}
+        \\const invoke = func codec -> value => return codec.run value
+        \\const answer = func (value: U32) => return invoke (policy value) value
+    );
+    defer module.deinit(allocator);
+    const body = for (module.bodies) |candidate| {
+        if (std.mem.eql(u8, module.name(candidate.declaration_name), "answer")) break candidate;
+    } else return error.MissingSelectedBody;
+    var remaining: usize = 65_536;
+    try @import("package_core.zig").checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+}
+
+test "source loop carries retain only the branch that reaches the backedge" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator,
+        \\const scan = func (items: Array U32) => return do:
+        \\  let total = 0
+        \\  let valid = true
+        \\  for value in items:
+        \\    if @u32.lt 0 value:
+        \\      total := @u32.add self value
+        \\    else:
+        \\      let forbidden = 123456789
+        \\      valid := false
+        \\      break
+        \\  return @u32.add total (if valid then 100 else 0)
+    );
+    defer module.deinit(allocator);
+    const package = @import("package_core.zig");
+    const body = module.bodies[0];
+    var remaining: usize = 65_536;
+    try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+    var forbidden: core.BindingId = 0;
+    for (module.nodes) |node| if (node.tag == .bind) {
+        const value = module.node(node.b);
+        if (value.tag == .constant and value.a == 123456789) forbidden = node.a;
+    };
+    try std.testing.expect(forbidden != 0);
+    const carry = for (module.loop_carries) |*candidate| {
+        if (module.binding(candidate.incoming).ty == T.u32_type) break candidate;
+    } else return error.MissingCarry;
+    const original = carry.backedge;
+    carry.backedge = forbidden;
+    remaining = 65_536;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator));
+    carry.backedge = original;
+    remaining = 65_536;
+    try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+}
+
+test "source lexical storage admits high binding identities without granting branch locals" {
+    const allocator = std.testing.allocator;
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(allocator);
+    var text: [80]u8 = undefined;
+    for (0..4100) |index| try source.appendSlice(allocator, try std.mem.print(&text, "const pad_{d} = 0\n", .{index}));
+    try source.appendSlice(allocator,
+        \\const selected = func (flag: Bool) -> (input: U32) => return do:
+        \\  let outer = @u32.add input 1
+        \\  if flag:
+        \\    let inner = @u32.add outer 2
+        \\    return inner
+        \\  return outer
+    );
+    var module = try lowerSource(allocator, source.items);
+    defer module.deinit(allocator);
+    try std.testing.expect(module.bindings.len > 4096);
+    const package = @import("package_core.zig");
+    const body = for (module.bodies) |candidate| {
+        if (std.mem.eql(u8, module.name(candidate.declaration_name), "selected")) break candidate;
+    } else return error.MissingSelectedBody;
+    var remaining: usize = 1_000_000;
+    try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+    // The last lexical declaration belongs to the conditional branch. Forging
+    // the final read to use it must still fail despite identical scalar types.
+    var inner: core.BindingId = 0;
+    var final_read: core.Id = 0;
+    for (module.nodes, 0..) |node, index| {
+        if (node.tag == .bind) inner = node.a;
+        if (node.tag == .reference and node.ty == T.u32_type) final_read = @intCast(index);
+    }
+    try std.testing.expect(inner > 4096 and final_read != 0);
+    const reference = module.nodes[final_read].a;
+    const original = module.references[reference];
+    module.references[reference].binding = inner;
+    remaining = 1_000_000;
+    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator));
+    module.references[reference] = original;
+    remaining = 1_000_000;
+    try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
+}
+
+test "source ordinary scheme lists retain exact ownership without package binder limits" {
+    const count = 192;
+    var nodes: [count + 7]T.Node = @splat(.{ .tag = .variable });
+    nodes[0] = .{ .tag = .absent };
+    nodes[T.unit] = .{ .tag = .unit };
+    nodes[T.boolean] = .{ .tag = .boolean };
+    nodes[T.u32_type] = .{ .tag = .u32 };
+    nodes[T.f32_type] = .{ .tag = .f32 };
+    nodes[T.never] = .{ .tag = .never };
+    var extra: [count * 2 + 2]u32 = undefined;
+    for (0..count) |i| {
+        extra[i] = @intCast(i + 6);
+        extra[count + i] = @intCast(i);
+    }
+    extra[count * 2] = count + 6;
+    extra[count * 2 + 1] = count;
+    var rows = [_]T.Effects.Row{.{}};
+    var graph: core.Types = .{ .nodes = &nodes, .extra = &extra, .effects = .{ .rows = &rows, .variable_count = count + 1 } };
+    const scheme: T.Scheme = .{ .root = T.unit, .variables = .{ .len = count }, .row_variables = .{ .start = count, .len = count } };
+    var remaining: usize = 65_536;
+    var source: contracts.Context = .{ .types = &graph, .remaining = &remaining, .large_plain_graph = true, .source_instances = true };
+    try source.initialize();
+    try source.generic(scheme);
+    try std.testing.expect(try source.ownsVariable(count + 5));
+    try std.testing.expect(!try source.ownsVariable(count + 6));
+    try std.testing.expect(try source.ownsRow(count - 1));
+    try std.testing.expect(!try source.ownsRow(count));
+    // Repeated membership inquiries spend bounded work without rescanning the
+    // scheme. A copied scope keeps its own lexical authority after push/pop.
+    const work_before = remaining;
+    for (0..count) |_| {
+        try std.testing.expect(try source.ownsVariable(count + 5));
+        try std.testing.expect(try source.ownsRow(count - 1));
+    }
+    try std.testing.expectEqual(@as(usize, count * 2), work_before - remaining);
+    var saved = source;
+    const nested: T.Scheme = .{ .root = T.unit, .variables = .{ .start = count * 2, .len = 1 }, .row_variables = .{ .start = count * 2 + 1, .len = 1 } };
+    try source.pushGeneric(nested);
+    try std.testing.expect(try source.ownsVariable(count + 6));
+    try std.testing.expect(try source.ownsRow(count));
+    try std.testing.expect(!try saved.ownsVariable(count + 6));
+    try std.testing.expect(!try saved.ownsRow(count));
+    source.popGeneric();
+    try std.testing.expect(!try source.ownsVariable(count + 6));
+    try std.testing.expect(!try source.ownsRow(count));
+    try source.pushGeneric(nested);
+    remaining = 1;
+    try std.testing.expectError(error.InvalidArtifact, source.ownsVariable(count + 6));
+    try std.testing.expect(!source.scheme_membership_valid);
+    source = saved;
+    remaining = 65_536;
+    try std.testing.expect(!try source.ownsVariable(count + 6));
+    try std.testing.expect(!try source.ownsRow(count));
+    var portable: contracts.Context = .{ .types = &graph, .remaining = &remaining };
+    try portable.initialize();
+    try std.testing.expectError(error.InvalidArtifact, portable.generic(scheme));
+    try std.testing.expectEqual(@as(usize, 0), portable.scheme_count);
+    extra[1] = extra[0];
+    try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(scheme));
+    try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+    extra[1] = 7;
+    extra[count + 1] = extra[count];
+    try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(scheme));
+    try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+    extra[count + 1] = 1;
+    nodes[6] = .{ .tag = .u32 };
+    try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(scheme));
+    try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+    nodes[6] = .{ .tag = .variable };
+    remaining = 1;
+    try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(scheme));
+    try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+}
+
+test "generalized alias row parameters retain exact witnesses before body closure views" {
+    var nodes = [_]T.Node{
+        .{ .tag = .absent },                           .{ .tag = .unit },                             .{ .tag = .boolean },                          .{ .tag = .u32 },                              .{ .tag = .f32 },                    .{ .tag = .never },
+        .{ .tag = .function, .a = 1, .b = 1, .c = 1 }, .{ .tag = .function, .a = 1, .b = 1, .c = 2 }, .{ .tag = .function, .a = 1, .b = 1, .c = 0 }, .{ .tag = .function, .a = 1, .b = 1, .c = 3 }, .{ .tag = .record, .a = 1, .b = 2 }, .{ .tag = .record, .a = 5, .b = 2 },
+        .{ .tag = .record, .a = 9, .b = 2 },           .{ .tag = .record, .a = 13, .b = 2 },
+    };
+    // A partial factory's implementation closed carrier 0, while the
+    // resulting declaration generalized that same carrier as an endpoint.
+    var extra = [_]T.Id{ 0, 100, 6, 101, 6, 100, 7, 101, 7, 100, 7, 101, 8, 100, 9, 101, 8 };
+    var labels = [_]T.Effects.Label{T.foreign_operation};
+    var rows = [_]T.Effects.Row{ .{}, .{ .tail = .{ .variable = 0 } }, .{ .tail = .{ .variable = 1 } }, .{ .labels = .{ .len = 1 } } };
+    var operations = [_]T.Operation{ .{ .identity = .{ .unit = 0, .decl = 0 } }, .{ .identity = .{ .unit = 0, .decl = 1 } } };
+    var graph: core.Types = .{ .nodes = &nodes, .extra = &extra, .effects = .{ .rows = &rows, .labels = &labels, .variable_count = 2 }, .operations = &operations };
+    var remaining: usize = 65_536;
+    var context: contracts.Context = .{ .types = &graph, .remaining = &remaining };
+    try context.initialize();
+    var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining, .views = &context, .foreign_views = true, .left_rows = .{ .len = 1 } };
+    const scheme: T.Scheme = .{ .root = 10, .row_variables = .{ .len = 1 } };
+    try proof.instantiateScheme(scheme, 11);
+    try std.testing.expectEqual(@as(T.Effects.Id, 2), proof.scheme_row_witnesses[0].?.row);
+    try std.testing.expect(!context.closed_rows.contains(2) and !context.pure_rows.contains(2));
+    // Repeated occurrences retain one exact choice: neither an unrelated
+    // inference tail nor Foreign may be silently collapsed to a pure row.
+    try std.testing.expectError(error.InvalidArtifact, proof.instantiateScheme(scheme, 12));
+    try std.testing.expectError(error.InvalidArtifact, proof.instantiateScheme(scheme, 13));
+}
+
+test "repeated callback witnesses compare exact immutable row aliases without granting purity" {
+    var nodes = [_]T.Node{
+        .{ .tag = .absent },                           .{ .tag = .unit },                             .{ .tag = .boolean },                          .{ .tag = .u32 },                              .{ .tag = .f32 }, .{ .tag = .never },
+        .{ .tag = .function, .a = 3, .b = 1, .c = 1 }, .{ .tag = .function, .a = 3, .b = 1, .c = 2 }, .{ .tag = .function, .a = 3, .b = 1, .c = 3 }, .{ .tag = .function, .a = 3, .b = 1, .c = 4 },
+    };
+    var extra = [_]T.Id{};
+    var labels = [_]T.Effects.Label{T.foreign_operation};
+    var rows = [_]T.Effects.Row{ .{}, .{ .tail = .{ .variable = 0 } }, .{ .tail = .{ .variable = 0 } }, .{ .tail = .{ .variable = 1 } }, .{ .labels = .{ .len = 1 }, .tail = .{ .variable = 0 } } };
+    var operations = [_]T.Operation{ .{ .identity = .{ .unit = 0, .decl = 0 } }, .{ .identity = .{ .unit = 0, .decl = 1 } } };
+    var graph: core.Types = .{ .nodes = &nodes, .extra = &extra, .effects = .{ .rows = &rows, .labels = &labels, .variable_count = 2 }, .operations = &operations };
+    var remaining: usize = 65_536;
+    var context: contracts.Context = .{ .types = &graph, .remaining = &remaining };
+    try context.initialize();
+    var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining, .views = &context };
+    try proof.validate(6, 7);
+    try std.testing.expect(!context.closed_rows.contains(1) and !context.closed_rows.contains(2));
+    try std.testing.expect(!context.pure_rows.contains(1) and !context.pure_rows.contains(2));
+    try std.testing.expectError(error.InvalidArtifact, context.visit(7));
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 8));
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(6, 9));
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(9, 6));
+    try context.pure_rows.set(1);
+    try context.closed_rows.set(1);
+    try proof.validate(6, 7);
+    try std.testing.expect(context.pure_rows.contains(2) and context.closed_rows.contains(2));
+}
+
+test "source instance ownership survives solver copying without thawing types or effects" {
+    const Equations = @import("scheme_equations.zig");
+    var nodes = [_]T.Node{
+        .{ .tag = .absent },           .{ .tag = .unit },             .{ .tag = .boolean },                          .{ .tag = .u32 },                              .{ .tag = .f32 },                              .{ .tag = .never },
+        .{ .tag = .variable, .a = 0 }, .{ .tag = .variable, .a = 1 }, .{ .tag = .function, .a = 3, .b = 1, .c = 1 }, .{ .tag = .function, .a = 3, .b = 1, .c = 2 }, .{ .tag = .function, .a = 3, .b = 1, .c = 3 },
+    };
+    var extra = [_]T.Id{};
+    var labels = [_]T.Effects.Label{T.foreign_operation};
+    var rows = [_]T.Effects.Row{ .{}, .{ .tail = .{ .variable = 0 } }, .{ .tail = .{ .variable = 1 } }, .{ .labels = .{ .len = 1 }, .tail = .{ .variable = 0 } } };
+    var operations = [_]T.Operation{ .{ .identity = .{ .unit = 0, .decl = 0 } }, .{ .identity = .{ .unit = 0, .decl = 1 } } };
+    const module: core.Module = .{
+        .types = .{ .nodes = &nodes, .extra = &extra, .effects = .{ .rows = &rows, .labels = &labels, .variable_count = 2 }, .operations = &operations },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    var remaining: usize = 65_536;
+    var context: contracts.Context = .{ .types = &module.types, .remaining = &remaining, .source_instances = true };
+    try context.initialize();
+    try context.instance_variables.set(6);
+    try context.instance_rows.set(0);
+    var solver = try Equations.Solver.init(std.testing.allocator, &module, &context, &remaining);
+    defer solver.deinit();
+    try std.testing.expect(solver.ownsRigid(solver.graph.node(6)));
+    try std.testing.expect(!solver.ownsRigid(solver.graph.node(7)));
+    const owned_row = solver.graph.row(1).tail.formal;
+    const unowned_row = solver.graph.row(2).tail.formal;
+    try std.testing.expect(solver.ownsRigid(solver.graph.node(owned_row)));
+    try std.testing.expect(!solver.ownsRigid(solver.graph.node(unowned_row)));
+    var foreign_identity = solver.graph.node(owned_row);
+    foreign_identity.a += 1;
+    try std.testing.expect(!solver.ownsRigid(foreign_identity));
+    var inquiry = context;
+    inquiry.types = &solver.graph;
+    inquiry.solver = &solver;
+    try inquiry.visit(8);
+    try std.testing.expectError(error.InvalidArtifact, inquiry.visit(9));
+    var proof: contracts.Principal = .{ .left = &solver.graph, .right = &solver.graph, .remaining = &remaining, .views = &inquiry };
+    try proof.validate(owned_row, owned_row);
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(8, 10));
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(10, 8));
+    try std.testing.expectError(error.InvalidArtifact, solver.unify(6, T.f32_type));
+    try std.testing.expect(!inquiry.pure_rows.contains(1) and !inquiry.closed_rows.contains(1));
+    var portable = context;
+    portable.source_instances = false;
+    var rejected = try Equations.Solver.init(std.testing.allocator, &module, &portable, &remaining);
+    defer rejected.deinit();
+    try std.testing.expect(!rejected.ownsRigid(rejected.graph.node(6)));
+    try std.testing.expect(!rejected.ownsRigid(rejected.graph.node(rejected.graph.row(1).tail.formal)));
+}
+
+// These helpers borrow the caller's temporary graph buffers only for one
+// synchronous proof. The owned module never stores those temporary buffers.
+fn rejectMergeRows(module: *const core.Module, binding: core.BindingId, callback_type: T.Id, rows: []T.Effects.Row, allocator: std.mem.Allocator) !void {
+    var inquiry = module.*;
+    inquiry.types.effects.rows = rows;
+    inquiry.types.effects.variable_count += 1;
+    const callback = inquiry.types.nodes[callback_type];
+    defer inquiry.types.nodes[callback_type] = callback;
+    inquiry.types.nodes[callback_type].c = @intCast(rows.len - 1);
+    var remaining: usize = 1_000_000;
+    try std.testing.expectError(error.InvalidArtifact, @import("package_core.zig").checkedInterfaceBody(&inquiry, binding, .{}, &remaining, allocator));
+}
+fn rejectMergeField(module: *const core.Module, binding: core.BindingId, nodes: []T.Node, extra: []u32, allocator: std.mem.Allocator) !void {
+    var inquiry = module.*;
+    inquiry.types.nodes = nodes;
+    inquiry.types.extra = extra;
+    var found = false;
+    for (inquiry.nodes) |*node| if (node.tag == .record_merge) {
+        const saved = node.ty;
+        defer node.ty = saved;
+        node.ty = @intCast(nodes.len - 1);
+        var remaining: usize = 1_000_000;
+        try std.testing.expectError(error.InvalidArtifact, @import("package_core.zig").checkedInterfaceBody(&inquiry, binding, .{}, &remaining, allocator));
+        found = true;
+    };
+    try std.testing.expect(found);
+}
+
+fn mergeSelectionScenario(allocator: std.mem.Allocator) !void {
+    var module = try lowerSource(allocator,
+        \\type Access = {callback: U32 -> Unit ! {}}
+        \\const merge = func (base: Access): Access => return @record.merge base {}
+    );
+    defer module.deinit(allocator);
+    var binding: core.BindingId = 0;
+    for (module.bodies) |body| if (std.mem.eql(u8, module.name(body.declaration_name), "merge")) {
+        binding = body.binding;
+    };
+    try std.testing.expect(binding != 0);
+    var remaining: usize = 1_000_000;
+    try @import("package_core.zig").checkedInterfaceBody(&module, binding, .{}, &remaining, allocator);
+    const function = module.types.node(module.binding(binding).ty);
+    const access = module.types.node(function.a);
+    try std.testing.expectEqual(T.Tag.record, access.tag);
+    const field = module.types.recordField(access, 0);
+    const callback = module.types.nodes[field.ty];
+    try std.testing.expectEqual(T.Tag.function, callback.tag);
+    // Exact merge field identity must not admit an unowned callback row at
+    // the independent executable header/input/output boundary.
+    const original_effects = module.types.effects;
+    const expanded_rows = try allocator.alloc(T.Effects.Row, original_effects.rows.len + 1);
+    defer allocator.free(expanded_rows);
+    @memcpy(expanded_rows[0..original_effects.rows.len], original_effects.rows);
+    expanded_rows[original_effects.rows.len] = .{ .tail = .{ .variable = original_effects.variable_count } };
+    try rejectMergeRows(&module, binding, field.ty, expanded_rows, allocator);
+    // A forged result record cannot substitute a numeric field for the
+    // selected callback field, even though its name and record width match.
+    const original_types = module.types;
+    const expanded_nodes = try allocator.alloc(T.Node, original_types.nodes.len + 1);
+    defer allocator.free(expanded_nodes);
+    @memcpy(expanded_nodes[0..original_types.nodes.len], original_types.nodes);
+    const expanded_extra = try allocator.alloc(u32, original_types.extra.len + 2);
+    defer allocator.free(expanded_extra);
+    @memcpy(expanded_extra[0..original_types.extra.len], original_types.extra);
+    expanded_extra[original_types.extra.len] = field.name;
+    expanded_extra[original_types.extra.len + 1] = T.u32_type;
+    expanded_nodes[original_types.nodes.len] = .{ .tag = .record, .a = @intCast(original_types.extra.len), .b = 1 };
+    try rejectMergeField(&module, binding, expanded_nodes, expanded_extra, allocator);
+}
+test "record merge selection identity does not admit unknown callback rows or forged fields" {
+    try mergeSelectionScenario(std.testing.allocator);
 }

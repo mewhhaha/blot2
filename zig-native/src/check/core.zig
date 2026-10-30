@@ -17,7 +17,7 @@ pub const Name = struct { start: u32 = 0, len: u32 = 0 };
 /// Only record field spellings survive in this compact symbol projection.
 /// Physical layouts use spelling, never the incidental interning order.
 pub const FieldName = struct { symbol: u32, spelling: Name };
-pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task };
+pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage };
 pub const ArrayOp = @import("../backend/collection_ops.zig").Op;
 pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
@@ -37,6 +37,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 /// match a=match-info index; pattern_bind a=pattern,b=value,c=exiting fallback suite.
 /// update a=update-info index. Its self binding is assigned before the replacement.
 /// array/array_op a=values start,b=len; array_op c=ArrayOp enum ordinal.
+/// storage a=values start,b=len,c=storage_ops.Op; requires scoped storage proof.
 /// closure a=closure catalog; apply a=callee,b=one argument,c=checked per-use
 /// type instance when the stored callee is universal (otherwise zero).
 /// This private type edge is not admitted by frozen portable Core validation.
@@ -437,7 +438,7 @@ pub const Module = struct {
     pub fn children(self: *const Module, id: Id) []const Id {
         const value = self.node(id);
         return switch (value.tag) {
-            .block, .suite, .product, .record, .array, .array_op, .task => self.extra[value.a..][0..value.b],
+            .block, .suite, .product, .record, .array, .array_op, .storage, .task => self.extra[value.a..][0..value.b],
             .call, .contract_method, .break_ => self.extra[value.b..][0..value.c],
             .package_pack => blk: {
                 for (self.dictionary_selections) |selection| {

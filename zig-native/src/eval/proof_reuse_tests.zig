@@ -54,11 +54,11 @@ fn repeated(allocator: std.mem.Allocator, module: *const core.Module) !void {
 }
 test "exact semantic evidence distinguishes U32 and F32 repeated generic bodies with no evaluation" {
     var module = try lower(
-        \\const identity = fn value => value
-        \\entry const first = fn (value: U32) -> U32 => identity value
-        \\entry const second = fn (value: U32) -> U32 => identity value
-        \\entry const floating = fn (value: F32) -> F32 => identity value
-        \\entry const floating_again = fn (value: F32) -> F32 => identity value
+        \\const identity = func value => return value
+        \\entry const first = func (value: U32) : U32 => return identity value
+        \\entry const second = func (value: U32) : U32 => return identity value
+        \\entry const floating = func (value: F32) : F32 => return identity value
+        \\entry const floating_again = func (value: F32) : F32 => return identity value
     );
     defer module.deinit(a);
     const original = try a.dupe(types.Node, module.types.nodes);
@@ -78,9 +78,9 @@ fn excluded(allocator: std.mem.Allocator, module: *const core.Module) !void {
 test "nominal payloads containing callables need richer evidence and do not enter this cache" {
     var module = try lower(
         \\type Box is data = #Box { run: Unit -> U32 }
-        \\const invoke = fn (box: Box) -> U32 => box.run ()
-        \\entry const first = fn (box: Box) -> U32 => invoke box
-        \\entry const second = fn (box: Box) -> U32 => invoke box
+        \\const invoke = func (box: Box) : U32 => return box.run ()
+        \\entry const first = func (box: Box) : U32 => return invoke box
+        \\entry const second = func (box: Box) : U32 => return invoke box
     );
     defer module.deinit(a);
     try excluded(a, &module);
@@ -88,11 +88,11 @@ test "nominal payloads containing callables need richer evidence and do not ente
 }
 
 const selected_fixture =
-    \\const identity = fn value => value
-    \\entry const first = fn (value: U32) -> U32 => identity value
-    \\entry const second = fn (value: U32) -> U32 => identity value
-    \\entry const floating = fn (value: F32) -> F32 => identity value
-    \\entry const floating_again = fn (value: F32) -> F32 => identity value
+    \\const identity = func value => return value
+    \\entry const first = func (value: U32) : U32 => return identity value
+    \\entry const second = func (value: U32) : U32 => return identity value
+    \\entry const floating = func (value: F32) : F32 => return identity value
+    \\entry const floating_again = func (value: F32) : F32 => return identity value
 ;
 fn selectedProofs(allocator: std.mem.Allocator, module: *const core.Module, entry: bool) !void {
     var session = try evaluator.Session.init(allocator, &.{module.*});
@@ -141,7 +141,7 @@ fn specializationProofs(allocator: std.mem.Allocator, module: *const core.Module
     try std.testing.expectEqual(integer_hits, session.proofs.proof_reused);
 }
 test "generic export rejection publishes no proof while concrete specialization retains only its evidence" {
-    var module = try lower(selected_fixture ++ "\nentry const generic = fn value => identity value\n");
+    var module = try lower(selected_fixture ++ "\nentry const generic = func value => return identity value\n");
     defer module.deinit(a);
     try specializationProofs(a, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, specializationProofs, .{&module});

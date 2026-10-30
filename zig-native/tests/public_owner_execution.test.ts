@@ -10,34 +10,34 @@ const executable = Deno.args[0] ??
 const library = `type Box a is data = #Box a
 opaque type Secret = {left: U32, right: Array U32}
 type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-const closed = fn () => @resource.acquire (fn () => #Secret {right: #[8, 9], left: 7}) (fn owner => ())
-const tree = fn () => @resource.acquire (fn () => #Branch (#Leaf 7, #Leaf 9)) (fn owner => ())
-const box = fn () => @resource.acquire (fn () => #Box #[7, 9]) (fn owner => ())
-const release_secret = fn (owner: unique Secret) => @resource.release owner
-const release_tree = fn (owner: unique (Tree U32)) => @resource.release owner
-const release_box = fn (owner: unique (Box (Array U32))) => @resource.release owner
+const closed = func () => return @resource.acquire (func () => return #Secret {right: #[8, 9], left: 7}) (func owner => return ())
+const tree = func () => return @resource.acquire (func () => return #Branch (#Leaf 7, #Leaf 9)) (func owner => return ())
+const box = func () => return @resource.acquire (func () => return #Box #[7, 9]) (func owner => return ())
+const release_secret = func (owner: unique Secret) => return @resource.release owner
+const release_tree = func (owner: unique (Tree U32)) => return @resource.release owner
+const release_box = func (owner: unique (Box (Array U32))) => return @resource.release owner
 `;
 const source =
   `import {closed, tree, box, release_secret, release_tree, release_box} from "./owners"
-entry const make = fn (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => @resource.acquire (fn () => 42) drop
-entry const float = fn (drop: cleanup ((unique F32) -> Unit ! {Foreign})) => @resource.acquire (fn () => 1.5) drop
-entry const array = fn (drop: cleanup ((unique (Array U32)) -> Unit ! {Foreign})) => @resource.acquire (fn () => #[1, 2]) drop
-entry const pure = fn () -> unique U32 => 9
-entry const consume = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-entry const pass = fn (owner: unique U32) => owner
-entry const share = fn (owner: unique U32) => @usage.share owner
-entry const read = fn (owner: shared U32) => @usage.borrow owner (fn loan => @usage.read loan)
-entry const alias = fn (owner: shared U32) => owner
-entry const length = fn (owner: unique (Array U32)) => @usage.borrow owner (fn loan => @usage.length loan)
-entry const tuple = fn () => @resource.acquire (fn () => (#[7, 9], {items: #[#[1, 2]]})) (fn owner => ())
-entry const finish_tuple = fn (owner: unique (Array U32, {items: Array (Array U32)})) => @resource.release owner
-entry const secret = fn () => closed ()
-entry const finish_secret = fn owner => release_secret owner
-entry const tree_owner = fn () => tree ()
-entry const finish_tree = fn owner => release_tree owner
-entry const box_owner = fn () => box ()
-entry const finish_box = fn owner => release_box owner
-entry const waiting = fn (host: U32 -> U32 ! {Foreign}) => host 7
+entry const make = func (drop: cleanup ((unique U32) -> Unit ! {Foreign})) => return @resource.acquire (func () => return 42) drop
+entry const float = func (drop: cleanup ((unique F32) -> Unit ! {Foreign})) => return @resource.acquire (func () => return 1.5) drop
+entry const array = func (drop: cleanup ((unique (Array U32)) -> Unit ! {Foreign})) => return @resource.acquire (func () => return #[1, 2]) drop
+entry const pure = func () : unique U32 => return 9
+entry const consume = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+entry const pass = func (owner: unique U32) => return owner
+entry const share = func (owner: unique U32) => return @usage.share owner
+entry const read = func (owner: shared U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+entry const alias = func (owner: shared U32) => return owner
+entry const length = func (owner: unique (Array U32)) => return @usage.borrow owner (func loan => return @usage.length loan)
+entry const tuple = func () => return @resource.acquire (func () => return (#[7, 9], {items: #[#[1, 2]]})) (func owner => return ())
+entry const finish_tuple = func (owner: unique (Array U32, {items: Array (Array U32)})) => return @resource.release owner
+entry const secret = func () => return closed ()
+entry const finish_secret = func owner => return release_secret owner
+entry const tree_owner = func () => return tree ()
+entry const finish_tree = func owner => return release_tree owner
+entry const box_owner = func () => return box ()
+entry const finish_box = func owner => return release_box owner
+entry const waiting = func (host: U32 -> U32 ! {Foreign}) => return host 7
 `;
 const ownerError = (code: string) => (error: unknown) =>
   error instanceof GuestError && error.code === code;
@@ -278,7 +278,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
           const invalid = await compiler.build({
             sources: {
               [entry]: source.replace(
-                "@usage.borrow owner (fn loan => @usage.read loan)",
+                "@usage.borrow owner (func loan => return @usage.read loan)",
                 "(owner, owner)",
               ),
             },
@@ -313,11 +313,11 @@ for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`raw Wasm owner bridges reject forged and reused leases and share once authority (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
-    const source = `entry const make = fn () -> unique U32 => 42
-entry const consume = fn (owner: unique U32) => @usage.borrow owner (fn loan => @usage.read loan)
-entry const once: once ((unique U32) -> U32) = fn owner => @usage.borrow owner (fn loan => @usage.read loan)
-entry const many = fn (owner: shared U32) => @usage.read owner
-entry const share = fn (owner: unique U32) => @usage.share owner
+    const source = `entry const make = func () : unique U32 => return 42
+entry const consume = func (owner: unique U32) => return @usage.borrow owner (func loan => return @usage.read loan)
+entry const once: once ((unique U32) -> U32) = func owner => return @usage.borrow owner (func loan => return @usage.read loan)
+entry const many = func (owner: shared U32) => return @usage.read owner
+entry const share = func (owner: unique U32) => return @usage.share owner
 `;
     const compiler = await createZigProjectCompiler({
       executable,

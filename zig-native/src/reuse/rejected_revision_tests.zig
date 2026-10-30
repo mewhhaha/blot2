@@ -15,30 +15,30 @@ const io = std.testing.io;
 const shapes =
     \\data Box a = #Box a
     \\type Pair is data = #Pair { left: F32, right: F32 }
-    \\const pair = fn (left: F32) => fn (right: F32) => #Pair { left, right }
-    \\const swap = fn (value: Pair) => #Pair { left: value.right, right: value.left }
-    \\const boxed = fn value => #Box value
+    \\const pair = func (left: F32) => return func (right: F32) => return #Pair { left, right }
+    \\const swap = func (value: Pair) => return #Pair { left: value.right, right: value.left }
+    \\const boxed = func value => return #Box value
 ;
 const dep =
     \\import {Pair, pair, swap, boxed} from "./shapes"
     \\const value: U32 = 42
-    \\const read: Unit -> U32 = fn () => value
-    \\const choose = fn (value: Pair) => swap (swap value)
-    \\const keep = fn (value: F32) => boxed (pair value 1.0)
+    \\const read: Unit -> U32 = func () => return value
+    \\const choose = func (value: Pair) => return swap (swap value)
+    \\const keep = func (value: F32) => return boxed (pair value 1.0)
 ;
 const mid =
     \\import * as dep from "./dep"
     \\import {Pair, pair} from "./shapes"
-    \\const read_twice = fn () => @u32.add (dep.read ()) (dep.read ())
-    \\const chosen = fn (value: F32) => dep.choose (pair value 3.0)
+    \\const read_twice = func () => return @u32.add (dep.read ()) (dep.read ())
+    \\const chosen = func (value: F32) => return dep.choose (pair value 3.0)
 ;
 const main =
     \\import * as mid from "./mid"
     \\import * as dep from "./dep"
     \\import {Box} from "./shapes"
     \\entry const answer: U32 = mid.read_twice ()
-    \\entry const right = fn (value: F32) -> F32 => (mid.chosen value).right
-    \\entry const kept = fn (value: F32) -> F32 => do:
+    \\entry const right = func (value: F32) : F32 => return (mid.chosen value).right
+    \\entry const kept = func (value: F32) : F32 => return do:
     \\  let #Box held = dep.keep value
     \\  break held.left
 ;
@@ -104,12 +104,12 @@ const Edit = struct {
     /// published without the ordinary lane.
     portable: ?bool,
 };
-const dep_unknown = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = missing\nconst read: Unit -> U32 = fn () => value\nconst choose = fn (value: Pair) => swap (swap value)\nconst keep = fn (value: F32) => boxed (pair value 1.0)\n";
-const dep_mismatch = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = true\nconst read: Unit -> U32 = fn () => value\nconst choose = fn (value: Pair) => swap (swap value)\nconst keep = fn (value: F32) => boxed (pair value 1.0)\n";
-const dep_edited = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = 43\nconst read: Unit -> U32 = fn () => value\nconst choose = fn (value: Pair) => swap (swap value)\nconst keep = fn (value: F32) => boxed (pair value 1.0)\n";
-const mid_duplicate = "import * as dep from \"./dep\"\nimport {Pair, pair, pair} from \"./shapes\"\nconst read_twice = fn () => @u32.add (dep.read ()) (dep.read ())\nconst chosen = fn (value: F32) => dep.choose (pair value 3.0)\n";
+const dep_unknown = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = missing\nconst read: Unit -> U32 = func () => return value\nconst choose = func (value: Pair) => return swap (swap value)\nconst keep = func (value: F32) => return boxed (pair value 1.0)\n";
+const dep_mismatch = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = true\nconst read: Unit -> U32 = func () => return value\nconst choose = func (value: Pair) => return swap (swap value)\nconst keep = func (value: F32) => return boxed (pair value 1.0)\n";
+const dep_edited = "import {Pair, pair, swap, boxed} from \"./shapes\"\nconst value: U32 = 43\nconst read: Unit -> U32 = func () => return value\nconst choose = func (value: Pair) => return swap (swap value)\nconst keep = func (value: F32) => return boxed (pair value 1.0)\n";
+const mid_duplicate = "import * as dep from \"./dep\"\nimport {Pair, pair, pair} from \"./shapes\"\nconst read_twice = func () => return @u32.add (dep.read ()) (dep.read ())\nconst chosen = func (value: F32) => return dep.choose (pair value 3.0)\n";
 const main_unknown = main ++ "\nentry const broken: U32 = absent\n";
-const main_hole = main ++ "\nentry const unfinished = fn (value: U32) -> F32 => @hole\n";
+const main_hole = main ++ "\nentry const unfinished = func (value: U32) : F32 => return @hole\n";
 const main_export = "import * as mid from \"./mid\"\nimport * as dep from \"./dep\"\nimport {Box, nothing} from \"./shapes\"\nentry const answer: U32 = mid.read_twice ()\n";
 const main_mismatch = main ++ "\nentry const wrong: U32 = true\n";
 const edits = [_]Edit{

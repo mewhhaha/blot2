@@ -5,8 +5,8 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const header = `type State a is effect = {get: Unit -> a, set: a -> Unit}\n`;
 const nested = header + `
-entry const answer = fn () => @effect.scope (fn (left: State U32) =>
-  @effect.scope (fn (right: State U32) => do:
+entry const answer = func () => return @effect.scope (func (left: State U32) => return
+  @effect.scope (func (right: State U32) => return do:
     let (outer, result) = do (@effect.state left.get left.set 10):
       use nested <- do (@effect.state right.get right.set 100):
         use a <- left.get ()
@@ -22,27 +22,27 @@ entry const answer = fn () => @effect.scope (fn (left: State U32) =>
 `;
 
 const aliases = header + `
-entry const answer = fn () => @effect.scope (fn (s: State U32) => do:
+entry const answer = func () => return @effect.scope (func (s: State U32) => return do:
   let capability = s
   let read = capability.get
   let write = capability.set
-  let local = fn () => read ()
+  let local = func () => return read ()
   let (state, result) = do (@effect.state read write 7):
     break local ()
   break result
 )
 `;
 const forwarding = header + `
-entry const answer = fn () => @effect.scope (fn (left: State U32) =>
-  @effect.scope (fn (right: State U32) => do (@effect.provider left.get (fn () => 20)):
-    break do (@effect.provider right.get (fn () => left.get ())):
-      break do (@effect.provider left.get (fn () => 99)):
+entry const answer = func () => return @effect.scope (func (left: State U32) => return
+  @effect.scope (func (right: State U32) => return do (@effect.provider left.get (func () => return 20)):
+    break do (@effect.provider right.get (func () => return left.get ())):
+      break do (@effect.provider left.get (func () => return 99)):
         use direct <- left.get ()
         use forwarded <- right.get ()
         break @u32.add direct forwarded
   )
 )
-entry const shadow = fn () => @effect.scope (fn (s: State U32) => do:
+entry const shadow = func () => return @effect.scope (func (s: State U32) => return do:
   let (outer, result) = do (@effect.state s.get s.set 10):
     use nested <- do (@effect.state s.get s.set 100):
       break s.get ()
@@ -75,7 +75,7 @@ Deno.test("scoped capability operation aliases retain their owner in local callb
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const hostSource = header + `
-entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: State U32) => do:
+entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (s: State U32) => return do:
   let provider = @effect.state s.get s.set 10
   use nested <- do provider:
     use previous <- s.get ()
@@ -85,7 +85,7 @@ entry const answer = fn (host: U32 -> U32 ! {Foreign}) => @effect.scope (fn (s: 
   let (state, result) = nested
   break result
 )
-entry const trapped = fn (divisor: U32) => @effect.scope (fn (s: State U32) => do:
+entry const trapped = func (divisor: U32) => return @effect.scope (func (s: State U32) => return do:
   let (state, result) = do (@effect.state s.get s.set 10):
     use previous <- s.get ()
     break @u32.div previous divisor
@@ -146,7 +146,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
       const rejected = await compiler.build({
         sources: {
           [entry]: header +
-            "entry const bad = fn () => @effect.scope (fn (s: State U32) => s)\n",
+            "entry const bad = func () => return @effect.scope (func (s: State U32) => return s)\n",
         },
       });
       assert(!rejected.success);

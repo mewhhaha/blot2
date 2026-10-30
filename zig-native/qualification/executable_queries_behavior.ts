@@ -40,9 +40,9 @@ const pins = Object.fromEntries(
 await Deno.mkdir(out, { recursive: true });
 const entry = `${out}/main.blot`, dep = `${out}/dep.blot`;
 const main =
-  `import * as dep from "./dep"\nconst changed = 1\nentry const run = fn (value: U32) -> U32 => @u32.add (dep.helper value) changed\n`;
+  `import * as dep from "./dep"\nconst changed = 1\nentry const run = func (value: U32) : U32 => return @u32.add (dep.helper value) changed\n`;
 const library =
-  `const helper = fn (value: U32) -> U32 => do:\n  let total = value\n${
+  `const helper = func (value: U32) : U32 => return do:\n  let total = value\n${
     "  total := @u32.add total 1\n".repeat(32)
   }  break total\n`;
 const changedMain = main.replace("const changed = 1", "const changed = 3");

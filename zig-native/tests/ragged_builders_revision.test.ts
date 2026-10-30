@@ -16,18 +16,18 @@ Deno.test("ragged retained bounds filters captures payload and primitive wrapper
   const wrappers = `infix 30 (>) = gt
 infix 30 (<) = lt
 infixl 70 (*) = mul
-const gt = fn left => fn right => @type.call "gt" left right
-const lt = fn left => fn right => @type.call "lt" left right
-const mul = fn left => fn right => @type.call "mul" left right
-const U32.lt = fn left => fn right => @u32.lt left right
-const U32.gt = fn left => fn right => U32.lt right left
-const U32.mul = fn left => fn right => @u32.mul left right
+const gt = func left => return func right => return @type.call "gt" left right
+const lt = func left => return func right => return @type.call "lt" left right
+const mul = func left => return func right => return @type.call "mul" left right
+const U32.lt = func left => return func right => return @u32.lt left right
+const U32.gt = func left => return func right => return U32.lt right left
+const U32.mul = func left => return func right => return @u32.mul left right
 `;
-  const main = `entry const run = fn seed => do:
+  const main = `entry const run = func seed => return do:
   let values = #[0,1,2,3,4]
   let bound = seed
   break #[x * x | x <- values, x > bound, x < 4]
-entry const triangle = fn count => do:
+entry const triangle = func count => return do:
   let values: List U32 = []
   for x in 0..count:
     for y in 0..x:
@@ -126,14 +126,14 @@ Deno.test("ragged imported controls preserve qualified identity through staging 
     stdRoot: new URL("../../std", import.meta.url).pathname,
   };
   const main = `import { limit } from "./limits"
-entry const run = fn () => do:
+entry const run = func () => return do:
   let result: List U32 = []
   for x in 0..3:
     if @u32.lt x limit:
       result := [...self, x]
   break @array.from_list result
 const folded = run ()
-entry const staged = fn () => folded
+entry const staged = func () => return folded
 `;
   const padding = Array.from(
     { length: 6 },

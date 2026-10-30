@@ -15,7 +15,7 @@ function moduleSource(module: number, bump: number): string {
   const lines = [];
   for (let f = 0; f < functions; f++) {
     lines.push(
-      `const f${module}_${f} = fn (value: U32) => if @u32.lt value ${f} then @u32.add value ${
+      `const f${module}_${f} = func (value: U32) => return if @u32.lt value ${f} then @u32.add value ${
         module * 1000 + f + bump
       } else @u32.mul (@u32.add value ${f}) ${(f % 5) + 1}`,
     );
@@ -26,7 +26,7 @@ function moduleSource(module: number, bump: number): string {
     for (let f = g * size + 1; f < (g + 1) * size; f++) {
       sum = `@u32.add (${sum}) (f${module}_${f} value)`;
     }
-    lines.push(`const g${module}_${g} = fn (value: U32) => ${sum}`);
+    lines.push(`const g${module}_${g} = func (value: U32) => return ${sum}`);
   }
   return lines.join("\n") + "\n";
 }
@@ -39,7 +39,7 @@ function entrySource(): string {
     lines.push(`import {${names.join(", ")}} from "./m${m}"`);
     for (const name of names) sum = `@u32.add (${sum}) (${name} value)`;
   }
-  lines.push(`entry const run: U32 -> U32 = fn value => ${sum}`);
+  lines.push(`entry const run: U32 -> U32 = func value => return ${sum}`);
   return lines.join("\n") + "\n";
 }
 
@@ -72,8 +72,8 @@ Deno.test("frontend lowering and codegen workers emit identical Wasm and diagnos
     edited[`${directory}/m1.blot`] = moduleSource(1, 7);
     edited[`${directory}/m4.blot`] = moduleSource(4, 9);
     const broken = { ...original };
-    broken[`${directory}/m2.blot`] += "const wrong: U32 = fn value => value\n";
-    broken[`${directory}/m5.blot`] += "const other: U32 = fn value => value\n";
+    broken[`${directory}/m2.blot`] += "const wrong: U32 = func value => return value\n";
+    broken[`${directory}/m5.blot`] += "const other: U32 = func value => return value\n";
     const results: Uint8Array[][] = [];
     const rejections: unknown[] = [];
     const counts = [[1, 1, 1], [2, 1, 1], [4, 1, 1], [1, 4, 1], [4, 4, 1], [

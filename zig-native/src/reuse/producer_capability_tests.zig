@@ -14,24 +14,24 @@ const io = std.testing.io;
 
 const prelude =
     \\type Box a is data = #Box a
-    \\const Box.map = fn transform => fn box => case box of
+    \\const Box.map = func transform => return func box => return case box of
     \\  #Box value => #Box (transform value)
-    \\const F32.lerp = fn left => fn right => fn weight => @f32.add left (@f32.mul (@f32.sub right left) weight)
-    \\const apply = fn function => fn value => function value
+    \\const F32.lerp = func left => return func right => return func weight => return @f32.add left (@f32.mul (@f32.sub right left) weight)
+    \\const apply = func function => return func value => return function value
 ;
 const vec =
     \\type P is data = #P { x: F32 }
-    \\const P.mix = fn (a: P) => fn (b: P) => fn (t: F32) => #P { x: F32.lerp a.x b.x t }
+    \\const P.mix = func (a: P) => return func (b: P) => return func (t: F32) => return #P { x: F32.lerp a.x b.x t }
 ;
 const mid =
     \\import { P } from "./vec"
-    \\const blend = fn (a: F32) => fn (b: F32) => fn (t: F32) => F32.lerp a b t
+    \\const blend = func (a: F32) => return func (b: F32) => return func (t: F32) => return F32.lerp a b t
     \\const shade: U32 = 1
 ;
 const main =
     \\import * as mid from "./mid"
     \\entry const answer: U32 = mid.shade
-    \\entry const mixed = fn (a: F32) -> F32 => mid.blend a 1.0 0.5
+    \\entry const mixed = func (a: F32) : F32 => return mid.blend a 1.0 0.5
 ;
 
 const Fixture = struct {
@@ -128,7 +128,7 @@ test "a member imported through another catalog publishes the same recipes live 
     try std.testing.expectEqual(capability_flow.Contract.input_shape, live.blend);
 
     // A scalar edit checks `mid` again, against frozen `vec` and prelude.
-    try fixture.dir.dir.writeFile(io, .{ .sub_path = "mid.blot", .data = "import { P } from \"./vec\"\nconst blend = fn (a: F32) => fn (b: F32) => fn (t: F32) => F32.lerp a b t\nconst shade: U32 = 2\n" });
+    try fixture.dir.dir.writeFile(io, .{ .sub_path = "mid.blot", .data = "import { P } from \"./vec\"\nconst blend = func (a: F32) => return func (b: F32) => return func (t: F32) => return F32.lerp a b t\nconst shade: U32 = 2\n" });
     const edited = try revise(&session, &fixture);
     defer a.free(edited);
     var frozen = try Published.capture(&session.seed);

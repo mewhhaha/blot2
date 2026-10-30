@@ -9,7 +9,7 @@ const io = std.testing.io;
 
 const entry = "import {read} from \"./left\"\nimport {fixed} from \"./right\"\nentry const answer: U32 = @u32.add (read ()) fixed\n";
 const original = "const value: U32 = 41\n";
-const left = "import {value} from \"./changed\"\nconst read: Unit -> U32 = fn () => value\n";
+const left = "import {value} from \"./changed\"\nconst read: Unit -> U32 = func () => return value\n";
 const Fixture = struct {
     dir: std.testing.TmpDir,
     path: [:0]u8,
@@ -226,7 +226,7 @@ test "module abstraction publication OOM preserves old opaque owners and retry" 
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const consumer = "import {Token, make, read} from \"./changed\"\nentry const answer = read (make 41)\n";
-    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = fn value => #Token (@u32.add value offset)\nconst read: Token -> U32 = fn (#Token value) => value\n";
+    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = func value => return #Token (@u32.add value offset)\nconst read: Token -> U32 = func (#Token value) => return value\n";
     try fixture.write("main.blot", consumer);
     try fixture.write("changed.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});

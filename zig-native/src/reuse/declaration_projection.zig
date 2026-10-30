@@ -278,7 +278,7 @@ const Scan = struct {
                 try self.reference(call.target);
                 try self.children(.{ .start = n.b, .len = n.c });
             },
-            .block, .suite, .product, .array, .array_op => try self.children(.{ .start = n.a, .len = n.b }),
+            .block, .suite, .product, .array, .array_op, .storage => try self.children(.{ .start = n.a, .len = n.b }),
             .record => {
                 try self.children(.{ .start = n.a, .len = n.b });
                 _ = try self.words(.{ .start = n.c, .len = n.b });
