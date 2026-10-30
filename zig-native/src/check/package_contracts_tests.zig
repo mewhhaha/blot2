@@ -2753,7 +2753,9 @@ test "source loop carries retain only the branch that reaches the backedge" {
     );
     defer module.deinit(allocator);
     const package = @import("package_core.zig");
-    const body = module.bodies[0];
+    const body = for (module.bodies) |candidate| {
+        if (std.mem.eql(u8, module.name(candidate.declaration_name), "scan")) break candidate;
+    } else return error.MissingScanBody;
     var remaining: usize = 65_536;
     try package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator);
     var forbidden: core.BindingId = 0;
@@ -2766,6 +2768,7 @@ test "source loop carries retain only the branch that reaches the backedge" {
         if (module.binding(candidate.incoming).ty == T.u32_type) break candidate;
     } else return error.MissingCarry;
     const original = carry.backedge;
+    defer carry.backedge = original;
     carry.backedge = forbidden;
     remaining = 65_536;
     try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBody(&module, body.binding, .{}, &remaining, allocator));
