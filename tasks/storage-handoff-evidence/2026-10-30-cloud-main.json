@@ -34,5 +34,47 @@
     "evidence_portability": "Attempt logs are ignored local outputs; this summary is tracked."
   },
   "frame": "not run; main did not compile",
-  "broad_qualification": "not rerun for documentation-only changes"
+  "broad_qualification": "not rerun for documentation-only changes",
+  "toolbar_integration": {
+    "change": "Use existing per-label part/span API for 46 toolbar words; preserve field order, generated payload and checked budgets.",
+    "source_sha256": "a142e2df9387c7cc980fda5a9476da27b03fb3c65f27b585f778a9d8e89799f6",
+    "checks": {
+      "projection_order": "passed: 46 of 46 same fields in same order",
+      "single_descriptor_attempt": "failed: budget still exceeded at labels.clipper_tool",
+      "per_label_attempt": "advanced beyond toolbar; failed on brush renderer type evidence"
+    },
+    "attempts": [
+      {
+        "attempt": "build/gdev-first-frame/main-c1db2b377eef68e4",
+        "success": false,
+        "diagnostic": {
+          "filename": "gdev/src/game.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 5490,
+          "end": 5509,
+          "message": "Source module storage validation exceeded its checked work budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      },
+      {
+        "attempt": "build/gdev-first-frame/main-d8bf61dd5f724f15",
+        "success": false,
+        "diagnostic": {
+          "filename": "ink/lib/brush.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 22957,
+          "end": 22986,
+          "message": "The scoped body lacks complete type evidence",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      }
+    ],
+    "gdev_checkpoint": "5719816f761edb859f9e9d39adcc33f5ec4c4ca4"
+  }
 }

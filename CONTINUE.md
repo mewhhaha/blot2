@@ -19,12 +19,18 @@ Get **one real Gdev frame running in Pen**. No current Gdev `main.wasm` has
 successfully compiled, and no Pen frame or screenshot has been produced.
 
 The cloud retry built the development compiler with Zig 0.17.0 and Deno 2.9.6.
-The actual-main attempt moved beyond the previous Boxing diagnostic and failed
-in `src/game.blot:114` inside `editor_toolbar`: repeated `text ()` calls exhaust
-source-module storage validation's checked work budget. The bounded next step is
-to bind the existing text descriptor once locally and reuse its fields,
-preserving words, owners and label order without raising budgets. See the
-[tracked retry evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json).
+The actual-main attempt moved beyond the previous Boxing diagnostic. Binding
+`text ()` once still exhausted module validation, so Gdev's editor toolbar now
+uses the existing per-label `part`/`span_*` exports. Its 46 fields and
+evaluation order match the previous toolbar, without changing generated payloads
+or budgets.
+
+The next real-main diagnostic is `ink/lib/brush.blot:539`, the distance
+expression `plane.distance + x * offset.x`: scoped emission lacks complete type
+evidence. Inspect the canonical stored-brush/face/geometry boundary before
+changing solver semantics. Main Wasm and the Pen frame still fail to qualify.
+See
+[the tracked retry evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json).
 
 The machine's command sandbox cannot connect to its proxy; network operations
 work through the supported escalated command path. The normal Deno task eagerly
