@@ -372,5 +372,35 @@
       "frame": "not run"
     },
     "blot_formatter": "blocked by locked npm.jsr.io proxy HTTP403; no dependency or lock integrity changed"
+  },
+  "station_boundary_experiments": {
+    "compiler": "temporary native diagnostic build; exact compiler source restored after build; normal executable unchanged",
+    "budget": 32000000,
+    "baseline": {
+      "attempt": "main-5cba7c57fc50501e",
+      "draw_board_whole_dictionary_entry_allowance": 159569,
+      "enabled_completed_cost": 5898
+    },
+    "station_canonical_types": {
+      "attempt": "main-861a7abc76066db8",
+      "draw_board_whole_dictionary_entry_allowance": 159820,
+      "saved_before_board": 251,
+      "result": "still budget; reverted because no useful application advancement"
+    },
+    "settings_leaf_types": {
+      "attempt": "main-19ae3d151effd8a",
+      "draw_board_whole_dictionary_entry_allowance": 105061,
+      "enabled_completed_cost": 5595,
+      "result": "worse shared entry allowance despite cheaper individual helper proof; reverted"
+    },
+    "interpretation": "Station is reached with less than160K of shared32M remaining; propagated failure span does not locate dominant cost. No proof rule, budget or packet behavior changed."
+  },
+  "purchase_feedback_fixture": {
+    "fixes": [
+      "Use ../tests/minor_support/game from Pen virtual src/test_fixture entry, as documented.",
+      "Construct Stash through its defining salt_state module, retaining the same data."
+    ],
+    "validation": "pen test-blot tests/purchase_feedback.blot still does not compile: test_support/shop.blot:160:97 type_mismatch; same failure with station/settings source experiments reverted. Zero checks executed.",
+    "qualification": "incomplete; no assertions removed"
   }
 }
