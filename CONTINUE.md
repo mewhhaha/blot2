@@ -2,116 +2,51 @@
 
 ## Current cloud frontier
 
-Canonical structural DAG keys now clear the 4,096-node selected-type blocker.
-One builder spans every complete key; completed descriptors are interned with
-exact comparison and local environment-aware memoization. Field, callback,
-nominal, abstract/private and effect-row identities remain explicit. Node/depth
-limits are unchanged; output is additionally bounded to 65,536 words with
-262,144 word-work units. No proof results are cached.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. There
+is still no successful main Wasm or frame. The latest normal main attempt,
+`main-b7f90a2d5b71fe12`, cleared the expression-expansion blocker and reached
+station.blot:140's write_notices loop. Its whole access record carries
+callbacks; the next source candidate pins the three existing Array U32 owners
+before the loop. A real-main retry is running; do not reapply earlier annotation
+experiments.
 
-The new native wide-callback law fails on the old tree encoder's selected-type
-bound and passes on this candidate. Twenty of 21 affected native laws pass; the
-primitive-associated-partials fixture has the same layout failure in the
-previous native binary. Four executed-Wasm tests pass in development/optimized
-and sync/async modes, including distinct captured U32/F32 callbacks. All 2,679
-native tests compile; both changed production files have zero lint findings. The
-required full gate was attempted and remains blocked fetching locked Baba
-through the registry proxy.
+The greenfield cleanup removed retired railway refund migration, module, codec
+135, three owners and cart relocation. It had expanded roughly 23,000 nodes at
+each normalization. Current building creation/decoding reject unavailable kinds;
+active demolition and permanent depot rendering remain. Astra xhigh reviewed
+this removal. No framing/schema or active codec lane layout changed; FrameAccess
+now has 165 fields. Gdev checkpoint: `751ecba`.
 
-Runtime-only private append-region lowering now clears the ground and
-celebration comprehensions. A bounded proof admits one empty List accumulator,
-loop/guard aliases, one append site and terminal Array conversion, with no
-intermediate observation/capture. Emission uses one grow owner and freezes it at
-conversion; parser/Core/evaluator semantics and stableCarry stay unchanged.
-Iterator exhaustion requires the exact current-loop target, complete carry list
-and unchanged accumulator; other carries are checked after all aliases exist.
-Checked collection goals now propagate semantic element types with their
-resolved environments, including generic Array cursors.
+Three standalone building-kind checks pass, including both required traps;
+protocol codegen --check passes. Older depot/control fixtures have missing
+helper imports. The saved-state fixture fails a separate Array/ResizeArray
+callback check at line414 before execution; its expected snapshot count is now65
+with no key135. Full game qualification remains pending.
 
-All 2,682 native tests compile. Three new proof laws and 12 existing scoped
-backend laws pass; both executed-Wasm tests pass in development/optimized and
-sync/async modes, including empty generic iteration, live trace order, nested
-qualifiers, fixed aggregates/F32 and typed staging. Changed Zig files have zero
-lint findings. Astra xhigh reviewed the iterator proof and collection
-refinement. The required full gate was attempted through the configured proxy
-and remains blocked fetching locked Baba.
+Retained compiler fixes: bounded canonical DAG selected-type keys; runtime-only
+private append regions with exact loop/exhaustion/capture independence;
+collection-element refinement; checked View/Ref/Link result witnesses; and
+termination propagation through return children. Parser/evaluator semantics,
+nominal identity checks, stableCarry and checked budgets remain intact. Astra
+xhigh reviewed the proof boundaries and diagnosed the witness/control issues.
 
-Actual main attempt `main-ae40bc851636d8a9` advanced to Ink editor.blot:820,
-`brush.encode_stored origin faces`. Error tracing found that planValue changed
-borrow descriptors to View/Ref/Link while retaining the source owner's semantic
-type witness. The planner now attaches the checked operation result type with
-its captured environment; owner roots and nominal identity checks are unchanged.
-Astra xhigh independently confirmed the cause. The new two-mode executed-Wasm
-law fails on the preceding compiler and passes here for all three capabilities,
-repeated calls, distinct owners and sync/async execution. The existing reader
-owner/epoch/offset execution law passes. Sixteen of 17 native call laws pass;
-the primitive-associated-partials layout failure remains the documented baseline
-failure. Changed production lint is clean; the full gate was attempted and is
-still blocked by the registry proxy. The normal retry cleared that encoder and
-reached generated protocol.blot:1124. Its Event case returned on every arm, then
-the enclosing return tried to assign a terminated scalar sentinel into the
-established nominal result. Return-child termination now propagates directly.
-The new native law passes including its full allocation-failure sweep; both
-executed-Wasm modes pass in sync/async, including a continuing match arm and
-invalid-tag traps. All 2,683 native tests compile. Changed Zig lint is clean;
-the required full gate was attempted and remains registry-proxy blocked.
+All 2,683 native tests compile. Focused comprehension, borrow, return and key
+execution laws pass in both build modes and sync/async; the new return law also
+passes its full allocation-failure sweep. Changed Zig lint is clean. The
+primitive-associated-partials native layout failure remains the documented
+baseline failure. The earlier 76 package/core contract laws passed at their
+preceding checkpoint; this is not full qualification of the current candidate.
 
-Actual main `main-c60946ec3aaab671` clears the input decoder and reaches Ink
-ui/tree.blot:396's siblings comprehension. Its guard's array.any closure
-captures the current entry. The private append proof now checks every complete
-Core closure capture against the final accumulator alias set with bounded work;
-source admission still validates capture completeness. Direct, nested and
-record-wrapped accumulator captures remain rejected. Astra xhigh reviewed this
-extension. All three proof laws and both executed-Wasm modes pass, including a
-predicate capturing the loop entry and an external collection; existing live
-trace-order cases pass. Complete native inventory compiles and changed Zig lint
-is clean. The required full gate was attempted and remains registry blocked. The
-next normal real-main retry is running. No main Wasm or Pen frame has passed.
-Continue to the real frame; do not stop at another handoff.
+The required full compiler gate remains blocked before tests fetching locked
+Baba9.0.1 through the configured registry proxy. Registry additions remain a
+saved draft, not applied or published; dependencies/lock/TLS are unchanged.
+Native Pen and its compiler plugin are built locally. The machine has a local
+Mesa lavapipe driver for the eventual headless attempt.
 
-Implemented changes clear the preceding boundaries: record field-name indexing
-retains first right matches and every child proof; the game music-policy
-forwarder keeps inferred effects; clearing_members explicitly uses the existing
-set.Set math.Vec4 key contract. The earlier zero-span layout error was an
-unresolved map key, not a nested resizable payload. All temporary diagnostic
-compiler sources were restored exactly, and budgets/proof rules are unchanged.
-
-The preceding compiler checkpoint passed **76** package/core contract laws with
-zero failures, skips, leaks or logged errors. Its **2,674**-test inventory was
-compiled before the new key-builder laws above. The new laws cover record width
-thresholds, reordered/colliding/duplicate names, bounded work, missing and
-forged children, correlated witnesses, Foreign callbacks and rigid ownership.
-The 166-field regression uses 499 debits instead of the former 14,028; this is a
-specific comparison law, not an application performance measurement. Changed
-production-file Zig lint passes with zero findings. The changed test file has
-one preexisting allocation-size warning at line2705, outside the changed laws.
-
-The dictionary-equivalence trace contains 2,963 whole-dictionary entries, 2,961
-successful exits and 89 solver lifetimes. **Zero** previous successful exits
-match a later entry under the full solver/context/state key. The 1,168 matches
-obtained by ignoring store changes justify no proof cache. Negative immutable
-header metadata and unchanged failed-comparison epochs remain the only new
-reuse; real writes/failures still roll back.
-
-Editor Settings retains its existing Camera/Array U32 callback inputs with
-independent effect rows. HUD settings/layout locals are canonical and preserve
-arithmetic order. Subsequent station, settings-leaf and generic-layer annotation
-experiments were measured and reverted. Do not reapply them or broad whole-frame
-render annotations. The unused render_world.finish argument is removed; actual
-finish still runs later in present.
-
-Full qualification remains blocked before tests by the locked Baba registry
-proxy tunnel; full Zig lint previously had 24 findings outside the changed
-production file. Registry additions are saved as a draft, not applied or
-published. The Blot formatter is also blocked. Native Pen/plugin builds and Gdev
-pen codegen --check pass. Purchase-feedback fixture imports/constructor identity
-are repaired, but its existing shared helper still fails type checking; no
-fixture assertions were removed.
-
-The
-[cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
-and compressed traces preserve the measurements. Temporary diagnostic compiler
-sources were restored exactly; normal failure diagnostics remain below.
+Use the existing siblings and tracked storage-handoff runners below. Keep
+unrelated fixture migration paused. Detailed fixes and measurements are in
+[the cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
+and pinned Git history.
 
 ## Immediate next step
 
@@ -180,7 +115,7 @@ not substitute a synthetic guest for this milestone.
 - ABI 8, version-2 numeric session protocol, Gdev schema 26 and packet operation
   order remain fixed. Storage: 2 MiB temporary, 256 KiB persistent, 2 MiB
   transport, 4096 owner slots.
-- Gdev's `world_storage.FrameAccess` describes the existing 166-field frame
+- Gdev's `world_storage.FrameAccess` describes the existing 165-field frame
   record; ten game stages use it. Its four storage callbacks have explicit pure
   effects. Building callbacks use typed forwarding functions.
 - Hand's scratch transaction ties input, merged working access and consumer to

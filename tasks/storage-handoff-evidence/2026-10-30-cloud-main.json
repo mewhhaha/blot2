@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-c60946ec3aaab671",
-    "configured_identity": "1d7c2e0356d59ed7eddacf6814be5e437b0893eea3b0d743132211746a699e4f",
+    "attempt": "build/gdev-first-frame/main-b7f90a2d5b71fe12",
+    "configured_identity": "e8efc1fd0d9bcaa1f7e61ced0d46db946a6375ec54c003fbc994de2925fb5278",
     "diagnostic": {
-      "filename": "ink/lib/ui/tree.blot",
+      "filename": "gdev/src/ui/station.blot",
       "stage": "emit",
-      "code": "storage_escape",
-      "start": 17119,
-      "end": 17232,
-      "message": "A loop must retain the same named owners and borrowed roots across iterations",
+      "code": "storage_unsupported",
+      "start": 7220,
+      "end": 7373,
+      "message": "This form is not yet supported by the bounded scoped-storage backend",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -947,5 +947,35 @@
     "lint": "0 findings in both changed Zig files",
     "full_gate": "attempted; registry proxy blocks locked Baba before tests",
     "main_retry": "running; no frame yet"
+  },
+  "greenfield_railway_cleanup": {
+    "gdev_checkpoint": "751ecba",
+    "removed": "retired refund normalization, module, codec135, three owners, FrameAccess field, cart relocation and compatibility-only tests",
+    "preserved": "permanent depot rail/cart assets and feature laws, current demolition, framing schema26, active codec lane layouts, remaining numeric packet order",
+    "current_frame_access_fields": 165,
+    "profile": "retire_railways23043 expansion nodes on each normalization; removed actual legacy dominator, no budget increase",
+    "review": "Astra xhigh confirmed coherence, current building domain rejection and main.scene validity; no codec/schema bump required",
+    "boundary_tests": "3 passed,0failed,0skipped: current kinds decode and both unavailable kind traps",
+    "codegen": "passed",
+    "older_affected_gates": "depot/control modules missing helper imports; codec_saved_state callback Array/ResizeArray type mismatch line414 before execution; not qualified",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-b7f90a2d5b71fe12",
+      "identity": "e8efc1fd0d9bcaa1f7e61ced0d46db946a6375ec54c003fbc994de2925fb5278",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/ui/station.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 7220,
+          "end": 7373,
+          "message": "This form is not yet supported by the bounded scoped-storage backend",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "next_candidate": "pin existing station notice destination owners before writing loop"
   }
 }
