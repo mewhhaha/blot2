@@ -3,7 +3,21 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const longField = "x".repeat(7000);
-const source = `type LargeState = {${longField}: ResizeArray U32}
+const source =
+  `const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
+  let encode = func (value: U32): Array U32 => return #[value, @u32.add value 1]
+  let encoded = encode input
+  let scratch: GrowArray U32 = #[]
+  scratch.push encoded[0]
+  for value in encoded:
+    destination.push value
+  destination.push scratch[0]
+entry const scratch_writer = func (input: U32) => return do:
+  let destination: ResizeArray U32 = #[]
+  for index in 0 .. 100:
+    encoded_writer destination (@u32.add input index)
+  return #[destination.length, destination[0], destination[1], destination[2], destination[297], destination[298], destination[299]]
+type LargeState = {${longField}: ResizeArray U32}
 const write_large = func (state: LargeState) -> (amount: U32) => return do:
   state.${longField}[0] := @u32.add state.${longField}[0] amount
 const read_large = func (state: LargeState) => return state.${longField}[0]
@@ -76,6 +90,18 @@ for (const codegenTier of ["development", "optimized"] as const) {
             assert.deepEqual(
               await call("large_key", input),
               new Uint32Array([input + 10, input + 11, input + 11]),
+            );
+            assert.deepEqual(
+              await call("scratch_writer", input),
+              new Uint32Array([
+                300,
+                input,
+                input + 1,
+                input,
+                input + 99,
+                input + 100,
+                input + 99,
+              ]),
             );
           }
         } finally {

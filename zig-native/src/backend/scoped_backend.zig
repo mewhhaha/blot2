@@ -1641,6 +1641,26 @@ const Generator = struct {
             },
             else => {},
         }
+        if (self.planning_writer and (n.tag == .array or n.tag == .call or n.tag == .apply)) {
+            const actual = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
+            const owner = try self.unit(actual.unit);
+            const node = owner.types.node(actual.ty);
+            const info = types.info(&owner.types, actual.ty);
+            if (node.tag == .array or (info != null and (info.?.kind == .grow or info.?.kind == .resize))) {
+                const element = @import("storage_collections.zig").element(owner, actual.ty) orelse return null;
+                if (!try self.selectedInlineType(.{ .unit = actual.unit, .ty = element, .environment = actual.environment }, remaining)) return null;
+                const before = self.type_arguments.items.len;
+                defer self.type_arguments.shrinkRetainingCapacity(before);
+                if (actual.environment) |environment| try self.restoreTypes(environment);
+                const row = try self.shape(owner, 0, element, 0);
+                if (!plainShape(row)) return null;
+                // Admission-only descriptor. Real child emission establishes
+                // allocation, aliases and ordered input-root access facts.
+                const root_id = self.roots.items.len;
+                try self.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = self.depth, .element = row, .element_initialized = true, .dedicated = false });
+                return .{ .tag = .array, .word = .{ .id = 0 }, .root = root_id, .depth = self.depth, .mode = if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed, .type_evidence = .{ .root = actual, .arguments = try self.captureTypes() } };
+            }
+        }
         if (!try self.selectedInlineType(.{ .unit = m.unit, .ty = n.ty }, remaining)) return null;
         var value = try self.shape(m, id, n.ty, 0);
         value.type_evidence = .{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() };
@@ -1748,6 +1768,10 @@ const Generator = struct {
         switch (n.tag) {
             .panic => return true,
             .constant => {},
+            .array => {
+                if (!self.planning_writer) return false;
+                for (m.children(id)) |child| if (!try self.numericExpression(m, child, remaining, active, used, readers, depth + 1)) return false;
+            },
             .reference => {
                 var ref = m.reference(id);
                 if (ref.unit == 0) ref.unit = m.unit;
@@ -2643,6 +2667,8 @@ const Generator = struct {
             const planning_before = self.planning_writer;
             self.planning_writer = true;
             defer self.planning_writer = planning_before;
+            const roots_before = self.roots.items.len;
+            defer self.roots.shrinkRetainingCapacity(roots_before);
             const bindings_before = self.bindings.items.len;
             defer self.bindings.shrinkRetainingCapacity(bindings_before);
             for (m.bodyParameters(body), arguments) |parameter, value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = parameter.binding, .value = value, .remaining = 0 });

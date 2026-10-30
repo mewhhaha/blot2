@@ -1029,6 +1029,34 @@
       "scalar_spans": "1a7ebd64631b2aad2dac34776f47395d04ee4ece",
       "hud_owner": "65671cbb6d38a0dd64b905d6cc885fec65dcd010"
     },
-    "main_attempt": "build/gdev-first-frame/main-ba3ccf824ebef718 running; no frame yet"
+    "main_attempt": {
+      "evidence": "/workspace/blot2/build/gdev-first-frame/main-ba3ccf824ebef718",
+      "identity": "cfec51b67617012b554be00a6769a4a891fc5167628bf9c5fca86b8f901920e0",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/ink/lib/persist.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 7932,
+          "end": 7935,
+          "message": "Storage source expansion exceeded its expression budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    }
+  },
+  "unit_writer_scratch_arrays": {
+    "admission": "only .array/.call/.apply selected fixed/grow/resize collection results with inline plain elements; emission-free virtual roots restored with planner bindings; no new mutation ops",
+    "validation": "ordinary specialize=false child retains complete source/ownership checks and actual input read/write order; local scratch released normally",
+    "review": "Astra xhigh: no correctness blocker",
+    "native_inventory": 2687,
+    "native": "low512 expression-budget repeated-helper law passes full exhaustive allocation-failure checks; escaping local borrow rejected with zero Wasm;4 affected laws pass without leaks/errors",
+    "executed": "100 calls per invocation, both tiers and sync/async, exact ordered values and length;2 tests pass",
+    "lint": "2 changed Zig files zero findings; TypeScript formatting corrected",
+    "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
+    "main_attempt": "build/gdev-first-frame/main-187a5b3cf2d81e75 running"
   }
 }

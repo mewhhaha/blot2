@@ -6,6 +6,39 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
+fn publishScratchWriter(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
+
+test "Unit writer helpers admit plain local scratch arrays with checked cleanup" {
+    const helper = "const encode = func (input: U32): Array U32 => return #[input, @u32.add input 1]\n" ++
+        "const append = func (values: Array U32) -> (destination: ResizeArray U32) => return do:\n  for index in 0 .. @storage.length values:\n    @storage.push destination values[index]\n" ++
+        "const write = func (destination: ResizeArray U32) -> (input: U32) => return do:\n  let encoded = encode input\n  let local: GrowArray U32 = #[]\n  @storage.push local encoded[0]\n  @storage.push local encoded[1]\n  let sum: U32 = 0\n";
+    var parts: [102][]const u8 = undefined;
+    parts[0] = helper;
+    @memset(parts[1..81], "  sum := @u32.add sum 1\n");
+    parts[81] = "  append (encode sum) destination\n  @storage.push destination local[0]\nentry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[]\n";
+    @memset(parts[82..101], "  write rows input\n");
+    parts[101] = "  return rows[0]\n";
+    const source = try std.mem.concat(a, u8, &parts);
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publishScratchWriter(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishScratchWriter, .{@as([]const core.Module, &.{module})});
+    var invalid = try lower(a, "const borrow = func () => return &(#[42])[0]\n" ++
+        "const write = func (destination: ResizeArray U32) => return do:\n  let scratch: Array U32 = #[1]\n  @storage.push destination (@storage.load (borrow ()))\n" ++
+        "entry const answer = func () => return do:\n  let rows: ResizeArray U32 = #[]\n  write rows\n  return rows[0]\n");
+    defer invalid.deinit(a);
+    var rejected = try scoped.compile(a, &.{invalid}, 1);
+    defer rejected.deinit(a);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, rejected.diagnostic.?.code);
+    try std.testing.expectEqual(@as(usize, 0), rejected.bytes.len);
+}
+
 fn publishSelectedReader(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
     defer result.deinit(allocator);

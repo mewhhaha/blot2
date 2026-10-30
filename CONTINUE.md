@@ -2,10 +2,20 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-ba3ccf824ebef718`, running with checked
-generic reader admission and optional-key fallback. No successful main Wasm or
-frame yet. The prior generic-reader attempt cleared the emission-work frontier
-and reached an oversized optional capture key in HUD/staffing reset.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-187a5b3cf2d81e75`, running with checked
+scratch-array Unit writer admission. The preceding `main-ba3ccf824ebef718`
+cleared oversized keys and reached the finite500,000 emission-work limit in
+Ink persistence encoding. No successful main Wasm or frame yet.
+
+Unit writer planning now models plain local array literals and collection
+results of checked calls/applications with temporary, emission-free roots.
+The real child still validates ownership, records actual ordered input access
+and releases scratch. No other storage operations were admitted. Astra xhigh
+reviewed the boundaries. The low512-budget law passes exhaustive OOM, including
+an escaping-borrow negative; three existing safety/writer laws pass. Repeated
+100-call scratch execution passes both tiers and sync/async. All2,687 native
+tests compile; changed Zig lint is clean. Full gate attempted and registry
+blocked. This does not qualify main.
 
 The new reader predicate resolves selected nominal arguments and constructor
 payloads in their captured environments, with the existing work/depth bounds.
