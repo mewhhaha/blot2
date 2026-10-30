@@ -4203,6 +4203,7 @@ const Generator = struct {
             },
             .return_ => {
                 const value = try self.expression(m, n.a, depth + 1);
+                if (value.terminated) return value;
                 if (m.typeOf(n.a) == T.never) {
                     try self.c.op(.unreachable_, 0);
                     return self.terminated();

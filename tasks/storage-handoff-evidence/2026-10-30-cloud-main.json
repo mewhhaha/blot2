@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-ae40bc851636d8a9",
-    "configured_identity": "9b62492a408c7354d61d5f6d4b4bc112ebad747db91dce4b0aef19bbbce4f127",
+    "attempt": "build/gdev-first-frame/main-c60946ec3aaab671",
+    "configured_identity": "1d7c2e0356d59ed7eddacf6814be5e437b0893eea3b0d743132211746a699e4f",
     "diagnostic": {
-      "filename": "ink/lib/editor.blot",
+      "filename": "ink/lib/ui/tree.blot",
       "stage": "emit",
-      "code": "storage_unsupported",
-      "start": 42816,
-      "end": 42848,
-      "message": "This expression has no admitted storage layout or binding",
+      "code": "storage_escape",
+      "start": 17119,
+      "end": 17232,
+      "message": "A loop must retain the same named owners and borrowed roots across iterations",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -909,5 +909,34 @@
     "lint": "scoped_backend.zig zero findings",
     "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
     "main_retry": "running; no frame yet"
+  },
+  "completed_return_children": {
+    "fix": "propagate terminated child before assigning outer return result",
+    "trace": "Event aggregate28 vs terminated scalar0; return target exists",
+    "native_inventory": 2683,
+    "native": "new law passes full allocation-failure sweep, existing lexical boundary law passes sampled mode; no failures/leaks/logged errors",
+    "executed_wasm": "2 modes pass, sync/async; nominal completed exits, continuing match arm, invalid-tag trap",
+    "affected_executed_wasm": "preceding comprehension and borrow witness4 tests pass on this compiler",
+    "lint": "0 findings in both changed Zig files",
+    "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-c60946ec3aaab671",
+      "identity": "1d7c2e0356d59ed7eddacf6814be5e437b0893eea3b0d743132211746a699e4f",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "ink/lib/ui/tree.blot",
+          "stage": "emit",
+          "code": "storage_escape",
+          "start": 17119,
+          "end": 17232,
+          "message": "A loop must retain the same named owners and borrowed roots across iterations",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "qualification": "incomplete; main reaches UI closure comprehension, no frame"
   }
 }

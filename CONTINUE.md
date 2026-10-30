@@ -47,9 +47,21 @@ repeated calls, distinct owners and sync/async execution. The existing reader
 owner/epoch/offset execution law passes. Sixteen of 17 native call laws pass;
 the primitive-associated-partials layout failure remains the documented baseline
 failure. Changed production lint is clean; the full gate was attempted and is
-still blocked by the registry proxy. A normal real-main retry is running. No
-main Wasm or Pen frame has passed. Continue through this frontier to the real
-frame; do not stop at another handoff.
+still blocked by the registry proxy. The normal retry cleared that encoder and
+reached generated protocol.blot:1124. Its Event case returned on every arm, then
+the enclosing return tried to assign a terminated scalar sentinel into the
+established nominal result. Return-child termination now propagates directly.
+The new native law passes including its full allocation-failure sweep; both
+executed-Wasm modes pass in sync/async, including a continuing match arm and
+invalid-tag traps. All 2,683 native tests compile. Changed Zig lint is clean;
+the required full gate was attempted and remains registry-proxy blocked.
+
+Actual main `main-c60946ec3aaab671` clears the input decoder and reaches Ink
+ui/tree.blot:396's siblings comprehension. Its guard's array.any closure
+captures the current entry; the private append proof currently declines all
+closures. Extend only with a bounded complete-capture independence check against
+the final accumulator alias set. No main Wasm or Pen frame has passed. Continue
+to the real frame; do not stop at another handoff.
 
 Implemented changes clear the preceding boundaries: record field-name indexing
 retains first right matches and every child proof; the game music-policy

@@ -292,3 +292,27 @@ test "owned returns cross lexical blocks but never another function boundary" {
     }
     try std.testing.expect(changed != 0);
 }
+
+test "owned return children preserve completed nominal exits through allocation failure" {
+    const source =
+        \\type Event is data = $Down U32 | $Move (F32, F32) | $None
+        \\const decode = func (tag: U32) => return do:
+        \\  return case tag of
+        \\    1 => do:
+        \\      return $Down 7
+        \\    2 => do:
+        \\      return $Move (2.0, 3.0)
+        \\    _ => @panic "invalid"
+        \\entry const answer = func (tag: U32) => return do:
+        \\  let rows: ResizeArray U32 = #[tag]
+        \\  let event = decode rows[0]
+        \\  return case event of
+        \\    $Down code => code
+        \\    $Move (x, y) => @f32.to_u32 (@f32.add x y)
+        \\    $None => 0
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publish(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
+}
