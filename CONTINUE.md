@@ -2,46 +2,42 @@
 
 ## Current cloud frontier
 
-The negative-only prerequisite-header memo is implemented and checked. Solver
-rollback in `goalMatches` now preserves resolution caches only when the full
-store mark and unsaturated type/effect/physical clocks are unchanged and no OOM
-occurred. Metadata-only mismatches reject before opening a checkpoint; actual
-mutating failures still roll back. No dictionary proof results are cached.
+The editor settings now carry their existing Camera and Array U32 callback
+inputs, with independent effect rows. That exposed a HUD arithmetic proof gap;
+canonical platform settings and F32 layout locals clear it while preserving
+left-associated arithmetic. The latest real-main attempt,
+`main-8900154ada036b96`, still exhausts checked work at `render_world`. Its last
+nested trace reaches `station.draw_board` / `shake_board`. No main Wasm or real
+Pen frame has passed. Inspect that bounded source boundary next; keep generic
+access and real callback effects.
 
-All 74 package/core contract laws pass, and all 2,672 native tests compile. A
-preexisting loop law targeted sentinel body zero; it now selects `scan` and
-retains its valid/forged-backedge/restored-body assertions. Changed-file lint
-passes. Full qualification remains blocked before tests by `npm.jsr.io` HTTP403;
-full Zig lint also has 24 findings outside the changed file. Registry additions
-are saved as a draft, not applied or published.
+The compiler memoizes only completed negative immutable prerequisite-header
+searches. `goalMatches` preserves resolution caches across failed comparisons
+only when the full store mark and unsaturated type/effect/physical clocks are
+unchanged and no OOM occurred. Mutating failures still roll back. No dictionary
+proof results are cached. All 74 package/core contract laws pass, and all 2,672
+native tests compile. A preexisting loop law now selects `scan` instead of
+sentinel body zero and retains its good/forged-backedge/restored assertions.
 
-Main still exhausts checked work at `render_world` (attempt
-`main-ec092e513c504d8`). The latest trace rules out field grounding as dominant
-(only 800 deep-resolution debits). Nested whole-dictionary proofs are expensive,
-but repeated targets do not establish identical inputs or lexical authority.
-Before any result reuse, compare successful exits with later entries under exact
-solver lifetime, substitutions, epochs and lexical/effect context. Do not prune
-correlated goals or raise budgets to hide the failure.
+Changed-file Zig lint passes. Full qualification remains blocked before tests by
+`npm.jsr.io` HTTP403; full Zig lint has 24 findings outside the changed file.
+Registry additions are saved as a draft, not applied or published. The Blot
+formatter is also blocked by that registry. Native Pen, its compiler plugin and
+Gdev `pen codegen --check` pass.
 
-The bounded brush, element-clock and deposit contracts cleared their earlier
-numeric type-evidence diagnostics. Main still fails at `game.blot:384`, the
-`render_world editing access presentation` call: checked module validation work
-is exhausted. No main Wasm or real Pen frame has passed.
+Earlier tracing showed nested dictionary expansion dominates the exhausted
+budget; field grounding accounted for only 800 debits. Repeated targets alone do
+not establish identical substitutions, solver lifetimes or lexical/effect
+authority. Do not cache proof results without exact equivalence, prune
+correlated goals or raise budgets. Whole-frame render annotations increased work
+and were reverted. The unused `render_world.finish` argument is removed; the
+actual finish callback still runs later in `present`.
 
-The unused `render_world.finish` argument is removed; the real finish callback
-still runs later in `present`. Whole-frame annotations increased work and were
-reverted. A temporary diagnostic build shows the render body itself completes in
-59,455 work debits; the enclosing `game_using` consumes 31,252,019 of the
-module's shared 32-million allowance before failure. Nested prerequisite work is
-the next investigation target. Identify expensive declarations and distinguish
-identical retries, failed alternatives and distinct substitutions before adding
-reuse. Inclusive trace records must not be summed across nesting levels.
-
-The cloud-main evidence JSON and compressed trace in Blot's
-`tasks/storage-handoff-evidence/` preserve the measurements. Compiler source was
-restored exactly; no proof rule or budget changed. Native Pen and its compiler
-plugin builds pass, as does Gdev `pen codegen --check`. The Blot formatter is
-still unrun because the locked Baba host `npm.jsr.io` returns proxy HTTP 403.
+The
+[cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
+and compressed diagnostic trace retain the earlier measurements. Temporary
+proof-attribution instrumentation was restored exactly; normal failure
+diagnostics remain as described below.
 
 ## Immediate next step
 
@@ -163,11 +159,6 @@ already removed. One output block-break/return inference defect remains tracked
 in the task record. Source solver inquiries still discard private existential
 equalities; do not thaw all private rigids independently, which would lose
 correlation between inquiries.
-
-The finite render-boundary review is **not implemented**: if the next blocker
-requires it, pin `game.layer`, `render_world`, and the single shadowing goals
-layer callback to existing FrameAccess/Presentation/render.FrameAccess types;
-preserve callback effect parameters and editor policy types.
 
 Older checkpoints are kept in the
 [earlier handoff in Git](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/CONTINUE.md).

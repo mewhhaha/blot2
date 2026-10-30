@@ -19,18 +19,19 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
+    "attempt": "build/gdev-first-frame/main-8900154ada036b96",
+    "configured_identity": "7b21ec0c66c4aef28723b22b7105c76d6d55f43e1c5bd13563b8b24e15b0f40e",
     "diagnostic": {
       "filename": "gdev/src/game.blot",
       "stage": "emit",
       "code": "storage_unsupported",
-      "start": 5521,
-      "end": 5528,
+      "start": 20219,
+      "end": 20259,
       "message": "Source module storage validation exceeded its checked work budget",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
     },
-    "attempt": "build/gdev-first-frame/main-9abd9a411d6dc5c4",
     "evidence_portability": "Attempt logs are ignored local outputs; this summary is tracked."
   },
   "frame": "not run; main did not compile",
@@ -335,5 +336,41 @@
     "whole_dictionary_records": 2902,
     "whole_dictionary_debits_inclusive": 35369006,
     "interpretation": "Grounding is not dominant. Whole-dictionary totals include nested expansions and do not establish proof equivalence; no dictionary-result cache introduced."
+  },
+  "editor_hud_contracts": {
+    "gdev_checkpoint": "e81a5c98d7b3f2141a3107ffd61ffd31111b3379",
+    "compiler_sha256": "1e26ecccb91855776b87a1f2a47f424e86eebbd62f7ad66d312837e5e5973e66",
+    "configured_identity": "7b21ec0c66c4aef28723b22b7105c76d6d55f43e1c5bd13563b8b24e15b0f40e",
+    "changes": [
+      "Editor Settings pins existing FrameAccess/Camera/Array U32 callback inputs with independent latent effect rows.",
+      "HUD platform owner and Access read use canonical types. F32 layout locals and left-associated subtraction intermediates preserve operations/grouping."
+    ],
+    "policy_only_attempt": "main-fb3797002dc26dc5: moved beyond initial budget failure to HUD subtraction evidence diagnostic",
+    "combined_attempt": {
+      "evidence": "build/gdev-first-frame/main-8900154ada036b96",
+      "identity": "7b21ec0c66c4aef28723b22b7105c76d6d55f43e1c5bd13563b8b24e15b0f40e",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/game.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 20219,
+          "end": 20259,
+          "message": "Source module storage validation exceeded its checked work budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "checks": {
+      "codegen_check": "passed",
+      "markdown_links": "371 files, zero broken links",
+      "markdown_format": "passed",
+      "full_main": "failed: budget at render_world; last nested trace reaches station.draw_board / shake_board",
+      "frame": "not run"
+    },
+    "blot_formatter": "blocked by locked npm.jsr.io proxy HTTP403; no dependency or lock integrity changed"
   }
 }
