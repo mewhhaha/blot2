@@ -15,12 +15,20 @@ fn require(ok: bool) Error!void {
 pub const SourceProofCache = struct {
     const TargetKey = struct { unit: u32, target_unit: u32, target_binding: core.BindingId };
     const FactKey = struct { unit: u32, root: T.Id };
+    const HeaderKey = struct {
+        producer: core.BindingRef,
+        kind: T.ObligationKind,
+        name: u32,
+        operator: T.Operator,
+        identity: T.NominalIdentity,
+    };
     allocator: std.mem.Allocator,
     units: []const *const core.Module,
     completed: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
     targets: std.AutoHashMapUnmanaged(TargetKey, std.ArrayList(core.BindingId)) = .empty,
     indexed_catalogs: std.AutoHashMapUnmanaged(u32, void) = .empty,
     usage_facts: std.AutoHashMapUnmanaged(FactKey, bool) = .empty,
+    absent_headers: std.AutoHashMapUnmanaged(HeaderKey, void) = .empty,
     module_work: ?[]usize = null,
     exhausted_unit: ?u32 = null,
     pub fn init(allocator: std.mem.Allocator, units: []const *const core.Module) Equations.Error!SourceProofCache {
@@ -91,6 +99,7 @@ pub const SourceProofCache = struct {
         self.targets.deinit(self.allocator);
         self.indexed_catalogs.deinit(self.allocator);
         self.usage_facts.deinit(self.allocator);
+        self.absent_headers.deinit(self.allocator);
         if (self.module_work) |work| self.allocator.free(work);
         self.completed.deinit(self.allocator);
         self.allocator.free(self.units);
@@ -113,6 +122,19 @@ pub const SourceProofCache = struct {
     fn publish(self: *SourceProofCache, module: *const core.Module, binding: core.BindingId) void {
         std.debug.assert(self.owns(module));
         self.completed.putAssumeCapacity(.{ .unit = module.unit, .binding = binding }, {});
+    }
+    /// Immutable negative metadata, never an instantiated predicate receipt.
+    /// A possible header still requires the ordinary body/type/row proof.
+    fn possibleHeader(self: *SourceProofCache, initial: *const core.Module, binding: core.BindingId, wanted: core.Obligation, depth: usize, remaining: *usize) Equations.Error!bool {
+        if (!self.owns(initial)) return error.InvalidArtifact;
+        try headerStep(depth, remaining);
+        const key: HeaderKey = .{ .producer = .{ .unit = initial.unit, .binding = binding }, .kind = wanted.kind, .name = wanted.name, .operator = wanted.operator, .identity = wanted.identity };
+        if (self.absent_headers.contains(key)) return false;
+        const possible = try reachableHeaderMetadata(self.allocator, self.units, initial, initial, binding, wanted, depth, remaining);
+        // A failed/incomplete search, including allocation or work exhaustion,
+        // cannot publish an absence. Mutable solver types never enter the key.
+        if (!possible) try self.absent_headers.put(self.allocator, key, {});
+        return possible;
     }
     /// A structural fact, independent of lexical/effect authority. Mutable
     /// solver graphs are inspected directly and never read or publish facts.
@@ -178,7 +200,178 @@ pub const SourceProofCache = struct {
         self.indexed_catalogs.putAssumeCapacity(module.unit, {});
     }
 };
+fn headerStep(depth: usize, remaining: *usize) Equations.Error!void {
+    if (depth >= 128 or remaining.* == 0) return error.InvalidArtifact;
+    remaining.* -= 1;
+}
+fn headerModule(units: []const *const core.Module, origin: *const core.Module, unit: u32) Equations.Error!*const core.Module {
+    if (unit == origin.unit) return origin;
+    for (units) |owner| if (owner.unit == unit) return owner;
+    return error.InvalidArtifact;
+}
+/// Conservative closure search over declaration catalogs only. Both cached and
+/// uncached callers use the same search; no lexical/solver facts are consulted.
+fn reachableHeaderMetadata(allocator: std.mem.Allocator, units: []const *const core.Module, origin: *const core.Module, initial: *const core.Module, binding: core.BindingId, wanted: core.Obligation, depth: usize, remaining: *usize) Equations.Error!bool {
+    var pending: std.ArrayList(core.BindingRef) = .empty;
+    defer pending.deinit(allocator);
+    var visited: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty;
+    defer visited.deinit(allocator);
+    try pending.append(allocator, .{ .unit = initial.unit, .binding = binding });
+    while (pending.pop()) |reference_| {
+        var reference = reference_;
+        var owner = try headerModule(units, origin, reference.unit);
+        var forwards: usize = 0;
+        while (true) {
+            try headerStep(depth + forwards, remaining);
+            if (reference.binding == 0 or reference.binding >= owner.bindings.len) return error.InvalidArtifact;
+            const declaration = owner.binding(reference.binding);
+            if (declaration.kind != .external) break;
+            var target_ = declaration.target;
+            if (target_.unit == 0) target_.unit = owner.unit;
+            const next = try headerModule(units, origin, target_.unit);
+            if (target_.binding == 0 or target_.binding >= next.bindings.len) return error.InvalidArtifact;
+            const imported = next.binding(target_.binding);
+            if (declaration.public_variables.len != imported.public_variables.len or declaration.public_rows.len != imported.public_rows.len) return error.InvalidArtifact;
+            reference = target_;
+            owner = next;
+            forwards += 1;
+        }
+        reference.unit = owner.unit;
+        const seen = try visited.getOrPut(allocator, reference);
+        if (seen.found_existing) continue;
+        const declaration = owner.binding(reference.binding);
+        // Unknown lexical producers are not evidence for a negative result.
+        if (declaration.kind != .global or owner.body(reference.binding) == null) return true;
+        for (owner.obligations[declaration.scheme.obligations.start..][0..declaration.scheme.obligations.len]) |goal| {
+            try headerStep(depth, remaining);
+            if (goal.kind == .callee_use) {
+                try pending.append(allocator, .{ .unit = if (goal.identity.unit == 0) owner.unit else goal.identity.unit, .binding = goal.identity.decl });
+            } else if (goal.kind == wanted.kind and goal.name == wanted.name and goal.operator == wanted.operator and std.meta.eql(goal.identity, wanted.identity)) return true;
+        }
+    }
+    return false;
+}
 const Admission = Equations.Admission;
+fn headerTestModule(unit: u32, bindings: []core.Binding, bodies: []core.Body, obligations: []core.Obligation) core.Module {
+    return .{
+        .unit = unit,
+        .types = .{ .nodes = &.{}, .extra = &.{} },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = bindings,
+        .bodies = bodies,
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = obligations,
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+}
+fn headerTestBinding(kind: @FieldType(core.Binding, "kind"), first: u32, count: u32) core.Binding {
+    return .{ .kind = kind, .body_id = if (kind == .global) 1 else 0, .ty = 0, .scheme = .{ .obligations = .{ .start = first, .len = count } }, .target = .{ .binding = 0 }, .span = .{ .start = 0, .end = 0 } };
+}
+fn headerMemoScenario(allocator: std.mem.Allocator) !void {
+    var bodies = [_]core.Body{ .{}, .{} };
+    var first_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.global, 0, 2), headerTestBinding(.local, 0, 0), headerTestBinding(.global, 2, 1) };
+    var first_goals = [_]core.Obligation{
+        .{ .ty = 1, .kind = .callee_use, .identity = .{ .unit = 2, .decl = 1 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .callee_use, .identity = .{ .unit = 3, .decl = 1 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .field, .name = 99, .span = .{ .start = 0, .end = 0 } },
+    };
+    var proxy_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.external, 0, 0) };
+    proxy_bindings[1].target = .{ .unit = 4, .binding = 1 };
+    var branch_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.global, 0, 1) };
+    var branch_goals = [_]core.Obligation{.{ .ty = 1, .kind = .callee_use, .identity = .{ .unit = 4, .decl = 1 }, .span = .{ .start = 0, .end = 0 } }};
+    var leaf_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.global, 0, 6), headerTestBinding(.global, 6, 1) };
+    var leaf_goals = [_]core.Obligation{
+        .{ .ty = 1, .kind = .field, .name = 17, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .writable_field, .name = 99, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .field, .name = 99, .operator = .add, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .field, .name = 99, .identity = .{ .unit = 1, .decl = 0 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .field, .name = 99, .identity = .{ .unit = 0, .decl = 1 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .callee_use, .identity = .{ .unit = 1, .decl = 1 }, .span = .{ .start = 0, .end = 0 } },
+        .{ .ty = 1, .kind = .field, .name = 99, .span = .{ .start = 0, .end = 0 } },
+    };
+    var broken_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.external, 0, 0), headerTestBinding(.external, 0, 0) };
+    broken_bindings[1].target = .{ .unit = 4, .binding = 1 };
+    broken_bindings[1].public_variables.len = 1;
+    broken_bindings[2].target = .{ .unit = 999, .binding = 1 };
+    const first = headerTestModule(1, &first_bindings, &bodies, &first_goals);
+    const proxy = headerTestModule(2, &proxy_bindings, &bodies, &.{});
+    const branch = headerTestModule(3, &branch_bindings, &bodies, &branch_goals);
+    const leaf = headerTestModule(4, &leaf_bindings, &bodies, &leaf_goals);
+    const broken = headerTestModule(5, &broken_bindings, &bodies, &.{});
+    var cache = try SourceProofCache.init(allocator, &.{ &first, &proxy, &branch, &leaf, &broken });
+    defer cache.deinit();
+    const wanted = first_goals[2];
+    var remaining: usize = 1000;
+    // A possible header beyond a proxy/diamond must not be cached as authority.
+    for (leaf_goals[0..5]) |present| {
+        try std.testing.expect(try cache.possibleHeader(&first, 1, present, 0, &remaining));
+        try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+    }
+    try std.testing.expect(try cache.possibleHeader(&first, 2, wanted, 0, &remaining));
+    try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+    remaining = 2;
+    if (cache.possibleHeader(&first, 1, wanted, 0, &remaining)) |_| return error.TestExpectedError else |err| {
+        try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
+    remaining = 1000;
+    try std.testing.expectError(error.InvalidArtifact, cache.possibleHeader(&first, 1, wanted, 128, &remaining));
+    for ([_]core.BindingId{ 1, 2 }) |invalid| {
+        if (cache.possibleHeader(&broken, invalid, wanted, 0, &remaining)) |_| return error.TestExpectedError else |err| {
+            try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+            if (err == error.OutOfMemory) return err;
+            try std.testing.expectEqual(error.InvalidArtifact, err);
+        }
+    }
+    try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+    remaining = 1000;
+    const result = cache.possibleHeader(&first, 1, wanted, 0, &remaining) catch |err| {
+        try std.testing.expectEqual(@as(u32, 0), cache.absent_headers.count());
+        return err;
+    };
+    try std.testing.expect(!result);
+    try std.testing.expectEqual(@as(u32, 1), cache.absent_headers.count());
+    remaining = 1;
+    try std.testing.expect(!try cache.possibleHeader(&first, 1, wanted, 0, &remaining));
+    try std.testing.expectEqual(@as(usize, 0), remaining);
+    try std.testing.expectError(error.InvalidArtifact, cache.possibleHeader(&first, 1, wanted, 0, &remaining));
+    remaining = 1000;
+    // Every header component, as well as producer unit/binding, stays exact.
+    for (leaf_goals[0..5]) |present| try std.testing.expect(try cache.possibleHeader(&first, 1, present, 0, &remaining));
+    try std.testing.expect(try cache.possibleHeader(&first, 3, wanted, 0, &remaining));
+    try std.testing.expect(try cache.possibleHeader(&leaf, 2, wanted, 0, &remaining));
+    var different_bindings = first_bindings;
+    var different_view = first;
+    different_view.bindings = &different_bindings;
+    try std.testing.expectError(error.InvalidArtifact, cache.possibleHeader(&different_view, 1, wanted, 0, &remaining));
+    // A different immutable environment sees a newly present header. No result
+    // is shared by unit numbers, solver substitutions, or a retained revision.
+    var changed_bindings = leaf_bindings;
+    changed_bindings[1].scheme.obligations.len = 7;
+    const changed = headerTestModule(4, &changed_bindings, &bodies, &leaf_goals);
+    var fresh = try SourceProofCache.init(allocator, &.{ &first, &proxy, &branch, &changed, &broken });
+    defer fresh.deinit();
+    try std.testing.expect(try fresh.possibleHeader(&first, 1, wanted, 0, &remaining));
+    try std.testing.expectEqual(@as(u32, 0), fresh.absent_headers.count());
+    // Uncached calls retain their lexical origin even when the context only
+    // lists the imported producer and its summary points back into the caller.
+    var return_bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.global, 0, 1) };
+    var return_goals = [_]core.Obligation{.{ .ty = 1, .kind = .callee_use, .identity = .{ .unit = 1, .decl = 3 }, .span = .{ .start = 0, .end = 0 } }};
+    const returning = headerTestModule(6, &return_bindings, &bodies, &return_goals);
+    try std.testing.expect(try reachableHeaderMetadata(allocator, &.{&returning}, &first, &returning, 1, wanted, 0, &remaining));
+}
+test "source header absence memo preserves forwarding keys budgets and atomic failure" {
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, headerMemoScenario, .{});
+}
 test "source target catalog indexes exact aliases once and publishes atomically" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, targetCatalogScenario, .{});
 }
@@ -1248,45 +1441,10 @@ const Walker = struct {
     /// Positive candidates still pass the ordinary body/type/row proof below.
     fn reachableHeader(self: *Self, initial: *const core.Module, binding: core.BindingId, wanted: core.Obligation, depth: usize) Error!bool {
         const solver = self.scopes.solver orelse return true;
-        const allocator = solver.store.allocator;
-        var pending: std.ArrayList(core.BindingRef) = .empty;
-        defer pending.deinit(allocator);
-        var visited: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty;
-        defer visited.deinit(allocator);
-        pending.append(allocator, .{ .unit = initial.unit, .binding = binding }) catch return solver.readerError(error.OutOfMemory);
-        while (pending.pop()) |reference_| {
-            var reference = reference_;
-            var owner = try self.target(reference);
-            var forwards: usize = 0;
-            while (true) {
-                try self.step(depth + forwards);
-                try require(reference.binding != 0 and reference.binding < owner.bindings.len);
-                const declaration = owner.binding(reference.binding);
-                if (declaration.kind != .external) break;
-                var target_ = declaration.target;
-                if (target_.unit == 0) target_.unit = owner.unit;
-                const next = try self.target(target_);
-                try require(target_.binding != 0 and target_.binding < next.bindings.len);
-                const imported = next.binding(target_.binding);
-                try require(declaration.public_variables.len == imported.public_variables.len and declaration.public_rows.len == imported.public_rows.len);
-                reference = target_;
-                owner = next;
-                forwards += 1;
-            }
-            reference.unit = owner.unit;
-            const seen = visited.getOrPut(allocator, reference) catch return solver.readerError(error.OutOfMemory);
-            if (seen.found_existing) continue;
-            const declaration = owner.binding(reference.binding);
-            // Unknown lexical producers are not evidence for a negative result.
-            if (declaration.kind != .global or owner.body(reference.binding) == null) return true;
-            for (owner.obligations[declaration.scheme.obligations.start..][0..declaration.scheme.obligations.len]) |goal| {
-                try self.step(depth);
-                if (goal.kind == .callee_use) {
-                    pending.append(allocator, .{ .unit = if (goal.identity.unit == 0) owner.unit else goal.identity.unit, .binding = goal.identity.decl }) catch return solver.readerError(error.OutOfMemory);
-                } else if (goal.kind == wanted.kind and goal.name == wanted.name and goal.operator == wanted.operator and std.meta.eql(goal.identity, wanted.identity)) return true;
-            }
+        if (self.context.source_proofs) |cache| {
+            if (cache.owns(initial)) return cache.possibleHeader(initial, binding, wanted, depth, self.scopes.remaining) catch |err| return solver.readerError(err);
         }
-        return false;
+        return reachableHeaderMetadata(solver.store.allocator, self.units(), self.origin orelse self.module, initial, binding, wanted, depth, self.scopes.remaining) catch |err| return solver.readerError(err);
     }
     fn sharedGoal(self: *Self, wanted: ?core.Obligation, given: core.Obligation, depth: usize) Error!bool {
         try self.step(depth);

@@ -282,5 +282,21 @@
         "work_debits_inclusive": 1630802
       }
     ]
+  },
+  "header_absence_cache": {
+    "change": "Memoize only completed immutable negative prerequisite-header searches; positive candidates retain ordinary body/type/row admission. Preserve uncached lexical-origin target lookup.",
+    "baseline_trace": {
+      "attempt": "main-fafb137d5dba18ea",
+      "queries": 313261,
+      "unique_keys": 465,
+      "scan_work_debits": 1757865
+    },
+    "native_inventory": 2671,
+    "focused_native_laws": "5 passed, including new forwarding/diamond/cycle/key/environment/budget/failure-publication law with full allocator-failure helper and existing callback/Foreign/private-witness laws.",
+    "first_candidate_main": "main-e184ee1ad2993c9f: still fails checked source validation budget at render_world; no frame.",
+    "full_gate": "attempted; blocked before tests by npm.jsr.io HTTP CONNECT 403",
+    "zig_lint": "24 findings, all in files outside the changed package_core.zig; full lint does not pass.",
+    "qualification": "pending",
+    "network_draft": "saved additions npm.jsr.io and jsr.io; not applied or published"
   }
 }

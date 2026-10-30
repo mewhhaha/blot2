@@ -2,6 +2,18 @@
 
 ## Current cloud frontier
 
+A negative-only immutable prerequisite-header memo is now implemented. Its new
+native regression and four existing authority/correlation laws pass; all 2,671
+native tests compile. The first candidate still exhausts validation at the same
+render call. Full qualification is pending: the compiler gate cannot fetch Baba
+from blocked `npm.jsr.io`, and full Zig lint reports 24 findings outside the
+changed file. Registry additions are saved only as an environment draft.
+
+Next measure `groundSharedFieldOwner` copy, deep-resolution and matching costs.
+Prefer the existing head-only physical-field proof path if that measured work is
+excessive; do not prune supposedly unrelated goals or weaken private-witness
+correlation.
+
 The bounded brush, element-clock and deposit contracts cleared their earlier
 numeric type-evidence diagnostics. Main still fails at `game.blot:384`, the
 `render_world editing access presentation` call: checked module validation work
