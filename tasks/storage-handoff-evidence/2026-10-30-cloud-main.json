@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-b7f90a2d5b71fe12",
-    "configured_identity": "e8efc1fd0d9bcaa1f7e61ced0d46db946a6375ec54c003fbc994de2925fb5278",
+    "attempt": "build/gdev-first-frame/main-fbc2dfdebe16b95f",
+    "configured_identity": "7db5974ed36477612a85fc1a4f329c3d7017e47d948588b9f39b31eefb682e2d",
     "diagnostic": {
-      "filename": "gdev/src/ui/station.blot",
+      "filename": "blot2/std/vector.blot",
       "stage": "emit",
       "code": "storage_unsupported",
-      "start": 7220,
-      "end": 7373,
-      "message": "This form is not yet supported by the bounded scoped-storage backend",
+      "start": 1294,
+      "end": 1297,
+      "message": "Storage source expansion exceeded its expression budget",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -977,5 +977,43 @@
       ]
     },
     "next_candidate": "pin existing station notice destination owners before writing loop"
+  },
+  "emission_work_policy": {
+    "default_per_export_or_child": 500000,
+    "previous_default": 100000,
+    "review": "Astra xhigh confirmed compiler resource allowance is independent of ownership, source proof, layout, depth, key and guest capacity limits; no automatic escalation",
+    "api": "private typed WorkLimits; zero rejected; check before increment; all five child generators inherit policy and shared counters; no session setting",
+    "native_inventory": 2684,
+    "native": "17 affected laws pass, zero failures/skips/leaks/errors; native low-limit child exhausts without output, sufficient1024 passes",
+    "executed": "2 build modes pass sync/async; 51 ordered Foreign calls; old100k compiler fails expansion diagnostic",
+    "measured_fixture": {
+      "expressions": 104717,
+      "peak_body": 104717,
+      "limit": 500000,
+      "wasm_bytes": 1183448,
+      "cli_total_us": 500535
+    },
+    "recursion": "direct,mutual,andknowncallbackcycles still rejected",
+    "lint": "zero findings in3changedZigfiles",
+    "full_gate": "attempted; lockedBaba registryproxy tunnel blocks beforetests",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-fbc2dfdebe16b95f",
+      "identity": "7db5974ed36477612a85fc1a4f329c3d7017e47d948588b9f39b31eefb682e2d",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "blot2/std/vector.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 1294,
+          "end": 1297,
+          "message": "Storage source expansion exceeded its expression budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "next": "reduce measured whole-text-record expansion/local pressure via exact existing span APIs; do not raise cap automatically"
   }
 }

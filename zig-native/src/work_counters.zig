@@ -78,6 +78,9 @@ pub const SchemeMembership = struct {
     indexed_items: u64 = 0,
 };
 pub const Counters = struct {
+    scoped_emission_expressions: u64 = 0,
+    max_scoped_emission_body_steps: u64 = 0,
+    max_scoped_emission_limit: u64 = 0,
     /// Region solver work only; frontend type stores are counted separately.
     normalization: Normalization = .{},
     scheme_membership: SchemeMembership = .{},

@@ -18,6 +18,9 @@ const storage_plan = @import("storage_plan.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const source_proof = @import("../check/package_core.zig");
 const Error = std.mem.Allocator.Error || error{Declined};
+/// Compiler work policy, independent of guest storage capacities and proofs.
+/// Each export and reusable child retains its own finite expansion allowance.
+pub const WorkLimits = struct { expressions: u32 = 500_000 };
 
 /// Transitional selection follows reached expressions, not imported type tables.
 /// It grants no admission authority; the selected backend still validates Core.
@@ -165,6 +168,8 @@ const Generator = struct {
     depth: usize = 0,
     nesting: u32 = 0,
     steps: usize = 0,
+    work_limits: WorkLimits = .{},
+    emission_work: *@import("../work_counters.zig").Counters,
     layout_steps: usize = 0,
     // Templates contain only closed inline data and zero local words. Each use
     // receives independent fields; root/variant evidence is never cached here.
@@ -1952,6 +1957,8 @@ const Generator = struct {
                 .calls = .{ .allocator = self.allocator },
                 .active_calls = self.active_calls,
                 .specialize = false,
+                .work_limits = self.work_limits,
+                .emission_work = self.emission_work,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2082,6 +2089,8 @@ const Generator = struct {
                 .calls = .{ .allocator = self.allocator },
                 .active_calls = self.active_calls,
                 .specialize = false,
+                .work_limits = self.work_limits,
+                .emission_work = self.emission_work,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2441,6 +2450,8 @@ const Generator = struct {
                 .calls = .{ .allocator = self.allocator },
                 .active_calls = self.active_calls,
                 .specialize = false,
+                .work_limits = self.work_limits,
+                .emission_work = self.emission_work,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2593,6 +2604,8 @@ const Generator = struct {
                 .calls = .{ .allocator = self.allocator },
                 .active_calls = self.active_calls,
                 .specialize = false,
+                .work_limits = self.work_limits,
+                .emission_work = self.emission_work,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2917,6 +2930,8 @@ const Generator = struct {
                 .calls = .{ .allocator = self.allocator },
                 .active_calls = self.active_calls,
                 .specialize = false,
+                .work_limits = self.work_limits,
+                .emission_work = self.emission_work,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -3898,9 +3913,11 @@ const Generator = struct {
         errdefer if (self.diagnostic == null) {
             self.diagnostic = .{ .unit = m.unit, .span = m.span(id), .code = .storage_unsupported, .detail = "This expression has no admitted storage layout or binding" };
         };
+        if (self.steps >= self.work_limits.expressions) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its expression budget");
         self.steps += 1;
+        self.emission_work.scoped_emission_expressions +|= 1;
+        self.emission_work.max_scoped_emission_body_steps = @max(self.emission_work.max_scoped_emission_body_steps, self.steps);
         if (depth > 128) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its nesting bound");
-        if (self.steps > 100_000) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its expression budget");
         const n = m.node(id);
         switch (n.tag) {
             .task => return self.fail(m, id, .storage_unsupported, "Language tasks are not part of the data-stack model; use isolated host worker jobs and copied packets"),
@@ -4404,6 +4421,10 @@ pub fn compile(allocator: std.mem.Allocator, units: []const core.Module, entry: 
     return compileWithConfig(allocator, units, entry, .{});
 }
 pub fn compileWithConfig(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, config: storage_plan.Config) std.mem.Allocator.Error!backend.Result {
+    return compileWithWorkLimits(allocator, units, entry, config, .{});
+}
+pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, config: storage_plan.Config, limits: WorkLimits) std.mem.Allocator.Error!backend.Result {
+    if (limits.expressions == 0) return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped emission requires a positive expression allowance" } };
     const views = try allocator.alloc(*const core.Module, units.len);
     defer allocator.free(views);
     for (units, 0..) |*unit_, index| views[index] = unit_;
@@ -4446,15 +4467,16 @@ pub fn compileWithConfig(allocator: std.mem.Allocator, units: []const core.Modul
     var validation_budget: usize = 1_000_000;
     var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
     defer active_calls.deinit();
-    var g: Generator = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime };
+    var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
+    var g: Generator = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work };
     defer g.deinit();
     g.emit(entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Declined => return .{ .diagnostic = g.diagnostic orelse .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported } },
+        error.Declined => return .{ .counters = emission_work, .diagnostic = g.diagnostic orelse .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported } },
     };
     const capacities = try allocator.alloc(u32, g.max_stacks);
     defer allocator.free(capacities);
-    if (config.persistent_lanes.len != 0 and config.persistent_lanes.len != g.globals.items.len) return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Persistent storage budgets must match the named pool inventory" } };
+    if (config.persistent_lanes.len != 0 and config.persistent_lanes.len != g.globals.items.len) return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Persistent storage budgets must match the named pool inventory" } };
     @memset(capacities, config.grower_bytes);
     capacities[g.fixed_region] = config.temporary_bytes;
     for (g.globals.items, 0..) |global, index| {
@@ -4468,14 +4490,14 @@ pub fn compileWithConfig(allocator: std.mem.Allocator, units: []const core.Modul
     const memory_plan: storage.Plan = .{ .region_capacities = capacities, .owner_capacity = config.owner_capacity };
     storage.finishPlan(&module, runtime, memory_plan) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Owned storage memory plan exceeds Wasm32 capacity" } },
+        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Owned storage memory plan exceeds Wasm32 capacity" } },
     };
     if (g.transport) |transport| packets.configure(&module, transport, storage.regionBase(memory_plan, g.transport_region.?) catch unreachable, capacities[g.transport_region.?]) catch {
-        return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid copied transport memory plan" } };
+        return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid copied transport memory plan" } };
     };
     const bytes = module.assembleWithOptions(.{}) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
+        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
     };
-    return .{ .bytes = bytes, .emitted_functions = module.functions.items.len, .whole_module_only = true };
+    return .{ .bytes = bytes, .emitted_functions = module.functions.items.len, .whole_module_only = true, .counters = emission_work };
 }

@@ -3,12 +3,24 @@
 ## Current cloud frontier
 
 Continue until one real Gdev frame runs in native Pen and inspect the PNG. There
-is still no successful main Wasm or frame. The latest normal main attempt,
-`main-b7f90a2d5b71fe12`, cleared the expression-expansion blocker and reached
-station.blot:140's write_notices loop. Its whole access record carries
-callbacks; the next source candidate pins the three existing Array U32 owners
-before the loop. A real-main retry is running; do not reapply earlier annotation
-experiments.
+is still no successful main Wasm or frame. Normal main `main-fbc2dfdebe16b95f`
+clears the station notice/reset and shop-row loop boundaries, then reaches the
+finite 500,000-expression emission allowance in std/vector. Current source
+candidates use named station owners and a GrowArray Row builder with one freeze.
+A standalone shop fixture hits the engine local limit; the next measured source
+fix replaces whole text-record lookups with verified existing per-label span
+calls. Do not automatically raise the cap again.
+
+The old 100,000 cap was a compiler work policy, not an ownership requirement.
+Astra xhigh reviewed the finite 500,000 default and private native boundary
+option. Child helpers inherit it; zero is rejected, exhaustion publishes no
+Wasm, and peak/total/limit counters are recorded. The large executed law expands
+104,717 expressions and preserves 51 ordered Foreign calls in both tiers and
+sync/async. It fails the old cap. Seventeen affected native laws pass, including
+ownership rejection; recursion rejection passes. Complete inventory2,684
+compiles and changed Zig lint is clean. Full gate was attempted and remains
+registry blocked. No proof, layout, depth, key or guest storage limit was
+increased.
 
 The greenfield cleanup removed retired railway refund migration, module, codec
 135, three owners and cart relocation. It had expanded roughly 23,000 nodes at
@@ -30,7 +42,7 @@ termination propagation through return children. Parser/evaluator semantics,
 nominal identity checks, stableCarry and checked budgets remain intact. Astra
 xhigh reviewed the proof boundaries and diagnosed the witness/control issues.
 
-All 2,683 native tests compile. Focused comprehension, borrow, return and key
+All 2,684 native tests compile. Focused comprehension, borrow, return and key
 execution laws pass in both build modes and sync/async; the new return law also
 passes its full allocation-failure sweep. Changed Zig lint is clean. The
 primitive-associated-partials native layout failure remains the documented

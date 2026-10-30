@@ -316,3 +316,32 @@ test "owned return children preserve completed nominal exits through allocation 
     try publish(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
+
+test "scoped emission work limits bound reusable children without publishing partial Wasm" {
+    const scoped = @import("scoped_backend.zig");
+    var parts: [102][]const u8 = undefined;
+    parts[0] = "const read = func (rows: ResizeArray U32) => return do:\n  let value: U32 = 0\n";
+    @memset(parts[1..101], "  value := @u32.add value 1\n");
+    parts[101] = "  return @u32.add value rows[0]\nentry const answer = func (value: U32) => return do:\n  let rows: ResizeArray U32 = #[value]\n  return read rows\n";
+    const source = try std.mem.concat(a, u8, &parts);
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    var invalid = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 0 });
+    defer invalid.deinit(a);
+    try std.testing.expect(invalid.diagnostic != null);
+    try std.testing.expectEqual(@as(usize, 0), invalid.bytes.len);
+    var limited = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 64 });
+    defer limited.deinit(a);
+    try std.testing.expect(limited.diagnostic != null);
+    try std.testing.expectEqualStrings("Storage source expansion exceeded its expression budget", limited.diagnostic.?.message());
+    try std.testing.expectEqual(@as(usize, 0), limited.bytes.len);
+    try std.testing.expectEqual(@as(u64, 64), limited.counters.max_scoped_emission_body_steps);
+    var sufficient = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 1024 });
+    defer sufficient.deinit(a);
+    try std.testing.expect(sufficient.diagnostic == null);
+    try std.testing.expect(sufficient.bytes.len > 8);
+    try std.testing.expect(sufficient.counters.max_scoped_emission_body_steps > 64);
+    try std.testing.expect(sufficient.counters.max_scoped_emission_body_steps <= 1024);
+    try std.testing.expect(sufficient.counters.scoped_emission_expressions > sufficient.counters.max_scoped_emission_body_steps);
+}
