@@ -718,5 +718,110 @@
     },
     "codegen_check": "passed",
     "qualification": "no main Wasm/frame"
+  },
+  "selected_type_diagnostic": {
+    "attempt": "main-239a503327b26b87",
+    "configured_identity": "8cc028b4762dbf7ac1d570bdf11972aacf685d491a7a7579792a720058c80ddb",
+    "trace_bytes": 530604,
+    "visits": 4096,
+    "unique_resolved_type_environment_pairs": 640,
+    "max_depth": 5,
+    "bounds_and_root_deltas": [
+      "SELECT_ROOTS producer=2:19 name=application count=13 words=423 active=42",
+      "SELECT_ROOT_DONE ordinal=0 formal=2:2934 cost=32 words=292 left=4064",
+      "SELECT_ROOT_DONE ordinal=1 formal=2:2933 cost=281 words=2543 left=3783",
+      "SELECT_ROOT_DONE ordinal=2 formal=2:2930 cost=281 words=2543 left=3502",
+      "SELECT_ROOT_DONE ordinal=3 formal=2:2928 cost=312 words=2833 left=3190",
+      "SELECT_ROOT_DONE ordinal=4 formal=2:2923 cost=2 words=2 left=3188",
+      "SELECT_ROOT_DONE ordinal=5 formal=2:2922 cost=281 words=2543 left=2907",
+      "SELECT_ROOT_DONE ordinal=6 formal=2:2918 cost=281 words=2543 left=2626",
+      "SELECT_ROOT_DONE ordinal=7 formal=2:2913 cost=2 words=2 left=2624",
+      "SELECT_ROOT_DONE ordinal=8 formal=2:2912 cost=281 words=2543 left=2343",
+      "SELECT_ROOT_DONE ordinal=9 formal=2:2908 cost=281 words=2543 left=2062",
+      "SELECT_ROOT_DONE ordinal=10 formal=2:2906 cost=281 words=2543 left=1781",
+      "SELECT_ROOT_DONE ordinal=11 formal=2:2902 cost=281 words=2543 left=1500",
+      "SELECT_LIMIT source=2:2605 span=42534..42747 input=265:24864 depth=3 left=0 words=37492",
+      "SELECT_ROOT_FAIL ordinal=12 formal=2:2899 cost=1500 words=13596 left=0"
+    ],
+    "most_repeated": [
+      {
+        "actual": "2:3",
+        "environment": "0:0",
+        "count": 267,
+        "tag": "u32"
+      },
+      {
+        "actual": "2:10",
+        "environment": "0:0",
+        "count": 207,
+        "tag": "array"
+      },
+      {
+        "actual": "265:3",
+        "environment": "0:0",
+        "count": 157,
+        "tag": "u32"
+      },
+      {
+        "actual": "265:4950",
+        "environment": "0:0",
+        "count": 115,
+        "tag": "array"
+      },
+      {
+        "actual": "2:4",
+        "environment": "0:0",
+        "count": 100,
+        "tag": "f32"
+      },
+      {
+        "actual": "265:4",
+        "environment": "0:0",
+        "count": 66,
+        "tag": "f32"
+      },
+      {
+        "actual": "2:1",
+        "environment": "0:0",
+        "count": 63,
+        "tag": "unit"
+      },
+      {
+        "actual": "265:1",
+        "environment": "0:0",
+        "count": 39,
+        "tag": "unit"
+      },
+      {
+        "actual": "2:15",
+        "environment": "0:0",
+        "count": 20,
+        "tag": "nominal"
+      },
+      {
+        "actual": "2:13",
+        "environment": "0:0",
+        "count": 18,
+        "tag": "nominal"
+      },
+      {
+        "actual": "2:228",
+        "environment": "0:0",
+        "count": 18,
+        "tag": "nominal"
+      },
+      {
+        "actual": "2:56",
+        "environment": "0:0",
+        "count": 18,
+        "tag": "nominal"
+      }
+    ],
+    "kind": "separate observational native compiler; normal source restored exactly",
+    "trace": "tasks/storage-handoff-evidence/2026-10-30-selected-types.log.gz",
+    "trace_uncompressed_sha256": "fa5b61713a6363702f42713e83784ca4d36799df66025c1f07589167814a3721",
+    "normal_main_attempt": "main-a4f8c5d5de900dd9",
+    "interpretation": "4096 work exhausted at depth5;640 distinct resolved(unit,type,captured environment pointer/length) pairs. This process-local grouping is not reusable semantic authority. Expanded output already37492u32 words.",
+    "next_plan": "Canonical structural DAG selection keys, deterministic exact postorder interning across ordered roots; preserve structural identity across sharing/type-ID changes and captured environments. Retain work/depth limits with explicit bounded probes/output/allocation; test identities/correlations/recursion/failures. Not implemented. No source policy split or proof-result caching."
   }
 }

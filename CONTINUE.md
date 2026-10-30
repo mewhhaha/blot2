@@ -2,26 +2,33 @@
 
 ## Current cloud frontier
 
-Record matching now indexes field names for 17–256-field records, preserving
-first right-side matches, left traversal and every child type/effect/owner
-proof. The fixed 512-slot ordinal table allocates nothing; every probe is
-bounded and charged. It clears the actual-main validation-budget boundary. A
-typed game forwarder with inferred effects, an explicit F32 music result and a
-generic sound-policy receiver clear the subsequent tutorial.music_reveal
-callback proof. An explicit set.Set math.Vec4 annotation at the clearing-members
-allocation clears the subsequent layout error. Attempt `main-a4f8c5d5de900dd9`
-now fails at world_storage.application's returned policy record (line684):
-selected call type exceeds the supported bound. The guard in
-scoped_backend.selectionType combines depth>128 and exhausted work; distinguish
-them and identify the repeated/type path before changing code. Do not increase
-either bound. No main Wasm or Pen frame has passed.
+Main now reaches the specialization key for world_storage.application's static
+policy record (line684). The normal attempt is `main-a4f8c5d5de900dd9`;
+`main-239a503327b26b87` is its observational diagnostic. The **4,096-node**
+selectedType allowance is exhausted at depth **5**, not the 128-depth bound. Its
+13 public roots revisit 640 resolved type/environment pairs across 4,096 visits
+and already emit 37,492 u32 key words. Root12 consumes the remaining 1,500
+visits. No main Wasm or Pen frame has passed.
 
-The earlier zero-span layout diagnostic was an unresolved generic map key, not
-evidence of a nested resizable payload. Tracing the existing failure unwind
-identified clearing_members at world_storage:186; both clearing APIs already
-require set.Set math.Vec4. The allocation annotation preserves that contract,
-owner lifetime and separate bucket storage. Diagnostic source was restored
-exactly.
+Astra's next plan is canonical structural DAG keys across the complete ordered
+type-root forest. Intern completed descriptors postorder using exact comparison
+after hashing; environment-aware TypeRef memoization is only a local
+accelerator. Preserve callback prefix, root/field order and spelling, nominal
+identity, abstract/private binder roles and exact function-row carriers. Raw
+type-ID backreferences and skipped repeated nodes do not preserve structural
+identity. Keep node/depth limits; bound probes, output words and allocations
+explicitly. Test sharing-independent equality, captured environments/private
+correlations, changed rows/nominals/fields, active-call recursion, collisions,
+depth on memo hits, output exhaustion and atomic allocation failure. This is
+**not implemented**. Keep the application bundle intact; no proof-result cache
+is indicated.
+
+Implemented changes clear the preceding boundaries: record field-name indexing
+retains first right matches and every child proof; the game music-policy
+forwarder keeps inferred effects; clearing_members explicitly uses the existing
+set.Set math.Vec4 key contract. The earlier zero-span layout error was an
+unresolved map key, not a nested resizable payload. All temporary diagnostic
+compiler sources were restored exactly, and budgets/proof rules are unchanged.
 
 All **76** package/core contract laws pass with zero failures, skips, leaks or
 logged errors, and all **2,674** native tests compile. The new laws cover record
