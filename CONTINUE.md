@@ -5,11 +5,19 @@
 Record matching now indexes field names for 17–256-field records, preserving
 first right-side matches, left traversal and every child type/effect/owner
 proof. The fixed 512-slot ordinal table allocates nothing; every probe is
-bounded and charged. This clears the actual-main validation-budget boundary.
-Attempt `main-1a7c3c830b1ca111` now fails at `game.blot:385`, the
-`tutorial.music_reveal` callback passed to `sounds.draw`, with incomplete type
-evidence. Inspect that callback contract next. No main Wasm or Pen frame has
-passed; budgets and proof rules are unchanged.
+bounded and charged. It clears the actual-main validation-budget boundary. A
+typed game forwarder with inferred effects, an explicit F32 music result and a
+generic sound-policy receiver clear the subsequent tutorial.music_reveal
+callback proof. Attempt `main-ff803d6142b9d0bb` now reaches a storage-layout
+error in world_storage: an array element lacks a fixed inline layout. No main
+Wasm or Pen frame has passed; budgets and proof rules are unchanged.
+
+The reported span0..0 is lost when shape substitutes a type argument and calls
+shape(actual_unit, 0, actual_ty). The generic message does not establish that a
+particular owner contains resizable data: unresolved/function/unknown nominal
+types use the same fallthrough. Trace the existing failed shape unwind to its
+nonzero source node, including substitution, record-field and nominal-payload
+edges. Identify that exact row before changing storage.
 
 All **76** package/core contract laws pass with zero failures, skips, leaks or
 logged errors, and all **2,674** native tests compile. The new laws cover record
@@ -17,7 +25,8 @@ width thresholds, reordered/colliding/duplicate names, bounded work, missing and
 forged children, correlated witnesses, Foreign callbacks and rigid ownership.
 The 166-field regression uses 499 debits instead of the former 14,028; this is a
 specific comparison law, not an application performance measurement. Changed
-production-file Zig lint passes with zero findings.
+production-file Zig lint passes with zero findings. The changed test file has
+one preexisting allocation-size warning at line2705, outside the changed laws.
 
 The dictionary-equivalence trace contains 2,963 whole-dictionary entries, 2,961
 successful exits and 89 solver lifetimes. **Zero** previous successful exits
