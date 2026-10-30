@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-1a7c3c830b1ca111",
+    "attempt": "build/gdev-first-frame/main-ff803d6142b9d0bb",
     "configured_identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
     "diagnostic": {
-      "filename": "gdev/src/game.blot",
+      "filename": "gdev/src/world_storage.blot",
       "stage": "emit",
       "code": "storage_unsupported",
-      "start": 20276,
-      "end": 20297,
-      "message": "The scoped body lacks complete type evidence",
+      "start": 0,
+      "end": 0,
+      "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -638,6 +638,37 @@
     },
     "changed_production_file_lint": "passed: zero findings in package_contracts.zig",
     "full_gate": "attempted; blocked before tests caching locked @jsr/mewhhaha__baba9.0.1 from npm.jsr.io: unsuccessful proxy tunnel",
-    "qualification": "incomplete; no Wasm or frame"
+    "qualification": "incomplete; no Wasm or frame",
+    "changed_test_file_lint": "one preexisting allocation-size-overflow warning at package_contracts_tests.zig:2705, outside changed hunks"
+  },
+  "music_policy": {
+    "gdev_checkpoint": "7de9d49d63eb1185283df6bfefb072053331f66b",
+    "changes": [
+      "Sound renderer ties generic callback receiver to supplied access, with F32 alpha/result and open final effect row.",
+      "Tutorial music callback explicitly returns F32.",
+      "Composition uses an exact FrameAccess typed forwarding callback; actual final effects remain inferred."
+    ],
+    "policy_only_attempt": "main-713f627b91d577b8: unchanged incomplete evidence at tutorial.music_reveal reference",
+    "forwarder_attempt": {
+      "evidence": "build/gdev-first-frame/main-ff803d6142b9d0bb",
+      "identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/world_storage.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "codegen_check": "passed",
+    "result": "clears prior callback proof; reaches backend shape layout failure with no source-proof diagnostics",
+    "qualification": "no main Wasm or Pen frame"
   }
 }

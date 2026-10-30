@@ -2,10 +2,10 @@
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. Record field-name indexing clears the exhausted render
-validation budget; main next fails on the tutorial.music_reveal callback passed
-to sounds.draw. No real Gdev main Wasm or Pen frame has passed. The earlier full
-compiler gate stopped at its protocol smoke span assertion (three passed, one
-failed); see
+validation budget; a typed music-policy forwarder clears the next callback
+proof. Main now reaches an array-element layout diagnostic in world_storage. No
+real Gdev main Wasm or Pen frame has passed. The earlier full compiler gate
+stopped at its protocol smoke span assertion (three passed, one failed); see
 [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
 ## Immediate milestone
