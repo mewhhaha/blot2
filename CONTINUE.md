@@ -1,5 +1,19 @@
 # Continue here — owned-storage checkpoint, 30 October 2026
 
+## Current cloud frontier
+
+The bounded brush, element-clock and deposit contracts cleared their earlier
+numeric type-evidence diagnostics. Main still fails at `game.blot:384`, the
+`render_world finish editing access presentation` call: checked source-module
+validation work is exhausted. No main Wasm or real Pen frame has passed.
+
+Whole-frame annotations increased validation work and were reverted. Keep the
+existing generic render access/callback effects. Attribute repeated proof work
+or try one measured narrow alias boundary before changing compiler limits. The
+Blot cloud-main evidence JSON records the attempts. The compiler plugin build
+passed; the native host build was interrupted by environment restart. The Blot
+formatter remains unrun because `npm.jsr.io` is denied by the proxy.
+
 This is an **unfinished migration checkpoint**, saved across `blot2`, `gdev`,
 `ink` and `pen` on `main` so work can continue on another computer. The older
 qualification reports below apply to older implementations, not this rewrite.
@@ -25,11 +39,7 @@ uses the existing per-label `part`/`span_*` exports. Its 46 fields and
 evaluation order match the previous toolbar, without changing generated payloads
 or budgets.
 
-The next real-main diagnostic is `ink/lib/brush.blot:539`, the distance
-expression `plane.distance + x * offset.x`: scoped emission lacks complete type
-evidence. Inspect the canonical stored-brush/face/geometry boundary before
-changing solver semantics. Main Wasm and the Pen frame still fail to qualify.
-See
+The latest render frontier is recorded above and in
 [the tracked retry evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json).
 
 The machine's command sandbox cannot connect to its proxy; network operations

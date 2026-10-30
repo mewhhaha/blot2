@@ -76,5 +76,82 @@
       }
     ],
     "gdev_checkpoint": "5719816f761edb859f9e9d39adcc33f5ec4c4ca4"
+  },
+  "render_contracts": {
+    "status": "partial integration; full main still fails",
+    "changes": [
+      "Canonical Stored/Face/Quat/Vec3/F32 values in Ink brush.draw; arithmetic order retained.",
+      "Canonical Elements/Clock and explicit U32-to-F32 phase calculation.",
+      "Deposits Read result and canonical Arena/Deposit/F32 locals."
+    ],
+    "discarded_experiment": "Full 166-field FrameAccess annotations on game render callbacks exhausted validation earlier and were reverted.",
+    "attempts": [
+      {
+        "attempt": "build/gdev-first-frame/main-d15d60a27ad2c316",
+        "success": false,
+        "diagnostic": {
+          "filename": "gdev/src/world/elements.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 9917,
+          "end": 9973,
+          "message": "The scoped body lacks complete type evidence",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      },
+      {
+        "attempt": "build/gdev-first-frame/main-d6c8225925deeb56",
+        "success": false,
+        "diagnostic": {
+          "filename": "blot2/std/prelude.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 752,
+          "end": 779,
+          "message": "The scoped body lacks complete type evidence",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      },
+      {
+        "attempt": "build/gdev-first-frame/main-75c34172f35b41f3",
+        "success": false,
+        "diagnostic": {
+          "filename": "gdev/src/game.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 11974,
+          "end": 12011,
+          "message": "Source module storage validation exceeded its checked work budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      },
+      {
+        "attempt": "build/gdev-first-frame/main-725ecb42f31dd356",
+        "success": false,
+        "diagnostic": {
+          "filename": "gdev/src/game.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 20101,
+          "end": 20148,
+          "message": "Source module storage validation exceeded its checked work budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      }
+    ],
+    "current_frontier": "game.blot:384 render_world finish editing access presentation; source module checked validation budget exhausted.",
+    "tooling": {
+      "plugin_build": "passed: cargo build --locked --release --target wasm32-wasip2 -j 1",
+      "native_build": "interrupted by environment restart; resume using cached outputs",
+      "blot_formatter": "unrun: locked Baba tarball host npm.jsr.io returns proxy HTTP 403"
+    }
   }
 }

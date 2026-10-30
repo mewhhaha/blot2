@@ -1,10 +1,11 @@
 # Owned-storage rewrite: active task index
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
-handoff evidence. The final Boxing batch is written but unbuilt. No real Gdev
-main Wasm or Pen frame has passed. The full compiler gate stopped at its
-protocol smoke span assertion (three passed, one failed); see
-[the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
+handoff evidence. Cloud retries moved beyond the earlier Boxing and bounded
+render diagnostics, then exhausted checked module validation at the game render
+call. No real Gdev main Wasm or Pen frame has passed. The earlier full compiler
+gate stopped at its protocol smoke span assertion (three passed, one failed);
+see [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
 ## Immediate milestone
 
