@@ -298,5 +298,42 @@
     "zig_lint": "24 findings, all in files outside the changed package_core.zig; full lint does not pass.",
     "qualification": "pending",
     "network_draft": "saved additions npm.jsr.io and jsr.io; not applied or published"
+  },
+  "noop_rollback_elision": {
+    "scope": "goalMatches only; no successful dictionary proofs are cached",
+    "change": [
+      "Reject immutable header mismatches before opening a Store checkpoint.",
+      "On failed endpoint/signature comparison, elide Store rollback only when full mark and type/effect/physical epochs are unchanged, unsaturated, and no OOM occurred.",
+      "Mutating failures retain ordinary rollback."
+    ],
+    "regression": "Warm resolution cache survives metadata/concrete mismatches; partial binding rejection restores fresh variable; later valid alternative succeeds; saturated clock forces rollback.",
+    "native_inventory": 2672,
+    "contract_family": {
+      "selected": 74,
+      "passed": 74,
+      "failed": 0,
+      "skipped": 0,
+      "leaks": 0,
+      "logged_errors": 0
+    },
+    "changed_file_lint": "passed: 0 findings in package_core.zig",
+    "full_gate": "attempted; blocked before tests by npm.jsr.io proxy HTTP403",
+    "main_attempt": "main-ec092e513c504d8",
+    "main_result": "still fails module validation budget at game render_world call; no main Wasm/frame",
+    "qualification": "incomplete; do not infer application speedup"
+  },
+  "loop_fixture_correction": {
+    "preexisting_failure": "Pre-cache 5b01731 also fails source loop carry law because bodies[0] is sentinel.",
+    "fix": "Select named scan declaration; preserve good/forged-backedge/restored-body checks.",
+    "baseline_log": "Pre-cache loop test exit1; corrected law passes."
+  },
+  "post_header_attribution": {
+    "attempt": "main-fe194f4b8fb41919",
+    "grounding_resolve_debits": 800,
+    "shared_ground_debits_inclusive": 12517,
+    "shared_type_witness_debits": 3365546,
+    "whole_dictionary_records": 2902,
+    "whole_dictionary_debits_inclusive": 35369006,
+    "interpretation": "Grounding is not dominant. Whole-dictionary totals include nested expansions and do not establish proof equivalence; no dictionary-result cache introduced."
   }
 }

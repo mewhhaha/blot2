@@ -372,6 +372,89 @@ fn headerMemoScenario(allocator: std.mem.Allocator) !void {
 test "source header absence memo preserves forwarding keys budgets and atomic failure" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, headerMemoScenario, .{});
 }
+test "source goal header rejection preserves epochs while failed type proofs still roll back" {
+    const allocator = std.testing.allocator;
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    var module = headerTestModule(1, &.{}, &.{}, &.{});
+    module.types = .{ .nodes = source.nodes.items, .extra = source.extra.items, .effects = .{ .rows = source.effects.rows.items, .labels = source.effects.labels.items, .variable_count = @intCast(source.effects.variables.items.len) }, .operations = source.operations.items };
+    var remaining: usize = 65_536;
+    var scopes: contracts.Context = .{ .types = &module.types, .remaining = &remaining };
+    var solver = try Equations.Solver.init(allocator, &module, &scopes, &remaining);
+    defer solver.deinit();
+    solver.view = &module.types;
+    solver.refresh();
+    scopes.solver = &solver;
+    var workspace: Equations.Workspace = .{ .allocator = allocator };
+    var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
+    var walker: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission };
+    const warm_variable = try solver.store.fresh();
+    const warm_root = try solver.store.array(warm_variable);
+    solver.refresh();
+    try solver.unify(warm_variable, T.u32_type);
+    const warmed = try solver.resolve(warm_root);
+    const resolution_steps = solver.store.resolution_steps;
+    const wanted: core.Obligation = .{ .ty = T.u32_type, .kind = .field, .name = 17, .span = .{ .start = 0, .end = 0 } };
+    var mismatches: [5]core.Obligation = undefined;
+    @memset(&mismatches, wanted);
+    mismatches[0].kind = .writable_field;
+    mismatches[1].name = 18;
+    mismatches[2].operator = .add;
+    mismatches[3].identity.unit = 2;
+    mismatches[4].identity.decl = 3;
+    for (mismatches) |given| {
+        const type_epoch = solver.store.mutation_epoch;
+        const effect_epoch = solver.store.effects.mutation_epoch;
+        const physical_epoch = solver.store.effects.physical_epoch;
+        var proof: contracts.Principal = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes, .foreign_views = true };
+        try std.testing.expect(!try walker.goalMatches(&proof, wanted, given, false));
+        try std.testing.expectEqual(type_epoch, solver.store.mutation_epoch);
+        try std.testing.expectEqual(effect_epoch, solver.store.effects.mutation_epoch);
+        try std.testing.expectEqual(physical_epoch, solver.store.effects.physical_epoch);
+        try std.testing.expect(!proof.foreign_views);
+        try std.testing.expectEqual(warmed, try solver.resolve(warm_root));
+        try std.testing.expectEqual(resolution_steps, solver.store.resolution_steps);
+    }
+    var different_type = wanted;
+    different_type.ty = T.f32_type;
+    const unchanged_mark = solver.store.mark();
+    const unchanged_type_epoch = solver.store.mutation_epoch;
+    const unchanged_effect_epoch = solver.store.effects.mutation_epoch;
+    const unchanged_physical_epoch = solver.store.effects.physical_epoch;
+    var read_proof: contracts.Principal = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes };
+    try std.testing.expect(!try walker.goalMatches(&read_proof, wanted, different_type, false));
+    try std.testing.expectEqualDeep(unchanged_mark, solver.store.mark());
+    try std.testing.expectEqual(unchanged_type_epoch, solver.store.mutation_epoch);
+    try std.testing.expectEqual(unchanged_effect_epoch, solver.store.effects.mutation_epoch);
+    try std.testing.expectEqual(unchanged_physical_epoch, solver.store.effects.physical_epoch);
+    try std.testing.expectEqual(warmed, try solver.resolve(warm_root));
+    try std.testing.expectEqual(resolution_steps, solver.store.resolution_steps);
+    const fresh = try solver.store.fresh();
+    const left = try solver.store.product(&.{ fresh, T.u32_type });
+    const right = try solver.store.product(&.{ T.f32_type, T.f32_type });
+    solver.refresh();
+    var first = wanted;
+    var second = wanted;
+    first.ty = left;
+    second.ty = right;
+    const epoch = solver.store.mutation_epoch;
+    var proof: contracts.Principal = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes };
+    // The first tuple element can unify, but the second rejects. That actual
+    // speculative proof must still revoke its binding and resolution epoch.
+    try std.testing.expect(!try walker.goalMatches(&proof, first, second, false));
+    try std.testing.expectEqual(fresh, solver.store.head(fresh, 0));
+    try std.testing.expect(solver.store.mutation_epoch > epoch);
+    second.ty = try solver.store.product(&.{ T.f32_type, T.u32_type });
+    solver.refresh();
+    proof = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes };
+    try std.testing.expect(try walker.goalMatches(&proof, first, second, false));
+    try std.testing.expectEqual(T.f32_type, solver.store.head(fresh, 0));
+    solver.store.mutation_epoch = std.math.maxInt(u64);
+    const saturated_generation = solver.store.closed_generation;
+    proof = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes };
+    try std.testing.expect(!try walker.goalMatches(&proof, wanted, different_type, false));
+    try std.testing.expect(solver.store.closed_generation > saturated_generation);
+}
 test "source target catalog indexes exact aliases once and publishes atomically" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, targetCatalogScenario, .{});
 }
@@ -1406,15 +1489,31 @@ const Walker = struct {
             wanted.identity = try self.canonicalCallee(wanted.identity, proof.left, wanted.ty);
             given.identity = try self.canonicalCallee(given.identity, proof.right, given.ty);
         }
+        proof.foreign_views = false;
+        // Header rejection performs no solver operation. Avoid a vacuous
+        // rollback that would revoke exact-epoch resolution caches before the
+        // next, potentially relevant hypothesis is checked.
+        if (wanted.kind != given.kind or wanted.name != given.name or wanted.operator != given.operator or wanted.identity.unit != given.identity.unit or wanted.identity.decl != given.identity.decl) return false;
         const solver = self.scopes.solver;
         const point = if (solver) |owner| owner.store.mark() else null;
+        const type_epoch = if (solver) |owner| owner.store.mutation_epoch else 0;
+        const effect_epoch = if (solver) |owner| owner.store.effects.mutation_epoch else 0;
+        const physical_epoch = if (solver) |owner| owner.store.effects.physical_epoch else 0;
         var accepted = false;
         defer if (!accepted) {
-            if (solver) |owner| owner.rollback(point.?);
+            if (solver) |owner| {
+                // A failed comparison can have read only: retain its derived
+                // resolution caches only when every semantic store clock and
+                // allocation/version boundary is unchanged. Saturated clocks
+                // and OOM cannot certify that condition.
+                const unchanged = !owner.oom and
+                    type_epoch != std.math.maxInt(u64) and effect_epoch != std.math.maxInt(u64) and physical_epoch != std.math.maxInt(u64) and
+                    owner.store.mutation_epoch == type_epoch and owner.store.effects.mutation_epoch == effect_epoch and owner.store.effects.physical_epoch == physical_epoch and
+                    std.meta.eql(point.?, owner.store.mark());
+                if (!unchanged) owner.rollback(point.?);
+            }
         };
 
-        proof.foreign_views = false;
-        if (wanted.kind != given.kind or wanted.name != given.name or wanted.operator != given.operator or wanted.identity.unit != given.identity.unit or wanted.identity.decl != given.identity.decl) return false;
         inline for (.{ "ty", "other", "result" }) |field| {
             const left = @field(wanted, field);
             const right = @field(given, field);

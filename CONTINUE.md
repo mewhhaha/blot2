@@ -2,17 +2,26 @@
 
 ## Current cloud frontier
 
-A negative-only immutable prerequisite-header memo is now implemented. Its new
-native regression and four existing authority/correlation laws pass; all 2,671
-native tests compile. The first candidate still exhausts validation at the same
-render call. Full qualification is pending: the compiler gate cannot fetch Baba
-from blocked `npm.jsr.io`, and full Zig lint reports 24 findings outside the
-changed file. Registry additions are saved only as an environment draft.
+The negative-only prerequisite-header memo is implemented and checked. Solver
+rollback in `goalMatches` now preserves resolution caches only when the full
+store mark and unsaturated type/effect/physical clocks are unchanged and no OOM
+occurred. Metadata-only mismatches reject before opening a checkpoint; actual
+mutating failures still roll back. No dictionary proof results are cached.
 
-Next measure `groundSharedFieldOwner` copy, deep-resolution and matching costs.
-Prefer the existing head-only physical-field proof path if that measured work is
-excessive; do not prune supposedly unrelated goals or weaken private-witness
-correlation.
+All 74 package/core contract laws pass, and all 2,672 native tests compile. A
+preexisting loop law targeted sentinel body zero; it now selects `scan` and
+retains its valid/forged-backedge/restored-body assertions. Changed-file lint
+passes. Full qualification remains blocked before tests by `npm.jsr.io` HTTP403;
+full Zig lint also has 24 findings outside the changed file. Registry additions
+are saved as a draft, not applied or published.
+
+Main still exhausts checked work at `render_world` (attempt
+`main-ec092e513c504d8`). The latest trace rules out field grounding as dominant
+(only 800 deep-resolution debits). Nested whole-dictionary proofs are expensive,
+but repeated targets do not establish identical inputs or lexical authority.
+Before any result reuse, compare successful exits with later entries under exact
+solver lifetime, substitutions, epochs and lexical/effect context. Do not prune
+correlated goals or raise budgets to hide the failure.
 
 The bounded brush, element-clock and deposit contracts cleared their earlier
 numeric type-evidence diagnostics. Main still fails at `game.blot:384`, the
