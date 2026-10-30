@@ -147,11 +147,140 @@
         }
       }
     ],
-    "current_frontier": "game.blot:384 render_world finish editing access presentation; source module checked validation budget exhausted.",
+    "current_frontier": "game.blot:384 render_world editing access presentation; checked module-validation budget exhausted.",
     "tooling": {
       "plugin_build": "passed: cargo build --locked --release --target wasm32-wasip2 -j 1",
-      "native_build": "interrupted by environment restart; resume using cached outputs",
-      "blot_formatter": "unrun: locked Baba tarball host npm.jsr.io returns proxy HTTP 403"
+      "native_build": "passed: cargo build --locked --release -p pen -j 4; pinned Rust 1.99.0, workspace-local signed Debian prerequisites",
+      "blot_formatter": "unrun: locked Baba tarball host npm.jsr.io returns proxy HTTP 403",
+      "codegen_check": "passed: pen codegen --check --project /workspace/gdev",
+      "pen_version": "0.1.0, wasmtime 49.0.3, pen:plugin@0.2.0"
     }
+  },
+  "unused_render_argument": {
+    "change": "Removed only unused render_world.finish parameter and its argument; actual finish invocation in present retained.",
+    "gdev_checkpoint": "50d5b3ab42cd63d315a06183f7ee04b9c3f994dc",
+    "success": false,
+    "diagnostics": [
+      {
+        "filename": "gdev/src/game.blot",
+        "stage": "emit",
+        "code": "storage_unsupported",
+        "start": 20091,
+        "end": 20131,
+        "message": "Source module storage validation exceeded its checked work budget",
+        "offset_encoding": "utf8_bytes",
+        "utf16": null,
+        "details": null
+      }
+    ]
+  },
+  "proof_attribution": {
+    "kind": "temporary diagnostic build, not release qualification",
+    "attempt": "main-390f36e2029d9808",
+    "configured_identity": "ca64d38b4e493a8dfb26ce78575a93317ae0a5f76cb6f264c8291a473d2a0c7b",
+    "compiler_source_restored_exactly": true,
+    "normal_compiler_sha256": "d150f04dcab4118a3870421abc2806d80cab176de948bd130be45a72e863bf26",
+    "budgets_changed": false,
+    "trace": "tasks/storage-handoff-evidence/2026-10-30-proof-work.log.gz",
+    "trace_uncompressed_sha256": "e6f9c2fe2b795c556a2e2f8c831c0049741cb8d41cdb631bf900f089fb2cf171",
+    "caller_unit": 241,
+    "caller_type_nodes": 54052,
+    "caller_type_extra_words": 183436,
+    "module_allowance": 32000000,
+    "render_world_body": {
+      "work_debits_inclusive": 59455,
+      "remaining_after_body": 864457,
+      "status": "body proof completed"
+    },
+    "game_using": {
+      "work_debits_inclusive": 31252019,
+      "remaining_after_failure": 0
+    },
+    "phase_totals": {
+      "principal/inclusive": {
+        "records": 1387,
+        "work_debits_inclusive": 90502133,
+        "max_record": 31630045
+      },
+      "instantiated/given": {
+        "records": 218,
+        "work_debits_inclusive": 155682,
+        "max_record": 1396
+      },
+      "instantiated/direct": {
+        "records": 122,
+        "work_debits_inclusive": 145685,
+        "max_record": 3087
+      },
+      "solve/init": {
+        "records": 113,
+        "work_debits_inclusive": 64122,
+        "max_record": 594
+      },
+      "solve/import": {
+        "records": 113,
+        "work_debits_inclusive": 0,
+        "max_record": 0
+      },
+      "solve/type_witnesses": {
+        "records": 113,
+        "work_debits_inclusive": 163952,
+        "max_record": 5639
+      },
+      "solve/row_witnesses": {
+        "records": 113,
+        "work_debits_inclusive": 0,
+        "max_record": 0
+      },
+      "goals/copy": {
+        "records": 3332,
+        "work_debits_inclusive": 60920,
+        "max_record": 574
+      },
+      "goals/physical": {
+        "records": 2784,
+        "work_debits_inclusive": 1106218,
+        "max_record": 17196
+      },
+      "goals/resolve": {
+        "records": 3794,
+        "work_debits_inclusive": 1368196,
+        "max_record": 1573
+      },
+      "goals/prerequisite": {
+        "records": 3794,
+        "work_debits_inclusive": 50955199,
+        "max_record": 1080596
+      },
+      "solve/goals": {
+        "records": 113,
+        "work_debits_inclusive": 16476292,
+        "max_record": 3103015
+      },
+      "instantiated/fallback_inclusive": {
+        "records": 113,
+        "work_debits_inclusive": 16704366,
+        "max_record": 3105026
+      }
+    },
+    "interpretation": "Nested records are inclusive; do not sum parent and child families. Solver-init/direct matching debits are comparatively small. Investigate nested prerequisite work next; exact duplicate proof equivalence is not established.",
+    "next_check": "Identify principal targets 185:139, 107:120, 107:79; trace goal attempts with actual substitutions and lexical/effect/solver epochs before considering reuse.",
+    "expensive_principal_records": [
+      {
+        "target": "185:139",
+        "occurrences": 1,
+        "work_debits_inclusive": 3182133
+      },
+      {
+        "target": "107:120",
+        "occurrences": 1,
+        "work_debits_inclusive": 2333264
+      },
+      {
+        "target": "107:79",
+        "occurrences": 1,
+        "work_debits_inclusive": 1630802
+      }
+    ]
   }
 }
