@@ -20,7 +20,8 @@ setting controls ordinary inference and associated work through project checking
 and compile-time evaluation; its default is 1,000,000.
 
 For fresh and retained compile costs, profiling commands and the current
-performance priorities, see [compile measurements](../COMPILE_MEASUREMENTS.md).
+performance priorities, see
+[compile measurements](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_MEASUREMENTS.md).
 The benchmark preserves the project's budget, native assets and frozen standard
 library so its timings match the configured workload.
 
@@ -49,8 +50,10 @@ and imported receivers retain their contracts. Channels, select-one and CPU
 workers remain unfinished. See [structured tasks](guide.md#structured-tasks) and
 the [task ABI](guest-abi.md#structured-task-extension).
 
-The repository [installation instructions](../README.md#build-and-use) bundle
-the release compiler with this CLI, formatter, guide and standard library.
+The repository
+[installation instructions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#build-and-use)
+bundle the release compiler with this CLI, formatter, guide and standard
+library.
 
 Run `deno task test:compiler` from the repository root. Tests cover compiler
 ownership, language behavior, generated Wasm, host lifetimes, retained builds,
@@ -63,4 +66,5 @@ optimizer `codegenWorkers`; see
 [the project API](../zig-native/PROJECT_CLIENT.md). Public idiomatic Blot/Rust
 sources and compile/runtime methodology are in
 [benchmarks/idiomatic](../benchmarks/idiomatic/README.md), with measured tables
-in the [root README](../README.md#idiomatic-blot-and-rust-benchmarks).
+in the
+[root README](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#idiomatic-blot-and-rust-benchmarks).

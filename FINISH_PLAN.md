@@ -1,11 +1,12 @@
 # Finish the current Blot program
 
 **Current memory migration:** the owner subsequently chose a greenfield
-data-stack model. Follow the [rewrite review](zig-native/STORAGE_REWRITE_REVIEW.md)
-and [tasks 110–121](tasks/STORAGE_REWRITE.md). The counted-runtime/cancellation
+data-stack model. Follow the
+[rewrite review](zig-native/STORAGE_REWRITE_REVIEW.md) and
+[tasks 110–121](tasks/STORAGE_REWRITE.md). The counted-runtime/cancellation
 direction and compatibility requirements below are historical; the new program
-keeps isolated host workers and explicit copies and removes language tasks.
-This does not mark unrelated compiler/performance work complete.
+keeps isolated host workers and explicit copies and removes language tasks. This
+does not mark unrelated compiler/performance work complete.
 
 Prepared 23 October 2026 from current main `93bc8d4`, the preserved candidate in
 `/workspace/blot2`, the task index, and GitHub issues #25–#27. This is an
@@ -347,10 +348,11 @@ ordinary-edit, two-second and sub-second targets remain open.
 
 The candidate passes 2,573 exhaustive native laws, 1,656 guests, 44 independent
 held-out Wasm executions and 232 requests over 200 distinct edits. Post-session
-RSS is 521 MiB. The [86-item ledger](COMPILER_CT109_LEDGER.md) records
-implemented work, rejected experiments and still-open architectural designs. The
-qualified CLI and native compiler are installed locally; raw evidence and limits
-are linked from the qualification record.
+RSS is 521 MiB. The
+[86-item ledger](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_LEDGER.md)
+records implemented work, rejected experiments and still-open architectural
+designs. The qualified CLI and native compiler are installed locally; raw
+evidence and limits are linked from the qualification record.
 
 The broader language and upstream-issue requirements below remain open; this
 performance follow-up does not close unrelated completion work.
@@ -368,8 +370,9 @@ Exact frontend correspondence now checks one module on the first edit instead
 of 22. Bounded operation indexes/certificates, lexical links and import scratch
 remove repeated work. The report includes 200 distinct edits, allocator/CPU
 attribution, exhaustive qualification and rejected experiments. All 86 review
-suggestions have a [disposition](COMPILER_CT106_WORK.md); conditional
-alternatives and unfinished architectural work are explicit.
+suggestions have a
+[disposition](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT106_WORK.md);
+conditional alternatives and unfinished architectural work are explicit.
 
 Full qualification passes 2,564 exhaustive native laws and 1,655 guest checks.
 The broader completion requirements below remain open; this performance pass
@@ -392,7 +395,8 @@ fresh controls. Later literal edits take 2.96–3.18 s in that single diagnostic
 sequence, including about 1.5 s inference. The 20% body-CPU target, both edit
 classes below four/two seconds, and sub-second editing remain open. Continue
 with the remaining body-region dependencies and residual inference in
-[the current queue](COMPILE_HILLS.md); keep first-edit frontend work separate.
+[the current queue](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md);
+keep first-edit frontend work separate.
 
 The measured candidate passes 2,548 exhaustive native laws; its guest suite
 catches a lost restart-reuse optimization, fixed by omitting unsupported
@@ -428,16 +432,20 @@ whole-program spawn-contract scans during emission. Seven alternating release
 pairs show 28.6% less game CPU and 29.0% less devtools CPU with identical Wasm.
 The isolated compiler passes full qualification; the remaining inference,
 retained-reuse and absolute performance targets below stay open. The
-[post-CT96 review](PERFORMANCE_REVIEW.md) narrows CT97 to repeated row
-traversal, CT98 to executable-admission diagnostics and BT4 to allocations in
-the slow backend sweeps. It adds evidence, without closing those hills.
+[post-CT96 review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/PERFORMANCE_REVIEW.md)
+narrows CT97 to repeated row traversal, CT98 to executable-admission diagnostics
+and BT4 to allocations in the slow backend sweeps. It adds evidence, without
+closing those hills.
 
-The baseline [compile/build measurements](COMPILE_MEASUREMENTS.md) established
-the remaining performance work against compiler `63c931f`. Follow
-[CT95–CT101](COMPILE_HILLS.md) for application compilation and
-[BT1–BT5](BUILD_HILLS.md) for compiler iteration. CT96 addressed the repeated
-spawn-capability scan; the earlier task-086 constant-work decision remains
-separate because these clocks include nested preparation.
+The baseline
+[compile/build measurements](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_MEASUREMENTS.md)
+established the remaining performance work against compiler `63c931f`. Follow
+[CT95–CT101](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md)
+for application compilation and
+[BT1–BT5](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/BUILD_HILLS.md)
+for compiler iteration. CT96 addressed the repeated spawn-capability scan; the
+earlier task-086 constant-work decision remains separate because these clocks
+include nested preparation.
 
 The subsequent
 [associated-work repair](zig-native/ASSOCIATED_WORK_QUALIFICATION.md) restores

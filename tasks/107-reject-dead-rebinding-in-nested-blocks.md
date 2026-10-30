@@ -9,7 +9,7 @@
   2026 as [issue #11](https://github.com/mewhhaha/blot2/issues/11), a silent
   miscompile.
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

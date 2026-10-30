@@ -8,7 +8,7 @@
 - **Originating requirements:** PLAN: Hill 6 and earlier semantic compilation /
   revision deltas. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -37,8 +37,8 @@ last-good revisions but still reconstruct metadata on edits.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Repeat literal/body/import edits, no-ops and failed corrections across many
   revisions and compare fresh results.

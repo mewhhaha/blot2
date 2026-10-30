@@ -7,7 +7,7 @@
 - **Originating requirements:** reported on 11 October 2026 by the gdev session
   while porting gdev's tests to Blot. Sources: that session's report.
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

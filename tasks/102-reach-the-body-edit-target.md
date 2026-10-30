@@ -9,9 +9,9 @@
   [024](024-apply-general-body-interface-cutoff.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md),
-  [README final gates](README.md#final-qualification-gates).
+  [README final gates](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#final-qualification-gates).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

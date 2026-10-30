@@ -1,6 +1,6 @@
 # Specialization and principal query migration
 
-The [CT112 work](../COMPILER_CT112_WORK.md) preserves the completion of selected
+The [CT112 work](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT112_WORK.md) preserves the completion of selected
 closure results across replay. A validated query restores both its input-to-result
 answer and its result's completion at the exact expected interface. Native
 receipts also own the closure captures frozen by that same solved region; their

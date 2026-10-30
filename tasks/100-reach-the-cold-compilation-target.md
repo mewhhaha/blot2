@@ -6,13 +6,13 @@
   2026; no completion is claimed.
 - **19 October 2026:** cold gdev game is about 2.3 s wall through serve-project
   with 4 codegen workers (CT89), from 3.0 s CPU at the CT1 baseline. See
-  [COMPILE_HILLS.md](../COMPILE_HILLS.md).
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [084](084-qualify-the-complete-program.md)
 - **Originating requirements:** PLAN: final performance / cold compilation of
   approximately 500 ms. Sources: [PLAN.md](../PLAN.md),
-  [README final gates](README.md#final-qualification-gates).
+  [README final gates](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#final-qualification-gates).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

@@ -9,7 +9,7 @@
   2026 as [issue #10](https://github.com/mewhhaha/blot2/issues/10); owner
   approved the checker-side fix the same day.
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -86,9 +86,9 @@ which broke Ink's ECS builders.
     and each callback is serialized at the instance its own body infers
     (`inferClosure`). `closeRetainedRows` (`core_eval.zig`) closed only the
     outer arrow of an anonymous closure, so the curried render system
-    `func presentation => return func frame => return ...` stayed open and declined. A closure
-    literal that is an anonymous closure's whole body is now closed like a named
-    curried body's parameter arrow.
+    `func presentation => return func frame => return ...` stayed open and
+    declined. A closure literal that is an anonymous closure's whole body is now
+    closed like a named curried body's parameter arrow.
   - In a `:=` builder chain only the head `app.new policy` was closed; each
     later link read it, so `attemptClosedNode` declined and the head was
     serialized at the next link's erased layout. The attempt now reads enclosing

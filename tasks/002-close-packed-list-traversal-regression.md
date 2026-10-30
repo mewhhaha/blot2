@@ -8,7 +8,7 @@
 - **Originating requirements:** PLAN: Earlier programs still open / Collections.
   Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -47,8 +47,8 @@ traversal. Task 001 determines whether its narrower span change lands.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Run packed-row, packed-row revision, cursor-fork, iterator and collection
   execution suites, plus native immutable-Core/allocation-failure laws.

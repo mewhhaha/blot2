@@ -70,7 +70,7 @@ discarding about 16 MB of images.
   still names the pinned Core before comparing current structure. That is a
   deliberate integrity check; replacing it with owned lifetimes is a design
   decision. (On 18 October 2026 the owner approved generation tokens, CT18 in
-  [the compile-time hills](../COMPILE_HILLS.md); the digest check is now the
+  [the compile-time hills](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md); the digest check is now the
   opt-in `validate_pins`.)
 - Constant evaluation is 26 ms above `f7be6e7` (closure specialization in
   retained constants); constant evaluation and serialization together, about 270

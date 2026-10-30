@@ -2,10 +2,11 @@
 
 The active greenfield memory-model rewrite is described in the
 [Sol review](zig-native/STORAGE_REWRITE_REVIEW.md) and
-[tasks 110–121](tasks/STORAGE_REWRITE.md). It replaces the counted guest runtime,
-implicit application snapshots and language tasks, preserving copied host worker
-jobs and explicit checkpoints. Earlier ownership/concurrency milestones below
-are historical evidence, not requirements to restore those implementations.
+[tasks 110–121](tasks/STORAGE_REWRITE.md). It replaces the counted guest
+runtime, implicit application snapshots and language tasks, preserving copied
+host worker jobs and explicit checkpoints. Earlier ownership/concurrency
+milestones below are historical evidence, not requirements to restore those
+implementations.
 
 Blot uses the handwritten Zig 0.17 compiler in `zig-native/` and its retained
 project API. The gdev targets are about 500 ms cold compilation and under 100 ms
@@ -15,7 +16,7 @@ version of this file, with every earlier program's measurements, is
 `git show be33230:PLAN.md`.
 
 The next program, 94 compile-time hills measured on the current gdev, is in
-[COMPILE_HILLS.md](COMPILE_HILLS.md).
+[COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 
 The owner approved recreating the lost local snapshot on 19 October 2026 from
 current gdev/Ink. The active manifest has 583 files and 69 test entries. Paired
@@ -103,9 +104,9 @@ remaining work. Each milestone lands as a local commit on `main` after
 
 Historical baseline (17 October 2026, `3cf6de1`, release `blotc` through
 `serve-project` on the 1.09 MB snapshot; see
-[COMPILE_HILLS.md](COMPILE_HILLS.md#historical-baseline-17-october-2026-3cf6de1)
+[COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md#historical-baseline-17-october-2026-3cf6de1)
 and
-[STATUS.md](zig-native/STATUS.md#historical-compile-time-baseline-17-october-2026)):
+[STATUS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/zig-native/STATUS.md#historical-compile-time-baseline-17-october-2026)):
 
 - Cold CPU: game 3,011 ms (312 MiB peak RSS, 1.84 MB Wasm), devtools 1,051 ms,
   all 55 test entries 167.5 s, the largest test entry 19.5 s.
@@ -329,8 +330,8 @@ stops active recursion. The call DAG becomes a tree.
 The depth cliff is `collect`'s `collect_depth >= options.max_depth` (256). It
 raises `error.TypeLimit`, which is reported as `constant_fuel`. Even annotated
 callees are collected inside the caller's region: a 255-deep chain of
-`func (x: U32) -> U32` functions fails, and so does an operator-free generic chain
-at 300.
+`func (x: U32) -> U32` functions fails, and so does an operator-free generic
+chain at 300.
 
 1. **Depth-free closed-call partition.**
    - In `partitionCall`/`closedCall` (about lines 4531–4580), replace the nested
@@ -582,8 +583,8 @@ links also pass. [Current qualification](zig-native/CLOUD_QUALIFICATION.md)
 records exact pins and limitations. Current-host original issue/Ink throughput
 evidence also closes task 109. Owner-approved recreated Ink callback probes
 close task 108; [the durable record](zig-native/STATIC_CAPTURE_ROWS.md) includes
-its exact pre-fix controls. The task index now has 97 complete and 13 open tasks.
-The remaining feature/performance requirements and conditional cleanup
+its exact pre-fix controls. The task index now has 97 complete and 13 open
+tasks. The remaining feature/performance requirements and conditional cleanup
 stay open. Task 082's published `codeberg.org` network addition is active in
 enforced revision 4; the pinned source is accessible and the local backend is
 built, with doctor passing. Current source has not been pushed upstream.

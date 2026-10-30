@@ -1,7 +1,7 @@
 # CT110: shared effect proofs and bounded admission work
 
 The complete compiler gate, seven final release pairs, held-out execution and
-local installation checks pass. The [work record](../COMPILER_CT110_WORK.md)
+local installation checks pass. The [work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT110_WORK.md)
 retains the diagnostic candidates, rejected experiments and limitations.
 
 ## Candidate and controls

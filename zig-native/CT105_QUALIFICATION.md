@@ -191,7 +191,7 @@ established defects and have not been used to weaken correctness gates.
 ## Disposition of the 50 audit observations
 
 Observation numbers refer to the dated audit in
-[PERFORMANCE_REVIEW.md](../PERFORMANCE_REVIEW.md). Several observations describe
+[PERFORMANCE_REVIEW.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/PERFORMANCE_REVIEW.md). Several observations describe
 costs or hypotheses rather than established implementation defects. The table
 keeps those distinctions explicit; this batch does not claim to close all 50.
 
@@ -224,7 +224,7 @@ keeps those distinctions explicit; this batch does not claim to close all 50.
 
 The first-edit frontend finding spans observations 2, 4 and 28: indexed
 correspondence removes quadratic budget exhaustion, then reaches a graph-stage
-decline. The [subsequent review](../COMPILER_REVIEW_CT105.md) clarifies that this
+decline. The [subsequent review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_REVIEW_CT105.md) clarifies that this
 does not establish a semantic mismatch. Its debugger probe rules out the graph
 size cap for the observed case, while the exact declining branch remains
 unknown. Both this decline and the four body rebuilds remain in the next

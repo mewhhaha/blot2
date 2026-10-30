@@ -4,7 +4,7 @@ The compiler uses one native project pipeline for full builds and retained
 revisions. Deno supplies the optional client, formatter and guest host; it does
 not parse, infer or stage source for compilation.
 
-The [25 October architecture review](../COMPILER_ARCHITECTURE_REVIEW.md)
+The [25 October architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_ARCHITECTURE_REVIEW.md)
 separates this implemented design from proposed changes to semantic completion,
 incremental queries and development specialization. Current measurements and
 qualification are in [CT110](CT110_QUALIFICATION.md).
@@ -293,7 +293,7 @@ CPU time. Profiled region clocks also group caller sites by stage. They make the
 remaining elaboration boundary observable. Written `result` requirements retain
 the selected invocation row through checking and lowering; inferred conversions
 keep their existing syntax. See
-[the current work record](../COMPILER_CT111_WORK.md) for coverage, measurements
+[the current work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md) for coverage, measurements
 and qualification status.
 
 ### CT112 completed selected results
@@ -309,7 +309,7 @@ This is a bounded completed-result family. It does not grant completion from
 typed views, does not drop observed negative memo facts, and does not retain
 every elaborated body. Native receipts own the additional claims; the existing
 portable schema omits nested claims and rechecks those closures after restart.
-See the [CT112 work record](../COMPILER_CT112_WORK.md) for verification and
+See the [CT112 work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT112_WORK.md) for verification and
 measurements. The generic development ABI remains a separate unfinished step.
 
 ### CT114 frontend ownership and work accounting
@@ -327,7 +327,7 @@ including candidate scans, imported schemes and normalization visits. Checker
 calls during backend inference are excluded by phase. These measurements do not
 participate in identities, admission checks or semantic decisions.
 
-The [frontend review](../COMPILER_FRONTEND_REVIEW.md) proposes direct
+The [frontend review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md) proposes direct
 instantiation from immutable producer interfaces, requirement dependency
 tracking, and fewer copies across checked/Core/frozen boundaries. Those larger
 representation changes remain unimplemented. The current changes preserve the
@@ -345,7 +345,7 @@ The refinement Context has its own 8,192-record / 8 MiB buffer budget. This
 removes measured fresh-build saturation without changing evidence admission.
 Payload and lookup-work bounds remain fixed. The failed proof-recheck trials are
 not included: missing proof provenance still prevents replay of many otherwise
-matching body queries. See [the CT113 record](../COMPILER_CT113_WORK.md) for the
+matching body queries. See [the CT113 record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT113_WORK.md) for the
 trial boundaries, memory tradeoff, measurements and qualification status.
 
 ### CT116 dependency reuse and fresh module workers

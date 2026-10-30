@@ -1466,7 +1466,7 @@ registered tests; the full gate also exercises additional owner-graph coverage.
 
 Native sources: [body cache laws](src/reuse/body_check_cache_tests.zig) and
 [inline refinement laws](src/reuse/refinement_receipt.zig). Guest files are
-under [`tests/`](tests/). Current full-gate and paired-comparison evidence will
+under [`tests/`](tests). Current full-gate and paired-comparison evidence will
 be recorded here before task 024 is marked complete. The under-100-ms general
 edit target and the zero-of-107 gdev body-cache admission observation remain
 separate performance work in tasks 102/093; closing these fixed rows does not

@@ -4,11 +4,11 @@ The complete compiler gate passes on Candidate 10. Seven final release pairs
 and held-out execution controls also pass.
 The final 200-distinct-edit memory series and local installation checks pass.
 
-The [86-proposal ledger](../COMPILER_CT109_LEDGER.md) records the outcome of
+The [86-proposal ledger](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_LEDGER.md) records the outcome of
 every proposal. All eight previously marked “Remaining” have implementations or
 measured trials. Partial and conditional architectures remain explicit; this
 is not a claim that a shared IR, unified query graph or resumable inference has
-been implemented. [The work record](../COMPILER_CT109_WORK.md) preserves each
+been implemented. [The work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT109_WORK.md) preserves each
 candidate, rejected experiment and failed qualification run.
 
 ## Candidate and comparison controls

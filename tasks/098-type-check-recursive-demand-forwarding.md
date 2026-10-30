@@ -9,7 +9,7 @@
   semantics in [compiler/guide.md](../compiler/guide.md#demand-parameters) and
   [DEMANDS.md](../zig-native/DEMANDS.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -21,8 +21,8 @@ does for any other lazy callee.
 `const recursive: ~U32 -> U32 = func ~(value: U32) => return recursive (@demand value)`
 reports `type_mismatch` over the whole declaration, with or without the
 annotation and with `func ~value`. Forwarding to another lazy function
-(`func ~(value: U32) => return twice (@demand value)`) checks. The law "recursive demand
-forwarding declines its bounded inline proof" in
+(`func ~(value: U32) => return twice (@demand value)`) checks. The law
+"recursive demand forwarding declines its bounded inline proof" in
 [demand_inline_tests.zig](../zig-native/src/backend/demand_inline_tests.zig)
 expects the recursive program to check and is skipped until this task completes;
 it never ran before its file was registered.

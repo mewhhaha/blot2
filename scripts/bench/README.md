@@ -128,8 +128,8 @@ module checks. The latter includes candidate scans, scheme imports and frontend
 normalization; `stats.frontend` alone describes the entry module. Sum every
 phase except `backend` for the whole frontend. Keep this instrumented total
 separate from unprofiled process CPU and end-to-end latency. See the
-[frontend architecture review](../../COMPILER_FRONTEND_REVIEW.md) for the CT114
-findings and remaining representation changes.
+[frontend architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
+for the CT114 findings and remaining representation changes.
 
 ## Idiomatic Blot/Rust programs
 

@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-30",
+  "workflow": "real Gdev main through tracked storage_handoff driver",
+  "compiler_build": {
+    "status": "passed",
+    "zig": "0.17.0",
+    "deno": "2.9.6",
+    "backend": "native, llvm=false",
+    "command": "ZIG_GLOBAL_CACHE_DIR=/workspace/blot2/build/zig-global-cache deno run --no-config --no-lock --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts --dev --jobs=4",
+    "executable_sha256": "d150f04dcab4118a3870421abc2806d80cab176de948bd130be45a72e863bf26",
+    "configured_identity": "ea3d8c6e9a4d9f4b5ff83715d1f2a3213cccd6120f5743b2e3eee2b8fc5d00e5"
+  },
+  "source_checkpoints": {
+    "blot2": "e2fbe95b4ece3e2d4fd442d95274bb6156815705",
+    "pen": "d1658af9c303a50d91b6bc4a879e5e9e77dd84f2",
+    "ink": "a63a693188f873b200d7c2c7f7bab1aa21b81912",
+    "gdev": "ab425424864bd17854d6f026c731c7cdf7f5ff28"
+  },
+  "main_build": {
+    "status": "failed",
+    "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
+    "diagnostic": {
+      "filename": "gdev/src/game.blot",
+      "stage": "emit",
+      "code": "storage_unsupported",
+      "start": 5521,
+      "end": 5528,
+      "message": "Source module storage validation exceeded its checked work budget",
+      "offset_encoding": "utf8_bytes",
+      "utf16": null,
+      "details": null
+    },
+    "attempt": "build/gdev-first-frame/main-9abd9a411d6dc5c4",
+    "evidence_portability": "Attempt logs are ignored local outputs; this summary is tracked."
+  },
+  "frame": "not run; main did not compile",
+  "broad_qualification": "not rerun for documentation-only changes"
+}

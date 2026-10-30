@@ -14,7 +14,7 @@
 - **Originating requirements:** PLAN: Hill 17 follow-up / first remote analyzer
   run. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -45,9 +45,11 @@ baseline.
 
 ## Validation
 
-Apply the relevant [shared validation](README.md#shared-validation) rules. Use
-formatting, link, consistency and evidence checks for documentation-only
-changes; run code gates only when code or build inputs change.
+Apply the relevant
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+rules. Use formatting, link, consistency and evidence checks for
+documentation-only changes; run code gates only when code or build inputs
+change.
 
 - Confirm the lint run covers every `zig-native/src` file plus the fixture
   module, against the exact tree that task 084 qualifies.

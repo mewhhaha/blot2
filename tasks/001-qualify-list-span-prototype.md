@@ -7,7 +7,7 @@
 - **Originating requirements:** PLAN: Earlier programs still open / Collections.
   Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -23,7 +23,7 @@ bound. Changes also include `src/backend/collection_tests.zig` and
 records a successful experimental release and corrected native
 allocation-failure test; these are prior results, not a completed qualification.
 See the exact paths and binary hashes in
-[README.md](README.md#list-span-continuation).
+[README.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#list-span-continuation).
 
 ## Implementation checklist
 
@@ -45,8 +45,8 @@ See the exact paths and binary hashes in
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Run the prototype native filter `packed List span emission`, then its
   `list_span_execution.test.ts`, packed-row/revision, cursor and collection

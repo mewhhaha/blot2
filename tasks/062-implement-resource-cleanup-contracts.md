@@ -13,7 +13,7 @@
   cleanup and separate compilation. Sources:
   [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -41,8 +41,8 @@ suspended ownership. Portable semantic interfaces come from task 020.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Record cleanup traces for normal returns, early exits, nested resource scopes,
   failed requests and suspended cancellation.
@@ -138,8 +138,9 @@ native test names and guest JUnit report is recorded in
   payloads) cannot become owners or cleanup payloads. Raw Wasm traps drain host
   journals rather than promising source-level unwinding. Forms outside the rows
   are excluded scope under the owner decision of 15 October 2026 (closed
-  acceptance above; [README owner decisions](README.md#task-index)), not open
-  work. Such forms reject or decline conservatively.
+  acceptance above;
+  [README owner decisions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
+  not open work. Such forms reject or decline conservatively.
 - Durable record:
   [row-to-law index](../zig-native/LANGUAGE_QUALIFICATION.md#row-to-law-index-17-october-2026)
   and

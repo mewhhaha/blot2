@@ -7,7 +7,7 @@
 - **Originating requirements:** reported on 11 October 2026 by the gdev session:
   16 gdev tests fail to compile. Sources: that session's report.
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -32,14 +32,14 @@ It fails with
 evidence` at
 `std/prelude.blot` 13092–13144
 (`const Array.iter = func values => return
-@array.cursor values`): the empty array leaves
-its element type unpinned, and specialization reaches the cursor without a
-representation for it. `count
-#[1]` compiles. A data type parameter left
-unpinned (`count #[#A 1]` with `type
-Box [a, b] is data = | #A a | #B b`) fails
-the same way. In gdev, fixtures that never call `app.advance`/`app.render` leave
-`System`'s `update` and `render` parameters unpinned in `run_start`'s
+@array.cursor values`): the empty
+array leaves its element type unpinned, and specialization reaches the cursor
+without a representation for it. `count
+#[1]` compiles. A data type parameter
+left unpinned (`count #[#A 1]` with `type
+Box [a, b] is data = | #A a | #B b`)
+fails the same way. In gdev, fixtures that never call `app.advance`/`app.render`
+leave `System`'s `update` and `render` parameters unpinned in `run_start`'s
 `for system in systems:`; 16 gdev tests fail. Every compiler back to `f7be6e7`
 and every gdev commit back to `8205126` fail identically. Evaluating the worlds
 as constants instead fails `app.restore` with `ambiguous_associated` at the

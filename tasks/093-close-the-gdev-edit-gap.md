@@ -11,14 +11,15 @@
   CT90 (post-rebase gate passes; see the
   [cloud qualification](../zig-native/CLOUD_QUALIFICATION.md)) reuses frozen
   modules across test-entry switches: suite CPU 96 → 73 s. Open follow-ups are
-  recorded under CT10, CT11 and CT22 in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
+  recorded under CT10, CT11 and CT22 in
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [088](088-restore-summary-job-inference-cost.md)
 - **Originating requirements:** discovered while qualifying task
   [088](088-restore-summary-job-inference-cost.md), whose outcome asked for
   retained-edit inference back at the cost before call-summary jobs; PLAN: Hill
   6 / cheap edits. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

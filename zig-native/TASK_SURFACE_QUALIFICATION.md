@@ -82,7 +82,7 @@ Both the staged and installed CLI pass an out-of-checkout check of the embedded
 guide, formatter, standard prelude and the README's task example. That example
 returns 42 in synchronous and JSPI guests. The raw native compiler also builds
 the example and produces 42. See the
-[installation commands](../README.md#build-and-use).
+[installation commands](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#build-and-use).
 
 ## Repairs during verification
 

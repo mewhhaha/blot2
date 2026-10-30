@@ -5,7 +5,7 @@ defaults to four workers for eligible fresh dependency batches; retained checks
 keep their existing cutoff path. It does not enable private evaluator semantic
 components or change the serial semantic default described below. See
 [the project API](PROJECT_CLIENT.md) and
-[CT116 work record](../COMPILER_CT116_WORK.md).
+[CT116 work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT116_WORK.md).
 
 Task 013 is qualified at source milestone `4c61f25`. The default continues to
 use serial inference; explicit `semanticWorkers` or `--semantic-workers` selects
@@ -21,7 +21,7 @@ evaluator's counters or clocks. See
 [the census contract](REFINEMENT_QUERIES.md#request-census-ct113).
 
 The
-[25 October architecture review](../COMPILER_ARCHITECTURE_REVIEW.md#development-tier-and-semantic-worker-screen)
+[25 October architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_ARCHITECTURE_REVIEW.md#development-tier-and-semantic-worker-screen)
 adds a CT110 screen with separate omitted-default and explicit-component
 controls. Four-worker body profiles retain the three principal misses; 9,718
 scheduling attempts are recording-gated and 4,405 have no worker IO context. The

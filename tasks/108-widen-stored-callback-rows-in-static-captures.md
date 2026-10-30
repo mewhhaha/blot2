@@ -7,10 +7,10 @@
   replay, with verified pre-fix failure controls on 19 October 2026.
 - **Dependencies:** None.
 - **Originating requirements:** Reported from Ink by peer session on 16 October
-  2026 (`effect_mismatch` on `func () => return ecs.checkpoint engine` with a generic
-  `engine`); owner asked for it to be finished on 17 October 2026.
+  2026 (`effect_mismatch` on `func () => return ecs.checkpoint engine` with a
+  generic `engine`); owner asked for it to be finished on 17 October 2026.
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -21,10 +21,10 @@ compiles when the checked type widened that callback's row.
 
 The evaluator rebuilt a captured static value's type from its fields in
 `ClosureRegion.addAggregate` (`zig-native/src/eval/core_eval.zig`, nominal arm).
-A stored `func () => return ()` has an exact closed pure row, which fixed the invariant
-nominal argument before the capture was unified with the checker's declared
-type, whose row lists six State operations. `openCovariant` does not descend
-into nominal arguments by design, so `captureShape` failed with
+A stored `func () => return ()` has an exact closed pure row, which fixed the
+invariant nominal argument before the capture was unified with the checker's
+declared type, whose row lists six State operations. `openCovariant` does not
+descend into nominal arguments by design, so `captureShape` failed with
 `effect_mismatch` at emission. A named curried function (`checkpointer engine`)
 or a global engine avoided the static-capture path.
 
@@ -44,17 +44,17 @@ commit.
 
 ## Acceptance criteria
 
-- [x] The owner-approved recreated Ink probes and the new law build and run; nominal
-      argument invariance laws in `zig-native/src/check/types_tests.zig` still
-      pass.
+- [x] The owner-approved recreated Ink probes and the new law build and run;
+      nominal argument invariance laws in `zig-native/src/check/types_tests.zig`
+      still pass.
 - [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Replacement decision, 19 October 2026: the original local `v0`, `v1` and
-  `v3` files did not survive and are absent from the available history. The
-  owner authorized recreated probes using the checked-out Ink ECS library:
+- Replacement decision, 19 October 2026: the original local `v0`, `v1` and `v3`
+  files did not survive and are absent from the available history. The owner
+  authorized recreated probes using the checked-out Ink ECS library:
   `one_resource`, `two_resources` and `snapshot_resource`. These are replacement
   acceptance inputs, not recovered originals. Qualification must record their
   exact source/library/compiler pins, both code generation tiers, retained edit
@@ -78,5 +78,6 @@ commit.
 - Remaining limitations: the original files were lost; the owner approved the
   replacement inputs. Scalar guest memory visibility does not measure private
   heap usage, and this typing qualification makes no heap claim.
-- Durable record: [stored callback captures](../zig-native/STATIC_CAPTURE_ROWS.md),
-  the comment at the fix site and the committed regression law.
+- Durable record:
+  [stored callback captures](../zig-native/STATIC_CAPTURE_ROWS.md), the comment
+  at the fix site and the committed regression law.

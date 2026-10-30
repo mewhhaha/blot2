@@ -196,8 +196,8 @@ regions and repeated summary/body queries outside principal replay. Keep the
 body 20% target and four/two/one-second ordinary-edit targets open. Investigate
 first-edit frontend allocation separately from later revisions. Do not multiply
 historical ratios from different intervals into a cumulative speedup claim. See
-[the compile queue](../COMPILE_HILLS.md), [build queue](../BUILD_HILLS.md) and
-[performance review](../PERFORMANCE_REVIEW.md).
+[the compile queue](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md), [build queue](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/BUILD_HILLS.md) and
+[performance review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/PERFORMANCE_REVIEW.md).
 
 ## Installation and evidence
 

@@ -10,7 +10,7 @@
 - **Originating requirements:** PLAN: Hill 7 / region arenas and allocation
   target. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -41,8 +41,8 @@ boundaries. Baseline cumulative requested allocation is 321.2 MB.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Run nested-region, immutable-input, remapping, teardown and exhaustive
   allocation-failure laws, including failure after partial preparation.

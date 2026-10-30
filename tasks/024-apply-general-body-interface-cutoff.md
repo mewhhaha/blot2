@@ -8,12 +8,13 @@
   reading `obligation_spans`. A one-byte body edit no longer rechecks the 13
   importers of `robots.blot`: the gdev body edit went 1,616 → 1,228 ms. Still
   open: the body check cache admits none of `robots.blot`'s 107 bodies. See CT26
-  in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
+  in
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** PLAN: Hill 6 / general body edits under 100 ms.
   Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -41,8 +42,8 @@ semantic dependencies from executable and staging reads.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Edit bodies with unchanged types but changed values, effect traces, demand
   control flow or lifetime summaries; executable callers must update.

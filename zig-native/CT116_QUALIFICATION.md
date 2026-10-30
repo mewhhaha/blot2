@@ -4,7 +4,7 @@ Fresh profiled frontend time falls from 1.600 to 1.036 s; checking from 1.214 to
 0.649 s. Checker allocation requests fall 51.1% and requested allocation bytes
 fall 15.7%. These are instrumented phase measurements, distinct from the
 unprofiled build timings below. See
-[the work record](../COMPILER_CT116_WORK.md).
+[the work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT116_WORK.md).
 
 ## Implementation
 
@@ -72,7 +72,7 @@ about 5.68 s in the profiled builds and dominates the whole compilation.
 
 The public eighteen-program Blot/Rust comparison measures fresh compilation and
 same-engine Wasm execution, with independent output witnesses. See the
-[README table](../README.md#idiomatic-blot-and-rust-benchmarks),
+[README table](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#idiomatic-blot-and-rust-benchmarks),
 [methodology](../benchmarks/idiomatic/README.md) and
 [raw report](../benchmarks/results/ct116-2026-10-25.json). Do not generalize the
 small-program compile times to gdev or other whole applications.

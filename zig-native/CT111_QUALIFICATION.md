@@ -6,7 +6,7 @@ foundations for inferred interfaces, retained semantic queries and shared source
 graphs. Existing inferred conversions remain valid. Completed elaborated bodies
 and the expanded development generic ABI are still unimplemented; none of the
 five recommendations is complete. See the
-[implementation record](../COMPILER_CT111_WORK.md) for exact boundaries.
+[implementation record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT111_WORK.md) for exact boundaries.
 
 CT110 remains installed. CT111 is uncommitted and has not been pushed or
 installed. Three earlier neutral/regressing screens prompted the decision to

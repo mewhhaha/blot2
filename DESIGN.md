@@ -21,10 +21,10 @@ The proposed effect declarations also use `PascalCase`.
 
 ## Functions and blocks
 
-Functions use `func pattern => return expression`. Bind them at the top level with
-`const name = func pattern => return expression` or
-`let name = func pattern => return expression`. Both forms bind ordinary function values
-and are public by default.
+Functions use `func pattern => return expression`. Bind them at the top level
+with `const name = func pattern => return expression` or
+`let name = func pattern => return expression`. Both forms bind ordinary
+function values and are public by default.
 
 ```blot
 const identity = func value => return value
@@ -76,9 +76,9 @@ such as `if` and `for` do not implicitly introduce another `do` result boundary.
 
 Consequently, a statement-bodied function needs no trailing `break ()`. This is
 already implemented for plain blocks: a final expression statement is discarded,
-not implicitly returned. Expression-bodied `func x => return expression` still returns
-its expression. An explicit non-unit return on one path and unit fallthrough on
-another is a type error; no optional/union result is invented.
+not implicitly returned. Expression-bodied `func x => return expression` still
+returns its expression. An explicit non-unit return on one path and unit
+fallthrough on another is a type error; no optional/union result is invented.
 
 `return value` exits the innermost function through ordinary nested blocks,
 conditionals, matches, and loops. A monadic continuation can run zero or many
@@ -217,8 +217,8 @@ type-valued computation and partial type applications remain future work.
 
 ### Request handlers
 
-`@computation (func () => return ...)` captures a computation without executing it. An
-enclosing `do` can handle it with a request loop:
+`@computation (func () => return ...)` captures a computation without executing
+it. An enclosing `do` can handle it with a request loop:
 
 ```blot
 type Validate is effect = { check: U32 -> U32 }
@@ -368,8 +368,8 @@ type Transform a = a -> a
 `Position` and `Vec2` are interchangeable and share associated operations.
 `EntityId` and `U32` are distinct types despite the wrapper's simple payload.
 
-Booleans use PascalCase constructors: `type Bool is data = true | false`,
-rather than separate lowercase literal spellings.
+Booleans use PascalCase constructors: `type Bool is data = true | false`, rather
+than separate lowercase literal spellings.
 
 The data model does not require a runtime tag or heap allocation for every
 constructor. A single-constructor plain record can have an inline representation
@@ -641,11 +641,12 @@ const answer = func () => return U32.mul 2 $ U32.add 1 $ 20
 `f $ g $ x` means `f (g x)`. Precedence 0 is below arithmetic, comparisons and
 default backtick fixities; ordinary application still binds tighter. Infix RHSs
 may be lambdas, `do:` blocks or `case` expressions without parentheses, e.g.
-`invoke $ func value => return value + 1`. This syntax works for source operators in
-general, not through a special application opcode. Operands remain eager and
-left-to-right, unlike Haskell's evaluation model, and callback effects propagate
-through `apply`. The standalone `break $ value` form forwards a resolver result;
-`break f $ value` gives an ordinary application result to the block.
+`invoke $ func value => return value + 1`. This syntax works for source
+operators in general, not through a special application opcode. Operands remain
+eager and left-to-right, unlike Haskell's evaluation model, and callback effects
+propagate through `apply`. The standalone `break $ value` form forwards a
+resolver result; `break f $ value` gives an ordinary application result to the
+block.
 
 The proposed `@type.of` queries the inferred static type without evaluating its
 argument or constructing a runtime type object. Its `.add` lookup selects an
@@ -704,8 +705,8 @@ This is exactly ordinary curried application, not a tuple call, implicit method
 receiver, or a wrapper function. The callee resolves like an ordinary name,
 including a local function value or parameter. Its argument types, effects,
 evaluation order, and demand modes are unchanged. In particular,
-``false `and` expensive ()`` does not force the second argument when `and` has
-a `~right` parameter. Bind possibly effectful call results with `use`, as usual.
+``false `and` expensive ()`` does not force the second argument when `and` has a
+`~right` parameter. Bind possibly effectful call results with `use`, as usual.
 
 The default fixity is left-associative precedence 80, between the showcase's
 multiplication at 70 and prefix operators at 90. Function application, field
@@ -753,8 +754,8 @@ part of the existing module-design work.
 Initially, the backticks contain a function name, not an arbitrary expression.
 Bind a composed or partially applied function first. Infix sections with an
 omitted operand are deferred; use ordinary partial application or an explicit
-`func` instead. The compiler lowering target is the same call as prefix notation,
-with no additional runtime dispatch mechanism.
+`func` instead. The compiler lowering target is the same call as prefix
+notation, with no additional runtime dispatch mechanism.
 
 ## Text interpolation
 
@@ -1051,7 +1052,8 @@ under `examples/` use the currently supported language.
 
 A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
-frontend; see the [Helix setup](README.md#helix).
+frontend; see the
+[Helix setup](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#helix).
 
 | Area                    | Current status                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -6,13 +6,14 @@
   October 2026 measurement gate. Existing receipt slices remain.
 - **19 October 2026:** the compile-time hills cut the gdev literal edit to about
   1.0 s, from 1.88 s before CT9. Results for CT9, CT12, CT14–CT17, CT22, CT27
-  and CT89 are in [COMPILE_HILLS.md](../COMPILE_HILLS.md).
+  and CT89 are in
+  [COMPILE_HILLS.md](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILE_HILLS.md).
 - **Dependencies:** [023](023-narrow-literal-edit-invalidation.md)
 - **Originating requirements:** discovered while qualifying task
   [023](023-narrow-literal-edit-invalidation.md); PLAN: Hill 6 / literal edits
   under 30 ms. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -50,7 +51,7 @@ recorded measurements.**
   ([attribution](../zig-native/RETAINED_EDIT_COST.md#attribution)). That
   workload cannot be re-measured: the frozen gdev manifest was waived on 11
   October and `build/` was removed on 15 October (see
-  [README](README.md#task-index)).
+  [README](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)).
 - On the current 93-unit captured project, an LLVM release profile of a retained
   scalar edit at `2798ff9` reports 51–53 ms of constant work and 19 ms of value
   evaluation against 545–549 ms of inference

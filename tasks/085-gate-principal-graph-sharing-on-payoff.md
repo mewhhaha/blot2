@@ -8,7 +8,7 @@
   [024](024-apply-general-body-interface-cutoff.md); PLAN: Hill 6 / cheap edits
   and Hill 7 / semantic graph sharing. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

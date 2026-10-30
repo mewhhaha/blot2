@@ -11,7 +11,7 @@
   [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md),
   [Demand evaluation](../zig-native/DEMANDS.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 

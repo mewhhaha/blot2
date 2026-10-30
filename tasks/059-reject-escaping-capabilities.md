@@ -10,7 +10,7 @@
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 4 / capability
   escape. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -38,8 +38,8 @@ evidence now need the escape rules from task 057.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Test local use and nonescaping callbacks as positive cases; return/store
   scoped closures, demands and nested aggregates as negative cases.
@@ -110,9 +110,9 @@ native test names and guest JUnit report is recorded in
 - Remaining limitations: unproved storage lifetimes remain an intentional
   rejection under the normative design. Forms outside the rows are excluded
   scope under the owner decision of 15 October 2026 (closed acceptance above;
-  [README owner decisions](README.md#task-index)), not open work. Such forms
-  reject conservatively with stable diagnostics, which also rejects some
-  authority-free values and legal storage or callback flows
+  [README owner decisions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#task-index)),
+  not open work. Such forms reject conservatively with stable diagnostics, which
+  also rejects some authority-free values and legal storage or callback flows
   ([conservative limits](../zig-native/SCOPED_EFFECTS_QUALIFICATION.md#conservative-limits);
   later sections of that record narrow the boundary).
 - Durable record:

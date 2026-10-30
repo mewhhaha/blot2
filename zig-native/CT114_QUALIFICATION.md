@@ -16,7 +16,7 @@ Type-component scratch is reused between candidates. Predicate-free schemes
 retain all their type/effect quantifiers and ordinary instantiation; only
 sharing metadata that cannot be used is omitted. The whole-project counters
 exclude checker invocations during backend inference. See
-[the work record](../COMPILER_CT114_WORK.md).
+[the work record](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_CT114_WORK.md).
 
 Zig was already the only compiler. TypeScript hosts its client, CLI, guest API,
 formatter and derive source generator. README and API documentation now make
@@ -96,7 +96,7 @@ separately; the cancelled run is not qualification. An earlier compact-candidate
 screen also precedes the final checked span conversions and is not the final
 result.
 
-The [frontend architecture review](../COMPILER_FRONTEND_REVIEW.md) proposes
+The [frontend architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md) proposes
 direct instantiation from immutable producer interfaces, requirement dependency
 tracking, and fewer copies across checked/Core/frozen boundaries. Those changes
 remain unimplemented. Lexing/parsing are already a small part of the frontend;

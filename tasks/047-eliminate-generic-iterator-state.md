@@ -9,7 +9,7 @@
 - **Originating requirements:** PLAN: Earlier programs / iterator step and
   cursor allocation. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the
-  [task order and completion rules](README.md#completion-rules).
+  [task order and completion rules](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#completion-rules).
 
 ## Outcome
 
@@ -43,8 +43,8 @@ pins pull semantics.
 Use `zig version` before each build batch (Zig 0.17.0). For compiler changes,
 run `deno task test:compiler` and `deno task lint:zig` from the repository root
 before the local milestone commit. Use the
-[shared validation](README.md#shared-validation) commands for focused
-development and the scenarios below.
+[shared validation](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/tasks/README.md#shared-validation)
+commands for focused development and the scenarios below.
 
 - Test map/filter/take/take_while/enumerate/zip/zip_strict/windows pipelines,
   especially take 0 and a right side ending first.
@@ -96,23 +96,23 @@ development and the scenarios below.
   instructions, identical game Wasm and eleven work counters, requested bytes
   +0.0029%, and fifteen-pair CPU median 0.914 against current 047. Its measured
   `Store` growth is 128 bytes. Its complete guest preflight passes 1,588 checks
-  and fails one unchanged allocation budget by 508 bytes. The smaller eight-entry
-  version adds 64 bytes and passes the focused native/OOM
-  controls and LLVM build. Its guest preflight also passes 1,588 checks and
-  fails the same budget, now by 1,488 bytes.
-  Exact allocation tracing now attributes the extra bytes to region-pool growth.
-  A model reproduces all three measured request sequences; the four-entry
-  successor adds 32 bytes and passes the focused native/OOM and size controls.
-  Both analyzers and all 1,589 LLVM guests pass for that successor. N=64 requests
-  8,497,291 bytes, exactly the model's predicted 3,060 bytes over the control
-  and below the unchanged 8,505,963 budget. Its instruction screen passes with
-  3.77% fewer simulated instructions, identical game Wasm and eleven work counters,
-  and requested build bytes +0.000715%. Its complete forced LLVM gate passes
-  2,506 native laws, 1,589 guests and 37 harness checks, with zero skips, failures,
-  leaks or logged errors. Guest files use concurrency one after a preserved
-  four-file LSP deadline failure; the 250 ms deadline and assertions are unchanged.
-  The subsequent 74-sample retained-output control fails with 16 within-binary
-  game edit/revert byte mismatches, identically before and after P1. A private
+  and fails one unchanged allocation budget by 508 bytes. The smaller
+  eight-entry version adds 64 bytes and passes the focused native/OOM controls
+  and LLVM build. Its guest preflight also passes 1,588 checks and fails the
+  same budget, now by 1,488 bytes. Exact allocation tracing now attributes the
+  extra bytes to region-pool growth. A model reproduces all three measured
+  request sequences; the four-entry successor adds 32 bytes and passes the
+  focused native/OOM and size controls. Both analyzers and all 1,589 LLVM guests
+  pass for that successor. N=64 requests 8,497,291 bytes, exactly the model's
+  predicted 3,060 bytes over the control and below the unchanged 8,505,963
+  budget. Its instruction screen passes with 3.77% fewer simulated instructions,
+  identical game Wasm and eleven work counters, and requested build bytes
+  +0.000715%. Its complete forced LLVM gate passes 2,506 native laws, 1,589
+  guests and 37 harness checks, with zero skips, failures, leaks or logged
+  errors. Guest files use concurrency one after a preserved four-file LSP
+  deadline failure; the 250 ms deadline and assertions are unchanged. The
+  subsequent 74-sample retained-output control fails with 16 within-binary game
+  edit/revert byte mismatches, identically before and after P1. A private
   control disabling only evaluated named calls restores exact last-qualified
   bytes in seven phases. Tracing proves replay omits the serializer's shared
   value/layout entry. The repair keeps direct static materializers fresh while
@@ -123,18 +123,18 @@ development and the scenarios below.
   existing positive static-closure reuse law, with zero skips, leaks or logged
   errors. The conservative fallback is unqualified; preserve the law and review
   a precise repair. The gate stops before guests; both builds and 37 harness
-  checks pass. The owner requested a pause for scope/tool-efficiency review,
-  and all three queued follow-ups are canceled. The current failure is saved
-  in `build/bench/task047-static-sharing-v2-native-failure/`. Development resumed
+  checks pass. The owner requested a pause for scope/tool-efficiency review, and
+  all three queued follow-ups are canceled. The current failure is saved in
+  `build/bench/task047-static-sharing-v2-native-failure/`. Development resumed
   using Zig's backend. The precise successor restores only graph-proved
   value/layout sharing bindings; derived capture-free closures undergo ordinary
   current specialization and complete graph comparison. Eleven affected native
   laws, second-edit/OOM, ordering and alias controls, three both-tier guests,
   both analyzers and all seven exact original game phases pass. Evidence is in
-  `build/bench/task047-static-sharing-precise-preflight/`. Final LLVM qualification
-  remains required. The preselected seven
-  identity/31 comparison CPU pairs and final runtime qualification have not
-  started. Raw retained-output failures remain in
+  `build/bench/task047-static-sharing-precise-preflight/`. Final LLVM
+  qualification remains required. The preselected seven identity/31 comparison
+  CPU pairs and final runtime qualification have not started. Raw
+  retained-output failures remain in
   `build/bench/task047-p1-four-retained-parity-failure/`.
 - Current compiler baseline: local `4fda7c2` passes 2,497 executed native laws,
   1,585 guest/client checks, 37 harness checks and both analyzers at zero. This
