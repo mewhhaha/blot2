@@ -938,5 +938,14 @@
       ]
     },
     "qualification": "incomplete; main reaches UI closure comprehension, no frame"
+  },
+  "private_append_closure_guards": {
+    "fix": "bounded complete-capture independence against the final accumulator alias set; no control/suspension relaxation",
+    "review": "Astra xhigh confirmed source admission validates full/transitive captures; existing initializer checks reject indirect wrapping",
+    "native": "3 proof laws pass, including direct/nested/record-wrapped accumulator capture negatives; complete2683 inventory compiles",
+    "executed_wasm": "2 modes pass sync/async; captured loop entry and external collection, existing live order traces",
+    "lint": "0 findings in both changed Zig files",
+    "full_gate": "attempted; registry proxy blocks locked Baba before tests",
+    "main_retry": "running; no frame yet"
   }
 }

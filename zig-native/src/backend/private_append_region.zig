@@ -197,8 +197,12 @@ const Analyzer = struct {
                 for (m.call(id).arguments) |child| if (!self.independent(child)) return false;
                 return true;
             },
-            // A closure may read an accumulator long after its construction.
-            // Decline captures and control forms rather than infer their use.
+            .closure => {
+                // Checked Core captures include transitive free variables.
+                // Test against the complete alias set after region discovery.
+                for (m.closureCaptures(id)) |capture| if (!self.step() or self.alias(capture)) return false;
+                return true;
+            },
             else => return false,
         }
     }

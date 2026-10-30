@@ -58,10 +58,16 @@ the required full gate was attempted and remains registry-proxy blocked.
 
 Actual main `main-c60946ec3aaab671` clears the input decoder and reaches Ink
 ui/tree.blot:396's siblings comprehension. Its guard's array.any closure
-captures the current entry; the private append proof currently declines all
-closures. Extend only with a bounded complete-capture independence check against
-the final accumulator alias set. No main Wasm or Pen frame has passed. Continue
-to the real frame; do not stop at another handoff.
+captures the current entry. The private append proof now checks every complete
+Core closure capture against the final accumulator alias set with bounded work;
+source admission still validates capture completeness. Direct, nested and
+record-wrapped accumulator captures remain rejected. Astra xhigh reviewed this
+extension. All three proof laws and both executed-Wasm modes pass, including a
+predicate capturing the loop entry and an external collection; existing live
+trace-order cases pass. Complete native inventory compiles and changed Zig lint
+is clean. The required full gate was attempted and remains registry blocked. The
+next normal real-main retry is running. No main Wasm or Pen frame has passed.
+Continue to the real frame; do not stop at another handoff.
 
 Implemented changes clear the preceding boundaries: record field-name indexing
 retains first right matches and every child proof; the game music-policy

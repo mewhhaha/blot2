@@ -33,6 +33,7 @@ test "private append regions preserve guarded nested and dependent generator ord
         "entry const run = func (values: Array U32) => return #[x | x <- values, @u32.lt 1 x]\n",
         "entry const run = func (values: Array U32) => return #[@u32.add x y | x <- values, y <- #[x, 1], @u32.lt 0 y]\n",
         "const scalar = func (value: U32) => return @u32.add value 1\nentry const run = func (values: Array U32) => return #[scalar x | x <- values, let y = @u32.add x 1, @u32.lt x y]\n",
+        "const accept = func predicate => return predicate 1\nentry const run = func (values: Array U32) => return #[x | x <- values, accept (func id => return @u32.eq id x)]\n",
     };
     for (sources) |source| {
         var module = try lower(source);
@@ -46,6 +47,8 @@ test "private append regions reject accumulator observations captures and public
         "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  for x in 0..count:\n    rows := @list.append rows (@list.length rows)\n  break @array.from_list rows\n",
         "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  let old = rows\n  for x in 0..count:\n    rows := @list.append rows (@list.length old)\n  break @array.from_list rows\n",
         "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  for x in 0..count:\n    let observed = func () => return @list.length rows\n    rows := @list.append rows (observed ())\n  break @array.from_list rows\n",
+        "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  let old = rows\n  for x in 0..count:\n    let observed = func () => return func () => return @list.length old\n    rows := @list.append rows (observed () ())\n  break @array.from_list rows\n",
+        "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  for x in 0..count:\n    let box = {rows}\n    let observed = func () => return @list.length box.rows\n    rows := @list.append rows (observed ())\n  break @array.from_list rows\n",
         "entry const run = func (count: U32) => return do:\n  let rows: List U32 = []\n  for x in 0..count:\n    rows := @list.append rows x\n    rows := @list.append rows 2\n  break @array.from_list rows\n",
         "entry const run = func (values: Array U32) => return [x | x <- values]\n",
     };

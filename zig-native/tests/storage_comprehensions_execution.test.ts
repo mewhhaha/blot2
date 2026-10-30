@@ -25,6 +25,10 @@ entry const nested = func () => return do:
   let left: Array U32 = #[1, 2]
   let right: Array U32 = #[3, 4]
   return #[@u32.add (@u32.mul x 10) y | x <- left, y <- right, @u32.lt y 4]
+entry const closure_guard = func () => return do:
+  let input: Array U32 = #[1, 2, 3]
+  let selected: Array U32 = #[1, 3]
+  return #[x | x <- input, array.any (func wanted => return @u32.eq x wanted and @u32.lt 0 (@array.length selected)) selected]
 entry const aggregate = func () => return do:
   let input: Array F32 = #[1.25, 2.5]
   let output = #[$Row {x, count: 1} | x <- input]
@@ -77,6 +81,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
             new Uint32Array([10, 20, 30]),
           );
           assert.deepEqual(await call("nested"), new Uint32Array([13, 23]));
+          assert.deepEqual(
+            await call("closure_guard"),
+            new Uint32Array([1, 3]),
+          );
           assert.equal(await call("aggregate"), 3.75);
           assert.deepEqual(
             await call("generic"),
