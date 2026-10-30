@@ -64,6 +64,8 @@ export const devCheckAreas = {
       "check.package_core.test.source target catalog indexes exact aliases once and publishes atomically",
       "check.package_core.test.source header absence memo preserves forwarding keys budgets and atomic failure",
       "check.package_core.test.source goal header rejection preserves epochs while failed type proofs still roll back",
+      "check.package_contracts_tests.test.principal record field indexing preserves names first matches and checked work",
+      "check.package_contracts_tests.test.principal indexed record children retain correlated witnesses and callback effects",
       "check.package_core.test.source row indexes retain high identities without granting lexical authority through allocation failure",
       "check.package_contracts_tests.test.source imported callee assumptions preserve exact producer and public arguments",
       "check.package_contracts_tests.test.source ordinary scheme lists retain exact ownership without package binder limits",

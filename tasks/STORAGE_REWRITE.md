@@ -1,11 +1,11 @@
 # Owned-storage rewrite: active task index
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
-handoff evidence. Cloud retries cleared the toolbar, bounded render and HUD
-numeric diagnostics; validation still exhausts checked work at the game render
-call, with the latest nested trace reaching station.draw_board / shake_board. No
-real Gdev main Wasm or Pen frame has passed. The earlier full compiler gate
-stopped at its protocol smoke span assertion (three passed, one failed); see
+handoff evidence. Record field-name indexing clears the exhausted render
+validation budget; main next fails on the tutorial.music_reveal callback passed
+to sounds.draw. No real Gdev main Wasm or Pen frame has passed. The earlier full
+compiler gate stopped at its protocol smoke span assertion (three passed, one
+failed); see
 [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
 ## Immediate milestone

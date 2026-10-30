@@ -2,42 +2,49 @@
 
 ## Current cloud frontier
 
-The editor settings now carry their existing Camera and Array U32 callback
-inputs, with independent effect rows. That exposed a HUD arithmetic proof gap;
-canonical platform settings and F32 layout locals clear it while preserving
-left-associated arithmetic. The latest real-main attempt,
-`main-8900154ada036b96`, still exhausts checked work at `render_world`. Its last
-nested trace reaches `station.draw_board` / `shake_board`. No main Wasm or real
-Pen frame has passed. Inspect that bounded source boundary next; keep generic
-access and real callback effects.
+Record matching now indexes field names for 17–256-field records, preserving
+first right-side matches, left traversal and every child type/effect/owner
+proof. The fixed 512-slot ordinal table allocates nothing; every probe is
+bounded and charged. This clears the actual-main validation-budget boundary.
+Attempt `main-1a7c3c830b1ca111` now fails at `game.blot:385`, the
+`tutorial.music_reveal` callback passed to `sounds.draw`, with incomplete type
+evidence. Inspect that callback contract next. No main Wasm or Pen frame has
+passed; budgets and proof rules are unchanged.
 
-The compiler memoizes only completed negative immutable prerequisite-header
-searches. `goalMatches` preserves resolution caches across failed comparisons
-only when the full store mark and unsaturated type/effect/physical clocks are
-unchanged and no OOM occurred. Mutating failures still roll back. No dictionary
-proof results are cached. All 74 package/core contract laws pass, and all 2,672
-native tests compile. A preexisting loop law now selects `scan` instead of
-sentinel body zero and retains its good/forged-backedge/restored assertions.
+All **76** package/core contract laws pass with zero failures, skips, leaks or
+logged errors, and all **2,674** native tests compile. The new laws cover record
+width thresholds, reordered/colliding/duplicate names, bounded work, missing and
+forged children, correlated witnesses, Foreign callbacks and rigid ownership.
+The 166-field regression uses 499 debits instead of the former 14,028; this is a
+specific comparison law, not an application performance measurement. Changed
+production-file Zig lint passes with zero findings.
 
-Changed-file Zig lint passes. Full qualification remains blocked before tests by
-`npm.jsr.io` HTTP403; full Zig lint has 24 findings outside the changed file.
-Registry additions are saved as a draft, not applied or published. The Blot
-formatter is also blocked by that registry. Native Pen, its compiler plugin and
-Gdev `pen codegen --check` pass.
+The dictionary-equivalence trace contains 2,963 whole-dictionary entries, 2,961
+successful exits and 89 solver lifetimes. **Zero** previous successful exits
+match a later entry under the full solver/context/state key. The 1,168 matches
+obtained by ignoring store changes justify no proof cache. Negative immutable
+header metadata and unchanged failed-comparison epochs remain the only new
+reuse; real writes/failures still roll back.
 
-Earlier tracing showed nested dictionary expansion dominates the exhausted
-budget; field grounding accounted for only 800 debits. Repeated targets alone do
-not establish identical substitutions, solver lifetimes or lexical/effect
-authority. Do not cache proof results without exact equivalence, prune
-correlated goals or raise budgets. Whole-frame render annotations increased work
-and were reverted. The unused `render_world.finish` argument is removed; the
-actual finish callback still runs later in `present`.
+Editor Settings retains its existing Camera/Array U32 callback inputs with
+independent effect rows. HUD settings/layout locals are canonical and preserve
+arithmetic order. Subsequent station, settings-leaf and generic-layer annotation
+experiments were measured and reverted. Do not reapply them or broad whole-frame
+render annotations. The unused render_world.finish argument is removed; actual
+finish still runs later in present.
+
+Full qualification remains blocked before tests by the locked Baba registry
+proxy tunnel; full Zig lint previously had 24 findings outside the changed
+production file. Registry additions are saved as a draft, not applied or
+published. The Blot formatter is also blocked. Native Pen/plugin builds and Gdev
+pen codegen --check pass. Purchase-feedback fixture imports/constructor identity
+are repaired, but its existing shared helper still fails type checking; no
+fixture assertions were removed.
 
 The
 [cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
-and compressed diagnostic trace retain the earlier measurements. Temporary
-proof-attribution instrumentation was restored exactly; normal failure
-diagnostics remain as described below.
+and compressed traces preserve the measurements. Temporary diagnostic compiler
+sources were restored exactly; normal failure diagnostics remain below.
 
 ## Immediate next step
 

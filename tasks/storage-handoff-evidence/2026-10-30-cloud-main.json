@@ -10,24 +10,18 @@
     "executable_sha256": "d150f04dcab4118a3870421abc2806d80cab176de948bd130be45a72e863bf26",
     "configured_identity": "ea3d8c6e9a4d9f4b5ff83715d1f2a3213cccd6120f5743b2e3eee2b8fc5d00e5"
   },
-  "source_checkpoints": {
-    "blot2": "e2fbe95b4ece3e2d4fd442d95274bb6156815705",
-    "pen": "d1658af9c303a50d91b6bc4a879e5e9e77dd84f2",
-    "ink": "a63a693188f873b200d7c2c7f7bab1aa21b81912",
-    "gdev": "ab425424864bd17854d6f026c731c7cdf7f5ff28"
-  },
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-8900154ada036b96",
-    "configured_identity": "7b21ec0c66c4aef28723b22b7105c76d6d55f43e1c5bd13563b8b24e15b0f40e",
+    "attempt": "build/gdev-first-frame/main-1a7c3c830b1ca111",
+    "configured_identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
     "diagnostic": {
       "filename": "gdev/src/game.blot",
       "stage": "emit",
       "code": "storage_unsupported",
-      "start": 20219,
-      "end": 20259,
-      "message": "Source module storage validation exceeded its checked work budget",
+      "start": 20276,
+      "end": 20297,
+      "message": "The scoped body lacks complete type evidence",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -35,7 +29,7 @@
     "evidence_portability": "Attempt logs are ignored local outputs; this summary is tracked."
   },
   "frame": "not run; main did not compile",
-  "broad_qualification": "not rerun for documentation-only changes",
+  "broad_qualification": "incomplete: full compiler gate attempted but blocked before tests by locked Baba registry proxy tunnel; affected 76 native laws pass",
   "toolbar_integration": {
     "change": "Use existing per-label part/span API for 46 toolbar words; preserve field order, generated payload and checked budgets.",
     "source_sha256": "a142e2df9387c7cc980fda5a9476da27b03fb3c65f27b585f778a9d8e89799f6",
@@ -148,14 +142,14 @@
         }
       }
     ],
-    "current_frontier": "game.blot:384 render_world editing access presentation; checked module-validation budget exhausted.",
     "tooling": {
       "plugin_build": "passed: cargo build --locked --release --target wasm32-wasip2 -j 1",
       "native_build": "passed: cargo build --locked --release -p pen -j 4; pinned Rust 1.99.0, workspace-local signed Debian prerequisites",
       "blot_formatter": "unrun: locked Baba tarball host npm.jsr.io returns proxy HTTP 403",
       "codegen_check": "passed: pen codegen --check --project /workspace/gdev",
       "pen_version": "0.1.0, wasmtime 49.0.3, pen:plugin@0.2.0"
-    }
+    },
+    "frontier_at_that_checkpoint": "game.blot:384 render_world editing access presentation; checked module-validation budget exhausted."
   },
   "unused_render_argument": {
     "change": "Removed only unused render_world.finish parameter and its argument; actual finish invocation in present retained.",
@@ -402,5 +396,248 @@
     ],
     "validation": "pen test-blot tests/purchase_feedback.blot still does not compile: test_support/shop.blot:160:97 type_mismatch; same failure with station/settings source experiments reverted. Zero checks executed.",
     "qualification": "incomplete; no assertions removed"
+  },
+  "dictionary_equivalence_trace": {
+    "attempt": "main-ae63b7ac684fad70",
+    "entry_count": 2963,
+    "successful_exits": 2961,
+    "solver_lifetimes": 89,
+    "exit_to_later_entry_matches": {
+      "target_solver": 1937,
+      "target_only": 2610,
+      "without_store_state": 1168,
+      "strict": 0
+    },
+    "strict_examples": [],
+    "without_store_state_examples": [
+      {
+        "entry": "38",
+        "prior_exit": "37",
+        "producer": "113:146",
+        "cost": 1210
+      },
+      {
+        "entry": "39",
+        "prior_exit": "36",
+        "producer": "113:120",
+        "cost": 9565
+      },
+      {
+        "entry": "40",
+        "prior_exit": "38",
+        "producer": "113:146",
+        "cost": 1210
+      },
+      {
+        "entry": "41",
+        "prior_exit": "40",
+        "producer": "113:146",
+        "cost": 1210
+      },
+      {
+        "entry": "42",
+        "prior_exit": "35",
+        "producer": "113:146",
+        "cost": 1210
+      },
+      {
+        "entry": "51",
+        "prior_exit": "49",
+        "producer": "80:19",
+        "cost": 1332
+      },
+      {
+        "entry": "60",
+        "prior_exit": "27",
+        "producer": "113:2",
+        "cost": 1210
+      },
+      {
+        "entry": "71",
+        "prior_exit": "68",
+        "producer": "107:28",
+        "cost": 1077
+      },
+      {
+        "entry": "77",
+        "prior_exit": "74",
+        "producer": "107:28",
+        "cost": 1077
+      },
+      {
+        "entry": "78",
+        "prior_exit": "75",
+        "producer": "161:3",
+        "cost": 1343
+      },
+      {
+        "entry": "99",
+        "prior_exit": "93",
+        "producer": "113:2",
+        "cost": 1211
+      },
+      {
+        "entry": "104",
+        "prior_exit": "102",
+        "producer": "87:15",
+        "cost": 1279
+      }
+    ],
+    "highest_successful_inclusive_costs": [
+      {
+        "producer_name": "107:78:key_action",
+        "count": 3,
+        "inclusive_sum": 2613413,
+        "max_cost": 871199
+      },
+      {
+        "producer_name": "185:130:set_open",
+        "count": 15,
+        "inclusive_sum": 1875068,
+        "max_cost": 125044
+      },
+      {
+        "producer_name": "107:118:invoke_shortcut",
+        "count": 2,
+        "inclusive_sum": 1749834,
+        "max_cost": 874917
+      },
+      {
+        "producer_name": "107:11:store_brush",
+        "count": 45,
+        "inclusive_sum": 1508537,
+        "max_cost": 33613
+      },
+      {
+        "producer_name": "106:14:obstacles",
+        "count": 28,
+        "inclusive_sum": 1456294,
+        "max_cost": 52016
+      },
+      {
+        "producer_name": "107:37:set_brush",
+        "count": 38,
+        "inclusive_sum": 1418578,
+        "max_cost": 37331
+      },
+      {
+        "producer_name": "185:134:activate",
+        "count": 2,
+        "inclusive_sum": 1188126,
+        "max_cost": 594063
+      },
+      {
+        "producer_name": "106:13:ground_versioned",
+        "count": 28,
+        "inclusive_sum": 1108632,
+        "max_cost": 39598
+      },
+      {
+        "producer_name": "7:9:map",
+        "count": 60,
+        "inclusive_sum": 988028,
+        "max_cost": 16469
+      },
+      {
+        "producer_name": "107:67:nudge",
+        "count": 18,
+        "inclusive_sum": 948456,
+        "max_cost": 52692
+      },
+      {
+        "producer_name": "260:1:begin",
+        "count": 4,
+        "inclusive_sum": 911540,
+        "max_cost": 227885
+      },
+      {
+        "producer_name": "106:20:brick_obstacles",
+        "count": 14,
+        "inclusive_sum": 899360,
+        "max_cost": 64247
+      }
+    ],
+    "status": "diagnostic only; no proof results cached",
+    "configured_identity": "29ed29030418af1662d2f8bd30af0e0eefc2c69bd357c92714cfdd4a8c2c8387",
+    "normal_source_restored_exactly": true,
+    "trace": "tasks/storage-handoff-evidence/2026-10-30-dictionary-equivalence.log.gz",
+    "trace_uncompressed_sha256": "762cf2617e5848c93aca11d13e6bfedef7f86bd5dc5576517bcbf0234b5bdfe2",
+    "strict_key": [
+      "canonical producer",
+      "monotonic solver lifetime and scope",
+      "budget owner",
+      "depth and goal depth",
+      "type/effect/physical clocks, cursor and next rigid nonce",
+      "full store mark",
+      "ordered raw/head public arguments with semantic node fields and row carriers",
+      "lexical context, canonical row/instance Facts and immutable catalogs",
+      "recursive admission and owner/control chains"
+    ],
+    "ineligible": [
+      "failed exit",
+      "opaque projection resolver",
+      "truncated owner chain",
+      "OOM",
+      "projection exhausted",
+      "saturated clocks"
+    ],
+    "interpretation": "No strict previous successful EXIT matches a later ENTRY. Ignoring store changes produces1168 candidates but establishes no reusable proof authority. Hashes are diagnostic candidate screens only."
+  },
+  "generic_layer_experiment": {
+    "attempt": "main-c16bcab27c144dd4",
+    "annotation": "Generic exact callback access receiver with Presentation/FrameAccess and independent final effects; render presentation only.",
+    "result": "same budget failure, no observable advancement; reverted"
+  },
+  "initial_source_checkpoints": {
+    "blot2": "e2fbe95b4ece3e2d4fd442d95274bb6156815705",
+    "pen": "d1658af9c303a50d91b6bc4a879e5e9e77dd84f2",
+    "ink": "a63a693188f873b200d7c2c7f7bab1aa21b81912",
+    "gdev": "ab425424864bd17854d6f026c731c7cdf7f5ff28"
+  },
+  "record_field_index": {
+    "change": "Index right-side field NAMES using fixed512 u16 slots for17..256fields; preserve first occurrence and all child proofs in original left order; bound and debit every probe. No allocation or dictionary proof cache.",
+    "regression_166_field_work": {
+      "before": 14028,
+      "after": 499,
+      "scope": "single comparison law; no application speedup claimed"
+    },
+    "native_inventory": 2674,
+    "contract_family": {
+      "selected": 76,
+      "passed": 76,
+      "failed": 0,
+      "skipped": 0,
+      "leaks": 0,
+      "logged_errors": 0
+    },
+    "native_test_executable_sha256": "d991aa9aefd80e1457d5bb0e14e8cb61a555d73b92bd41a659ad347005d18ae6",
+    "compiler_sha256": "2b4efa507848137b2f72db0d2cec59ff239ef27e31b68e471ee8f28c6b3a15bd",
+    "configured_identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
+    "source_checkpoints": {
+      "gdev": "f9a6945f6b5ace1672ed8b18c25f5925a8f5464a",
+      "ink": "a86fa59dfdef07b72cbeff723e71d00fa1338045",
+      "pen": "c4d853c622b7c3d28a9348b0121b43c9e15b1ea7"
+    },
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-1a7c3c830b1ca111",
+      "identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/game.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 20276,
+          "end": 20297,
+          "message": "The scoped body lacks complete type evidence",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "changed_production_file_lint": "passed: zero findings in package_contracts.zig",
+    "full_gate": "attempted; blocked before tests caching locked @jsr/mewhhaha__baba9.0.1 from npm.jsr.io: unsuccessful proxy tunnel",
+    "qualification": "incomplete; no Wasm or frame"
   }
 }

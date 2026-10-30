@@ -1214,6 +1214,53 @@ pub const Principal = struct {
         self.pending[self.pending_count] = right;
         self.pending_count += 1;
     }
+    /// Index names only. Every selected child still passes ordinary matching in
+    /// left-field order, including row witnesses and lexical owner checks.
+    fn matchIndexedRecord(self: *Principal, a: T.Node, b: T.Node, depth: usize) Error!bool {
+        if (b.b <= 16 or b.b > 256) return false;
+        // Ordinal + 1 leaves zero empty, including for a field named zero.
+        // Keep ordinals rather than pointers: matching can grow solver storage.
+        var slots: [512]u16 = @splat(0);
+        for (0..b.b) |ordinal| {
+            const field = self.right.recordField(b, ordinal);
+            var slot: usize = @intCast((field.name *% 0x9e3779b1) >> 23);
+            var inserted = false;
+            for (0..slots.len) |_| {
+                try require(self.remaining.* != 0);
+                self.remaining.* -= 1;
+                const prior = slots[slot];
+                if (prior == 0) {
+                    slots[slot] = @intCast(ordinal + 1);
+                    inserted = true;
+                    break;
+                }
+                if (self.right.recordField(b, @as(usize, prior) - 1).name == field.name) {
+                    inserted = true; // Preserve the first right-side match.
+                    break;
+                }
+                slot = (slot + 1) & (slots.len - 1);
+            }
+            try require(inserted);
+        }
+        for (0..a.b) |ordinal| {
+            const field = self.left.recordField(a, ordinal);
+            var slot: usize = @intCast((field.name *% 0x9e3779b1) >> 23);
+            const selected = found: {
+                for (0..slots.len) |_| {
+                    try require(self.remaining.* != 0);
+                    self.remaining.* -= 1;
+                    const entry = slots[slot];
+                    try require(entry != 0);
+                    const candidate = self.right.recordField(b, @as(usize, entry) - 1);
+                    if (candidate.name == field.name) break :found candidate.ty;
+                    slot = (slot + 1) & (slots.len - 1);
+                }
+                return error.InvalidArtifact;
+            };
+            try self.match(field.ty, selected, depth + 1);
+        }
+        return true;
+    }
     fn match(self: *Principal, left: T.Id, right: T.Id, depth: usize) Error!void {
         if (depth >= 128 or self.remaining.* == 0) {
             self.remaining.* = 0;
@@ -1361,6 +1408,7 @@ pub const Principal = struct {
                 try require(a.b == b.b and a.b <= 0x7fff_ffff);
                 _ = try span(self.left, .{ .start = a.a, .len = a.b * 2 });
                 _ = try span(self.right, .{ .start = b.a, .len = b.b * 2 });
+                if (try self.matchIndexedRecord(a, b, depth)) return;
                 for (0..a.b) |index| {
                     const field = self.left.recordField(a, index);
                     var found = false;

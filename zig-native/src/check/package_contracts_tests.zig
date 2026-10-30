@@ -2998,6 +2998,21 @@ test "source instance ownership survives solver copying without thawing types or
     var proof: contracts.Principal = .{ .left = &solver.graph, .right = &solver.graph, .remaining = &remaining, .views = &inquiry };
     try proof.validate(owned_row, owned_row);
     try std.testing.expectError(error.InvalidArtifact, proof.validate(8, 10));
+    var fields: [17]T.Field = undefined;
+    for (&fields, 0..) |*field, index| field.* = .{ .name = @intCast(index), .ty = 6 };
+    const valid_record = try solver.store.record(&fields);
+    fields[16].ty = 7;
+    const forged_record = try solver.store.record(&fields);
+    solver.refresh();
+    remaining = 65_536;
+    proof = .{ .left = &solver.graph, .right = &solver.graph, .remaining = &remaining, .views = &inquiry };
+    try proof.validate(valid_record, valid_record);
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(valid_record, forged_record));
+    remaining = 65_536;
+    proof = .{ .left = &solver.graph, .right = &solver.graph, .remaining = &remaining };
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(valid_record, valid_record));
+    remaining = 65_536;
+    proof = .{ .left = &solver.graph, .right = &solver.graph, .remaining = &remaining, .views = &inquiry };
     try std.testing.expectError(error.InvalidArtifact, proof.validate(10, 8));
     try std.testing.expectError(error.InvalidArtifact, solver.unify(6, T.f32_type));
     try std.testing.expect(!inquiry.pure_rows.contains(1) and !inquiry.closed_rows.contains(1));
@@ -3080,4 +3095,119 @@ fn mergeSelectionScenario(allocator: std.mem.Allocator) !void {
 }
 test "record merge selection identity does not admit unknown callback rows or forged fields" {
     try mergeSelectionScenario(std.testing.allocator);
+}
+
+fn recordProofTypes(store: *const T.Store) core.Types {
+    return .{ .nodes = store.nodes.items, .extra = store.extra.items, .effects = .{ .rows = store.effects.rows.items, .labels = store.effects.labels.items, .variable_count = @intCast(store.effects.variables.items.len) }, .operations = store.operations.items };
+}
+
+test "principal record field indexing preserves names first matches and checked work" {
+    var store = try T.Store.init(std.testing.allocator);
+    defer store.deinit();
+    var left_fields: [257]T.Field = undefined;
+    var right_fields: [257]T.Field = undefined;
+    for ([_]usize{ 16, 17, 166, 256, 257 }) |width| {
+        for (left_fields[0..width], 0..) |*field, index| field.* = .{ .name = @intCast(index), .ty = if (index % 2 == 0) T.u32_type else T.f32_type };
+        left_fields[width - 1].name = std.math.maxInt(u32);
+        for (left_fields[0..width], 0..) |field, index| right_fields[width - 1 - index] = field;
+        const left = try store.record(left_fields[0..width]);
+        const right = try store.record(right_fields[0..width]);
+        var graph = recordProofTypes(&store);
+        var remaining: usize = if (width <= 256) 2000 else 100_000;
+        var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+        try proof.validate(left, right);
+        if (width == 166) {
+            // The real frame-view width must fit without quadratic name scans.
+            try std.testing.expect(remaining > 1000);
+            for ([_]usize{ 1, 168 }) |allowance| {
+                remaining = allowance;
+                proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+                try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+                try std.testing.expectEqual(@as(usize, 0), remaining);
+            }
+        }
+        // Even the last left-side child is proved, and a missing name rejects.
+        const node = graph.node(right);
+        const saved_type = store.extra.items[node.a + 1];
+        store.extra.items[node.a + 1] = T.boolean;
+        graph = recordProofTypes(&store);
+        remaining = 100_000;
+        proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+        try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+        store.extra.items[node.a + 1] = saved_type;
+        const saved_name = store.extra.items[node.a];
+        store.extra.items[node.a] = 0x7fff_ffff;
+        graph = recordProofTypes(&store);
+        remaining = 100_000;
+        proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+        try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+        store.extra.items[node.a] = saved_name;
+    }
+    // Distinct names deliberately collide, including a zero name. Reordering
+    // and duplicate right names must retain the reference walk's first match.
+    var candidate: u32 = 0;
+    var count: usize = 0;
+    while (count < 17) : (candidate += 1) {
+        if ((candidate *% 0x9e3779b1) >> 23 != 0) continue;
+        left_fields[count] = .{ .name = candidate, .ty = T.u32_type };
+        count += 1;
+    }
+    for (left_fields[0..17], 0..) |field, index| right_fields[16 - index] = field;
+    left_fields[16] = left_fields[0];
+    right_fields[0] = left_fields[0];
+    right_fields[16] = .{ .name = left_fields[0].name, .ty = T.boolean };
+    const left = try store.record(left_fields[0..17]);
+    const right = try store.record(right_fields[0..17]);
+    var graph = recordProofTypes(&store);
+    var remaining: usize = 10_000;
+    var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+    try proof.validate(left, right);
+    const record = graph.node(right);
+    std.mem.swap(T.Id, &store.extra.items[record.a + 1], &store.extra.items[record.a + 16 * 2 + 1]);
+    graph = recordProofTypes(&store);
+    remaining = 10_000;
+    proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+}
+
+test "principal indexed record children retain correlated witnesses and callback effects" {
+    var store = try T.Store.init(std.testing.allocator);
+    defer store.deinit();
+    const variable = try store.fresh();
+    const variables = try store.saveList(&.{variable});
+    const foreign_row = try store.effects.row(&.{T.foreign_operation}, .closed);
+    const pure_callback = try store.function(T.u32_type, T.unit);
+    const foreign_callback = try store.functionWithEffects(T.u32_type, T.unit, foreign_row);
+    var left_fields: [17]T.Field = undefined;
+    var right_fields: [17]T.Field = undefined;
+    for (&left_fields, &right_fields, 0..) |*left, *right, index| {
+        left.* = .{ .name = @intCast(index), .ty = if (index == 0 or index == 16) variable else T.u32_type };
+        right.* = .{ .name = @intCast(index), .ty = T.u32_type };
+    }
+    const left = try store.record(&left_fields);
+    const right = try store.record(&right_fields);
+    var graph = recordProofTypes(&store);
+    var remaining: usize = 10_000;
+    var proof: contracts.Principal = .{ .left = &graph, .right = &graph, .remaining = &remaining, .instance = variables };
+    try proof.validate(left, right);
+    try std.testing.expectEqual(T.u32_type, proof.witnesses[0]);
+    const record = graph.node(right);
+    store.extra.items[record.a + 16 * 2 + 1] = T.f32_type;
+    graph = recordProofTypes(&store);
+    remaining = 10_000;
+    proof = .{ .left = &graph, .right = &graph, .remaining = &remaining, .instance = variables };
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+    const expected_record = graph.node(left);
+    store.extra.items[expected_record.a + 1] = T.u32_type;
+    store.extra.items[expected_record.a + 16 * 2 + 1] = pure_callback;
+    store.extra.items[record.a + 16 * 2 + 1] = foreign_callback;
+    graph = recordProofTypes(&store);
+    remaining = 10_000;
+    proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+    try std.testing.expectError(error.InvalidArtifact, proof.validate(left, right));
+    store.extra.items[record.a + 16 * 2 + 1] = pure_callback;
+    graph = recordProofTypes(&store);
+    remaining = 10_000;
+    proof = .{ .left = &graph, .right = &graph, .remaining = &remaining };
+    try proof.validate(left, right);
 }
