@@ -12,6 +12,7 @@ const Code = @import("runtime_code.zig").Code;
 const Local = @import("runtime_code.zig").Local;
 const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
+const selected_types = @import("storage_type_key.zig");
 const storage_plan = @import("storage_plan.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const source_proof = @import("../check/package_core.zig");
@@ -1898,10 +1899,13 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         try evidence.append(self.allocator, result_type);
         var type_work: usize = 4096;
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
         for (m.bodyParameters(body), arguments) |parameter, arg| {
             try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(arg.floating) });
-            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_work, 0);
+            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         }
+        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const parameter_count = std.math.add(usize, arguments.len, if (owned_result) 3 else 0) catch return self.unsupported(m, body.root);
@@ -2028,8 +2032,11 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32), result_type });
         var type_work: usize = 4096;
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_work, 0);
-        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_work, 0);
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
+        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
+        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
@@ -2132,7 +2139,8 @@ const Generator = struct {
             },
         }
     }
-    fn readerLayoutEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), remaining: *usize) Error!void {
+    fn readerLayoutEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
+        const remaining = keys.remaining;
         if (remaining.* == 0 or value.name.len >= remaining.*) return self.fail(m, id, .storage_unsupported, "The static callback capture schema exceeds its supported bound");
         remaining.* -= 1;
         try evidence.appendSlice(self.allocator, &.{ @backingInt(value.tag), @backingInt(value.mode), @intFromBool(value.sequence), @intFromBool(value.floating), @intCast(value.fields.len), @intCast(value.variant_tags.len), @intCast(value.name.len), if (value.variant_index) |selected| @intCast(selected) else std.math.maxInt(u32) });
@@ -2143,17 +2151,17 @@ const Generator = struct {
         if (value.nominal) |identity| try evidence.appendSlice(self.allocator, &.{ 1, identity.unit, identity.decl }) else try evidence.append(self.allocator, 0);
         if (value.type_evidence) |known| {
             try evidence.append(self.allocator, 1);
-            try self.selectedType(m, id, .{ .unit = known.root.unit, .ty = known.root.ty, .environment = known.arguments }, evidence, remaining, 0);
+            try self.selectedType(m, id, .{ .unit = known.root.unit, .ty = known.root.ty, .environment = known.arguments }, evidence, keys, 0);
         } else try evidence.append(self.allocator, 0);
         if (value.callable) |callable| {
             try evidence.appendSlice(self.allocator, &.{ callable.unit, callable.target, callable.node });
             const owner = try self.unit(callable.unit);
-            for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty, .environment = callable.types }, evidence, remaining, 0);
+            for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty, .environment = callable.types }, evidence, keys, 0);
         }
         try evidence.appendSlice(self.allocator, value.variant_tags);
         try evidence.append(self.allocator, @intCast(value.variant_possible.len));
         for (value.variant_possible) |possible| try evidence.append(self.allocator, @intFromBool(possible));
-        for (value.fields) |field| try self.readerLayoutEvidence(m, id, field, evidence, remaining);
+        for (value.fields) |field| try self.readerLayoutEvidence(m, id, field, evidence, keys);
     }
     fn readerReads(self: *Generator, value: Value) Error!void {
         if (value.tag == .aggregate or value.tag == .callable) {
@@ -2382,9 +2390,12 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 1, result_type });
         var type_work: usize = 4096;
-        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_work);
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_work, 0);
-        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_work, 0);
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_key);
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
+        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
+        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
@@ -2524,8 +2535,10 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 2, @intCast(owners.items.len) });
         var type_work: usize = 4096;
-        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_work);
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_work, 0);
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_key);
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         for (descriptors.items) |value| {
             try evidence.appendSlice(self.allocator, &.{ @intCast(try writerOrdinal(owners.items, value.root.?)), @intCast(value.other_roots.len) });
             for (value.other_roots) |other| try evidence.append(self.allocator, @intCast(try writerOrdinal(owners.items, other)));
@@ -2533,8 +2546,9 @@ const Generator = struct {
         for (owners.items) |owner_id| {
             const owner = self.roots.items[owner_id];
             try evidence.appendSlice(self.allocator, &.{ @intFromBool(owner.frozen), @intFromBool(owner.element_initialized) });
-            try self.readerLayoutEvidence(m, body.root, owner.element, &evidence, &type_work);
+            try self.readerLayoutEvidence(m, body.root, owner.element, &evidence, &type_key);
         }
+        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const function = self.module.addTypedFunction(&.{.i32}, .i32, .scalar) catch |err| switch (err) {
@@ -2656,51 +2670,83 @@ const Generator = struct {
             try self.selectedCallbacks(m, id, value, &path, selection, &remaining, 0);
         };
     }
-    fn selectedType(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, selection: *std.ArrayList(u32), remaining: *usize, depth: usize) Error!void {
-        if (remaining.* == 0 or depth > 128) return self.fail(m, id, .storage_unsupported, "The selected call type exceeds the supported bound");
-        remaining.* -= 1;
+    fn selectedType(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, selection: *std.ArrayList(u32), keys: *selected_types.Builder, depth: usize) Error!void {
+        const result = self.selectedTypeNode(m, id, input, keys, depth) catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Declined => error.Declined,
+            error.Cycle => self.fail(m, id, .storage_unsupported, "Cyclic selected call types cannot form a structural key"),
+            error.Limit => self.fail(m, id, .storage_unsupported, "The selected call type exceeds the supported bound"),
+        };
+        keys.root(selection, result) catch |err| return self.selectedKeyError(m, id, err);
+    }
+    fn selectedKeyError(self: *Generator, m: *const core.Module, id: core.Id, err: selected_types.Error) Error {
+        return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Cycle => self.fail(m, id, .storage_unsupported, "Cyclic selected call types cannot form a structural key"),
+            error.Limit => self.fail(m, id, .storage_unsupported, "The selected call key exceeds its encoded-word or construction-work bound"),
+        };
+    }
+    fn finishSelectedTypes(self: *Generator, m: *const core.Module, id: core.Id, selection: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
+        keys.finish(selection) catch |err| return self.selectedKeyError(m, id, err);
+    }
+    fn selectedTypeChild(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, descriptor: *std.ArrayList(u32), keys: *selected_types.Builder, depth: usize, height: *usize) (Error || selected_types.Error)!void {
+        const child = try self.selectedTypeNode(m, id, input, keys, depth + 1);
+        try keys.addWord(descriptor, child.id);
+        height.* = @max(height.*, child.height + 1);
+    }
+    fn selectedTypeNode(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, keys: *selected_types.Builder, depth: usize) (Error || selected_types.Error)!selected_types.Result {
+        if (keys.remaining.* == 0 or depth > 128) return error.Limit;
         const actual = try self.resolveType(input, 0);
+        const reference: selected_types.Reference = .{
+            .unit = actual.unit,
+            .ty = actual.ty,
+            .environment = if (actual.environment) |environment| @intFromPtr(environment.ptr) else 0,
+            .environment_len = if (actual.environment) |environment| environment.len else 0,
+            .captured = actual.environment != null,
+        };
+        if (try keys.enter(reference, depth)) |completed| return completed;
         const owner = try self.unit(actual.unit);
         const node = owner.types.node(actual.ty);
-        try selection.append(self.allocator, @backingInt(node.tag));
+        var descriptor: std.ArrayList(u32) = .empty;
+        defer descriptor.deinit(self.allocator);
+        var height: usize = 0;
+        try keys.addWord(&descriptor, @backingInt(node.tag));
         switch (node.tag) {
-            .array, .list, .cursor, .demand, .resolver, .provider => try self.selectedType(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, selection, remaining, depth + 1),
+            .array, .list, .cursor, .demand, .resolver, .provider => try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height),
             .usage => {
-                try selection.append(self.allocator, node.b);
-                try self.selectedType(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, selection, remaining, depth + 1);
-                try selection.append(self.allocator, @intFromBool(node.c != 0));
-                if (node.c != 0) try self.selectedType(m, id, .{ .unit = actual.unit, .ty = node.c, .environment = actual.environment }, selection, remaining, depth + 1);
+                try keys.addWord(&descriptor, node.b);
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                try keys.addWord(&descriptor, @intFromBool(node.c != 0));
+                if (node.c != 0) try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.c, .environment = actual.environment }, &descriptor, keys, depth, &height);
             },
             .function => {
-                try self.selectedType(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, selection, remaining, depth + 1);
-                try self.selectedType(m, id, .{ .unit = actual.unit, .ty = node.b, .environment = actual.environment }, selection, remaining, depth + 1);
-                // Uninstantiated effect carriers keep their exact checked
-                // source identity. They are not a snapshot of caller history.
-                try selection.appendSlice(self.allocator, &.{ if (node.c == 0) 0 else actual.unit, node.c });
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.b, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                // Retain the existing exact checked row-carrier identity.
+                try keys.addWords(&descriptor, &.{ if (node.c == 0) 0 else actual.unit, node.c });
             },
             .product, .nominal => {
-                if (node.tag == .nominal) try selection.appendSlice(self.allocator, &.{ node.a, node.b });
+                if (node.tag == .nominal) try keys.addWords(&descriptor, &.{ node.a, node.b });
                 const children = if (node.tag == .product) owner.types.list(.{ .start = node.a, .len = node.b }) else owner.types.nominalArguments(node);
-                try selection.append(self.allocator, @intCast(children.len));
-                for (children) |child| try self.selectedType(m, id, .{ .unit = actual.unit, .ty = child, .environment = actual.environment }, selection, remaining, depth + 1);
+                try keys.addWord(&descriptor, @intCast(children.len));
+                for (children) |child| try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = child, .environment = actual.environment }, &descriptor, keys, depth, &height);
             },
             .record => {
-                try selection.append(self.allocator, node.b);
+                try keys.addWord(&descriptor, node.b);
                 for (0..node.b) |index| {
                     const field = owner.types.recordField(node, index);
                     if (owner.fieldSpelling(field.name)) |name| {
-                        try selection.append(self.allocator, @intCast(name.len));
-                        for (name) |byte| try selection.append(self.allocator, byte);
-                    } else try selection.appendSlice(self.allocator, &.{ std.math.maxInt(u32), actual.unit, field.name });
-                    try self.selectedType(m, id, .{ .unit = actual.unit, .ty = field.ty, .environment = actual.environment }, selection, remaining, depth + 1);
+                        try keys.addWord(&descriptor, @intCast(name.len));
+                        for (name) |byte| try keys.addWord(&descriptor, byte);
+                    } else try keys.addWords(&descriptor, &.{ std.math.maxInt(u32), actual.unit, field.name });
+                    try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = field.ty, .environment = actual.environment }, &descriptor, keys, depth, &height);
                 }
             },
             .unit, .boolean, .u32, .f32, .never => {},
-            // Abstract return binders can occur when a saturated factory
-            // returns a still-unapplied known callback. Keep their source role;
-            // they do not choose an associated implementation or create ABI.
-            else => try selection.appendSlice(self.allocator, &.{ actual.unit, actual.ty }),
+            // Abstract roles keep their source identity and correlation.
+            else => try keys.addWords(&descriptor, &.{ actual.unit, actual.ty }),
         }
+        return keys.complete(reference, descriptor.items, height);
     }
     fn invoke(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
         const m = try self.unit(target.unit);
@@ -2749,7 +2795,10 @@ const Generator = struct {
         const public = m.types.list(m.binding(target.binding).public_variables);
         try selected.appendSlice(self.allocator, &.{ std.math.maxInt(u32), @intCast(public.len) });
         var type_work: usize = 4096;
-        for (public) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter }, &selected, &type_work, 0);
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (public) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter }, &selected, &type_key, 0);
+        try self.finishSelectedTypes(m, body.root, &selected, &type_key);
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
         if (self.specialize) if (try self.reusableCall(m, target, arguments)) |value| return value;
@@ -2813,13 +2862,16 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         try evidence.appendSlice(self.allocator, &.{ callable.node, result_type, @intFromBool(argument.floating) });
         var type_work: usize = 4096;
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
         for (callable.captures, function.fields) |binding, capture| {
             try evidence.appendSlice(self.allocator, &.{ @backingInt(capture.tag), @backingInt(capture.mode), @intFromBool(capture.sequence), @intFromBool(capture.floating) });
-            try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &evidence, &type_work, 0);
+            try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &evidence, &type_key, 0);
             if (capture.tag != .scalar) try self.registerShapeRead(capture);
         }
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &evidence, &type_work, 0);
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = result_type }, &evidence, &type_work, 0);
+        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &evidence, &type_key, 0);
+        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = result_type }, &evidence, &type_key, 0);
+        try self.finishSelectedTypes(m, id, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = owner.unit, .binding = 0, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, words);
@@ -2941,9 +2993,12 @@ const Generator = struct {
         try self.selectedArguments(m, id, function.fields, &.{argument}, &selected);
         try selected.appendSlice(self.allocator, &.{ std.math.maxInt(u32), @intCast(callable.captures.len + 2) });
         var type_work: usize = 4096;
-        for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &selected, &type_work, 0);
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &selected, &type_work, 0);
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, &selected, &type_work, 0);
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &selected, &type_key, 0);
+        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &selected, &type_key, 0);
+        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, &selected, &type_key, 0);
+        try self.finishSelectedTypes(m, id, &selected, &type_key);
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, id, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, id, .storage_unsupported, "Selected calls exceeded their active call bound");
         if (self.specialize and checked_use) if (try self.reusableClosure(m, id, function, argument)) |value| return value;

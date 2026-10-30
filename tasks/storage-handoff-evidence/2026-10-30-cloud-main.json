@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-a4f8c5d5de900dd9",
-    "configured_identity": "9a1838f8e70a67767e868eb8c5c4cdac6c06d14c4f692e4411178a707e2c6d9b",
+    "attempt": "build/gdev-first-frame/main-867dc2590c407af7",
+    "configured_identity": "14175da6422cadf0c0493cf85d544a59706a560a92bc8b680c994a1fa584a7d3",
     "diagnostic": {
-      "filename": "gdev/src/world_storage.blot",
+      "filename": "gdev/src/world/world_ground.blot",
       "stage": "emit",
-      "code": "storage_unsupported",
-      "start": 42534,
-      "end": 42747,
-      "message": "The selected call type exceeds the supported bound",
+      "code": "storage_escape",
+      "start": 6953,
+      "end": 7010,
+      "message": "A loop must retain the same named owners and borrowed roots across iterations",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -823,5 +823,50 @@
     "normal_main_attempt": "main-a4f8c5d5de900dd9",
     "interpretation": "4096 work exhausted at depth5;640 distinct resolved(unit,type,captured environment pointer/length) pairs. This process-local grouping is not reusable semantic authority. Expanded output already37492u32 words.",
     "next_plan": "Canonical structural DAG selection keys, deterministic exact postorder interning across ordered roots; preserve structural identity across sharing/type-ID changes and captured environments. Retain work/depth limits with explicit bounded probes/output/allocation; test identities/correlations/recursion/failures. Not implemented. No source policy split or proof-result caching."
+  },
+  "selected_type_dag": {
+    "change": "One owned canonical postorder descriptor table per complete key; exact hash collision comparison, source/captured-environment references stay local to completed-subtree memo. All previous identity-bearing payloads preserved.",
+    "limits": {
+      "node_work": 4096,
+      "depth": 128,
+      "encoded_words": 65536,
+      "word_work": 262144
+    },
+    "review": "Astra xhigh reviewed interning, payload adapter,7key constructors, ownership, publication and depth checks.",
+    "native_inventory": 2679,
+    "focused_native": {
+      "selected": 21,
+      "passed": 20,
+      "failed": 1,
+      "leaks": 0,
+      "logged_errors": 0,
+      "preexisting_failure": "selected primitive associated partials reuse their saturated callers; previous native2674 binary reproduces same unresolved layout error"
+    },
+    "wide_law_baseline": "Pre-DAG backend with same new native fixture fails selected call type bound; restored candidate passes.",
+    "executed_wasm": "4 tests passed: wide callback policy and captured U32/F32 types; development+optimized, each sync+async, result42.",
+    "lint": "0 findings in storage_type_key.zig and scoped_backend.zig",
+    "full_gate": "attempted; blocked before tests fetching locked Baba9.0.1 through registry proxy",
+    "compiler_sha256": "04734a194b06b8bc44b359ad6c8cd85225d48db02978da258e35f48bf7637464",
+    "configured_identity": "14175da6422cadf0c0493cf85d544a59706a560a92bc8b680c994a1fa584a7d3",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-867dc2590c407af7",
+      "identity": "14175da6422cadf0c0493cf85d544a59706a560a92bc8b680c994a1fa584a7d3",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "gdev/src/world/world_ground.blot",
+          "stage": "emit",
+          "code": "storage_escape",
+          "start": 6953,
+          "end": 7010,
+          "message": "A loop must retain the same named owners and borrowed roots across iterations",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "gdev_checkpoint": "84fb0a3ea1342fcc195f39a4f28c78821e7f5898",
+    "qualification": "incomplete; real main reaches comprehension carry ownership check, no Wasm/frame"
   }
 }

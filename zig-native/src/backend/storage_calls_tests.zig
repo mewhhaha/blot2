@@ -354,3 +354,30 @@ test "selected primitive associated partials reuse their saturated callers" {
     try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
+
+test "selected application policies share wide callback type descriptions within the existing bound" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "type Wide = {");
+    for (0..166) |index| {
+        const field = try std.fmt.allocPrint(a, "f{d}: Array U32,", .{index});
+        defer a.free(field);
+        try source.appendSlice(a, field);
+    }
+    try source.appendSlice(a, "}\nconst inspect = func (value: Wide): U32 ! {} => return 0\nconst policy = func ");
+    for (0..13) |index| {
+        const parameter = try std.fmt.allocPrint(a, "callback_{d} -> ", .{index});
+        defer a.free(parameter);
+        try source.appendSlice(a, parameter);
+    }
+    try source.appendSlice(a, "(value: U32): U32 => return @u32.add value 1\nentry const answer = func () => return do:\n  let kept: Array U32 = #[41]\n  return policy ");
+    for (0..13) |_| try source.appendSlice(a, "inspect ");
+    try source.appendSlice(a, "kept[0]\n");
+    var module = try lower(a, source.items);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("wide policy diagnostic: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}

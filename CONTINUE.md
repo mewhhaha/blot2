@@ -2,26 +2,37 @@
 
 ## Current cloud frontier
 
-Main now reaches the specialization key for world_storage.application's static
-policy record (line684). The normal attempt is `main-a4f8c5d5de900dd9`;
-`main-239a503327b26b87` is its observational diagnostic. The **4,096-node**
-selectedType allowance is exhausted at depth **5**, not the 128-depth bound. Its
-13 public roots revisit 640 resolved type/environment pairs across 4,096 visits
-and already emit 37,492 u32 key words. Root12 consumes the remaining 1,500
-visits. No main Wasm or Pen frame has passed.
+Canonical structural DAG keys now clear the 4,096-node selected-type blocker.
+One builder spans every complete key; completed descriptors are interned with
+exact comparison and local environment-aware memoization. Field, callback,
+nominal, abstract/private and effect-row identities remain explicit. Node/depth
+limits are unchanged; output is additionally bounded to 65,536 words with
+262,144 word-work units. No proof results are cached.
 
-Astra's next plan is canonical structural DAG keys across the complete ordered
-type-root forest. Intern completed descriptors postorder using exact comparison
-after hashing; environment-aware TypeRef memoization is only a local
-accelerator. Preserve callback prefix, root/field order and spelling, nominal
-identity, abstract/private binder roles and exact function-row carriers. Raw
-type-ID backreferences and skipped repeated nodes do not preserve structural
-identity. Keep node/depth limits; bound probes, output words and allocations
-explicitly. Test sharing-independent equality, captured environments/private
-correlations, changed rows/nominals/fields, active-call recursion, collisions,
-depth on memo hits, output exhaustion and atomic allocation failure. This is
-**not implemented**. Keep the application bundle intact; no proof-result cache
-is indicated.
+The new native wide-callback law fails on the old tree encoder's selected-type
+bound and passes on this candidate. Twenty of 21 affected native laws pass; the
+primitive-associated-partials fixture has the same layout failure in the
+previous native binary. Four executed-Wasm tests pass in development/optimized
+and sync/async modes, including distinct captured U32/F32 callbacks. All 2,679
+native tests compile; both changed production files have zero lint findings. The
+required full gate was attempted and remains blocked fetching locked Baba
+through the registry proxy.
+
+Actual main advances to owner consistency in comprehensions: after direct
+building-ID generation cleared its first loop failure, attempt
+`main-867dc2590c407af7` now rejects world_ground.blot:123's filtered Array
+comprehension. The parser builds an immutable List accumulator with
+append/rebind on every iteration; replacing its owner correctly fails
+stableCarry. Do not weaken that check or rewrite every game comprehension.
+
+Astra reviewed runtime-only lowering of a proven private append region: one
+empty accumulator, loop/branch aliases only, no intermediate observation or
+capture, one append site and terminal Array conversion. Allocate one grow owner,
+append in the original order, freeze at conversion and keep normal owner/borrow
+checks. Preserve parser/Core semantics so typed staging still works; core_eval
+currently declines storage operations. The new private_append_region module is
+being implemented and is not yet connected/qualified. No main Wasm or Pen frame
+has passed.
 
 Implemented changes clear the preceding boundaries: record field-name indexing
 retains first right matches and every child proof; the game music-policy
@@ -30,9 +41,10 @@ set.Set math.Vec4 key contract. The earlier zero-span layout error was an
 unresolved map key, not a nested resizable payload. All temporary diagnostic
 compiler sources were restored exactly, and budgets/proof rules are unchanged.
 
-All **76** package/core contract laws pass with zero failures, skips, leaks or
-logged errors, and all **2,674** native tests compile. The new laws cover record
-width thresholds, reordered/colliding/duplicate names, bounded work, missing and
+The preceding compiler checkpoint passed **76** package/core contract laws with
+zero failures, skips, leaks or logged errors. Its **2,674**-test inventory was
+compiled before the new key-builder laws above. The new laws cover record width
+thresholds, reordered/colliding/duplicate names, bounded work, missing and
 forged children, correlated witnesses, Foreign callbacks and rigid ownership.
 The 166-field regression uses 499 debits instead of the former 14,028; this is a
 specific comparison law, not an application performance measurement. Changed
