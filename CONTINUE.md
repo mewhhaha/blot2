@@ -18,21 +18,29 @@ native tests compile; both changed production files have zero lint findings. The
 required full gate was attempted and remains blocked fetching locked Baba
 through the registry proxy.
 
-Actual main advances to owner consistency in comprehensions: after direct
-building-ID generation cleared its first loop failure, attempt
-`main-867dc2590c407af7` now rejects world_ground.blot:123's filtered Array
-comprehension. The parser builds an immutable List accumulator with
-append/rebind on every iteration; replacing its owner correctly fails
-stableCarry. Do not weaken that check or rewrite every game comprehension.
+Runtime-only private append-region lowering now clears the ground and
+celebration comprehensions. A bounded proof admits one empty List accumulator,
+loop/guard aliases, one append site and terminal Array conversion, with no
+intermediate observation/capture. Emission uses one grow owner and freezes it at
+conversion; parser/Core/evaluator semantics and stableCarry stay unchanged.
+Iterator exhaustion requires the exact current-loop target, complete carry list
+and unchanged accumulator; other carries are checked after all aliases exist.
+Checked collection goals now propagate semantic element types with their
+resolved environments, including generic Array cursors.
 
-Astra reviewed runtime-only lowering of a proven private append region: one
-empty accumulator, loop/branch aliases only, no intermediate observation or
-capture, one append site and terminal Array conversion. Allocate one grow owner,
-append in the original order, freeze at conversion and keep normal owner/borrow
-checks. Preserve parser/Core semantics so typed staging still works; core_eval
-currently declines storage operations. The new private_append_region module is
-being implemented and is not yet connected/qualified. No main Wasm or Pen frame
-has passed.
+All 2,682 native tests compile. Three new proof laws and 12 existing scoped
+backend laws pass; both executed-Wasm tests pass in development/optimized and
+sync/async modes, including empty generic iteration, live trace order, nested
+qualifiers, fixed aggregates/F32 and typed staging. Changed Zig files have zero
+lint findings. Astra xhigh reviewed the iterator proof and collection
+refinement. The required full gate was attempted through the configured proxy
+and remains blocked fetching locked Baba.
+
+Actual main attempt `main-ae40bc851636d8a9` advances to Ink editor.blot:820,
+`brush.encode_stored origin faces`, with an unresolved storage layout/binding. A
+separate error-tracing diagnostic build is running to locate the exact return.
+No main Wasm or Pen frame has passed. Continue through this frontier to the real
+frame; do not stop at another handoff.
 
 Implemented changes clear the preceding boundaries: record field-name indexing
 retains first right matches and every child proof; the game music-policy

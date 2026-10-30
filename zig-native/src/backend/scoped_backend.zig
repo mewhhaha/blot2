@@ -13,6 +13,7 @@ const Local = @import("runtime_code.zig").Local;
 const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
 const selected_types = @import("storage_type_key.zig");
+const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const source_proof = @import("../check/package_core.zig");
@@ -141,6 +142,7 @@ const Generator = struct {
     active_calls: *call_plan.ActiveCalls,
     specialize: bool = true,
     protected: std.ArrayList(Value) = .empty,
+    append_regions: std.ArrayList(struct { unit: u32, plan: private_append.Plan }) = .empty,
     units: []const core.Module,
     module: *wasm.Module,
     runtime: storage.Runtime,
@@ -184,6 +186,7 @@ const Generator = struct {
         // protected list owns only its backing buffer, not those shared slices.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.protected.deinit(self.allocator);
+        self.append_regions.deinit(self.allocator);
         self.roots.deinit(self.allocator);
         self.stacks.deinit(self.allocator);
         self.globals.deinit(self.allocator);
@@ -671,6 +674,26 @@ const Generator = struct {
             try trace.events.append(self.allocator, .{ .owner = index, .kind = kind, .shape = try self.cloneShape(owner.element) });
         }
     }
+    fn privateAppendNode(self: *const Generator, unit_: u32, id: core.Id, comptime field: []const u8) bool {
+        var index = self.append_regions.items.len;
+        while (index != 0) {
+            index -= 1;
+            const region = self.append_regions.items[index];
+            if (region.unit == unit_ and @field(region.plan, field) == id) return true;
+        }
+        return false;
+    }
+    fn freezeValue(self: *Generator, m: *const core.Module, id: core.Id, first: Value) Error!Value {
+        if (self.frozen(first)) return self.fail(m, id, .storage_borrow_conflict, "This array's growth capability was already consumed");
+        for (self.roots.items, 0..) |*owner, index| if (hasRoot(first, index)) {
+            owner.frozen = true;
+        };
+        try self.c.value(.{ .call, self.runtime.functions.freeze, first.token, first.epoch_low, first.epoch_high, first.word });
+        var result = first;
+        result.mode = .fixed;
+        result.type_evidence = null;
+        return result;
+    }
     fn frozen(self: *Generator, owner: Value) bool {
         for (self.roots.items, 0..) |item, index| if (item.frozen and hasRoot(owner, index)) return true;
         return false;
@@ -1039,17 +1062,7 @@ const Generator = struct {
                 try self.c.value(.{ .call, self.runtime.functions.truncate, first.token, first.epoch_low, first.epoch_high, first.word, count });
                 if (popped) |value| return value;
             },
-            .freeze => {
-                if (self.frozen(first)) return self.fail(m, id, .storage_borrow_conflict, "This array's growth capability was already consumed");
-                for (self.roots.items, 0..) |*owner, index| if (hasRoot(first, index)) {
-                    owner.frozen = true;
-                };
-                try self.c.value(.{ .call, self.runtime.functions.freeze, first.token, first.epoch_low, first.epoch_high, first.word });
-                var result = first;
-                result.mode = .fixed;
-                result.type_evidence = null;
-                return result;
-            },
+            .freeze => return self.freezeValue(m, id, first),
             .copy => {
                 const count = try self.length(m, id, first);
                 const copied = try self.array(m, id, count, first.mode);
@@ -1092,6 +1105,15 @@ const Generator = struct {
             try self.protected.append(self.allocator, args[index]);
         }
         const op = m.arrayOperation(id);
+        if (op == .append and self.privateAppendNode(m.unit, id, "append")) {
+            try self.writeElement(m, id, args[0], null, args[1]);
+            return args[0];
+        }
+        if (op == .convert and self.privateAppendNode(m.unit, id, "conversion")) {
+            var result = try self.freezeValue(m, id, args[0]);
+            result.sequence = false;
+            return result;
+        }
         const zero = (try self.constant(0)).word;
         switch (op) {
             .length => return .{ .word = try self.length(m, id, args[0]) },
@@ -1354,10 +1376,16 @@ const Generator = struct {
         while (passes <= goals.len) : (passes += 1) {
             const before = self.type_arguments.items.len;
             for (goals) |goal| {
-                if (goal.kind != .field or goal.result == 0) continue;
+                if ((goal.kind != .field and goal.kind != .collection) or goal.result == 0) continue;
                 const receiver = try self.resolveType(.{ .unit = m.unit, .ty = goal.ty }, 0);
                 const source = try self.unit(receiver.unit);
                 const node = source.types.node(receiver.ty);
+                if (goal.kind == .collection) {
+                    const element = types.readableElement(&source.types, receiver.ty) orelse
+                        (if (node.tag == .list) node.a else continue);
+                    try self.mapTypes(.{ .unit = m.unit, .ty = goal.result }, .{ .unit = source.unit, .ty = element, .environment = receiver.environment }, 0);
+                    continue;
+                }
                 if (node.tag == .record) {
                     const name = m.fieldSpelling(goal.name) orelse continue;
                     for (0..node.b) |index| {
@@ -4073,7 +4101,7 @@ const Generator = struct {
                 const element = @import("storage_collections.zig").element(m, n.ty) orelse return self.unsupported(m, id);
                 _ = element;
                 const info = types.info(&m.types, n.ty);
-                const mode: storage.Mode = if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed;
+                const mode: storage.Mode = if (self.privateAppendNode(m.unit, id, "initial")) .grow else if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed;
                 const values = m.children(id);
                 const capacity = try self.constant(@intCast(values.len));
                 const result = try self.array(m, id, capacity.word, mode);
@@ -4131,6 +4159,13 @@ const Generator = struct {
                 return .{ .word = result };
             },
             .block => {
+                const region_count = self.append_regions.items.len;
+                defer self.append_regions.shrinkRetainingCapacity(region_count);
+                // This proof changes storage allocation only. The ordinary
+                // evaluator retains the original immutable List semantics.
+                if (self.destination == null) if (private_append.analyze(m, id)) |plan| {
+                    try self.append_regions.append(self.allocator, .{ .unit = m.unit, .plan = plan });
+                };
                 const roots_before = self.roots.items.len;
                 const mark = try self.frameMark();
                 const bindings_before = self.bindings.items.len;

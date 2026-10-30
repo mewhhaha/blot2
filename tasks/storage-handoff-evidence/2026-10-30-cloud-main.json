@@ -13,15 +13,15 @@
   "main_build": {
     "status": "failed",
     "command": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts",
-    "attempt": "build/gdev-first-frame/main-867dc2590c407af7",
-    "configured_identity": "14175da6422cadf0c0493cf85d544a59706a560a92bc8b680c994a1fa584a7d3",
+    "attempt": "build/gdev-first-frame/main-ae40bc851636d8a9",
+    "configured_identity": "9b62492a408c7354d61d5f6d4b4bc112ebad747db91dce4b0aef19bbbce4f127",
     "diagnostic": {
-      "filename": "gdev/src/world/world_ground.blot",
+      "filename": "ink/lib/editor.blot",
       "stage": "emit",
-      "code": "storage_escape",
-      "start": 6953,
-      "end": 7010,
-      "message": "A loop must retain the same named owners and borrowed roots across iterations",
+      "code": "storage_unsupported",
+      "start": 42816,
+      "end": 42848,
+      "message": "This expression has no admitted storage layout or binding",
       "offset_encoding": "utf8_bytes",
       "utf16": null,
       "details": null
@@ -868,5 +868,36 @@
     },
     "gdev_checkpoint": "84fb0a3ea1342fcc195f39a4f28c78821e7f5898",
     "qualification": "incomplete; real main reaches comprehension carry ownership check, no Wasm/frame"
+  },
+  "private_append_regions": {
+    "proof": "bounded private accumulator, exact iterator exhaustion and carry disjointness; no parser/evaluator rewrite or stableCarry weakening",
+    "native_inventory": 2682,
+    "native_proof_laws": 3,
+    "existing_scoped_backend_laws": 12,
+    "native_result": "15 passed, zero failures/leaks/logged errors; existing batch uses sampled allocation mode",
+    "executed_wasm": "2 tests passed: development/optimized, sync/async, empty and nested generic iteration with live trace order, F32/aggregate payloads and typed staging",
+    "lint": "0 findings in all four changed Zig files",
+    "collection_refinement": "checked .collection goals map exact semantic collection elements under the resolved environment",
+    "review": "Astra xhigh reviewed iterator topology, exhaustion, carry disjointness and semantic collection refinement",
+    "full_gate": "attempted; locked Baba9.0.1 registry proxy unsuccessful tunnel before tests",
+    "main_attempt": {
+      "evidence": "build/gdev-first-frame/main-ae40bc851636d8a9",
+      "identity": "9b62492a408c7354d61d5f6d4b4bc112ebad747db91dce4b0aef19bbbce4f127",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "ink/lib/editor.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 42816,
+          "end": 42848,
+          "message": "This expression has no admitted storage layout or binding",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "qualification": "incomplete; main advances to Ink saved-editor encoder, no Wasm/frame"
   }
 }
