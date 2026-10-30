@@ -6,6 +6,74 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
+fn publishSelectedReader(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
+fn publishLargeKeyFallback(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_outline_key_declines >= 2);
+}
+
+test "optional oversized reader and writer keys fall back without hiding invalid borrows" {
+    var name: [7000]u8 = undefined;
+    @memset(&name, 'x');
+    const source = try std.fmt.allocPrint(a, "type State = {{{s}: ResizeArray U32}}\n" ++
+        "const write = func (state: State) -> (amount: U32) => return do:\n  state.{s}[0] := @u32.add state.{s}[0] amount\n" ++
+        "const read = func (state: State) => return state.{s}[0]\n" ++
+        "entry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[10]\n  let state = {{{s}: rows}}\n  write state input\n  write state 1\n  return read state\n", .{ &name, &name, &name, &name, &name });
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publishLargeKeyFallback(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishLargeKeyFallback, .{@as([]const core.Module, &.{module})});
+    const invalid_source = try std.fmt.allocPrint(a, "type State = {{{s}: ResizeArray U32}}\n" ++
+        "const borrow = func (state: State) => return do:\n  let local: GrowArray U32 = #[1]\n  return &local[0]\n" ++
+        "entry const answer = func () => return do:\n  let rows: ResizeArray U32 = #[0]\n  let escaped = borrow {{{s}: rows}}\n  return @storage.load escaped\n", .{ &name, &name });
+    defer a.free(invalid_source);
+    var invalid = try lower(a, invalid_source);
+    defer invalid.deinit(a);
+    var rejected = try scoped.compile(a, &.{invalid}, 1);
+    defer rejected.deinit(a);
+    try std.testing.expect(rejected.diagnostic != null);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, rejected.diagnostic.?.code);
+    try std.testing.expectEqual(@as(usize, 0), rejected.bytes.len);
+}
+
+test "selected parameterized readers outline exact descriptor payloads across owners" {
+    var parts: [122][]const u8 = undefined;
+    parts[0] = "type Research rows is data = $Research {rows: rows, count: U32}\nconst read = func (value: Research rows) => return do:\n  let number = value.count\n";
+    @memset(parts[1..101], "  number := @u32.add number 1\n");
+    parts[101] = "  return number\nentry const answer = func (input: U32) => return do:\n  let owner: ResizeArray U32 = #[input]\n  let research = $Research {rows: &owner[0..1], count: input}\n  let total: U32 = 0\n";
+    @memset(parts[102..121], "  total := @u32.add total (read research)\n");
+    parts[121] = "  return total\n";
+    const source = try std.mem.concat(a, u8, &parts);
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    var result = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 512 });
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("generic reader: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.max_scoped_emission_body_steps <= 512);
+    try std.testing.expect(result.counters.scoped_emission_expressions > result.counters.max_scoped_emission_body_steps);
+    try std.testing.expect(result.bytes.len > 8);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSelectedReader, .{@as([]const core.Module, &.{module})});
+    const callable_source = try std.mem.replaceOwned(u8, a, source, "rows: &owner[0..1]", "rows: func () => return input");
+    defer a.free(callable_source);
+    var callable_module = try lower(a, callable_source);
+    defer callable_module.deinit(a);
+    var declined = try scoped.compileWithWorkLimits(a, &.{callable_module}, 1, .{}, .{ .expressions = 512 });
+    defer declined.deinit(a);
+    try std.testing.expect(declined.diagnostic != null);
+    try std.testing.expectEqualStrings("Storage source expansion exceeded its expression budget", declined.diagnostic.?.message());
+    try std.testing.expectEqual(@as(usize, 0), declined.bytes.len);
+}
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return lowerWithCatalog(allocator, source, false);
 }

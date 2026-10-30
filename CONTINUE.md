@@ -2,14 +2,29 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. There
-is still no successful main Wasm or frame. Normal main `main-fbc2dfdebe16b95f`
-clears the station notice/reset and shop-row loop boundaries, then reaches the
-finite 500,000-expression emission allowance in std/vector. Current source
-candidates use named station owners and a GrowArray Row builder with one freeze.
-A standalone shop fixture hits the engine local limit; the next measured source
-fix replaces whole text-record lookups with verified existing per-label span
-calls. Do not automatically raise the cap again.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-ba3ccf824ebef718`, running with checked
+generic reader admission and optional-key fallback. No successful main Wasm or
+frame yet. The prior generic-reader attempt cleared the emission-work frontier
+and reached an oversized optional capture key in HUD/staffing reset.
+
+The new reader predicate resolves selected nominal arguments and constructor
+payloads in their captured environments, with the existing work/depth bounds.
+Callable payloads decline. Reader/writer key encoding can decline an optional
+outline before cache publication or runtime effects; OOM propagates, mandatory
+invocation keys and body/source/ownership checks remain strict. Keys are never
+truncated. Two new native laws pass exhaustive allocation-failure checks; seven
+existing reader/writer laws pass. Executed generic, owner mutation and oversized
+key read/write laws pass in both tiers and sync/async. The affected guest batch
+is29passed/1failed: the associated latent-effect result layout failure reproduces
+on the preceding compiler. Changed Zig lint is clean; all2,686 native tests
+compile. Full gate attempted, registry blocked as below.
+
+Gdev checkpoint `1a7ebd6` replaces335 scalar text lookups across21 modules with
+verified existing spans; all403 scalar spans match the unchanged payload. Shop
+rows now use one GrowArray and freeze once; station writes/reset pin named
+owners. Six affected checks pass. HUD reset accepts only its named owner, with
+one additional passing check (`65671cb`). Do not automatically raise the
+500,000-expression cap again.
 
 The old 100,000 cap was a compiler work policy, not an ownership requirement.
 Astra xhigh reviewed the finite 500,000 default and private native boundary

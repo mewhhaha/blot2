@@ -1463,9 +1463,57 @@ const Generator = struct {
     // callbacks enter this summary. Generic declarations are instantiated from
     // their actual checked inputs before examining their scalar bodies.
     fn selectedInlineType(self: *Generator, input: TypeRef, remaining: *usize) Error!bool {
+        return self.selectedDataType(input, false, remaining, 0);
+    }
+    fn selectedDataType(self: *Generator, input: TypeRef, readers: bool, remaining: *usize, depth: usize) Error!bool {
+        if (remaining.* == 0 or depth > 128) return false;
+        remaining.* -= 1;
         const actual = try self.resolveType(input, 0);
         const owner = try self.unit(actual.unit);
-        return call_plan.inlineType(owner, actual.ty, remaining, 0);
+        const node = owner.types.node(actual.ty);
+        switch (node.tag) {
+            .unit, .boolean, .u32, .f32, .never => return true,
+            .array, .list => return readers and try self.selectedDataType(.{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, false, remaining, depth + 1),
+            .cursor => return readers and try self.selectedDataType(.{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, true, remaining, depth + 1),
+            .product, .record => {
+                for (0..node.b) |index| {
+                    const child = if (node.tag == .record) owner.types.recordField(node, index).ty else owner.types.list(.{ .start = node.a, .len = node.b })[index];
+                    if (!try self.selectedDataType(.{ .unit = actual.unit, .ty = child, .environment = actual.environment }, readers, remaining, depth + 1)) return false;
+                }
+                return true;
+            },
+            .nominal => {
+                if (types.info(&owner.types, actual.ty)) |info| return readers and try self.selectedDataType(.{ .unit = actual.unit, .ty = info.element, .environment = actual.environment }, false, remaining, depth + 1);
+                for (owner.nominals, 0..) |nominal, ordinal| {
+                    if (nominal.identity.unit != node.a or nominal.identity.decl != node.b) continue;
+                    const parameters = owner.types.list(nominal.parameters);
+                    const arguments = owner.types.nominalArguments(node);
+                    const constructors = owner.nominalConstructors(@intCast(ordinal));
+                    if (parameters.len != arguments.len or constructors.len == 0) return false;
+                    if (parameters.len > remaining.*) return false;
+                    remaining.* -= parameters.len;
+                    const before = self.type_arguments.items.len;
+                    defer self.type_arguments.shrinkRetainingCapacity(before);
+                    for (parameters, arguments) |parameter, argument| try self.mapTypesUnder(.{ .unit = actual.unit, .ty = parameter }, .{ .unit = actual.unit, .ty = argument }, actual.environment, 0);
+                    for (constructors) |constructor_id| {
+                        if (parameters.len >= remaining.*) return false;
+                        remaining.* -= parameters.len + 1;
+                        const variant_before = self.type_arguments.items.len;
+                        defer self.type_arguments.shrinkRetainingCapacity(variant_before);
+                        const constructor = owner.constructor(constructor_id);
+                        const signature = owner.types.node(constructor.scheme.root);
+                        const result = if (signature.tag == .function) signature.b else constructor.scheme.root;
+                        try self.mapTypesUnder(.{ .unit = actual.unit, .ty = result }, actual, actual.environment, 0);
+                        // Constructor formals use the newly installed scope;
+                        // its bindings retain the selected argument contexts.
+                        if (constructor.payload != 0 and !try self.selectedDataType(.{ .unit = actual.unit, .ty = constructor.payload }, readers, remaining, depth + 1)) return false;
+                    }
+                    return true;
+                }
+                return false;
+            },
+            else => return false,
+        }
     }
     // Symbolic values used only by the read-only admission walk. Runtime
     // capture words are supplied by readerParameter, never computed here.
@@ -1892,7 +1940,7 @@ const Generator = struct {
                 return self.readerArgument(value, &descriptor, remaining);
             };
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
-            return call_plan.readerType(try self.unit(actual.unit), actual.ty, remaining, 0);
+            return self.selectedDataType(actual, true, remaining, 0);
         }
         return self.selectedInlineType(.{ .unit = m.unit, .ty = n.ty }, remaining);
     }
@@ -2391,20 +2439,69 @@ const Generator = struct {
         }
         return result;
     }
+    // Only key encoding can decline here. Source/body admission and child
+    // emission remain outside this boundary; no cache entry exists yet.
+    fn optionalReaderEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32)) Error!bool {
+        const diagnostic_before = self.diagnostic;
+        self.readerCallEvidence(m, body, arguments, evidence) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            self.diagnostic = diagnostic_before;
+            self.emission_work.scoped_outline_key_declines +|= 1;
+            return false;
+        };
+        return true;
+    }
+    fn readerCallEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32)) Error!void {
+        const result_type = m.typeOf(body.root);
+        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 1, result_type });
+        var type_work: usize = 4096;
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, evidence, &type_key);
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &type_key, 0);
+        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, evidence, &type_key, 0);
+        try self.finishSelectedTypes(m, body.root, evidence, &type_key);
+    }
+    fn optionalWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, descriptors: []const Value, owners: []const usize, evidence: *std.ArrayList(u32)) Error!bool {
+        const diagnostic_before = self.diagnostic;
+        self.writerCallEvidence(m, body, arguments, descriptors, owners, evidence) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            self.diagnostic = diagnostic_before;
+            self.emission_work.scoped_outline_key_declines +|= 1;
+            return false;
+        };
+        return true;
+    }
+    fn writerCallEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, descriptors: []const Value, owners: []const usize, evidence: *std.ArrayList(u32)) Error!void {
+        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 2, @intCast(owners.len) });
+        var type_work: usize = 4096;
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, evidence, &type_key);
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &type_key, 0);
+        for (descriptors) |value| {
+            try evidence.appendSlice(self.allocator, &.{ @intCast(try writerOrdinal(owners, value.root.?)), @intCast(value.other_roots.len) });
+            for (value.other_roots) |other| try evidence.append(self.allocator, @intCast(try writerOrdinal(owners, other)));
+        }
+        for (owners) |owner_id| {
+            const owner = self.roots.items[owner_id];
+            try evidence.appendSlice(self.allocator, &.{ @intFromBool(owner.frozen), @intFromBool(owner.element_initialized) });
+            try self.readerLayoutEvidence(m, body.root, owner.element, evidence, &type_key);
+        }
+        try self.finishSelectedTypes(m, body.root, evidence, &type_key);
+    }
     fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         const result_type = m.typeOf(body.root);
         var remaining: usize = 100_000;
-        const actual_result = try self.resolveType(.{ .unit = m.unit, .ty = result_type }, 0);
-        if (!call_plan.readerType(try self.unit(actual_result.unit), actual_result.ty, &remaining, 0)) return null;
+        if (!try self.selectedDataType(.{ .unit = m.unit, .ty = result_type }, true, &remaining, 0)) return null;
         const result_shape = try self.shape(m, body.root, result_type, 0);
         const aggregate_result = result_shape.tag != .scalar;
         var has_descriptor = false;
         var words: usize = 0;
         for (m.bodyParameters(body), arguments) |parameter, argument| {
             if (!self.readerArgument(argument, &has_descriptor, &remaining)) return null;
-            const actual = try self.resolveType(.{ .unit = m.unit, .ty = parameter.ty }, 0);
-            if (argument.tag != .callable and !call_plan.readerType(try self.unit(actual.unit), actual.ty, &remaining, 0)) return null;
+            if (argument.tag != .callable and !try self.selectedDataType(.{ .unit = m.unit, .ty = parameter.ty }, true, &remaining, 0)) return null;
             words = std.math.add(usize, words, readerWords(argument)) catch return self.unsupported(m, body.root);
         }
         if (!has_descriptor) return null;
@@ -2421,19 +2518,11 @@ const Generator = struct {
         }
         const parameter_words = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return null;
         if (parameter_words > std.math.maxInt(u32)) return null;
-        // Reused Wasm readers perform their loads in a separate generator,
-        // including on cache hits. Preserve their reads in caller loops too.
-        for (arguments) |argument| try self.readerReads(argument);
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
-        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 1, result_type });
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_key);
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
-        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
+        if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
+        // Successful readers preserve their caller-loop read facts on hits too.
+        for (arguments) |argument| try self.readerReads(argument);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
@@ -2573,22 +2662,7 @@ const Generator = struct {
         }
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
-        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 2, @intCast(owners.items.len) });
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, &evidence, &type_key);
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-        for (descriptors.items) |value| {
-            try evidence.appendSlice(self.allocator, &.{ @intCast(try writerOrdinal(owners.items, value.root.?)), @intCast(value.other_roots.len) });
-            for (value.other_roots) |other| try evidence.append(self.allocator, @intCast(try writerOrdinal(owners.items, other)));
-        }
-        for (owners.items) |owner_id| {
-            const owner = self.roots.items[owner_id];
-            try evidence.appendSlice(self.allocator, &.{ @intFromBool(owner.frozen), @intFromBool(owner.element_initialized) });
-            try self.readerLayoutEvidence(m, body.root, owner.element, &evidence, &type_key);
-        }
-        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
+        if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const function = self.module.addTypedFunction(&.{.i32}, .i32, .scalar) catch |err| switch (err) {
