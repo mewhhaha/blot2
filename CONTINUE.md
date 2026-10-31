@@ -94,9 +94,9 @@ All ten generator tests, Rust formatting, regeneration and native freshness pass
 Rust packet output is unchanged. The real `host.with_frame`/`host.encode_frame`
 fixture passes both tiers and sync/async: runtime-empty packets, nested draws,
 solids/insets, changed preferences, fields, borrowed UI text, full-width retained
-IDs/removals and extensions. The final fixture adds count-header assertions and
-a prefilled destination. Astra xhigh review found no blocker; no Ink host change
-was needed. Detailed results stay in the tracked evidence.
+IDs/removals and extensions. Count-header assertions and reuse of a prefilled destination
+also pass (two tests,3m50s). Astra xhigh review found no blocker; no Ink host
+change was needed. Detailed results stay in the tracked evidence.
 
 Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
 the bounded cold build; production main has one unchanged gameplay export;

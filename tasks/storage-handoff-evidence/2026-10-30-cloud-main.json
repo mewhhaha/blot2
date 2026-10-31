@@ -1638,7 +1638,7 @@
     "fix": "Pen templates emit explicit U32.to_f32 for remaining schemas/counts/tags/declared integer lanes; integer division precedes conversion unchanged",
     "checks": "10 generator tests, cargo fmt --all --check, regeneration and current native pen codegen --project ../gdev --check pass; generated Rust output unchanged",
     "pen_sha256": "a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014",
-    "focused_encoder": "Both tiers and sync/async pass complete current-owner encoder witness (2 tests, 3m49s); final added header assertions/prefilled destination rerun in progress. Original host source unchanged. Astra xhigh review clear.",
+    "focused_encoder": "Final 2 tests pass in3m50s: both tiers and sync/async, complete current-owner packet payload/count headers and reuse of a prefilled destination; original host source unchanged. Astra xhigh review clear.",
     "previous_native_attempt": {
       "attempt": "build/storage-integration/gdev-one-frame/attempt-gf78rbfc",
       "status": "completed_failure_before_module_or_frame",
@@ -1658,6 +1658,12 @@
       },
       "elapsed_seconds_approx": 2040,
       "peak_sampled_child_rss_kib": 16413984
-    }
+    },
+    "ink_checkpoint": "803613a",
+    "logs": [
+      "/tmp/ink-frame-encoding-final.log",
+      "/tmp/ink-frame-conversions-baseline.log"
+    ],
+    "baseline_note": "Direct solid/integer-extension old-generator probes also pass; they show conversion equivalence rather than reproduce the context-dependent full-main failure."
   }
 }
