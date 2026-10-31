@@ -1,5 +1,6 @@
 // Bounded synthetic owned-backend call-graph profile.
 // deno run --allow-all scripts/bench/scoped_calls.ts [--sizes 2,4,8]
+// Field refinement: add --fields 72 (sizes then count repeated record calls).
 // Optional: --depth 5 --timeout-ms 5000 --profile --blotc PATH
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
@@ -9,9 +10,10 @@ const args = new Map<string, string | true>();
 for (let at = 0; at < Deno.args.length; at++) {
   const key = Deno.args[at];
   if (
-    !["--sizes", "--depth", "--timeout-ms", "--blotc", "--profile"].includes(
-      key,
-    )
+    !["--sizes", "--fields", "--depth", "--timeout-ms", "--blotc", "--profile"]
+      .includes(
+        key,
+      )
   ) {
     throw new Error(`Unexpected argument: ${key}`);
   }
@@ -27,12 +29,21 @@ for (let at = 0; at < Deno.args.length; at++) {
 const option = (name: string, fallback: string) =>
   String(args.get(name) ?? fallback);
 const sizes = option("--sizes", "2,4,8").split(",").map(Number);
+const fields = Number(option("--fields", "0"));
 const depth = Number(option("--depth", "5"));
 const timeoutMs = Number(option("--timeout-ms", "5000"));
+let maximumSize = 128;
+if (fields === 0) maximumSize = 16;
 if (
-  !sizes.length || sizes.some((n) => !Number.isInteger(n) || n < 1 || n > 16)
+  !sizes.length ||
+  sizes.some((n) => !Number.isInteger(n) || n < 1 || n > maximumSize)
 ) {
-  throw new Error("--sizes must be comma-separated integers from 1 to 16");
+  throw new Error(
+    `--sizes must be comma-separated integers from 1 to ${maximumSize}`,
+  );
+}
+if (!Number.isInteger(fields) || fields < 0 || fields > 128) {
+  throw new Error("--fields must be an integer from 0 to 128");
 }
 if (!Number.isInteger(depth) || depth < 2 || depth > 12) {
   throw new Error("--depth must be an integer from 2 to 12");
@@ -52,6 +63,40 @@ const hex = (bytes: Uint8Array) =>
 const hashBytes = async (bytes: BufferSource) =>
   hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 const compilerSha256 = await hashBytes(await Deno.readFile(blotc));
+
+function fieldSource(repetitions: number, fieldCount: number): string {
+  const lines = [
+    "const read = func row => return do:",
+    "  let total = row.f0",
+  ];
+  for (let index = 1; index < fieldCount; index++) {
+    lines.push(`  total := @u32.add total row.f${index}`);
+  }
+  lines.push("  return total");
+  let deepest = "read";
+  for (let level = 1; level <= depth; level++) {
+    const stage = `stage_${level}`;
+    lines.push(
+      `const ${stage} = func row => return @u32.add (${deepest} row) (${deepest} row)`,
+    );
+    deepest = stage;
+  }
+  const record = Array.from(
+    { length: fieldCount },
+    (_, index) => `f${index}: @u32.add input ${index}`,
+  ).join(", ");
+  lines.push(`const make = func (input: U32) => return {${record}}`);
+  lines.push(
+    "entry const answer = func (input: U32): U32 => return do:",
+    "  let marker: GrowArray U32 = #[input]",
+    "  let result = @u32.add input marker[0]",
+  );
+  for (let call = 0; call < repetitions; call++) {
+    lines.push(`  result := @u32.add result (${deepest} (make input))`);
+  }
+  lines.push("  return result");
+  return `${lines.join("\n")}\n`;
+}
 
 function sourceFor(width: number): string {
   const lines = [
@@ -102,8 +147,32 @@ function expected(width: number, input: number): number {
   return result;
 }
 
+function expectedFields(
+  repetitions: number,
+  fieldCount: number,
+  depth: number,
+  input: number,
+) {
+  let oneRead = 0;
+  for (let index = 0; index < fieldCount; index++) {
+    oneRead = (oneRead + input + index) >>> 0;
+  }
+  for (let level = 0; level < depth; level++) {
+    oneRead = (oneRead + oneRead) >>> 0;
+  }
+  let result = (input + input) >>> 0;
+  for (let call = 0; call < repetitions; call++) {
+    result = (result + oneRead) >>> 0;
+  }
+  return result;
+}
+
 for (const width of sizes) {
-  const source = sourceFor(width);
+  let source: string;
+  if (fields === 0) source = sourceFor(width);
+  else source = fieldSource(width, fields);
+  let workload = "field_refinement";
+  if (fields === 0) workload = "call_graph";
   const sourceSha256 = await hashBytes(new TextEncoder().encode(source));
   const started = performance.now();
   let compiler:
@@ -132,14 +201,17 @@ for (const width of sizes) {
     guest = await instantiateGuest(result.bytes);
     for (const input of [1, 7, 41]) {
       const actual = guest.call("answer", input);
-      const want = expected(width, input);
+      let want = expectedFields(width, fields, depth, input);
+      if (fields === 0) want = expected(width, input);
       if (actual !== want) {
         throw new Error(`answer(${input})=${actual}; expected ${want}`);
       }
     }
     const report: Record<string, unknown> = {
       status: "complete",
+      workload,
       width,
+      fields,
       depth,
       latency_ms: performance.now() - started,
       build_ms: buildMs,
@@ -160,7 +232,9 @@ for (const width of sizes) {
     if (timedOut) status = "timeout_incomplete";
     console.log(JSON.stringify({
       status,
+      workload,
       width,
+      fields,
       depth,
       latency_ms: performance.now() - started,
       timeout_ms: timeoutMs,

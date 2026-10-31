@@ -15,6 +15,20 @@ Timeouts are incomplete and kill the active compiler. The
 is a Safe/noLLVM synthetic result; whole-Gdev subsecond compilation remains
 open.
 
+For nested generic field access on anonymous records:
+
+```sh
+deno run --no-config --no-lock -A scripts/bench/scoped_calls.ts --blotc zig-native/zig-out-native-dev/bin/blotc --fields 64 --sizes 4 --depth 5
+```
+
+`--fields` selects the record workload; `--sizes` then counts repeated calls.
+Each stage calls its predecessor twice. Runtime checks independently sum the
+fields and apply the stage/repetition counts. The
+[concrete-field record](../../zig-native/measurements/concrete-fields-2026-10-31.json)
+includes five alternating pairs and an unchanged scalar control. A 64-field
+depth-six probe reaches the existing source-validation budget; it is a rejected
+workload, not a timing result. Do not raise compiler limits for the benchmark.
+
 Run measurements on an otherwise idle host, using a preserved release binary for
 each variant. Keep the frozen workload manifest, output hashes, commands and raw
 samples with the report. Safe/noLLVM builds qualify development behavior; they

@@ -29,6 +29,74 @@ fn publishSharedScalarModule(allocator: std.mem.Allocator, modules: []const core
     try std.testing.expectEqual(@as(u64, 4), result.counters.scoped_scalar_definitions);
     try std.testing.expect(result.counters.scoped_scalar_cache_hits >= 2);
 }
+fn publishConcreteFields(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    // Both source field orders select one read definition. Wrappers with an
+    // uncovered ambient retain ordinary scoped emission.
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_inline_definitions);
+    try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
+    try std.testing.expect(result.counters.scoped_concrete_admission_hits > 0);
+    try std.testing.expect(result.counters.scoped_field_recipe_hits > 0);
+    try std.testing.expect(result.counters.scoped_field_name_probes < 32);
+}
+test "concrete anonymous field instances share body plans through allocation failures" {
+    var module = try lower(a,
+        \\const read = func row => return @u32.add row.left row.right
+        \\const twice = func row => return @u32.add (read row) (read row)
+        \\const outer = func row => return @u32.add (twice row) (twice row)
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let marker: GrowArray U32 = #[input]
+        \\  let first = outer {right: 3, left: marker[0]}
+        \\  let second = outer {left: marker[0], right: 5}
+        \\  return @u32.add first second
+    );
+    defer module.deinit(a);
+    try publishConcreteFields(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishConcreteFields, .{@as([]const core.Module, &.{module})});
+}
+test "concrete field recipes retain declaration types order absence and capacity fallback" {
+    var module = try lower(a,
+        \\const first = {left: 1, right: 2}
+        \\const second = {extra: 0.0, left: 1.0, right: 2.0}
+        \\const third = {missing: 0}
+        \\entry const answer = func () => return 0
+    );
+    defer module.deinit(a);
+    var first: @import("../check/types.zig").Id = 0;
+    var second: @import("../check/types.zig").Id = 0;
+    var missing: u32 = 0;
+    var left: u32 = 0;
+    for (module.bodies) |body| {
+        const name = module.name(body.declaration_name);
+        const ty = module.typeOf(body.root);
+        if (std.mem.eql(u8, name, "first")) first = ty;
+        if (std.mem.eql(u8, name, "second")) second = ty;
+        if (std.mem.eql(u8, name, "third")) missing = module.types.recordField(module.types.node(ty), 0).name;
+    }
+    for (0..module.types.node(first).b) |index| {
+        const field = module.types.recordField(module.types.node(first), index);
+        if (std.mem.eql(u8, module.fieldSpelling(field.name).?, "left")) left = field.name;
+    }
+    var cache: @import("storage_field_plan.zig").Cache = .{ .allocator = a };
+    defer cache.deinit();
+    const integer = (try cache.get(&module, left, &module, first)).?;
+    const floating = (try cache.get(&module, left, &module, second)).?;
+    try std.testing.expectEqual(@import("../check/types.zig").u32_type, integer.ty);
+    try std.testing.expectEqual(@import("../check/types.zig").f32_type, floating.ty);
+    try std.testing.expectEqual(left, module.types.recordField(module.types.node(first), integer.index).name);
+    try std.testing.expectEqual(left, module.types.recordField(module.types.node(second), floating.index).name);
+    try std.testing.expect(try cache.get(&module, missing, &module, first) == null);
+    const probes = cache.probes;
+    try std.testing.expect(try cache.get(&module, missing, &module, first) == null);
+    try std.testing.expectEqual(probes, cache.probes);
+    try std.testing.expect(cache.hits > 0);
+    var uncached: @import("storage_field_plan.zig").Cache = .{ .allocator = a, .maximum_entries = 0 };
+    defer uncached.deinit();
+    try std.testing.expectEqual(integer, (try uncached.get(&module, left, &module, first)).?);
+    try std.testing.expectEqual(@as(u64, 0), uncached.hits);
+}
 test "nested scalar call definitions share diamonds across exports" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);

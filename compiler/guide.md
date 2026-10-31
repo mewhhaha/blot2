@@ -369,7 +369,9 @@ execute once in written order. An ordinary call can pass a record directly:
 `function { x: 1, y: 2 }`. Destructure a known record shape with `{ x, y }`;
 fields can be reordered or omitted. An unannotated parameter's shape must be
 known before destructuring; generic `record.x` access instead infers a field
-requirement. Read a field with `value.field`; `value.field := expression`
+requirement. A named record declaration is unnecessary: the body can infer the
+requirement and each concrete call must satisfy it. Callback effects remain part
+of the check. Read a field with `value.field`; `value.field := expression`
 rebinds the local root, with `self` naming the old field value inside the
 replacement. Structural updates may change that field's type and preserve the
 remaining fields, including nested records.

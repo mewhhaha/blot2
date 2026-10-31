@@ -6,17 +6,28 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. The diagnostic runner defaults to
 a five-second build deadline and kills the compiler on timeout.
 
-The first batch shares nested scalar definitions and memoizes pure direct-call
-admission with exact source-owned zero-row certificates. Five alternating
-Safe/noLLVM pairs on the depth-12 graph improve median build time from **676.75
-ms to 88.53 ms**, expressions from **131,106 to 661**, and Wasm from **952,207
-to 7,529 bytes**.
-[Pinned evidence](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
-keeps this synthetic result separate from Gdev: its original language fixture
-remains about 480 ms; actor presentation and main exceed the five-second cutoff.
-The whole-game target remains open. Next measure real admission declines and
-substitution/captured-environment work before extending sharing to aggregates
-and descriptor-bearing helpers.
+Concrete anonymous field instances now share completed body admission and
+executable definitions throughout one compilation. Field recipes retain source
+declarations; every use resolves their types under its current receiver
+environment. Record keys and inline words use the same canonical field order.
+Nominal witnesses, callbacks and descriptors retain the ordinary scoped paths;
+field-associated ambient rows remain unchanged and do not establish purity.
+
+Five alternating Safe/noLLVM pairs on a 64-field, depth-five graph improve
+median build time from **511.30 ms to 181.76 ms**, admission nodes from **69,546
+to 701**, emission expressions from **5,494 to 579**, and Wasm from **46,959 to
+12,452 bytes**. The paired scalar control remains about **91 ms**.
+[Pinned evidence](zig-native/measurements/concrete-fields-2026-10-31.json) keeps
+these synthetic results separate from Gdev: its original language fixture
+compiles in about **507 ms** and passes all six entries/11 assertions in sync
+and JSPI. Actor presentation and main still exceed the five-second cutoff. The
+whole-game target remains open. Next sample the bounded real build's admission
+declines and substitution/captured-environment work before extending sharing to
+descriptors. The field refinement fixed-point solver still runs.
+
+The
+[previous scalar batch](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
+improved its separately pinned depth-12 graph from 676.75 ms to 88.53 ms.
 
 This is a greenfield project. Breaking changes are welcome; remove superseded
 APIs and implementations. Preserve useful behavior, assertions, deterministic
@@ -72,16 +83,17 @@ context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
-Astra xhigh reviewed the semantic fixes and performance batch. Earlier gate
-attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
-host reaches protocol smoke: three pass and one fails on existing operand-span
-ends, independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The performance batch compiles all 2,733 native
-tests; its affected family passes 103/104 laws with the recorded
-associated-partial baseline failure, plus six additional native laws. All three
-new laws pass, including exhaustive publication allocation failures. Affected
-guests pass 38/39 with the independently reproduced associated-latent baseline.
-Full Zig lint now reports zero findings across 565 source files.
+Astra xhigh reviewed the semantic fixes and both performance batches. Earlier
+gate attempts on the frame candidate were blocked fetching locked Baba 9.0.1.
+This host reaches protocol preflight and fails on existing operand-span ends,
+independently reproduced with the preserved baseline compiler. Full
+qualification remains pending. The concrete-field batch compiles all 2,736
+native tests; its affected family passes 106/107 laws with the recorded
+associated-partial baseline failure. All three new laws pass, including an
+exhaustive allocation-failure sweep for concrete-field sharing. Affected guests
+pass 60/61 with the independently reproduced associated-latent baseline; all
+four new guests pass. Full Zig lint reports zero findings across 566 source
+files. Current performance binaries have not qualified a real Gdev frame.
 
 ## Remaining execution work
 

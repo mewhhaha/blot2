@@ -12,6 +12,7 @@ const Code = @import("runtime_code.zig").Code;
 const Local = @import("runtime_code.zig").Local;
 const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
+const field_plan = @import("storage_field_plan.zig");
 const scope_outline = @import("wasm_scope_outline.zig");
 const type_arguments_index = @import("storage_type_arguments.zig");
 const selected_types = @import("storage_type_key.zig");
@@ -164,7 +165,9 @@ const Generator = struct {
     specialization_origin: ?evaluation.SourceLocation = null,
     methods: *MethodSelector,
     calls: call_plan.Cache,
-    scalar_calls: *call_plan.Cache,
+    shared_calls: *call_plan.Cache,
+    field_recipes: *field_plan.Cache,
+    numeric_call_peak: usize = 0,
     scalar_admission: *call_plan.ScalarAdmission,
     active_calls: *call_plan.ActiveCalls,
     specialize: bool = true,
@@ -1524,10 +1527,20 @@ const Generator = struct {
             else => {},
         }
     }
+    fn recordFieldRecipe(self: *Generator, query: *const core.Module, name: u32, owner: *const core.Module, ty: T.Id) Error!?field_plan.Recipe {
+        const hits_before = self.field_recipes.hits;
+        const probes_before = self.field_recipes.probes;
+        defer {
+            self.emission_work.scoped_field_recipe_hits +|= self.field_recipes.hits - hits_before;
+            self.emission_work.scoped_field_name_probes +|= self.field_recipes.probes - probes_before;
+        }
+        return self.field_recipes.get(query, name, owner, ty);
+    }
     /// Resolve dependent field results before planning a callee's local owners.
     /// The checked receiver and its actual catalog declaration establish the
     /// result; the spelling of a member never implies a collection element type.
     fn refineFields(self: *Generator, m: *const core.Module, goals: []const core.Obligation) Error!void {
+        self.emission_work.scoped_field_refinements +|= 1;
         // This call graph only reads or appends substitutions. Other emission
         // scopes may restore/shrink/swap them and must keep ordinary resolution.
         var binding_index: type_arguments_index.Index = .{ .allocator = self.allocator };
@@ -1545,6 +1558,7 @@ const Generator = struct {
         while (passes <= goals.len) : (passes += 1) {
             const before = self.type_arguments.items.len;
             for (goals) |goal| {
+                self.emission_work.scoped_field_goal_visits +|= 1;
                 if ((goal.kind != .field and goal.kind != .collection) or goal.result == 0) continue;
                 const receiver = try self.resolveType(.{ .unit = m.unit, .ty = goal.ty }, 0);
                 const source = try self.unit(receiver.unit);
@@ -1556,14 +1570,8 @@ const Generator = struct {
                     continue;
                 }
                 if (node.tag == .record) {
-                    const name = m.fieldSpelling(goal.name) orelse continue;
-                    for (0..node.b) |index| {
-                        const field = source.types.recordField(node, index);
-                        const spelling = source.fieldSpelling(field.name) orelse continue;
-                        if (!std.mem.eql(u8, name, spelling)) continue;
-                        try self.mapTypes(.{ .unit = m.unit, .ty = goal.result }, .{ .unit = source.unit, .ty = field.ty, .environment = receiver.environment }, 0);
-                        break;
-                    }
+                    const recipe = try self.recordFieldRecipe(m, goal.name, source, receiver.ty);
+                    if (recipe) |field| try self.mapTypes(.{ .unit = m.unit, .ty = goal.result }, .{ .unit = source.unit, .ty = field.ty, .environment = receiver.environment }, 0);
                     continue;
                 }
                 const identity = T.receiverIdentity(node) orelse continue;
@@ -1931,6 +1939,118 @@ const Generator = struct {
         try self.refineFields(owner, callable.goals);
         return self.numericExpression(owner, closure.body, remaining, active, used + 1, true, depth + 1);
     }
+    // A completed concrete plan never captures runtime words, owner roots or
+    // substitutions. Nominal/hidden witnesses and callable rows stay scoped.
+    fn concreteInlineType(self: *Generator, input: TypeRef, remaining: *usize, depth: usize) Error!bool {
+        if (remaining.* == 0 or depth > 128) return false;
+        remaining.* -= 1;
+        const actual = try self.resolveType(input, 0);
+        const owner = try self.unit(actual.unit);
+        const node = owner.types.node(actual.ty);
+        switch (node.tag) {
+            .unit, .boolean, .u32, .f32 => return true,
+            .product, .record => {
+                for (0..node.b) |index| {
+                    const child = if (node.tag == .record) owner.types.recordField(node, index).ty else owner.types.list(.{ .start = node.a, .len = node.b })[index];
+                    if (!try self.concreteInlineType(.{ .unit = actual.unit, .ty = child, .environment = actual.environment }, remaining, depth + 1)) return false;
+                }
+                return true;
+            },
+            else => return false,
+        }
+    }
+    fn concreteInlineEvidence(self: *Generator, m: *const core.Module, body: *const core.Body) Error!?[]const u32 {
+        const previous = self.diagnostic;
+        return self.concreteInlineEvidenceInner(m, body) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            self.diagnostic = previous;
+            return null;
+        };
+    }
+    // This recognizes the source identity of a field-associated ambient. It
+    // does NOT close that ambient: a completed body walk must still admit all
+    // other operations, and source/call effect checks remain unchanged.
+    fn structuralFieldAmbients(self: *Generator, m: *const core.Module, body: *const core.Body, variables: T.List, remaining: *usize) Error!bool {
+        for (m.types.list(variables)) |variable| {
+            var found = false;
+            for (m.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len]) |goal| {
+                if (remaining.* == 0) return false;
+                remaining.* -= 1;
+                if (goal.kind != .field or goal.signature == 0) continue;
+                const signature = m.types.node(goal.signature);
+                if (signature.tag != .function) continue;
+                const row = m.types.row(signature.c);
+                if (row.labels.len != 0 or row.tail != .variable or row.tail.variable != variable) continue;
+                const receiver = try self.resolveType(.{ .unit = m.unit, .ty = goal.ty }, 0);
+                const owner = try self.unit(receiver.unit);
+                if (owner.types.node(receiver.ty).tag != .record) continue;
+                if (try self.recordFieldRecipe(m, goal.name, owner, receiver.ty) == null) continue;
+                found = true;
+                break;
+            }
+            if (!found) return false;
+        }
+        return true;
+    }
+    fn concreteInlineEvidenceInner(self: *Generator, m: *const core.Module, body: *const core.Body) Error!?[]const u32 {
+        const binding = m.binding(body.binding);
+        if (body.scheme.generative.len != 0 or binding.scheme.generative.len != 0) return null;
+        var remaining: usize = 4096;
+        const row_frontiers = [_]T.List{ body.scheme.row_variables, binding.scheme.row_variables, binding.public_rows };
+        for (row_frontiers) |rows| if (!try self.structuralFieldAmbients(m, body, rows, &remaining)) return null;
+        for (m.bodyParameters(body)) |parameter| if (!try self.concreteInlineType(.{ .unit = m.unit, .ty = parameter.ty }, &remaining, 0)) return null;
+        if (!try self.concreteInlineType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, &remaining, 0)) return null;
+        const frontiers = [_]T.List{ body.scheme.variables, binding.scheme.variables, binding.public_variables };
+        for (frontiers) |variables| for (m.types.list(variables)) |variable| {
+            if (!try self.concreteInlineType(.{ .unit = m.unit, .ty = variable }, &remaining, 0)) return null;
+        };
+        var evidence: std.ArrayList(u32) = .empty;
+        errdefer evidence.deinit(self.allocator);
+        try evidence.append(self.allocator, std.math.maxInt(u32) - 3);
+        // Exact source row identities remain symbolic; these are not zero-row
+        // certificates and cannot establish purity or authorize an invocation.
+        for (row_frontiers) |rows| {
+            try evidence.append(self.allocator, rows.len);
+            try evidence.appendSlice(self.allocator, m.types.list(rows));
+        }
+        var type_work: usize = 4096;
+        var keys = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer keys.deinit();
+        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &keys, 0);
+        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = m.typeOf(body.root) }, &evidence, &keys, 0);
+        for (frontiers) |variables| {
+            try evidence.append(self.allocator, variables.len);
+            for (m.types.list(variables)) |variable| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = variable }, &evidence, &keys, 0);
+        }
+        try self.finishSelectedTypes(m, body.root, &evidence, &keys);
+        return try evidence.toOwnedSlice(self.allocator);
+    }
+    fn admitNumericBody(self: *Generator, m: *const core.Module, target: core.BindingRef, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool) Error!bool {
+        const peak_before = self.numeric_call_peak;
+        self.numeric_call_peak = used;
+        defer self.numeric_call_peak = @max(peak_before, self.numeric_call_peak);
+        const body = m.body(target.binding) orelse return false;
+        if (!readers and !self.planning_writer) if (try self.concreteInlineEvidence(m, body)) |evidence| {
+            defer self.allocator.free(evidence);
+            const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
+            if (self.shared_calls.admitted(key)) |height| {
+                if (remaining.* == 0 or height > 128 - used) return false;
+                remaining.* -= 1;
+                self.numeric_call_peak = @max(self.numeric_call_peak, used + height);
+                self.emission_work.scoped_concrete_admission_hits +|= 1;
+                return true;
+            }
+        };
+        const admitted = try self.numericExpression(m, body.root, remaining, active, used + 1, readers, 0);
+        if (admitted and !readers and !self.planning_writer) if (try self.concreteInlineEvidence(m, body)) |evidence| {
+            defer self.allocator.free(evidence);
+            const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
+            const before = self.shared_calls.plans.items.len;
+            try self.shared_calls.admit(key, self.numeric_call_peak - used);
+            if (self.shared_calls.plans.items.len > before) self.emission_work.scoped_concrete_admissions +|= 1;
+        };
+        return admitted;
+    }
     fn numericCallBody(self: *Generator, target: core.BindingRef, inputs: []const TypeRef, values: ?[]const Value, output: TypeRef, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool) Error!bool {
         if (used == active.len) return false;
         // Different selected callbacks can nest through the same generic
@@ -1974,6 +2094,7 @@ const Generator = struct {
             return self.plannedCallback(function, known[parameters.len], remaining, active, used + 1, 0);
         }
         const before = self.type_arguments.items.len;
+        errdefer self.type_arguments.shrinkRetainingCapacity(before);
         const bindings_before = self.bindings.items.len;
         defer self.bindings.shrinkRetainingCapacity(bindings_before);
         active[used] = target;
@@ -1988,10 +2109,7 @@ const Generator = struct {
         } else for (parameters, inputs) |parameter, input| try self.mapTypes(.{ .unit = owner.unit, .ty = parameter.ty }, input, 0);
         try self.mapTypes(.{ .unit = owner.unit, .ty = owner.typeOf(body.root) }, output, 0);
         try self.refineFields(owner, owner.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len]);
-        const admitted = self.numericExpression(owner, body.root, remaining, active, used + 1, readers, 0) catch |err| {
-            self.type_arguments.shrinkRetainingCapacity(before);
-            return err;
-        };
+        const admitted = try self.admitNumericBody(owner, target, remaining, active, used, readers);
         var result = try self.resolveType(.{ .unit = owner.unit, .ty = owner.typeOf(body.root) }, 0);
         if (result.environment == null) switch ((try self.unit(result.unit)).types.node(result.ty).tag) {
             .unit, .boolean, .u32, .f32, .never => {},
@@ -2004,6 +2122,7 @@ const Generator = struct {
         return admitted;
     }
     fn numericExpression(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool, depth: usize) Error!bool {
+        self.numeric_call_peak = @max(self.numeric_call_peak, used);
         self.emission_work.scoped_call_admission_nodes +|= 1;
         if (id == 0) return true;
         if (remaining.* == 0 or depth > 128) return false;
@@ -2271,6 +2390,10 @@ const Generator = struct {
     fn reusableCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         const raw_result_type = m.typeOf(body.root);
+        switch (m.types.node(raw_result_type).tag) {
+            .record, .product => return null,
+            else => {},
+        }
         const owned_result = m.types.node(raw_result_type).tag == .array;
         if (owned_result and !self.specialize) return null;
         var result_type = raw_result_type;
@@ -2312,7 +2435,7 @@ const Generator = struct {
         }
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
-        var cache = self.scalar_calls;
+        var cache = self.shared_calls;
         if (owned_result) cache = &self.calls;
         const existing = cache.find(key);
         if (existing != null and !owned_result) self.emission_work.scoped_scalar_cache_hits +|= 1;
@@ -2330,7 +2453,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
-                .scalar_calls = self.scalar_calls,
+                .shared_calls = self.shared_calls,
+                .field_recipes = self.field_recipes,
                 .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
@@ -2428,8 +2552,24 @@ const Generator = struct {
     /// the call. The callee cannot retain this slot or manufacture an owner.
     fn reusableInlineCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
+        var eligible = !self.planning_writer;
+        for (arguments) |argument| if (!plainShape(argument) or argument.demand != null or argument.host != null) {
+            eligible = false;
+            break;
+        };
+        var early: ?[]const u32 = null;
+        if (eligible) early = try self.concreteInlineEvidence(m, body);
+        defer if (early) |evidence| self.allocator.free(evidence);
+        if (!self.specialize and early == null) return null;
+        var completed: ?usize = null;
+        if (early) |evidence| {
+            const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
+            if (self.shared_calls.find(key)) |found| if (!self.shared_calls.entries.items[found].building) {
+                completed = found;
+            };
+        }
         var remaining: usize = 100_000;
-        if (!call_plan.inlineBody(self.units, m, target.binding, &remaining)) {
+        if (completed == null and !call_plan.inlineBody(self.units, m, target.binding, &remaining)) {
             var active: [128]core.BindingRef = undefined;
             active[0] = target;
             if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
@@ -2444,19 +2584,35 @@ const Generator = struct {
         var words: usize = 0;
         for (arguments) |argument| words = std.math.add(usize, words, try inlineWords(argument)) catch return self.unsupported(m, body.root);
         const aggregate_result = result_shape.tag == .aggregate;
+        // A scratch result slot must never consume an array-return destination.
+        if (aggregate_result and self.destination != null) return null;
         const parameter_count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return self.unsupported(m, body.root);
         if (parameter_count > std.math.maxInt(u32)) return self.unsupported(m, body.root);
+        var concrete: ?[]const u32 = null;
+        if (eligible) concrete = try self.concreteInlineEvidence(m, body);
+        defer if (concrete) |evidence| self.allocator.free(evidence);
+        if (!self.specialize and concrete == null) return null;
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
-        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32), result_type });
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-        try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
-        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
-        const index = if (self.calls.find(key)) |found| found else blk: {
+        var cache = &self.calls;
+        var encoded: []const u32 = undefined;
+        if (concrete) |closed| {
+            cache = self.shared_calls;
+            encoded = closed;
+        } else {
+            try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32), result_type });
+            var type_work: usize = 4096;
+            var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+            defer type_key.deinit();
+            for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
+            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
+            try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
+            encoded = evidence.items;
+        }
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = encoded };
+        const existing = cache.find(key);
+        if (existing != null and concrete != null) self.emission_work.scoped_inline_cache_hits +|= 1;
+        const index = if (existing) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
             defer self.allocator.free(signature);
             @memset(signature, .i32);
@@ -2464,12 +2620,13 @@ const Generator = struct {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.unsupported(m, body.root),
             };
-            const inserted = try self.calls.insert(key, function, result_shape.floating);
+            const inserted = try cache.insert(key, function, result_shape.floating);
             var child: Generator = .{
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
-                .scalar_calls = self.scalar_calls,
+                .shared_calls = self.shared_calls,
+                .field_recipes = self.field_recipes,
                 .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
@@ -2503,10 +2660,11 @@ const Generator = struct {
                 try child.storeValue(.{ .id = @intCast(words) }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, body.root, output));
-            self.calls.entries.items[inserted].building = false;
+            cache.entries.items[inserted].building = false;
+            if (concrete != null) self.emission_work.scoped_inline_definitions +|= 1;
             break :blk inserted;
         };
-        const entry = self.calls.entries.items[index];
+        const entry = cache.entries.items[index];
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive inline specializations are not admitted");
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
@@ -2877,7 +3035,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
-                .scalar_calls = self.scalar_calls,
+                .shared_calls = self.shared_calls,
+                .field_recipes = self.field_recipes,
                 .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
@@ -3038,7 +3197,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
-                .scalar_calls = self.scalar_calls,
+                .shared_calls = self.shared_calls,
+                .field_recipes = self.field_recipes,
                 .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
@@ -3226,8 +3386,39 @@ const Generator = struct {
                 for (children) |child| try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = child, .environment = actual.environment }, &descriptor, keys, depth, &height);
             },
             .record => {
-                try keys.addWord(&descriptor, node.b);
+                // Keys follow semantic field order, just as inline words do.
+                // Bound both ordinal count and name bytes before sorting.
+                if (node.b > keys.remaining.*) return error.Limit;
+                var name_words: usize = 1;
                 for (0..node.b) |index| {
+                    const field = owner.types.recordField(node, index);
+                    var words: usize = 4;
+                    if (owner.fieldSpelling(field.name)) |name| words = std.math.add(usize, name.len, 2) catch return error.Limit;
+                    name_words = std.math.add(usize, name_words, words) catch return error.Limit;
+                    if (name_words > keys.options.encoded_words or name_words > keys.word_work) return error.Limit;
+                }
+                const order = try self.allocator.alloc(u32, node.b);
+                defer self.allocator.free(order);
+                for (order, 0..) |*ordinal, index| ordinal.* = @intCast(index);
+                const Ordering = struct {
+                    owner: *const core.Module,
+                    node: T.Node,
+                    fn less(context: @This(), left: u32, right: u32) bool {
+                        const a = context.owner.types.recordField(context.node, left).name;
+                        const b = context.owner.types.recordField(context.node, right).name;
+                        const a_name = context.owner.fieldSpelling(a);
+                        const b_name = context.owner.fieldSpelling(b);
+                        if (a_name) |name| {
+                            if (b_name) |other| return std.mem.order(u8, name, other) == .lt;
+                            return true;
+                        }
+                        if (b_name != null) return false;
+                        return a < b;
+                    }
+                };
+                std.mem.sort(u32, order, Ordering{ .owner = owner, .node = node }, Ordering.less);
+                try keys.addWord(&descriptor, node.b);
+                for (order) |index| {
                     const field = owner.types.recordField(node, index);
                     if (owner.fieldSpelling(field.name)) |name| {
                         try keys.addWord(&descriptor, @intCast(name.len));
@@ -3313,7 +3504,7 @@ const Generator = struct {
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
         if (reuse) if (try self.reusableCall(m, target, arguments)) |value| return value;
-        if (reuse and self.specialize) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
+        if (reuse) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
         if (reuse and self.specialize) if (try self.reusableReaderCall(m, target, arguments)) |value| return value;
         if (reuse and self.specialize) if (try self.reusableUnitWriter(m, target, arguments)) |value| return value;
         // A reusable definition's child enters while compiling its body. Do
@@ -3408,7 +3599,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
-                .scalar_calls = self.scalar_calls,
+                .shared_calls = self.shared_calls,
+                .field_recipes = self.field_recipes,
                 .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
@@ -4623,18 +4815,16 @@ const Generator = struct {
                 const right = try self.expression(m, n.b, depth + 1);
                 if (right.terminated) return right;
                 try self.protected.append(self.allocator, right);
-                var merged = (try self.mergeRecordValues(left, right)) orelse return self.unsupported(m, id);
+                const merged = (try self.mergeRecordValues(left, right)) orelse return self.unsupported(m, id);
                 const output = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
                 const owner = try self.unit(output.unit);
                 const record = owner.types.node(output.ty);
                 if (record.tag == .record) {
                     if (record.b != merged.fields.len) return self.unsupported(m, id);
-                    const fields = try self.arena.allocator().alloc(Value, record.b);
-                    for (fields, 0..) |*field, index| {
+                    for (0..record.b) |index| {
                         const name = owner.fieldSpelling(owner.types.recordField(record, index).name) orelse return self.unsupported(m, id);
-                        field.* = dataField(merged, name) orelse return self.unsupported(m, id);
+                        if (dataField(merged, name) == null) return self.unsupported(m, id);
                     }
-                    merged.fields = fields;
                 }
                 return merged;
             },
@@ -5041,14 +5231,16 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     defer active_calls.deinit();
     var scalar_admission: call_plan.ScalarAdmission = .{ .allocator = allocator, .units = units };
     defer scalar_admission.deinit();
-    var scalar_calls: call_plan.Cache = .{ .allocator = allocator };
-    defer scalar_calls.deinit();
+    var field_recipes: field_plan.Cache = .{ .allocator = allocator };
+    defer field_recipes.deinit();
+    var shared_calls: call_plan.Cache = .{ .allocator = allocator };
+    defer shared_calls.deinit();
     var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
     var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry };
     defer methods.deinit();
-    var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .scalar_calls = &scalar_calls, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
+    var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
     g.emit(entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,

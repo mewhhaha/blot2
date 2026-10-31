@@ -48,11 +48,37 @@ pub const ActiveCalls = struct {
     }
 };
 pub const Cache = struct {
+    const Plan = struct { key: Key, height: usize };
     allocator: std.mem.Allocator,
     entries: std.ArrayList(Entry) = .empty,
+    plans: std.ArrayList(Plan) = .empty,
     pub fn deinit(self: *Cache) void {
         for (self.entries.items) |entry| self.allocator.free(entry.key.evidence);
         self.entries.deinit(self.allocator);
+        for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
+        self.plans.deinit(self.allocator);
+    }
+    /// Completed admission is separate from executable function publication.
+    pub fn admitted(self: *const Cache, key: Key) ?usize {
+        for (self.plans.items) |plan| {
+            if (plan.key.eql(key)) return plan.height;
+        }
+        return null;
+    }
+    /// Publish only successful complete walks. Keys own the same exact static
+    /// evidence as executable entries, without caller environments or values.
+    pub fn admit(self: *Cache, key: Key, height: usize) std.mem.Allocator.Error!void {
+        for (self.plans.items) |*plan| {
+            if (!plan.key.eql(key)) continue;
+            plan.height = @max(plan.height, height);
+            return;
+        }
+        // This is optional metadata; saturation leaves ordinary probing intact.
+        if (self.plans.items.len >= 65_536) return;
+        var owned_key = key;
+        owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
+        errdefer self.allocator.free(owned_key.evidence);
+        try self.plans.append(self.allocator, .{ .key = owned_key, .height = height });
     }
     pub fn find(self: *const Cache, key: Key) ?usize {
         for (self.entries.items, 0..) |entry, index| {
@@ -73,6 +99,32 @@ pub const Cache = struct {
         return index;
     }
 };
+
+test "completed call admission owns exact contextual keys and conservative heights" {
+    var cache: Cache = .{ .allocator = std.testing.allocator };
+    defer cache.deinit();
+    var evidence = [_]u32{ 17, 23 };
+    const first: Key = .{ .unit = 1, .binding = 2, .context = 3, .evidence = &evidence };
+    var second = first;
+    second.context = 4;
+    try cache.admit(first, 3);
+    try cache.admit(second, 5);
+    evidence[0] = 99;
+    try std.testing.expectEqual(@as(?usize, null), cache.admitted(first));
+    try std.testing.expectEqual(@as(?usize, null), cache.admitted(second));
+    var original_first = first;
+    original_first.evidence = &.{ 17, 23 };
+    var original_second = second;
+    original_second.evidence = original_first.evidence;
+    try std.testing.expectEqual(@as(?usize, 3), cache.admitted(original_first));
+    try std.testing.expectEqual(@as(?usize, 5), cache.admitted(original_second));
+    try cache.admit(original_first, 2);
+    try std.testing.expectEqual(@as(?usize, 3), cache.admitted(original_first));
+    try cache.admit(original_first, 7);
+    try std.testing.expectEqual(@as(?usize, 7), cache.admitted(original_first));
+    try std.testing.expectEqual(@as(usize, 2), cache.plans.items.len);
+    try std.testing.expectEqual(@as(usize, 0), cache.entries.items.len);
+}
 
 /// Only scalar computations can use the first reusable ABI. Storage,
 /// captures, globals, handlers and unknown forms retain explicit admission in

@@ -1,0 +1,445 @@
+{
+  "date": "2026-10-31T22:30:22.421767+00:00",
+  "goal": "Subsecond Gdev compilation remains incomplete. Every diagnostic build is capped at five seconds.",
+  "scope": "Concrete anonymous data-only field specialization in the scoped backend; no syntax change or named-record requirement. Safe/noLLVM development evidence only. ABI8 and session2 unchanged.",
+  "implementation": [
+    "Resolve field existence and raw declared type with a compilation-local declaration recipe; map its type in the current receiver environment on every use. Negative lookup is cached. Saturation retains ordinary lookup.",
+    "Memoize completed descendant body admission with exact concrete primitive/product/record input/result and quantified/public type evidence, source row identities, invocation context and conservative call height. The first executable-definition root walk still reconstructs inference equations.",
+    "Share completed concrete inline executable definitions across generators and nested calls. Exclude nominal/phantom witnesses, callable/descriptor/open types and pending aggregate destinations from the new shared path.",
+    "Canonicalize record keys by UTF8 field spelling, preserve paired field types, and retain canonical merged Value field order. Bound name/count work before sorting. Products stay ordered.",
+    "Recognizing field-associated ambient rows is physical-cache eligibility only. No ambient is closed or erased, and ordinary body/emission/effect checks remain required. The field-refinement fixed-point solver is still present."
+  ],
+  "source": {
+    "baseline_commit": "88beb5471f27104d857b5acbb9a97eeca49be09e",
+    "candidate_base_commit": "88beb5471f27104d857b5acbb9a97eeca49be09e",
+    "changed_production_sha256": {
+      "zig-native/src/backend/scoped_backend.zig": "7a4a6a8c08dcd2eececd1bde25f37d35a6b978f3c99e30853246b94782682815",
+      "zig-native/src/backend/storage_calls.zig": "8e578389d5b93d9030e17be7e12c2ae2661b70f2fbee1821453d07a86ec8cbe8",
+      "zig-native/src/backend/storage_field_plan.zig": "9c1f7dc26928543ed6054e249e888a49f5f7e05df20e55a004af9644a271448c",
+      "zig-native/src/work_counters.zig": "2c9c1f9fc80b12dc7f4faedb6726a004498805c837b2be74b7e2c3f53ac75787"
+    },
+    "fixture_and_harness_sha256": {
+      "scripts/bench/scoped_calls.ts": "9e748243c770f423625d323d8bf94099b0902f63bc08a842cdb528f5b2b995fa",
+      "zig-native/src/backend/storage_calls_tests.zig": "ea695b7ade0233f35b6ddd2da49dd9eb43af86f1d74b05ac89a56ba6cf3e0bee",
+      "zig-native/tests/concrete_fields_execution.test.ts": "8c827296e6b4ac7c7c9453327ca397d9a9afd6225bc1e05764966411fdcaf7a0",
+      "scripts/dev_check_areas.ts": "12d7f9ed1288b151a3e025a29cb1872e51f94199f9456dace98d240533fb69c2"
+    },
+    "std_tree": "3076b1172f56836f3233f47f2a1c811d31aedab4",
+    "prelude_sha256": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "gdev_commit": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+    "pen_commit": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+    "siblings_clean": true
+  },
+  "environment": {
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false,
+    "deno": "2.9.8",
+    "os": "Linux-7.3.0-4-cachyos-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "affinity": "Unpinned; sequential alternating samples, no competing builds during timing.",
+    "build_command": "zig version && cd zig-native && zig build install compiler-identity test-compile -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev -j2"
+  },
+  "measurement_method": {
+    "sessions": "Five alternating pairs per workload; fresh compiler sessions, disk cache disabled. Five-second startup and build deadlines.",
+    "build_ms": "Build request only; excludes startup, Wasm instantiation and execution.",
+    "latency_ms": "Session startup through successful build, instantiation and checked execution.",
+    "execution": "Every paired synthetic sample executes answer(1), answer(7), answer(41) against an independent JS recurrence.",
+    "profile_backend": false,
+    "previous_batch_record": "zig-native/measurements/scoped-call-sharing-2026-10-31.json"
+  },
+  "concrete_fields": {
+    "workload": "64 anonymous U32 fields; a generic field sum, five stages each calling its predecessor twice, four repeated top-level calls and an entry-owned GrowArray marker.",
+    "command": "deno run --no-config --no-lock -A scripts/bench/scoped_calls.ts --blotc COMPILER --fields 64 --sizes 4 --depth 5 --timeout-ms 5000",
+    "baseline": {
+      "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+      "source_sha256": "2de33cb1ea5ec15abe070cda3657149a602d1c64b7d27dc12e4e57870cc000f1",
+      "build_ms_samples": [
+        498.078617,
+        514.410275,
+        510.04614599999996,
+        511.296164,
+        527.923606
+      ],
+      "latency_ms_samples": [
+        514.136536,
+        529.520902,
+        525.1422249999999,
+        526.384368,
+        541.9781519999999
+      ],
+      "median_build_ms": 511.296164,
+      "wasm_bytes": 46959,
+      "nonzero_work_counters": {
+        "scoped_emission_expressions": 5494,
+        "scoped_call_admission_nodes": 69546,
+        "scoped_scalar_admission_nodes": 20,
+        "scoped_refinement_lookups": 58368,
+        "scoped_refinement_linear_bindings": 321024,
+        "max_scoped_emission_body_steps": 5243,
+        "max_scoped_emission_limit": 500000
+      }
+    },
+    "candidate": {
+      "compiler_sha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "source_sha256": "2de33cb1ea5ec15abe070cda3657149a602d1c64b7d27dc12e4e57870cc000f1",
+      "build_ms_samples": [
+        181.76059899999996,
+        163.35544100000004,
+        178.588229,
+        183.68537099999998,
+        215.00178699999998
+      ],
+      "latency_ms_samples": [
+        195.82198699999998,
+        178.29462999999998,
+        190.99693099999996,
+        196.11509500000005,
+        228.241352
+      ],
+      "median_build_ms": 181.76059899999996,
+      "wasm_bytes": 12452,
+      "nonzero_work_counters": {
+        "scoped_emission_expressions": 579,
+        "scoped_call_admission_nodes": 701,
+        "scoped_scalar_admission_nodes": 8,
+        "scoped_inline_definitions": 7,
+        "scoped_inline_cache_hits": 11,
+        "scoped_concrete_admissions": 5,
+        "scoped_concrete_admission_hits": 13,
+        "scoped_field_refinements": 44,
+        "scoped_field_goal_visits": 510,
+        "scoped_field_recipe_hits": 384,
+        "scoped_field_name_probes": 2080,
+        "scoped_refinement_lookups": 1792,
+        "scoped_refinement_linear_bindings": 9856,
+        "max_scoped_emission_body_steps": 323,
+        "max_scoped_emission_limit": 500000
+      }
+    },
+    "median_speedup": 2.8130198008425364,
+    "sample_order": [
+      {
+        "pair": 0,
+        "variant": "baseline"
+      },
+      {
+        "pair": 0,
+        "variant": "candidate"
+      },
+      {
+        "pair": 1,
+        "variant": "candidate"
+      },
+      {
+        "pair": 1,
+        "variant": "baseline"
+      },
+      {
+        "pair": 2,
+        "variant": "baseline"
+      },
+      {
+        "pair": 2,
+        "variant": "candidate"
+      },
+      {
+        "pair": 3,
+        "variant": "candidate"
+      },
+      {
+        "pair": 3,
+        "variant": "baseline"
+      },
+      {
+        "pair": 4,
+        "variant": "baseline"
+      },
+      {
+        "pair": 4,
+        "variant": "candidate"
+      }
+    ]
+  },
+  "scalar_control": {
+    "workload": "The unchanged four-lane depth12 scalar diamond from the prior batch.",
+    "command": "deno run --no-config --no-lock -A scripts/bench/scoped_calls.ts --blotc COMPILER --sizes 4 --depth 12 --timeout-ms 5000",
+    "baseline": {
+      "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+      "source_sha256": "ceb0706376c8642eac9d78bbdffd49a736a8965e04f9fb4d202d7680ba8b85c4",
+      "build_ms_samples": [
+        91.510941,
+        112.48478499999999,
+        116.376443,
+        88.464402,
+        88.16889900000001
+      ],
+      "latency_ms_samples": [
+        113.33005399999996,
+        141.56118199999997,
+        148.970486,
+        121.88744200000002,
+        113.250902
+      ],
+      "median_build_ms": 91.510941,
+      "wasm_bytes": 7529,
+      "nonzero_work_counters": {
+        "scoped_emission_expressions": 661,
+        "scoped_scalar_definitions": 49,
+        "scoped_scalar_cache_hits": 51,
+        "scoped_call_admission_nodes": 10,
+        "scoped_scalar_admission_nodes": 1017,
+        "scoped_scalar_admission_hits": 139,
+        "max_scoped_emission_body_steps": 34,
+        "max_scoped_emission_limit": 500000
+      }
+    },
+    "candidate": {
+      "compiler_sha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "source_sha256": "ceb0706376c8642eac9d78bbdffd49a736a8965e04f9fb4d202d7680ba8b85c4",
+      "build_ms_samples": [
+        88.95269300000001,
+        96.67598300000003,
+        89.19440200000003,
+        91.08893700000004,
+        104.48690099999999
+      ],
+      "latency_ms_samples": [
+        112.79234200000002,
+        123.128555,
+        122.34169700000001,
+        118.071279,
+        128.62699100000003
+      ],
+      "median_build_ms": 91.08893700000004,
+      "wasm_bytes": 7529,
+      "nonzero_work_counters": {
+        "scoped_emission_expressions": 661,
+        "scoped_scalar_definitions": 49,
+        "scoped_scalar_cache_hits": 51,
+        "scoped_call_admission_nodes": 10,
+        "scoped_scalar_admission_nodes": 1017,
+        "scoped_scalar_admission_hits": 139,
+        "scoped_field_refinements": 150,
+        "max_scoped_emission_body_steps": 34,
+        "max_scoped_emission_limit": 500000
+      }
+    },
+    "median_speedup": 1.004632878743551,
+    "sample_order": [
+      {
+        "pair": 0,
+        "variant": "baseline"
+      },
+      {
+        "pair": 0,
+        "variant": "candidate"
+      },
+      {
+        "pair": 1,
+        "variant": "candidate"
+      },
+      {
+        "pair": 1,
+        "variant": "baseline"
+      },
+      {
+        "pair": 2,
+        "variant": "baseline"
+      },
+      {
+        "pair": 2,
+        "variant": "candidate"
+      },
+      {
+        "pair": 3,
+        "variant": "candidate"
+      },
+      {
+        "pair": 3,
+        "variant": "baseline"
+      },
+      {
+        "pair": 4,
+        "variant": "baseline"
+      },
+      {
+        "pair": 4,
+        "variant": "candidate"
+      }
+    ],
+    "interpretation": "No demonstrated scalar speedup or regression; median build latency remains about91ms and Wasm/counters match."
+  },
+  "rejected_probe": {
+    "status": "failed",
+    "workload": "field_refinement",
+    "width": 4,
+    "fields": 64,
+    "depth": 6,
+    "latency_ms": 175.00892199999998,
+    "timeout_ms": 5000,
+    "error": "[{\"filename\":\"/home/jacobt/src/blot2/scoped-call-profile.blot\",\"stage\":\"emit\",\"code\":\"storage_unsupported\",\"start\":4457,\"end\":4477,\"message\":\"Source module storage validation exceeded its checked work budget\",\"offset_encoding\":\"utf8_bytes\",\"utf16\":null,\"details\":null}]",
+    "source_sha256": "759a0aa4185a9b21cc35961a6f28b85a9204d3ffa285c51eda845f0e76d9274d",
+    "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+    "interpretation": "The depth6 field workload fails source-module validation before successful emission. Its latency is not an optimization comparison. Limits were not raised."
+  },
+  "gdev_bounded_builds": [
+    {
+      "variant": "baseline",
+      "entry": "tests/language_compatibility.blot",
+      "compilerSha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+      "sourceCheckpoint": {
+        "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 514.545038,
+      "success": true,
+      "compiled": true,
+      "wasmBytes": 25283,
+      "assetCount": 0
+    },
+    {
+      "variant": "candidate",
+      "entry": "tests/language_compatibility.blot",
+      "compilerSha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "sourceCheckpoint": {
+        "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 507.167524,
+      "success": true,
+      "compiled": true,
+      "wasmBytes": 25283,
+      "assetCount": 0
+    },
+    {
+      "variant": "candidate",
+      "entry": "tests/actor_presentation.blot",
+      "compilerSha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "sourceCheckpoint": {
+        "entrySha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5002.318211,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete"
+    },
+    {
+      "variant": "candidate",
+      "entry": "src/main.blot",
+      "compilerSha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "sourceCheckpoint": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5002.659412,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete"
+    }
+  ],
+  "gdev_language_execution": {
+    "source_entry": "tests/language_compatibility.blot",
+    "variants": [
+      "baseline",
+      "candidate"
+    ],
+    "entries": 6,
+    "assertions_per_mode": 11,
+    "modes": [
+      "sync",
+      "JSPI"
+    ],
+    "passed": true,
+    "assertion_counts_in_source_order": [
+      2,
+      2,
+      2,
+      1,
+      3,
+      1
+    ]
+  },
+  "verification": {
+    "compiled_native_inventory": 2736,
+    "development_family": {
+      "command": "deno task check:dev --area scoped-storage --budget-seconds 180",
+      "selected": 107,
+      "passed": 106,
+      "failed": 1,
+      "leaks": 0,
+      "fault_mode": "sampled",
+      "wall_seconds": 10.242731736,
+      "compiler_sha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+      "native_binary_sha256": "3f9f1fc2980c9c462502dea3d602681e4c3980e327d919cf43bcbc576b59f2ce",
+      "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+      "baseline_provenance": "Previously independently reproduced and retained in scoped-call-sharing-2026-10-31.json. This development family is not a pass."
+    },
+    "new_native_laws": {
+      "passed": 3,
+      "failed": 0,
+      "leaks": 0,
+      "names": [
+        "backend.storage_calls_tests.test.concrete anonymous field instances share body plans through allocation failures",
+        "backend.storage_calls_tests.test.concrete field recipes retain declaration types order absence and capacity fallback",
+        "backend.storage_calls.test.completed call admission owns exact contextual keys and conservative heights"
+      ],
+      "full_allocation_failure_sweep": "Concrete anonymous field sharing law passed in exhaustive mode with zero leaks; sampled discovery found699 allocation sites."
+    },
+    "affected_guests": {
+      "passed": 60,
+      "failed": 1,
+      "files": [
+        "zig-native/tests/storage_calls_execution.test.ts",
+        "zig-native/tests/concrete_fields_execution.test.ts",
+        "zig-native/tests/storage_records_execution.test.ts",
+        "zig-native/tests/storage_record_merge_execution.test.ts",
+        "zig-native/tests/storage_generic_readers_execution.test.ts",
+        "zig-native/tests/storage_nominal_fields_execution.test.ts",
+        "zig-native/tests/scoped_contract_methods_execution.test.ts",
+        "zig-native/tests/storage_reader_witnesses_execution.test.ts",
+        "zig-native/tests/scoped_callback_value_execution.test.ts"
+      ],
+      "new_tests_passed": 4,
+      "baseline_failure": "associated function results retain selected latent effect rows",
+      "baseline_reproduced_current_run": true,
+      "coverage": "Development and optimized tiers; sync and JSPI; U32/F32/Bool, negative zero,100000 repeated calls, live GrowArray roots, aggregate and array-return scratch lifetimes, mixed-type merged inputs/results, phantom nominal fallback, synchronous and asynchronous Foreign callbacks. The pending-destination guard was reviewed but is not directly reached by the current destinationBody admission rules."
+    },
+    "full_gate": {
+      "command": "deno task test:compiler",
+      "passed": false,
+      "stage": "preflight-regressions",
+      "failure": "wire contract operand spans: actual ends42/47, expected43/48",
+      "baseline_reproduced_current_run": true,
+      "baseline_protocol_passed": 41,
+      "baseline_protocol_failed": 1,
+      "remaining_native_and_guest_stages": "not reached"
+    },
+    "lint": {
+      "command": "deno task lint:zig",
+      "source_files": 566,
+      "source_findings": 0,
+      "fixture_files": 1,
+      "fixture_findings": 0
+    },
+    "typescript_check": true,
+    "format_check": true,
+    "diff_check": true,
+    "review": "Astra xhigh reviewed final production diff; no correctness blockers found."
+  },
+  "limitations": [
+    "No whole-Gdev compile-time win established; actor presentation and main were cancelled after five seconds and remain incomplete.",
+    "No final-candidate Pen frame, browser/GPU, exhaustive whole-native gate or LLVM release qualification.",
+    "Recipes cache source declaration ordinals/types, not universal physical offsets or caller substitutions.",
+    "No language feature removed, no compiler budget raised, no Gdev/Ink/Pen source or assets changed.",
+    "Optional admission and executable caches use linear exact lookup; both are bounded by their existing context and work limits, and admission metadata is capped at65536 plans.",
+    "Next: bounded sampling of real Gdev admission declines and substitution/captured-environment work before broader sharing."
+  ],
+  "raw_evidence_local": "build/bench/concrete-fields (ignored; this portable record preserves source/compiler identities, all paired latency samples, work counters, commands and qualification limits)"
+}
