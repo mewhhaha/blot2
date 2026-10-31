@@ -7,96 +7,55 @@ current main Wasm or frame has succeeded. Preserve ABI8/session2, framing26,
 the165-field FrameAccess, packet order and the storage capacities below.
 
 Production source expansion remains500,000 expressions per function. Astra xhigh
-reviewed one bounded1,000,000 experiment; other limits are unchanged and there
-is no further automatic increase. The latest completed full attempt,
-`main-7d1564b64ec56839`, passed trails/map and stopped at569,125 in
-`robots.claimed_as` because Activity had no equality implementation. Gdev
-`e9127dd` supplies the five constructor comparisons; all25 pairs and real claim
-mutation pass in both tiers and sync/async. Its full retry
-`main-133334896341e559` was stopped after focused probes found later failures.
+reviewed one bounded1,000,000 experiment; no further cap increase is authorized.
+The latest completed full attempt, `main-378b434395b10721`, reached894,814
+expressions in the first exported body, then exhausted the unchanged100,000-node
+layout budget in Ink ECS. It took1,138s and10,893,316KiB peak child RSS. No
+complete first export or valid real-main module was emitted.
 
-Use compile-only probes of the real `game.played.update` and `.render` with
-`world.with_owners`, `host.with_frame` and canonical FrameAccess to isolate late
-failures cheaply. Both stages now finish source emission, after invocation-local
-global borrows and concrete generated codec policies. Gdev37775ff and
-Inkb0ec918 preserve exact ActorObservation framing and pass strict encode/decode,
-inspection and malformed-input checks in both tiers/sync-async. Native generation
-check and Astra xhigh review pass. General contract-method lowering is deferred.
+Closed parameterized nominal layouts now use declaration-local substitutions to
+prove context-free cache eligibility. Every argument must close, including
+phantom arguments; storage capabilities and callables decline. Closed shapes
+are built with isolated substitutions so nested semantic witnesses cannot retain
+an unrelated caller context. The300-field/200-copy regression fails the old
+layout budget and passes unchanged with the cache. Both new native laws pass;
+all2,702 compile; nine affected native laws pass, including wrapped exhaustive
+OOM checks. Mixed Maybe/Box/Pair witnesses execute in both tiers and sync/async.
+The affected guest batch is51passes/1known associated-result layout baseline
+failure. Astra xhigh review and changed-file lint/format pass. The required full
+gate was attempted and remains blocked fetching locked Baba9.0.1 through the
+registry proxy. A private first-export histogram run measures the actual effect;
+the ECS frontier is not yet proven cleared.
 
-The current blocker is emitted root size: update15,294,397bytes and
-render13,958,167bytes, above the7,654,321function-size limit. Both V8 and actual
-Wasmtime49 reject update. Ignored diagnostic clients captured the bytes without
-altering production validation. Compaction runs (1,258,823->480,431locals), but
-large callback-heavy gameplay remains inline. Per-inline instruction costs and
-filtered writer-decline diagnostics are identifying the precise admission gate.
-Do not raise engine, source or storage caps to conceal this failure. Probe drivers
-live below ignored build/; tracked full-main/Pen runners remain authoritative.
+Compile-only probes of real `game.played.update` and `.render`, with canonical
+FrameAccess and real owner/frame scopes, finish source emission but fail engine
+validation: update root15,294,397bytes, render13,958,167bytes, against7,654,321.
+Actual Wasmtime49 and V8 agree. Existing compaction reduces update locals from
+1,258,823 to480,431, still above the50,000-local engine limit. Diagnostic byte
+capture never bypasses production validation. Source and storage caps remain
+unchanged; stage success does not qualify main or a native frame.
 
-Writer planning now admits fixed scratch fill/generate with exact inline element
-layouts and checked callbacks. Runtime indices are typed U32, never literals;
-normal child ownership/region/ordered-effect validation remains authoritative.
-The128-expression law fails on the old compiler and passes with exhaustive OOM;
-borrowed/owning row negatives publish no bytes. Seven affected native laws pass,
-all2,700 compile, and guests are49passes/1known baseline. Executed callbacks cover
-ordered destination effects and implicit global reads after mutation. Astra
-review, lint/format pass; the full gate was attempted and remains registry-blocked.
+Astra xhigh is reviewing bounded extraction of closed machine-instruction ranges
+into private helpers with exact cross-body register state. The real main session
+loop invalidates shortcuts that assume freshly zeroed call-local state; captured
+demand memoization is an executed counterexample. Private per-root Wasm globals
+may preserve that state, provided root nonreentry/call-cycle checks, exact packed
+instruction rewrites, entry resets, control closure and existing engine limits
+are enforced. No production extraction is installed yet.
 
-Planner closures now retain obligations from their defining module. Named and
-closure planning scope and restore active goals; factory arguments are planned
-in the caller first. A minimal imported nested-callback law reproduces the old
-index93/length51 panic and passes with U32/F32 in both tiers and sync/async. The
-native law proves the caller goal exceeds the helper's complete type table and
-passes exhaustive OOM. Four affected native laws also pass; all2,696 tests
-compile. The guest batch is35passes/1recorded baseline associated-result layout
-failure. Astra xhigh reviewed the code; changed Zig lint and TS formatting pass.
-
-Inline specialization results now capture their selected type substitutions. A
-Pose3 argument had the correct physical identity but an empty generic witness
-that resolved as Robot after a previous argument. Actor/Pose/Actor with
-identical word layouts reproduces the old failure; Some/Nothing combinations
-pass both tiers/sync-async with the snapshot. The new low512 native law passes
-exhaustive OOM; recursion rejection passes and all2,697 tests compile. The guest
-batch is 37passes/1recorded baseline failure. Astra xhigh reviewed the one-line
-fix; lint/format pass and the required full gate was attempted (registry
-blocked).
-
-Loaded user nominal fields now retain checked semantic witnesses. Closed
-cached layouts carry empty-context evidence; open generic layouts capture the
-selected substitutions. Imported Vector/Pose readers reproduce the old add
-dispatch failure and execute in both tiers/sync-async with retained values,
-owner mutation and signed zero. The native law passes exhaustive OOM; all2,698
-native tests compile and the affected guest batch is39passes/1known baseline
-associated-result layout failure. Astra xhigh review and changed-file lint pass.
-
-Late scoped-only local compaction is retained (`d2a09a2`): single-definition i32
-locals confined to one straight-line segment reuse dead slots after ownership
-and safepoint lowering. Parameters, default-zero reads, other types, multiple
-writes and cross-control values stay separate; hidden-local markers decline. The
-original101×250 ordered-Foreign guest now executes in both tiers/sync-async.
-Five native laws pass, including exhaustive OOM and50,001 input locals reduced
-to one. No source-expression or guest limit changed in that checkpoint.
-
-Ink map.locate's explicit Maybe U32 result (`fbe379b`) passes five key-policy
-probes and existing map laws. Brush edges now build into a GrowArray and freeze
-once; the focused cube witness passes geometry, uniqueness, vertex degree and
-output independence in both tiers/sync-async. Retained compiler/source fixes and
-detailed evidence live in
+Retained fixes include exact selected type keys and result snapshots, defining
+module obligations for planner closures, semantic witnesses on loaded nominals,
+checked fixed scratch fill/generate writer admission and late local compaction.
+Gdev's simulation projection excludes unrelated borrowed UI rows while retaining
+the165-field public FrameAccess. Ink's concrete generated codec policies preserve
+ActorObservation framing and strict malformed-input behavior. Focused native and
+executed-Wasm evidence is recorded in
 [the cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
-and pinned Git history, including exact generic contexts/keys, ordered writer
-scratch footprints, checked getters/partials, return termination and private
-append regions. Do not relax those contracts while fixing later failures.
+and pinned Git history. Do not relax these contracts to advance integration.
 
-The required full compiler gate was attempted and remains blocked before tests
-fetching locked Baba9.0.1 through the registry proxy. Registry additions are an
-unapplied saved draft; dependencies, lockfiles and TLS are unchanged. Native
-Pen, its compiler plugin and Mesa lavapipe are available locally. Keep unrelated
-fixture migration and performance work paused.
-
-If the bounded main experiment completes below1M, Astra supports a deliberate 1M
-production policy checkpoint with peak per-function work, total work, time/RSS
-and default/boundary laws recorded. Then make the next full compile the real Pen
-run, avoiding another standalone rebuild. If1M exhausts, keep that ceiling and
-reduce the measured expansion. A real PNG still requires inspection.
+Native Pen, its compiler plugin and Mesa lavapipe are available locally. Keep
+unrelated fixture migration and performance work paused. The next qualifying
+run must use the real main and produce an inspected native Pen PNG.
 
 ## Immediate next step
 

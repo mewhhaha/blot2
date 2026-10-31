@@ -12,6 +12,66 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+test "context free inline layouts substitute constructor variables and reject open phantom arguments" {
+    var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
+        "type Pair [a, b] is data = $Pair (a, b)\n" ++
+        "type Token a is data = $Token Unit\n" ++
+        "type Row is data = $Row {integer: Maybe U32, floating: Maybe F32}\n" ++
+        "const fixed: Maybe (Pair [U32, F32]) = $Some ($Pair (7, 1.5))\n" ++
+        "const row: Row = $Row {integer: $Some 7, floating: $Some 1.5}\n" ++
+        "const phantom: Token U32 = $Token ()\n" ++
+        "const open = func (_: a): Token a => return $Token ()\n" ++
+        "const borrowed = func (_: Ref U32): Token (Ref U32) => return $Token ()\n" ++
+        "const callable = func (_: Unit -> U32): Token (Unit -> U32) => return $Token ()\n" ++
+        "entry const answer = func () => return 0\n");
+    defer module.deinit(a);
+    var found: usize = 0;
+    for (module.bodies) |body| {
+        const name = module.name(body.declaration_name);
+        const accepted = std.mem.eql(u8, name, "fixed") or std.mem.eql(u8, name, "row") or std.mem.eql(u8, name, "phantom");
+        const rejected = std.mem.eql(u8, name, "open") or std.mem.eql(u8, name, "borrowed") or std.mem.eql(u8, name, "callable");
+        if (!accepted and !rejected) continue;
+        try std.testing.expectEqual(@import("../check/types.zig").Tag.nominal, module.types.node(module.typeOf(body.root)).tag);
+        var remaining: usize = 100_000;
+        try std.testing.expectEqual(accepted, @import("storage_calls.zig").inlineType(&module, module.typeOf(body.root), &remaining, 0));
+        if (accepted) {
+            var tiny: usize = 1;
+            try std.testing.expect(!@import("storage_calls.zig").inlineType(&module, module.typeOf(body.root), &tiny, 0));
+        }
+        found += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 6), found);
+}
+test "closed generic row templates keep repeated copies within the fixed layout budget" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "type Maybe a is data = $Some a | $Nothing\ntype Row is data = $Row {");
+    for (0..300) |index| {
+        const field = try a.print("f{d}: Maybe F32,", .{index});
+        defer a.free(field);
+        try source.appendSlice(a, field);
+    }
+    try source.appendSlice(a, "}\nconst make = func (input: F32) => return $Row {");
+    for (0..300) |index| {
+        const field = try a.print("f{d}: $Some input,", .{index});
+        defer a.free(field);
+        try source.appendSlice(a, field);
+    }
+    try source.appendSlice(a, "}\nconst copy = func (pool: ResizeArray Row) => return @storage.copy pool\nentry const answer = func (input: F32) => return do:\n  let pool: ResizeArray Row = #[make input]\n");
+    for (0..200) |index| {
+        const call = try a.print("  let copied{d} = copy pool\n", .{index});
+        defer a.free(call);
+        try source.appendSlice(a, call);
+    }
+    try source.appendSlice(a, "  return @storage.length pool\n");
+    var module = try lower(a, source.items);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("CLOSED_LAYOUT_EMIT {any}\n", .{diagnostic});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
 fn publishGeneratorModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 128 });
     defer result.deinit(allocator);
@@ -165,7 +225,7 @@ fn publishLargeKeyFallback(allocator: std.mem.Allocator, modules: []const core.M
 test "optional oversized reader and writer keys fall back without hiding invalid borrows" {
     var name: [7000]u8 = undefined;
     @memset(&name, 'x');
-    const source = try std.fmt.allocPrint(a, "type State = {{{s}: ResizeArray U32}}\n" ++
+    const source = try a.print("type State = {{{s}: ResizeArray U32}}\n" ++
         "const write = func (state: State) -> (amount: U32) => return do:\n  state.{s}[0] := @u32.add state.{s}[0] amount\n" ++
         "const read = func (state: State) => return state.{s}[0]\n" ++
         "entry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[10]\n  let state = {{{s}: rows}}\n  write state input\n  write state 1\n  return read state\n", .{ &name, &name, &name, &name, &name });
@@ -174,7 +234,7 @@ test "optional oversized reader and writer keys fall back without hiding invalid
     defer module.deinit(a);
     try publishLargeKeyFallback(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishLargeKeyFallback, .{@as([]const core.Module, &.{module})});
-    const invalid_source = try std.fmt.allocPrint(a, "type State = {{{s}: ResizeArray U32}}\n" ++
+    const invalid_source = try a.print("type State = {{{s}: ResizeArray U32}}\n" ++
         "const borrow = func (state: State) => return do:\n  let local: GrowArray U32 = #[1]\n  return &local[0]\n" ++
         "entry const answer = func () => return do:\n  let rows: ResizeArray U32 = #[0]\n  let escaped = borrow {{{s}: rows}}\n  return @storage.load escaped\n", .{ &name, &name });
     defer a.free(invalid_source);
@@ -570,13 +630,13 @@ test "selected application policies share wide callback type descriptions within
     defer source.deinit(a);
     try source.appendSlice(a, "type Wide = {");
     for (0..166) |index| {
-        const field = try std.fmt.allocPrint(a, "f{d}: Array U32,", .{index});
+        const field = try a.print("f{d}: Array U32,", .{index});
         defer a.free(field);
         try source.appendSlice(a, field);
     }
     try source.appendSlice(a, "}\nconst inspect = func (value: Wide): U32 ! {} => return 0\nconst policy = func ");
     for (0..13) |index| {
-        const parameter = try std.fmt.allocPrint(a, "callback_{d} -> ", .{index});
+        const parameter = try a.print("callback_{d} -> ", .{index});
         defer a.free(parameter);
         try source.appendSlice(a, parameter);
     }

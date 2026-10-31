@@ -57,11 +57,12 @@ pub const Cache = struct {
         return null;
     }
     pub fn insert(self: *Cache, key: Key, function: u32, floating: bool) !usize {
-        const evidence = try self.allocator.dupe(u32, key.evidence);
-        errdefer self.allocator.free(evidence);
+        var owned_key = key;
+        owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
+        errdefer self.allocator.free(owned_key.evidence);
         const index = self.entries.items.len;
         try self.entries.append(self.allocator, .{
-            .key = .{ .unit = key.unit, .binding = key.binding, .evidence = evidence },
+            .key = owned_key,
             .function = function,
             .floating = floating,
         });
@@ -135,30 +136,112 @@ pub fn destinationBody(m: *const core.Module, root: core.Id, arrays: *usize, rem
 }
 
 /// Closed inline data has no owning descriptors, borrows, or callable slots.
-/// Generic layouts stay with the ordinary planner until their substitutions
-/// have an explicit reusable-call contract.
+/// Parameterized nominals qualify only when declaration-local substitutions
+/// independently prove that every argument and payload is closed inline data.
+const InlineInput = struct { ty: T.Id, environment: ?*const InlineScope = null };
+const InlineScope = struct {
+    parent: ?*const InlineScope,
+    arguments_environment: ?*const InlineScope,
+    parameters: []const T.Id,
+    arguments: []const T.Id,
+};
+fn inlineBinding(m: *const core.Module, formal: T.Id, actual: InlineInput, variable: T.Id, remaining: *usize, depth: usize) ?InlineInput {
+    if (remaining.* == 0 or depth > 128) return null;
+    remaining.* -= 1;
+    if (formal == variable) return actual;
+    const selected = inlineResolved(m, actual, remaining, depth + 1) orelse return null;
+    const left = m.types.node(formal);
+    const right = m.types.node(selected.ty);
+    if (left.tag != right.tag) return null;
+    switch (left.tag) {
+        .product => {
+            if (left.b != right.b) return null;
+            const first = m.types.list(.{ .start = left.a, .len = left.b });
+            const second = m.types.list(.{ .start = right.a, .len = right.b });
+            for (first, second) |parameter, argument| {
+                if (remaining.* == 0) return null;
+                if (inlineBinding(m, parameter, .{ .ty = argument, .environment = selected.environment }, variable, remaining, depth + 1)) |found| return found;
+            }
+        },
+        .record => {
+            if (left.b != right.b) return null;
+            for (0..left.b) |index| {
+                const field = m.types.recordField(left, index);
+                for (0..right.b) |other| {
+                    if (remaining.* == 0) return null;
+                    remaining.* -= 1;
+                    const candidate = m.types.recordField(right, other);
+                    if (field.name != candidate.name) continue;
+                    if (inlineBinding(m, field.ty, .{ .ty = candidate.ty, .environment = selected.environment }, variable, remaining, depth + 1)) |found| return found;
+                }
+            }
+        },
+        .nominal => {
+            if (left.a != right.a or left.b != right.b) return null;
+            const first = m.types.nominalArguments(left);
+            const second = m.types.nominalArguments(right);
+            if (first.len != second.len) return null;
+            for (first, second) |parameter, argument| {
+                if (remaining.* == 0) return null;
+                if (inlineBinding(m, parameter, .{ .ty = argument, .environment = selected.environment }, variable, remaining, depth + 1)) |found| return found;
+            }
+        },
+        else => {},
+    }
+    return null;
+}
+fn inlineResolved(m: *const core.Module, input: InlineInput, remaining: *usize, depth: usize) ?InlineInput {
+    if (depth > 128) return null;
+    const node = m.types.node(input.ty);
+    if (node.tag != .variable and node.tag != .bound) return input;
+    if (remaining.* == 0) return null;
+    remaining.* -= 1;
+    var environment = input.environment;
+    while (environment) |scope| : (environment = scope.parent) {
+        for (scope.parameters, scope.arguments) |parameter, argument| {
+            if (remaining.* == 0) return null;
+            if (inlineBinding(m, parameter, .{ .ty = argument, .environment = scope.arguments_environment }, input.ty, remaining, depth + 1)) |found| return inlineResolved(m, found, remaining, depth + 1);
+        }
+    }
+    return null;
+}
 pub fn inlineType(m: *const core.Module, ty: T.Id, remaining: *usize, depth: usize) bool {
+    return inlineTypeUnder(m, .{ .ty = ty }, remaining, depth);
+}
+fn inlineTypeUnder(m: *const core.Module, input: InlineInput, remaining: *usize, depth: usize) bool {
     if (remaining.* == 0 or depth > 128) return false;
     remaining.* -= 1;
-    const n = m.types.node(ty);
+    const actual = inlineResolved(m, input, remaining, depth) orelse return false;
+    const n = m.types.node(actual.ty);
     switch (n.tag) {
         .unit, .boolean, .u32, .f32, .never => return true,
         .product, .record => {
             for (0..n.b) |index| {
                 const child = if (n.tag == .record) m.types.recordField(n, index).ty else m.types.list(.{ .start = n.a, .len = n.b })[index];
-                if (!inlineType(m, child, remaining, depth + 1)) return false;
+                if (!inlineTypeUnder(m, .{ .ty = child, .environment = actual.environment }, remaining, depth + 1)) return false;
             }
             return true;
         },
         .nominal => {
-            if (m.types.nominalArguments(n).len != 0) return false;
+            if (@import("../check/storage_types.zig").identity(n.a, n.b) != null) return false;
+            const arguments = m.types.nominalArguments(n);
+            // Phantom arguments still belong to the semantic type. They must
+            // be independently closed even when no payload mentions them.
+            for (arguments) |argument| if (!inlineTypeUnder(m, .{ .ty = argument, .environment = actual.environment }, remaining, depth + 1)) return false;
             for (m.nominals, 0..) |nominal, index| {
                 if (nominal.identity.unit != n.a or nominal.identity.decl != n.b) continue;
+                const parameters = m.types.list(nominal.parameters);
                 const constructors = m.nominalConstructors(@intCast(index));
-                if (constructors.len == 0) return false;
-                for (constructors) |constructor| {
-                    const payload = m.constructor(constructor).payload;
-                    if (payload != 0 and !inlineType(m, payload, remaining, depth + 1)) return false;
+                if (parameters.len != arguments.len or constructors.len == 0) return false;
+                const scope: InlineScope = .{ .parent = actual.environment, .arguments_environment = actual.environment, .parameters = parameters, .arguments = arguments };
+                for (constructors) |id| {
+                    const constructor = m.constructor(id);
+                    const signature = m.types.node(constructor.scheme.root);
+                    const result = if (signature.tag == .function) signature.b else constructor.scheme.root;
+                    const returned = m.types.node(result);
+                    if (returned.tag != .nominal or returned.a != n.a or returned.b != n.b or m.types.nominalArguments(returned).len != arguments.len) return false;
+                    const variant: InlineScope = .{ .parent = &scope, .arguments_environment = actual.environment, .parameters = &.{result}, .arguments = &.{actual.ty} };
+                    if (constructor.payload != 0 and !inlineTypeUnder(m, .{ .ty = constructor.payload, .environment = &variant }, remaining, depth + 1)) return false;
                 }
                 return true;
             }
