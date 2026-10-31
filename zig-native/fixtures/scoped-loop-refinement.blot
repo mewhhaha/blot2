@@ -1,0 +1,118 @@
+import * as array from "std/array"
+import {Vec3} from "std/vector"
+
+type Quat is data = $Quat {x: F32, y: F32, z: F32, w: F32}
+type Pose3 is data = $Pose3 {position: Vec3, rotation: Quat, scale: Vec3}
+type Motion is data = $Motion {yaw: F32, speed: F32, phase: F32}
+type End is data = $Arrived | $Blocked | $Budget
+type Forecast is data = $Forecast {end: End, pose: Pose3, motion: Motion, points: &[Vec3], elapsed: F32, distance: F32, remaining: F32}
+type Mixed is data = $Left U32 | $Right U32 | $Borrow &[U32]
+
+entry const trace = func (count: U32): Array U32 => return do:
+  let best: Maybe U32 = $Nothing
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    let replace: Bool = true
+    if let $Some previous = best:
+      replace := index < previous
+    if replace:
+      best := $Some index
+    observations.push (Maybe.unwrap_or 99 best)
+  return @storage.freeze observations
+
+entry const nested = func (count: U32): Array U32 => return do:
+  let state: {best: Maybe U32, visits: U32} = {best: $Nothing, visits: 0}
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    if let $Some previous = state.best:
+      state.visits := self + 1
+    else:
+      state.best := $Some index
+    observations.push (Maybe.unwrap_or 99 state.best)
+  observations.push state.visits
+  return @storage.freeze observations
+
+entry const alternating = func (count: U32): Array U32 => return do:
+  let state: Maybe (Maybe U32) = $Some $Nothing
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    if let $Some value = state:
+      if let $Some previous = value:
+        observations.push previous
+        state := $Nothing
+        continue
+      state := $Some ($Some index)
+    else:
+      state := $Some $Nothing
+    observations.push (100 + index)
+  return @storage.freeze observations
+
+entry const mixed = func (count: U32): Array U32 => return do:
+  let state: Mixed = $Left 10
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    if let $Left value = state:
+      observations.push value
+      state := $Right 20
+    else:
+      let $Right value = state else:
+        return @panic "borrow variant was never constructed"
+      observations.push value
+      state := $Left 10
+  return @storage.freeze observations
+
+entry const borrowed = func (count: U32): Array U32 => return do:
+  let labels: Array U32 = #[7]
+  let view = &labels[0..1]
+  let selected: Maybe (&[U32]) = $Some view
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    observations.push (case selected of
+      $Some values => values.at 0
+      $Nothing => 99)
+    selected := if index % 2 == 0 then $Nothing else $Some view
+  return @storage.freeze observations
+
+entry const borrowed_continue = func (count: U32): Array U32 => return do:
+  let labels: Array U32 = #[7]
+  let view = &labels[0..1]
+  let selected: Maybe (&[U32]) = $Some view
+  let observations: GrowArray U32 = #[]
+  for index in 0 .. count:
+    observations.push (case selected of
+      $Some values => values.at 0
+      $Nothing => 99)
+    selected := if index % 2 == 0 then $Nothing else $Some view
+    continue
+  return @storage.freeze observations
+
+const arrived = func (value: Forecast) => return case value.end of
+  $Arrived => true
+  _ => false
+
+const choose = func (forecasts: Array (Maybe Forecast)): Maybe U32 => return do:
+  let best: Maybe U32 = $Nothing
+  for index in 0 .. forecasts.length:
+    let $Some candidate = forecasts[index] else:
+      continue
+    let replace: Bool = true
+    if let $Some previous = best:
+      let $Some old = forecasts[previous] else:
+        return @panic "missing forecast"
+      replace := if arrived candidate != arrived old then arrived candidate
+        else if arrived candidate then candidate.distance < old.distance
+        else candidate.remaining < old.remaining or (candidate.remaining == old.remaining and candidate.distance < old.distance)
+    if replace:
+      best := $Some index
+  return best
+
+// Preserve the real forecast layout: the candidate has a borrowed point view
+// as well as pose/motion records. A scalar-only minimum uses another path.
+entry const minimum = func (values: Array F32): U32 => return do:
+  let points: Array Vec3 = #[]
+  let forecasts: Array (Maybe Forecast) = array.map (func (distance: F32) => return $Some $Forecast {
+    end: $Arrived,
+    pose: $Pose3 {position: $Vec3 {x: 0.0, y: 0.0, z: 0.0}, rotation: $Quat {x: 0.0, y: 0.0, z: 0.0, w: 1.0}, scale: $Vec3 {x: 1.0, y: 1.0, z: 1.0}},
+    motion: $Motion {yaw: 0.0, speed: 0.0, phase: 0.0},
+    points: points.view 0 0, elapsed: 0.0, distance, remaining: 0.0}) values
+  return Maybe.unwrap_or 99 (choose forecasts)

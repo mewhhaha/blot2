@@ -22,6 +22,38 @@ fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Modu
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expect(result.counters.scoped_refinement_indexed_bindings > 0);
 }
+test "loop header inline variants publish across entry backedge and continue allocation failures" {
+    var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
+        "entry const trace = func (count: U32): Array U32 => return do:\n" ++
+        "  let state: {best: Maybe (Maybe U32), visits: U32} = {best: $Some $Nothing, visits: 0}\n" ++
+        "  let observations: GrowArray U32 = #[]\n" ++
+        "  for index in 0 .. count:\n" ++
+        "    if let $Some value = state.best:\n" ++
+        "      if let $Some previous = value:\n" ++
+        "        @storage.push observations previous\n" ++
+        "        state.best := $Nothing\n" ++
+        "        continue\n" ++
+        "      state.best := $Some ($Some index)\n" ++
+        "    else:\n" ++
+        "      state.best := $Some $Nothing\n" ++
+        "    @storage.push observations index\n" ++
+        "  return @storage.freeze observations\n" ++
+        "entry const borrowed = func (count: U32): Array U32 => return do:\n" ++
+        "  let labels: Array U32 = #[7]\n" ++
+        "  let view = &labels[0..1]\n" ++
+        "  let selected: Maybe (&[U32]) = $Some view\n" ++
+        "  let observations: GrowArray U32 = #[]\n" ++
+        "  for index in 0 .. count:\n" ++
+        "    @storage.push observations (case selected of\n" ++
+        "      $Some values => @storage.read values 0\n" ++
+        "      $Nothing => 99)\n" ++
+        "    selected := if @u32.eq (@u32.rem index 2) 0 then $Nothing else $Some view\n" ++
+        "    continue\n" ++
+        "  return @storage.freeze observations\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "wide field refinement restores scoped indexes through allocation failures" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);

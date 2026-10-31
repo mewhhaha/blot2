@@ -124,7 +124,7 @@ const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
 const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining: u32 };
 const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ?Value = null };
-const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
+const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
 const RootRead = struct { owner: usize, shape: Value };
 const ReadFrame = struct { first: []?*const Value, persistent: std.ArrayList(RootRead) = .empty };
 const WriterKind = enum { read, write };
@@ -804,6 +804,19 @@ const Generator = struct {
         result.fields = try self.arena.allocator().alloc(Value, value.fields.len);
         for (result.fields, value.fields) |*field, original| field.* = try self.temporary(original);
         return result;
+    }
+    fn loopHeader(self: *Generator, value: *Value) Error!void {
+        // The body runs with values from every backedge, not just the entry
+        // edge. An inactive inline payload needs no extra authority. Borrowed
+        // payloads retain exactly the incoming evidence; every backedge must
+        // remain within that set, independently of owner identity stability.
+        if (value.variant_tags.len != 0) {
+            const possible = try self.arena.allocator().alloc(bool, value.fields.len);
+            for (possible, value.fields, 0..) |*present, field, index| present.* = possibleVariant(value.*, index) or plainShape(field);
+            value.variant_index = null;
+            value.variant_possible = possible;
+        }
+        for (value.fields) |*field| try self.loopHeader(field);
     }
     fn assign(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value) Error!void {
         target.literal = null;
@@ -4204,18 +4217,21 @@ const Generator = struct {
         };
         const carries = m.loopCarries(id);
         const values = try self.arena.allocator().alloc(Value, carries.len);
-        for (values, carries) |*value, carry| {
+        const headers = try self.arena.allocator().alloc(Value, carries.len);
+        for (values, carries, headers) |*value, carry, *header| {
             const incoming = try self.bindingValue(m, carry.incoming);
             if (!@import("storage_control.zig").fixedCarry(incoming)) return self.unsupported(m, id);
             value.* = try self.temporary(incoming);
             try self.assign(m, id, value, incoming);
+            try self.loopHeader(value);
+            header.* = try self.cloneShape(value.*);
         }
         try self.c.op(.block, 0);
         try self.c.op(.loop, 0);
         self.nesting += 2;
         const frame_mark = try self.c.temp();
         try self.c.set(frame_mark, .{ .call, self.runtime.functions.mark, self.fixed_region });
-        try self.loops.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .carries = values, .iterator = if (info.kind != .forever) iterator else null, .mark = frame_mark, .depth = self.depth + 1, .read_frame = read_frame });
+        try self.loops.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .carries = values, .headers = headers, .iterator = if (info.kind != .forever) iterator else null, .mark = frame_mark, .depth = self.depth + 1, .read_frame = read_frame });
         defer _ = self.loops.pop();
         if (info.kind != .forever) {
             try self.c.value(.{ .i32_ge_u, iterator, end });
@@ -4235,8 +4251,9 @@ const Generator = struct {
                 next.* = try self.snapshot(try self.bindingValue(m, carry.backedge));
                 try self.checkEscape(m, id, next.*, self.depth);
             }
-            for (values, next_values) |*value, next| {
+            for (values, next_values, headers) |*value, next, header| {
                 if (!@import("storage_control.zig").stableCarry(value.*, next)) return self.fail(m, id, .storage_escape, "A loop must retain the same named owners and borrowed roots across iterations");
+                if (!includesReadShape(header, next)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
                 try self.assign(m, id, value, next);
             }
         }
@@ -4464,8 +4481,9 @@ const Generator = struct {
                         value.* = try self.snapshot(try self.expression(m, arg, depth + 1));
                         try self.checkEscape(m, id, value.*, target.depth);
                     }
-                    for (target.carries, snapshots) |*carry, value| {
+                    for (target.carries, snapshots, target.headers) |*carry, value, header| {
                         if (!@import("storage_control.zig").stableCarry(carry.*, value)) return self.fail(m, id, .storage_escape, "A loop exit must retain the same named owners and borrowed roots");
+                        if (n.op == .continue_ and !includesReadShape(header, value)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
                         try self.assign(m, id, carry, value);
                     }
                     if (n.op == .continue_) try self.checkReadFrame(m, id, target.read_frame);

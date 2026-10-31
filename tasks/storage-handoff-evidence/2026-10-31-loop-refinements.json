@@ -1,0 +1,57 @@
+{
+  "change": "Loop carries widen entry-only inline variant possibilities before body emission, retain existing borrowed-payload evidence, and require each backedge/continue to fit an independent frozen header shape. Existing owner/root stability and escape checks remain authoritative.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/fixtures/scoped-loop-refinement.blot",
+    "zig-native/tests/scoped_loop_refinement_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-loop-fix/bin/blotc",
+    "sha256": "5fcee8f6879b58a0e0c524e2a4ce1c8659f63e88aee3cec1e4aefcdf75274822",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-loop-native-dev/bin/blot-tests",
+    "sha256": "590d770bbe8a422e9a54ddac5da22e5a15aa8cb469ba0c8766dc340b1b7e6492",
+    "compiled_inventory": 2720,
+    "affected_selected": 214,
+    "passed": 213,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "new_law": "Exhaustive allocation-failure sweep passes inline nested Maybe and borrowed same-owner alternation with continue."
+  },
+  "guest": {
+    "passed": 38,
+    "failed": 0,
+    "coverage": [
+      "development and optimized code tiers",
+      "synchronous and JSPI guests",
+      "initial Nothing to repeated Some trace stays 0000",
+      "nested records and nested Maybe with continue",
+      "plain alternatives in a mixed borrowed nominal",
+      "same-owner Some(view)/Nothing alternation 7,99,7,99 including continue",
+      "real Forecast pose/motion/borrowed point layout preserves ascending minimum and first tie",
+      "zero iterations",
+      "new borrowed variant rejected on normal and continue exits",
+      "failed revision publishes no bytes and recovers identical successful bytes",
+      "existing hidden borrow/root widening/loop-read restrictions"
+    ]
+  },
+  "baseline": {
+    "compiler_sha256": "150c979bd5801661dafcf23286a29da43d39b2e3528d4b86237bfeb4b74045de",
+    "new_laws_fail_both_tiers": true
+  },
+  "review": "Astra /root/migration_plan approved final per-payload widening, frozen headers, backedge/continue subset checking and preserved borrow authority. Required positive/negative laws all pass.",
+  "lint": "Both changed Zig files each zero analyzer findings; Zig format, TS format and git diff whitespace checks pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 fetch network blocked before tests (Operation not permitted); dependency/manifest/TLS unchanged"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged; no dummy owners, casts, legacy opaque fallback, Ink edits or main/GPU build.",
+  "date": "2026-10-31",
+  "qualification": "Affected loop refinement laws only; actual Gdev hauling laws and final main requalification are tracked separately."
+}
