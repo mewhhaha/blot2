@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-31",
+  "milestone": "Current migrated Gdev main renders one actual native Pen frame; PNG visually inspected",
+  "success": true,
+  "entry": "src/main.blot:main",
+  "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+  "configured_identity": "8280d9b1c98fc54509907c3c29b5a8b020e944d8bce92cd6c79e2f57c530bf45",
+  "pen_sha256": "e18c556712cbbed1a02ab90c3d740696c3af5e3b6116b2300e8069a6eb546941",
+  "compile_attempt": "build/storage-integration/gdev-one-frame/attempt-x1y41a9e",
+  "render_attempt": "build/storage-integration/gdev-one-frame/attempt-j3uhue7n",
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiled_wasm_unchanged": true,
+  "compiler_seconds": 2188.17,
+  "wasm": {
+    "wasm_bytes": 47432547,
+    "defined_functions": 8644,
+    "code_body_bytes": 46222641,
+    "largest_function_body_bytes": 2267273,
+    "largest_declared_locals": 20570,
+    "largest_parameters_plus_locals": 20571,
+    "globals": 237015,
+    "sha256": "63a4ae23b2ff61198b0d02ad47c2cd1342a524f33f16becc0a193ec2374fef0c",
+    "V8_validate": true,
+    "Pen_Wasmtime49_validate": true,
+    "guest_ABI": 8
+  },
+  "png": {
+    "file": "2026-10-31-first-frame.png",
+    "sha256": "c1ff619ffe1e16093819fa6b5a9b158e6404f3ecabc1e13849e665aa80b0b15e",
+    "width": 640,
+    "height": 480,
+    "visually_inspected": true,
+    "matches_historical_frame_byte_for_byte": true,
+    "inspection": "Complete authored startup letter board, centered on the dark canvas. Reuse the identical existing PNG rather than duplicate a binary artifact."
+  },
+  "trace": "0 d3d3efbacc306317 685c42a4adac06bb",
+  "trace_matches_historical_frame": true,
+  "source_checkpoints": {
+    "blot2": "05d2b5205e4107f383dcab7df7ae7b0170ac60ca",
+    "pen": "27ad0a7c63653c795f127a9b7ce59392d3e149e9",
+    "ink": "86254779208a091b4818120aa8156fd3a16ea97e",
+    "gdev": "7029c1268dc6f12f1fd76d05fd3e25003a837aaf"
+  },
+  "source_inputs": {
+    "static_imported_files": 264,
+    "static_import_digest": "611a5b3eed4eef4474b8565f095c8d4b240a73a355e42777dab3c5998d001677",
+    "scope": "Static source-import inventory with implicit prelude; compiler-native asset registry remains separately configured.",
+    "changes_after_compile_started": "Only devtools/command_line.blot changed; it is not reached by actual main. All reached source inputs stayed frozen. Subsequent commits change documentation/evidence only.",
+    "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+    "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af"
+  },
+  "render_method": {
+    "mode": "Pen standard raw-Wasm bundle loader with the exact compiled main; no source recompilation, optimization or patching",
+    "identity": {
+      "name": "gdev",
+      "title": "gdev \u2014 Blot 3D",
+      "players": 2
+    },
+    "scene": "Byte-for-byte copy of original src/main.scene; fresh player data",
+    "assets": "Original gdev/src/assets absolute path, retaining its src parent for text/locales/presets",
+    "no_native_metadata_override": true,
+    "astra_review": "Reviewed loader equivalence: same native engine/session/GPU/screenshot path, no requested devtools, named scripts or main_trace; reports disabled and no adjacent packaged game/Steam startup."
+  },
+  "graphics": {
+    "mode": "Headless software Vulkan using installed Mesa lavapipe",
+    "icd": "../.dev-tools/sysroot/usr/share/vulkan/icd.d/lvp_icd.json",
+    "icd_sha256": "9a6a0d616f3f2efc2d227f89653047e5330ff634b0519ffbf1b2c60dc1c0e0e7",
+    "driver_sha256": "0004262f4dc95585492d55925face67a79a7c869ad8760b42ae01bd0bdb807a2",
+    "library_path": "../.dev-tools/sysroot/usr/lib/x86_64-linux-gnu",
+    "graphics_tier_override": null
+  },
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "preserved": {
+    "guest_ABI": 8,
+    "session": 2,
+    "framing_schema": 26,
+    "frame_access_fields": 165,
+    "production_expression_limit": 500000,
+    "layout_limit": 100000,
+    "project_reply_bytes": 67108864,
+    "maximum_function_body_bytes": 7654321,
+    "maximum_parameters_plus_locals": 50000,
+    "maximum_globals": 1000000
+  },
+  "scope": "One real startup frame and exact trace/image regression; not full gameplay/browser/recovery or release/performance qualification.",
+  "pending": [
+    "Ordinary legacy backend retirement task120",
+    "Remaining original-export emission/large-fixture qualification",
+    "Full compiler gate blocked before tests by locked Baba9.0.1 fetch; known reproduced associated-partial native baseline and preexisting broad lint findings remain visible"
+  ]
+}

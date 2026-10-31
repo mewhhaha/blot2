@@ -4,10 +4,11 @@ Blot is a functional language whose handwritten Zig compiler emits WebAssembly.
 Deno supplies its CLI, project client, formatter and guest host.
 
 The owned-storage rewrite is **unfinished**. One real Gdev main frame has passed
-native Pen with an inspected screenshot. Remaining source/API migration and
-fixture execution continue; later compiler/library revisions require a fresh
-frame. Start with [CONTINUE.md](CONTINUE.md) and the
-[active task index](tasks/STORAGE_REWRITE.md) for exact candidate evidence.
+native Pen with an inspected screenshot. Active source/generator conversion is
+checkpointed; remaining compiler and runtime qualification continue. Later
+semantic revisions require a fresh frame. Start with [CONTINUE.md](CONTINUE.md)
+and the [active task index](tasks/STORAGE_REWRITE.md) for exact candidate
+evidence.
 
 This is a greenfield project. Breaking changes are welcome; remove superseded
 implementations and APIs rather than maintaining legacy compatibility.

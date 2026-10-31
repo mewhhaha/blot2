@@ -7,11 +7,13 @@
 - The owner requests continuous checkpoints to `main`: commit and push coherent,
   checked batches as work progresses. Verify push success and report any
   failure; a local commit alone does not protect against losing the environment.
-- Start with `CONTINUE.md` and `tasks/STORAGE_REWRITE.md`. The owned-storage
-  rewrite is unfinished, but one real Gdev main frame now passes in native Pen
-  with an inspected PNG. Continue remaining compiler/fixture qualification from
-  the shared notes. Recheck real integration after semantic changes; historical
-  evidence qualifies its exact candidate, not later revisions.
+- Active source/generator migration is checkpointed, and the current reviewed
+  compiler and host pass one real Gdev frame with an inspected PNG. Use
+  `CONTINUE.md` for exact identities and remaining original-export/backend
+  qualification; source inventory success is not whole-runtime qualification.
+- Start with `CONTINUE.md` and `tasks/STORAGE_REWRITE.md`. Recheck real
+  integration after semantic changes; historical evidence qualifies its exact
+  candidate, not later revisions.
 - Use the existing sibling checkouts `../pen`, `../ink` and `../gdev`. Preserve
   their checkpointed source and assets. Do not create a worktree unless asked.
 - Current syntax uses `func`, explicit `return`, curried `->`, `$Constructor`,

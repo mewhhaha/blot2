@@ -200,7 +200,9 @@
       "Salt-clicks fixed inline layout",
       "Icon atlas host projection form",
       "Ordinary legacy backend retirement task120"
-    ]
+    ],
+    "actual_main_frame": "2026-10-31-migrated-frame.json",
+    "frame_passed": true
   },
   "final_actor_qualification": {
     "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",

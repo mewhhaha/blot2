@@ -3,11 +3,13 @@
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The candidate has advanced through checked source validation
 and one real Gdev main frame in native Pen, with all runner checks and an
-inspected PNG. See [the exact first-frame candidate](storage-handoff-evidence/2026-10-31-first-frame.json).
-Broader compiler, library/game and host/browser qualification remain pending.
-Keep changing compile frontiers in CONTINUE.md and its linked evidence. The
-earlier full compiler gate stopped at its protocol smoke span assertion (three
-passed, one failed); see
+inspected PNG. See
+[the current migrated-frame candidate](storage-handoff-evidence/2026-10-31-migrated-frame.json).
+The final source/API inventories pass 760 valid files and six intended semantic
+rejections across Ink/Gdev. Broader compiler, original-export, library/game and
+host/browser qualification remain pending. Keep changing compile frontiers in
+CONTINUE.md and its linked evidence. The earlier full compiler gate stopped at
+its protocol smoke span assertion (three passed, one failed); see
 [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
 ## First native frame — complete
@@ -24,7 +26,8 @@ deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/g
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
 
-For actual integration, build matching Pen and plugin binaries, then run:
+For actual integration, build matching Pen and plugin binaries, then run (the
+default recompiles; `CONTINUE.md` documents verified artifact reuse):
 
 ```sh
 python3 scripts/storage_handoff/run_pen.py --launch

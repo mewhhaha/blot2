@@ -7,18 +7,21 @@ APIs and implementations. Preserve useful behavior, assertions, deterministic
 math, original workloads and independent references. Read `AGENTS.md`,
 `compiler/guide.md`, `zig-native/CONTRACT.md` and `tasks/STORAGE_REWRITE.md`.
 
-One actual Gdev main frame passed native Pen with an inspected 640×480 startup
-letter-board PNG. Its exact historical compiler, sources and result are in
-[the first-frame record](tasks/storage-handoff-evidence/2026-10-31-first-frame.json)
-and [screenshot](tasks/storage-handoff-evidence/2026-10-31-first-frame.png).
-That frame used compiler SHA `e6ccd2d4…`; later fixes require a fresh real
-frame. Broader gameplay, browser, recovery and release qualification remain
-open.
+Actual Gdev main passes one headless native Pen frame on the current reviewed
+compiler `52e04df6` and matching host. All six checks pass. The inspected
+640×480 startup image and guest trace match the original frame byte for byte.
+[Current exact identities and result](tasks/storage-handoff-evidence/2026-10-31-migrated-frame.json)
+reuse
+[the identical existing PNG](tasks/storage-handoff-evidence/2026-10-31-first-frame.png).
+The earlier e6 compiler's
+[first-frame record](tasks/storage-handoff-evidence/2026-10-31-first-frame.json)
+remains historical evidence. Broader gameplay, browser, recovery and release
+qualification remain open.
 
-The remaining source migration has reached the full Ink/Gdev inventories,
-fixtures, generators and active documentation. Current language uses `func`,
-explicit `return`, curried `->`, `$Constructor`, primitive booleans, `and`/`or`
-and `#[...]` arrays. Grammar-rejection fixtures, foreign shader syntax and
+The active source/API migration covers the full Ink/Gdev inventories, fixtures,
+generators and active documentation. Current language uses `func`, explicit
+`return`, curried `->`, `$Constructor`, primitive booleans, `and`/`or` and
+`#[...]` arrays. Grammar-rejection fixtures, foreign shader syntax and
 historical captures intentionally retain their own text. Generated sources must
 come from generator inputs, never manual output patches.
 
@@ -50,7 +53,7 @@ named candidate rather than every later revision.
 now select exact visible implementations with full signature/effect evidence and
 context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
-candidate. Actual main must be rechecked on this binary.
+candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic fixes. The required full compiler gate was
 attempted for each batch but stops before tests because the configured proxy
@@ -94,6 +97,21 @@ Run actual Gdev main through native Pen, including its real imports and assets:
 ```sh
 python3 scripts/storage_handoff/run_pen.py --launch
 ```
+
+The default command recompiles every run. To retry rendering an already checked
+actual main, use its exact artifact hash (the current record above identifies
+this build):
+
+```sh
+python3 scripts/storage_handoff/run_pen.py --launch --compiled-main ../gdev/.pen/runtime/game.wasm --expected-wasm-sha256 63a4ae23b2ff61198b0d02ad47c2cd1342a524f33f16becc0a193ec2374fef0c
+```
+
+This copies the unchanged Wasm and starting scene into a fresh bundle, retaining
+the original assets/text/locales/presets and all six host checks. It uses Pen's
+standard raw-Wasm loader. Explicit Vulkan driver settings are respected; the
+runner can also find the optional onboarding Mesa sysroot. No source compilation
+or optimization runs in this mode. Rebuild after semantic changes rather than
+reusing an older artifact.
 
 Require every runner check and inspect the PNG. For a compile-only diagnosis:
 
