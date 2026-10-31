@@ -1348,7 +1348,11 @@ pub const Module = struct {
             defer body.deinit();
             for (self.functions.items, 0..) |function, id| {
                 if (!code.emits(id)) continue;
+                const optimized = bodies[id].body;
+                const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
+                try self.scopedEngineBody(function.parameters.len, locals.len, 0);
                 if (encoding_same) if (matcher.?.encodedBody(id)) |cached| {
+                    try self.scopedEngineBody(function.parameters.len, locals.len, cached.len);
                     try payload.uleb(@intCast(cached.len));
                     try payload.raw(cached);
                     if (options.current) |current| try current.recordEncoded(id, cached);
@@ -1359,8 +1363,6 @@ pub const Module = struct {
                     continue;
                 };
                 body.clear();
-                const optimized = bodies[id].body;
-                const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
                 var instructions: []const Instruction = function.instructions.items;
                 if (optimized) |owned| instructions = owned.instructions.items;
                 var lowered: @import("runtime_flags.zig").Iterator = .{ .facts = flags, .instructions = instructions };
@@ -1387,6 +1389,7 @@ pub const Module = struct {
                 };
                 if (observer) |profile| try profile.finish(&body);
                 try body.byte(0x0b);
+                try self.scopedEngineBody(function.parameters.len, locals.len, body.items().len);
                 if (options.current) |current| try current.recordEncoded(id, body.items());
                 try payload.uleb(@intCast(body.items().len));
                 try payload.raw(body.items());
@@ -1572,6 +1575,12 @@ pub const Module = struct {
             try output.section(0, payload.items());
         }
         return output.buffer.toOwnedSlice(self.allocator);
+    }
+    fn scopedEngineBody(self: *const Module, parameters: usize, locals: usize, bytes: usize) !void {
+        if (self.memory_model != .data_stacks) return;
+        // Enforce the existing host limits on the final optimized/encoded body,
+        // including reused code. Earlier outlining bounds are conservative.
+        if (parameters > 50_000 or locals > 50_000 - parameters or bytes > 7_654_321) return error.ModuleTooLarge;
     }
 };
 

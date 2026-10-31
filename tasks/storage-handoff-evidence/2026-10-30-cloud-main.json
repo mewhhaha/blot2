@@ -1493,13 +1493,49 @@
     "executed": "2new tests PASS both tiers syncasync across F32/U32, nested Maybe/Box/Pair, negativezero, live pool mutation and retained results; affected51PASS/1known baseline",
     "review": "Astra xhigh finalclear. Cache key ownership construction simplified to make nested evidence ownership explicit; no cache behavior change.",
     "full_gate": "Attempted with configured proxy; locked Baba9.0.1 fetch unsuccessful tunnel before tests",
-    "actual_main": "Private current-cache first-export histogram running; no claim of ECS frontier clearance",
+    "actual_main": {
+      "artifact": "main-8544798919476965",
+      "status": "failed layout100001 at644559total/561352root expressions; nofirstexport",
+      "wall_seconds": 681.4244434780048,
+      "child_peak_rss_kib": 6629844,
+      "layout_debits_reconciled": 100001,
+      "root_cache_hits": 1331808,
+      "remaining_work": "repeated open nominal/record/descriptor layouts"
+    },
     "logs": [
       "/tmp/blot-closed-generic-layouts-baseline.log",
       "/tmp/blot-closed-generic-layouts-regressions.log",
       "/tmp/blot-closed-generic-layouts-affected-guests.log",
       "/tmp/blot-closed-generic-layouts-full-gate.log",
       "/tmp/gdev-main-closed-layouts.log"
+    ]
+  },
+  "scoped_machine_helpers": {
+    "implementation": "Completedinvoke closedtypedmachine ranges extracted afterfullsourceownership/release/rewind checks; sourceSSA retained untilfinalization. Privatei32bank perroot promotescrossbody+writtenRBD inclfutureuses, exactget/set/tee flags, root-onlyreset. Noengine/storage/sourcecapraise.",
+    "heuristic": "Measured eager5000minimumresidualIR; boundedpreview+finalencodedlimits;reachableacyclicandunknownindirectreject;coordinatecatalogguard",
+    "accounting": "Onlycommittedhelpers creditownperbodyexpression/layoutdebits; nestedcreditsnotdoublecounted; cumulativeworkretained; allprovisionallimitsactive",
+    "native": "8newlawsPASS incl exhaustiveOOM; all2711inventorycompile;12affectednative regressionsPASS including wrappedfullOOM",
+    "guests": "57PASS1recordedbaseline incl paddedcaptureddemandloop actualextraction asserted, both tiers/syncasync",
+    "stage": {
+      "artifact": "main-93e1c33a68375341",
+      "module_bytes": 13994810,
+      "validation": "PASS productionV8 andactualPenWasmtime49 Module::validate",
+      "helpers": 313,
+      "private_globals": 55227,
+      "total_expressions": 505091,
+      "peak_body_expressions": 20378,
+      "expression_limit": 500000
+    },
+    "review": "Astra xhigh finalreview CLEAR: typedrange/state/credit/OOM + finalencoded/reusedengineguards",
+    "full_gate": "Attempted; lockedBaba9.0.1 proxytunnel failedbeforetests",
+    "native_pen_attempt": "build/storage-integration/gdev-one-frame/attempt-s1i49tls running; noframeclaim",
+    "logs": [
+      "/tmp/blot-machine-regions-native.log",
+      "/tmp/blot-machine-regions-regressions.log",
+      "/tmp/blot-machine-regions-affected-guests.log",
+      "/tmp/gdev-stage-update-machine-regions.log",
+      "/tmp/gdev-stage-update-machine-regions-wasmtime.log",
+      "/tmp/gdev-pen-machine-regions.log"
     ]
   }
 }

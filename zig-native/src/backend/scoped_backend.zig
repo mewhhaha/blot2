@@ -12,6 +12,7 @@ const Code = @import("runtime_code.zig").Code;
 const Local = @import("runtime_code.zig").Local;
 const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
+const scope_outline = @import("wasm_scope_outline.zig");
 const selected_types = @import("storage_type_key.zig");
 const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
@@ -170,6 +171,7 @@ const Generator = struct {
     steps: usize = 0,
     work_limits: WorkLimits = .{},
     emission_work: *@import("../work_counters.zig").Counters,
+    outlining: *scope_outline.Context,
     layout_steps: usize = 0,
     // Templates contain only closed inline data and zero local words. Each use
     // receives independent fields; root/variant evidence is never cached here.
@@ -2167,6 +2169,7 @@ const Generator = struct {
                 .specialize = false,
                 .work_limits = self.work_limits,
                 .emission_work = self.emission_work,
+                .outlining = self.outlining,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2299,6 +2302,7 @@ const Generator = struct {
                 .specialize = false,
                 .work_limits = self.work_limits,
                 .emission_work = self.emission_work,
+                .outlining = self.outlining,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2701,6 +2705,7 @@ const Generator = struct {
                 .specialize = false,
                 .work_limits = self.work_limits,
                 .emission_work = self.emission_work,
+                .outlining = self.outlining,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -2856,6 +2861,7 @@ const Generator = struct {
                 .specialize = false,
                 .work_limits = self.work_limits,
                 .emission_work = self.emission_work,
+                .outlining = self.outlining,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -3111,6 +3117,7 @@ const Generator = struct {
         if (!try self.active_calls.enter(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         defer self.active_calls.leave();
         const first_root = self.roots.items.len;
+        const outline_ticket = self.outlining.begin(self.c.function, .{ .expressions = self.steps, .layouts = self.layout_steps });
         const mark = try self.frameMark();
         const uses = @import("storage_liveness.zig").count(self.allocator, m, body.root) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -3129,6 +3136,16 @@ const Generator = struct {
         try self.escape(m, body.root, &result, self.depth);
         try self.release(first_root, result);
         try self.rewindUnescaped(first_root, mark, result);
+        if (outline_ticket) |ticket| {
+            const credit = self.outlining.tryExtract(ticket, .{ .expressions = self.steps, .layouts = self.layout_steps }) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return self.fail(m, body.root, .storage_unsupported, "Scoped helper extraction could not preserve its checked machine state"),
+            };
+            if (credit) |committed| {
+                self.steps -= @intCast(committed.expressions);
+                self.layout_steps -= committed.layouts;
+            }
+        }
         return result;
     }
     fn reusableClosure(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value) Error!?Value {
@@ -3191,6 +3208,7 @@ const Generator = struct {
                 .specialize = false,
                 .work_limits = self.work_limits,
                 .emission_work = self.emission_work,
+                .outlining = self.outlining,
                 .units = self.units,
                 .unit_views = self.unit_views,
                 .proof_cache = self.proof_cache,
@@ -4606,6 +4624,10 @@ const Generator = struct {
                 else => return self.unsupported(m, body.root),
             };
             self.c = .{ .module = self.module, .function = function };
+            self.outlining.registerRoot(function) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return self.unsupported(m, body.root),
+            };
             // These values belong to one Wasm local namespace and one body
             // planning budget. Completed source proofs, call definitions and
             // physical capacity requests remain compilation-wide.
@@ -4727,7 +4749,9 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
     defer active_calls.deinit();
     var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
-    var g: Generator = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work };
+    var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
+    defer outlining.deinit();
+    var g: Generator = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
     g.emit(entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -4754,6 +4778,12 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     if (g.transport) |transport| packets.configure(&module, transport, storage.regionBase(memory_plan, g.transport_region.?) catch unreachable, capacities[g.transport_region.?]) catch {
         return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid copied transport memory plan" } };
     };
+    const outlined = outlining.finalize() catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped helpers exceeded their checked machine-state or engine limits" } },
+    };
+    emission_work.scoped_outlined_regions = outlined.regions;
+    emission_work.scoped_outlined_globals = outlined.globals;
     const bytes = module.assembleWithOptions(.{}) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },

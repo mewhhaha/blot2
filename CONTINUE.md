@@ -21,27 +21,42 @@ an unrelated caller context. The300-field/200-copy regression fails the old
 layout budget and passes unchanged with the cache. Both new native laws pass;
 all2,702 compile; nine affected native laws pass, including wrapped exhaustive
 OOM checks. Mixed Maybe/Box/Pair witnesses execute in both tiers and sync/async.
-The affected guest batch is51passes/1known associated-result layout baseline
-failure. Astra xhigh review and changed-file lint/format pass. The required full
-gate was attempted and remains blocked fetching locked Baba9.0.1 through the
-registry proxy. A private first-export histogram run measures the actual effect;
-the ECS frontier is not yet proven cleared.
+The affected guest batch was51passes/1known associated-result layout baseline
+failure. Astra xhigh review and changed-file lint/format pass. The private
+first-export histogram `main-8544798919476965` still failed at644,559 total
+expressions (561,352 root), after681s/6,629,844KiB peak RSS. Direct layout
+misses plus proof visits reconcile exactly to100,001;1,331,808 cache hits did
+not eliminate repeated open layouts. No cap was raised.
 
-Compile-only probes of real `game.played.update` and `.render`, with canonical
-FrameAccess and real owner/frame scopes, finish source emission but fail engine
-validation: update root15,294,397bytes, render13,958,167bytes, against7,654,321.
-Actual Wasmtime49 and V8 agree. Existing compaction reduces update locals from
-1,258,823 to480,431, still above the50,000-local engine limit. Diagnostic byte
-capture never bypasses production validation. Source and storage caps remain
-unchanged; stage success does not qualify main or a native frame.
+Completed source calls now extract closed, typed machine ranges into private
+helpers, after all escape/release/rewind checks. Cross-body and written
+read-before-definition i32 registers use private per-root Wasm globals, reset
+only at original function entry. Future uses promote every occurrence; zero-only
+lanes remain zero. Strict branch closure, exact call signatures, hidden-local
+and coordinate guards, reachable acyclicity and final encoded host limits are
+checked. Only committed helpers credit their own per-body expression/layout
+work; cumulative work is unchanged and provisional limits remain active.
 
-Astra xhigh is reviewing bounded extraction of closed machine-instruction ranges
-into private helpers with exact cross-body register state. The real main session
-loop invalidates shortcuts that assume freshly zeroed call-local state; captured
-demand memoization is an executed counterexample. Private per-root Wasm globals
-may preserve that state, provided root nonreentry/call-cycle checks, exact packed
-instruction rewrites, entry resets, control closure and existing engine limits
-are enforced. No production extraction is installed yet.
+The real update stage `main-93e1c33a68375341` now PASSES production V8 validation
+and actual Pen Wasmtime49 Module::validate:13,994,810bytes total,313helpers,
+55,227private globals,505,091total expressions,20,378peak body work under the
+unchanged500,000limit. Previously update root15,294,397bytes and480,431locals
+failed both engines. Stage success does not qualify the real main or frame.
+
+Eight new native laws pass, including exhaustive allocation faults, nested
+credit/refcount preservation, captured loop state, future references, tee/packed
+metadata, parameter resets, non-i32 parent decline, typed controls, cycles,
+unknown dispatch, global bounds and the final50,000combined-local boundary.
+All2,711 native tests compile. Affected guests are57passes/1known baseline;
+the new padded captured-demand loop asserts actual extraction and executes in
+both tiers and sync/async. Changed Zig files have zero analyzer findings. The
+required full gate was attempted before checkpointing and remains blocked by
+the locked Baba9.0.1 registry proxy fetch. No dependency or lockfile changed.
+
+The actual native Pen attempt is running at
+`build/storage-integration/gdev-one-frame/attempt-s1i49tls`, using the matching
+default compiler. No real-main success or PNG has been observed yet. Continue
+this attempt before launching another full compile.
 
 Retained fixes include exact selected type keys and result snapshots, defining
 module obligations for planner closures, semantic witnesses on loaded nominals,
