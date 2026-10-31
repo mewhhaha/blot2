@@ -1404,5 +1404,55 @@
       "log": "/tmp/gdev-stage-render-menu.log"
     },
     "qualification": "Focused compile-only stages; no actual main or Pen frame success; ABI8/session2/framing26/capacities unchanged"
+  },
+  "invocation_local_global_borrows": {
+    "gdev_checkpoint": "32893f901a81521708af1f3befcc0e2604fd8e8b",
+    "fix": "Title palette borrowed inside draw; locale list accessors generated from existing ranges and borrowed inside each consumer; no global stored views",
+    "generated": "38accessors, both outputs otherwise byte-identical, regenerated deterministically",
+    "executed": "5locale checks PASS bothtiers/syncasync:80ordered/idempotent requests, first/lastpayload, savedrows roundtrip,81keys",
+    "review": "Astra xhigh clear"
+  },
+  "concrete_generated_codec_policies": {
+    "ink_checkpoint": "b0ec918ddececff9f0ba249ec35f56b0c75e4236",
+    "gdev_checkpoint": "37775fff2ee3ce2c72e104e11432a32c8da2f01b",
+    "fix": "One typed named decoder shares unchanged validation body; Codec impl delegates to exact named encoder/decoder; concrete generated policies use same functions directly; generic requirements and custom field dispatch retained",
+    "executed": "ActorObservation exact27words/version2/fullU32/signedzero, inspectionfieldorder and version/tag/count/id/width/bool/Inf/NaN/truncation/trailing rejection:4checks PASS bothtiers syncasync",
+    "native_generation": "Actual Pen compiler plugin generated-output check PASS",
+    "review": "Astra xhigh final clear; general scoped contract-method lowering remains unsupported",
+    "logs": [
+      "/tmp/gdev-actor-observation-development.log",
+      "/tmp/gdev-actor-observation-optimized.log",
+      "/tmp/gdev-inspector-generation-check.log"
+    ]
+  },
+  "stage_engine_size_frontier": {
+    "update": {
+      "artifact": "main-cc22235b30a2b934",
+      "module_bytes": 16440600,
+      "root_body_bytes": 15294397,
+      "input_locals": 1258823,
+      "output_locals": 480431,
+      "instructions": 4033735,
+      "work": {
+        "total": 504789,
+        "max_body": 412013,
+        "limit": 500000
+      }
+    },
+    "render": {
+      "artifact": "main-92007bcfb27b08f6",
+      "module_bytes": 14989842,
+      "root_body_bytes": 13958167
+    },
+    "engine_limit": 7654321,
+    "validation": "V8 and actual Wasmtime49 default Module::validate reject update function size; no validation setting changed",
+    "analysis": "Compactor works. Per-inline code costs: robots.update1.615MIR, with_flock_of/with_cells1.295M. Filtered first writer decline is readerArgument before numeric body admission; exact offending field being traced. Conservative copy simulation insufficient alone.",
+    "qualification": "Compile-only stages reached successful emission through ignored capturing client; engine validation FAIL; no real main or Pen frame qualifies",
+    "logs": [
+      "/tmp/gdev-stage-update-compactor.log",
+      "/tmp/gdev-stage-render-concrete-codec.log",
+      "/tmp/gdev-stage-update-inline-cost.log",
+      "/tmp/gdev-stage-update-writer-declines.log"
+    ]
   }
 }

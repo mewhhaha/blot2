@@ -17,15 +17,20 @@ mutation pass in both tiers and sync/async. Its full retry
 
 Use compile-only probes of the real `game.played.update` and `.render` with
 `world.with_owners`, `host.with_frame` and canonical FrameAccess to isolate late
-failures cheaply. Update now passes ReturningHome, salt simulation and arena
-interpolation, then stops at `locale.keys`; render passes nominal field dispatch
-and menu construction, then stops at `title.title_colors`. Both are implicit
-global collection references under investigation. Salt's lower result is
-explicit Maybe F32; arena uses its scalar F32.lerp and passes endpoint/clamping
-checks in both tiers/sync-async. Ink menu now builds sprites into GrowArray and
-freezes once; all three menu laws, including left/right highlight order, pass.
-Current local probe drivers are below ignored `build/`; the tracked full-main
-and Pen runners remain the integration authority.
+failures cheaply. Both stages now finish source emission, after invocation-local
+global borrows and concrete generated codec policies. Gdev37775ff and
+Inkb0ec918 preserve exact ActorObservation framing and pass strict encode/decode,
+inspection and malformed-input checks in both tiers/sync-async. Native generation
+check and Astra xhigh review pass. General contract-method lowering is deferred.
+
+The current blocker is emitted root size: update15,294,397bytes and
+render13,958,167bytes, above the7,654,321function-size limit. Both V8 and actual
+Wasmtime49 reject update. Ignored diagnostic clients captured the bytes without
+altering production validation. Compaction runs (1,258,823->480,431locals), but
+large callback-heavy gameplay remains inline. Per-inline instruction costs and
+filtered writer-decline diagnostics are identifying the precise admission gate.
+Do not raise engine, source or storage caps to conceal this failure. Probe drivers
+live below ignored build/; tracked full-main/Pen runners remain authoritative.
 
 Planner closures now retain obligations from their defining module. Named and
 closure planning scope and restore active goals; factory arguments are planned
