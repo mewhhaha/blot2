@@ -3,8 +3,45 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const longField = "x".repeat(7000);
-const source =
-  `const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
+const source = `import * as array from "std/array"
+entry const nested_readers = func (input: U32) => return do:
+  let values: Array U32 = if input == 0 then #[] else if input == 1 then #[1, 99] else #[2]
+  let needles: Array U32 = #[1]
+  return array.any (func outer => return do:
+    if outer == 99:
+      @panic "unvisited suffix"
+    return array.any (func inner => return inner == outer) needles) values
+type Shifted is data = $Shifted {rows: ResizeArray U32}
+const Shifted.length = func (value: Shifted) => return @u32.add (@storage.length value.rows) 100
+const Shifted.at = func (value: Shifted) -> (index: U32) => return @u32.add value.rows[index] 200
+const add_three = func first -> second -> third => return first + second + third
+const write_three = func (rows: ResizeArray U32) -> (first: U32) -> (second: U32) => return do:
+  rows.push (@u32.add first second)
+  return rows.length
+entry const staged_effect = func (input: U32) => return do:
+  let rows: ResizeArray U32 = #[]
+  let first = write_three rows
+  let second = first input
+  let before = rows.length
+  let result = second 1
+  return #[before, result, rows[0]]
+entry const partial_integer = func (input: U32) => return do:
+  let first = add_three input
+  let second = first 2
+  return second 3
+entry const partial_floating = func (input: F32) => return do:
+  let first = add_three input
+  let second = first 2.25
+  return second 3.5
+entry const getters = func (input: U32) => return do:
+  let first: ResizeArray U32 = #[input]
+  let second: ResizeArray U32 = #[10]
+  let read = first.at
+  first[0] := @u32.add input 2
+  first.push 99
+  let shifted = $Shifted {rows: second}
+  return #[first.length, read 0, shifted.length, shifted.at 0]
+const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
   let encode = func (value: U32): Array U32 => return #[value, @u32.add value 1]
   let encoded = encode input
   let scratch: GrowArray U32 = #[]
@@ -81,12 +118,23 @@ for (const codegenTier of ["development", "optimized"] as const) {
               ? await guest.callAsync(name, input)
               : guest.call(name, input);
           for (const input of [0, 1, 100]) {
+            assert.equal(await call("nested_readers", input), input == 1);
             assert.deepEqual(
               await call("answer", input),
               new Uint32Array([input + 1, input + 102, input + 13]),
             );
             assert.equal(await call("integer"), 3);
             assert.equal(await call("floating"), 3.75);
+            assert.equal(await call("partial_integer", input), input + 5);
+            assert.equal(await call("partial_floating", input), input + 5.75);
+            assert.deepEqual(
+              await call("staged_effect", input),
+              new Uint32Array([0, 1, input + 1]),
+            );
+            assert.deepEqual(
+              await call("getters", input),
+              new Uint32Array([2, input + 2, 101, 210]),
+            );
             assert.deepEqual(
               await call("large_key", input),
               new Uint32Array([input + 10, input + 11, input + 11]),

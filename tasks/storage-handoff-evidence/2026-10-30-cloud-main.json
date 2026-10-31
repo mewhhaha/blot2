@@ -1058,5 +1058,20 @@
     "lint": "2 changed Zig files zero findings; TypeScript formatting corrected",
     "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
     "main_attempt": "build/gdev-first-frame/main-187a5b3cf2d81e75 running"
+  },
+  "checked_getters_partials_and_nested_readers": {
+    "date": "2026-10-31",
+    "profile": "event path452738 expressions; station.receive202675; discovered1567x61; first refusal was definitions.length, then partial applications, then coarse named-target recursion guard",
+    "changes": "exact getter dispatch, deferred saturated method/body proof, named partials retaining checked caller input/output contexts, bounded repeated named-body traversal; preserve composite result environments before scope shrink",
+    "bounds": "128 selected planning frames and shared100000 work unchanged; closure guard and actual exact selected ActiveCalls recursion rejection unchanged; no guest/proof/layout/key limit increases",
+    "caught_regression": "nested active Maybe maps failed only with new named traversal; restoring coarse guard passed; retaining composite result environments makes unchanged fixture pass",
+    "native": "complete2687 inventory compiles; low512 native member/partial/nested-reader law passes full exhaustive OOM; recursion and escape laws pass;4 additional reader/writer laws pass sampled",
+    "executed": "29passed1confirmed baseline failure; new nominal getters, saved.at mutation, two owners, U32/F32 two-step partials, effects at saturation only, nestedany trap-suffix short circuit and100 scratchwriter calls pass bothtiers sync/async",
+    "baseline_failure": "associated function results retain selected latent effect rows: unresolved inline layout, reproduced on preceding e159 compiler",
+    "gdev": "explicitcount/catalog/requirement-pool reader arguments; publicwrappers preserved; standaloneprogression test1PASS; codegen --checkPASS",
+    "review": "Astra xhigh final review clear including composite-context correction",
+    "lint": "2 changedZigfiles zero findings; TypeScript formatting passes",
+    "full_gate": "attempted for corrected candidate; lockedBaba9.0.1 proxy unsuccessful tunnel beforetests",
+    "main_attempt": "build/gdev-first-frame/main-bb8b18d3484ed760 running; superseded getterbuilds cancelled after regression found"
   }
 }

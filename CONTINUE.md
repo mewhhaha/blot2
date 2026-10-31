@@ -2,20 +2,34 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-187a5b3cf2d81e75`, running with checked
-scratch-array Unit writer admission. The preceding `main-ba3ccf824ebef718`
-cleared oversized keys and reached the finite500,000 emission-work limit in
-Ink persistence encoding. No successful main Wasm or frame yet.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-bb8b18d3484ed760`, running with checked
+collection getters, named partials and bounded nested generic readers. No
+successful main Wasm or frame yet. Superseded getter attempts were cancelled
+while correcting a nested-Maybe context regression; do not use them as passes.
 
-Unit writer planning now models plain local array literals and collection
-results of checked calls/applications with temporary, emission-free roots.
-The real child still validates ownership, records actual ordered input access
-and releases scratch. No other storage operations were admitted. Astra xhigh
-reviewed the boundaries. The low512-budget law passes exhaustive OOM, including
-an escaping-borrow negative; three existing safety/writer laws pass. Repeated
-100-call scratch execution passes both tiers and sync/async. All2,687 native
-tests compile; changed Zig lint is clean. Full gate attempted and registry
-blocked. This does not qualify main.
+The measured event path had452,738 inline expressions, including repeated
+discovery checks. Getters now follow the exact checked dispatch; curried members
+retain their receiver until saturation. Named partials preserve checked input
+and output types before restoring captured contexts. The planner permits finite
+nested uses of one generic declaration under its unchanged128-call/work bounds;
+actual selected-call recursion checks remain strict. Composite result contexts
+survive temporary-scope cleanup. The unchanged nested-Maybe law caught and
+qualified that correction. Astra xhigh reviewed the final boundaries.
+
+The affected guest batch is29passes/1confirmed baseline failure (associated
+latent-effect result layout). Real member syntax, two owners/mutation, U32/F32
+partials, effects only at saturation, nested-any short circuit and scratch-array
+cleanup pass in both tiers and sync/async. The low512-budget native law includes
+member calls, two-step partials and nested readers, with exhaustive OOM. Recursion
+and escape negatives plus four other reader/writer laws pass. All2,687 native
+tests compile; changed Zig lint and TypeScript format are clean. Full gate was
+attempted and remains registry blocked.
+
+Gdev's discovery readers receive the immutable catalog, count and requirement
+pools explicitly; public behavior and wrappers remain. A standalone initial
+state/catalog-boundary check and protocol freshness check pass. Local scratch
+Unit writer admission remains limited to plain arrays with no runtime planning
+effects; actual child ownership and access checks remain authoritative.
 
 The new reader predicate resolves selected nominal arguments and constructor
 payloads in their captured environments, with the existing work/depth bounds.

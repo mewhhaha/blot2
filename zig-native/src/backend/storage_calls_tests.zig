@@ -14,18 +14,23 @@ fn publishScratchWriter(allocator: std.mem.Allocator, modules: []const core.Modu
 }
 
 test "Unit writer helpers admit plain local scratch arrays with checked cleanup" {
-    const helper = "const encode = func (input: U32): Array U32 => return #[input, @u32.add input 1]\n" ++
-        "const append = func (values: Array U32) -> (destination: ResizeArray U32) => return do:\n  for index in 0 .. @storage.length values:\n    @storage.push destination values[index]\n" ++
+    const helper = "const Array.length = func (values: Array a): U32 => return @array.length values\n" ++
+        "const Array.at = func (values: Array a) -> (index: U32) => return @array.get values index\n" ++
+        "const ResizeArray.push = func (values: ResizeArray a) -> (value: a) => return @storage.push values value\n" ++
+        "const some = func (values: Array U32) -> (predicate: U32 -> Bool) => return do:\n  for index in 0 .. values.length:\n    if predicate (values.at index):\n      return true\n  return false\n" ++
+        "const bump = func (first: U32) -> (second: U32) -> (third: U32) => return @u32.add (@u32.add first second) third\n" ++
+        "const encode = func (input: U32): Array U32 => return #[input, @u32.add input 1]\n" ++
+        "const append = func (values: Array U32) -> (destination: ResizeArray U32) => return do:\n  let read = values.at\n  for index in 0 .. values.length:\n    destination.push (read index)\n" ++
         "const write = func (destination: ResizeArray U32) -> (input: U32) => return do:\n  let encoded = encode input\n  let local: GrowArray U32 = #[]\n  @storage.push local encoded[0]\n  @storage.push local encoded[1]\n  let sum: U32 = 0\n";
     var parts: [102][]const u8 = undefined;
     parts[0] = helper;
     @memset(parts[1..81], "  sum := @u32.add sum 1\n");
-    parts[81] = "  append (encode sum) destination\n  @storage.push destination local[0]\nentry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[]\n";
+    parts[81] = "  let found = some encoded (func outer => return some encoded (func inner => return true))\n  if found:\n    destination.push input\n  let first = bump input\n  let partial = first sum\n  destination.push (partial 0)\n  append (encode sum) destination\n  @storage.push destination local[0]\nentry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[]\n";
     @memset(parts[82..101], "  write rows input\n");
     parts[101] = "  return rows[0]\n";
     const source = try std.mem.concat(a, u8, &parts);
     defer a.free(source);
-    var module = try lower(a, source);
+    var module = try lowerWithCatalog(a, source, true);
     defer module.deinit(a);
     try publishScratchWriter(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishScratchWriter, .{@as([]const core.Module, &.{module})});

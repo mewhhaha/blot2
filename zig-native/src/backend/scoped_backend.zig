@@ -1517,6 +1517,52 @@ const Generator = struct {
     }
     // Symbolic values used only by the read-only admission walk. Runtime
     // capture words are supplied by readerParameter, never computed here.
+    const GetterSelection = struct { target: core.BindingRef, receiver: TypeRef };
+    fn selectedGetter(self: *Generator, m: *const core.Module, id: core.Id, value: Value) Error!?GetterSelection {
+        const projection = m.projection(m.node(id).b);
+        var receiver = try self.resolveType(.{ .unit = m.unit, .ty = projection.source_type }, 0);
+        var source = try self.unit(receiver.unit);
+        if (T.receiverIdentity(source.types.node(receiver.ty)) == null) if (value.type_evidence) |evidence| {
+            try self.restoreTypes(evidence.arguments);
+            receiver = try self.resolveType(evidence.root, 0);
+            source = try self.unit(receiver.unit);
+        };
+        const identity = T.receiverIdentity(source.types.node(receiver.ty)) orelse value.nominal orelse return null;
+        const target = (try self.fieldTarget(m, identity, projection.field)) orelse return null;
+        return .{ .target = target, .receiver = receiver };
+    }
+    fn planPartial(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, depth: usize) Error!?Value {
+        const n = m.node(id);
+        const function = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return null;
+        const callable = function.callable orelse return null;
+        if (callable.node != 0 or function.host != null or function.demand != null) return null;
+        const owner = try self.unit(callable.unit);
+        const body = owner.body(callable.target) orelse return null;
+        const parameters = owner.bodyParameters(body);
+        if (function.fields.len + 1 >= parameters.len) return null;
+        const argument = (try self.planValue(m, n.b, remaining, depth + 1)) orelse return null;
+        const before = self.type_arguments.items.len;
+        defer self.type_arguments.shrinkRetainingCapacity(before);
+        const use_input = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(n.b) }, 0);
+        const use_output = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
+        try self.restoreTypes(callable.types);
+        var signature = owner.binding(callable.target).ty;
+        for (function.fields) |_| {
+            const arrow = owner.types.node(signature);
+            if (arrow.tag != .function) return null;
+            signature = arrow.b;
+        }
+        const arrow = owner.types.node(signature);
+        if (arrow.tag != .function) return null;
+        try self.mapTypes(.{ .unit = owner.unit, .ty = arrow.a }, use_input, 0);
+        try self.mapTypes(.{ .unit = owner.unit, .ty = arrow.b }, use_output, 0);
+        const formal: TypeRef = .{ .unit = owner.unit, .ty = parameters[function.fields.len].ty };
+        if (try self.callableType(argument)) |argument_signature| try self.mapTypesUnder(formal, argument_signature, argument.callable.?.types, 0) else try self.mapValueTypes(formal, argument, 0);
+        const fields = try self.arena.allocator().alloc(Value, function.fields.len + 1);
+        @memcpy(fields[0..function.fields.len], function.fields);
+        fields[function.fields.len] = argument;
+        return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = .{ .unit = owner.unit, .target = callable.target, .types = try self.captureTypes() } };
+    }
     fn planValue(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, depth: usize) Error!?Value {
         if (id == 0 or remaining.* == 0 or depth > 128) return null;
         remaining.* -= 1;
@@ -1565,6 +1611,18 @@ const Generator = struct {
                 const projection = m.projection(n.b);
                 const name = m.fieldSpelling(projection.field) orelse return null;
                 if (dataField(receiver, name)) |field| return field;
+                const before = self.type_arguments.items.len;
+                defer self.type_arguments.shrinkRetainingCapacity(before);
+                const selection = (try self.selectedGetter(m, id, receiver)) orelse return null;
+                const owner = try self.unit(selection.target.unit);
+                const body = owner.body(selection.target.binding) orelse return null;
+                const signature = owner.types.node(owner.binding(selection.target.binding).ty);
+                if (signature.tag != .function) return null;
+                try self.mapTypes(.{ .unit = owner.unit, .ty = signature.a }, selection.receiver, 0);
+                try self.mapTypes(.{ .unit = owner.unit, .ty = signature.b }, .{ .unit = m.unit, .ty = projection.result_type }, 0);
+                // A curried getter captures its receiver now; admission of its
+                // body waits for the saturated callback, just like invoke.
+                if (owner.bodyParameters(body).len > 1) return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = try self.arena.allocator().dupe(Value, &.{receiver}), .callable = .{ .unit = owner.unit, .target = selection.target.binding, .types = try self.captureTypes() } };
             },
             .product, .record => {
                 const children = m.children(id);
@@ -1621,6 +1679,7 @@ const Generator = struct {
                     return receiver;
                 }
             },
+            .apply => if (try self.planPartial(m, id, remaining, depth)) |partial| return partial,
             .associated => {
                 const first = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return null;
                 const second = (try self.planValue(m, n.b, remaining, depth + 1)) orelse return null;
@@ -1702,7 +1761,9 @@ const Generator = struct {
     }
     fn numericCallBody(self: *Generator, target: core.BindingRef, inputs: []const TypeRef, values: ?[]const Value, output: TypeRef, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool) Error!bool {
         if (used == active.len) return false;
-        for (active[0..used]) |prior| if (std.meta.eql(prior, target)) return false;
+        // Different selected callbacks can nest through the same generic
+        // declaration. Planning is bounded by call depth and shared work;
+        // emission independently rejects exact selected-call recursion.
         const owner = try self.unit(target.unit);
         const body = owner.body(target.binding) orelse return false;
         const parameters = owner.bodyParameters(body);
@@ -1755,7 +1816,12 @@ const Generator = struct {
             return err;
         };
         var result = try self.resolveType(.{ .unit = owner.unit, .ty = owner.typeOf(body.root) }, 0);
-        if (result.environment == null and (try self.unit(result.unit)).types.node(result.ty).tag == .function) result.environment = try self.captureTypes();
+        if (result.environment == null) switch ((try self.unit(result.unit)).types.node(result.ty).tag) {
+            .unit, .boolean, .u32, .f32, .never => {},
+            // Composite results can still mention formals from this temporary
+            // selected call, including nested instantiations of one nominal.
+            else => result.environment = try self.captureTypes(),
+        };
         self.type_arguments.shrinkRetainingCapacity(before);
         if (admitted) try self.mapTypes(output, result, 0);
         return admitted;
@@ -1813,6 +1879,10 @@ const Generator = struct {
                 const function = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return false;
                 const argument = (try self.planValue(m, n.b, remaining, depth + 1)) orelse return false;
                 if (!try self.numericExpression(m, n.b, remaining, active, used, readers, depth + 1)) return false;
+                if (readers) if (try self.planValue(m, id, remaining, depth + 1)) |partial| if (partial.tag == .callable) {
+                    var descriptor = false;
+                    return self.readerArgument(partial, &descriptor, remaining);
+                };
                 if (!try self.plannedCallback(function, argument, remaining, active, used, depth + 1)) return false;
             },
             .pattern_bind => {
@@ -1824,7 +1894,20 @@ const Generator = struct {
                     const receiver = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(n.a) }, 0);
                     const owner = try self.unit(receiver.unit);
                     const record = owner.types.node(receiver.ty);
-                    if (record.tag != .record) return false;
+                    if (record.tag != .record) {
+                        if (!readers or !try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1)) return false;
+                        const value = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return false;
+                        const before = self.type_arguments.items.len;
+                        defer self.type_arguments.shrinkRetainingCapacity(before);
+                        const selection = (try self.selectedGetter(m, id, value)) orelse return false;
+                        const declaration = (try self.unit(selection.target.unit)).body(selection.target.binding) orelse return false;
+                        if ((try self.unit(selection.target.unit)).bodyParameters(declaration).len > 1) {
+                            const function = (try self.planValue(m, id, remaining, depth + 1)) orelse return false;
+                            var descriptor = false;
+                            return self.readerArgument(function, &descriptor, remaining);
+                        }
+                        return self.numericCallBody(selection.target, &.{selection.receiver}, &.{value}, .{ .unit = m.unit, .ty = n.ty }, remaining, active, used, readers);
+                    }
                     var found = false;
                     const name = m.fieldSpelling(projection.field) orelse return false;
                     for (0..record.b) |index| {
