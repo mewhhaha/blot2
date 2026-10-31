@@ -2,12 +2,29 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The first bounded 1,000,000-expression experiment (`main-29f12d755e093cf4`)
-passed the former root cap and stopped at504,593 with an unresolved element
-layout in output_chart. The production default is still500,000; this is not a
-policy qualification or a successful main Wasm/frame. The same1M retry `main-8320eac6eff57b00` is running with the writer-region and
-chart fixes, preceding the implicit-global admission guard. Follow
-the actual main to a real Pen PNG. No further automatic cap increase.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The
+first bounded 1,000,000-expression experiment (`main-29f12d755e093cf4`) passed
+the former root cap and stopped at504,593 with an unresolved element layout in
+output_chart. The production default is still500,000; this is not a policy
+qualification or a successful main Wasm/frame. The same1M retry
+`main-8320eac6eff57b00` stopped at507,616 in Ink map.locate's early empty Maybe
+return. Its exact `Maybe U32` annotation now passes five key-policy probes and
+the existing executed map laws. Retry `main-7d1564b64ec56839` is running at
+Blot0a72/Inkfbe379b; it predates the separately checked local-slot compactor
+below. Follow the actual main to a real Pen PNG. No further automatic cap
+increase.
+
+A valid 101×250 scalar-rebinding/Foreign guest exceeded the engine's local
+limit. Late scoped-only slot compaction now reuses single-definition i32 locals
+whose uses stay inside one straight-line segment. Parameters, other machine
+types, default-zero reads, multiple definitions and cross-control values stay
+separate; hidden-local markers decline. Both tiers pass ordered101 host calls in
+sync/async. Five native laws pass, including exhaustive OOM and50,001 input
+locals compacted to one. All2,695 native tests compile. The affected guest batch
+is33passes/1known baseline associated-result layout failure. Astra xhigh
+reviewed the implementation; changed Zig lint and TypeScript formatting pass.
+Full gate attempted, still blocked fetching locked Baba before tests. No
+source-expression, proof, layout, depth, key or guest capacity changed.
 
 A persistent-pool witness exposed scratch Grow/Resize regions overlapping a
 named pool in outlined Unit writers. Children now inherit caller availability
@@ -18,33 +35,33 @@ the parent memory plan includes child regions. Both tiers/sync-async pass live
 persistent pools, two growers, busy-first/busy-second regions and reuse after
 scope exit. Three affected native laws pass, including exhaustive OOM; all2,688
 compile. The broad guest batch remains29passes/1known baseline failure. Astra
-xhigh reviewed the fix; lint/format pass and the required full gate was attempted
-but is registry blocked.
+xhigh reviewed the fix; lint/format pass and the required full gate was
+attempted but is registry blocked.
 
-Optional writer admission now declines implicit references to global collections,
-which belong to the caller's named-pool catalog. Ordinary scoped emission reads
-the live pool; explicit descriptor arguments remain eligible. A mutated-global
-regression passes with both implicit and explicit writers in both tiers and
-sync/async, plus exhaustive native OOM. The affected guest batch remains29/1
-with the recorded baseline failure. All2,689 native tests compile.
+Optional writer admission now declines implicit references to global
+collections, which belong to the caller's named-pool catalog. Ordinary scoped
+emission reads the live pool; explicit descriptor arguments remain eligible. A
+mutated-global regression passes with both implicit and explicit writers in both
+tiers and sync/async, plus exhaustive native OOM. The affected guest batch
+remains29/1 with the recorded baseline failure. All2,689 native tests compile.
 
 Chart interpolation uses the existing F32.lerp family explicitly. advance_into
 now takes the named row owner, rates owner and plain Layout, creates its old-row
 view internally, and completes reads before shrinking. Callers are migrated;
 retained-history fixtures copy rows into separate owners. Two standalone checks
 pass, including overtaking interpolation, stable ties and still-frame snapping.
-The broader output module is blocked by its existing missing helper import.
-ABI, proofs, layout/depth/key limits, schemas and guest capacities are unchanged.
+The broader output module is blocked by its existing missing helper import. ABI,
+proofs, layout/depth/key limits, schemas and guest capacities are unchanged.
 
 A direct real `ray_box` probe found `abs` declined solely because the getter
 planner required reader mode. It now validates the receiver in its original
 mode, follows exact checked dispatch and validates the getter body. Plain
 partials require known callables with plain captures; descriptors remain
-excluded from scalar/inline admission. The real probe now outlines ray_box.
-The low512 native primitive/custom-getter law passes exhaustive OOM, including
-a generic abs wrapper. Four affected native laws pass; all2,688 compile.
-Executed primitive/custom getters, signed zero and partials pass in both tiers
-and sync/async. The guest batch remains29passes/1known baseline failure. A
+excluded from scalar/inline admission. The real probe now outlines ray_box. The
+low512 native primitive/custom-getter law passes exhaustive OOM, including a
+generic abs wrapper. Four affected native laws pass; all2,688 compile. Executed
+primitive/custom getters, signed zero and partials pass in both tiers and
+sync/async. The guest batch remains29passes/1known baseline failure. A
 standalone Gdev ray-box fixture passes eight boundary cases. Changed Zig lint
 and TypeScript format pass; required full gate attempted, registry blocked.
 Astra xhigh reviewed this narrow change. No budget was raised.
@@ -62,10 +79,10 @@ The affected guest batch is29passes/1confirmed baseline failure (associated
 latent-effect result layout). Real member syntax, two owners/mutation, U32/F32
 partials, effects only at saturation, nested-any short circuit and scratch-array
 cleanup pass in both tiers and sync/async. The low512-budget native law includes
-member calls, two-step partials and nested readers, with exhaustive OOM. Recursion
-and escape negatives plus four other reader/writer laws pass. All2,687 native
-tests compile; changed Zig lint and TypeScript format are clean. Full gate was
-attempted and remains registry blocked.
+member calls, two-step partials and nested readers, with exhaustive OOM.
+Recursion and escape negatives plus four other reader/writer laws pass. All2,687
+native tests compile; changed Zig lint and TypeScript format are clean. Full
+gate was attempted and remains registry blocked.
 
 Gdev's discovery readers receive the immutable catalog, count and requirement
 pools explicitly; public behavior and wrappers remain. A standalone initial
@@ -81,9 +98,9 @@ invocation keys and body/source/ownership checks remain strict. Keys are never
 truncated. Two new native laws pass exhaustive allocation-failure checks; seven
 existing reader/writer laws pass. Executed generic, owner mutation and oversized
 key read/write laws pass in both tiers and sync/async. The affected guest batch
-is29passed/1failed: the associated latent-effect result layout failure reproduces
-on the preceding compiler. Changed Zig lint is clean; all2,686 native tests
-compile. Full gate attempted, registry blocked as below.
+is29passed/1failed: the associated latent-effect result layout failure
+reproduces on the preceding compiler. Changed Zig lint is clean; all2,686 native
+tests compile. Full gate attempted, registry blocked as below.
 
 Gdev checkpoint `1a7ebd6` replaces335 scalar text lookups across21 modules with
 verified existing spans; all403 scalar spans match the unchanged payload. Shop

@@ -1188,10 +1188,17 @@
     },
     "retry_after_chart_regions": {
       "artifact": "build/gdev-first-frame/main-8320eac6eff57b00",
-      "status": "running",
+      "status": "stopped at507616 with unresolved map.locate early empty-Maybe payload",
       "blot_base": "8594c321b96efcc5b8ddf6bfae8b16301e4baa10",
       "gdev_base": "92503ebb82d789075d623e88bdba6c7dafcd5fb5",
       "note": "same1Mceiling; predatesimplicitglobaladmissionguard; productiondefaultstill500k"
+    },
+    "retry_after_map_signature": {
+      "artifact": "build/gdev-first-frame/main-7d1564b64ec56839",
+      "status": "running",
+      "blot_base": "0a72b1283947db1e944379bf3bf0c407a193fe90",
+      "ink_base": "fbe379bb8bb3816fabb7363ce27e2499b3ba34e3",
+      "note": "same1M experimental ceiling; predates late-local compactor; production default remains500k"
     }
   },
   "writer_scratch_regions": {
@@ -1223,5 +1230,31 @@
     "lint": "2changedZigfiles0findings;TSformatpasses",
     "full_gate": "attempted; lockedBabaregistryproxyunsuccessfultunnel",
     "review": "Astraxhighconfirmed exactemittercondition anddeclineboundary"
+  },
+  "map_locate_result_signature": {
+    "source": "locate explicitly returns Maybe U32 bucket index; key/value/policy remain generic",
+    "probes": "U32, simple Vec4, actual SIMD trail policy, set.from, mixed U32/Vec4; all compile and execute four inputs in sync/async",
+    "existing_tests": "maps.blot collisions/growth, independent copy, ordered reinsert/frozen: all zero failures sync/async",
+    "review": "Astra xhigh confirmed precise source contract; general return-context propagation deferred for frame priority",
+    "ink_checkpoint": "fbe379bb8bb3816fabb7363ce27e2499b3ba34e3"
+  },
+  "late_scoped_local_compaction": {
+    "problem": "valid101calls\u00d7250scalarrebindings produces over50k locals and engine rejects successful Wasm payload before change",
+    "boundary": "end of runtime pipeline after resource/task safepoints; scoped data_stacks only, both tiers",
+    "eligible": "single-definition i32 locals, no read before definition, all refs in one straight-line segment; slots released at final reference",
+    "pinned": "parameters, other machine types, zero-definition/default-zero, multiple definitions, cross-control refs",
+    "decline": "invalid local IDs/control graph or ownership/resource_retire hidden local operands",
+    "preserved": "instruction order, stack effects, all packed metadata, immutable original; replacement atomic under OOM; no source/guest limits changed",
+    "native": "5PASS including full OOM, 50001->1 local witness and both-tier/counting gate; complete2695 inventory compiles",
+    "executed": "original101\u00d7250 ordered Foreign guest PASS both tiers sync/async; affected batch33PASS1confirmed baseline associated-result layout failure",
+    "review": "Astra xhigh final code review: no correctness blocker",
+    "lint": "4changed Zig files zero findings; TS format clean",
+    "full_gate": "attempted; locked Baba9.0.1 registry proxy unsuccessful tunnel before tests",
+    "local_logs": [
+      "/tmp/late-local-baseline.log",
+      "/tmp/blot-local-compact-native.log",
+      "/tmp/blot-local-compact-guests.log",
+      "/tmp/blot-local-compact-full-gate.log"
+    ]
   }
 }

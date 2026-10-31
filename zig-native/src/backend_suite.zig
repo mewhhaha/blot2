@@ -14,6 +14,7 @@ comptime {
     _ = @import("backend/wasm_sroa.zig");
     _ = @import("backend/simd_abi.zig");
     _ = @import("backend/wasm_row_reduce.zig");
+    _ = @import("backend/wasm_local_compact.zig");
     _ = @import("backend/runtime_operation_backend_tests.zig");
     _ = @import("backend/provider_origins.zig");
     _ = @import("check/scoped_effect_backend_tests.zig");

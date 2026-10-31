@@ -235,6 +235,16 @@ pub const Session = struct {
                 owned = replacement;
             }
         }
+        if (self.module.memory_model == .data_stacks) {
+            if (owned) |body| {
+                view.locals = body.locals;
+                view.instructions = body.instructions;
+            }
+            if (try @import("wasm_local_compact.zig").run(self.allocator, &view)) |replacement| {
+                if (owned) |*body| body.deinit(self.allocator);
+                owned = replacement;
+            }
+        }
         return owned;
     }
 };
