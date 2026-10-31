@@ -60,7 +60,18 @@
   },
   "pending": [
     "Full compiler gate blocked before tests by locked Baba9.0.1 fetch through proxy",
-    "Broader library/game/host/browser/recovery qualification",
-    "Temporary compiler diagnostic removal and affected checks"
-  ]
+    "Broad Zig lint has25 findings, byte-for-byte identical to pre-cleanup baseline; changed files zero findings",
+    "Broader library/game/host/browser/recovery and release performance qualification"
+  ],
+  "diagnostic_cleanup": {
+    "compiler_sha256": "38d40a78237a6f38d0a2d8c85fa1086cca575580765418394c58c8957f8126ab",
+    "prefix": "zig-native/zig-out-cleanup",
+    "change": "Removed temporary NUM_*,ROOT_*,SOURCE_WORK_FINAL output; no compiler semantic or limit changes",
+    "native": "All2716 compile;5 affected source-proof/backend tests pass, including wrapped allocation faults",
+    "executed": "2 restoration tests pass19s, both tiers and sync/async, exact values/outcomes, malformed traps/recovery",
+    "restoration_wasm": "byte-identical to qualified1,929,566B stage and validates with actual Pen Wasmtime49",
+    "lint": "Changed files zero; fullsrc25 findings exactly equal baseline",
+    "full_gate": "Attempted; blocked before tests fetching locked Baba9.0.1 via proxy",
+    "frame_identity": "The inspected frame used the original compiler SHA recorded above; its installed binary remains available for reproduction"
+  }
 }

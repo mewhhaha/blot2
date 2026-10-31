@@ -4749,18 +4749,7 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidArtifact => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid source proof context" } },
     };
-    defer {
-        // Temporary first-frame evidence: the actual Gdev world-storage unit
-        // is unit 2. Report its one shared source allowance without changing it.
-        for (views) |view| {
-            if (view.unit != 2) continue;
-            const inventory = view.nodes.len + view.extra.len + view.types.nodes.len + view.types.extra.len + view.obligations.len;
-            const allowance = @min(@as(usize, 32_000_000), @max(@as(usize, 1_000_000), inventory * 256));
-            if (allowance != 32_000_000) continue;
-            if (proof_cache.moduleRemaining(view.unit)) |remaining| std.debug.print("SOURCE_WORK_FINAL unit={d} inventory={d} allowance={d} consumed={d} principal_bytes={d}\n", .{ view.unit, inventory, allowance, allowance - remaining, @sizeOf(@import("../check/package_contracts.zig").Principal) });
-        }
-        proof_cache.deinit();
-    }
+    defer proof_cache.deinit();
     var dispatches: Dispatches = .empty;
     defer dispatches.deinit(allocator);
     var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };

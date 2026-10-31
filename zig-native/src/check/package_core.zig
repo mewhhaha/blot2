@@ -885,10 +885,7 @@ const Walker = struct {
         defer if (quantified) self.scopes.leave();
         try self.header(signature, self.module.parameters[body.parameters.start..][0..body.parameters.len], body.root, false);
         try self.bodyStorage(self.module.parameters[body.parameters.start..][0..body.parameters.len], body.root);
-        self.expression(body.root, 0) catch |err| {
-            std.debug.print("NUM_BODY unit={d} binding={d} name={s} span={d}..{d}\n", .{ self.module.unit, body.binding, self.module.name(body.declaration_name), body.span.start, body.span.end });
-            return err;
-        };
+        try self.expression(body.root, 0);
         try require(self.scopes.opening_count == 0);
     }
     fn units(self: *Self) []const *const core.Module {
@@ -1281,35 +1278,6 @@ const Walker = struct {
             if (!progress) {
                 for (pending) |goal| {
                     if (goal.ty == 0) continue;
-                    std.debug.print("NUM_PENDING producer={d} kind={s} op={s} span={d}..{d} ty={d}:{any} other={d}:{any} result={d}:{any}\n", .{ producer.unit, @tagName(goal.kind), @tagName(goal.operator), goal.span.start, goal.span.end, goal.ty, self.module.types.node(goal.ty), goal.other, self.module.types.node(goal.other), goal.result, self.module.types.node(goal.result) });
-                    inline for (.{ "ty", "other", "result", "signature" }) |field| {
-                        const type_id = @field(goal, field);
-                        const leaf = self.module.types.node(type_id);
-                        if (leaf.tag == .rigid and leaf.c == 0) {
-                            const original = self.origin orelse self.module;
-                            const prefix = leaf.b < original.types.nodes.len and original.types.node(leaf.b).tag == .variable;
-                            var active = false;
-                            for (self.scopes.schemes[0..self.scopes.scheme_count]) |scheme_| {
-                                if (std.mem.findScalar(T.Id, self.module.types.list(scheme_.variables), leaf.b) != null) active = true;
-                            }
-                            const solver_owned = if (self.scopes.solver) |owner| owner.ownsRigid(leaf) else false;
-                            std.debug.print("NUM_CLASS role={s} original_unit={d} original_id={d} prefix_variable={any} checked_instance={any} active_scheme_binder={any} solver_owned={any} source_instances={any}\n", .{ field, original.unit, leaf.b, prefix, self.scopes.instance_variables.contains(leaf.b), active, solver_owned, self.scopes.source_instances });
-                        }
-                    }
-                    if (goal.kind == .field and self.module.types.node(goal.ty).tag == .rigid) {
-                        const source_module = self.origin orelse self.module;
-                        std.debug.print("ROOT_FIELD name={s} owner={d} result={d}\n", .{ source_module.fieldSpelling(goal.name) orelse "?", goal.ty, goal.result });
-                        for (self.scopes.schemes[0..self.scopes.scheme_count]) |scheme_| {
-                            std.debug.print("ROOT_SCHEME root={d} vars={any} rows={any} goals={d}\n", .{ scheme_.root, self.module.types.list(scheme_.variables), self.module.types.list(scheme_.row_variables), scheme_.obligations.len });
-                            for (try self.scopes.schemeGoals(scheme_)) |given_| {
-                                std.debug.print("ROOT_GIVEN kind={s} identity={d}:{d} ty={d}:{any} other={d} result={d} name={d}\n", .{ @tagName(given_.kind), given_.identity.unit, given_.identity.decl, given_.ty, self.module.types.node(given_.ty), given_.other, given_.result, given_.name });
-                                if (given_.kind == .callee_use) {
-                                    const pack = self.module.types.node(given_.ty);
-                                    if (pack.tag == .product) std.debug.print("ROOT_PACK {any}\n", .{self.module.types.list(.{ .start = pack.a, .len = pack.b })});
-                                }
-                            }
-                        }
-                    }
                     if (self.admission.source_failure) |failure| {
                         if (failure.* == null) failure.* = .{ .unit = producer.unit, .span = goal.span };
                     }
@@ -1634,11 +1602,7 @@ const Walker = struct {
             }
             return false;
         }
-        self.solverGoals(solver, owner, declaration.scheme, &copy, depth + 1) catch |err| {
-            std.debug.print("NUM_SUMMARY caller={d} producer={d}:{d} span={d}..{d}\n", .{ self.module.unit, owner.unit, binding, given.span.start, given.span.end });
-
-            return err;
-        };
+        try self.solverGoals(solver, owner, declaration.scheme, &copy, depth + 1);
         accepted = true;
         return true;
     }

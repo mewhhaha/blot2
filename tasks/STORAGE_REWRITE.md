@@ -2,27 +2,29 @@
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The candidate has advanced through checked source validation
-and initial owner layouts, but no real Gdev main Wasm or Pen frame has passed.
+and one real Gdev main frame in native Pen, with all runner checks and an
+inspected PNG. See [the exact first-frame candidate](storage-handoff-evidence/2026-10-31-first-frame.json).
+Broader compiler, library/game and host/browser qualification remain pending.
 Keep changing compile frontiers in CONTINUE.md and its linked evidence. The
 earlier full compiler gate stopped at its protocol smoke span assertion (three
 passed, one failed); see
 [the handoff evidence](storage-handoff-evidence/2026-10-30-full-gate.txt).
 
-## Immediate milestone
+## First native frame — complete
 
-Compile the actual Gdev main, then render one real frame in Pen. Keep unrelated
-fixture, generator, legacy-retirement and performance work paused unless a
-concrete frame blocker requires it. Preserve source and assets across the four
-existing sibling checkouts.
+The real main compiled and rendered one headless frame on 2026-10-31. Continue
+the remaining qualification and greenfield backend/API retirement requirements
+below; first-frame success does not establish full gameplay or performance.
+Preserve source, assets and useful requirements across the existing siblings.
 
-From Blot, after building the matching native development compiler:
+For an optional compile-only diagnostic with the matching native compiler:
 
 ```sh
-deno run -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
+deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
 
-After main compiles and Pen and its plugin are rebuilt:
+For actual integration, build matching Pen and plugin binaries, then run:
 
 ```sh
 python3 scripts/storage_handoff/run_pen.py --launch
