@@ -1072,6 +1072,52 @@
     "review": "Astra xhigh final review clear including composite-context correction",
     "lint": "2 changedZigfiles zero findings; TypeScript formatting passes",
     "full_gate": "attempted for corrected candidate; lockedBaba9.0.1 proxy unsuccessful tunnel beforetests",
-    "main_attempt": "build/gdev-first-frame/main-bb8b18d3484ed760 running; superseded getterbuilds cancelled after regression found"
+    "main_attempt": {
+      "evidence": "/workspace/blot2/build/gdev-first-frame/main-bb8b18d3484ed760",
+      "identity": "7f81430078a1b24ae56ccbbabece042cd4c275c9623f64b4800e1cb84719e35a",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/ink/lib/math.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 26181,
+          "end": 26183,
+          "message": "Storage source expansion exceeded its expression budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    }
+  },
+  "root_emission_profile_before_plain_getters": {
+    "attempt": "build/gdev-first-frame/main-6a4814117f5cbd4c",
+    "cap": "rootfunction25 reaches500000; run_event456491 inline expressions; hands.receive104780",
+    "numeric_visits": 2472052,
+    "plan_visits": 2689889,
+    "numeric_calls": 415972,
+    "selected_data_visits": 7649167,
+    "capture_calls": 1175313,
+    "capture_input_entries": 998248592,
+    "capture_retained_entries": 115728960,
+    "capture_retained_bytes": 3703326720,
+    "max_snapshot_entries": 186,
+    "existing_call_hits": 78920,
+    "existing_call_misses": 1547,
+    "note": "diagnostic artifact only; measurements identify preceding candidate, no optimizations or budget changes inferred"
+  },
+  "plain_getter_admission": {
+    "change": "allow exact getter dispatch and body checking in original scalar/inline mode; plain partials require known callable/plain captures; descriptor receiver exclusion remains",
+    "measured_refusal": "realray_box specialize=true arity4; prelude genericabs value.abs rejected onlybyreader-onlyguard",
+    "probe": "realray_box now outlines atrootandemitschild;1613totalexpressions,1560peak,18433Wasmbytes",
+    "native_inventory": 2688,
+    "native": "4affectedlawsPASSincludinggenericabs+nominalgetterlow512andfullOOM; borrowedescapeandrecursionstillrejected",
+    "executed": "29passed1confirmedbaselinefailure; primitive/customgettersnegative/signedzero, plainpartial andallpreviouscontext/descriptor/scratchlaws pass bothtierssyncasync",
+    "game_test": "ray_box_storage1PASSwith8boundarychecks outsidehit/insideexit/parallelmiss/rotatednonuniform/zeroScale/infinity/NaN/partialcall",
+    "review": "Astraxhigh finalreviewclear",
+    "lint": "2changedZigfileszerofindings;changedTypeScriptformatpasses",
+    "full_gate": "attempted; lockedBabaregistryproxyunsuccessfultunnelbeforetests",
+    "main_attempt": "build/gdev-first-frame/main-213d2fc24abd7fc7 running"
   }
 }

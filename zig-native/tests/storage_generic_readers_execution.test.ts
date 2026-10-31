@@ -4,6 +4,17 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const longField = "x".repeat(7000);
 const source = `import * as array from "std/array"
+type Magnitude is data = $Magnitude F32
+const Magnitude.abs = func (value: Magnitude) => return case value of
+  $Magnitude number => number.abs + 10.0
+const Magnitude.plus = func (value: Magnitude) -> (extra: F32) => return case value of
+  $Magnitude number => number + extra
+entry const primitive_getters = func (input: F32) => return do:
+  let rows: ResizeArray F32 = #[input]
+  let value = rows[0]
+  let magnitude = $Magnitude value
+  let add = magnitude.plus
+  return #[value.abs, abs value, magnitude.abs, add 2.0]
 entry const nested_readers = func (input: U32) => return do:
   let values: Array U32 = if input == 0 then #[] else if input == 1 then #[1, 99] else #[2]
   let needles: Array U32 = #[1]
@@ -117,6 +128,17 @@ for (const codegenTier of ["development", "optimized"] as const) {
             asynchronous
               ? await guest.callAsync(name, input)
               : guest.call(name, input);
+          for (const input of [-100, -1.25, -0, 0, 1.25]) {
+            assert.deepEqual(
+              await call("primitive_getters", input),
+              new Float32Array([
+                Math.abs(input),
+                Math.abs(input),
+                Math.abs(input) + 10,
+                input + 2,
+              ]),
+            );
+          }
           for (const input of [0, 1, 100]) {
             assert.equal(await call("nested_readers", input), input == 1);
             assert.deepEqual(

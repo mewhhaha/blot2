@@ -1895,7 +1895,7 @@ const Generator = struct {
                     const owner = try self.unit(receiver.unit);
                     const record = owner.types.node(receiver.ty);
                     if (record.tag != .record) {
-                        if (!readers or !try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1)) return false;
+                        if (!try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1)) return false;
                         const value = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return false;
                         const before = self.type_arguments.items.len;
                         defer self.type_arguments.shrinkRetainingCapacity(before);
@@ -1903,6 +1903,11 @@ const Generator = struct {
                         const declaration = (try self.unit(selection.target.unit)).body(selection.target.binding) orelse return false;
                         if ((try self.unit(selection.target.unit)).bodyParameters(declaration).len > 1) {
                             const function = (try self.planValue(m, id, remaining, depth + 1)) orelse return false;
+                            if (function.tag != .callable) return false;
+                            if (!readers) {
+                                for (function.fields) |capture| if (!plainShape(capture)) return false;
+                                return true;
+                            }
                             var descriptor = false;
                             return self.readerArgument(function, &descriptor, remaining);
                         }

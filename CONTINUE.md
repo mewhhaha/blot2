@@ -2,10 +2,22 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-bb8b18d3484ed760`, running with checked
-collection getters, named partials and bounded nested generic readers. No
-successful main Wasm or frame yet. Superseded getter attempts were cancelled
-while correcting a nested-Maybe context regression; do not use them as passes.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-213d2fc24abd7fc7`, running with pure getters
+admitted in scalar/inline mode. The preceding candidate still hit the500,000
+root emission cap, now in Ink ray/box math. No successful main Wasm or frame.
+
+A direct real `ray_box` probe found `abs` declined solely because the getter
+planner required reader mode. It now validates the receiver in its original
+mode, follows exact checked dispatch and validates the getter body. Plain
+partials require known callables with plain captures; descriptors remain
+excluded from scalar/inline admission. The real probe now outlines ray_box.
+The low512 native primitive/custom-getter law passes exhaustive OOM, including
+a generic abs wrapper. Four affected native laws pass; all2,688 compile.
+Executed primitive/custom getters, signed zero and partials pass in both tiers
+and sync/async. The guest batch remains29passes/1known baseline failure. A
+standalone Gdev ray-box fixture passes eight boundary cases. Changed Zig lint
+and TypeScript format pass; required full gate attempted, registry blocked.
+Astra xhigh reviewed this narrow change. No budget was raised.
 
 The measured event path had452,738 inline expressions, including repeated
 discovery checks. Getters now follow the exact checked dispatch; curried members

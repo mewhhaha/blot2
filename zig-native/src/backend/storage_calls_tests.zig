@@ -6,6 +6,30 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
+fn publishPlainGetters(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
+test "plain getters preserve exact dispatch through selected inline helpers" {
+    var parts: [103][]const u8 = undefined;
+    parts[0] = "const F32.abs = func (value: F32) => return @f32.abs value\n" ++
+        "const abs = func value => return value.abs\n" ++
+        "type Number is data = $Number F32\n" ++
+        "const Number.abs = func (number: Number) => return do:\n  let $Number value = number\n  return @f32.add (@f32.abs value) 10.0\n" ++
+        "const kernel = func (input: F32) => return do:\n  let number = $Number input\n  let total = @f32.add (abs input) number.abs\n";
+    @memset(parts[1..81], "  total := @f32.add total 1.0\n");
+    parts[81] = "  return total\nentry const answer = func (input: F32) => return do:\n  let rows: ResizeArray F32 = #[input]\n  let total: F32 = 0.0\n";
+    @memset(parts[82..102], "  total := @f32.add total (kernel rows[0])\n");
+    parts[102] = "  return total\n";
+    const source = try std.mem.concat(a, u8, &parts);
+    defer a.free(source);
+    var module = try lowerWithCatalog(a, source, true);
+    defer module.deinit(a);
+    try publishPlainGetters(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPlainGetters, .{@as([]const core.Module, &.{module})});
+}
 fn publishScratchWriter(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
     defer result.deinit(allocator);

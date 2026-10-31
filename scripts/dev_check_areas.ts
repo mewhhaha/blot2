@@ -111,6 +111,7 @@ export const devCheckAreas = {
       "backend.storage_calls_tests.test.returned reader descriptors reuse alias maps without fresh owner results",
       "backend.storage_calls_tests.test.plain Unit writers reuse checked row mutation and growth helpers",
       "backend.storage_calls_tests.test.Unit writer helpers admit plain local scratch arrays with checked cleanup",
+      "backend.storage_calls_tests.test.plain getters preserve exact dispatch through selected inline helpers",
       "backend.storage_calls_tests.test.selected pure calls follow exact reference aliases without expanding callers",
       "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
       "backend.storage_calls_tests.test.closed owned calls reuse code across unrelated generic environments",
