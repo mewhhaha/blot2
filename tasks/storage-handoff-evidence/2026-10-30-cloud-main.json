@@ -1524,11 +1524,22 @@
       "private_globals": 55227,
       "total_expressions": 505091,
       "peak_body_expressions": 20378,
-      "expression_limit": 500000
+      "expression_limit": 500000,
+      "functions": 1727,
+      "largest_body": {
+        "function": 42,
+        "body_bytes": 745905,
+        "locals_with_parameters": 245
+      },
+      "largest_local_namespace": {
+        "function": 1231,
+        "body_bytes": 420180,
+        "locals_with_parameters": 12309
+      }
     },
     "review": "Astra xhigh finalreview CLEAR: typedrange/state/credit/OOM + finalencoded/reusedengineguards",
     "full_gate": "Attempted; lockedBaba9.0.1 proxytunnel failedbeforetests",
-    "native_pen_attempt": "build/storage-integration/gdev-one-frame/attempt-5rjaql86 running with reviewed7200s existingpluginwalltimeout; noframeclaim",
+    "native_pen_attempt": "build/storage-integration/gdev-one-frame/attempt-5442nr03 running: single realproductionmain,7200s existingpluginwalltimeout; noframeclaim",
     "logs": [
       "/tmp/blot-machine-regions-native.log",
       "/tmp/blot-machine-regions-regressions.log",
@@ -1546,5 +1557,18 @@
       "review": "Astra xhigh clear; exact300s behavior matches hostdeadline/codepath",
       "first_process_peak_rss_kib": 2650820
     }
+  },
+  "entry_packaging": {
+    "gdev_checkpoint": "08623b9",
+    "production": "src/main.blot main declarationbyteexact; soleproductionexport",
+    "preserved_witnesses": [
+      "performance/reference_main.blot:main_reference",
+      "performance/transport_reference_main.blot:main_transport_reference",
+      "performance/traced_main.blot:main+main_trace"
+    ],
+    "reason": "4complete world.run exports andpartialfirst-export31MBforecast; existing64MiB reply alsoincludesassets. Astra recommendsseparatequalificationentries beforefull4exportcompile. Noobservedcompletedmodule sizefailure claimed.",
+    "stopped_attempt": "attempt-5rjaql86 intentionalpackagingchange, notcompilerfailure",
+    "checks": "4entryfilesparsePASS; allsourcefunctionbodiesbyteexact; normalPenfallbacktomainverified; explicittracefixturepreservesbothnames",
+    "scope": "No gameplay, assets, ABI, session, storage, engineorcompilerbudgetchanges; performanceconsumer migrationdeferredandlocationsdocumented"
   }
 }

@@ -55,13 +55,20 @@ required full gate was attempted before checkpointing and remains blocked by
 the locked Baba9.0.1 registry proxy fetch. No dependency or lockfile changed.
 
 The actual native Pen attempt is running at
-`build/storage-integration/gdev-one-frame/attempt-5rjaql86`, using the matching
+`build/storage-integration/gdev-one-frame/attempt-5442nr03`, using the matching
 default compiler. The prior `attempt-s1i49tls` hit Pen's default 300-second
 plugin deadline, which killed and reopened the active compiler; its retry was
 stopped and its evidence retained. Gdev now configures a reviewed 7,200-second
 cold-build deadline through the existing plugin setting. Compiler work, engine
-and storage limits are unchanged. No real-main success or PNG has been observed
-yet. Continue the active attempt before launching another full compile.
+and storage limits are unchanged. The subsequent four-export attempt
+`attempt-5rjaql86` was stopped for reviewed packaging cleanup: production main
+now has one unchanged gameplay entry; optional trace/reference entries and names
+are preserved in dedicated Gdev performance fixtures. The partial first-export
+forecast was about 31 MB, while the 64 MiB reply also carries assets. This is
+an intentional packaging change, not a measured completed-module size failure.
+All four entry files parse and source-body identity checks pass; performance
+consumer migration remains deferred. No real-main success or PNG has been
+observed yet. Continue the active attempt before launching another full compile.
 
 Retained fixes include exact selected type keys and result snapshots, defining
 module obligations for planner closures, semantic witnesses on loaded nominals,
