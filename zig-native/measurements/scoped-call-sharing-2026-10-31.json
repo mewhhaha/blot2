@@ -1,0 +1,328 @@
+{
+  "date": "2026-10-31T21:13:03.048708+00:00",
+  "goal": "Subsecond Gdev compilation; incomplete. Bounded iteration takes priority over another long whole-game compile.",
+  "scope": "First performance recovery batch: compilation-wide scalar code sharing and positive closed direct-call admission memo. Development Safe/native-backend results only; unchanged guest ABI8 and session2. No claimed whole-Gdev or release speedup.",
+  "source": {
+    "baseline_commit": "03e3802bd74efae5451c2b938ef5ca3f63dcbbf2",
+    "candidate_base_commit": "03e3802bd74efae5451c2b938ef5ca3f63dcbbf2",
+    "changed_production_sha256": {
+      "zig-native/src/backend/scoped_backend.zig": "de91989c47b64b1fde78ea472aef098fb0e0a456c710938192b9b0b1772385f6",
+      "zig-native/src/backend/storage_calls.zig": "60ac17dd002a3ac5df1fc2fe28eb4c88e560498c83336136bbc7ad8fe6aa1bbd",
+      "zig-native/src/work_counters.zig": "e5a5b200f4cda3a0ec0afccfbd1ff166adaf3f5045414bdc3728b191b3f78a50"
+    },
+    "std_tree": "3076b1172f56836f3233f47f2a1c811d31aedab4",
+    "prelude_sha256": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "gdev_commit": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+    "pen_commit": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf"
+  },
+  "environment": {
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false,
+    "deno": "2.9.8",
+    "os": "Linux-7.3.0-4-cachyos-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "affinity": "Unpinned, sequential alternating runs; no competing builds during timing."
+  },
+  "synthetic": {
+    "workload": "Four independent depth12 scalar call diamonds; dynamic U32 inputs, entry-owned GrowArray marker; all outputs executed against independent recurrence for inputs1/7/41.",
+    "source_sha256": "ceb0706376c8642eac9d78bbdffd49a736a8965e04f9fb4d202d7680ba8b85c4",
+    "samples": "Five alternating pairs; fresh compiler sessions, disk cache disabled; build latency excludes startup, Wasm instantiation and execution.",
+    "baseline": {
+      "compiler_sha256": "9bcb74f32df819a6f02095dbed71102b29d733919ddeb39dd85e48e69a3800e7",
+      "build_ms_samples": [
+        685.059088,
+        676.9528070000001,
+        676.750205,
+        673.850547,
+        673.3861380000001
+      ],
+      "median_build_ms": 676.750205,
+      "range_ms": [
+        673.3861380000001,
+        685.059088
+      ],
+      "wasm_bytes": 952207,
+      "work": {
+        "scoped_emission_expressions": 131106,
+        "max_scoped_emission_body_steps": 32755
+      }
+    },
+    "candidate": {
+      "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+      "build_ms_samples": [
+        89.220707,
+        115.59708299999997,
+        87.00177000000002,
+        88.526362,
+        88.38254700000002
+      ],
+      "median_build_ms": 88.526362,
+      "range_ms": [
+        87.00177000000002,
+        115.59708299999997
+      ],
+      "wasm_bytes": 7529,
+      "work": {
+        "scoped_emission_expressions": 661,
+        "scoped_scalar_definitions": 49,
+        "scoped_scalar_cache_hits": 51,
+        "scoped_call_admission_nodes": 10,
+        "scoped_scalar_admission_nodes": 1017,
+        "scoped_scalar_admission_hits": 139,
+        "max_scoped_emission_body_steps": 34
+      }
+    },
+    "speedup": 7.6446178258178055,
+    "scaling": [
+      {
+        "variant": "baseline",
+        "width": 1,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 1030,
+        "admission_nodes": null,
+        "wasm_bytes": 10041
+      },
+      {
+        "variant": "baseline",
+        "width": 4,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 4078,
+        "admission_nodes": null,
+        "wasm_bytes": 31315
+      },
+      {
+        "variant": "baseline",
+        "width": 8,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 8142,
+        "admission_nodes": null,
+        "wasm_bytes": 59679
+      },
+      {
+        "variant": "baseline",
+        "width": 1,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 32787,
+        "admission_nodes": null,
+        "wasm_bytes": 240265
+      },
+      {
+        "variant": "baseline",
+        "width": 4,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 131106,
+        "admission_nodes": null,
+        "wasm_bytes": 952207
+      },
+      {
+        "variant": "baseline",
+        "width": 8,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 262198,
+        "admission_nodes": null,
+        "wasm_bytes": 1901463
+      },
+      {
+        "variant": "candidate",
+        "width": 1,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 100,
+        "admission_nodes": 138,
+        "wasm_bytes": 3560
+      },
+      {
+        "variant": "candidate",
+        "width": 4,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 349,
+        "admission_nodes": 513,
+        "wasm_bytes": 5297
+      },
+      {
+        "variant": "candidate",
+        "width": 8,
+        "depth": 6,
+        "profiled": false,
+        "emission_expressions": 681,
+        "admission_nodes": 1013,
+        "wasm_bytes": 7613
+      },
+      {
+        "variant": "candidate",
+        "width": 1,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 178,
+        "admission_nodes": 264,
+        "wasm_bytes": 4118
+      },
+      {
+        "variant": "candidate",
+        "width": 4,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 661,
+        "admission_nodes": 1017,
+        "wasm_bytes": 7529
+      },
+      {
+        "variant": "candidate",
+        "width": 8,
+        "depth": 12,
+        "profiled": true,
+        "emission_expressions": 1305,
+        "admission_nodes": 2021,
+        "wasm_bytes": 12077
+      }
+    ]
+  },
+  "real_gdev": {
+    "compiles": [
+      {
+        "label": "baseline-language",
+        "compiler_sha256": "9bcb74f32df819a6f02095dbed71102b29d733919ddeb39dd85e48e69a3800e7",
+        "entry_sha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+        "success": true,
+        "build_ms": 479.55351999999993,
+        "wasm_bytes": 25204,
+        "status": "complete",
+        "deadline_ms": 5000
+      },
+      {
+        "label": "candidate-language",
+        "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+        "entry_sha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+        "success": true,
+        "build_ms": 477.82861499999996,
+        "wasm_bytes": 25283,
+        "status": "complete",
+        "deadline_ms": 5000
+      },
+      {
+        "label": "baseline-actor_presentation",
+        "compiler_sha256": "9bcb74f32df819a6f02095dbed71102b29d733919ddeb39dd85e48e69a3800e7",
+        "entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "success": false,
+        "build_ms": 5002.444278999999,
+        "wasm_bytes": null,
+        "status": "timeout_incomplete",
+        "deadline_ms": 5000
+      },
+      {
+        "label": "candidate-actor_presentation",
+        "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+        "entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "success": false,
+        "build_ms": 5003.82349,
+        "wasm_bytes": null,
+        "status": "timeout_incomplete",
+        "deadline_ms": 5000
+      },
+      {
+        "label": "candidate-main",
+        "compiler_sha256": "bd08c538d2a22f12018afdf3b102af9aa3977c09e3f8853e8f3a795496127b1b",
+        "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "success": false,
+        "build_ms": 5002.490666,
+        "wasm_bytes": null,
+        "status": "timeout_incomplete",
+        "deadline_ms": 5000
+      }
+    ],
+    "language_execution": [
+      {
+        "variant": "baseline",
+        "entries": 6,
+        "assertions": 11,
+        "modes": [
+          "sync",
+          "JSPI"
+        ],
+        "passed": true
+      },
+      {
+        "variant": "candidate",
+        "entries": 6,
+        "assertions": 11,
+        "modes": [
+          "sync",
+          "JSPI"
+        ],
+        "passed": true
+      }
+    ],
+    "main": "Five-second capped main build incomplete; original PNG and old36-minute record qualify52e only.",
+    "profile": "Twelve early process stack samples over1.69seconds after debugger attach saw loading/parsing; this partial first-window sample is not a phase percentage for the complete build."
+  },
+  "validation": {
+    "review": "Astra xhigh final review clear; no code blocker.",
+    "compiled_native_inventory": 2733,
+    "development_family": {
+      "area": "scoped-storage",
+      "selected": 104,
+      "passed": 103,
+      "failed": 1,
+      "failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+      "baseline": "Recorded preexisting associated-partial failure; corresponding associated-latent guest independently fails preserved baseline binary too."
+    },
+    "additional_native": {
+      "selected": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "new_laws": {
+      "native": 3,
+      "all_passed": true,
+      "exhaustive_allocation_failure_publication": true,
+      "zero_leaks": true,
+      "coverage": "Linear emitted/accepted work, independent exports, allocation failures, completed child after failed parent, recursion, warm/fresh height bound, missing row certificate and foreign-label rejection."
+    },
+    "affected_guests": {
+      "passed": 38,
+      "failed": 1,
+      "failure": "associated function results retain selected latent effect rows",
+      "baseline_reproduced": true
+    },
+    "full_gate": {
+      "attempted": true,
+      "completed": false,
+      "smoke_passed": 3,
+      "smoke_failed": 1,
+      "failure": "Protocol explanatory operand spans end42/47 vs expected43/48.",
+      "baseline_reproduced": true
+    },
+    "lint": {
+      "files": 565,
+      "findings": 0
+    },
+    "real_frame_rerun": false,
+    "release_qualification": false,
+    "diagnostic_runner": {
+      "deadline": "100ms real-main attempt exits1 with timeout_incomplete and compiled:false",
+      "semantic_rejection": "Typed-hole fixture exits1 with failed and compiled:false",
+      "startup_deadline": "Both benchmark harnesses bound project startup as well as the build."
+    }
+  },
+  "reproduce": {
+    "baseline_build": "At the pinned baseline commit, before production changes: zig version; cd zig-native; zig build install compiler-identity -Doptimize=safe -Dllvm=false --prefix zig-out-perf-baseline",
+    "candidate_build": "zig version; cd zig-native; zig build install compiler-identity test-compile -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev",
+    "synthetic": "deno run --no-config --no-lock -A scripts/bench/scoped_calls.ts --blotc zig-native/zig-out-native-dev/bin/blotc --sizes 4 --depth 12 --timeout-ms 5000",
+    "bounded_main": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler zig-native/zig-out-native-dev/bin/blotc --timeout-ms 5000",
+    "raw_local_evidence": "build/bench/scoped-call-sharing"
+  },
+  "next": [
+    "Collect admission declines and late-window samples on bounded original actor/Ink exports. Extend sharing only for exact typed aggregate/descriptor plans with validated owner/effect summaries.",
+    "Measure lexical substitution lookup/capture work; replace the dominant repeated scan/copy with scoped indexing or compact immutable environments.",
+    "Keep main build deadline5seconds by default and preserve every failed/incomplete sample; whole-Gdev1second target and task120/121 remain open."
+  ]
+}

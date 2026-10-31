@@ -1,73 +1,133 @@
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
-const parent = resolve(Deno.args[0] ?? "build/gdev-first-frame");
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    compiler: { type: "string" },
+    entry: { type: "string" },
+    "timeout-ms": { type: "string", default: "5000" },
+    profile: { type: "boolean", default: false },
+  },
+});
+const parentArg = positionals[0] ?? "build/gdev-first-frame";
+if (positionals.length > 1) {
+  throw new Error("Expected at most one output directory");
+}
+const timeoutMs = Number(values["timeout-ms"]);
+if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
+  throw new Error("--timeout-ms must be an integer from 100 to 30000");
+}
+
+const parent = resolve(parentArg);
 await Deno.mkdir(parent, { recursive: true });
 const evidence = await Deno.makeTempDir({ dir: parent, prefix: "main-" });
 const root = resolve("../gdev");
 const settings =
   JSON.parse(await Deno.readTextFile(`${root}/pen.json`)).compiler.settings;
-const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-const executable = `${evidence}/blotc`;
-await Deno.writeTextFile(
-  executable,
-  `#!/bin/sh\nexec ${
-    quote(resolve("zig-native/zig-out-dev/bin/blotc"))
-  } "$@" 2>>${quote(`${evidence}/compiler-stderr.log`)}\n`,
+const compilerPath = resolve(
+  values.compiler ?? "zig-native/zig-out-dev/bin/blotc",
 );
-await Deno.chmod(executable, 0o755);
-const compiler = await createZigProjectCompiler({
-  executable,
-  entry: `${root}/src/main.blot`,
-  prelude: resolve("std/prelude.blot"),
-  stdRoot: resolve("std"),
-  imports: Object.fromEntries(
-    Object.entries(settings.imports).map((
-      [key, path],
-    ) => [key, resolve(root, path as string)]),
-  ),
-  nativeAssets: {
-    roots: settings.nativeAssets.roots.map((path: string) =>
-      resolve(root, path)
-    ),
-    imports: settings.nativeAssets.imports.map((
-      item: Record<string, string>,
-    ) => ({
-      ...item,
-      module: resolve(root, item.module),
-      path: resolve(root, item.path),
-    })),
-  },
-  inferenceBudget: settings.inferenceBudget,
-  storage: settings.storage,
-  cacheDirectory: false,
-});
+const entryPath = resolve(root, values.entry ?? "src/main.blot");
+const entryBytes = await Deno.readFile(entryPath);
+const penBytes = await Deno.readFile(`${root}/pen.json`);
+const sha256 = async (bytes: BufferSource) =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+const compilerSha256 = await sha256(await Deno.readFile(compilerPath));
+let buildMs: number | null = null;
+let buildStarted: number | null = null;
+let compiler: Awaited<ReturnType<typeof createZigProjectCompiler>> | undefined;
+let report: Record<string, unknown>;
 try {
-  const result = await compiler.build();
-  const report = result.success
-    ? {
-      evidence,
-      identity: compiler.compilerIdentity,
+  compiler = await createZigProjectCompiler({
+    executable: compilerPath,
+    entry: entryPath,
+    prelude: resolve("std/prelude.blot"),
+    stdRoot: resolve("std"),
+    imports: Object.fromEntries(
+      Object.entries(settings.imports).map((
+        [key, path],
+      ) => [key, resolve(root, path as string)]),
+    ),
+    nativeAssets: {
+      roots: settings.nativeAssets.roots.map((path: string) =>
+        resolve(root, path)
+      ),
+      imports: settings.nativeAssets.imports.map((
+        item: Record<string, string>,
+      ) => ({
+        ...item,
+        module: resolve(root, item.module),
+        path: resolve(root, item.path),
+      })),
+    },
+    inferenceBudget: settings.inferenceBudget,
+    storage: settings.storage,
+    cacheDirectory: false,
+    startupTimeoutMs: timeoutMs,
+    profileBackend: values.profile,
+  });
+  buildStarted = performance.now();
+  const result = await compiler.build({
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  buildMs = performance.now() - buildStarted;
+  if (result.success) {
+    report = {
       success: true,
+      compiled: true,
       wasmBytes: result.bytes.length,
       assetCount: result.assets?.length ?? 0,
       stats: result.stats,
-    }
-    : {
-      evidence,
-      identity: compiler.compilerIdentity,
+    };
+    await Deno.writeFile(`${evidence}/main.wasm`, result.bytes);
+  } else {
+    report = {
       success: false,
+      compiled: false,
+      status: "failed",
       diagnostics: result.diagnostics,
     };
-  if (result.success) {
-    await Deno.writeFile(`${evidence}/main.wasm`, result.bytes);
+    Deno.exitCode = 1;
   }
-  await Deno.writeTextFile(
-    `${evidence}/result.json`,
-    JSON.stringify(report, null, 2) + "\n",
-  );
-  console.log(JSON.stringify(report));
-  if (!result.success) Deno.exitCode = 1;
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const timedOut = /abort|timed out/i.test(message);
+  let status = "failed";
+  if (timedOut) status = "timeout_incomplete";
+  report = {
+    success: false,
+    compiled: false,
+    status,
+    error: message,
+  };
+  if (timedOut && buildStarted !== null) {
+    buildMs = performance.now() - buildStarted;
+  }
+  Deno.exitCode = 1;
 } finally {
-  await compiler.dispose();
+  await compiler?.dispose();
 }
+
+const output = {
+  evidence,
+  identity: compiler?.compilerIdentity ?? null,
+  compiler: compilerPath,
+  compilerSha256,
+  entry: entryPath,
+  sourceCheckpoint: {
+    entrySha256: await sha256(entryBytes),
+    penJsonSha256: await sha256(penBytes),
+  },
+  deadlineMs: timeoutMs,
+  buildMs,
+  profileBackend: values.profile,
+  ...report!,
+};
+await Deno.writeTextFile(
+  `${evidence}/result.json`,
+  JSON.stringify(output, null, 2) + "\n",
+);
+console.log(JSON.stringify(output));

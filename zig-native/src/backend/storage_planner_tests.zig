@@ -31,7 +31,7 @@ test "planner callbacks keep module local obligations through nested closure bod
         "const Meter.amount = func ($Meter value) => return value\n" ++
         "const read = func (context: {");
     for (0..80) |index| {
-        const field = try std.fmt.allocPrint(a, "a{d}: t{d},", .{ index, index });
+        const field = try a.print("a{d}: t{d},", .{ index, index });
         defer a.free(field);
         try source.appendSlice(a, field);
     }
@@ -41,7 +41,7 @@ test "planner callbacks keep module local obligations through nested closure bod
         "  let rows: Array {value: U32} = #[{value: marker[0]}]\n" ++
         "  return read {");
     for (0..80) |index| {
-        const field = try std.fmt.allocPrint(a, "a{d}: input,", .{index});
+        const field = try a.print("a{d}: input,", .{index});
         defer a.free(field);
         try source.appendSlice(a, field);
     }

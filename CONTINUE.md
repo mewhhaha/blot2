@@ -2,14 +2,31 @@
 
 ## Current frontier
 
+Compilation latency is the active priority: **subsecond Gdev compilation**. Do
+not repeat the recorded 36-minute main build. The diagnostic runner defaults to
+a five-second build deadline and kills the compiler on timeout.
+
+The first batch shares nested scalar definitions and memoizes pure direct-call
+admission with exact source-owned zero-row certificates. Five alternating
+Safe/noLLVM pairs on the depth-12 graph improve median build time from **676.75
+ms to 88.53 ms**, expressions from **131,106 to 661**, and Wasm from **952,207
+to 7,529 bytes**.
+[Pinned evidence](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
+keeps this synthetic result separate from Gdev: its original language fixture
+remains about 480 ms; actor presentation and main exceed the five-second cutoff.
+The whole-game target remains open. Next measure real admission declines and
+substitution/captured-environment work before extending sharing to aggregates
+and descriptor-bearing helpers.
+
 This is a greenfield project. Breaking changes are welcome; remove superseded
 APIs and implementations. Preserve useful behavior, assertions, deterministic
 math, original workloads and independent references. Read `AGENTS.md`,
 `compiler/guide.md`, `zig-native/CONTRACT.md` and `tasks/STORAGE_REWRITE.md`.
 
-Actual Gdev main passes one headless native Pen frame on the current reviewed
-compiler `52e04df6` and matching host. All six checks pass. The inspected
-640×480 startup image and guest trace match the original frame byte for byte.
+Actual Gdev main passed one headless native Pen frame on the last
+frame-qualified compiler `52e04df6` and matching host. All six checks pass. The
+inspected 640×480 startup image and guest trace match the original frame byte
+for byte.
 [Current exact identities and result](tasks/storage-handoff-evidence/2026-10-31-migrated-frame.json)
 reuse
 [the identical existing PNG](tasks/storage-handoff-evidence/2026-10-31-first-frame.png).
@@ -27,10 +44,10 @@ come from generator inputs, never manual output patches.
 
 ## Checked compiler fixes
 
-The installed development compiler is the reviewed contract-method candidate,
-SHA `52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004`. Older
-exact candidates remain local build artifacts; portable evidence qualifies its
-named candidate rather than every later revision.
+The last frame-qualified compiler is the reviewed contract-method candidate, SHA
+`52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004`. Older exact
+candidates may be absent locally; portable evidence qualifies its named
+candidate rather than every later revision.
 
 - [Imported opaque layouts](tasks/storage-handoff-evidence/2026-10-31-opaque-layouts.json)
   use exact closed producer metadata while preserving public opacity.
@@ -55,11 +72,16 @@ context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
-Astra xhigh reviewed the semantic fixes. The required full compiler gate was
-attempted for each batch but stops before tests because the configured proxy
-blocks locked Baba 9.0.1 from `npm.jsr.io`. No dependency, lockfile or TLS
-workaround was applied. Changed files have no new analyzer findings; four
-existing checker warnings and the broader 25-finding baseline remain visible.
+Astra xhigh reviewed the semantic fixes and performance batch. Earlier gate
+attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
+host reaches protocol smoke: three pass and one fails on existing operand-span
+ends, independently reproduced with the preserved baseline compiler. Full
+qualification remains pending. The performance batch compiles all 2,733 native
+tests; its affected family passes 103/104 laws with the recorded
+associated-partial baseline failure, plus six additional native laws. All three
+new laws pass, including exhaustive publication allocation failures. Affected
+guests pass 38/39 with the independently reproduced associated-latent baseline.
+Full Zig lint now reports zero findings across 565 source files.
 
 ## Remaining execution work
 
@@ -116,9 +138,15 @@ reusing an older artifact.
 Require every runner check and inspect the PNG. For a compile-only diagnosis:
 
 ```sh
-deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
+deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 5000 > /tmp/gdev-main.log 2>&1
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
+
+Use `--entry tests/language_compatibility.blot` for the small real fixture and
+`--profile` for completed-build phase attribution. The diagnostic accepts at
+most 30 seconds; a timeout remains incomplete. Defer the Pen frame driver's
+regular application pipeline until bounded compilation is fast enough. The older
+PNG does not qualify a later compiler.
 
 The reusable frontend inventory checks unused declarations through overlays:
 

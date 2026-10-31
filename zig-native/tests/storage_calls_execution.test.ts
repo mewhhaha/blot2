@@ -1,6 +1,33 @@
 import { strict as assert } from "node:assert";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
+Deno.test("nested shared scalar calls preserve wrapping and floating point bits", async () => {
+  await compileAndRun(
+    `
+const step = func (value: U32): U32 => return @u32.add value 1
+const twice = func (value: U32): U32 => return step (step value)
+const four = func (value: U32): U32 => return twice (twice value)
+const negative = func (value: F32): F32 => return @f32.neg value
+const reverse = func (value: F32): F32 => return negative (negative value)
+const identity = func value => return value
+entry const answer = func (input: U32): U32 => return do:
+  let marker: GrowArray U32 = #[input]
+  return four (identity marker[0])
+entry const floating = func (input: F32): F32 => return do:
+  let marker: GrowArray F32 = #[input]
+  return reverse (identity marker[0])
+`,
+    (guest) => {
+      for (const value of [0, 41, 0xfffffffd, 0xffffffff]) {
+        assert.equal(guest.call("answer", value), (value + 4) >>> 0);
+      }
+      for (const value of [0, -0, 1.5, -3.25, Infinity, -Infinity]) {
+        assert(Object.is(guest.call("floating", value), value));
+      }
+    },
+  );
+});
+
 Deno.test("owned selected call cycles reject direct mutual and known callback recursion", async () => {
   const cases = [
     `const recurse = func (value: U32): U32 => return recurse value`,

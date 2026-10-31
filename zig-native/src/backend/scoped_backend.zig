@@ -164,6 +164,8 @@ const Generator = struct {
     specialization_origin: ?evaluation.SourceLocation = null,
     methods: *MethodSelector,
     calls: call_plan.Cache,
+    scalar_calls: *call_plan.Cache,
+    scalar_admission: *call_plan.ScalarAdmission,
     active_calls: *call_plan.ActiveCalls,
     specialize: bool = true,
     protected: std.ArrayList(Value) = .empty,
@@ -2002,6 +2004,7 @@ const Generator = struct {
         return admitted;
     }
     fn numericExpression(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool, depth: usize) Error!bool {
+        self.emission_work.scoped_call_admission_nodes +|= 1;
         if (id == 0) return true;
         if (remaining.* == 0 or depth > 128) return false;
         remaining.* -= 1;
@@ -2252,19 +2255,31 @@ const Generator = struct {
         }
         return self.selectedInlineType(.{ .unit = m.unit, .ty = n.ty }, remaining);
     }
+    fn closedScalarBody(self: *Generator, m: *const core.Module, target: core.BindingId) Error!bool {
+        const nodes_before = self.scalar_admission.nodes;
+        const hits_before = self.scalar_admission.hits;
+        defer {
+            self.emission_work.scoped_scalar_admission_nodes +|= self.scalar_admission.nodes - nodes_before;
+            self.emission_work.scoped_scalar_admission_hits +|= self.scalar_admission.hits - hits_before;
+        }
+        // An optional probe cannot consume the existing fallback's allowance.
+        var remaining: usize = 100_000;
+        return self.scalar_admission.admit(m, target, &remaining);
+    }
     /// Scalar leaves use a normal Wasm call, not repeated source expansion.
     /// The initial ABI transports F32 as exact i32 bits, matching Value.word.
     fn reusableCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         const raw_result_type = m.typeOf(body.root);
         const owned_result = m.types.node(raw_result_type).tag == .array;
+        if (owned_result and !self.specialize) return null;
         var result_type = raw_result_type;
         for (arguments) |arg| if (arg.tag != .scalar or arg.demand != null) return null;
         var remaining: usize = 100_000;
         if (owned_result) {
             var arrays: usize = 0;
             if (!call_plan.destinationBody(m, body.root, &arrays, &remaining, 0) or arrays != 1) return null;
-        } else if (!call_plan.scalarBody(m, body.root, &remaining, 0)) {
+        } else if (!call_plan.scalarBody(m, body.root, &remaining, 0) and !try self.closedScalarBody(m, target.binding)) {
             var active: [128]core.BindingRef = undefined;
             active[0] = target;
             if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
@@ -2297,7 +2312,11 @@ const Generator = struct {
         }
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
-        const index = if (self.calls.find(key)) |found| found else blk: {
+        var cache = self.scalar_calls;
+        if (owned_result) cache = &self.calls;
+        const existing = cache.find(key);
+        if (existing != null and !owned_result) self.emission_work.scoped_scalar_cache_hits +|= 1;
+        const index = if (existing) |found| found else blk: {
             const parameter_count = std.math.add(usize, arguments.len, if (owned_result) 3 else 0) catch return self.unsupported(m, body.root);
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
             defer self.allocator.free(signature);
@@ -2306,11 +2325,13 @@ const Generator = struct {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.unsupported(m, body.root),
             };
-            const inserted = try self.calls.insert(key, function, result_type == T.f32_type);
+            const inserted = try cache.insert(key, function, result_type == T.f32_type);
             var child: Generator = .{
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
+                .scalar_calls = self.scalar_calls,
+                .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
                 .work_limits = self.work_limits,
@@ -2353,15 +2374,16 @@ const Generator = struct {
                 child.destination = input;
                 child.external_destination = 0;
             }
-            const output = child.invoke(target, inputs, 0) catch |err| {
+            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
             try child.c.value(if (owned_result) output.word else try child.scalar(m, body.root, output));
-            self.calls.entries.items[inserted].building = false;
+            cache.entries.items[inserted].building = false;
+            if (!owned_result) self.emission_work.scoped_scalar_definitions +|= 1;
             break :blk inserted;
         };
-        const entry = self.calls.entries.items[index];
+        const entry = cache.entries.items[index];
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive storage specializations are not admitted");
         for (arguments) |argument| try self.c.value(argument.word);
         if (destination) |owner| {
@@ -2447,6 +2469,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
+                .scalar_calls = self.scalar_calls,
+                .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
                 .work_limits = self.work_limits,
@@ -2471,7 +2495,7 @@ const Generator = struct {
             const inputs = try child.arena.allocator().alloc(Value, arguments.len);
             var next: u32 = 0;
             for (inputs, arguments) |*input, argument| input.* = try child.inlineParameter(argument, &next);
-            const output = child.invoke(target, inputs, 0) catch |err| {
+            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
@@ -2853,6 +2877,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
+                .scalar_calls = self.scalar_calls,
+                .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
                 .work_limits = self.work_limits,
@@ -2879,7 +2905,7 @@ const Generator = struct {
             for (inputs, arguments) |*input, argument| {
                 try self.readerParameter(&child, input, argument, &next);
             }
-            const output = child.invoke(target, inputs, 0) catch |err| {
+            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
@@ -3012,6 +3038,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
+                .scalar_calls = self.scalar_calls,
+                .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
                 .work_limits = self.work_limits,
@@ -3051,7 +3079,7 @@ const Generator = struct {
                 try child.writerInput(input, owners.items, assigned);
                 offset += @intCast(readerWords(argument) * 4);
             }
-            const output = child.invoke(target, inputs, 0) catch |err| {
+            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
@@ -3227,6 +3255,11 @@ const Generator = struct {
         return self.invoke(target, arguments, depth);
     }
     fn invoke(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
+        return self.invokeBody(target, arguments, depth, true);
+    }
+    // Definitions bypass their own registry entry. Reached calls still share
+    // scalar definitions across generators; owner-bearing ABIs remain local.
+    fn invokeBody(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize, reuse: bool) Error!Value {
         const m = try self.unit(target.unit);
         const body = m.body(target.binding) orelse return error.Declined;
         const parameters = m.bodyParameters(body);
@@ -3279,10 +3312,10 @@ const Generator = struct {
         try self.finishSelectedTypes(m, body.root, &selected, &type_key);
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
-        if (self.specialize) if (try self.reusableCall(m, target, arguments)) |value| return value;
-        if (self.specialize) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
-        if (self.specialize) if (try self.reusableReaderCall(m, target, arguments)) |value| return value;
-        if (self.specialize) if (try self.reusableUnitWriter(m, target, arguments)) |value| return value;
+        if (reuse) if (try self.reusableCall(m, target, arguments)) |value| return value;
+        if (reuse and self.specialize) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
+        if (reuse and self.specialize) if (try self.reusableReaderCall(m, target, arguments)) |value| return value;
+        if (reuse and self.specialize) if (try self.reusableUnitWriter(m, target, arguments)) |value| return value;
         // A reusable definition's child enters while compiling its body. Do
         // not enter twice merely because planning moved to another Generator.
         if (!try self.active_calls.enter(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
@@ -3375,6 +3408,8 @@ const Generator = struct {
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
                 .calls = .{ .allocator = self.allocator },
+                .scalar_calls = self.scalar_calls,
+                .scalar_admission = self.scalar_admission,
                 .active_calls = self.active_calls,
                 .specialize = false,
                 .work_limits = self.work_limits,
@@ -5004,12 +5039,16 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     var validation_budget: usize = 1_000_000;
     var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
     defer active_calls.deinit();
+    var scalar_admission: call_plan.ScalarAdmission = .{ .allocator = allocator, .units = units };
+    defer scalar_admission.deinit();
+    var scalar_calls: call_plan.Cache = .{ .allocator = allocator };
+    defer scalar_calls.deinit();
     var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
     var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry };
     defer methods.deinit();
-    var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
+    var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .scalar_calls = &scalar_calls, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
     g.emit(entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,

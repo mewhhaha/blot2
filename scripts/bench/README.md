@@ -1,5 +1,20 @@
 # Compiler experiments
 
+For the owned backend, start with the bounded scalar call graph:
+
+```sh
+deno run --no-config --no-lock -A scripts/bench/scoped_calls.ts --blotc zig-native/zig-out-dev/bin/blotc --sizes 1,4,8 --depth 12
+```
+
+Each fresh session has a five-second build deadline, executes its Wasm against
+an independent recurrence, and reports source/compiler hashes, build latency,
+bytes and work counters. Add `--profile` for attribution; keep instrumented
+samples separate from throughput measurements. `--timeout-ms` caps at 30,000.
+Timeouts are incomplete and kill the active compiler. The
+[first paired record](../../zig-native/measurements/scoped-call-sharing-2026-10-31.json)
+is a Safe/noLLVM synthetic result; whole-Gdev subsecond compilation remains
+open.
+
 Run measurements on an otherwise idle host, using a preserved release binary for
 each variant. Keep the frozen workload manifest, output hashes, commands and raw
 samples with the report. Safe/noLLVM builds qualify development behavior; they

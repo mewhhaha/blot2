@@ -1,9 +1,15 @@
 # Owned-storage rewrite: active task index
 
+The active priority is subsecond Gdev compilation with bounded iteration. The
+first scalar call-sharing batch has measured synthetic gains; whole-game
+compilation exceeds the five-second diagnostic cutoff. See
+[the pinned evidence](../zig-native/measurements/scoped-call-sharing-2026-10-31.json)
+and [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
+
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
-handoff evidence. The candidate has advanced through checked source validation
-and one real Gdev main frame in native Pen, with all runner checks and an
-inspected PNG. See
+handoff evidence. The earlier candidate advanced through checked source
+validation and one real Gdev main frame in native Pen, with all runner checks
+and an inspected PNG. See
 [the current migrated-frame candidate](storage-handoff-evidence/2026-10-31-migrated-frame.json).
 The final source/API inventories pass 760 valid files and six intended semantic
 rejections across Ink/Gdev. Broader compiler, original-export, library/game and

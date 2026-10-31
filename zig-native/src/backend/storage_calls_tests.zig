@@ -22,6 +22,120 @@ fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Modu
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expect(result.counters.scoped_refinement_indexed_bindings > 0);
 }
+fn publishSharedScalarModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 4), result.counters.scoped_scalar_definitions);
+    try std.testing.expect(result.counters.scoped_scalar_cache_hits >= 2);
+}
+test "nested scalar call definitions share diamonds across exports" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "const level0 = func (input: U32): U32 => return @u32.add input 1\n");
+    const depth = 10;
+    for (1..depth + 1) |level| {
+        const definition = try a.print("const level{d} = func (input: U32): U32 => return level{d} (level{d} input)\n", .{ level, level - 1, level - 1 });
+        defer a.free(definition);
+        try source.appendSlice(a, definition);
+    }
+    try source.appendSlice(a, "entry const first = func (input: U32): U32 => return level10 input\n" ++
+        "entry const second = func (input: U32): U32 => return level10 input\n");
+    var module = try lower(a, source.items);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, depth + 3), result.counters.scoped_scalar_definitions);
+    try std.testing.expect(result.counters.scoped_scalar_cache_hits >= depth + 1);
+    try std.testing.expect(result.counters.scoped_emission_expressions < 300);
+    try std.testing.expect(result.counters.scoped_scalar_admission_nodes < 600);
+    try std.testing.expect(result.counters.scoped_call_admission_nodes == 0);
+}
+test "nested scalar call publication survives allocation failures" {
+    var module = try lower(a,
+        \\const leaf = func (input: U32): U32 => return @u32.add input 1
+        \\const twice = func (input: U32): U32 => return leaf (leaf input)
+        \\const four = func (input: U32): U32 => return twice (twice input)
+        \\entry const answer = func (input: U32): U32 => return four input
+    );
+    defer module.deinit(a);
+    try publishSharedScalarModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSharedScalarModule, .{@as([]const core.Module, &.{module})});
+}
+test "closed scalar admission retains only completed bounded call graphs" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "const level0 = func (input: U32): U32 => return @u32.add input 1\n" ++
+        "const declined = func (input: U32): U32 => return do:\n" ++
+        "  let first = level0 input\n  let rows: GrowArray U32 = #[first]\n  return rows[0]\n" ++
+        "const cycle = func (input: U32): U32 => return cycle input\n" ++
+        "const generic = func input => return input\n");
+    for (1..81) |level| {
+        const definition = try a.print("const level{d} = func (input: U32): U32 => return level{d} input\n", .{ level, level - 1 });
+        defer a.free(definition);
+        try source.appendSlice(a, definition);
+    }
+    var module = try lower(a, source.items);
+    defer module.deinit(a);
+    var graph: @import("storage_calls.zig").ScalarAdmission = .{ .allocator = a, .units = &.{module} };
+    defer graph.deinit();
+    var fresh: @import("storage_calls.zig").ScalarAdmission = .{ .allocator = a, .units = &.{module} };
+    defer fresh.deinit();
+    var leaf: core.BindingId = 0;
+    var shallow: core.BindingId = 0;
+    var deep: core.BindingId = 0;
+    for (module.bodies) |body| {
+        const name = module.name(body.declaration_name);
+        if (std.mem.eql(u8, name, "level0")) leaf = body.binding;
+        if (std.mem.eql(u8, name, "level10")) shallow = body.binding;
+        if (std.mem.eql(u8, name, "level80")) deep = body.binding;
+        if (!std.mem.eql(u8, name, "declined") and !std.mem.eql(u8, name, "cycle") and !std.mem.eql(u8, name, "generic")) continue;
+        var remaining: usize = 100_000;
+        try std.testing.expect(!try graph.admit(&module, body.binding, &remaining));
+        try std.testing.expect(!graph.completed.contains(.{ .unit = 1, .binding = body.binding }));
+        try std.testing.expectEqual(@as(usize, 0), graph.len);
+    }
+    try std.testing.expect(leaf != 0 and shallow != 0 and deep != 0);
+    try std.testing.expect(graph.completed.contains(.{ .unit = 1, .binding = leaf }));
+    var remaining: usize = 100_000;
+    try std.testing.expect(try graph.admit(&module, shallow, &remaining));
+    remaining = 100_000;
+    try std.testing.expect(!try graph.admit(&module, deep, &remaining));
+    remaining = 100_000;
+    try std.testing.expect(!try fresh.admit(&module, deep, &remaining));
+    try std.testing.expect(!graph.completed.contains(.{ .unit = 1, .binding = deep }));
+    remaining = 0;
+    try std.testing.expect(!try graph.admit(&module, shallow, &remaining));
+
+    // Inferred zero rows retain exact declaration-owned certificates. A new
+    // inventory cannot borrow those certificates from a previously warm memo.
+    var uncertified = module;
+    const bindings = try a.dupe(core.Binding, module.bindings);
+    defer a.free(bindings);
+    uncertified.bindings = bindings;
+    bindings[shallow].scheme.closed_rows = .{};
+    var missing: @import("storage_calls.zig").ScalarAdmission = .{ .allocator = a, .units = &.{uncertified} };
+    defer missing.deinit();
+    remaining = 100_000;
+    try std.testing.expect(!try missing.admit(&uncertified, shallow, &remaining));
+
+    var effectful = module;
+    const rows = try a.dupe(@import("../check/types.zig").Effects.Row, module.types.effects.rows);
+    defer a.free(rows);
+    const labels = try a.alloc(@import("../check/types.zig").Effects.Label, module.types.effects.labels.len + 1);
+    defer a.free(labels);
+    @memcpy(labels[0..module.types.effects.labels.len], module.types.effects.labels);
+    labels[labels.len - 1] = @import("../check/types.zig").foreign_operation;
+    const arrow = module.types.node(module.binding(leaf).ty);
+    rows[arrow.c].labels = .{ .start = @intCast(labels.len - 1), .len = 1 };
+    effectful.types.effects.rows = rows;
+    effectful.types.effects.labels = labels;
+    var foreign: @import("storage_calls.zig").ScalarAdmission = .{ .allocator = a, .units = &.{effectful} };
+    defer foreign.deinit();
+    remaining = 100_000;
+    try std.testing.expect(!try foreign.admit(&effectful, leaf, &remaining));
+}
 test "scoped contract methods select checked scalar witnesses through allocation failures" {
     var module = try lower(a,
         \\type Render a is contract = {const render: a -> U32}
@@ -546,7 +660,7 @@ test "closed direct call graphs reuse inline data without admitting recursive ca
     defer result.deinit(a);
     try std.testing.expect(base.diagnostic == null);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expectEqual(base.emitted_functions + 1, result.emitted_functions);
+    try std.testing.expectEqual(base.emitted_functions + 2, result.emitted_functions);
     var cycle = try lower(a, "const cycle = func (value: U32): U32 => return cycle value\nentry const answer = func () => return cycle 1\n");
     defer cycle.deinit(a);
     var remaining: usize = 10_000;
@@ -594,7 +708,7 @@ test "selected numeric declarations reuse exact generic scalar specializations" 
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
-    try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+    try std.testing.expectEqual(base.emitted_functions + 2, left.emitted_functions);
 }
 
 test "selected inline data helpers reuse checked record results" {
@@ -614,7 +728,7 @@ test "selected inline data helpers reuse checked record results" {
     defer right.deinit(a);
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
-    try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+    try std.testing.expectEqual(base.emitted_functions + 2, left.emitted_functions);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
 
@@ -666,7 +780,7 @@ test "static readonly callback arguments reuse selected helpers across owners" {
     defer right.deinit(a);
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
-    try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+    try std.testing.expectEqual(base.emitted_functions + 2, left.emitted_functions);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
 
@@ -741,7 +855,7 @@ test "selected pure calls follow exact reference aliases without expanding calle
     defer right.deinit(a);
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
-    try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+    try std.testing.expectEqual(base.emitted_functions + 3, left.emitted_functions);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
 

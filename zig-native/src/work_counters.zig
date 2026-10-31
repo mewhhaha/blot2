@@ -79,6 +79,11 @@ pub const SchemeMembership = struct {
 };
 pub const Counters = struct {
     scoped_emission_expressions: u64 = 0,
+    scoped_scalar_definitions: u64 = 0,
+    scoped_scalar_cache_hits: u64 = 0,
+    scoped_call_admission_nodes: u64 = 0,
+    scoped_scalar_admission_nodes: u64 = 0,
+    scoped_scalar_admission_hits: u64 = 0,
     scoped_outline_key_declines: u64 = 0,
     scoped_outlined_regions: u64 = 0,
     scoped_outlined_globals: u64 = 0,

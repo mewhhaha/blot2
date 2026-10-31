@@ -109,6 +109,135 @@ pub fn scalarBody(m: *const core.Module, root: core.Id, remaining: *usize, depth
     return true;
 }
 
+/// Positive physical admission for closed primitive direct-call DAGs. Entries
+/// borrow one immutable source inventory; source authority is proved separately.
+pub const ScalarAdmission = struct {
+    allocator: std.mem.Allocator,
+    units: []const core.Module,
+    nodes: u64 = 0,
+    hits: u64 = 0,
+    completed: std.AutoHashMapUnmanaged(core.BindingRef, usize) = .empty,
+    active: [128]core.BindingRef = undefined,
+    len: usize = 0,
+
+    pub fn deinit(self: *ScalarAdmission) void {
+        self.completed.deinit(self.allocator);
+    }
+    pub fn admit(self: *ScalarAdmission, m: *const core.Module, binding: core.BindingId, remaining: *usize) std.mem.Allocator.Error!bool {
+        return (try self.body(m, binding, remaining, 0)) != null;
+    }
+    fn primitive(ty: T.Id) bool {
+        return ty == T.unit or ty == T.boolean or ty == T.u32_type or ty == T.f32_type;
+    }
+    fn closed(scheme: T.Scheme) bool {
+        return scheme.variables.len == 0 and scheme.row_variables.len == 0 and scheme.obligations.len == 0 and scheme.generative.len == 0;
+    }
+    fn charge(self: *ScalarAdmission, remaining: *usize, depth: usize) bool {
+        if (remaining.* == 0 or depth > 128) return false;
+        remaining.* -= 1;
+        self.nodes += 1;
+        return true;
+    }
+    fn pureRow(self: *ScalarAdmission, m: *const core.Module, id: T.Effects.Id, closed_rows: T.List, remaining: *usize, depth: usize) bool {
+        const row = m.types.row(id);
+        if (row.labels.len != 0) return false;
+        if (row.tail == .closed) return true;
+        if (row.tail != .variable) return false;
+        // These are the owning source body's checked zero-row witnesses, not
+        // ambient caller facts or the row IDs of another source module.
+        for (m.types.list(closed_rows)) |variable| {
+            if (!self.charge(remaining, depth)) return false;
+            if (row.tail.variable == variable) return true;
+        }
+        return false;
+    }
+    fn body(self: *ScalarAdmission, m: *const core.Module, binding: core.BindingId, remaining: *usize, depth: usize) std.mem.Allocator.Error!?usize {
+        if (!self.charge(remaining, depth) or binding == 0 or binding >= m.bindings.len) return null;
+        const target: core.BindingRef = .{ .unit = m.unit, .binding = binding };
+        if (self.completed.get(target)) |height| {
+            if (depth + height > 128 or self.len == self.active.len) return null;
+            self.hits += 1;
+            return height;
+        }
+        if (self.len == self.active.len or self.completed.count() >= 100000) return null;
+        for (self.active[0..self.len]) |prior| if (std.meta.eql(prior, target)) return null;
+        const source = m.body(binding) orelse return null;
+        if (!source.is_function or !closed(source.scheme) or !closed(m.binding(binding).scheme)) return null;
+        var signature = m.binding(binding).ty;
+        for (m.bodyParameters(source)) |parameter| {
+            if (!self.charge(remaining, depth + 1) or !primitive(parameter.ty)) return null;
+            const arrow = m.types.node(signature);
+            if (arrow.tag != .function or arrow.a != parameter.ty) return null;
+            if (!self.pureRow(m, arrow.c, m.binding(binding).scheme.closed_rows, remaining, depth + 1)) return null;
+            signature = arrow.b;
+        }
+        if (!primitive(signature) or signature != m.typeOf(source.root)) return null;
+        self.active[self.len] = target;
+        self.len += 1;
+        defer self.len -= 1;
+        const height = 1 + (try self.walk(m, source.root, source.closed_rows, remaining, depth + 1) orelse return null);
+        if (depth + height > 128 or self.completed.count() >= 100000) return null;
+        try self.completed.put(self.allocator, target, height);
+        return height;
+    }
+    fn walk(self: *ScalarAdmission, m: *const core.Module, root: core.Id, closed_rows: T.List, remaining: *usize, depth: usize) std.mem.Allocator.Error!?usize {
+        if (root == 0) return 0;
+        if (!self.charge(remaining, depth)) return null;
+        const n = m.node(root);
+        if (n.ty != T.never and !primitive(n.ty)) return null;
+        var height: usize = 0;
+        const operands = [_]core.Id{ n.a, n.b, n.c };
+        var children: []const core.Id = &.{};
+        switch (n.tag) {
+            .constant => {},
+            .reference => {
+                const ref = m.reference(root);
+                if ((ref.unit != 0 and ref.unit != m.unit) or ref.binding == 0 or ref.binding >= m.bindings.len) return null;
+                const kind = m.binding(ref.binding).kind;
+                if (kind != .local and kind != .parameter) return null;
+            },
+            .scalar, .logical => {
+                if (n.tag == .scalar and (n.c != 0 or @import("simd_intrinsics.zig").literalLanes(n.op))) return null;
+                children = operands[0..2];
+            },
+            .bind => children = operands[1..2],
+            .return_ => children = operands[0..1],
+            .if_value, .if_stmt => children = &operands,
+            .block, .suite => children = m.children(root),
+            .call => {
+                const call = m.call(root);
+                var target = call.target;
+                if (target.unit == 0) target.unit = m.unit;
+                if (target.unit == 0 or target.unit > self.units.len) return null;
+                const owner = &self.units[target.unit - 1];
+                if (target.binding == 0 or target.binding >= owner.bindings.len) return null;
+                const source = owner.body(target.binding) orelse return null;
+                const parameters = owner.bodyParameters(source);
+                if (call.arguments.len != parameters.len) return null;
+                var signature = call.callee_type;
+                for (call.arguments, parameters) |argument, parameter| {
+                    if (!self.charge(remaining, depth + 1) or !primitive(parameter.ty) or m.typeOf(argument) != parameter.ty) return null;
+                    const arrow = m.types.node(signature);
+                    if (arrow.tag != .function or arrow.a != parameter.ty) return null;
+                    if (!self.pureRow(m, arrow.c, closed_rows, remaining, depth + 1)) return null;
+                    signature = arrow.b;
+                }
+                if (!primitive(signature) or signature != n.ty) return null;
+                height = 1 + (try self.body(owner, target.binding, remaining, depth + 1) orelse return null);
+                children = call.arguments;
+            },
+            else => return null,
+        }
+        for (children) |child| {
+            if (child == 0) continue;
+            const child_height = try self.walk(m, child, closed_rows, remaining, depth + 1) orelse return null;
+            height = @max(height, 1 + child_height);
+        }
+        if (depth + height > 128) return null;
+        return height;
+    }
+};
+
 /// A first destination ABI: exactly one fixed array construction, scalar
 /// inputs, no calls/branches/loops or borrowed payloads. The caller opens the
 /// result owner; the callee initializes it without retaining local scratch.
