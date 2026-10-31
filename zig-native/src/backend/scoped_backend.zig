@@ -4382,6 +4382,15 @@ const Generator = struct {
                 const value = try self.expression(m, n.b, depth + 1);
                 if (value.terminated) return value;
                 if (n.c == 0) try self.pattern(m, n.a, value) else {
+                    // Refutable bindings use the same initialized-payload
+                    // evidence as matches. An impossible pattern has only its
+                    // checked exiting fallback; do not bind zeroed inactive
+                    // descriptors as if they were reachable loop carries.
+                    if (!evaluatedPattern(m, n.a, 0) and impossiblePattern(m, n.a, value, 0)) {
+                        const fallback = try self.expression(m, n.c, depth + 1);
+                        if (!fallback.terminated) return self.unsupported(m, id);
+                        return fallback;
+                    }
                     const matches = try self.testPattern(m, n.a, value, depth + 1);
                     try self.c.when(.{ .i32_eqz, matches });
                     self.nesting += 1;

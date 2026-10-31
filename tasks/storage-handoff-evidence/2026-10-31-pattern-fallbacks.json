@@ -1,0 +1,62 @@
+{
+  "change": "Refutable pattern bindings use the same checked impossible-pattern evidence as matches. If no evaluated value pattern is present and the pattern is impossible, emit its original checked exiting fallback directly. This avoids binding an inactive Some payload with no borrowed owner and preserves loop carry stability.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/tests/scoped_pattern_fallback_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-pattern-fix/bin/blotc",
+    "sha256": "3a0e2e89d3a706ecf206d5189b8d33bf8ab18cee7f1d011cc439c047a61a0940",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-pattern-native-dev/bin/blot-tests",
+    "sha256": "d08583ce6460d57581b8204a282a58bae64c65585c53f6dc17266fe27d5c179f",
+    "compiled_inventory": 2723,
+    "selected": 217,
+    "passed": 216,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "new_law": "Inactive borrowed cursor payload with an exiting return fallback passes exhaustive emission allocation-failure sweep."
+  },
+  "guest": {
+    "passed": 48,
+    "failed": 0,
+    "baseline_both_tiers": "/tmp/blot-pattern-baseline.log",
+    "coverage": [
+      "both codegen tiers and sync/JSPI",
+      "generic PoolCursor traversal of fresh empty borrowed rows",
+      "populated and conditional/joined owners",
+      "exiting return/break/continue fallback side effects",
+      "evaluated value-pattern input and fallback effects preserved",
+      "dynamic Some/Nothing still follows runtime value",
+      "maximum U32 values",
+      "all previous opaque/loop/SIMD/empty/root/hidden-borrow negative laws",
+      "existing value-pattern tuple/record scope laws"
+    ]
+  },
+  "integration": {
+    "original_Pen_occlusion_entry": "emits and runs unchanged source with all four flags and exact packet fields",
+    "golden_note": "Temporary root runner had stale preference lane order. Qualification maps all14 lanes to documented ink/preferences.encode: quality0..8, master/effects/music9..11, bloom12, left_handed13. No tracked assertion/source changed.",
+    "full_original_Pen_module": "Built1234578bytes and all original packet/preferences/UI/command-boundary witnesses pass on exact compiler3a0e2e89, using documented current preference lane order; no engine frame/PNG qualification inferred.",
+    "full_runtime_driver": "/tmp/blot-pattern-pen-precompiled-runtime.ts"
+  },
+  "diagnosis": "Dedicated ignored debug binary traced implicit PoolCursor values view root25 becoming null on unreachable Some path, while step metadata selected Nothing with Some impossible. All diagnostic prints removed before qualified final build.",
+  "review": "Astra /root/migration_plan approved exact nine-line diff: input work first, evaluated-pattern guard, existing impossiblePattern proof, original exiting fallback at current nesting, stableCarry unchanged.",
+  "lint": "Both changed Zig files each zero analyzer findings; Zig/TS formatting and git diff whitespace pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 fetch network blocked before tests; dependencies/manifests/TLS unchanged"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No arbitrary borrow root, dummy owner, cast, opaque fallback, Ink/Pen edits, main/GPU build or weakened stability checks.",
+  "date": "2026-10-31",
+  "pen_packet_fixture": {
+    "wasm_bytes": 1234578,
+    "wasm_sha256": "fef3ba8c383d2b7de857e669837ebfef7d358a331887803f5dacc6885beafe36",
+    "result": "All original packet/UI/command checks, all four occlusion flags and all 35 original render-scale combinations pass on the complete original fixture module. This is a guest packet witness, not a native engine frame."
+  }
+}

@@ -95,6 +95,18 @@ test "proven empty borrowed rows keep zero iteration exits and trap reads across
     try publishSmallModule(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
+test "impossible refutable bindings emit exiting fallback without inactive borrowed payload allocations" {
+    var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
+        "type LocalCursor is data = $LocalCursor {values: &[U32], index: U32}\n" ++
+        "entry const answer = func (): U32 => return do:\n" ++
+        "  let step: Maybe LocalCursor = $Nothing\n" ++
+        "  let $Some cursor = step else:\n" ++
+        "    return 42\n" ++
+        "  return @storage.read cursor.values cursor.index\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "wide field refinement restores scoped indexes through allocation failures" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
