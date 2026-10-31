@@ -72,58 +72,38 @@ Native Pen, its compiler plugin and Mesa lavapipe are available locally. Keep
 unrelated fixture migration and performance work paused. The next qualifying
 run must use the real main and produce an inspected native Pen PNG.
 
-## Immediate next step
+## Run and inspect the frame
 
-Get **one real Gdev frame running in Pen**. No current Gdev `main.wasm` has
-successfully compiled, and no Pen frame or screenshot has been produced.
+Resume the active native attempt above before launching another full compile.
+On a new machine, read `AGENTS.md`, `compiler/guide.md` and
+`zig-native/CONTRACT.md`; build the matching compiler, Pen and plugin using the
+pinned toolchains and existing sibling checkouts.
 
-The cloud retry built the development compiler with Zig 0.17.0 and Deno 2.9.6.
-The actual-main attempt moved beyond the previous Boxing diagnostic. Binding
-`text ()` once still exhausted module validation, so Gdev's editor toolbar now
-uses the existing per-label `part`/`span_*` exports. Its 46 fields and
-evaluation order match the previous toolbar, without changing generated payloads
-or budgets.
-
-The latest render frontier is recorded above and in
-[the tracked retry evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json).
-
-The machine's command sandbox cannot connect to its proxy; network operations
-work through the supported escalated command path. The normal Deno task eagerly
-fetches the locked Baba package from unavailable `npm.jsr.io`. For the existing
-build script and real-main driver, which need only local modules and Node
-builtins, the retry used `deno run --no-config --no-lock` with the permissions
-listed in the evidence. No manifest, lockfile, TLS or checksum was changed.
-
-Use the existing four sibling checkouts; do not create a worktree unless asked.
-Use Zig **0.17.0**, Deno, and a current Rust toolchain compatible with Pen. Read
-`AGENTS.md`, `compiler/guide.md` and `zig-native/CONTRACT.md`. From the Blot
-checkout:
+The tracked runners use Gdev's real `src/main.blot`, `pen.json`, imports,
+assets and storage settings. For an isolated main diagnostic:
 
 ```sh
-zig version
-ZIG_GLOBAL_CACHE_DIR="$PWD/build/zig-global-cache" deno task build:compiler:dev
-deno run -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
+deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
 
-The retained harness uses the real Gdev `src/main.blot`, `pen.json`, imports,
-assets and storage settings, with the compiler cache disabled. It preserves a
-unique attempt directory below ignored `build/`. It is now tracked under
-`scripts/storage_handoff/`; the old copies and detailed logs under `build/` are
-local evidence and will not travel through Git.
-
-After main builds, rebuild Pen on the new machine
-(`cargo build --release -p pen` in `../pen`) and run:
+For the actual frame:
 
 ```sh
 python3 scripts/storage_handoff/run_pen.py --launch
 ```
 
-This launches the real Gdev through Pen headlessly for one 640×480 frame. It
-requires successful exit, exactly one trace, a completed guest/render marker and
-a PNG. Inspect the PNG. Configure a software Vulkan driver if the machine needs
-one; the script preserves explicitly configured driver environment variables. Do
-not substitute a synthetic guest for this milestone.
+Pen compiles the project through its native plugin, runs one headless 640×480
+frame and saves a unique directory under `build/storage-integration/`. Success
+requires zero exit status, exactly one guest trace, completed guest/render
+markers and a PNG. Inspect that PNG. Use a configured software Vulkan driver
+when needed; do not substitute a synthetic guest for this milestone.
+
+The normal Deno task currently cannot fetch locked Baba from `npm.jsr.io`
+through the configured proxy. The local-only diagnostic driver works with the
+flags above; no manifest, lockfile, TLS or checksum has changed. Build outputs
+and detailed logs are ignored local evidence; keep portable results in the
+[tracked record](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json).
 
 ## Frozen contracts and language
 
@@ -154,45 +134,21 @@ The scoped data-stack backend exists, but ordinary legacy backend retirement and
 full application qualification remain unfinished. Do not claim measured Gdev
 runtime or compile-time improvements yet.
 
-## Earlier handoff verification (not rerun)
+## Deferred qualification
 
-- Complete native inventory **2,670 tests compiles** with the native Zig
-  backend. This is not an exhaustive native execution pass.
-- Focused native laws pass for exact generalized row witnesses, same immutable
-  row aliases, checked instance ownership retained as rigid facts, and merge
-  selection identity with independent admission checks. The row-substitution law
-  preserves `Foreign` labels and correlation.
-- Both executed-Wasm record-merge laws pass: owner/callback behavior with right
-  replacement precedence, and scratch borrow-escape rejection.
-- Std/prelude migration: 25 checks passed and one scalar-export law failed. The
-  same failure was reproduced against the pre-migration std snapshot. A later
-  focused array-contract batch passed ten checks with that same failure. Scoped
-  backend global/nonfunction entry support remains pending; do not hide the
-  fixture with `#run`.
-- The required `deno task test:compiler` was run for this checkpoint. Its smoke
-  phase passed three checks and failed the project wire-contract law at
-  `zig-native/tests/zig_project_protocol.test.ts:404`: expected diagnostic span
-  ends 43/48, observed 42/47. The full gate stopped there; release/exhaustive
-  qualification is **not complete**. See the committed evidence note.
-- Handoff Zig lint passes with zero findings (553 production files plus the test
-  fixture). Three temporary-buffer lifetime warnings in the new native
-  regression were fixed using synchronous borrowed inquiry helpers.
-- Pen `cargo fmt --all --check` passes in both workspaces.
-- Latest semantic compiler before handoff-only changes: binary SHA-256
-  `d372edd37b3124b88f8737b1f6c616ae95a0a56ed2142dd19ab0c478e254846b`, raw
-  identity `29bc25d3f516f7de415236e372873045a651686c80f0d7f4daa167c46ac45a4a`,
-  configured Gdev identity
-  `71db1abcb18e7df70ea95c47d8c9061681fbe9222e809043840e6156ceaede9d`. These
-  identities are distinct; binaries and caches must be rebuilt locally.
+The full compiler gate and broad library/game fixture migration remain pending.
+Besides the current associated-result baseline, earlier qualification recorded
+a scalar-export fixture failure and a project wire-contract diagnostic-span
+mismatch. Preserve their assertions when those gates resume. Current native
+Pen/plugin builds and generation checks do not qualify the full host/browser
+acknowledgement, rollback and recovery matrix.
 
-Temporary `NUM_*`, `ROOT_*` and `SOURCE_WORK_FINAL` failure diagnostics remain
-in compiler sources. Remove them after the application candidate works, then run
-affected checks and Zig lint. The latest final-failure merge diagnostics were
-already removed. One output block-break/return inference defect remains tracked
-in the task record. Source solver inquiries still discard private existential
-equalities; do not thaw all private rigids independently, which would lose
-correlation between inquiries.
+Temporary `NUM_*`, `ROOT_*` and `SOURCE_WORK_FINAL` diagnostics remain in compiler
+sources. Remove them after the real frame works, then run affected checks and
+lint. The task record also retains an output block-break/return inference defect.
+Source solver inquiries still discard private existential equalities; do not
+thaw all private rigids independently and lose correlation between inquiries.
 
-Older checkpoints are kept in the
-[earlier handoff in Git](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/CONTINUE.md).
-Their test counts and performance results do not qualify this rewrite.
+Historical counts, identities and detailed checkpoints remain in
+[Git history](https://github.com/mewhhaha/blot2/blob/093bcc2c767e718e0082f9385d6515b61bf9fb33/CONTINUE.md)
+and the tracked evidence. They do not qualify the current combined candidate.
