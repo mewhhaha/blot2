@@ -1,167 +1,123 @@
-# Continue here — owned-storage rewrite
+# Continue the owned-storage rewrite
 
-## Current cloud frontier
+## Current frontier
 
-One real Gdev main frame now works in native Pen. The 2026-10-31 run exited
-zero, completed exactly one guest trace and one headless step, rendered a
-complete frame and saved an inspected 640×480 PNG of the authored startup letter
-board. This establishes first-frame integration; broader gameplay, recovery,
-browser and release/performance qualification remain pending.
+This is a greenfield project. Breaking changes are welcome; remove superseded
+APIs and implementations. Preserve useful behavior, assertions, deterministic
+math, original workloads and independent references. Read `AGENTS.md`,
+`compiler/guide.md`, `zig-native/CONTRACT.md` and `tasks/STORAGE_REWRITE.md`.
 
-- [Portable result and exact identities](tasks/storage-handoff-evidence/2026-10-31-first-frame.json)
-- [Inspected screenshot](tasks/storage-handoff-evidence/2026-10-31-first-frame.png)
-- Local artifacts: `build/storage-integration/gdev-one-frame/attempt-eru2w98y`.
+One actual Gdev main frame passed native Pen with an inspected 640×480 startup
+letter-board PNG. Its exact historical compiler, sources and result are in
+[the first-frame record](tasks/storage-handoff-evidence/2026-10-31-first-frame.json)
+and [screenshot](tasks/storage-handoff-evidence/2026-10-31-first-frame.png).
+That frame used compiler SHA `e6ccd2d4…`; later fixes require a fresh real
+frame. Broader gameplay, browser, recovery and release qualification remain
+open.
 
-The real module is 45,764,043bytes. Its largest function body is 2,245,344bytes,
-maximum combined parameters/locals 20,175 and global count 236,431. V8 and
-actual Pen Wasmtime49 validate it. All existing source, storage and engine
-limits held. The cold compile took 2,188.86seconds; this is evidence, not a
-performance claim.
+The remaining source migration has reached the full Ink/Gdev inventories,
+fixtures, generators and active documentation. Current language uses `func`,
+explicit `return`, curried `->`, `$Constructor`, primitive booleans, `and`/`or`
+and `#[...]` arrays. Grammar-rejection fixtures, foreign shader syntax and
+historical captures intentionally retain their own text. Generated sources must
+come from generator inputs, never manual output patches.
 
-The frame used the installed `zig-native/zig-out-dev/bin/blotc` (SHA prefix
-`e6ccd2d4`). A separately checked `zig-out-cleanup` candidate (`38d40a78`)
-removes temporary compiler prints; its full restoration Wasm is byte-identical.
-Keep the exact frame/compiler/source identities in the portable record when
-qualifying later candidates. The successful installed binary remains available.
+## Checked compiler fixes
 
-## Current source migration
+The installed development compiler is the reviewed callback-value candidate, SHA
+`9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929`. Older exact
+candidates remain local build artifacts; portable evidence qualifies its named
+candidate rather than every later revision.
 
-The active fan-out is converting the remaining library/game fixtures, generators
-and current documentation, preserving assertions and workload sizes. Checked
-batches are pushed continuously to all four `main` branches. The Blot syntax,
-editor and embedded-source batch is recorded in
-[the portable migration evidence](tasks/storage-handoff-evidence/2026-10-31-source-migration.json):
-63 guest checks pass; 1,805 of 1,816 affected native laws pass with sampled
-faults, and all eleven failures reproduce in the retained pre-migration binary.
-The full gate still cannot fetch locked Baba through the configured proxy.
+- [Imported opaque layouts](tasks/storage-handoff-evidence/2026-10-31-opaque-layouts.json)
+  use exact closed producer metadata while preserving public opacity.
+- Loop refinements, literal SIMD forwarding, proven-empty nested rows and
+  impossible pattern fallbacks have executed regression coverage in the linked
+  records under `tasks/storage-handoff-evidence/`. Original hauling and full
+  packet fixtures now run without dummy rows or altered algorithms.
+- [Lexical schemes](tasks/storage-handoff-evidence/2026-10-31-lexical-schemes.json)
+  use bounded immutable lists, avoiding sparse temporary-fact saturation.
+- [Indexed mutation](tasks/storage-handoff-evidence/2026-10-31-indexed-fields.json)
+  preserves original owner and selected-field equations, including two indices.
+- [Callback values](tasks/storage-handoff-evidence/2026-10-31-callback-values.json)
+  align source/Core recipe classification while keeping invocation and no-store
+  checks strict. All six original Gdev restore tests and both rejection tests
+  pass. The latest native inventory compiles 2,728 tests; 395/396 affected laws
+  pass with the same independently reproduced associated-partial baseline
+  failure. All 59 affected guest tests pass.
 
-Pen bindings now use named packet writers; sibling outputs are regenerated from
-the generator. Ink incremental ECS preserves 1,435 assertions and sparse restore
-qualifies historical dead rows with malformed-packet rejection. Gdev flight,
-restore, HUD and performance families have checked checkpoints; broader fixture
-conversion remains active. Do not infer whole-repository qualification from
-these families.
+Astra xhigh reviewed the semantic fixes. The required full compiler gate was
+attempted for each batch but stops before tests because the configured proxy
+blocks locked Baba 9.0.1 from `npm.jsr.io`. No dependency, lockfile or TLS
+workaround was applied. Changed files have no new analyzer findings; four
+existing checker warnings and the broader 25-finding baseline remain visible.
 
-Use
-`scripts/migration_audit.ts --project ../gdev --report /tmp/gdev-audit.json
---expectations ../gdev/tests/migration_expectations.json tests devtools test_support`
-with `deno run --no-config --no-lock -A` for a frontend/API inventory. It checks
-unused declarations through overlays; it does not emit the original exports or
-execute their assertions. The source digest covers the selected project's Blot
-files; external libraries are read live. Rerun after shared dependencies settle.
+## Remaining execution work
 
-## Current implementation and next work
+Source checks are distinct from emitting original exports and running
+assertions. Ink's completed inventory reports 322 passes and three expected
+invalid fixtures; rerun after source changes. Gdev's 441-file inventory had
+three restore-family failures cleared by the callback fix and one icon-preview
+API migration. Refresh the final inventory after that tool/generator batch.
 
-Imported closed opaque layouts now use exact validated producer metadata while
-preserving public opacity. The checked candidate and focused coverage are in
-[opaque layout evidence](tasks/storage-handoff-evidence/2026-10-31-opaque-layouts.json).
-New fixture execution exposed two further backend defects: initial `Nothing`
-refinements prune loop-carried `Some` branches, and traversing an empty typed
-row pool cannot materialize nested borrowed payloads. Preserve the original
-empty and tie assertions; do not seed dummy rows or weaken expectations. SIMD
-literal forwarding and custom Codec/Format emission also remain compiler
-frontiers.
+Current execution frontiers include generic Format/custom Codec method lowering,
+parser array-element layouts, actor frame evidence and the full affordance
+fixture. Original prepared-physics replay comparisons pass through the smaller
+batch counts; the 2,048-body case traps and needs diagnosis with unchanged
+limits. The complete adapter module emits, but its frame-packet entry traps.
+Preserve original workloads and assertions while resolving these issues.
 
-Read `AGENTS.md`, `tasks/STORAGE_REWRITE.md`, `compiler/guide.md` and
-`zig-native/CONTRACT.md`. The rewrite remains unfinished: retire the ordinary
-legacy backend and qualify remaining fixtures against named owners, preserving
-assertions, deterministic behavior and workload sizes. Greenfield changes are
-welcome; do not keep superseded APIs or compatibility implementations.
+Ordinary legacy backend retirement is still unfinished (task 120). Some pure
+programs still emit ABI 3; do not fake ABI 8 with unused owners or claim that
+the whole rewrite is complete. Task 121 covers final behavior and measurements.
+Release/performance claims require the qualified release compiler.
 
-Retained compiler fixes include closed generic layout caching, exact selected
-call/type evidence, defining-module obligations, nominal field witnesses,
-checked scratch writer planning, late local compaction and scoped refinement
-indexing. Closed machine ranges become private helpers after escape/release
-checks. Cross-body registers use private per-root globals reset only on original
-function entry. Branch/signature, reachable-cycle, coordinate and indirect-call
-guards remain enforced. Only committed helpers credit their own per-body work;
-cumulative work and provisional limits remain intact. Detailed laws and failed
-predecessors live in the evidence and pinned Git history, not this resume note.
+## Integration and checks
 
-Current source boundaries are concrete: Ink's retained-instance projection keeps
-its order/extra guards; generated packet integers and numeric halves use
-explicit U32-to-F32 conversions; restoration comparisons select F32 explicitly;
-station restore loops alias named owners instead of carrying unrelated access
-callbacks. Gdev simulation excludes borrowed UI rows while preserving the
-165-field public FrameAccess. Canonical generated codec policies and packet
-ordering are intact.
+Use the existing sibling checkouts. Build with Zig 0.17.0, checking
+`zig version` first, and `-Dllvm=false` for development/native tests. Use
+coherent affected batches and the required full gate as documented in
+`AGENTS.md`.
 
-Production main exports one actual game entry. Optional tracing/reference
-entries live in `../gdev/performance/*_main.blot`; their older comparison
-runners still need migration. Gdev's plugin deadline is 7,200seconds for the
-cold build; compiler work, engine, asset/reply and storage limits were not
-raised.
-
-## Run and inspect a new candidate
-
-Use the existing sibling checkouts. Build matching tools using Zig 0.17.0 with
-`-Dllvm=false` for development and the checked-in Pen Rust toolchain. On another
-machine configure the native compiler plugin and a headless software Vulkan
-driver. Do not open desktop windows or substitute a synthetic guest.
+Run actual Gdev main through native Pen, including its real imports and assets:
 
 ```sh
 python3 scripts/storage_handoff/run_pen.py --launch
 ```
 
-The runner compiles real `../gdev/src/main.blot` with its imports, assets and
-storage settings and writes a unique attempt below `build/storage-integration/`.
-Require all runner checks and inspect the resulting PNG. For an isolated
-compile:
+Require every runner check and inspect the PNG. For a compile-only diagnosis:
 
 ```sh
 deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts > /tmp/gdev-main.log 2>&1
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
 
-Keep large logs/build outputs ignored; commit concise identities, results and
-useful visual evidence. Continue pushing coherent checked batches to `main` and
-verify the remote SHA. Environment publication requires an explicit request.
+The reusable frontend inventory checks unused declarations through overlays:
+
+```sh
+deno run --no-config --no-lock -A scripts/migration_audit.ts --project ../gdev --expectations ../gdev/tests/migration_expectations.json --report /tmp/gdev-audit.json
+```
+
+It does not emit original exports or execute their assertions. Its project
+source digest excludes external library snapshots; rerun after dependencies
+settle. Keep large outputs ignored and commit concise portable evidence.
 
 ## Frozen contracts
 
-- ABI 8, session 2, saved framing 26 and packet operation order stay fixed.
-- Storage remains 2 MiB temporary, 256 KiB persistent, 2 MiB transport and 4096
-  owner slots. The project reply budget remains 64 MiB including Wasm and
-  assets.
-- Production expansion remains 500,000 expressions per physical function; layout
-  work 100,000. No further cap increase is authorized. Engine limits stay
-  7,654,321 function-body bytes, 50,000 combined parameters/locals and 1,000,000
-  globals.
-- Declare independent named owners. Frame/access records alias live pools;
-  borrowed views are invocation-local. Copy retained state and host/worker
-  numeric packets explicitly. Checkpoint/restore is explicit; renderer rejection
-  does not roll simulation back. Language tasks are retired; host workers
-  remain.
-- Use `func`, explicit `return`, curried `->`, `$` constructors, primitive
-  booleans, `and`/`or`, and `#[]` arrays. Lists use `[]`. Compile-time `#run`,
-  `#if`, `#do` remain part of the migration.
+- ABI 8, session 2, Gdev saved framing 26 and packet order remain fixed.
+- Gdev storage: 2 MiB temporary, 256 KiB persistent, 2 MiB transport, 4,096
+  owners. Reply budget: 64 MiB including assets.
+- Production expansion: 500,000 expressions per physical function; layout work:
+  100,000. Engine bounds: 7,654,321 body bytes, 50,000 parameters/locals and
+  1,000,000 globals. Do not raise these limits to pass fixtures.
+- Named owners are independent. Access records alias live pools. Borrowed views
+  remain invocation-local; copy retained history and host/worker packets.
+  Preserve callback effects and explicit checkpoint/restore. Renderer rejection
+  is not rollback. Language tasks are retired; copied-packet workers remain.
 - Gdev FrameAccess has 165 fields and four explicitly pure storage callbacks.
-  Building callbacks use typed forwarding functions. Hand's transaction keeps
-  input, merged working access and consumer tied to one generic type; its ten
-  replacement fields preserve types while changing owners and callback effects.
+  Preserve exact generic field types and real latent callback effects.
 
-See `zig-native/SCOPED_STORAGE.md`, `zig-native/STORAGE_REWRITE_REVIEW.md` and
-storage tasks 110–121 for the remaining design and requirements.
-
-## Qualification still pending
-
-The full compiler gate was attempted again after diagnostic removal, but cannot
-fetch locked Baba 9.0.1 from `npm.jsr.io` through the configured proxy. No
-manifest, lockfile, TLS or checksum was changed. All 2,716 native tests compile;
-the affected source/editor/guest checks above and both-tier sync/async
-restoration checks pass. The cleanup emits identical restoration Wasm.
-Changed-file lint is zero; the broad scan reports 25 findings exactly matching
-the pre-cleanup baseline.
-
-Broader compiler/library/game and host/browser acknowledgement, explicit restore
-and recovery gates remain open. Preserve the known associated-result
-latent-effect layout baseline, earlier scalar-export and wire-contract span
-assertions, and the output block-break/return inference defect. Source solver
-inquiries still discard private existential equalities; do not thaw all private
-rigids separately and lose correlation between inquiries. Temporary
-NUM/ROOT/SOURCE_WORK prints have been removed.
-
-Historical measurements and the complete integration trail remain in
-[tasks/storage-handoff-evidence/2026-10-30-cloud-main.json](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
-and pinned Git history. They qualify their own candidates; the first-frame
-record above identifies the candidate actually inspected.
+Continuously commit coherent checked batches to each `main` and verify remote
+hashes. Preserve unrelated work. Environment publication requires a separate
+explicit request. Older checkpoint narratives remain in pinned Git history and
+portable evidence, rather than duplicate continuation documents.
