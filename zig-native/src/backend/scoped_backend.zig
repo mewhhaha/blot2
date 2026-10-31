@@ -118,7 +118,7 @@ fn orderFields(fields: []Value) void {
         }
     }.less);
 }
-const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true };
+const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true };
 const Global = struct { target: core.BindingRef, word: u32, token: u32, epoch_low: u32, epoch_high: u32, capacity_request: usize, literal_bytes: ?u32 = null, initializing: bool = false };
 const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument = null };
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
@@ -654,6 +654,16 @@ const Generator = struct {
     fn readElement(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: Local) Error!Value {
         try self.writerEvent(m, id, array_, .read);
         try self.registerShapeRead(array_);
+        const address = try self.c.temp();
+        try self.c.set(address, .{ .call, self.runtime.functions.address, array_.token, array_.epoch_low, array_.epoch_high, array_.word, index });
+        if (self.emptyUninitialized(array_)) {
+            // The checked address traps: every possible owner was constructed
+            // with zero rows and has had no write. Do not manufacture payload
+            // borrow roots for this unreachable value. The read frame still
+            // rejects a later backedge that adds reachable payload evidence.
+            try self.c.op(.unreachable_, 0);
+            return self.terminated();
+        }
         var element = (try self.root(m, id, array_)).element;
         // A joined pool can hold borrows into either origin. Preserve the
         // complete origin set independently of the runtime-selected address.
@@ -664,9 +674,17 @@ const Generator = struct {
             element = try self.cloneShape(element);
             try self.storedShape(m, id, &element, self.roots.items[other].element, std.math.maxInt(usize));
         }
-        const address = try self.c.temp();
-        try self.c.set(address, .{ .call, self.runtime.functions.address, array_.token, array_.epoch_low, array_.epoch_high, array_.word, index });
         return self.loadValue(address, 0, element);
+    }
+    fn emptyUninitialized(self: *const Generator, value: Value) bool {
+        const first = value.root orelse return false;
+        const owner = self.roots.items[first];
+        if (!owner.known_empty or owner.element_initialized) return false;
+        for (value.other_roots) |other| {
+            const alternative = self.roots.items[other];
+            if (!alternative.known_empty or alternative.element_initialized) return false;
+        }
+        return true;
     }
     fn zeroShape(self: *Generator, shape_: Value) Error!Value {
         var value = shape_;
@@ -751,6 +769,7 @@ const Generator = struct {
         for (self.roots.items, 0..) |*owner, root_id| if (array_.root == root_id or std.mem.findScalar(usize, array_.other_roots, root_id) != null) {
             try self.storedShape(m, id, &owner.element, value, owner.depth);
             owner.element_initialized = true;
+            owner.known_empty = false;
         };
         try self.writerEvent(m, id, array_, .write);
         const address = try self.c.temp();
@@ -1090,9 +1109,12 @@ const Generator = struct {
         const protected_before = self.protected.items.len;
         defer self.protected.shrinkRetainingCapacity(protected_before);
         const first = try self.expression(m, args[0], depth + 1);
+        if (first.terminated) return first;
         try self.protected.append(self.allocator, first);
         const second = if (args.len >= 2) try self.expression(m, args[1], depth + 1) else try self.constant(0);
+        if (second.terminated) return second;
         const third = if (args.len == 3) try self.expression(m, args[2], depth + 1) else try self.constant(0);
+        if (third.terminated) return third;
         switch (op) {
             .reserve => {
                 const count = self.knownLiteral(second) orelse return self.fail(m, id, .storage_unsupported, "A storage reservation requires a compile-time U32 literal");
@@ -1174,7 +1196,7 @@ const Generator = struct {
                 const index = (try self.constant(0)).word;
                 try self.c.loop(.{ .i32_lt_u, index, count });
                 const value = try self.readElement(m, id, first, index);
-                try self.writeElement(m, id, copied, index, value);
+                if (!value.terminated) try self.writeElement(m, id, copied, index, value);
                 try self.c.next(index);
                 try self.c.again();
                 return copied;
@@ -1193,7 +1215,8 @@ const Generator = struct {
         const to = try self.c.temp();
         try self.c.set(from, .{ .i32_add, start, index });
         try self.c.set(to, .{ .i32_add, offset, index });
-        try self.writeElement(m, id, target, to, try self.readElement(m, id, source, from));
+        const value = try self.readElement(m, id, source, from);
+        if (!value.terminated) try self.writeElement(m, id, target, to, value);
         try self.c.next(index);
         try self.c.op(.br, 0);
         try self.c.end();
@@ -1207,6 +1230,7 @@ const Generator = struct {
         defer self.protected.shrinkRetainingCapacity(before);
         for (inputs, 0..) |input, index| {
             args[index] = try self.expression(m, input, depth + 1);
+            if (args[index].terminated) return args[index];
             try self.protected.append(self.allocator, args[index]);
         }
         const op = m.arrayOperation(id);
@@ -1306,7 +1330,7 @@ const Generator = struct {
                 try self.c.value(.{ .i32_ge_u, index, count });
                 try self.c.op(.br_if, 1);
                 const value = if (op == .fill) args[1] else try self.apply(m, id, args[1], .{ .word = index }, depth + 1);
-                try self.writeElement(m, id, result, index, value);
+                if (!value.terminated) try self.writeElement(m, id, result, index, value);
                 try self.checkReadFrame(m, id, read_frame);
                 try self.c.next(index);
                 try self.c.op(.br, 0);
@@ -3025,6 +3049,7 @@ const Generator = struct {
                 const owner = &self.roots.items[owner_id];
                 try self.storedShape(m, body.root, &owner.element, event.shape, owner.depth);
                 owner.element_initialized = true;
+                owner.known_empty = false;
             } else {
                 const owner = self.roots.items[owner_id];
                 if (!includesReadShape(event.shape, owner.element) or !includesReadShape(owner.element, event.shape)) return self.fail(m, body.root, .storage_escape, "A writer call must preserve its checked read and mutation shape order");
@@ -3605,7 +3630,9 @@ const Generator = struct {
         const protected_before = self.protected.items.len;
         defer self.protected.shrinkRetainingCapacity(protected_before);
         for (inputs, values) |input, *value| {
-            value.* = try self.snapshot(try self.expression(m, input, depth + 1));
+            const evaluated = try self.expression(m, input, depth + 1);
+            if (evaluated.terminated) return evaluated;
+            value.* = try self.snapshot(evaluated);
             try self.protected.append(self.allocator, value.*);
         }
         const done = (try self.constant(0)).word;
@@ -3646,11 +3673,11 @@ const Generator = struct {
                 try self.c.when(matches);
                 self.nesting += 1;
                 try self.c.set(selected, 1);
-                const guard = if (arm.guard != 0) try self.scalar(m, id, try self.expression(m, arm.guard, depth + 1)) else (try self.constant(1)).word;
-                try self.c.when(guard);
+                const guard = if (arm.guard != 0) try self.expression(m, arm.guard, depth + 1) else try self.constant(1);
+                try self.c.when(try self.scalar(m, id, guard));
                 self.nesting += 1;
                 try self.c.set(done, 1);
-                const body = if (arm.body != 0) try self.expression(m, arm.body, depth + 1) else try self.constant(0);
+                const body = if (guard.terminated) guard else if (arm.body != 0) try self.expression(m, arm.body, depth + 1) else try self.constant(0);
                 if (!body.terminated) {
                     arm_continues = true;
                     if (result == null) result = try self.temporary(body);
@@ -4155,8 +4182,11 @@ const Generator = struct {
         }
         var value = original;
         if (selectors.len != 0 and selectors[at].kind == .index) {
-            const index = try self.scalar(m, id, try self.expression(m, selectors[at].index, depth + 1));
+            const index_value = try self.expression(m, selectors[at].index, depth + 1);
+            if (index_value.terminated) return index_value;
+            const index = try self.scalar(m, id, index_value);
             var selected = try self.readElement(m, id, value, index);
+            if (selected.terminated) return selected;
             // Selecting a writable element pins its extent throughout RHS
             // evaluation, including nested calls. Growth keeps it in place.
             var selected_borrow = value;
@@ -4174,10 +4204,14 @@ const Generator = struct {
                 leaf = field;
             }
             const replacement = try self.updateValue(m, id, leaf.*, next, depth + 1);
+            if (replacement.terminated) return replacement;
             const name = leaf.name;
             leaf.* = replacement;
             leaf.name = name;
-            for (self.roots.items, 0..) |*owner, root_id| if (hasRoot(value, root_id)) try self.storedShape(m, id, &owner.element, selected, owner.depth);
+            for (self.roots.items, 0..) |*owner, root_id| if (hasRoot(value, root_id)) {
+                try self.storedShape(m, id, &owner.element, selected, owner.depth);
+                owner.known_empty = false;
+            };
             try self.writerEvent(m, id, value, .write);
             const address = try self.c.temp();
             try self.c.set(address, .{ .call, self.runtime.functions.address, value.token, value.epoch_low, value.epoch_high, value.word, index });
@@ -4188,7 +4222,9 @@ const Generator = struct {
             const projection = if (selectors.len != 0) selectors[at].projection else path[at];
             const field = try self.projected(m, id, &value, projection);
             const name = field.name;
-            field.* = try self.updateValue(m, id, field.*, at + 1, depth + 1);
+            const replacement = try self.updateValue(m, id, field.*, at + 1, depth + 1);
+            if (replacement.terminated) return replacement;
+            field.* = replacement;
             field.name = name;
         }
         return value;
@@ -4196,8 +4232,13 @@ const Generator = struct {
     fn emitLoop(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
         const info = m.loopInfo(id);
         const collection_value: ?Value = if (info.kind == .array) try self.expression(m, info.first, depth + 1) else null;
-        const first = if (info.kind == .range) try self.scalar(m, id, try self.expression(m, info.first, depth + 1)) else (try self.constant(0)).word;
-        const end = if (info.kind == .range) try self.scalar(m, id, try self.expression(m, info.end, depth + 1)) else if (collection_value) |value| try self.length(m, id, value) else first;
+        if (collection_value) |value| if (value.terminated) return value;
+        const first_value = if (info.kind == .range) try self.expression(m, info.first, depth + 1) else try self.constant(0);
+        if (first_value.terminated) return first_value;
+        const first = try self.scalar(m, id, first_value);
+        const end_value: ?Value = if (info.kind == .range) try self.expression(m, info.end, depth + 1) else null;
+        if (end_value) |value| if (value.terminated) return value;
+        const end = if (end_value) |value| try self.scalar(m, id, value) else if (collection_value) |value| try self.length(m, id, value) else first;
         const iterator = try self.c.temp();
         try self.c.set(iterator, first);
         const roots_before = self.roots.items.len;
@@ -4243,11 +4284,12 @@ const Generator = struct {
         }
         self.depth += 1;
         for (carries, values) |carry, value| try self.bind(m, carry.iteration, value);
+        var unreachable_item: ?Value = null;
         if (info.pattern != 0) {
             const item = if (collection_value) |value| try self.readElement(m, id, value, try self.elementIndex(m, id, value, iterator)) else Value{ .word = iterator };
-            try self.pattern(m, info.pattern, item);
+            if (item.terminated) unreachable_item = item else try self.pattern(m, info.pattern, item);
         }
-        const body = try self.expression(m, info.body, depth + 1);
+        const body = unreachable_item orelse try self.expression(m, info.body, depth + 1);
         if (!body.terminated) {
             try self.checkReadFrame(m, id, read_frame);
             const next_values = try self.arena.allocator().alloc(Value, carries.len);
@@ -4338,6 +4380,7 @@ const Generator = struct {
             },
             .pattern_bind => {
                 const value = try self.expression(m, n.b, depth + 1);
+                if (value.terminated) return value;
                 if (n.c == 0) try self.pattern(m, n.a, value) else {
                     const matches = try self.testPattern(m, n.a, value, depth + 1);
                     try self.c.when(.{ .i32_eqz, matches });
@@ -4390,6 +4433,7 @@ const Generator = struct {
             },
             .force => {
                 const pending = try self.expression(m, n.a, depth + 1);
+                if (pending.terminated) return pending;
                 const memo = pending.demand orelse return self.unsupported(m, id);
                 if (memo.building) return self.unsupported(m, id);
                 memo.building = true;
@@ -4411,10 +4455,12 @@ const Generator = struct {
             },
             .apply => {
                 const function = try self.expression(m, n.a, depth + 1);
+                if (function.terminated) return function;
                 const before = self.protected.items.len;
                 defer self.protected.shrinkRetainingCapacity(before);
                 try self.protected.append(self.allocator, function);
                 const argument = try self.expression(m, n.b, depth + 1);
+                if (argument.terminated) return argument;
                 try self.protected.append(self.allocator, argument);
                 return self.apply(m, id, function, argument, depth + 1);
             },
@@ -4425,6 +4471,7 @@ const Generator = struct {
                 defer self.protected.shrinkRetainingCapacity(before);
                 for (children, 0..) |child, index| {
                     const value = try self.expression(m, child, depth + 1);
+                    if (value.terminated) return value;
                     const destination = if (n.tag == .record) m.recordDestinations(id)[index] else index;
                     fields[destination] = value;
                     if (n.tag == .record) fields[destination].name = m.fieldSpelling(m.types.recordField(m.types.node(n.ty), destination).name) orelse return self.unsupported(m, id);
@@ -4459,6 +4506,7 @@ const Generator = struct {
             },
             .project => {
                 var value = try self.expression(m, n.a, depth + 1);
+                if (value.terminated) return value;
                 if (m.projection(n.b).variants.len == 0) {
                     if (m.fieldSpelling(m.projection(n.b).field)) |spelling| if (dataField(value, spelling)) |field| return field;
                     return self.getter(m, id, value, depth + 1);
@@ -4467,7 +4515,9 @@ const Generator = struct {
             },
             .update => {
                 const info = m.updateInfo(id);
-                const root_value = try self.snapshot(try self.expression(m, info.root, depth + 1));
+                const evaluated = try self.expression(m, info.root, depth + 1);
+                if (evaluated.terminated) return evaluated;
+                const root_value = try self.snapshot(evaluated);
                 return self.updateValue(m, id, root_value, 0, depth + 1);
             },
             .loop => return self.emitLoop(m, id, depth),
@@ -4507,11 +4557,15 @@ const Generator = struct {
                 const values = m.children(id);
                 const capacity = try self.constant(@intCast(values.len));
                 const result = try self.array(m, id, capacity.word, mode);
+                if (values.len == 0 and result.other_roots.len == 0) if (result.root) |owner| {
+                    self.roots.items[owner].known_empty = true;
+                };
                 if (result.root) |owner_id| if (self.roots.items[owner_id].capacity_request) |request| {
                     self.capacity_requests.initial(request, @intCast(values.len), try width(self.roots.items[owner_id].element)) catch return self.fail(m, id, .storage_unsupported, "Array capacity exceeds the Wasm32 storage plan");
                 };
                 for (values, 0..) |child, index| {
                     const value = try self.expression(m, child, depth + 1);
+                    if (value.terminated) return value;
                     try self.writeElement(m, id, result, (try self.constant(@intCast(index))).word, value);
                 }
                 return result;
@@ -4625,7 +4679,9 @@ const Generator = struct {
                 return self.unsupported(m, id);
             },
             .if_value, .if_stmt => {
-                const condition = try self.scalar(m, n.a, try self.expression(m, n.a, depth + 1));
+                const condition_value = try self.expression(m, n.a, depth + 1);
+                if (condition_value.terminated) return condition_value;
+                const condition = try self.scalar(m, n.a, condition_value);
                 const bindings_before = self.bindings.items.len;
                 const merges = m.branchMerges(id);
                 const merged = try self.arena.allocator().alloc(?Value, merges.len);
@@ -4674,6 +4730,7 @@ const Generator = struct {
                 defer self.protected.shrinkRetainingCapacity(before);
                 for (call.arguments) |arg| {
                     const value = try self.expression(m, arg, depth + 1);
+                    if (value.terminated) return value;
                     try values.append(self.allocator, value);
                     try self.protected.append(self.allocator, value);
                 }
@@ -4759,7 +4816,7 @@ const Generator = struct {
             };
             const value = try self.invoke(.{ .unit = m.unit, .binding = body.binding }, &.{argument}, 0);
             if (arrayAbi(result)) try self.resetPackets();
-            const word = if (arrayAbi(result)) try self.toWire(m, body.root, value, result) else try self.scalar(m, body.root, value);
+            const word = if (value.terminated) value.word else if (arrayAbi(result)) try self.toWire(m, body.root, value, result) else try self.scalar(m, body.root, value);
             try self.release(0, null);
             try self.c.value(word);
             if (result == .f32) try self.c.op(.f32_reinterpret_i32, 0);

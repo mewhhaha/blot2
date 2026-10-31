@@ -69,6 +69,32 @@ test "literal lane wrappers retain selector evidence across scoped numeric fallb
     try publishSmallModule(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
+test "proven empty borrowed rows keep zero iteration exits and trap reads across allocation failures" {
+    var module = try lower(a, "type Row is data = $Row {text: &[U32]}\n" ++
+        "entry const empty = func (count: U32): U32 => return do:\n" ++
+        "  let rows: ResizeArray Row = #[]\n" ++
+        "  let total = 0\n" ++
+        "  for row in rows:\n" ++
+        "    for code in row.text:\n" ++
+        "      total := @u32.add self code\n" ++
+        "  return total\n" ++
+        "entry const direct = func (index: U32): U32 => return do:\n" ++
+        "  let rows: ResizeArray Row = #[]\n" ++
+        "  return @storage.read (@storage.read rows index).text 0\n" ++
+        "entry const seeded = func (count: U32): U32 => return do:\n" ++
+        "  let labels: Array U32 = #[65]\n" ++
+        "  let rows: ResizeArray Row = #[]\n" ++
+        "  if @u32.lt 0 count:\n" ++
+        "    @storage.push rows ($Row {text: &labels[0..1]})\n" ++
+        "  let total = 0\n" ++
+        "  for row in rows:\n" ++
+        "    for code in row.text:\n" ++
+        "      total := @u32.add self code\n" ++
+        "  return total\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "wide field refinement restores scoped indexes through allocation failures" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);

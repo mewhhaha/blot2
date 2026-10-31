@@ -1,0 +1,58 @@
+{
+  "change": "A separate compiler-only known_empty fact proves fresh zero-row literals with no writes. Reads terminate only when all possible named owners have that proof and still lack initialized nonplain payload evidence. Existing checked address evaluation and read-frame/backedge restrictions remain; no borrowed payload roots are synthesized. Terminal loop items skip the pattern/body but retain the zero-iteration continuation. Terminal operands propagate without layout or result marshaling.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/tests/scoped_empty_rows_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-empty-fix/bin/blotc",
+    "sha256": "0e7ac2534d4cb889b401e705f59d432411f3c9d231b0d321a901929dd96dc689",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-empty-native-dev/bin/blot-tests",
+    "sha256": "c51fcfd11af550d3787e813918224a873f7b0ba92f239f15a2f0136fcb0d7d86",
+    "compiled_inventory": 2722,
+    "selected": 216,
+    "passed": 215,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "new_law": "Fresh empty borrowed-row traversal, direct reads and conditional real row writes pass exhaustive emission allocation-failure sweep."
+  },
+  "guest": {
+    "passed": 44,
+    "failed": 0,
+    "baseline_failure_both_tiers": "/tmp/blot-empty-baseline.log",
+    "coverage": [
+      "both compiler tiers and sync/JSPI",
+      "empty row traversal retains zero-iteration result",
+      "real conditional row writes remain readable",
+      "all-empty joined owners and mixed empty/populated joins",
+      "alias writes and repeated helper appends invalidate empty evidence",
+      "plain row later iteration writes retain original correct behavior",
+      "a skipped trapping read branch followed by legitimate write",
+      "direct out-of-bounds reads including0/1/maxU32 still trap",
+      "index effects preserved before traps through projection/pattern/call/record/Array result",
+      "empty copy loop balances and returns length zero",
+      "guest usable after each trap",
+      "late borrow-origin writes rejected on ordinary and continue backedges",
+      "failed revision publishes no bytes and recovers exact successful bytes",
+      "existing opaque/SIMD/loop/hidden-borrow/root-widen laws"
+    ]
+  },
+  "proof_boundary": "Known-empty is admitted only for fresh zero-element literals; it is conservatively invalidated by every write/replayed writer and is not copied into reusable parameter roots/cache evidence. Plain initialized row layouts do not use this terminal rule. Every joined owner must satisfy both proof facts.",
+  "review": "Astra /root/migration_plan reviewed exact final diff and approved with no blocking findings: fresh literal proof, joined origins, invalidation/no parameter-cache transfer, checked index/address effects, preserved loop fallthrough, terminal propagation and later-write read-frame restrictions. No full-frame qualification inferred.",
+  "lint": "Both changed Zig files each zero analyzer findings; Zig/TS formatting and git diff whitespace pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 fetch network blocked before tests; no dependency/manifest/TLS changes"
+  },
+  "integration": "Root Pen full-frame trial on earlier25bcd candidate moves past unseeded View.at to later solids sizing stableCarry frontier; final candidate0e7ac requires fresh qualification.",
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy root/owner/row, cast, opaque fallback or Ink/Pen source edits; no main/GPU build.",
+  "date": "2026-10-31",
+  "qualification": "Affected empty-row laws only; the later Pen loop carry blocker and full-frame requalification remain separate."
+}
