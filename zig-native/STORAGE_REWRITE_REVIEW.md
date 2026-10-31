@@ -153,17 +153,15 @@ the old counted-runtime and language-task implementation direction in tasks
 Keep those evidence records; do not execute them to reconstruct removed features.
 Unrelated compiler work remains separate.
 
-[Ink's AGENTS.md](../../ink/AGENTS.md) says, “Reuse unchanged geometry and
-preserve old scene snapshots.” For the new implementation, keep geometry reuse
-and preserve **explicitly copied** snapshots. Automatic snapshot preservation is
-superseded by the user's requested model; task 115 updates that instruction and
-the scene API together. This is an interpretation of the user's greenfield
-authorization, not an extra approval requirement.
+[Ink's AGENTS.md](../../ink/AGENTS.md) now requires geometry reuse and explicit
+copies for retained snapshots. Task 115 carries those ownership and scene API
+requirements; automatic snapshot preservation is superseded by the greenfield
+model. No extra approval requirement follows from the historical wording.
 
 ## Evidence and lean execution
 
-The existing [development report](../build/bench/storage-application/results.json)
-records 32 guest/frontend checks, 16 selected exhaustive native laws, a compiled
+The ignored local development report, if retained at
+`build/bench/storage-application/results.json`, records 32 guest/frontend checks, 16 selected exhaustive native laws, a compiled
 inventory of 2,627 laws, zero Zig findings, a Pen fixture and copied worker
 batches with one/four workers. It explicitly says `release_qualified: false`.
 It does not qualify the complete inventory, a packed runtime or migrated games.

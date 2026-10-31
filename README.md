@@ -3,10 +3,11 @@
 Blot is a functional language whose handwritten Zig compiler emits WebAssembly.
 Deno supplies its CLI, project client, formatter and guest host.
 
-The owned-storage rewrite is **unfinished**. The next milestone is compiling the
-real Gdev main program and rendering one headless frame through Pen. No current
-main Wasm or Pen frame has passed. Start with [CONTINUE.md](CONTINUE.md) and the
-[active task index](tasks/STORAGE_REWRITE.md).
+The owned-storage rewrite is **unfinished**. One real Gdev main frame has passed
+native Pen with an inspected screenshot. Remaining source/API migration and
+fixture execution continue; later compiler/library revisions require a fresh
+frame. Start with [CONTINUE.md](CONTINUE.md) and the
+[active task index](tasks/STORAGE_REWRITE.md) for exact candidate evidence.
 
 This is a greenfield project. Breaking changes are welcome; remove superseded
 implementations and APIs rather than maintaining legacy compatibility.
@@ -37,8 +38,8 @@ retired; isolated host workers and copied numeric packets remain.
 ## Documentation
 
 - [Agent instructions](AGENTS.md): build rules and validation scope.
-- [Language guide](compiler/guide.md): language reference; consult the active
-  migration contracts for sections still describing the earlier runtime.
+- [Language guide](compiler/guide.md): source and named-owner contracts, with
+  the unfinished backend cutover stated explicitly.
 - [Scoped storage](zig-native/SCOPED_STORAGE.md) and
   [rewrite review](zig-native/STORAGE_REWRITE_REVIEW.md): ownership and scope.
 - [Compiler ownership contract](zig-native/CONTRACT.md).
