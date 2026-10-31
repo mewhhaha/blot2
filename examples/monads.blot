@@ -7,25 +7,25 @@ const add_present = func left => return func right => return do try:
   break first + second
 
 entry const present = func () => return
-  Maybe.unwrap_or 0 (add_present (#Some 40) (#Some 2))
+  Maybe.unwrap_or 0 (add_present ($Some 40) ($Some 2))
 
 const stop = func () => return do monad Maybe:
-  use #Nothing
+  use $Nothing
   break @panic "a failed bind skips this continuation"
 
 entry const absent = func () => return Maybe.unwrap_or 42 (stop ())
 
 const checked = func candidate => return do monad Result:
   use value <- candidate
-  break $ #Ok (value + 2)
+  break $ $Ok (value + 2)
 
-entry const result = func () => return Result.unwrap_or 0 (checked (#Ok 40))
+entry const result = func () => return Result.unwrap_or 0 (checked ($Ok 40))
 
 // Monadic loops use Maybe.iterate, whose steps finish before the next begins.
 const sum_present = func count => return do try:
   let total = 0
   for index in 0 .. count:
-    use value <- #Some 1
+    use value <- $Some 1
     total := self + value
   break total
 
@@ -33,5 +33,5 @@ entry const large_loop = func () => return Maybe.unwrap_or 0 (sum_present 100000
 
 // The same iteration protocol is available through ordinary function calls.
 const step = func count => return
-  if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
+  if count < 42 then $Some ($Continue (count + 1)) else $Some ($Done count)
 entry const iterated = func () => return Maybe.unwrap_or 0 (Maybe.iterate 0 step)

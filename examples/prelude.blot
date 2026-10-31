@@ -8,13 +8,13 @@ entry const doubled = func value => return value * 2
 entry const add_two = U32.add 2
 entry const transform = compose doubled increment
 
-entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ #Some 20
+entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ $Some 20
 
 entry const answer = func () => return do:
-  let candidate = Maybe.map add_two (#Some 40)
-  let #Some value = candidate else:
+  let candidate = Maybe.map add_two ($Some 40)
+  let $Some value = candidate else:
     break 0
-  break Result.unwrap_or 0 $ Result.map identity $ #Ok value
+  break Result.unwrap_or 0 $ Result.map identity $ $Ok value
 
 // One generic function and one local lambda each work at distinct types.
 entry const generic_identity = func () => return do:
@@ -29,14 +29,14 @@ const plus = func left => return func right => return left + right
 entry const named_operator = func () => return 20 `plus` 22
 
 entry const inspect = func (enabled: Bool) => return do:
-  let candidate = #Some (if enabled then #Some 42 else #Nothing)
+  let candidate = $Some (if enabled then $Some 42 else $Nothing)
   break case candidate of
-    #Some (#Some value) => value
-    #Some #Nothing => 0
-    #Nothing => 0
+    $Some ($Some value) => value
+    $Some $Nothing => 0
+    $Nothing => 0
 
 entry const recover = func (enabled: Bool) => return do:
-  let candidate = if enabled then #Ok 42 else #Err false
-  if let #Ok value = candidate:
+  let candidate = if enabled then $Ok 42 else $Err false
+  if let $Ok value = candidate:
     break value
   break 0

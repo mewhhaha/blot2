@@ -57,7 +57,7 @@ entry const inferred = func () => return do:
 bindings generalize independently at each use. Higher-order functions propagate
 the inferred effect rows of callbacks. Creating an effectful closure is pure;
 calling it requires the corresponding provider. Demand parameters use `~` and
-are evaluated explicitly with `@demand` (`@force` remains an alias). See
+are evaluated explicitly with `@demand`. See
 [effects and controlled IO](../compiler/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
