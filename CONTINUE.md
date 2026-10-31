@@ -78,25 +78,39 @@ fix passes all 26 lanes, full U32 IDs, order boundaries, Some/Nothing parameters
 signed zero, rejection of extras/oversized order, and recovery after traps.
 Both tiers and sync/async pass (48 checks). Guards and conversion are unchanged.
 
-The active real Pen attempt is
-`build/storage-integration/gdev-one-frame/attempt-s7g8la7z`, using indexed
-compiler SHA-256 `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`
-and configured identity
+The latest real Pen attempt,
+`build/storage-integration/gdev-one-frame/attempt-s7g8la7z`, failed after about
+34minutes at result-selected `from` in `std/prelude.blot:48`, before a module or
+PNG completed. Peak sampled compiler RSS was16,408,948KiB. Installed compiler
+SHA-256 remains `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`;
+configured identity is
 `f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954`.
 Native Pen SHA-256 is
 `a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014`.
-Resume this attempt before starting another full compile. No PNG has completed.
 
-The previous attempt finished after about34minutes at result-selected `from`
-in `std/prelude.blot:48`, before emitting a module. Pen's remaining generated
-U32 schema/count/tag/integer conversions now use explicit `U32.to_f32`.
-All ten generator tests, Rust formatting, regeneration and native freshness pass;
-Rust packet output is unchanged. The real `host.with_frame`/`host.encode_frame`
-fixture passes both tiers and sync/async: runtime-empty packets, nested draws,
-solids/insets, changed preferences, fields, borrowed UI text, full-width retained
-IDs/removals and extensions. Count-header assertions and reuse of a prefilled destination
-also pass (two tests,3m50s). Astra xhigh review found no blocker; no Ink host
-change was needed. Detailed results stay in the tracked evidence.
+Focused restoration tracing identified exact element/progression migration
+comparisons with unresolved conversion results. Both now use explicit
+`U32.to_f32`. Ink's numeric halves helper declares `Array F32` and converts its
+16-bit halves explicitly. Station's restore loop aliases three named U32 owners,
+keeping unrelated access callbacks out of its carry. Astra xhigh reviewed every
+boundary; no compiler dispatch or work/storage/engine limit changed. Temporary
+tracing was built separately and source was restored.
+
+The actual `world.with_owners` → `world.decode_state` stage now builds with the
+normal compiler:1,929,566bytes, SHA-256
+`45e6a168197be7d49f41aaf7756c5beb718c416a70a38bbdd755bb727a7a9dbe`.
+Scene restoration also builds (976,829bytes). Both validate in V8 and actual Pen
+Wasmtime49. The current-owner restoration fixture executes exact migrated
+values/outcomes, full-U32 round trips, callback-bearing notice access and
+malformed-input rejection/recovery in both tiers and sync/async. The old source
+reproduces the conversion and whole-access loop failures.
+
+Pen's explicit generated integer conversions retain layout and Rust bytes; all
+ten generator tests, formatting and freshness pass. The complete numeric frame
+encoder fixture also passes both tiers and sync/async, including nested payloads,
+changed preferences, borrowed UI text, retained IDs and destination reuse.
+Stage/fixture success does not qualify the real main or frame. Start the next
+native attempt only from this checked source batch; inspect its actual PNG.
 
 Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
 the bounded cold build; production main has one unchanged gameplay export;

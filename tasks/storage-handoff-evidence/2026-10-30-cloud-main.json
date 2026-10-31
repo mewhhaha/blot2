@@ -1624,7 +1624,7 @@
   },
   "current_native_pen": {
     "attempt": "build/storage-integration/gdev-one-frame/attempt-s7g8la7z",
-    "status": "running",
+    "status": "completed_failure_before_module_or_frame",
     "compiler_sha256": "e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd",
     "configured_identity": "f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954",
     "pen_sha256": "a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014",
@@ -1632,7 +1632,10 @@
     "gdev_checkpoint": "4b9a2acd66282c56a21751b2335caef3531cf159",
     "log": "/tmp/gdev-pen-explicit-wire.log",
     "resource_log": "/tmp/gdev-pen-explicit-wire-resources.json",
-    "previous_attempt": "attempt-gf78rbfc"
+    "previous_attempt": "attempt-gf78rbfc",
+    "elapsed_seconds_approx": 2050,
+    "peak_sampled_child_rss_kib": 16408948,
+    "diagnostic": "std/prelude.blot:48 result-selected from, storage_unsupported"
   },
   "wire_integer_conversions": {
     "fix": "Pen templates emit explicit U32.to_f32 for remaining schemas/counts/tags/declared integer lanes; integer division precedes conversion unchanged",
@@ -1665,5 +1668,40 @@
       "/tmp/ink-frame-conversions-baseline.log"
     ],
     "baseline_note": "Direct solid/integer-extension old-generator probes also pass; they show conversion equivalence rather than reproduce the context-dependent full-main failure."
+  },
+  "restoration_boundaries": {
+    "attribution": "Temporary result-dispatch reason/active-call/unwind tracing built separately; source restored. Actual decode_state reproduced open result in element.migrate equality, then progression.legacy_order equality; later station halves layout and whole-access carry failures.",
+    "fixes": [
+      "Explicit U32.to_f32 fire and house_kind comparisons",
+      "lanes.halves explicitly returns Array F32 and converts both exact 16-bit halves",
+      "Station notices decoder aliases seen/hovered/opened Array U32 owners, preserving write order"
+    ],
+    "review": "Astra xhigh reviewed each finite boundary and fixture; no compiler semantics or limits changed",
+    "restoration": {
+      "evidence": "build/gdev-restore-canonical/main-11077d93ac18683c",
+      "bytes": 1929566,
+      "sha256": "45e6a168197be7d49f41aaf7756c5beb718c416a70a38bbdd755bb727a7a9dbe",
+      "V8": true,
+      "Pen_Wasmtime49": true,
+      "trace_binary_wasm_byte_identical": true
+    },
+    "scene_restoration": {
+      "evidence": "build/gdev-scene-canonical/main-d3f6f66fac5b72a6",
+      "bytes": 976829,
+      "sha256": "741bf21d25848ead378556f0901b15a75248fee181d3eda4a54b6a969f8802fc",
+      "V8": true,
+      "Pen_Wasmtime49": true
+    },
+    "executed": "Final 2 tests pass17s: both tiers and sync/async exact persistence outcomes/values, U32 boundary halves/roundtrips, callback-bearing notice masks, malformed lengths/values/masks and trap recovery.",
+    "baselines": [
+      "build/gdev-restoration-baseline/main-96b94a9d914ec0bf: old element/progression source fails std/prelude48",
+      "build/gdev-restoration-station-baseline/main-efa6e79189af1e11: old station decoder fails whole loop while callback-bearing current fixture passes"
+    ],
+    "logs": [
+      "/tmp/gdev-restoration-conversions-final.log",
+      "/tmp/gdev-restore-canonical.log",
+      "/tmp/gdev-scene-canonical.log"
+    ],
+    "frame_qualified": false
   }
 }
