@@ -1,0 +1,57 @@
+{
+  "change": "Lexical source-scheme membership borrows validated immutable ID lists instead of copying ordinary generic variables/rows into fixed-capacity fact pages. Strictly sorted lists use charged binary search; unsorted unique lists preserve their order and use existing-work-bounded fallback. Only list descriptors and plain sorted flags are copied with Context; slots publish after full role/bounds/uniqueness validation.",
+  "source_paths": [
+    "zig-native/src/check/package_contracts.zig",
+    "zig-native/src/check/package_contracts_tests.zig"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-scheme-fix/bin/blotc",
+    "sha256": "8e5b453e10e792bda0d3b36ba13c1d45de0561faf93fbcecd7b4f9af6f7c4991",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-scheme-native-dev/bin/blot-tests",
+    "sha256": "0e91ec8f77fdd26f907380965123a345f02ca808d622c2f87aa441d9061c72d2",
+    "compiled_inventory": 2724,
+    "selected": 291,
+    "passed": 290,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "focused_coverage": [
+      "129 sparse IDs across129 pages",
+      "15000 sorted ordinary variables and rows",
+      "logarithmic membership work",
+      "unsorted unique nested lists",
+      "adjacent and nonadjacent duplicates reject",
+      "wrong variable role and out-of-range row reject",
+      "failed push publishes no authority",
+      "deterministic proof-work exhaustion",
+      "scope push/pop and value-copy rollback",
+      "forall binder authority separate from ordinary variables",
+      "portable128/public256/row128 limits unchanged"
+    ]
+  },
+  "guest": {
+    "passed": 48,
+    "failed": 0,
+    "coverage": "All prior opaque/loop/SIMD/empty/pattern/borrow-root laws plus existing value-pattern scope laws pass; both tiers and sync/JSPI in focused families."
+  },
+  "integration": {
+    "original_pinned_affordances": "Advances past close_ring_report temporary fact-page saturation to separate station_ui indexed-field proof mismatch; no source edits or successful complete-module claim.",
+    "original_saturation": "14508 variable IDs and4464 row-variable IDs, both strictly sorted, over147404 type nodes; old128-page temporary set saturated at ID43456.",
+    "next_frontier": "Generic access.editor[0].mode := $Edit loses old-field/replacement equality evidence; concrete setter emits and runs. No nominal-to-arbitrary-variable coercion proposed."
+  },
+  "review": "Astra migration_plan approved exact list implementation, failure atomicity, Context-copy semantics, forall behavior and focused tests; next projection mismatch is a separate batch.",
+  "unchanged_authority": "Actual instance_variables/instance_rows/pure_rows/closed_rows Facts unchanged. Public/package quantifier limits, explicit binder limits and proof-work ceilings unchanged; no new allocations or unbounded index/cache.",
+  "lint": "Both changed Zig files zero analyzer findings; Zig formatting and git diff whitespace pass. Existing fixture allocation additions now checked to clear changed-file analyzer findings.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 dependency fetch blocked before tests; no dependency/manifest/TLS changes"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy owners, casts, fallback opacity recipes, source workaround, Gdev/Ink/Pen edits, main/GPU build or weakened type proof.",
+  "date": "2026-10-31",
+  "qualification": "Lexical source-scheme membership and scope regression laws; the subsequent generic indexed-field producer equation is separate."
+}

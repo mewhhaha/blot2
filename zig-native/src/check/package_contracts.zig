@@ -88,9 +88,8 @@ pub const Context = struct {
     source_obligations: []const T.Obligation = &.{},
     schemes: [128]T.Scheme = undefined,
     scheme_count: usize = 0,
-    scheme_variables: @import("package_row_facts.zig").Facts = .{},
-    scheme_rows: @import("package_row_facts.zig").Facts = .{},
-    scheme_membership_valid: bool = false,
+    scheme_variables_sorted: [128]bool = @splat(false),
+    scheme_rows_sorted: [128]bool = @splat(false),
     formals: [128]T.Id = undefined,
     formal_count: usize = 0,
     introductions: [128]core.Id = @splat(0),
@@ -130,47 +129,36 @@ pub const Context = struct {
         self.generic_variables = .{};
         self.generic_rows = .{};
         self.scheme_count = 0;
-        self.scheme_membership_valid = false;
         try self.pushGeneric(scheme);
     }
     pub fn pushGeneric(self: *Context, scheme: T.Scheme) Error!void {
         try require(self.scheme_count < self.schemes.len);
         if (self.types.node(scheme.root).tag == .forall) {
             self.schemes[self.scheme_count] = scheme;
+            self.scheme_variables_sorted[self.scheme_count] = false;
+            self.scheme_rows_sorted[self.scheme_count] = false;
             self.scheme_count += 1;
-            self.scheme_membership_valid = false;
             return;
         }
         const variables = try span(self.types, scheme.variables);
         const rows = try span(self.types, scheme.row_variables);
         // Ordinary source schemes borrow validated lists rather than the
-        // package reader's fixed quantifier slots. Sparse bounded facts prove
-        // uniqueness without quadratic scans; every leaf consumes proof work.
-        // Portable packages and explicit lexical binders keep their own bounds.
+        // package reader's fixed quantifier slots. Canonical lists are sorted;
+        // prove that property once and use it without copying IDs into bounded
+        // lexical authority sets. Unsorted lists retain exact ordered identity
+        // and use a work-bounded uniqueness/membership walk.
         try require((self.large_plain_graph and self.source_instances) or (variables.len <= 128 and rows.len <= 128));
-        var seen_variables: @import("package_row_facts.zig").Facts = .{};
-        var seen_rows: @import("package_row_facts.zig").Facts = .{};
-        for (variables) |variable| {
-            try self.step(0);
-            try require(variable < self.types.nodes.len and self.types.node(variable).tag == .variable);
-            try require(!seen_variables.contains(variable));
-            try seen_variables.set(variable);
-        }
-        for (rows) |row| {
-            try self.step(0);
-            try require(row < self.types.effects.variable_count);
-            try require(!seen_rows.contains(row));
-            try seen_rows.set(row);
-        }
+        const variables_sorted = try self.uniqueSchemeList(variables, false);
+        const rows_sorted = try self.uniqueSchemeList(rows, true);
         self.schemes[self.scheme_count] = scheme;
+        self.scheme_variables_sorted[self.scheme_count] = variables_sorted;
+        self.scheme_rows_sorted[self.scheme_count] = rows_sorted;
         self.scheme_count += 1;
-        self.scheme_membership_valid = false;
         self.generic_variables = scheme.variables;
         self.generic_rows = scheme.row_variables;
     }
     pub fn popGeneric(self: *Context) void {
         self.scheme_count -= 1;
-        self.scheme_membership_valid = false;
         self.generic_variables = .{};
         self.generic_rows = .{};
         if (self.scheme_count != 0) {
@@ -184,9 +172,12 @@ pub const Context = struct {
     pub fn ownsVariable(self: *Context, id: T.Id) Error!bool {
         if (self.source_instances and self.instance_variables.contains(id)) return true;
         if (self.large_plain_graph and self.source_instances) {
-            try self.schemeMembership();
             try self.step(0);
-            return self.scheme_variables.contains(id);
+            for (self.schemes[0..self.scheme_count], self.scheme_variables_sorted[0..self.scheme_count]) |scheme, sorted| {
+                if (self.types.node(scheme.root).tag == .forall) continue;
+                if (try self.schemeListContains(try span(self.types, scheme.variables), id, sorted)) return true;
+            }
+            return false;
         }
         for (self.schemes[0..self.scheme_count]) |scheme| {
             if (self.types.node(scheme.root).tag == .forall) continue;
@@ -218,9 +209,11 @@ pub const Context = struct {
     pub fn ownsRow(self: *Context, id: u32) Error!bool {
         if (self.source_instances and self.instance_rows.contains(id)) return true;
         if (self.large_plain_graph and self.source_instances) {
-            try self.schemeMembership();
             try self.step(0);
-            return self.scheme_rows.contains(id);
+            for (self.schemes[0..self.scheme_count], self.scheme_rows_sorted[0..self.scheme_count]) |scheme, sorted| {
+                if (try self.schemeListContains(try span(self.types, scheme.row_variables), id, sorted)) return true;
+            }
+            return false;
         }
         for (self.schemes[0..self.scheme_count]) |scheme| {
             for (try span(self.types, scheme.row_variables)) |variable| {
@@ -230,28 +223,47 @@ pub const Context = struct {
         }
         return false;
     }
-    /// Membership follows the current lexical scheme stack. Value copies keep
-    /// rollback local; push/pop invalidate it. No instance or pure-row fact is
-    /// imported, and saturation/work exhaustion publishes no partial index.
-    fn schemeMembership(self: *Context) Error!void {
-        if (self.scheme_membership_valid) return;
-        var variables: @import("package_row_facts.zig").Facts = .{};
-        var rows: @import("package_row_facts.zig").Facts = .{};
-        for (self.schemes[0..self.scheme_count]) |scheme| {
-            if (self.types.node(scheme.root).tag != .forall) {
-                for (try span(self.types, scheme.variables)) |variable| {
-                    try self.step(0);
-                    try variables.set(variable);
-                }
-            }
-            for (try span(self.types, scheme.row_variables)) |row| {
-                try self.step(0);
-                try rows.set(row);
+    fn uniqueSchemeList(self: *Context, ids: []const T.Id, rows: bool) Error!bool {
+        var sorted = true;
+        for (ids, 0..) |id, index| {
+            try self.step(0);
+            if (rows) try require(id < self.types.effects.variable_count) else try require(id < self.types.nodes.len and self.types.node(id).tag == .variable);
+            if (index == 0) continue;
+            try self.step(0);
+            switch (std.math.order(ids[index - 1], id)) {
+                .eq => return error.InvalidArtifact,
+                .gt => sorted = false,
+                .lt => {},
             }
         }
-        self.scheme_variables = variables;
-        self.scheme_rows = rows;
-        self.scheme_membership_valid = true;
+        if (!sorted) for (ids, 0..) |id, index| {
+            for (ids[0..index]) |prior| {
+                try self.step(0);
+                try require(prior != id);
+            }
+        };
+        return sorted;
+    }
+    fn schemeListContains(self: *Context, ids: []const T.Id, id: T.Id, sorted: bool) Error!bool {
+        if (!sorted) {
+            for (ids) |candidate| {
+                try self.step(0);
+                if (candidate == id) return true;
+            }
+            return false;
+        }
+        var low: usize = 0;
+        var high = ids.len;
+        while (low < high) {
+            try self.step(0);
+            const middle = low + (high - low) / 2;
+            switch (std.math.order(ids[middle], id)) {
+                .eq => return true,
+                .lt => low = middle + 1,
+                .gt => high = middle,
+            }
+        }
+        return false;
     }
     pub fn schemeGoals(self: *Context, scheme: T.Scheme) Error![]const core.Obligation {
         try require(scheme.obligations.start <= self.obligations.len and scheme.obligations.len <= self.obligations.len - scheme.obligations.start);

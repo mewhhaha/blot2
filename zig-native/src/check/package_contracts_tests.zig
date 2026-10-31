@@ -2699,10 +2699,12 @@ test "source imported callee assumptions preserve exact producer and public argu
     const pack = consumer.types.node(consumer.obligations[selected].ty);
     try std.testing.expect(pack.tag == .product and pack.b != 0);
     const original_types = consumer.types;
-    const wrong_nodes = try allocator.alloc(T.Node, original_types.nodes.len + 1);
+    const wrong_node_count = try std.math.add(usize, original_types.nodes.len, 1);
+    const wrong_nodes = try allocator.alloc(T.Node, wrong_node_count);
     defer allocator.free(wrong_nodes);
     @memcpy(wrong_nodes[0..original_types.nodes.len], original_types.nodes);
-    const wrong_extra = try allocator.alloc(T.Id, original_types.extra.len + pack.b);
+    const wrong_extra_count = try std.math.add(usize, original_types.extra.len, pack.b);
+    const wrong_extra = try allocator.alloc(T.Id, wrong_extra_count);
     defer allocator.free(wrong_extra);
     @memcpy(wrong_extra[0..original_types.extra.len], original_types.extra);
     @memcpy(wrong_extra[original_types.extra.len..], original_types.list(.{ .start = pack.a, .len = pack.b }));
@@ -2846,14 +2848,15 @@ test "source ordinary scheme lists retain exact ownership without package binder
     try std.testing.expect(!try source.ownsVariable(count + 6));
     try std.testing.expect(try source.ownsRow(count - 1));
     try std.testing.expect(!try source.ownsRow(count));
-    // Repeated membership inquiries spend bounded work without rescanning the
-    // scheme. A copied scope keeps its own lexical authority after push/pop.
+    // Sorted borrowed lists support logarithmic membership work. A copied
+    // scope keeps its own lexical authority after push/pop.
     const work_before = remaining;
     for (0..count) |_| {
         try std.testing.expect(try source.ownsVariable(count + 5));
         try std.testing.expect(try source.ownsRow(count - 1));
     }
-    try std.testing.expectEqual(@as(usize, count * 2), work_before - remaining);
+    try std.testing.expect(work_before - remaining > count * 2);
+    try std.testing.expect(work_before - remaining <= count * 2 * 10);
     var saved = source;
     const nested: T.Scheme = .{ .root = T.unit, .variables = .{ .start = count * 2, .len = 1 }, .row_variables = .{ .start = count * 2 + 1, .len = 1 } };
     try source.pushGeneric(nested);
@@ -2867,7 +2870,10 @@ test "source ordinary scheme lists retain exact ownership without package binder
     try source.pushGeneric(nested);
     remaining = 1;
     try std.testing.expectError(error.InvalidArtifact, source.ownsVariable(count + 6));
-    try std.testing.expect(!source.scheme_membership_valid);
+    try std.testing.expectEqual(@as(usize, 2), source.scheme_count);
+    remaining = 65_536;
+    try std.testing.expect(try source.ownsVariable(count + 6));
+    try std.testing.expect(try source.ownsRow(count));
     source = saved;
     remaining = 65_536;
     try std.testing.expect(!try source.ownsVariable(count + 6));
@@ -2891,6 +2897,108 @@ test "source ordinary scheme lists retain exact ownership without package binder
     remaining = 1;
     try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(scheme));
     try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+}
+
+test "source lexical lists prove sparse and large identities without a page capacity assumption" {
+    const allocator = std.testing.allocator;
+    const Case = struct { count: usize, stride: usize };
+    for ([_]Case{ .{ .count = 129, .stride = 64 }, .{ .count = 15_000, .stride = 1 } }) |case| {
+        const last = try std.math.add(usize, try std.math.mul(usize, case.count, case.stride), 6);
+        const node_count = try std.math.add(usize, last, 2);
+        const nodes = try allocator.alloc(T.Node, node_count);
+        defer allocator.free(nodes);
+        @memset(nodes, .{ .tag = .variable });
+        nodes[0] = .{ .tag = .absent };
+        nodes[T.unit] = .{ .tag = .unit };
+        nodes[T.boolean] = .{ .tag = .boolean };
+        nodes[T.u32_type] = .{ .tag = .u32 };
+        nodes[T.f32_type] = .{ .tag = .f32 };
+        nodes[T.never] = .{ .tag = .never };
+        const extra_count = try std.math.add(usize, try std.math.mul(usize, case.count, 2), 7);
+        const extra = try allocator.alloc(u32, extra_count);
+        defer allocator.free(extra);
+        for (0..case.count) |index| {
+            extra[index] = @intCast(index * case.stride + 6);
+            extra[case.count + index] = @intCast(index * case.stride + 3);
+        }
+        const row_count: u32 = @intCast(last);
+        var rows = [_]T.Effects.Row{.{}};
+        var graph: core.Types = .{ .nodes = nodes, .extra = extra, .effects = .{ .rows = &rows, .variable_count = row_count } };
+        const base: T.Scheme = .{ .root = T.unit, .variables = .{ .len = @intCast(case.count) }, .row_variables = .{ .start = @intCast(case.count), .len = @intCast(case.count) } };
+        var remaining: usize = 2_000_000;
+        var source: contracts.Context = .{ .types = &graph, .remaining = &remaining, .large_plain_graph = true, .source_instances = true };
+        try source.initialize();
+        try source.generic(base);
+        const before = remaining;
+        for (0..case.count) |index| {
+            try std.testing.expect(try source.ownsVariable(@intCast(index * case.stride + 6)));
+            try std.testing.expect(try source.ownsRow(@intCast(index * case.stride + 3)));
+        }
+        try std.testing.expect(before - remaining <= case.count * 2 * 16);
+        try std.testing.expect(!try source.ownsVariable(@intCast(last)));
+        try std.testing.expect(!try source.ownsRow(0));
+
+        const at = case.count * 2;
+        extra[at] = @intCast(last);
+        extra[at + 1] = 6;
+        extra[at + 2] = 7;
+        extra[at + 3] = 2;
+        extra[at + 4] = 0;
+        extra[at + 5] = 1;
+        const nested: T.Scheme = .{ .root = T.unit, .variables = .{ .start = @intCast(at), .len = 3 }, .row_variables = .{ .start = @intCast(at + 3), .len = 3 } };
+        var saved = source;
+        try source.pushGeneric(nested);
+        try std.testing.expect(try source.ownsVariable(@intCast(last)));
+        try std.testing.expect(try source.ownsRow(0));
+        try std.testing.expect(!try saved.ownsVariable(@intCast(last)));
+        try std.testing.expect(!try saved.ownsRow(0));
+        source.popGeneric();
+        try std.testing.expect(!try source.ownsVariable(@intCast(last)));
+        try std.testing.expect(!try source.ownsRow(0));
+
+        // The previous borrowed lists stay immutable while forged nested
+        // lists test failure atomicity and exact duplicate/role validation.
+        extra[at + 2] = extra[at];
+        try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(nested));
+        try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+        extra[at + 2] = 7;
+        extra[at + 1] = extra[at];
+        try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(nested));
+        try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+        extra[at + 1] = 6;
+        extra[at] = T.unit;
+        try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(nested));
+        try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+        extra[at] = @intCast(last);
+        extra[at + 3] = row_count;
+        try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(nested));
+        try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+        extra[at + 3] = 2;
+        remaining = 1;
+        try std.testing.expectError(error.InvalidArtifact, source.pushGeneric(nested));
+        try std.testing.expectEqual(@as(usize, 1), source.scheme_count);
+        remaining = 2_000_000;
+        try std.testing.expect(!try source.ownsVariable(@intCast(last)));
+        try std.testing.expect(!try source.ownsRow(0));
+
+        extra[at + 6] = 8;
+        nodes[8] = .{ .tag = .bound };
+        nodes[last] = .{ .tag = .forall, .a = T.unit, .b = @intCast(at + 6), .c = 1 };
+        const quantified: T.Scheme = .{ .root = @intCast(last), .variables = nested.variables, .row_variables = nested.row_variables };
+        // The forall path grants no ordinary variable authority and retains
+        // the existing row-list rules without assuming sorted order.
+        var quantified_source: contracts.Context = .{ .types = &graph, .remaining = &remaining, .large_plain_graph = true, .source_instances = true };
+        try quantified_source.initialize();
+        try quantified_source.generic(quantified);
+        try std.testing.expect(!try quantified_source.ownsVariable(6));
+        try std.testing.expect(try quantified_source.ownsRow(0));
+        try std.testing.expect(!quantified_source.ownsFormal(8));
+        try quantified_source.enter(@intCast(last));
+        try std.testing.expect(quantified_source.ownsFormal(8));
+        try std.testing.expect(!try quantified_source.ownsVariable(6));
+        quantified_source.leave();
+        try std.testing.expect(!quantified_source.ownsFormal(8));
+    }
 }
 
 test "generalized alias row parameters retain exact witnesses before body closure views" {
