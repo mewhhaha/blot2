@@ -1,3 +1,8 @@
+> Historical language-task design/qualification. The greenfield owned-storage
+> model retires this surface. Do not implement the remaining task roadmap or
+> restore task adapters; use copied-packet host workers instead. Current work is
+> in [the storage rewrite](../tasks/STORAGE_REWRITE.md).
+
 # Structured tasks and host scheduling
 
 Normative design for 072–074. The compiler and guest adapter implement the

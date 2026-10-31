@@ -64,8 +64,9 @@ Current execution frontiers include generic Format/custom Codec method lowering,
 parser array-element layouts, actor frame evidence and the full affordance
 fixture. Original prepared-physics replay comparisons pass through the smaller
 batch counts; the 2,048-body case traps and needs diagnosis with unchanged
-limits. The complete adapter module emits, but its frame-packet entry traps.
-Preserve original workloads and assertions while resolving these issues.
+limits. All nine original adapter entries now pass 71 cases per mode after
+restoring their required request-bitset owner. Preserve original workloads and
+assertions while resolving remaining issues.
 
 Ordinary legacy backend retirement is still unfinished (task 120). Some pure
 programs still emit ABI 3; do not fake ABI 8 with unused owners or claim that

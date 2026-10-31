@@ -9,8 +9,7 @@ Unicode-scalar text operations, formatting, validation and a linear builder.
 Import [equality.blot](equality.blot) for structural equality contracts and
 [codec.blot](codec.blot) for explicit numeric-lane codecs; the
 [derivation guide](../compiler/derive.md) shows opt-in equality, debug and codec
-generation from checked data declarations.
-Only the root module's `entry const`
+generation from checked data declarations. Only the root module's `entry const`
 and `entry let` declarations become Wasm exports; they must fit the guest ABI,
 and Wasm emission keeps the declarations they reach. Unused source declarations
 are still checked. Use `{ prelude: null }` with `createCompiler` for a
@@ -20,8 +19,10 @@ additional directory aliases through `imports` or `--alias`. General module
 re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
-types and constructors use `PascalCase`. Functions are curried: `func left -> right
-=> return ...` abbreviates `func left => return func right => return ...`, and both are called
+types and constructors use `PascalCase`. Functions are curried:
+`func left -> right
+=> return ...` abbreviates
+`func left => return func right => return ...`, and both are called
 `function left right`.
 
 See the [API and performance audit](PERFORMANCE.md) for measured costs,
@@ -37,7 +38,7 @@ optimization guarantees and remaining work.
 | `compose outer inner value` | `outer (inner value)`                     |
 | `flip combine right left`   | `combine left right`                      |
 | `on combine project a b`    | `combine (project a) (project b)`         |
-| `Bool.not value`            | Exchanges `true` and `false`            |
+| `Bool.not value`            | Exchanges `true` and `false`              |
 
 ```blot
 const increment = func value => return value + 1
@@ -63,8 +64,8 @@ are evaluated explicitly with `@demand`. See
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `break ()` is needed, and their last expression statement is discarded. A
 non-unit result needs an explicit `break value` on every reachable path.
-Expression bodies such as `const answer = func () => return 42` still return their
-expression.
+Expression bodies such as `const answer = func () => return 42` still return
+their expression.
 
 ## Type equality
 
@@ -258,8 +259,9 @@ entry const answer = func () => return 20 `plus` 22
 Custom fixity declarations belong before other declarations. Application binds
 tighter than operators. See the
 [compiler syntax reference](../compiler/README.md#prelude-and-operators) for
-precedence/associativity. `and` and `or` are reserved Boolean operators. They short-circuit: the right
-operand runs only when the left operand does not determine the result.
+precedence/associativity. `and` and `or` are reserved Boolean operators. They
+short-circuit: the right operand runs only when the left operand does not
+determine the result.
 
 The prelude also defines `infixr 0 ($) = apply`. Like Haskell's application
 spelling, `f $ g $ x` groups as `f (g x)` and binds below arithmetic and default
@@ -346,11 +348,12 @@ JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 
 In the Zig compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
 `Array U32` by default. A type annotation selects fixed-length `Array a`,
-append-only `GrowArray a`, or `ResizeArray a` with push and truncate capabilities;
-all three use `#[...]` literals. Lists and arrays are separate types, with `List.from_array` and
-`Array.from_list` for explicit conversion. Both expose `length` and `is_empty`.
-Only arrays support indexing, indexed updates, `get`, and `set`. Numeric arrays
-remain the collection type accepted by the host ABI.
+append-only `GrowArray a`, or `ResizeArray a` with push and truncate
+capabilities; all three use `#[...]` literals. Lists and arrays are separate
+types, with `List.from_array` and `Array.from_list` for explicit conversion.
+Both expose `length` and `is_empty`. Only arrays support indexing, indexed
+updates, `get`, and `set`. Numeric arrays remain the collection type accepted by
+the host ABI.
 
 Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
 `fold_left`, `any`, `all`, `append`, `prepend`, `concat`, `slice`, `split_at`,
@@ -378,21 +381,18 @@ list.splice_many [
 ] [1, 2, 3, 4] // [1, 20, 21, 3, 30, 4]
 ```
 
-Lists use balanced trees of dense leaves, growing from small allocations to
-244-element leaves. Exclusive append/prepend reuses available storage; shared
-edits detach one leaf and its tree path, preserving earlier versions. Direct
-`list.append`/`list.prepend` calls and their aliases preserve this optimization,
-as do ordinary wrappers whose body directly calls the intrinsic. Traversal
-caches the current leaf; direct loops resolve once per leaf. Structural concat
-and slicing share complete subtrees and copy only boundary paths/leaves. A tiny
-slice does not keep an unused large leaf alive. Arrays remain contiguous; their
-append/prepend copies the contents. See
+List operations retain their value semantics; runtime List support depends on
+the selected backend. Arrays use contiguous checked rows. Persistent helpers
+such as `array.push` construct independent output; use a named `GrowArray` when
+appending into the same owner is intended. Access records and views retain
+aliases, so copy explicitly for an independent version. See
 [the list example](../examples/lists.blot) and
-[collection syntax](../compiler/guide.md#lists-arrays-and-libraries).
+[collection and ownership contracts](../compiler/guide.md#lists-arrays-and-libraries).
 
 ### Iterators and SIMD
 
-Lists and arrays expose immutable snapshot cursors through `values.iter`.
+`values.iter` provides sequential cursors. In the owned profile an Array cursor
+reads its owner rather than taking an independent payload snapshot.
 `cursor.next` returns the ordinary `$Some (value, next_cursor)` or `$Nothing`.
 User-defined types can provide the same associated `iter`/`next` functions and
 work in `for` and comprehensions, including effectful traversal and early exit.
@@ -405,7 +405,7 @@ is explicit. `windows` requires positive width and returns complete List
 windows. `zip` polls left before right and stops at either end; `zip_strict`
 traps if lengths differ.
 [The protocol and examples](../compiler/guide.md#lists-arrays-and-libraries)
-describe pull order and snapshot behavior.
+describe pull order, aliasing and copy requirements.
 
 [rolling.blot](rolling.blot) provides complete overlapping reductions.
 `fold step initial width values` reduces each window in order, including
@@ -522,14 +522,14 @@ For a complete small program, see
 | `value \|> transform`                | Applies `transform` to `value`                                 |
 | `.name`                              | Selects a field or receiver member as a function               |
 | `:value`, `:(expression)`            | Creates an ordinary `Type` witness                             |
-| `left and right`, `left or right`   | Short-circuits primitive Boolean operands          |
+| `left and right`, `left or right`    | Short-circuits primitive Boolean operands                      |
 | `value / divisor`, `value % divisor` | U32 quotient and remainder; zero divisor fails/traps           |
 | `a & b`, `a \| b`, `a ^ b`           | U32 bitwise operations                                         |
 | `value << bits`, `value >> bits`     | U32 shifts, masking the count to its low five bits             |
 | `bit_not value`                      | U32 complement                                                 |
 
-From low to high, infix precedences are `$` (0), `|>` (5), `or` (20), `and` (25),
-comparisons (30), `|` (40), `^` (45), `&` (50), shifts (55), addition and
+From low to high, infix precedences are `$` (0), `|>` (5), `or` (20), `and`
+(25), comparisons (30), `|` (40), `^` (45), `&` (50), shifts (55), addition and
 subtraction (60), and multiplication, division, remainder (70). `$`, `and`, and
 `or` associate right; comparisons are non-associative; the other listed
 operators associate left.
@@ -554,18 +554,18 @@ directly from scalar interpolations, avoiding intermediate vectors.
 
 Additional functions in `std/array`:
 
-| Function                              | Behavior                                       |
-| ------------------------------------- | ---------------------------------------------- |
-| `map transform values`                | Transforms elements in order                   |
-| `filter predicate values`             | Keeps matching elements in order               |
-| `filter_map transform values`         | Keeps the payloads of `$Some` results          |
-| `indices flags`                       | Indices of `true` values, in order            |
-| `prefix_sums values`                  | Inclusive U32 prefix sums, wrapping at 32 bits |
-| `slice start count values`            | Copies a checked contiguous range              |
-| `concat left right`, `flatten ranges payload` | Concatenates arrays or payload ranges in order                   |
-| `push value values`                   | Appends one value                              |
-| `zip left right`                      | Pairs elements up to the shorter length        |
-| `unzip pairs`, `unzip3 triples`       | Separates tuple columns                        |
+| Function                                      | Behavior                                       |
+| --------------------------------------------- | ---------------------------------------------- |
+| `map transform values`                        | Transforms elements in order                   |
+| `filter predicate values`                     | Keeps matching elements in order               |
+| `filter_map transform values`                 | Keeps the payloads of `$Some` results          |
+| `indices flags`                               | Indices of `true` values, in order             |
+| `prefix_sums values`                          | Inclusive U32 prefix sums, wrapping at 32 bits |
+| `slice start count values`                    | Copies a checked contiguous range              |
+| `concat left right`, `flatten ranges payload` | Concatenates arrays or payload ranges in order |
+| `push value values`                           | Appends one value                              |
+| `zip left right`                              | Pairs elements up to the shorter length        |
+| `unzip pairs`, `unzip3 triples`               | Separates tuple columns                        |
 
 Filtering evaluates its predicate/transform once per element. These helpers
 handle empty arrays. An invalid slice traps or fails constant evaluation.
@@ -576,8 +576,8 @@ Evaluator operation and storage limits still apply.
 
 ## Constructor spelling
 
-Data constructors use `$` in declarations, expressions and patterns (`#` is
-also accepted):
+Data constructors use `$` in declarations, expressions and patterns (`#` is also
+accepted):
 
 ```blot
 type Optional x is data = $Present x | $Absent

@@ -1,3 +1,8 @@
+> Historical language-task design/qualification. The greenfield owned-storage
+> model retires this surface. Do not implement the remaining task roadmap or
+> restore task adapters; use copied-packet host workers instead. Current work is
+> in [the storage rewrite](../tasks/STORAGE_REWRITE.md).
+
 # Task surface qualification, 23 October 2026
 
 This continuation of `87ba3f6` implements ordinary scope wrappers, exact
@@ -116,7 +121,7 @@ scoped nonlocal exits, purity certification and CPU worker transport remain
 unfinished. Iterator and compiler performance targets also remain open. This
 record makes no new application-performance claim and closes no upstream issue.
 
-See [the language guide](../compiler/guide.md#structured-tasks),
+See [the language guide](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/compiler/guide.md#structured-tasks),
 [the task contract](STRUCTURED_CONCURRENCY.md),
-[the task ABI](../compiler/guest-abi.md#structured-task-extension) and
+[the task ABI](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension) and
 [the continuation plan](../CONTINUE.md).

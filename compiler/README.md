@@ -43,12 +43,11 @@ limits. It does not reproduce retired Bend step counts. Runtime values use the
 [guest ABI](guest-abi.md); hosts pass explicit callable capabilities into entry
 functions. Lists and arrays have distinct types and representations.
 
-Structured tasks use checked scope/spawn helpers and `|receiver|` or tuple
-collect-all. The guest bridge preserves partial-result ownership, task cleanup,
-and synchronous/JSPI execution. Scope callbacks, exact spawn helpers, aliases
-and imported receivers retain their contracts. Channels, select-one and CPU
-workers remain unfinished. See [structured tasks](guide.md#structured-tasks) and
-the [task ABI](guest-abi.md#structured-task-extension).
+Language tasks are retired in the owned-storage model. ABI 8 rejects task
+metadata and imports; do not add scope/spawn/join compatibility helpers.
+Isolated host workers and data queues exchange copied numeric packets. Ordinary
+Foreign suspension remains supported. See [host workers](guide.md#host-workers)
+and the [current guest ABI](guest-abi.md).
 
 The repository
 [installation instructions](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#build-and-use)

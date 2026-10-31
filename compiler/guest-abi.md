@@ -240,98 +240,20 @@ pending host callback so the invocation can unwind, then dispose. A rejected
 host callback produces `host_exception` with the original rejection as its
 cause. A new invocation remains possible after cleanup.
 
-Suspension alone does not reclaim allocations. Every fourth backedge of an
-eligible `for ever:` loop, the runtime traces the carry's object graph and
-reuses unreachable allocation blocks. Each loop activation has its own counter,
-so nested loops cannot consume an outer loop's collection turns. Collection
-amortizes tracing work while adding latency to the iterations that collect.
-Carries may contain tuples, records, variants, closures, and nested arrays; no
-numeric-buffer packing or annotation is required. Objects do not move, so
-sharing, immutable aliases, and rollback versions retain their addresses.
-Pre-loop objects remain pinned and their outgoing references are traced as well.
+Owned-storage suspension preserves the active owners and borrows until the
+invocation unwinds. The adapter excludes same-instance reentry and copies
+callback packets. It must not reset application pools while a suspended call
+still uses them. Capacity and lifetime checks follow the data-stack plan;
+suspension does not introduce a collector or implicit rollback.
 
-Collection requires a checked, closed function effect row containing only
-`Foreign` or no effects, including curried functions with that checked type.
-Loops inside lexical effect handlers remain excluded. The collector recognizes
-exact allocated object starts conservatively: a scalar with the same bits as a
-pointer can retain an extra object, but its bits are never changed. Foreign
-packets remain copied values, not roots or borrowed heap views.
+## Retired runtime extensions
 
-Allocation blocks carry private headers and use size classes for reuse. Dynamic
-blocks start at or above 64 KiB so common small integer IDs cannot be mistaken
-for dynamic pointers; static data can still occupy the first page. The
-exact-start bitmap is reused while block boundaries remain unchanged, and
-invalidated by fresh bump allocation, including the first such allocation after
-an arena reset. The arena's high-water mark can therefore exceed the live
-payload size. Memory must fit the live graph, up to four iterations of temporary
-allocations, and temporary collection metadata. `blot:allocate(0)` observes that
-high-water cursor; cursor differences are not cumulative allocation counts once
-blocks are reused. The host must not reset memory while a suspended invocation
-still holds pointers.
+ABI 8 rejects counted ownership/resource hooks, task imports and task metadata.
+Language-level scope/spawn/join/cancellation and concurrent guest task callbacks
+are retired. Host workers and copied-packet queues remain separate features.
 
-## Structured task extension
-
-Task modules carry exactly one `blot:tasks` custom section. Its unsigned LEB128
-payload is version `2` followed by a descriptor count, at most 4096. No trailing
-payload is allowed. Version `1` is rejected. Each descriptor names its exact
-typed start and move adapters; private compiler layout IDs are not exported. The
-adapter rejects missing or duplicate sections, unknown versions, invalid counts,
-mismatched exports and incompatible signatures before execution. Modules without
-tasks keep the ordinary ABI.
-
-The compiler imports `blot:task/1` operations `open`, `close`, `spawn`, `join`,
-`collect`, `cancel`, `poll`, `drop`, `drain`, `checkpoint`, `current`, `resume`
-and `transfer`, with exact checked Wasm signatures. Hidden descriptor exports
-`blot:task_start/N`, `blot:task_move_captures/N` and `blot:task_move_result/N`
-invoke the checked thunk and transfer resource tokens through its selected
-layout. Native context helpers save and restore each task's counted root
-journal, frame, external lease and callback-reference baselines. They are
-private to the instance adapter.
-
-Group/task IDs are monotonically increasing generations, never guest pointers.
-The instance validates every live handle and descriptor before touching native
-state. Join moves one owned success result or reports terminal failure or
-cancellation. Result envelopes retain a native lease until their ownership is
-published or discarded. Resource cleanup journals move with owning captures and
-returned values, including cancellation and failed publication. Scope completion
-waits for children, including descendants published during an existing child's
-suspension. Independently observed failures are reported by spawn ordinal after
-every outstanding callback settles.
-
-`collect(input, count, output)` takes three i32 arguments and returns no Wasm
-value. `input` names `count` pairs of scalar `(task ID, descriptor ID)` words;
-`output` names space for `count` i32 result-envelope addresses. The bridge
-checks alignment, memory ranges, descriptors, live generations and duplicate
-handles before consuming any input or starting work. The compiler currently
-emits one to sixteen handles per collection; the bridge independently bounds its
-count at 4096. It retains partial results until every selected task succeeds,
-transfers all result journals, then publishes the envelope addresses in written
-order. A failure drains in-flight children and releases partial-result
-ownership.
-
-`collect` is an optional extension when loading older task modules: their
-original import set remains supported. Duplicate imports and incompatible
-signatures still reject. These protocol changes do not add stream or select-one
-support.
-
-Use a `concurrent` callback type in Source and an explicit host binding:
-
-```ts
-const guest = await instantiateGuest(bytes, { asynchronous: true });
-const host = guest.capabilityAsync({
-  parameter: "U32",
-  result: "U32",
-  concurrent: true,
-  call: async (value) => await compute(value),
-});
-await guest.callAsync("main", host);
-guest.dispose();
-```
-
-An ordinary callback cannot satisfy this qualifier. Numeric Array packets are
-copied on both crossings. Suspended sibling callbacks may settle in either
-order; each reaction restores its task generation before copying a result or
-allocating guest data. Public calls remain serial per instance; disposal rejects
-until the active invocation settles. Scheduling is cooperative and creates no
-workers or shared host memory. The active group/task and resource budgets are
-4096 per instance; generation exhaustion rejects without recycling identities.
+The still-existing earlier backend and its removal are tracked by task 120. Its
+former collector and task protocol details are preserved in
+[the exact historical ABI document](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guest-abi.md#structured-task-extension).
+Those details are evidence for retirement and rejection tests, not a current
+application API or a direction to restore compatibility.

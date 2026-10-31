@@ -1,130 +1,67 @@
 # Standard library performance
 
-Library performance follows ordinary type, effect and ownership evidence. The
-compiler does not recognize prelude, collection-helper or framework declaration
-names. Use the [language guide](../compiler/guide.md) for semantics and the
-[compiler status](../zig-native/STATUS.md) for current compilation measurements.
-Historical comparisons remain in git.
+Use the [language guide](../compiler/guide.md) and
+[owned-storage profile](../zig-native/SCOPED_STORAGE.md) for current contracts.
+The rewrite is unfinished: ordinary pure modules can still select ABI 3. Check
+the actual guest manifest before attributing measurements to owned storage.
+Earlier counted-runtime/List-layout measurements and optimizer details remain in
+[the pinned historical document](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/std/PERFORMANCE.md).
 
-## Choosing collections
+## Collections and ownership
 
-`List a` and `Array a` are distinct types. Lists support traversal and
-persistent construction. Arrays provide indexing, checked `get`/`set`, and
-trapping `at`/`replace`. Conversions are explicit; there is no public List
-indexing. Collection transformations take their collection argument last for
-pipelines. Numeric arrays cross the guest ABI by copying, so host mutation
-cannot change a retained guest value.
+Choose a fixed `Array` when the extent is known, `GrowArray` for append and
+`ResizeArray` when shrinking is needed. Current arrays have checked contiguous
+row storage. An access record, view or callback capture preserves aliases;
+updates do not silently preserve an older array version. Use `@storage.copy` and
+copy referenced payloads for independently retained state.
 
-Lists use persistent balanced trees with right-sized leaves of at most 244
-storage words. An exclusive end edit can reuse slack and tree nodes. A shared
-edit copies one path and leaf, preserving both snapshots. Arrays are contiguous.
-The persistent `array.push` helper copies into a new array; an explicit `GrowArray` owner supports append before freezing. Choose
-a fixed-length destination when the final size is known.
+Collection-producing helpers may copy substantial rows. Keep input and output
+owners' simultaneous live extents within the configured plan. Large builders can
+need a separately named destination, followed by freeze. `freeze` removes growth
+authority across aliases; it does not copy data or create a snapshot. Preserve
+overflow, range and lifetime checks instead of increasing capacities to pass a
+workload.
 
-Flat tuples and structural records with 1–16 checked scalar fields can occupy
-consecutive payload words in Lists and Arrays. Public lengths and cursor
-positions still count elements. Nested, nominal, reference-bearing, erased and
-wider rows retain the boxed representation. Extracted values own their storage;
-packing never licenses changing a surviving snapshot or reordering F32 work.
+`prefix_sums` scans in input order into one independent destination. Array
+`indices`, `filter` and `filter_map` append into a named grower and freeze once.
+`concat` and `flatten` preserve ordering and length-overflow checks. Lists are
+distinct from arrays; general runtime List support is not promised by the owned
+profile. Keep grammar and compile-time semantics separate from backend support.
 
-Packing reduces retained storage and construction/conversion work on qualified
-fixtures. Historical qualification found roughly 1.9 times the CPU for a
-read-only List fold and 1.5 times for its cursor versus the preceding boxed
-layout. The qualified direct-loop span check reduces that three-field fold's CPU
-by about 24% against the packed baseline, with unchanged memory. It does not
-complete the all-width boxed-baseline regression or change cursor emission. See
-[List traversal qualification](../zig-native/LIST_TRAVERSAL.md) for the proof,
-measurements and remaining limits. Measure the actual traversal and element
-shape before selecting a representation.
+## Effects and numerical behavior
 
-## Effects, callbacks and demands
+Folds preserve reducer effects. `any`/`all` stop at the first deciding element;
+empty inputs return false/true without calling the predicate. Construction
+callbacks retain their documented purity requirements. Known callbacks remain
+subject to checked owner and effect evidence.
 
-List and Array folds propagate reducer effects. List `any` and `all` stop at the
-first deciding element; empty inputs return false and true respectively without
-calling the predicate. List `filter` evaluates each predicate once in order.
-Array construction and collection `map`/`generate` retain their documented pure
-callback contracts.
+`Maybe.unwrap_or_else` and `Result.unwrap_or_else` defer fallbacks; `unwrap_or`
+is eager. Local supported demands evaluate at most once per invocation. Skipped
+work must not introduce effects or traps. Exact support and escape limits are in
+the owned-storage profile.
 
-`Maybe.unwrap_or_else` and `Result.unwrap_or_else` defer the fallback until
-failure. `unwrap_or` remains eager. `@demand` requests one deferred result and
-shares its successful completion; `@force` remains an alias. An ordinary
-callback runs on each invocation. Skipped demands must not run effects or traps.
-See [the demand design](../zig-native/DEMANDS.md) for forwarding, escaping
-values, provider scope, cancellation and failed completion.
+Preserve F32 operation order, signed zero, NaNs, full-width U32 values and SIMD
+lane contracts. A vectorized or cached implementation needs independent
+numerical witnesses. Do not infer allocation or runtime cost from source
+spelling, inlining or a small synthetic fixture.
 
-Known callbacks can use direct calls and bounded inlining. Unknown callbacks
-retain the general path. Known demand combinators containing admitted branches,
-constructor matches, guards and acyclic local forwarding calls can use local
-memo state instead of a heap cell. Admission is bounded to 96 expression/pattern
-nodes across the forwarding chain and preserves lexical binding identities,
-evaluation order and once-only demand behavior.
+## Measurements
 
-Numeric collections can pack checked nested records and single-constructor data
-with at most sixteen scalar leaves. Unknown or reference-bearing layouts keep
-ordinary storage, and escaped values keep the boxed ABI. See
-[numeric layouts](../zig-native/NUMERIC_LAYOUTS.md) for storage, lifetime and
-measurement limits.
+Qualify correctness before timing. Pair each compiler with its standard library
+and record executable/hello identities, source/settings digests, Wasm hash,
+actual ABI, host/engine version, workload sizes and measurement boundary.
+Release measurements use the qualified release compiler, not native-backend safe
+development builds. See
+[application qualification](../tasks/121-qualify-and-measure-owned-applications.md).
 
-## Optimization boundaries
+Keep guest runtime, declared/committed memory, compiler CPU, requested
+allocation and process RSS separate. Fixed ABI 8 memory includes reserved
+regions; committed pages are not live object bytes or cumulative allocation.
+Preserve original warmups, samples, independent references and exact result
+checks. Fixture speedups do not establish whole-application speedups.
 
-| Mechanism           | Current boundary                                                                                                                                                                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Exclusive updates   | Checked success branches, nested unique fields, loop exits, read-only direct callees and dropped generator closures preserve ownership; surviving aliases, captures and extracted inner values prevent destructive updates.                           |
-| Small aggregates    | Fully initialized, nonescaping records, tuples and wrappers can become scalar locals. ABI values, captured values, unknown offsets and runtime roots remain boxed.                                                                                    |
-| Small collections   | Up to eight scalar elements can use locals when all uses are admitted traversal or intrinsic length reads; escaping and updated collections remain boxed.                                                                                             |
-| Exact builders      | Up to four rectangular finite generators can allocate final storage directly. Bounds must be independent of region binders, nonallocating, nontrapping and pure. Ragged, filtered and effectful regions keep ordinary builders.                       |
-| Staged construction | Private bounded indexed regions update scratch and freeze once. Published spans and observed intermediate versions remain immutable. Append/prepend can reuse unpublished end slack.                                                                  |
-| Traversal           | Word-element and packed-row cursors retain their own leaf cache. Cross-leaf fields use checked lookup. Generic iterator step/cursor allocations are not universally eliminated.                                                                       |
-| Inlining            | A four-node source budget expands to 64 for aggregate results inside loops or known callbacks. Numeric adapters with four to sixteen scalar leaves get eight nodes per leaf, up to 128; six nested expansions and the 4,096-instruction bound remain. |
-| SIMD and fusion     | Existing proofs apply to admitted typed loops. Private four-lane values use v128 locals. Bounded ragged count/fill and rolling/summary modules are implemented and qualified. Broader fusion and SIMD keep ordinary fallbacks.                        |
-
-`prefix_sums` scans in input order into one independent fixed-length destination.
-Array `indices`, `filter` and `filter_map` append into a private `GrowArray`
-in one traversal and freeze the result.
-`concat` avoids intermediate chunk arrays; `flatten` counts lengths before
-filling. Both retain length-overflow checks. Vec2/Vec3 interpolation preserves
-the documented F32 operation order; sine and cosine share angle reduction in
-`F32.tan`.
-
-The current continuation uses counted strong edges and invocation/journal
-leases. Nonmoving trial deletion reclaims real cycles formed by State, closures
-and cached demands; typed payload masks describe their edges. Removal of the
-ordinary tracing paths still awaits the final combined CPU and compiler gates.
-Guest memory readings report committed Wasm pages, including temporary capacity,
-rather than exact live objects or cumulative allocation. See
-[shared ownership](../zig-native/SHARED_OWNERSHIP.md) and
-[cycle reclamation](../zig-native/CYCLIC_OWNERSHIP.md) for the contracts.
-
-## Measuring changes
-
-Build both compiler versions with Zig 0.17 and keep their standard libraries
-paired with the appropriate executable. Dependency files include compiler
-identity and cannot be shared indiscriminately between versions. The harnesses
-record binary/source hashes, check results and retain raw samples.
-
-```sh
-deno run --allow-read --allow-write --allow-run scripts/bench_stdlib.ts \
-  zig-native/zig-out/bin/blotc std build/stdlib-bench \
-  /path/to/baseline/blotc /path/to/baseline/std
-
-deno run --allow-read --allow-write --allow-run scripts/bench_packed_rows.ts \
-  /path/to/baseline/blotc zig-native/zig-out/bin/blotc std build/packed-rows
-
-deno run --allow-read --allow-write --allow-run scripts/bench_runtime_costs.ts \
-  zig-native/zig-out/bin/blotc std build/runtime-costs
-```
-
-Keep guest runtime, guest memory, compiler CPU, compiler requested allocation
-and process RSS separate. Warmup and sampling policies are defined by each
-harness; compare matching fixtures and measurement boundaries. Fixture speedups
-do not establish whole-application speedups. On the current development machine
-ananicy can demote Deno and its children, so wall time alone is insufficient
-evidence.
-
-For compilation, keep a `createCompiler` instance open across edits and dispose
-it when finished. Retained reuse validates source bodies, semantic reads and
-complete captured-value graphs; a type-preserving edit can still invalidate
-executable callers. Use `deno task bench:compile` to separate fresh processes,
-session population, first edit, later edit and no-op requests. Its
-`--restart-cache` option measures process restart separately. Failed edits must
-preserve the preceding successful revision and its owners.
+Retained compilation is a separate measurement from cold compilation. Keep a
+project session open across edits; distinguish population, first edit, later
+edit, no-op and process restart. Failed edits must preserve the preceding good
+revision. Existing benchmark harnesses retain useful workloads, but each result
+qualifies its exact backend and candidate rather than the unfinished rewrite.

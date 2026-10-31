@@ -89,5 +89,41 @@
       "snapshot_policy": "Explicit @storage.copy; original element1 retained while mutable copy becomes41."
     },
     "qualification": "Guide code blocks only; full compiler/library qualification remains separate."
+  },
+  "documentation_cleanup_followup": {
+    "date": "2026-10-31",
+    "relative_link_inventory": {
+      "blot2": 267,
+      "pen": 44,
+      "ink": 12,
+      "gdev": 49
+    },
+    "missing_relative_file_targets": 0,
+    "changes": [
+      "Current README/CONTINUE/status records distinguish historical successful frame from later candidate qualification.",
+      "Current guide/std/host docs state named-owner and alias/copy contracts; retired collector/task protocol details link to exact historical revisions.",
+      "Historical language-task design records clearly marked superseded, current host-worker scope retained.",
+      "Moved historical Ink evidence links repaired; removed stale current-asset/package links while retaining original art/reference provenance."
+    ]
+  },
+  "gdev_tech_generator_followup": {
+    "commit": "e99d6083a1fd1cd7f2dcc8a452539983b3a74fb5",
+    "source_sha256": {
+      "tools/tech/README.md": "0ae7c9d3da69768cd5cb001a0b4b4667ada5ac1e8eaff30dd17311ceb120708c",
+      "tools/tech/src/catalog.rs": "a43cddde2e4e94fe5eff19b65950e7965409e31ccf6e5faf9fdbc72152ce67ef",
+      "tools/tech/src/tests.rs": "857ac96b955b90b636ab886dcaa42204a5909efdd36c4bcbfaa72e70ebdf3a75"
+    },
+    "rust_tests_passed": 16,
+    "rust_tests_failed": 0,
+    "locked_offline": true,
+    "cli": "41 upgrades;16 venues;real catalog valid",
+    "generated_source": {
+      "sha256": "a8e0a488aafa7c00c8ff196b91548d60f261438019e04e3c79b97563f23f61df",
+      "coverage": "actual41-node catalog edited with2grouped rules,3crew gates and finished-building dependency; exact model roundtrip",
+      "frontend_api_only": true,
+      "compiler_sha256": "5fcee8f6879b58a0e0c524e2a4ce1c8659f63e88aee3cec1e4aefcdf75274822"
+    },
+    "no_legacy_reader_fallback": true,
+    "no_wire_or_authored_gameplay_change": true
   }
 }
