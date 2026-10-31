@@ -1,4 +1,4 @@
-# Continue here — owned-storage checkpoint, 30 October 2026
+# Continue here — owned-storage integration
 
 ## Current cloud frontier
 
@@ -18,9 +18,10 @@ mutation pass in both tiers and sync/async. Its full retry
 Use compile-only probes of the real `game.played.update` and `.render` with
 `world.with_owners`, `host.with_frame` and canonical FrameAccess to isolate late
 failures cheaply. They do not qualify initialization, events, packet encoding,
-total-main work or a frame. Update reached jetpack's scalar lerp layout, then a
-ReturningHome call. Three explicit F32.lerp selections are under checking.
-Render exposed a compiler callback-planning crash, then brush edge construction.
+total-main work or a frame. Update now passes jetpack and ReturningHome and
+reaches an unresolved layout in salt_simulation. Render passes the callback
+planner crash, brush edges and kite lightning, then reaches unresolved add
+dispatch. Gdev85c80ee checkpoints scalar interpolation and lightning ownership.
 Current local probe drivers are below ignored `build/`; the tracked full-main
 and Pen runners remain the integration authority.
 
@@ -32,6 +33,16 @@ native law proves the caller goal exceeds the helper's complete type table and
 passes exhaustive OOM. Four affected native laws also pass; all2,696 tests
 compile. The guest batch is35passes/1recorded baseline associated-result layout
 failure. Astra xhigh reviewed the code; changed Zig lint and TS formatting pass.
+
+Inline specialization results now capture their selected type substitutions. A
+Pose3 argument had the correct physical identity but an empty generic witness
+that resolved as Robot after a previous argument. Actor/Pose/Actor with
+identical word layouts reproduces the old failure; Some/Nothing combinations
+pass both tiers/sync-async with the snapshot. The new low512 native law passes
+exhaustive OOM; recursion rejection passes and all2,697 tests compile. The guest
+batch is 37passes/1recorded baseline failure. Astra xhigh reviewed the one-line
+fix; lint/format pass and the required full gate was attempted (registry
+blocked).
 
 Late scoped-only local compaction is retained (`d2a09a2`): single-definition i32
 locals confined to one straight-line segment reuse dead slots after ownership

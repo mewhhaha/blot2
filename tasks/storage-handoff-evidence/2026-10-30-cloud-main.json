@@ -1308,5 +1308,63 @@
     "executed": "cube12unique unit edges, each corner degree3, independent second output after first mutation,6input faces retained;4checks zero failures both tiers sync/async",
     "review": "Astra xhigh final review passes",
     "real_render_retry": "running with fixed planner and brush; no frame qualification"
+  },
+  "inline_result_type_snapshots": {
+    "actual_trace": "return_home argument6: formal Pose3 nominal9:26; physical Pose3 9:26; semantic evidence prelude1:583 with empty arguments resolved as Robot20:86",
+    "bug": "reusableInlineCall retained generic result_type but no selected substitution snapshot; later argument mapping could reinterpret an earlier same-layout nominal",
+    "fix": "captureTypes for inline result evidence while selected mappings are still live, matching reader results; keys/identity/ownership checks unchanged",
+    "native": "newlow512law PASS exhaustiveOOM414ms; recursion negativePASS; complete2697 inventory compiles",
+    "executed": "Actor/Pose/Actor distinct same-layout nominals retained across calls; all4Some/Nothing combinations; both tiers/sync-async; old compiler failsbothmodes; affectedbatch37PASS1confirmed baseline associated-result layout failure",
+    "actual_update_after_fix": {
+      "evidence": "/workspace/blot2/build/gdev-stage-probes/main-8ea92340e8e2585a",
+      "identity": "26537ca876db3f1341b6b1c5f72d97eff45f6f04d2dccca97f5a442ab7b98696",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/gdev/src/world/salt_simulation.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "actual_render_after_fix": {
+      "evidence": "/workspace/blot2/build/gdev-stage-probes/main-f6d67cb0da8e1e84",
+      "identity": "26537ca876db3f1341b6b1c5f72d97eff45f6f04d2dccca97f5a442ab7b98696",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/blot2/std/prelude.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 614,
+          "end": 641,
+          "message": "This expression has no admitted storage layout or binding",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "review": "Astra xhigh final code and fixtures review passes",
+    "lint": "2changed Zig files zero findings; TS no-config format clean",
+    "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
+    "logs": [
+      "/tmp/blot-inline-witness-baseline.log",
+      "/tmp/blot-inline-witness-native.log",
+      "/tmp/blot-inline-witness-guests.log",
+      "/tmp/blot-inline-witness-full-gate.log"
+    ]
+  },
+  "flight_and_lightning_source": {
+    "gdev_checkpoint": "85c80ee50d05a3e3e0bfe70135879a4d6c13d921",
+    "jetpack": "3existing scalar F32.lerp selections, preserving formulas/operand order; thrust start/full/rebound runtimePASS both tiers/sync-async; Falling x/z compile coverage from real update probe",
+    "lightning": "GrowArrayDraw push/freeze preserves4main and3branch ordering;7strokes91points parameters/endpoints and older borrows afterappend92 runtimePASS both tiers/sync-async",
+    "review": "Astra xhigh final review passes; no formats/ABI/capacities changed"
   }
 }

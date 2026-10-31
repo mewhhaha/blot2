@@ -2316,7 +2316,7 @@ const Generator = struct {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
         }
-        result.type_evidence = .{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = &.{} };
+        result.type_evidence = .{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() };
         return result;
     }
     fn readerWords(value: Value) usize {

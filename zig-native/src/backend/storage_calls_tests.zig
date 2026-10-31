@@ -12,6 +12,20 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+test "inline generic result witnesses preserve distinct same layout nominal instances" {
+    var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
+        "type Actor is data = $Actor U32\ntype Pose is data = $Pose U32\n" ++
+        "const pick = func fallback -> maybe => return case maybe of\n  $Some value => value\n  $Nothing => fallback\n" ++
+        "const consume = func ($Actor actor) -> ($Pose pose) => return @u32.add (@u32.mul actor 100) pose\n" ++
+        "entry const answer = func (input: U32) => return do:\n  let rows: ResizeArray U32 = #[input]\n" ++
+        "  let actors: Maybe Actor = if @u32.eq (@u32.bit_and input 1) 0 then $Nothing else $Some ($Actor rows[0])\n" ++
+        "  let poses: Maybe Pose = if @u32.eq (@u32.bit_and input 2) 0 then $Nothing else $Some ($Pose rows[0])\n" ++
+        "  let actor = pick ($Actor 10) actors\n  let pose = pick ($Pose 20) poses\n  let retained = pick ($Actor 30) actors\n" ++
+        "  return @u32.add (consume actor pose) (consume retained pose)\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "writer outlining leaves implicit global pool reads with their owning generator" {
     var module = try lower(a, "const pool: Array U32 = #[5]\n" ++
         "const implicit = func (destination: ResizeArray U32) => return @storage.push destination pool[0]\n" ++
