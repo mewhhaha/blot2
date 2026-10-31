@@ -49,14 +49,19 @@ metadata, parameter resets, non-i32 parent decline, typed controls, cycles,
 unknown dispatch, global bounds and the final50,000combined-local boundary.
 All2,711 native tests compile. Affected guests are57passes/1known baseline;
 the new padded captured-demand loop asserts actual extraction and executes in
-both tiers and sync/async. Changed Zig files have zero analyzer findings. The
+both tiers and sync/async. Its extended U32/F32 cases also preserve signed zero,
+infinity and NaN across repeated invocations (four tests pass). Changed Zig files have zero analyzer findings. The
 required full gate was attempted before checkpointing and remains blocked by
 the locked Baba9.0.1 registry proxy fetch. No dependency or lockfile changed.
 
 The actual native Pen attempt is running at
-`build/storage-integration/gdev-one-frame/attempt-s1i49tls`, using the matching
-default compiler. No real-main success or PNG has been observed yet. Continue
-this attempt before launching another full compile.
+`build/storage-integration/gdev-one-frame/attempt-5rjaql86`, using the matching
+default compiler. The prior `attempt-s1i49tls` hit Pen's default 300-second
+plugin deadline, which killed and reopened the active compiler; its retry was
+stopped and its evidence retained. Gdev now configures a reviewed 7,200-second
+cold-build deadline through the existing plugin setting. Compiler work, engine
+and storage limits are unchanged. No real-main success or PNG has been observed
+yet. Continue the active attempt before launching another full compile.
 
 Retained fixes include exact selected type keys and result snapshots, defining
 module obligations for planner closures, semantic witnesses on loaded nominals,

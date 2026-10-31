@@ -1528,7 +1528,7 @@
     },
     "review": "Astra xhigh finalreview CLEAR: typedrange/state/credit/OOM + finalencoded/reusedengineguards",
     "full_gate": "Attempted; lockedBaba9.0.1 proxytunnel failedbeforetests",
-    "native_pen_attempt": "build/storage-integration/gdev-one-frame/attempt-s1i49tls running; noframeclaim",
+    "native_pen_attempt": "build/storage-integration/gdev-one-frame/attempt-5rjaql86 running with reviewed7200s existingpluginwalltimeout; noframeclaim",
     "logs": [
       "/tmp/blot-machine-regions-native.log",
       "/tmp/blot-machine-regions-regressions.log",
@@ -1536,6 +1536,15 @@
       "/tmp/gdev-stage-update-machine-regions.log",
       "/tmp/gdev-stage-update-machine-regions-wasmtime.log",
       "/tmp/gdev-pen-machine-regions.log"
-    ]
+    ],
+    "scalar_bits": "Extended4executedtestsPASS both tiers syncasync U32/F32; captured memo persistsloopiterations androotresetbetweeninputs, signedzero/infinity/NaN preserved",
+    "cold_plugin_timeout": {
+      "stopped_attempt": "attempt-s1i49tls",
+      "cause": "Existingdefault300s plugincalldeadline killedactivecompiler andsilentlyretried; secondprocess stopped andevidencepreserved",
+      "configured_seconds": 7200,
+      "change": "Gdevplugins.blot.timeoutexistingoperationalwallclock only; allcompiler/engine/storageboundsunchanged",
+      "review": "Astra xhigh clear; exact300s behavior matches hostdeadline/codepath",
+      "first_process_peak_rss_kib": 2650820
+    }
   }
 }
