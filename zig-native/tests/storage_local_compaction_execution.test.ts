@@ -3,14 +3,21 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const calls = 101;
-const source = `const relay = func (host: Array U32 -> Array U32 ! {Foreign}) -> (input: U32) => return do:
+const source =
+  `const relay = func (host: Array U32 -> Array U32 ! {Foreign}) -> (input: U32) => return do:
   let total = input
-${"  total := @u32.add total 1\n".repeat(250)}  use reply <- host #[total, input]
+${
+    "  total := @u32.add total 1\n".repeat(250)
+  }  use reply <- host #[total, input]
   return reply[0]
 entry const answer = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
   let marker: GrowArray U32 = #[0]
   let total: U32 = 0
-${Array.from({length:calls}, (_,i)=>`  use reply_${i} <- relay host ${i}\n  total := @u32.add total reply_${i}\n`).join("")}  return @u32.add total marker[0]
+${
+    Array.from({ length: calls }, (_, i) =>
+      `  use reply_${i} <- relay host ${i}\n  total := @u32.add total reply_${i}\n`)
+      .join("")
+  }  return @u32.add total marker[0]
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
   Deno.test(`scoped temporary locals execute large ordered Foreign bodies (${codegenTier})`, async () => {

@@ -1665,6 +1665,9 @@ const Generator = struct {
                         try self.mapValueTypes(.{ .unit = owner.unit, .ty = parameter.ty }, value, 0);
                         try self.bindings.append(self.allocator, .{ .unit = owner.unit, .id = parameter.binding, .value = value, .remaining = 0 });
                     }
+                    const previous_goals = self.active_goals;
+                    self.active_goals = owner.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len];
+                    defer self.active_goals = previous_goals;
                     if (try self.planValue(owner, body.root, remaining, depth + 1)) |value| if (value.tag == .callable) return value;
                 }
             },
@@ -1754,6 +1757,9 @@ const Generator = struct {
         defer self.bindings.shrinkRetainingCapacity(bindings_before);
         try self.restoreTypes(callable.types);
         const closure = owner.closure(callable.node);
+        const previous_goals = self.active_goals;
+        self.active_goals = callable.goals;
+        defer self.active_goals = previous_goals;
         try self.mapValueTypes(.{ .unit = owner.unit, .ty = closure.parameter.ty }, argument, 0);
         for (callable.captures, function.fields) |binding, capture| {
             try self.mapValueTypes(.{ .unit = owner.unit, .ty = owner.binding(binding).ty }, capture, 0);
@@ -1770,6 +1776,11 @@ const Generator = struct {
         // emission independently rejects exact selected-call recursion.
         const owner = try self.unit(target.unit);
         const body = owner.body(target.binding) orelse return false;
+        // A planned closure captures obligations in its defining module's
+        // type namespace, just as ordinary invoke/apply emission does.
+        const previous_goals = self.active_goals;
+        self.active_goals = owner.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len];
+        defer self.active_goals = previous_goals;
         const parameters = owner.bodyParameters(body);
         if (parameters.len != inputs.len) {
             // A source alias such as `floor = F32.floor` has no own

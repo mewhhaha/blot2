@@ -1195,10 +1195,36 @@
     },
     "retry_after_map_signature": {
       "artifact": "build/gdev-first-frame/main-7d1564b64ec56839",
-      "status": "running",
+      "status": "stopped at569125 in prelude eq via robots.claimed_as; missing workforce.Activity.eq",
       "blot_base": "0a72b1283947db1e944379bf3bf0c407a193fe90",
       "ink_base": "fbe379bb8bb3816fabb7363ce27e2499b3ba34e3",
-      "note": "same1M experimental ceiling; predates late-local compactor; production default remains500k"
+      "note": "same1M experimental ceiling; predates late-local compactor; production default remains500k",
+      "result": {
+        "evidence": "/workspace/blot2/build/gdev-first-frame/main-7d1564b64ec56839",
+        "identity": "64fcdc9d96175ef8fd026b3e836551084efe84b6e09db3237759e60cd526f809",
+        "success": false,
+        "diagnostics": [
+          {
+            "filename": "/workspace/blot2/std/prelude.blot",
+            "stage": "emit",
+            "code": "storage_unsupported",
+            "start": 1380,
+            "end": 1406,
+            "message": "This form is not yet supported by the bounded scoped-storage backend",
+            "offset_encoding": "utf8_bytes",
+            "utf16": null,
+            "details": null
+          }
+        ]
+      },
+      "sampled_peak_rss_kib": 6783848
+    },
+    "retry_after_activity_equality": {
+      "artifact": "build/gdev-first-frame/main-133334896341e559",
+      "status": "intentionally stopped early after isolated stages found later semantic failures",
+      "blot_base": "d2a09a248bee22f83eb5606c1f3fb83b89fd3da7",
+      "gdev_base": "e9127dd4654f56fe6d539fbe5145203c96f58792",
+      "note": "same experimental1M plus compactor; no successful main/frame or default qualification"
     }
   },
   "writer_scratch_regions": {
@@ -1256,5 +1282,31 @@
       "/tmp/blot-local-compact-guests.log",
       "/tmp/blot-local-compact-full-gate.log"
     ]
+  },
+  "planner_module_obligations": {
+    "bug": "numeric planner walked imported bodies without switching active_goals; closures captured caller type IDs and later indexed them in helper module",
+    "real_baseline": "render probe main-db3ba2f53a59417c panic2314/1492 at refineFields -> plannedCallback",
+    "fix": "scope/restore named-body goals, closure captured goals and associated factory body goals; caller factory arguments evaluated before switch; no obligations dropped",
+    "regression": "self-contained actual imported modules; live scoped marker;80 generic record fields; old compiler panics93/51 in both tiers; fixed U32/F32 expectations pass sync/async",
+    "native": "new law PASS exhaustiveOOM3.6s and read-scheme goal-ID/catalog inequality;4affected laws PASS; all2696 compile",
+    "guests": "35PASS1confirmed baseline associated latent-effect result layout failure",
+    "real_fixed": "render main-498185bd36523253 passed panic and reached brush.edges loop ownership rejection",
+    "review": "Astra xhigh final code and regression review passes",
+    "lint": "3changed Zig files zero findings; TS formatted with no-config (tests excluded by repository fmt settings)",
+    "full_gate": "attempted; locked Baba registry proxy unsuccessful tunnel before tests",
+    "logs": [
+      "/tmp/blot-planner-context-baseline.log",
+      "/tmp/blot-planner-goals-native.log",
+      "/tmp/blot-planner-goals-regressions.log",
+      "/tmp/blot-planner-goals-guests.log",
+      "/tmp/blot-planner-goals-full-gate.log"
+    ]
+  },
+  "brush_edges_owned_builder": {
+    "source": "GrowArray(Vec3,Vec3), push in original plane-pair order, freeze once; replaces loop-carried fixed-owner replacement",
+    "baseline": "focused fixture reproduces storage_escape loop named-owner/root invariant rejection",
+    "executed": "cube12unique unit edges, each corner degree3, independent second output after first mutation,6input faces retained;4checks zero failures both tiers sync/async",
+    "review": "Astra xhigh final review passes",
+    "real_render_retry": "running with fixed planner and brush; no frame qualification"
   }
 }

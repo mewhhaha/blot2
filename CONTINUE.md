@@ -2,161 +2,66 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The
-first bounded 1,000,000-expression experiment (`main-29f12d755e093cf4`) passed
-the former root cap and stopped at504,593 with an unresolved element layout in
-output_chart. The production default is still500,000; this is not a policy
-qualification or a successful main Wasm/frame. The same1M retry
-`main-8320eac6eff57b00` stopped at507,616 in Ink map.locate's early empty Maybe
-return. Its exact `Maybe U32` annotation now passes five key-policy probes and
-the existing executed map laws. Retry `main-7d1564b64ec56839` is running at
-Blot0a72/Inkfbe379b; it predates the separately checked local-slot compactor
-below. Follow the actual main to a real Pen PNG. No further automatic cap
-increase.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. No
+current main Wasm or frame has succeeded. Preserve ABI8/session2, framing26,
+the165-field FrameAccess, packet order and the storage capacities below.
 
-A valid 101×250 scalar-rebinding/Foreign guest exceeded the engine's local
-limit. Late scoped-only slot compaction now reuses single-definition i32 locals
-whose uses stay inside one straight-line segment. Parameters, other machine
-types, default-zero reads, multiple definitions and cross-control values stay
-separate; hidden-local markers decline. Both tiers pass ordered101 host calls in
-sync/async. Five native laws pass, including exhaustive OOM and50,001 input
-locals compacted to one. All2,695 native tests compile. The affected guest batch
-is33passes/1known baseline associated-result layout failure. Astra xhigh
-reviewed the implementation; changed Zig lint and TypeScript formatting pass.
-Full gate attempted, still blocked fetching locked Baba before tests. No
-source-expression, proof, layout, depth, key or guest capacity changed.
+Production source expansion remains500,000 expressions per function. Astra xhigh
+reviewed one bounded1,000,000 experiment; other limits are unchanged and there
+is no further automatic increase. The latest completed full attempt,
+`main-7d1564b64ec56839`, passed trails/map and stopped at569,125 in
+`robots.claimed_as` because Activity had no equality implementation. Gdev
+`e9127dd` supplies the five constructor comparisons; all25 pairs and real claim
+mutation pass in both tiers and sync/async. Its full retry
+`main-133334896341e559` was stopped after focused probes found later failures.
 
-A persistent-pool witness exposed scratch Grow/Resize regions overlapping a
-named pool in outlined Unit writers. Children now inherit caller availability
-and the region high-water mark; cached writers require their complete dedicated
-scratch footprint to be free. Busy contexts compile/reuse another exact-key
-variant. Closed scratch roots count, metadata publishes before completion, and
-the parent memory plan includes child regions. Both tiers/sync-async pass live
-persistent pools, two growers, busy-first/busy-second regions and reuse after
-scope exit. Three affected native laws pass, including exhaustive OOM; all2,688
-compile. The broad guest batch remains29passes/1known baseline failure. Astra
-xhigh reviewed the fix; lint/format pass and the required full gate was
-attempted but is registry blocked.
+Use compile-only probes of the real `game.played.update` and `.render` with
+`world.with_owners`, `host.with_frame` and canonical FrameAccess to isolate late
+failures cheaply. They do not qualify initialization, events, packet encoding,
+total-main work or a frame. Update reached jetpack's scalar lerp layout, then a
+ReturningHome call. Three explicit F32.lerp selections are under checking.
+Render exposed a compiler callback-planning crash, then brush edge construction.
+Current local probe drivers are below ignored `build/`; the tracked full-main
+and Pen runners remain the integration authority.
 
-Optional writer admission now declines implicit references to global
-collections, which belong to the caller's named-pool catalog. Ordinary scoped
-emission reads the live pool; explicit descriptor arguments remain eligible. A
-mutated-global regression passes with both implicit and explicit writers in both
-tiers and sync/async, plus exhaustive native OOM. The affected guest batch
-remains29/1 with the recorded baseline failure. All2,689 native tests compile.
+Planner closures now retain obligations from their defining module. Named and
+closure planning scope and restore active goals; factory arguments are planned
+in the caller first. A minimal imported nested-callback law reproduces the old
+index93/length51 panic and passes with U32/F32 in both tiers and sync/async. The
+native law proves the caller goal exceeds the helper's complete type table and
+passes exhaustive OOM. Four affected native laws also pass; all2,696 tests
+compile. The guest batch is35passes/1recorded baseline associated-result layout
+failure. Astra xhigh reviewed the code; changed Zig lint and TS formatting pass.
 
-Chart interpolation uses the existing F32.lerp family explicitly. advance_into
-now takes the named row owner, rates owner and plain Layout, creates its old-row
-view internally, and completes reads before shrinking. Callers are migrated;
-retained-history fixtures copy rows into separate owners. Two standalone checks
-pass, including overtaking interpolation, stable ties and still-frame snapping.
-The broader output module is blocked by its existing missing helper import. ABI,
-proofs, layout/depth/key limits, schemas and guest capacities are unchanged.
+Late scoped-only local compaction is retained (`d2a09a2`): single-definition i32
+locals confined to one straight-line segment reuse dead slots after ownership
+and safepoint lowering. Parameters, default-zero reads, other types, multiple
+writes and cross-control values stay separate; hidden-local markers decline. The
+original101×250 ordered-Foreign guest now executes in both tiers/sync-async.
+Five native laws pass, including exhaustive OOM and50,001 input locals reduced
+to one. No source-expression or guest limit changed in that checkpoint.
 
-A direct real `ray_box` probe found `abs` declined solely because the getter
-planner required reader mode. It now validates the receiver in its original
-mode, follows exact checked dispatch and validates the getter body. Plain
-partials require known callables with plain captures; descriptors remain
-excluded from scalar/inline admission. The real probe now outlines ray_box. The
-low512 native primitive/custom-getter law passes exhaustive OOM, including a
-generic abs wrapper. Four affected native laws pass; all2,688 compile. Executed
-primitive/custom getters, signed zero and partials pass in both tiers and
-sync/async. The guest batch remains29passes/1known baseline failure. A
-standalone Gdev ray-box fixture passes eight boundary cases. Changed Zig lint
-and TypeScript format pass; required full gate attempted, registry blocked.
-Astra xhigh reviewed this narrow change. No budget was raised.
-
-The measured event path had452,738 inline expressions, including repeated
-discovery checks. Getters now follow the exact checked dispatch; curried members
-retain their receiver until saturation. Named partials preserve checked input
-and output types before restoring captured contexts. The planner permits finite
-nested uses of one generic declaration under its unchanged128-call/work bounds;
-actual selected-call recursion checks remain strict. Composite result contexts
-survive temporary-scope cleanup. The unchanged nested-Maybe law caught and
-qualified that correction. Astra xhigh reviewed the final boundaries.
-
-The affected guest batch is29passes/1confirmed baseline failure (associated
-latent-effect result layout). Real member syntax, two owners/mutation, U32/F32
-partials, effects only at saturation, nested-any short circuit and scratch-array
-cleanup pass in both tiers and sync/async. The low512-budget native law includes
-member calls, two-step partials and nested readers, with exhaustive OOM.
-Recursion and escape negatives plus four other reader/writer laws pass. All2,687
-native tests compile; changed Zig lint and TypeScript format are clean. Full
-gate was attempted and remains registry blocked.
-
-Gdev's discovery readers receive the immutable catalog, count and requirement
-pools explicitly; public behavior and wrappers remain. A standalone initial
-state/catalog-boundary check and protocol freshness check pass. Local scratch
-Unit writer admission remains limited to plain arrays with no runtime planning
-effects; actual child ownership and access checks remain authoritative.
-
-The new reader predicate resolves selected nominal arguments and constructor
-payloads in their captured environments, with the existing work/depth bounds.
-Callable payloads decline. Reader/writer key encoding can decline an optional
-outline before cache publication or runtime effects; OOM propagates, mandatory
-invocation keys and body/source/ownership checks remain strict. Keys are never
-truncated. Two new native laws pass exhaustive allocation-failure checks; seven
-existing reader/writer laws pass. Executed generic, owner mutation and oversized
-key read/write laws pass in both tiers and sync/async. The affected guest batch
-is29passed/1failed: the associated latent-effect result layout failure
-reproduces on the preceding compiler. Changed Zig lint is clean; all2,686 native
-tests compile. Full gate attempted, registry blocked as below.
-
-Gdev checkpoint `1a7ebd6` replaces335 scalar text lookups across21 modules with
-verified existing spans; all403 scalar spans match the unchanged payload. Shop
-rows now use one GrowArray and freeze once; station writes/reset pin named
-owners. Six affected checks pass. HUD reset accepts only its named owner, with
-one additional passing check (`65671cb`). Do not automatically raise the
-500,000-expression cap again.
-
-The old 100,000 cap was a compiler work policy, not an ownership requirement.
-Astra xhigh reviewed the finite 500,000 default and private native boundary
-option. Child helpers inherit it; zero is rejected, exhaustion publishes no
-Wasm, and peak/total/limit counters are recorded. The large executed law expands
-104,717 expressions and preserves 51 ordered Foreign calls in both tiers and
-sync/async. It fails the old cap. Seventeen affected native laws pass, including
-ownership rejection; recursion rejection passes. Complete inventory2,684
-compiles and changed Zig lint is clean. Full gate was attempted and remains
-registry blocked. No proof, layout, depth, key or guest storage limit was
-increased.
-
-The greenfield cleanup removed retired railway refund migration, module, codec
-135, three owners and cart relocation. It had expanded roughly 23,000 nodes at
-each normalization. Current building creation/decoding reject unavailable kinds;
-active demolition and permanent depot rendering remain. Astra xhigh reviewed
-this removal. No framing/schema or active codec lane layout changed; FrameAccess
-now has 165 fields. Gdev checkpoint: `751ecba`.
-
-Three standalone building-kind checks pass, including both required traps;
-protocol codegen --check passes. Older depot/control fixtures have missing
-helper imports. The saved-state fixture fails a separate Array/ResizeArray
-callback check at line414 before execution; its expected snapshot count is now65
-with no key135. Full game qualification remains pending.
-
-Retained compiler fixes: bounded canonical DAG selected-type keys; runtime-only
-private append regions with exact loop/exhaustion/capture independence;
-collection-element refinement; checked View/Ref/Link result witnesses; and
-termination propagation through return children. Parser/evaluator semantics,
-nominal identity checks, stableCarry and checked budgets remain intact. Astra
-xhigh reviewed the proof boundaries and diagnosed the witness/control issues.
-
-All 2,684 native tests compile. Focused comprehension, borrow, return and key
-execution laws pass in both build modes and sync/async; the new return law also
-passes its full allocation-failure sweep. Changed Zig lint is clean. The
-primitive-associated-partials native layout failure remains the documented
-baseline failure. The earlier 76 package/core contract laws passed at their
-preceding checkpoint; this is not full qualification of the current candidate.
-
-The required full compiler gate remains blocked before tests fetching locked
-Baba9.0.1 through the configured registry proxy. Registry additions remain a
-saved draft, not applied or published; dependencies/lock/TLS are unchanged.
-Native Pen and its compiler plugin are built locally. The machine has a local
-Mesa lavapipe driver for the eventual headless attempt.
-
-Use the existing siblings and tracked storage-handoff runners below. Keep
-unrelated fixture migration paused. Detailed fixes and measurements are in
+Ink map.locate's explicit Maybe U32 result (`fbe379b`) passes five key-policy
+probes and existing map laws. Brush edges now build into a GrowArray and freeze
+once; the focused cube witness passes geometry, uniqueness, vertex degree and
+output independence in both tiers/sync-async. Retained compiler/source fixes and
+detailed evidence live in
 [the cloud-main evidence](tasks/storage-handoff-evidence/2026-10-30-cloud-main.json)
-and pinned Git history.
+and pinned Git history, including exact generic contexts/keys, ordered writer
+scratch footprints, checked getters/partials, return termination and private
+append regions. Do not relax those contracts while fixing later failures.
+
+The required full compiler gate was attempted and remains blocked before tests
+fetching locked Baba9.0.1 through the registry proxy. Registry additions are an
+unapplied saved draft; dependencies, lockfiles and TLS are unchanged. Native
+Pen, its compiler plugin and Mesa lavapipe are available locally. Keep unrelated
+fixture migration and performance work paused.
+
+If the bounded main experiment completes below1M, Astra supports a deliberate 1M
+production policy checkpoint with peak per-function work, total work, time/RSS
+and default/boundary laws recorded. Then make the next full compile the real Pen
+run, avoiding another standalone rebuild. If1M exhausts, keep that ceiling and
+reduce the measured expansion. A real PNG still requires inspection.
 
 ## Immediate next step
 
