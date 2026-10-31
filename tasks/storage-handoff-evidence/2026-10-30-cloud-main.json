@@ -1596,7 +1596,7 @@
     },
     "review": "Astra xhigh finalsemanticreviewclear; unchangedfullscopeappendonlycallgraphverified",
     "full_gate": "Attemptedbeforecheckpoint; lockedBaba9.0.1 proxytunnelfailurebeforetests",
-    "active_old_attempt": "attempt-5442nr03 hasonebounded5minutegraceperiodduringcheckpoint/push; thenswapunlessmodulecomplete",
+    "active_old_attempt": "attempt-5442nr03 returnednaturallyduringgrace: Inkpen/host.blot:198:18 unsupportedproject_instance; noframe",
     "logs": [
       "/tmp/blot-refinement-index-native.log",
       "/tmp/blot-refinement-index-native-regressions.log",
@@ -1606,5 +1606,32 @@
       "/tmp/blot-live-stack-2.log",
       "/tmp/blot-live-refinement-counts.json"
     ]
+  },
+  "retained_instance_projection": {
+    "ink_checkpoint": "7fa4374",
+    "fix": "Exactrender.Instanceinput/wire.Instancereturn onrealproject_instance; contextgeneric,effectsinferred; guardandconversionbodyunchanged",
+    "baseline": "OriginaladapterFAIL focusedprobe atsamehostprojection; annotationonlyPASS",
+    "executed": "2testsPASS both tiers syncasync,12checkspermode/48total: all26lanes/fullU32splits/0+maxorder/Some+Nothing/signedzero/nonemptyextrareject/oversizedorderreject/recovery",
+    "files": [
+      "ink/tests/pen_instance_projection.blot",
+      "ink/tests/pen_instance_projection.test.ts"
+    ],
+    "logs": [
+      "/tmp/ink-instance-projection-original.log",
+      "/tmp/ink-instance-projection-annotation.log",
+      "/tmp/ink-instance-projection-final-tests.log"
+    ]
+  },
+  "current_native_pen": {
+    "attempt": "build/storage-integration/gdev-one-frame/attempt-gf78rbfc",
+    "status": "running indexedcompiler+typedinstanceadapter; noframeclaim",
+    "compiler_sha256": "e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd",
+    "configured_identity": "f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954",
+    "previous_attempt": {
+      "attempt": "attempt-5442nr03",
+      "status": "emitdiagnosticink/pen/host.blot198:18; returnednaturally",
+      "peak_rss_kib": 16283644
+    },
+    "log": "/tmp/gdev-pen-indexed-instance.log"
   }
 }

@@ -69,27 +69,30 @@ bindings and zero index declines (180.3s, 2,681,820 KiB peak RSS). No compiler,
 engine or storage limit changed. Candidate prefix: `zig-out-refinement-index`.
 The full gate was attempted and remains registry-blocked.
 
-The old Pen attempt has one final five-minute grace period while this checked
-candidate is checkpointed. If no main module arrives, preserve its cancellation
-evidence and replace it with the indexed compiler; do not wait indefinitely or
-run two native attempts together. The local deadline is in
-`/tmp/blot-index-swap-deadline.json`.
+The old single-main attempt `attempt-5442nr03` returned naturally during its
+final grace period: Ink `pen/host.blot:198:18`, unsupported retained-instance
+projection. Peak compiler RSS was 16,283,644 KiB. No module/frame qualified.
+Ink's projector now declares its exact `render.Instance -> wire.Instance`
+boundary. The original adapter reproduces the focused failure; the signature-only
+fix passes all 26 lanes, full U32 IDs, order boundaries, Some/Nothing parameters,
+signed zero, rejection of extras/oversized order, and recovery after traps.
+Both tiers and sync/async pass (48 checks). Guards and conversion are unchanged.
 
-The actual native Pen attempt is running at
-`build/storage-integration/gdev-one-frame/attempt-5442nr03`, using the matching
-default compiler. The prior `attempt-s1i49tls` hit Pen's default 300-second
-plugin deadline, which killed and reopened the active compiler; its retry was
-stopped and its evidence retained. Gdev now configures a reviewed 7,200-second
-cold-build deadline through the existing plugin setting. Compiler work, engine
-and storage limits are unchanged. The subsequent four-export attempt
-`attempt-5rjaql86` was stopped for reviewed packaging cleanup: production main
-now has one unchanged gameplay entry; optional trace/reference entries and names
-are preserved in dedicated Gdev performance fixtures. The partial first-export
-forecast was about 31 MB, while the 64 MiB reply also carries assets. This is
-an intentional packaging change, not a measured completed-module size failure.
-All four entry files parse and source-body identity checks pass; performance
-consumer migration remains deferred. No real-main success or PNG has been
-observed yet. Continue the active attempt before launching another full compile.
+The current real Pen attempt is
+`build/storage-integration/gdev-one-frame/attempt-gf78rbfc`, using the installed
+indexed compiler (SHA-256 `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`)
+and the typed instance adapter. Its configured hello identity is
+`f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954`.
+Resume this attempt before starting another compile. No PNG has completed yet.
+
+Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
+the bounded cold build; production main has one unchanged gameplay export;
+optional reference/tracing bodies and names live in performance fixtures.
+The 300-second timeout killed the first attempt; the later four-export attempt
+was stopped intentionally to avoid packaging four complete game copies under
+the unchanged 64 MiB project reply budget. No completed-module size failure was
+claimed. Compiler work, engine, ABI/session, assets and storage limits remain
+unchanged.
 
 Retained fixes include exact selected type keys and result snapshots, defining
 module obligations for planner closures, semantic witnesses on loaded nominals,
