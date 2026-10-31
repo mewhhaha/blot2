@@ -78,15 +78,18 @@ fix passes all 26 lanes, full U32 IDs, order boundaries, Some/Nothing parameters
 signed zero, rejection of extras/oversized order, and recovery after traps.
 Both tiers and sync/async pass (48 checks). Guards and conversion are unchanged.
 
-The latest real Pen attempt,
-`build/storage-integration/gdev-one-frame/attempt-s7g8la7z`, failed after about
-34minutes at result-selected `from` in `std/prelude.blot:48`, before a module or
-PNG completed. Peak sampled compiler RSS was16,408,948KiB. Installed compiler
-SHA-256 remains `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`;
+The active real Pen attempt is
+`build/storage-integration/gdev-one-frame/attempt-eru2w98y`, using the checked
+restoration batch (Gdev `dbf45e8`, Ink `959119d`). Resume it before starting
+another full compile. No real main module or PNG has completed yet. Installed
+compiler SHA-256 remains
+`e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`;
 configured identity is
 `f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954`.
 Native Pen SHA-256 is
 `a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014`.
+The preceding attempt stopped at a generic conversion after about34minutes;
+its detailed identity, failure and resources remain in the tracked evidence.
 
 Focused restoration tracing identified exact element/progression migration
 comparisons with unresolved conversion results. Both now use explicit
@@ -109,8 +112,8 @@ Pen's explicit generated integer conversions retain layout and Rust bytes; all
 ten generator tests, formatting and freshness pass. The complete numeric frame
 encoder fixture also passes both tiers and sync/async, including nested payloads,
 changed preferences, borrowed UI text, retained IDs and destination reuse.
-Stage/fixture success does not qualify the real main or frame. Start the next
-native attempt only from this checked source batch; inspect its actual PNG.
+Stage/fixture success does not qualify the real main or frame. Complete the
+active native attempt and inspect its actual PNG.
 
 Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
 the bounded cold build; production main has one unchanged gameplay export;
