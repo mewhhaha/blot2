@@ -13222,11 +13222,11 @@ fn sharedSessionScenario(a: Allocator, units: []const core.Module) !void {
 }
 test "a shared private session derives every unit fact Session.init derives through allocation failures" {
     var module = try bodyRecipeLower(
-        \\type Pair is data = #Pair { left: U32, right: U32 }
-        \\type Shape is data = #Square { side: U32 } | #Rect { width: U32, height: U32 }
+        \\type Pair is data = $Pair { left: U32, right: U32 }
+        \\type Shape is data = $Square { side: U32 } | $Rect { width: U32, height: U32 }
         \\entry const area = func (shape: Shape) => return case shape of
-        \\  #Square { side } => @u32.mul side side
-        \\  #Rect { width, height } => @u32.mul width height
+        \\  $Square { side } => @u32.mul side side
+        \\  $Rect { width, height } => @u32.mul width height
         \\entry const total = func (pair: Pair) => return @u32.add pair.left pair.right
     );
     defer module.deinit(std.testing.allocator);
@@ -13810,14 +13810,14 @@ test "constant receipt tape separates nested reads and preserves ordinary fuel" 
 test "concrete self runtime method interface terminates without executing recursive typed or plain bodies" {
     const allocator = std.testing.allocator;
     for ([_][]const u8{
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.read: Box -> U32 where {} = func (value: Box) => return value.read
-        \\entry const selected: Unit -> U32 = func () => return (#Box 1).read
+        \\entry const selected: Unit -> U32 = func () => return ($Box 1).read
         \\entry const answer = 42
         ,
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.read: Box -> U32 where {} = func value => return value.read
-        \\entry const selected: Unit -> U32 = func () => return (#Box 1).read
+        \\entry const selected: Unit -> U32 = func () => return ($Box 1).read
         \\entry const answer = 42
         ,
     }) |source| {
@@ -13831,13 +13831,13 @@ test "concrete self runtime method interface terminates without executing recurs
 test "concrete self runtime method remains fuel-limited when a constant forces recursion" {
     const allocator = std.testing.allocator;
     for ([_][]const u8{
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.read: Box -> U32 where {} = func (value: Box) => return value.read
-        \\entry const answer = (#Box 1).read
+        \\entry const answer = ($Box 1).read
         ,
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.read: Box -> U32 where {} = func value => return value.read
-        \\entry const answer = (#Box 1).read
+        \\entry const answer = ($Box 1).read
         ,
     }) |source| {
         var module = try bodyRecipeLower(source);
@@ -14000,7 +14000,7 @@ test "principal source containment owns nested closures and local reads with bou
         \\  let captured = func (y: U32) => return @u32.add x y
         \\  break captured
         \\const second = func (x: U32) => return @u32.sub x 1
-        \\const force = func ~(value: U32) => return @force value
+        \\const force = func ~(value: U32) => return @demand value
         \\entry const delayed = force (@u32.add 1 2)
         \\entry const answer = 7
     );
@@ -14375,15 +14375,15 @@ fn revealedCycleScenario(allocator: Allocator, module: *const core.Module, paren
 test "newly revealed source selection cycles decline without publishing partial members under allocation failure" {
     const allocator = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\type Seed is data = #Seed
-        \\type Box a is data = #Box a
-        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-        \\const f_0 = func value => return @type.call "build" value #Seed
+        \\type Seed is data = $Seed
+        \\type Box a is data = $Box a
+        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+        \\const f_0 = func value => return @type.call "build" value $Seed
         \\entry const parent: a -> a = func value => return (f_0 value).read
         \\const Box.read: Box a -> a = func box => return case box of
-        \\  #Box value => value
+        \\  $Box value => value
         \\entry const recursive_read: Box a -> a = func box => return case box of
-        \\  #Box value => parent value
+        \\  $Box value => parent value
     );
     defer module.deinit(allocator);
     var parent: core.BindingId = 0;
@@ -14410,8 +14410,8 @@ test "newly revealed source selection cycles decline without publishing partial 
 test "source head theorems require immutable fixed heads and retain mismatches caller selections Never and limits" {
     const allocator = std.testing.allocator;
     var module = try bodyRecipeLower(
-        \\type Cell a is data = #Cell a
-        \\const closed = func ignored => return @state.get (#Cell 0)
+        \\type Cell a is data = $Cell a
+        \\const closed = func ignored => return @state.get ($Cell 0)
         \\const parametric = func (witness: Cell a) : Cell a => return @state.get witness
         \\const open = func witness => return @state.get witness
         \\entry const answer = 42

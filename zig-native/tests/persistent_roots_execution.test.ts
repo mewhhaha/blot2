@@ -234,8 +234,8 @@ let saved = (func (capture: Array U32) => return func (index: U32) => return cap
 let pending = delay (@array.fill 3 (saved 0))
 let alias = pending
 entry const run = func (value: U32) => return do:
-  let before = @force pending
-  let after = @force alias
+  let before = @demand pending
+  let after = @demand alias
   let changed = @array.set values 0 value
   break saved 2 + before[1] + after[2] + changed[0]
 entry const pressure = func (count: U32) => return do:
@@ -298,17 +298,17 @@ Deno.test("source State preserves the old graph held by a strong ready demand me
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const source = `
-data Cell value = #Cell value
+type Cell value is data = $Cell value
 const delay = func ~value => return value
 entry const run = func (value: U32) => return do:
-  let (_, result) = @state.run (#Cell #[value]) (func () => return do:
+  let (_, result) = @state.run ($Cell #[value]) (func () => return do:
     let pending = delay (do:
-      use cell <- @state.get (func () => return #Cell #[0])
-      let #Cell values = cell
+      use cell <- @state.get (func () => return $Cell #[0])
+      let $Cell values = cell
       break values)
-    use before <- @force pending
-    use @state.set (#Cell #[value + 100])
-    use after <- @force pending
+    use before <- @demand pending
+    use @state.set ($Cell #[value + 100])
+    use after <- @demand pending
     break before[0] + after[0])
   break result
 `;
@@ -449,8 +449,8 @@ const pending = delay (@array.fill 3 40)
 const alias = pending
 const values = [#[10, 11], #[20, 21], #[30, 31]]
 entry const run = func (index: U32) => return do:
-  let before = @force pending
-  let after = @force alias
+  let before = @demand pending
+  let after = @demand alias
   let total = 0
   for selected in values:
     total := self + selected[1]
@@ -525,8 +525,8 @@ entry const run = func (value: U32) => return do:
   values[0] := {pending: delay #[value, value + 1], read: func (index: U32) => return value + index}
   let old = before[0]
   let changed = values[0]
-  let cached = @force old.pending
-  let current = @force changed.pending
+  let cached = @demand old.pending
+  let current = @demand changed.pending
   break cached[1] + current[1] + old.read 1 + changed.read 1
 `;
   try {

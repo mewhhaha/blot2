@@ -73,7 +73,7 @@ test "tags on catalog declarations and fixities reject without evaluating tag ex
         "@[missing_tag]\neffect Read: Unit -> U32\nentry const answer = 42\n",
         "@[missing_tag]\ntype Read is effect = Unit -> U32\nentry const answer = 42\n",
         "@[missing_tag]\ntype Box value is effect = {get: Unit -> value}\nentry const answer = 42\n",
-        "@[missing_tag]\ntype Box value is data = #Box value\nentry const answer = 42\n",
+        "@[missing_tag]\ntype Box value is data = $Box value\nentry const answer = 42\n",
         "@[missing_tag]\ninfixl 60 (+) = add\nconst add = func left => return func right => return @u32.add left right\nentry const answer = 40 + 2\n",
         "@[missing_tag]\ninfixl 60 `add`\nconst add = func left => return func right => return @u32.add left right\nentry const answer = 40 `add` 2\n",
     };
@@ -530,16 +530,16 @@ test "imported nominal families and associated schemes preserve structured ident
         \\infixl 60 (+) = _fixity_add
         \\const coordinate = func value => return value.x
         \\const plus = func a => return func b => return a + b
-        \\entry const answer = coordinate (plus (#left.Point {x:20}) (#P {x:22}))
-        \\entry const floating = coordinate (#right.Point {x:1.25})
+        \\entry const answer = coordinate (plus ($left.Point {x:20}) ($P {x:22}))
+        \\entry const floating = coordinate ($right.Point {x:1.25})
         \\const annotated = func (value:Position) => return value.x
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
         },
         .{ .name = "points.blot", .text =
-        \\type Point is data = #Point {x:U32}
-        \\const Point.add = func left => return func right => return #Point {x:@u32.add left.x right.x}
+        \\type Point is data = $Point {x:U32}
+        \\const Point.add = func left => return func right => return $Point {x:@u32.add left.x right.x}
         },
-        .{ .name = "other.blot", .text = "type Point is data = #Point {x:F32}\n" },
+        .{ .name = "other.blot", .text = "type Point is data = $Point {x:F32}\n" },
     });
     defer fixture.deinit();
     var checked = try project_check.checkProject(a, &fixture.source);
@@ -565,15 +565,15 @@ test "imported result and demand schemes keep owned quantified relations and num
         \\import * as lib from "./library"
         \\import { convert as from, delay as suspend } from "./library"
         \\entry const integer=func()=> return do:
-        \\  let #lib.Box value:lib.Box U32=from 42
-        \\  break @force (suspend value)
+        \\  let $lib.Box value:lib.Box U32=from 42
+        \\  break @demand (suspend value)
         \\entry const floating=func()=> return do:
-        \\  let #lib.Box value:lib.Box F32=lib.convert 1.25
-        \\  break @force (lib.delay value)
+        \\  let $lib.Box value:lib.Box F32=lib.convert 1.25
+        \\  break @demand (lib.delay value)
         },
         .{ .name = "library.blot", .text =
-        \\type Box value is data = #Box value
-        \\const Box.from=func value=> return #Box value
+        \\type Box value is data = $Box value
+        \\const Box.from=func value=> return $Box value
         \\const convert=func value=> return @type.result "from" value
         \\const delay=func ~value=> return value
         },
@@ -607,33 +607,33 @@ test "imported result and demand schemes keep owned quantified relations and num
 test "generated monadic progress preserves designated prelude identity through local shadowing" {
     var fixture = try Fixture.initWithPrelude(&.{
         .{ .name = "main.blot", .text =
-        \\type Iteration [state,result] is data = #LocalContinue state | #LocalDone result
+        \\type Iteration [state,result] is data = $LocalContinue state | $LocalDone result
         \\const sequence=func()=> return do (monad Maybe):
         \\  let total=0
         \\  for index in 0..3:
-        \\    use value <- #Some 1
+        \\    use value <- $Some 1
         \\    total:=@u32.add self value
         \\  break total
         \\entry const answer=func()=> return case sequence() of
-        \\  #Some value=>value
-        \\  #Nothing=>42
+        \\  $Some value=>value
+        \\  $Nothing=>42
         },
         .{ .name = "prelude.blot", .text =
-        \\type Iteration [state,result] is data = #Continue state | #Done result
-        \\type Maybe value is data = #Some value | #Nothing
+        \\type Iteration [state,result] is data = $Continue state | $Done result
+        \\type Maybe value is data = $Some value | $Nothing
         \\const monad=func constructor=> return @do.monad constructor
-        \\const Maybe.pure=func value=> return #Some value
+        \\const Maybe.pure=func value=> return $Some value
         \\const Maybe.bind=func candidate=> return func next=> return case candidate of
-        \\  #Some value=>next value
-        \\  #Nothing=>#Nothing
+        \\  $Some value=>next value
+        \\  $Nothing=> $Nothing
         \\const Maybe.iterate=func initial=> return func step=> return do:
         \\  let state=initial
         \\  for ever:
         \\    use candidate <- step state
-        \\    if let #Some (#Done result)=candidate:
-        \\      break #Some result
-        \\    let #Some (#Continue next)=candidate else:
-        \\      break #Nothing
+        \\    if let $Some ($Done result)=candidate:
+        \\      break $Some result
+        \\    let $Some ($Continue next)=candidate else:
+        \\      break $Nothing
         \\    state:=next
         },
     }, "prelude.blot");
@@ -654,8 +654,8 @@ test "module abstraction public opaque factories hide constructor and representa
     const producer =
         \\opaque type Token = U32
         \\private const offset = 1
-        \\const make: U32 -> Token = func value => return #Token (@u32.add value offset)
-        \\const read: Token -> U32 = func (#Token value) => return value
+        \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
+        \\const read: Token -> U32 = func ($Token value) => return value
     ;
     var fixture = try Fixture.init(&.{
         .{ .name = "tokens.blot", .text = producer },
@@ -675,10 +675,10 @@ test "module abstraction public opaque factories hide constructor and representa
 test "module abstraction private named imports and associated declarations stay private" {
     const producer =
         \\private const hidden = 42
-        \\private type Secret is data = #Secret U32
+        \\private type Secret is data = $Secret U32
         \\private type Reader is effect = Unit -> U32
-        \\type Token is data = #Token U32
-        \\private const Token.hidden = func (#Token value) => return value
+        \\type Token is data = $Token U32
+        \\private const Token.hidden = func ($Token value) => return value
     ;
     for ([_][]const u8{ "hidden", "Secret", "Reader" }) |name| {
         const source = try a.print("import {{ {s} }} from \"./producer\"\nentry const answer = 42\n", .{name});
@@ -693,7 +693,7 @@ test "module abstraction private named imports and associated declarations stay 
 
 test "module abstraction selective forwarding preserves type and value producers" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n" },
+        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n" },
         .{ .name = "facade.blot", .text = "export { Token as Ticket, make, read } from \"./tokens\"\n" },
         .{ .name = "outward.blot", .text = "export { Ticket, make, read } from \"./facade\"\n" },
         .{ .name = "main.blot", .text = "import * as outward from \"./outward\"\nconst direct: outward.Ticket = outward.make 42\nentry const answer = outward.read direct\n" },
@@ -707,8 +707,8 @@ test "module abstraction selective forwarding preserves type and value producers
 
 test "module abstraction public signatures cannot escape private identities" {
     for ([_][]const u8{
-        "private opaque type Secret = U32\nconst leak: Secret = #Secret 42\n",
-        "private type Secret is data = #Secret U32\nconst leak = #Secret 42\n",
+        "private opaque type Secret = U32\nconst leak: Secret = $Secret 42\n",
+        "private type Secret is data = $Secret U32\nconst leak = $Secret 42\n",
         "private type Reader is effect = Unit -> U32\nconst leak = func () => return Reader ()\n",
     }) |source| {
         var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = source }});
@@ -720,11 +720,11 @@ test "module abstraction public signatures cannot escape private identities" {
 }
 
 test "module abstraction opaque import aliases cannot construct project or coerce" {
-    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = func value => return #Token { value: value }\n";
+    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = func value => return $Token { value: value }\n";
     for ([_]struct { text: []const u8, code: []const u8 }{
         .{ .text = "import { Token, make } from \"./producer\"\nentry const answer = (make 42).value\n", .code = "private_access" },
-        .{ .text = "import { Token as Ticket } from \"./producer\"\nentry const answer = #Ticket { value: 42 }\n", .code = "private_access" },
-        .{ .text = "import { Token, make } from \"./producer\"\ntype Alias = Token\nconst read = func (#Token value) => return value\nentry const answer = read (make 42)\n", .code = "private_access" },
+        .{ .text = "import { Token as Ticket } from \"./producer\"\nentry const answer = $Ticket { value: 42 }\n", .code = "private_access" },
+        .{ .text = "import { Token, make } from \"./producer\"\ntype Alias = Token\nconst read = func ($Token value) => return value\nentry const answer = read (make 42)\n", .code = "private_access" },
         .{ .text = "import { Token } from \"./producer\"\nconst pass: Token -> Token = func value => return value\nentry const answer = pass 42\n", .code = "type_mismatch" },
     }) |item| {
         var fixture = try Fixture.init(&.{ .{ .name = "producer.blot", .text = producer }, .{ .name = "main.blot", .text = item.text } });
@@ -738,8 +738,8 @@ test "module abstraction opaque import aliases cannot construct project or coerc
 
 test "module abstraction nominal identity ignores unrelated declaration insertion" {
     for ([_][]const u8{
-        "opaque type Token = U32\nconst make = #Token\n",
-        "private const inserted = 7\nopaque type Token = U32\nconst make = #Token\n",
+        "opaque type Token = U32\nconst make = $Token\n",
+        "private const inserted = 7\nopaque type Token = U32\nconst make = $Token\n",
     }) |text| {
         var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = text }});
         defer fixture.deinit();
@@ -759,8 +759,8 @@ test "module abstraction private helpers remain usable in public factory bodies"
     var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text =
         \\private const identity = func value => return value
         \\opaque type Token a = a
-        \\const make = func value => return #Token (identity value)
-        \\const read = func (#Token value) => return value
+        \\const make = func value => return $Token (identity value)
+        \\const read = func ($Token value) => return value
         \\entry const answer = read (make 42)
     }});
     defer fixture.deinit();
@@ -770,7 +770,7 @@ test "module abstraction private helpers remain usable in public factory bodies"
 }
 
 test "module abstraction distinct producers namespace privacy and reexports cannot bypass access" {
-    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = #Token\nprivate const Token.hidden = func (#Token value) => return value\n";
+    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = $Token\nprivate const Token.hidden = func ($Token value) => return value\n";
     for ([_]struct { source: []const u8, code: []const u8 }{
         .{ .source = "import * as producer from \"./producer\"\nentry const answer = producer.hidden\n", .code = "unknown_value" },
         .{ .source = "export { hidden } from \"./producer\"\nentry const answer = 42\n", .code = "unknown_export" },
@@ -789,11 +789,11 @@ test "module abstraction distinct producers namespace privacy and reexports cann
 
 test "module abstraction forwarding retains data constructors effects and contracts" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "producer.blot", .text = "type Choice is data = #Pick U32\ntype Signal is effect = Unit -> U32\ntype Evidence a is contract = {type_rep a}\n" },
+        .{ .name = "producer.blot", .text = "type Choice is data = $Pick U32\ntype Signal is effect = Unit -> U32\ntype Evidence a is contract = {type_rep a}\n" },
         .{ .name = "facade.blot", .text = "export {Choice as Result, Pick as Build, Signal as Read, Evidence as Witness} from \"./producer\"\n" },
         .{ .name = "main.blot", .text =
         \\import {Result, Build, Read, Witness} from "./facade"
-        \\const value: Result = #Build 42
+        \\const value: Result = $Build 42
         \\const keep: a -> a where {Witness a} = func value => return value
         \\const reader = @effect.provider Read (func () => return 42)
         \\entry const answer = func () => return do reader:

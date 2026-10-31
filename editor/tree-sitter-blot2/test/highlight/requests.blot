@@ -28,13 +28,13 @@ const cancelled = func computation => return do:
         break
   break 0
 
-complete #Some value =>
+complete $Some value =>
 // <- keyword.control
 //       ^^^^ constructor
 //            ^^^^^ variable.parameter
   break value
 
-complete #Ok (#Done value) =>
+complete $Ok ($Done value) =>
 // <- keyword.control
 //       ^^ constructor
 //            ^^^^ constructor

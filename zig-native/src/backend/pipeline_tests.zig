@@ -113,13 +113,13 @@ test "source callback emission releases imports retained references descriptors 
 
 const record_witness_source =
     \\const apple = 0.0
-    \\type Pair is data = #Pair { zebra: U32, apple: F32 }
+    \\type Pair is data = $Pair { zebra: U32, apple: F32 }
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
     \\const get = func (witness: p -> a) : a => return State.get ()
-    \\const state = @effect.state (State.get Pair) (State.set Pair) (#Pair { zebra: 42, apple: 1.5 })
+    \\const state = @effect.state (State.get Pair) (State.set Pair) ($Pair { zebra: 42, apple: 1.5 })
     \\entry const answer = func () => return do:
     \\  let (_, result) = do state:
-    \\    use value <- get #Pair
+    \\    use value <- get $Pair
     \\    break value.zebra
     \\  break result
 ;
@@ -136,32 +136,32 @@ test "closed record evidence retains caller field storage during generic effect 
 
 const retained_checkpoint_sources = [_][]const u8{
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-    \\type Builder [world,scope,checkpoint] is data = #Builder { initial: world, scope: world -> scope, checkpoint: checkpoint }
+    \\type Builder [world,scope,checkpoint] is data = $Builder { initial: world, scope: world -> scope, checkpoint: checkpoint }
     \\const empty = func () => return do:
     \\  let scope = func world => return func action => return do:
     \\    use result <- action ()
     \\    break (world,result)
-    \\  break #Builder { initial: (), scope, checkpoint: func () => return () }
+    \\  break $Builder { initial: (), scope, checkpoint: func () => return () }
     \\const insert = func initial => return func builder => return do:
-    \\  let #Builder { initial: previous_initial, scope: previous_scope, checkpoint } = builder
+    \\  let $Builder { initial: previous_initial, scope: previous_scope, checkpoint } = builder
     \\  let scope = func world => return func action => return do:
     \\    let (current,previous) = world
     \\    use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
     \\    let (next,(previous_next,result)) = outcome
     \\    break ((next,previous_next),result)
-    \\  break #Builder { initial: (initial,previous_initial), scope, checkpoint }
+    \\  break $Builder { initial: (initial,previous_initial), scope, checkpoint }
     \\const snapshot = func initial => return func builder => return do:
-    \\  let #Builder { checkpoint: previous_checkpoint } = builder
-    \\  let #Builder { initial: previous_initial, scope: previous_scope } = insert initial builder
+    \\  let $Builder { checkpoint: previous_checkpoint } = builder
+    \\  let $Builder { initial: previous_initial, scope: previous_scope } = insert initial builder
     \\  let checkpoint = func () => return do:
     \\    use previous_checkpoint ()
     \\    use current <- State.get ()
     \\    use State.set (@u32.add current 1)
     \\    break ()
-    \\  break #Builder { initial: previous_initial, scope: previous_scope, checkpoint }
+    \\  break $Builder { initial: previous_initial, scope: previous_scope, checkpoint }
     \\const built = snapshot 41 (empty ())
     \\entry const answer = func () => return do:
-    \\  let #Builder { initial,scope,checkpoint } = built
+    \\  let $Builder { initial,scope,checkpoint } = built
     \\  let (world,_) = scope initial checkpoint
     \\  let (current,_) = world
     \\  break current
@@ -202,37 +202,37 @@ test "retained checkpoint implementations emit their own rows and release every 
 
 const curried_dispatch_source =
     \\effect Read: Unit -> F32
-    \\type Box is data = #Box F32
-    \\type Deferred is data = #Deferred F32
-    \\type Scale is data = #Scale F32
+    \\type Box is data = $Box F32
+    \\type Deferred is data = $Deferred F32
+    \\type Scale is data = $Scale F32
     \\const Box.mix = func left => return func right => return func weight => return do:
-    \\  let #Box base = left
+    \\  let $Box base = left
     \\  break @f32.add base (@f32.mul right weight)
     \\const Deferred.mix = func left => return do:
-    \\  let #Deferred base = left
+    \\  let $Deferred base = left
     \\  use offset <- Read ()
     \\  break func right => return func weight => return @f32.add (@f32.add base offset) (@f32.mul right weight)
     \\const Scale.mix = func left => return func right => return func weight => return do:
-    \\  let #Scale scale = right
+    \\  let $Scale scale = right
     \\  break @f32.add left (@f32.mul scale weight)
     \\const mix = func left => return func right => return @type.call "mix" left right
     \\const reader = @effect.provider Read (func () => return 2.0)
-    \\entry const nominal = func (value: F32) => return mix (#Box value) 2.0 1.0
+    \\entry const nominal = func (value: F32) => return mix ($Box value) 2.0 1.0
     \\entry const partial = func (value: F32) => return do:
-    \\  let blend = mix (#Box value) 4.0
+    \\  let blend = mix ($Box value) 4.0
     \\  break blend 0.5
     \\entry const deferred = func (value: F32) => return do reader:
-    \\  break mix (#Deferred value) 4.0 0.5
-    \\entry const right = func (value: F32) => return mix value (#Scale 2.0) 1.0
-    \\type Live is data = #Live F32
+    \\  break mix ($Deferred value) 4.0 0.5
+    \\entry const right = func (value: F32) => return mix value ($Scale 2.0) 1.0
+    \\type Live is data = $Live F32
     \\const Live.mix = func left => return func right => return func () => return do:
-    \\  let #Live base = left
+    \\  let $Live base = left
     \\  use value <- Read ()
     \\  break @f32.add base (@f32.add right value)
     \\const earlier = @effect.provider Read (func () => return 100.0)
     \\entry const live = func (value: F32) => return do:
     \\  let callback = do earlier:
-    \\    break mix (#Live value) 0.0
+    \\    break mix ($Live value) 0.0
     \\  break do reader:
     \\    break callback ()
 ;

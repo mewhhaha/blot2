@@ -55,9 +55,9 @@ Deno.test("runtime text literals, formatting, collections and host adapters pres
   await compileAndRun(
     `
 import * as text from "std/text"
-type Ticket is data = #Ticket U32
+type Ticket is data = $Ticket U32
 impl TicketFormat : text.Format Ticket = {
-  const format = func (#Ticket number) => return text.concat "ticket " (text.from_u32 number),
+  const format = func ($Ticket number) => return text.concat "ticket " (text.from_u32 number),
 }
 entry const empty = func () => return ""
 entry const unicode = func () => return "Hi, 世界🙂"
@@ -71,18 +71,18 @@ entry const built = func (count: U32) => return do:
     out := text.append "x" self
   break text.finish out
 entry const decimal = func (number: U32) => return text.format number
-entry const custom = func (number: U32) => return text.format (#Ticket number)
+entry const custom = func (number: U32) => return text.format ($Ticket number)
 entry const fixed = func (value: F32) => return case text.from_f32_fixed 2 value of
-  #Some formatted => formatted
-  #Nothing => "invalid"
+  $Some formatted => formatted
+  $Nothing => "invalid"
 entry const bad_precision = func () => return case text.from_f32_fixed 7 1.0 of
-  #Nothing => 1
-  #Some _ => 0
+  $Nothing => 1
+  $Some _ => 0
 entry const invalid = func (host: U32 -> Array U32 ! {Foreign}) => return do:
   use input <- host 0
   break case text.from_scalars input of
-    #Nothing => 0
-    #Some _ => 1
+    $Nothing => 0
+    $Some _ => 1
 entry const roundtrip = func (host: Array U32 -> Array U32 ! {Foreign}) => return do:
   use output <- host "Hi, 世界🙂"
   break output

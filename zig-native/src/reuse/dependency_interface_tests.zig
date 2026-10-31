@@ -17,7 +17,7 @@ const consumer_api = @import("dependency_consumer.zig");
 const slots_api = @import("dependency_symbol_slots.zig");
 
 const producer_source =
-    \\data Box a = #Box { value: a }
+    \\type Box a is data = $Box { value: a }
     \\const Box.get = func receiver => return receiver.value
     \\type Cell a is effect = { get: Unit -> a, set: a -> Unit }
     \\const identity = func value => return value
@@ -27,7 +27,7 @@ const producer_source =
 const consumer_source =
     \\entry const answer: Unit -> U32 = func () => return do reader:
     \\  use value <- Cell.get U32 ()
-    \\  break @u32.add (qualified (identity (#Box { value: value }).get)) 1
+    \\  break @u32.add (qualified (identity ($Box { value: value }).get)) 1
 ;
 
 test "frozen principal imports share exact ordinary scheme and catalog rules" {
@@ -398,7 +398,7 @@ test "loaded dependency principal Core and rows remain immutable across distinct
     for ([_][]const u8{
         "entry const answer: Unit -> U32 = func () => return identity (40 + 2)\n",
         "entry const answer: Unit -> F32 = func () => return identity (40.0 + 2.5)\n",
-        "entry const answer: Unit -> U32 = func () => return do:\n  let #Some value = #Some 42 else:\n    break 0\n  break value\n",
+        "entry const answer: Unit -> U32 = func () => return do:\n  let $Some value = $Some 42 else:\n    break 0\n  break value\n",
     }) |source| {
         var compiled = try consumer_api.compile(a, source, &pool, &frozen.modules[0]);
         defer compiled.deinit(a);
@@ -412,7 +412,7 @@ test "loaded dependency principal Core and rows remain immutable across distinct
 
 test "shared symbol slots relocate once and conflicting type roles are rejected" {
     const a = std.testing.allocator;
-    const bytes = try artifact(a, "data Pair = #Pair {x: U32,y: U32}\nconst identity=func value=> return value\n");
+    const bytes = try artifact(a, "type Pair is data = $Pair {x: U32,y: U32}\nconst identity=func value=> return value\n");
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
     defer format.deinit(a, &frozen);
@@ -479,7 +479,7 @@ test "empty and Unicode dictionary values remain exact while builtin and source 
 
 test "principal type operation and pattern cycles decline before import" {
     const a = std.testing.allocator;
-    const source = "data Box a=#Box {value:a}\ntype Named {input, output} is effect = input -> output\nconst identity=func value=> return value\n";
+    const source = "type Box a is data= $Box {value:a}\ntype Named {input, output} is effect = input -> output\nconst identity=func value=> return value\n";
     const bytes = try artifact(a, source);
     defer a.free(bytes);
     var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
@@ -539,8 +539,8 @@ test "decoded malformed Core declines before symbols or interface are published"
 const abstraction_producer =
     \\opaque type Token = U32
     \\private const offset = 1
-    \\const make: U32 -> Token = func value => return #Token (@u32.add value offset)
-    \\const read: Token -> U32 = func (#Token value) => return value
+    \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
+    \\const read: Token -> U32 = func ($Token value) => return value
 ;
 const abstraction_consumer = "entry const answer = func (value: U32) => return read (make value)\n";
 
@@ -854,7 +854,7 @@ test "implementation portable complete proofs reject forged roots targets and mi
 }
 
 const legacy_implementation_producer =
-    \\type Token is data = #Token U32
+    \\type Token is data = $Token U32
     \\const Token.add = func (left: Token) => return func (right: Token) => return left
     \\type Source s is contract = { associated "add" s s s ! {}, type Item }
     \\impl TokenSource : Source Token = { type Item = U32 }
@@ -887,7 +887,7 @@ test "implementation portable legacy prerequisite certificates retain selected t
 }
 
 const inferred_legacy_implementation_producer =
-    \\type Token is data = #Token U32
+    \\type Token is data = $Token U32
     \\const Token.add = func (left: Token) => return func (right: Token) => return left
     \\type Source s is contract = { associated "add" s s s, type Item }
     \\impl TokenSource : Source Token = { type Item = U32 }
@@ -955,7 +955,7 @@ test "implementation compiled producers retain method substitutions and transiti
 }
 
 fn compiledHandlerImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
-    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token 42)\n");
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first ($Token 42)\n");
     defer compiled.deinit(allocator);
     try std.testing.expect(compiled.diagnostic == null and compiled.compiled.diagnostic == null);
     try std.testing.expect(compiled.compiled.bytes.len > 8);
@@ -994,7 +994,7 @@ test "implementation compiled rejection preserves prerequisite facts and omits u
 }
 
 fn compiledWitnessImplementation(allocator: std.mem.Allocator, bytes: []const u8) !void {
-    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first (#Token (func () : U32 => return 7))\n");
+    var compiled = try consume(allocator, bytes, "entry const answer: U32 = Source.first ($Token (func () : U32 => return 7))\n");
     defer compiled.deinit(allocator);
     if (compiled.diagnostic) |issue| std.debug.print("compiled witness frontend {s} at {d}: {s}\n", .{ issue.code, issue.start, issue.message });
     if (compiled.compiled.diagnostic) |issue| std.debug.print("compiled witness backend {s}\n", .{@tagName(issue.code)});
@@ -1282,9 +1282,9 @@ const callable_container_producer =
     \\  let version = retained
     \\  break {nested: #[version]}
     \\opaque type Wrapper a = a
-    \\const wrap = func unused => return func retained => return #Wrapper retained
+    \\const wrap = func unused => return func retained => return $Wrapper retained
     \\const unwrap = func unused => return func wrapped => return case wrapped of
-    \\  #Wrapper retained => retained
+    \\  $Wrapper retained => retained
 ;
 fn callableContainerArtifactLaw(allocator: std.mem.Allocator) !void {
     const bytes = try artifact(allocator, callable_container_producer);
@@ -1369,10 +1369,10 @@ test "owned result path artifacts reject coordinated selector forgery with uncha
 }
 
 const nullary_shape_producer =
-    \\type Maybe a is data = #Some a | #None
+    \\type Maybe a is data = $Some a | $None
     \\const absent = func value => return case value of
-    \\  #Some payload => payload
-    \\  #None => #None
+    \\  $Some payload => payload
+    \\  $None => $None
 ;
 
 const text_shape_producer =
@@ -1834,9 +1834,9 @@ test "returned invocation binders retain declaring arrows and captured versions 
 }
 
 const pattern_capture_producer =
-    \\type Application is data = #Application {reset: Unit -> U32}
+    \\type Application is data = $Application {reset: Unit -> U32}
     \\const reset_scoped = func application => return func () => return do:
-    \\  let #Application {reset} = application
+    \\  let $Application {reset} = application
     \\  break reset ()
 ;
 fn patternCaptureArtifactLaw(allocator: std.mem.Allocator) !void {

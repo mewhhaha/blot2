@@ -10,7 +10,7 @@ be used instead. The compiler has no unrestricted runtime reflection.
 For example, save this source as `model.blot`:
 
 ```blot
-type Ticket is data = #Ticket { number: U32, active: Bool } | #Empty
+type Ticket is data = $Ticket { number: U32, active: Bool } | $Empty
 ```
 
 Save `schema.json` beside it:
@@ -66,12 +66,12 @@ and malformed element payloads. The standard library supplies U32 and Bool
 codecs. A custom field codec can enforce domain validation:
 
 ```blot
-type Positive is data = #Positive U32
+type Positive is data = $Positive U32
 impl PositiveCodec : codec.Codec Positive = {
-  const encode = func (#Positive value) => return #[value],
+  const encode = func ($Positive value) => return #[value],
   const decode = func words => return
-    if words.length == 1 and words[0] > 0 then #Some (#Positive words[0])
-    else #Nothing,
+    if words.length == 1 and words[0] > 0 then $Some ($Positive words[0])
+    else $Nothing,
 }
 ```
 

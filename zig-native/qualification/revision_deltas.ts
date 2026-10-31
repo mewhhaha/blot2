@@ -24,13 +24,13 @@ await Deno.mkdir(aggregateDirectory, { recursive: true });
 await Deno.writeTextFile(`${aggregateDirectory}/dep.blot`, "const shared: Array U32 = #[1, 2, 3]\n");
 await Deno.writeTextFile(`${aggregateDirectory}/main.blot`, `import * as dep from "./dep"
 const table: Array U32 = #[10, 20, 30]
-type Pair is data = #Pair { left: U32, right: U32 }
-const pair = #Pair { left: 20, right: 22 }
+type Pair is data = $Pair { left: U32, right: U32 }
+const pair = $Pair { left: 20, right: 22 }
 const aliased = (table, table)
 const other = 0
 entry const pick = func (i: U32) => return table[i]
 entry const first = func () => return do:
-  let #Pair { left, right } = pair
+  let $Pair { left, right } = pair
   break @u32.add left right
 entry const sum_alias = func (i: U32) => return do:
   let (left, right) = aliased
@@ -99,7 +99,7 @@ const workloads = [
   { name: "scalar-constant", file: "scalar", search: "@u32.add 20 21", replace: "@u32.add 20 22" },
   { name: "ecs-literal", file: "ecs", search: "x: 10.0", replace: "x: 11.0" },
   { name: "tags-constant", file: "tags", search: "entry const answer: U32 = 20", replace: "entry const answer: U32 = 21" },
-  { name: "monads-literal", file: "monads", search: "#Some 40", replace: "#Some 41" },
+  { name: "monads-literal", file: "monads", search: "$Some 40", replace: "$Some 41" },
   { name: "lists-literal", file: "lists", search: "[1, 2, 3]", replace: "[1, 2, 4]" },
   { name: "ecs-body-swap", file: "ecs", search: "total := self + x + y", replace: "total := self + y + x" },
   { name: "ecs-body-grow", file: "ecs", search: "x: x + vx * seconds", replace: "x: x + vx * seconds + 0.0" },

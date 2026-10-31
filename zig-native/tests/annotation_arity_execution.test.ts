@@ -1,13 +1,13 @@
 import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
 Deno.test("annotation constructor saturation keeps primitive array curried and shaped types distinct", async () => {
-  await compileAndRun(`type Curried a => type b is data = #Curried (a,b)
-type Shaped [a,b] is data = #Shaped (a,b)
-const curried: Curried U32 F32 = #Curried (20,1.5)
-const shaped: Shaped [U32,F32] = #Shaped (22,2.5)
+  await compileAndRun(`type Curried a => type b is data = $Curried (a,b)
+type Shaped [a,b] is data = $Shaped (a,b)
+const curried: Curried U32 F32 = $Curried (20,1.5)
+const shaped: Shaped [U32,F32] = $Shaped (22,2.5)
 entry const answer = func () => return do:
-  let #Curried (left,_) = curried
-  let #Shaped (right,_) = shaped
+  let $Curried (left,_) = curried
+  let $Shaped (right,_) = shaped
   break @u32.add left right
 entry const folded = answer ()
 entry const scalar = func (values: Array U32) => return @array.get values 0
@@ -27,8 +27,8 @@ Deno.test("annotation saturation diagnostics preserve reference categories and m
     ["const values: Array = #[]\n", "Array requires one element type"],
     ["const values: Array U32 Bool = #[]\n", "type does not accept another argument; currying must be explicit in its declaration"],
     ["const values: Array Array = #[]\n", "Array requires one element type"],
-    ["type Maybe a is data = #Some a | #Nothing\nconst value: Maybe = #Nothing\n", "partially applied type constructor requires another argument"],
-    ["type Maybe a is data = #Some a | #Nothing\nconst value: Maybe Array Bool = #Nothing\n", "Array requires one element type"],
+    ["type Maybe a is data = $Some a | $Nothing\nconst value: Maybe = $Nothing\n", "partially applied type constructor requires another argument"],
+    ["type Maybe a is data = $Some a | $Nothing\nconst value: Maybe Array Bool = $Nothing\n", "Array requires one element type"],
   ]) await compileExpectedFailure(source, "type_arity", message, { prelude: "none" });
 });
 

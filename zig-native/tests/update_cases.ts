@@ -17,10 +17,10 @@ entry const run = func (index: U32) : U32 => return update index
     name: "mixed_nominal_array_fields",
     expected: { run: 42 },
     source: `
-type Point is data = #Point { x: U32, y: U32 }
-type Bucket is data = #Bucket { points: Array Point }
+type Point is data = $Point { x: U32, y: U32 }
+type Bucket is data = $Bucket { points: Array Point }
 entry const run = func () : U32 => return do:
-  let bucket = #Bucket { points: #[#Point { y: 1, x: 10 }, #Point { y: 2, x: 20 }] }
+  let bucket = $Bucket { points: #[$Point { y: 1, x: 10 }, $Point { y: 2, x: 20 }] }
   let before = bucket
   bucket.points[1].x := @u32.add self 2
   break @u32.add before.points[1].x bucket.points[1].x

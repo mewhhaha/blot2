@@ -24,7 +24,7 @@ const Fixture = struct {
         var pool: symbols.Pool = .{};
         defer pool.deinit(a);
         if (shifted) _ = try pool.intern(a, "unrelated");
-        const source = "type Cell is data = #Cell { payload: U32 }\neffect Read: Unit -> U32\nconst generic = func value => return value\nconst read = func () => return Read ()\nentry const answer = func () => return 1\n";
+        const source = "type Cell is data = $Cell { payload: U32 }\neffect Read: Unit -> U32\nconst generic = func value => return value\nconst read = func () => return Read ()\nentry const answer = func () => return 1\n";
         var tokens = try lexer.lex(a, source);
         defer tokens.deinit(a);
         var tree = try parser.parse(a, source, tokens.tokens.items, &pool);

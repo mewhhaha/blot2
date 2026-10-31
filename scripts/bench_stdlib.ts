@@ -47,7 +47,7 @@ const cases = [
   ],
   [
     "filter_map",
-    "func (values: Array U32) => return array.filter_map (func x => return if x % 2 == 0 then #Some (x + 1) else #Nothing) values",
+    "func (values: Array U32) => return array.filter_map (func x => return if x % 2 == 0 then $Some (x + 1) else $Nothing) values",
     input,
     evens.map((x) => x + 1),
   ],
@@ -84,13 +84,13 @@ const cases = [
   ],
   [
     "vector_lerp",
-    "func (count: U32) => return do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  break #[v.x, v.y, v.z]",
+    "func (count: U32) => return do:\n  let v = $Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v ($Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  break #[v.x, v.y, v.z]",
     8193,
     [2, 4, 6],
   ],
   [
     "result_iterate",
-    "func (count: U32) => return do:\n  let result = Result.iterate 0 (func i => return #Ok (if i < count then #Continue (i + 1) else #Done i))\n  break #[Result.unwrap_or 0 result]",
+    "func (count: U32) => return do:\n  let result = Result.iterate 0 (func i => return $Ok (if i < count then $Continue (i + 1) else $Done i))\n  break #[Result.unwrap_or 0 result]",
     8193,
     [8193],
   ],

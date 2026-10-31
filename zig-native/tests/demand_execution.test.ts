@@ -6,14 +6,14 @@ Deno.test("persistent demanded arrays survive arena resets and local demands ret
 const delay = func ~value => return value
 const pending = delay (@array.fill 3 7)
 const alias = pending
-entry const read = func () : U32 => return @array.get (@force pending) 2
-entry const read_alias = func () : U32 => return @array.get (@force alias) 0
+entry const read = func () : U32 => return @array.get (@demand pending) 2
+entry const read_alias = func () : U32 => return @array.get (@demand alias) 0
 entry const pressure = func (count: U32) : Array U32 => return @array.fill count 99
 entry const local = func (value: U32) : U32 => return do:
   let pending = delay (@array.generate 3 (func index => return @u32.add value index))
-  let before = @force pending
+  let before = @demand pending
   value := 99
-  let after = @force pending
+  let after = @demand pending
   break @u32.add (@array.get before 2) (@array.get after 0)
 `, guest => {
     equal(guest.call("read", null), 7);

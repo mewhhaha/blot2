@@ -10,13 +10,13 @@ Deno.test("lexical summary captures preserve snapshots aliases demands and provi
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const dependencies = `${directory}/library.blotdep`;
-  const declarations = `type Box is data = #Box { value: U32 }
+  const declarations = `type Box is data = $Box { value: U32 }
 type Tick is effect = Unit -> U32
 type Other is effect = Unit -> U32
 const make: U32 -> (U32 -> U32 ! {}) = func amount => return func value => return @u32.add amount value
 const boxes = func left => return func right => return func (value: U32) => return @u32.add value (@u32.add left.value right.value)
 const nested = func callback => return func (value: U32) => return callback value
-const delayed = func ~(value: U32) => return func () => return @force value
+const delayed = func ~(value: U32) => return func () => return @demand value
 const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = func implementation => return do:
   let provider = @effect.provider Tick implementation
   break func () => return do provider:
@@ -31,9 +31,9 @@ const provided: (Unit -> U32 ! {}) -> (Unit -> U32 ! {}) = func implementation =
     `import * as library from "./library"
 const first = library.make ${invalid === "capture" ? "true" : amount}
 const other = library.make ${amount + 1}
-const box = #library.Box { value: ${amount} }
+const box = $library.Box { value: ${amount} }
 const pair = library.boxes box ${
-      shared ? "box" : `(#library.Box { value: ${amount + 1} })`
+      shared ? "box" : `($library.Box { value: ${amount + 1} })`
     }
 const transformed = library.nested (library.make ${amount + 2})
 const deferred = library.delayed (@u32.add ${amount} 2)

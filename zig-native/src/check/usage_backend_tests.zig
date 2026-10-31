@@ -299,13 +299,13 @@ test "resource closed aggregate backend retains child roles through replay and f
 
 test "resource nominal closed storage backend owns opaque references through replay and every failed allocation" {
     var module = try lower(
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\opaque type Secret = {left: U32, right: Array U32}
-        \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-        \\entry const boxed = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return ()) (func loan => return 42)
-        \\entry const tree = func (value: U32) => return @resource.scope (func () => return #Branch (#Leaf value, #Leaf 9)) (func owner => return ()) (func loan => return 42)
+        \\type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
+        \\entry const boxed = func (value: U32) => return @resource.scope (func () => return $Box #[value, 7]) (func owner => return ()) (func loan => return 42)
+        \\entry const tree = func (value: U32) => return @resource.scope (func () => return $Branch ($Leaf value, $Leaf 9)) (func owner => return ()) (func loan => return 42)
         \\entry const secret = func (value: U32) => return do:
-        \\  use owner <- @resource.acquire (func () => return #Secret {right: #[value, 8], left: value}) (func owned => return ())
+        \\  use owner <- @resource.acquire (func () => return $Secret {right: #[value, 8], left: value}) (func owned => return ())
         \\  let transfer: once (Unit -> Unit ! {Foreign}) = func () => return @resource.release owner
         \\  use transfer ()
         \\  break 42
@@ -386,11 +386,11 @@ test "public owner admission refuses forged callable storage authority" {
 
 test "structured host cleanup schemas retain source roles through replay and every failed allocation" {
     var module = try lower(
-        \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
+        \\type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
         \\opaque type Secret = {items: Array U32, nonce: U32}
         \\entry const record = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.scope (func () => return {nonce: 7, items: #[1, 2]}) drop (func loan => return 42)
-        \\entry const tree = func (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Branch (#Leaf 7, #Leaf 9)) drop (func loan => return 42)
-        \\entry const opaque_data = func (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Secret {items: #[1, 2], nonce: 7}) drop (func loan => return 42)
+        \\entry const tree = func (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return $Branch ($Leaf 7, $Leaf 9)) drop (func loan => return 42)
+        \\entry const opaque_data = func (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => return @resource.scope (func () => return $Secret {items: #[1, 2], nonce: 7}) drop (func loan => return 42)
         \\entry const owner = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.acquire (func () => return {nonce: 7, items: #[1, 2]}) drop
         \\entry const release = func (owner: unique {items: Array U32, nonce: U32}) => return @resource.release owner
     );

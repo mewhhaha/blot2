@@ -116,8 +116,8 @@ type without embedding shader source or fabricating a runtime input value:
 import { Inputs, Shader, shader } from "./triangle.wgsl"
 const scale = func (inputs: Inputs) => return inputs.scale
 entry const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader of
-  #Shader id => send id
-entry const example_scale = func () => return scale (#Inputs { scale: 1.0 })
+  $Shader id => send id
+entry const example_scale = func () => return scale ($Inputs { scale: 1.0 })
 ```
 
 Each successful build returns `assets`, an array of

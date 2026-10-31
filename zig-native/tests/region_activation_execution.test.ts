@@ -80,8 +80,8 @@ Deno.test("unique region storage rederives fresh retained portable and changed S
         assert.deepEqual(retained.bytes, original);
         checkpoint = await compiler.exportCheckpoint();
         const changed = source.replace(
-          "    use State.set #End",
-          "    use State.set (#Next delayed)",
+          "    use State.set $End",
+          "    use State.set ($Next delayed)",
         );
         assert.notEqual(changed, source);
         const edited = await compiler.build({ sources: { [entry]: changed } });

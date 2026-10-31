@@ -36,10 +36,10 @@ const Fixture = struct {
     }
 };
 const generic_alias =
-    \\type Box value is data = #Box value
-    \\const Box.pure = func value => return #Box value
+    \\type Box value is data = $Box value
+    \\const Box.pure = func value => return $Box value
     \\const Box.bind = func candidate => return func next => return case candidate of
-    \\  #Box value => next value
+    \\  $Box value => next value
     \\const monad = func constructor => return @do.monad constructor
     \\const identity = func value => return value
     \\const resolver = identity (monad (identity Box))
@@ -47,80 +47,80 @@ const generic_alias =
     \\  use value <- candidate
     \\  break @u32.add value 2
     \\entry const answer = func () => return do:
-    \\  let #Box value = sequence resolver (#Box 40)
+    \\  let $Box value = sequence resolver ($Box 40)
     \\  break value
     \\entry const folded = answer ()
 ;
 const lift_forward_unit =
-    \\type Box value is data = #Box value
-    \\const Box.pure = func value => return #Box value
+    \\type Box value is data = $Box value
+    \\const Box.pure = func value => return $Box value
     \\const Box.bind = func candidate => return func next => return case candidate of
-    \\  #Box value => next value
+    \\  $Box value => next value
     \\const monad = func constructor => return @do.monad constructor
     \\const present = do (monad Box):
     \\  break 40
     \\const forwarded = do (monad Box):
-    \\  break $ #Box 2
+    \\  break $ $Box 2
     \\const finished = do (monad Box):
-    \\  #Box 99
+    \\  $Box 99
     \\entry const answer = func () => return do:
-    \\  let #Box left = present
-    \\  let #Box right = forwarded
-    \\  let #Box () = finished
+    \\  let $Box left = present
+    \\  let $Box right = forwarded
+    \\  let $Box () = finished
     \\  break @u32.add left right
 ;
 const pure_ignores_mixed_returns =
-    \\type Box value is data = #Box value
-    \\const Box.pure = func ignored => return #Box 42
+    \\type Box value is data = $Box value
+    \\const Box.pure = func ignored => return $Box 42
     \\const sequence = func enabled => return do (@do.monad Box):
     \\  if enabled:
     \\    break true
     \\  break 40
     \\entry const answer = func () => return do:
-    \\  let #Box first = sequence true
-    \\  let #Box second = sequence false
+    \\  let $Box first = sequence true
+    \\  let $Box second = sequence false
     \\  break @u32.add first second
 ;
 const scalar_bind_input =
-    \\type Box value is data = #Box value
-    \\const Box.pure = func value => return #Box value
+    \\type Box value is data = $Box value
+    \\const Box.pure = func value => return $Box value
     \\const Box.bind = func (candidate:U32) => return func next => return next candidate
     \\const sequence = func () => return do (@do.monad Box):
     \\  use value <- 40
     \\  break @u32.add value 2
     \\entry const answer = func () => return do:
-    \\  let #Box value = sequence ()
+    \\  let $Box value = sequence ()
     \\  break value
 ;
 const continuation_multiplicity =
-    \\type Twice value is data = #Twice value
-    \\const Twice.pure = func value => return #Twice value
+    \\type Twice value is data = $Twice value
+    \\const Twice.pure = func value => return $Twice value
     \\const Twice.bind = func candidate => return func next => return case candidate of
-    \\  #Twice value => do:
-    \\    let #Twice first = next value
-    \\    let #Twice second = next (@u32.add value 1)
-    \\    break #Twice (@u32.add first second)
+    \\  $Twice value => do:
+    \\    let $Twice first = next value
+    \\    let $Twice second = next (@u32.add value 1)
+    \\    break $Twice (@u32.add first second)
     \\const sequence = func () => return do (@do.monad Twice):
     \\  let total = 0
-    \\  use value <- #Twice 20
+    \\  use value <- $Twice 20
     \\  total := @u32.add self value
     \\  break total
     \\entry const answer = func () => return do:
-    \\  let #Twice value = sequence ()
+    \\  let $Twice value = sequence ()
     \\  break value
 ;
 const bind_failure =
-    \\type Option value is data = #Present value | #Absent
-    \\const Option.pure = func value => return #Present value
+    \\type Option value is data = $Present value | $Absent
+    \\const Option.pure = func value => return $Present value
     \\const Option.bind = func candidate => return func next => return case candidate of
-    \\  #Present value => next value
-    \\  #Absent => #Absent
+    \\  $Present value => next value
+    \\  $Absent => $Absent
     \\const sequence = func () => return do (@do.monad Option):
-    \\  use value <- #Absent
+    \\  use value <- $Absent
     \\  break @panic "continuation must not execute"
     \\entry const answer = func () => return case sequence () of
-    \\  #Present value => value
-    \\  #Absent => 42
+    \\  $Present value => value
+    \\  $Absent => 42
 ;
 test "ordinary monad methods infer generic aliases arbitrary bind inputs and ignored returns" {
     for ([_][]const u8{ generic_alias, lift_forward_unit, pure_ignores_mixed_returns, scalar_bind_input, continuation_multiplicity, bind_failure }) |text| {
@@ -146,10 +146,10 @@ test "resolver protocol rejects invalid factories providers and incompatible sel
     const cases = [_]struct { text: []const u8, code: check.Code }{
         .{ .text = "entry const answer=@do.monad 42\n", .code = .type_constructor_required },
         .{ .text = "entry const answer=do 42:\n  break 42\n", .code = .invalid_provider },
-        .{ .text = "type Box value is data = #Box value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .missing_member },
-        .{ .text = "type Box value is data = #Box value\nconst Box.pure=func(value:U32)=> return #Box value\nentry const answer=do (@do.monad Box):\n  break true\n", .code = .type_mismatch },
+        .{ .text = "type Box value is data = $Box value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .missing_member },
+        .{ .text = "type Box value is data = $Box value\nconst Box.pure=func(value:U32)=> return $Box value\nentry const answer=do (@do.monad Box):\n  break true\n", .code = .type_mismatch },
         .{ .text = "entry const answer=do:\n  break $ 42\n", .code = .resolver_required },
-        .{ .text = "type Box value is data = #Box value\nconst Box.pure=func value=> return value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .type_mismatch },
+        .{ .text = "type Box value is data = $Box value\nconst Box.pure=func value=> return value\nentry const answer=do (@do.monad Box):\n  break 42\n", .code = .type_mismatch },
     };
     for (cases) |item| {
         var f = try Fixture.init(a, item.text);
@@ -170,36 +170,36 @@ test "resolver catalogs protocols and branch continuations free every failed all
 }
 
 const iteration_prelude =
-    \\type Iteration [state,result] is data = #Continue state | #Done result
-    \\type Maybe value is data = #Some value | #Nothing
+    \\type Iteration [state,result] is data = $Continue state | $Done result
+    \\type Maybe value is data = $Some value | $Nothing
     \\const monad=func constructor=> return @do.monad constructor
-    \\const Maybe.pure = func value => return #Some value
+    \\const Maybe.pure = func value => return $Some value
     \\const Maybe.map = func transform => return func candidate => return case candidate of
-    \\  #Some value => #Some (transform value)
-    \\  #Nothing => #Nothing
+    \\  $Some value => $Some (transform value)
+    \\  $Nothing => $Nothing
     \\const Maybe.bind = func candidate => return func next => return case candidate of
-    \\  #Some value => next value
-    \\  #Nothing => #Nothing
+    \\  $Some value => next value
+    \\  $Nothing => $Nothing
     \\// Finish each callback before advancing, so iteration uses constant stack.
     \\const Maybe.iterate = func initial => return func step => return do:
     \\  let state = initial
     \\  for ever:
     \\    use candidate <- step state
-    \\    if let #Some (#Done result) = candidate:
-    \\      break #Some result
-    \\    let #Some (#Continue next) = candidate else:
-    \\      break #Nothing
+    \\    if let $Some ($Done result) = candidate:
+    \\      break $Some result
+    \\    let $Some ($Continue next) = candidate else:
+    \\      break $Nothing
     \\    state := next
     \\const Maybe.unwrap_or = func fallback => return func candidate => return case candidate of
-    \\  #Some value => value
-    \\  #Nothing => fallback
+    \\  $Some value => value
+    \\  $Nothing => fallback
 ;
 const nested_loop_break =
     \\const sequence = func () => return do (monad Maybe):
     \\  let total = 0
     \\  for outer in 0..3:
     \\    for inner in 0..4:
-    \\      use value <- #Some 1
+    \\      use value <- $Some 1
     \\      total := @u32.add self value
     \\      if @u32.eq inner 1:
     \\        break
@@ -213,16 +213,16 @@ const bounded_stack =
     \\const range = func count => return do (monad Maybe):
     \\  let total = 0
     \\  for index in 0..count:
-    \\    use value <- #Some 1
+    \\    use value <- $Some 1
     \\    total := @u32.add self value
     \\  break total
     \\const forever = func count => return do (monad Maybe):
     \\  let total = 0
     \\  for ever:
-    \\    use value <- #Some 1
+    \\    use value <- $Some 1
     \\    total := @u32.add self value
     \\    if @u32.eq total count:
-    \\      break $ #Some total
+    \\      break $ $Some total
     \\entry const answer = func () => return @u32.add (Maybe.unwrap_or 0 (range 100000)) (Maybe.unwrap_or 0 (forever 100000))
 ;
 test "monadic iteration freezes actual source methods progress constructors and completion signatures" {
@@ -256,18 +256,18 @@ test "monadic iteration metadata and completion continuations release every fail
 
 test "two parameter resolver families preserve hidden failure evidence in forwarding" {
     var f = try Fixture.init(a,
-        \\type Result [error,value] is data = #Ok value | #Err error
-        \\const Result.pure=func value=> return #Ok value
+        \\type Result [error,value] is data = $Ok value | $Err error
+        \\const Result.pure=func value=> return $Ok value
         \\const Result.bind=func candidate=> return func next=> return case candidate of
-        \\  #Ok value=>next value
-        \\  #Err error=>#Err error
+        \\  $Ok value=>next value
+        \\  $Err error=> $Err error
         \\const Result.unwrap_or=func fallback=> return func candidate=> return case candidate of
-        \\  #Ok value=>value
-        \\  #Err _=>fallback
+        \\  $Ok value=>value
+        \\  $Err _=>fallback
         \\const checked=func candidate=> return do (@do.monad Result):
         \\  use value <- candidate
-        \\  break $ #Ok (@u32.add value 2)
-        \\entry const result=func()=> return Result.unwrap_or 0 (checked (#Ok 40))
+        \\  break $ $Ok (@u32.add value 2)
+        \\entry const result=func()=> return Result.unwrap_or 0 (checked ($Ok 40))
     );
     defer f.deinit(a);
     try f.valid();
@@ -283,7 +283,7 @@ test "nested monadic returns retain every progress layer and forwarding continua
         \\const forward=func()=> return do (monad Maybe):
         \\  for outer in 0..2:
         \\    for inner in 0..2:
-        \\      break $ #Some 42
+        \\      break $ $Some 42
         \\  break 0
         \\entry const answer=func()=> return @u32.add (Maybe.unwrap_or 0 (direct())) (Maybe.unwrap_or 0 (forward()))
     , .{ .prelude_unit = 1 });
@@ -302,13 +302,13 @@ test "nested monadic returns retain every progress layer and forwarding continua
 }
 test "monadic loops require source iterate and designated progress rather than same named local constructors" {
     const box =
-        \\type Box value is data = #Box value
-        \\const Box.pure=func value=> return #Box value
+        \\type Box value is data = $Box value
+        \\const Box.pure=func value=> return $Box value
         \\const Box.bind=func candidate=> return func next=> return case candidate of
-        \\  #Box value=>next value
+        \\  $Box value=>next value
         \\entry const answer=func()=> return do (@do.monad Box):
         \\  for index in 0..1:
-        \\    use #Box ()
+        \\    use $Box ()
         \\  break 42
     ;
     var missing = try Fixture.initOptions(a, iteration_prelude ++ "\n" ++ box, .{ .prelude_unit = 1 });
@@ -373,7 +373,7 @@ test "ordinary nested do cannot break a monadic progress boundary" {
         \\const sequence = func () => return do (monad Maybe):
         \\  let total = 0
         \\  for index in 0..3:
-        \\    use value <- #Some 1
+        \\    use value <- $Some 1
         \\    total := @u32.add self value
         \\    let ignored = do:
         \\      break
@@ -387,11 +387,11 @@ test "ordinary nested do cannot break a monadic progress boundary" {
 }
 test "definitely panicking resolver return invokes no missing pure method" {
     var f = try Fixture.init(a,
-        \\type Box value is data = #Box value
+        \\type Box value is data = $Box value
         \\const sequence = func () => return do (@do.monad Box):
         \\  break @panic "body panic"
         \\entry const answer: U32 = do:
-        \\  let #Box value = sequence ()
+        \\  let $Box value = sequence ()
         \\  break value
     );
     defer f.deinit(a);

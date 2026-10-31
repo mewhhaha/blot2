@@ -7,12 +7,12 @@ import {
 } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Box a is data = #Box a
+const library = `type Box a is data = $Box a
 opaque type Secret = {left: U32, right: Array U32}
-type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-const closed = func () => return @resource.acquire (func () => return #Secret {right: #[8, 9], left: 7}) (func owner => return ())
-const tree = func () => return @resource.acquire (func () => return #Branch (#Leaf 7, #Leaf 9)) (func owner => return ())
-const box = func () => return @resource.acquire (func () => return #Box #[7, 9]) (func owner => return ())
+type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
+const closed = func () => return @resource.acquire (func () => return $Secret {right: #[8, 9], left: 7}) (func owner => return ())
+const tree = func () => return @resource.acquire (func () => return $Branch ($Leaf 7, $Leaf 9)) (func owner => return ())
+const box = func () => return @resource.acquire (func () => return $Box #[7, 9]) (func owner => return ())
 const release_secret = func (owner: unique Secret) => return @resource.release owner
 const release_tree = func (owner: unique (Tree U32)) => return @resource.release owner
 const release_box = func (owner: unique (Box (Array U32))) => return @resource.release owner

@@ -179,13 +179,13 @@ test "recursive component allocation failures abandon pending members and retry 
 
 test "recursive selected frontend probe reaches bounded source inference" {
     const source =
-        \\type Seed is data = #Seed
-        \\type Box a is data = #Box a
-        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-        \\const f_0 = func value => return @type.call "build" value #Seed
+        \\type Seed is data = $Seed
+        \\type Box a is data = $Box a
+        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+        \\const f_0 = func value => return @type.call "build" value $Seed
         \\const parent: a -> a = func value => return (f_0 value).read
         \\const Box.read: Box a -> a = func box => return case box of
-        \\  #Box value => parent value
+        \\  $Box value => parent value
         \\entry const generic = func value => return parent value
     ;
     var module = try lower(source);
@@ -393,11 +393,11 @@ test "open principal retention declines callee trees and keeps diamonds with equ
 }
 
 test "source owned array record and nominal skeletons keep open diamonds bounded" {
-    for ([_][]const u8{ "#[value.first]", "{result: value.first}", "#Box value.first" }) |leaf| {
+    for ([_][]const u8{ "#[value.first]", "{result: value.first}", "$Box value.first" }) |leaf| {
         for ([_]usize{ 8, 16, 64 }) |depth| {
             var text: std.ArrayList(u8) = .empty;
             defer text.deinit(a);
-            try text.appendSlice(a, "type Box a is data = #Box a\n");
+            try text.appendSlice(a, "type Box a is data = $Box a\n");
             try text.print(a, "const f_0 = func value => return {s}\n", .{leaf});
             for (1..depth + 1) |i| try text.print(a, "const f_{d} = func value => return do:\n  let ignored = f_{d} value\n  break f_{d} value\n", .{ i, i - 1, i - 1 });
             try text.print(a, "entry const factory = do:\n  break f_{d}\n", .{depth});
@@ -426,10 +426,10 @@ test "recorded principal regions observe plain memo facts from graph description
     // Only the described callees mention Box. The recorded region first sees
     // Box through their graphs, after a description decided it.
     try text.appendSlice(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\const open_box = func (box: Box a) : a => return case box of
-        \\  #Box inner => inner
-        \\const f_0 = func value => return open_box (#Box value.first)
+        \\  $Box inner => inner
+        \\const f_0 = func value => return open_box ($Box value.first)
         \\
     );
     for (1..9) |i| try text.print(a, "const f_{d} = func value => return do:\n  let ignored = f_{d} value\n  break f_{d} value\n", .{ i, i - 1, i - 1 });
@@ -470,11 +470,11 @@ test "source owned structured residuals preserve independent concrete interfaces
     for ([_]struct { leaf: []const u8, select: []const u8 }{
         .{ .leaf = "#[value.first]", .select = "result[0]" },
         .{ .leaf = "{result: value.first}", .select = "result.result" },
-        .{ .leaf = "#Box value.first", .select = "case result of\n    #Box value => value" },
+        .{ .leaf = "$Box value.first", .select = "case result of\n    $Box value => value" },
     }) |shape| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.print(a, "type Box a is data = #Box a\nconst f_0 = func value => return {s}\n", .{shape.leaf});
+        try text.print(a, "type Box a is data = $Box a\nconst f_0 = func value => return {s}\n", .{shape.leaf});
         for (1..9) |i| try text.print(a, "const f_{d} = func value => return do:\n  let ignored = f_{d} value\n  break f_{d} value\n", .{ i, i - 1, i - 1 });
         try text.appendSlice(a, "const factory = do:\n  break f_8\n");
         for ([_]struct { []const u8, []const u8 }{ .{ "integer", "U32" }, .{ "floating", "F32" } }) |instance| try text.print(a, "entry const {s} = func (value: {s}) : {s} => return do:\n  let result = factory {{first: value}}\n  break {s}\n", .{ instance[0], instance[1], instance[1], shape.select });
@@ -652,7 +652,7 @@ fn sharedHeaderWitnessScenario(allocator: std.mem.Allocator, module: *const core
             if (err != error.Declined) return err;
             const diagnostic = session.diagnostic orelse return error.TestExpectedDiagnostic;
             try std.testing.expectEqual(evaluator.Code.missing_member, diagnostic.code);
-            try std.testing.expectEqualDeep(core.Span{ .start = 370, .end = 376 }, diagnostic.span);
+            try std.testing.expectEqualDeep(core.Span{ .start = 386, .end = 392 }, diagnostic.span);
             continue;
         };
         return error.TestExpectedError;
@@ -668,9 +668,9 @@ test "shared written headers preserve the first missing receiver witness under a
 
 test "result principal edges retain independent expected witnesses and ordinary failures under allocation pressure" {
     var module = try lower(
-        \\type Box a is data = #Box a
-        \\const Box.from = func value => return #Box value
-        \\type Missing is data = #Missing U32
+        \\type Box a is data = $Box a
+        \\const Box.from = func value => return $Box value
+        \\type Missing is data = $Missing U32
         \\const absent = func value => return value.absent
         \\const f_0 = func value => return @type.result "from" value
         \\const f_1 = func value => return f_0 (f_0 value)
@@ -678,19 +678,19 @@ test "result principal edges retain independent expected witnesses and ordinary 
         \\const f_3 = func value => return f_2 (f_2 value)
         \\entry const generic = func value => return f_3 value
         \\entry const integer = func (value: U32) => return do:
-        \\  let #Box result: Box U32 = f_0 value
+        \\  let $Box result: Box U32 = f_0 value
         \\  break result
         \\entry const floating = func (value: F32) => return do:
-        \\  let #Box result: Box F32 = f_0 value
+        \\  let $Box result: Box F32 = f_0 value
         \\  break result
         \\entry const argument_failure = func value => return do:
-        \\  let #Box result: Box U32 = f_0 (absent value)
+        \\  let $Box result: Box U32 = f_0 (absent value)
         \\  break result
         \\entry const result_failure = func (value: U32) : U32 => return do:
-        \\  let #Missing result: Missing = f_0 value
+        \\  let $Missing result: Missing = f_0 value
         \\  break result
         \\entry const competing_failure = func value => return do:
-        \\  let #Missing result: Missing = f_0 (absent value)
+        \\  let $Missing result: Missing = f_0 (absent value)
         \\  break result
     );
     defer module.deinit(a);
@@ -709,13 +709,13 @@ test "closed result directed diamonds propagate destinations before expanding sh
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
         try text.appendSlice(a,
-            \\type Box a is data = #Box a
+            \\type Box a is data = $Box a
             \\
         );
-        try text.appendSlice(a, if (double) "const Box.from = func (box: Box a) : Box a => return case box of\n  #Box value => #Box (@type.call \"add\" value value)\n" else "const Box.from = func (box: Box a) : Box a => return box\n");
+        try text.appendSlice(a, if (double) "const Box.from = func (box: Box a) : Box a => return case box of\n  $Box value => $Box (@type.call \"add\" value value)\n" else "const Box.from = func (box: Box a) : Box a => return box\n");
         try text.appendSlice(a, "const f_0 = func value => return @type.result \"from\" value\n");
         for (1..depth + 1) |i| try text.print(a, "const f_{d} = func value => return f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
-        try text.print(a, "entry const integer = func (value: U32) : U32 => return do:\n  let #Box result: Box U32 = f_{d} (#Box value)\n  break result\nentry const floating = func (value: F32) : F32 => return do:\n  let #Box result: Box F32 = f_{d} (#Box value)\n  break result\n", .{ depth, depth });
+        try text.print(a, "entry const integer = func (value: U32) : U32 => return do:\n  let $Box result: Box U32 = f_{d} ($Box value)\n  break result\nentry const floating = func (value: F32) : F32 => return do:\n  let $Box result: Box F32 = f_{d} ($Box value)\n  break result\n", .{ depth, depth });
         var module = try lowerPreludeProducer(text.items, &.{.add});
         defer module.deinit(a);
         var session = try evaluator.Session.init(a, &.{module});
@@ -751,7 +751,7 @@ test "source owned representation predicates retain open diamonds without closin
     }) |leaf| for ([_]usize{ 8, 16, 64 }) |depth| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "type Box a is data = #Box a\n");
+        try text.appendSlice(a, "type Box a is data = $Box a\n");
         try text.appendSlice(a, leaf);
         for (1..depth + 1) |i| try text.print(a, "const f_{d} = func value => return f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
         try text.print(a, "entry const factory = do:\n  break f_{d}\n", .{depth});
@@ -798,7 +798,7 @@ test "representation headers share live public inputs across distinct wrapper pr
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
         try text.appendSlice(a,
-            \\type Box a is data = #Box a
+            \\type Box a is data = $Box a
             \\entry const f_0: Box a -> Box a where { type_rep (Box a) } = func value => return value
             \\
         );
@@ -970,7 +970,7 @@ test "owned callback obligations bound higher order diamonds and preserve currie
         for ([_]usize{ 4, 8, 16, 64 }) |depth| {
             var text: std.ArrayList(u8) = .empty;
             defer text.deinit(a);
-            try text.print(a, "type Count is data = #Count U32\ntype Other is data = #Other U32\nconst identity = {s}\nconst f_0 = func callback => return func value => return do:\n  let compared = @type.same #Count #Other\n  use result <- {s}\n  break result\n", .{ producer, invocation });
+            try text.print(a, "type Count is data = $Count U32\ntype Other is data = $Other U32\nconst identity = {s}\nconst f_0 = func callback => return func value => return do:\n  let compared = @type.same $Count $Other\n  use result <- {s}\n  break result\n", .{ producer, invocation });
             for (1..depth + 1) |i| try text.print(a, "const f_{d} = func callback => return func value => return do:\n  use first <- f_{d} callback value\n  break f_{d} callback first\n", .{ i, i - 1, i - 1 });
             try text.print(a, "entry const generic = do:\n  break f_{d}\nentry const integer = func (value: U32) => return f_{d} identity value\nentry const floating = func (value: F32) => return f_{d} identity value\n", .{ depth, depth, depth });
             var module = try lower(text.items);
@@ -1074,7 +1074,7 @@ test "higher order callback capture fallback preserves source checking without d
     for ([_]usize{ 4, 8 }) |depth| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "type Count is data = #Count U32\ntype Other is data = #Other U32\nconst f_0 = func callback => return func value => return do:\n  let compared = @type.same #Count #Other\n  use result <- callback value\n  break result\n");
+        try text.appendSlice(a, "type Count is data = $Count U32\ntype Other is data = $Other U32\nconst f_0 = func callback => return func value => return do:\n  let compared = @type.same $Count $Other\n  use result <- callback value\n  break result\n");
         for (1..depth + 1) |i| try text.print(a, "const f_{d} = func callback => return func value => return do:\n  use first <- f_{d} callback value\n  use second <- f_{d} callback first\n  break second\n", .{ i, i - 1, i - 1 });
         try text.print(a, "const factory = do:\n  break f_{d}\nentry const answer = func (delta: U32) => return factory (func value => return @u32.add value delta) 7\n", .{depth});
         var module = try lower(text.items);
@@ -1192,13 +1192,13 @@ test "source result equations check newly revealed selected edges through every 
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
         try text.appendSlice(a,
-            \\type Seed is data = #Seed
-            \\type Box a is data = #Box a
-            \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-            \\const f_0 = func value => return @type.call "build" value #Seed
+            \\type Seed is data = $Seed
+            \\type Box a is data = $Box a
+            \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+            \\const f_0 = func value => return @type.call "build" value $Seed
             \\
         );
-        try text.appendSlice(a, "entry const parent: a -> a = func value => return (f_0 value).read\nconst Box.read: Box a -> a = func box => return case box of\n  #Box value => value\n");
+        try text.appendSlice(a, "entry const parent: a -> a = func value => return (f_0 value).read\nconst Box.read: Box a -> a = func box => return case box of\n  $Box value => value\n");
         try text.appendSlice(a, "const chain_0 = func value => return parent value\n");
         for (1..depth + 1) |i| try text.print(a, "const chain_{d} = func value => return do:\n  let discard = chain_{d} value\n  break chain_{d} value\n", .{ i, i - 1, i - 1 });
         try text.print(a, "entry const generic = func value => return chain_{d} value\nentry const integer = func (value: U32) : U32 => return chain_{d} value\nentry const floating = func (value: F32) : F32 => return chain_{d} value\n", .{ depth, depth, depth });
@@ -1275,21 +1275,21 @@ test "source selected member graphs retain written header and closed caller row 
         defer text.deinit(a);
         try text.appendSlice(a, if (row_failure)
             \\type Tick is effect = Unit -> Unit
-            \\type Box a is data = #Box {value: a}
+            \\type Box a is data = $Box {value: a}
             \\const Box.read: Box a -> a ! {Tick} = func box => return do:
             \\  use Tick ()
             \\  break box.value
             \\const f_0 = func box => return box.read
             \\
         else
-            \\type Box a is data = #Box {value: a}
+            \\type Box a is data = $Box {value: a}
             \\const Box.read: Box a -> a where { associated "add" a a a } = func box => return box.value
             \\const f_0 = func box => return box.read
             \\
         );
         for (1..5) |i| try text.print(a, "const f_{d} = func box => return do:\n  {s} ignored {s} f_{d} box\n  break f_{d} box\n", .{ i, if (row_failure) "use" else "let", if (row_failure) "<-" else "=", i - 1, i - 1 });
         try text.appendSlice(a, "const factory = do:\n  break f_4\nentry const good = func (value: U32) => return value\n");
-        try text.appendSlice(a, if (row_failure) "entry const answer = func () => return factory (#Box {value: 21})\n" else "entry const answer = func () => return factory (#Box {value: true})\n");
+        try text.appendSlice(a, if (row_failure) "entry const answer = func () => return factory ($Box {value: 21})\n" else "entry const answer = func () => return factory ($Box {value: true})\n");
         var module = try lowerPreludeProducer(text.items, &.{.add});
         defer module.deinit(a);
         try selectedSourceHeaderScenario(a, &module, row_failure);
@@ -1421,10 +1421,10 @@ test "source proven physical nominal merge update and fixed comparison graphs bo
         .{ .leaf = "const f_0 = func value => return {left: value, right: value}.left\n" },
         .{ .leaf = "const f_0 = func value => return @record.merge {left: value} {right: value}\n", .result = ".left" },
         .{ .leaf = "const f_0 = func value => return do:\n  let record = {left: 0, keep: value}\n  record.left := value\n  break record.left\n" },
-        .{ .declarations = "type Box a is data = #Box {left: a, keep: a}\n", .leaf = "const f_0 = func value => return (#Box {left: value, keep: value}).left\n" },
-        .{ .declarations = "type Box a is data = #Box {left: a, keep: a}\n", .leaf = "const f_0 = func (box: Box a) => return box.left\n", .input = "(#Box {left: value, keep: value})" },
-        .{ .declarations = "type Box a is data = #Box a\nconst Box.read: Box a -> a = func box => return case box of\n  #Box value => value\n", .leaf = "const f_0 = func (box: Box a) => return box.read\n", .input = "(#Box value)" },
-        .{ .declarations = "type Count is data = #Count U32\ntype Other is data = #Other U32\n", .leaf = "const f_0 = func ignored => return @type.same #Count #Other\n", .closed = true },
+        .{ .declarations = "type Box a is data = $Box {left: a, keep: a}\n", .leaf = "const f_0 = func value => return ($Box {left: value, keep: value}).left\n" },
+        .{ .declarations = "type Box a is data = $Box {left: a, keep: a}\n", .leaf = "const f_0 = func (box: Box a) => return box.left\n", .input = "($Box {left: value, keep: value})" },
+        .{ .declarations = "type Box a is data = $Box a\nconst Box.read: Box a -> a = func box => return case box of\n  $Box value => value\n", .leaf = "const f_0 = func (box: Box a) => return box.read\n", .input = "($Box value)" },
+        .{ .declarations = "type Count is data = $Count U32\ntype Other is data = $Other U32\n", .leaf = "const f_0 = func ignored => return @type.same $Count $Other\n", .closed = true },
     }) |case| for ([_]usize{ 4, 8, 16, 64 }) |depth| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
@@ -1540,12 +1540,12 @@ test "type head principal graphs retain structured nominal results and exact sta
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
         try text.appendSlice(a,
-            \\type Cell a is data = #Cell a
+            \\type Cell a is data = $Cell a
             \\entry const f_0 = func (witness: w) : Cell a => return @state.get witness
             \\
         );
         for (1..depth + 1) |i| try text.print(a, "entry const f_{d} = func witness => return do:\n  use ignored <- f_{d} witness\n  break f_{d} witness\n", .{ i, i - 1, i - 1 });
-        try text.print(a, "entry const generic = func witness => return do:\n  use cell <- f_{d} witness\n  let #Cell value = cell\n  break value\n", .{depth});
+        try text.print(a, "entry const generic = func witness => return do:\n  use cell <- f_{d} witness\n  let $Cell value = cell\n  break value\n", .{depth});
         var module = try lower(text.items);
         defer module.deinit(a);
         const nodes = try a.dupe(core.Node, module.nodes);
@@ -1578,12 +1578,12 @@ fn closedHeadGraphScenario(allocator: std.mem.Allocator, module: *const core.Mod
 
 test "source closed state witnesses bound diamonds with unrelated unknown public inputs" {
     for ([_][]const u8{
-        "const f_0 = func ignored => return @state.get (#Cell 0)\n",
+        "const f_0 = func ignored => return @state.get ($Cell 0)\n",
         "const f_0 = func (witness: Cell a) : Cell a => return @state.get witness\n",
     }) |leaf| for ([_]usize{ 4, 8, 16, 64 }) |depth| {
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "type Cell a is data = #Cell a\n");
+        try text.appendSlice(a, "type Cell a is data = $Cell a\n");
         try text.appendSlice(a, leaf);
         for (1..depth + 1) |i| try text.print(a, "const f_{d} = func witness => return do:\n  use ignored <- f_{d} witness\n  break f_{d} witness\n", .{ i, i - 1, i - 1 });
         try text.print(a, "entry const factory = do:\n  break f_{d}\n", .{depth});
@@ -1599,13 +1599,13 @@ test "source closed state witnesses bound diamonds with unrelated unknown public
 
 test "result principal jobs defer Never witness diagnostics to their original source entry" {
     var module = try lower(
-        \\type Box a is data = #Box a
-        \\const Box.from = func value => return #Box value
+        \\type Box a is data = $Box a
+        \\const Box.from = func value => return $Box value
         \\const convert = func value => return do:
         \\  let same = @type.same (@panic "uncalled witness") value
         \\  break @type.result "from" value
         \\entry const run = func (value: U32) : U32 => return do:
-        \\  let #Box result: Box U32 = convert value
+        \\  let $Box result: Box U32 = convert value
         \\  break result
     );
     defer module.deinit(a);
@@ -1659,19 +1659,19 @@ fn resultPrincipalWitnessScenario(allocator: std.mem.Allocator, module: *const c
 test "result principal judgments keep per use input and effect failures authoritative and recover under allocation failure" {
     for ([_]bool{ false, true }) |effects| {
         const pure =
-            \\type Out is data = #Out U32
-            \\const Out.from = func (value: F32) => return #Out 42
+            \\type Out is data = $Out U32
+            \\const Out.from = func (value: F32) => return $Out 42
             \\const leaf = func value => return @type.result "from" value
             \\entry const convert = func value => return leaf value
             \\entry const correct = func (value: F32) : Out => return convert value
             \\entry const answer = 42
         ;
         const effectful =
-            \\type Out is data = #Out U32
+            \\type Out is data = $Out U32
             \\type Tick is effect = Unit -> Unit
             \\const Out.from = func (value: F32) => return do:
             \\  use Tick ()
-            \\  break #Out 42
+            \\  break $Out 42
             \\const leaf = func value => return @type.result "from" value
             \\entry const convert = func value => return leaf value
             \\entry const correct: F32 -> Out ! {Tick} = func value => return convert value
@@ -1688,16 +1688,16 @@ test "written predicate schemes share fresh requirements without expanding sourc
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
     try text.appendSlice(a,
-        \\type N is data = #N U32
+        \\type N is data = $N U32
         \\const N.add = func left => return func right => return case left, right of
-        \\  #N a, #N b => #N (@u32.add a b)
+        \\  $N a, $N b => $N (@u32.add a b)
         \\const f_0: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
         \\
     );
     for (1..17) |i| try text.print(a, "const f_{d} = func value => return f_{d} value\n", .{ i, i - 1 });
     try text.appendSlice(a,
-        \\entry const run = func (value: U32) => return case f_16 (#N value) of
-        \\  #N result => result
+        \\entry const run = func (value: U32) => return case f_16 ($N value) of
+        \\  $N result => result
         \\
     );
     var module = try lower(text.items);
@@ -1813,35 +1813,35 @@ test "dispatched written schemes preserve fresh argument and result predicates w
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
     try text.appendSlice(a,
-        \\type Integer is data = #Integer U32
-        \\type Float is data = #Float F32
+        \\type Integer is data = $Integer U32
+        \\type Float is data = $Float F32
         \\const Integer.add = func left => return func right => return case left, right of
-        \\  #Integer x, #Integer y => #Integer (@u32.add x y)
+        \\  $Integer x, $Integer y => $Integer (@u32.add x y)
         \\const Float.add = func left => return func right => return case left, right of
-        \\  #Float x, #Float y => #Float (@f32.add x y)
+        \\  $Float x, $Float y => $Float (@f32.add x y)
         \\const f_0: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
         \\
     );
     for (1..9) |i| try text.print(a, "const f_{d} = func value => return f_{d} value\n", .{ i, i - 1 });
     try text.appendSlice(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\const Box.twice: Box a -> Box a where { associated "add" a a a } = func box => return case box of
-        \\  #Box value => do:
+        \\  $Box value => do:
         \\    let first = f_8 value
-        \\    break #Box (f_8 first)
+        \\    break $Box (f_8 first)
         \\const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = func left => return func right => return case left, right of
-        \\  #Box x, #Box y => #Box (f_8 x)
-        \\const Box.from: a -> Box a where { associated "add" a a a } = func value => return #Box (f_8 value)
+        \\  $Box x, $Box y => $Box (f_8 x)
+        \\const Box.from: a -> Box a where { associated "add" a a a } = func value => return $Box (f_8 value)
         \\const add = func left => return func right => return @type.call "add" left right
         \\const from = func value => return @type.result "from" value
-        \\entry const integer = func (value: U32) => return case (#Box (#Integer value)).twice of
-        \\  #Box (#Integer result) => result
-        \\entry const floating = func (value: F32) => return case (#Box (#Float value)).twice of
-        \\  #Box (#Float result) => result
-        \\entry const associated = func (value: U32) => return case add (#Box (#Integer value)) (#Box (#Integer value)) of
-        \\  #Box (#Integer result) => result
+        \\entry const integer = func (value: U32) => return case ($Box ($Integer value)).twice of
+        \\  $Box ($Integer result) => result
+        \\entry const floating = func (value: F32) => return case ($Box ($Float value)).twice of
+        \\  $Box ($Float result) => result
+        \\entry const associated = func (value: U32) => return case add ($Box ($Integer value)) ($Box ($Integer value)) of
+        \\  $Box ($Integer result) => result
         \\entry const constructed = func (value: F32) => return do:
-        \\  let #Box (#Float result): Box Float = from (#Float value)
+        \\  let $Box ($Float result): Box Float = from ($Float value)
         \\  break result
         \\
     );
@@ -1864,16 +1864,16 @@ test "summary admission visits a shared callee graph once and publishes atomical
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
     try text.appendSlice(a,
-        \\type N is data = #N U32
+        \\type N is data = $N U32
         \\const N.add = func left => return func right => return case left, right of
-        \\  #N a, #N b => #N (@u32.add a b)
+        \\  $N a, $N b => $N (@u32.add a b)
         \\const f_0 = func value => return @type.call "add" value value
         \\
     );
     for (1..33) |i| try text.print(a, "const f_{d} = func value => return f_{d} value\n", .{ i, i - 1 });
     try text.appendSlice(a,
-        \\entry const run = func (value: U32) => return case f_32 (#N value) of
-        \\  #N result => result
+        \\entry const run = func (value: U32) => return case f_32 ($N value) of
+        \\  $N result => result
         \\
     );
     var module = try lower(text.items);
@@ -1921,18 +1921,18 @@ fn contextualResultScenario(allocator: std.mem.Allocator, module: *const core.Mo
 test "constant contextual result evidence waits for receiver owners before one-sided inference" {
     var module = try lowerWithOptions(contextual_result_prelude ++
         \\
-        \\type Number is data = #Number U32
-        \\type Holder is data = #Holder {direction:Number}
+        \\type Number is data = $Number U32
+        \\type Holder is data = $Holder {direction:Number}
         \\const Number.add = func left => return func (right: U32) => return case left of
-        \\  #Number value => @u32.add value right
+        \\  $Number value => @u32.add value right
         \\const Number.walk = func (left: Number) => return func (remaining: U32) : U32 => return
         \\  if @u32.eq remaining 0 then 42 else @type.call "walk" left (@u32.sub remaining 1)
-        \\const holder = #Holder {direction: #Number 40}
+        \\const holder = $Holder {direction: $Number 40}
         \\const combine = func value => return value.direction + 2
         \\entry const nested = from (ceil (sqrt (from count))) + 2
         \\entry const floating = from count + 0.5
         \\entry const delayed = combine holder
-        \\entry const recursive = @type.call "walk" (#Number 0) 4
+        \\entry const recursive = @type.call "walk" ($Number 0) 4
     , .{ .builtin_catalog = true });
     defer module.deinit(a);
     const frozen_nodes = try a.dupe(core.Node, module.nodes);
@@ -1984,18 +1984,18 @@ fn ambientMemberScenario(allocator: std.mem.Allocator, module: *const core.Modul
 test "selected pure members admit ambient effects while callback inputs retain exact rows" {
     var module = try lower(
         \\effect Read: Unit -> U32
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.read: Box -> U32 = func box => return case box of
-        \\  #Box value => value
+        \\  $Box value => value
         \\const Box.invoke: Box -> (Unit -> U32) -> U32 = func box => return func callback => return callback ()
         \\const read = func value => return value.read
         \\entry const action = func () => return do:
         \\  use before <- Read ()
-        \\  break @u32.add before (read (#Box 2))
+        \\  break @u32.add before (read ($Box 2))
         \\const provider = @effect.provider Read (func () => return 40)
         \\entry const answer = do provider:
         \\  break action ()
-        \\entry const strict = func callback => return (#Box 2).invoke callback
+        \\entry const strict = func callback => return ($Box 2).invoke callback
     );
     defer module.deinit(a);
     try ambientMemberScenario(a, &module);
@@ -2030,13 +2030,13 @@ fn curriedAmbientScenario(allocator: std.mem.Allocator, module: *const core.Modu
 test "curried member results and retained pure closures admit ambient rows without dropping required effects" {
     var module = try lower(
         \\effect Read: Unit -> U32
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.add: Box -> U32 -> U32 = func box => return func offset => return case box of
-        \\  #Box value => @u32.add value offset
+        \\  $Box value => @u32.add value offset
         \\const reader = @effect.provider Read (func () => return 2)
         \\entry const answer = func () => return do reader:
         \\  use offset <- Read ()
-        \\  break (#Box 40).add offset
+        \\  break ($Box 40).add offset
         \\entry const constant = answer ()
         \\entry const pure = func () : U32 => return 42
         \\entry const effectful = func () => return Read ()
@@ -2078,20 +2078,20 @@ fn nestedScopeScenario(allocator: std.mem.Allocator, module: *const core.Module)
 test "nested State scope closures prove captured callback rows before freezing their graph" {
     var module = try lower(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\type Builder [world,scope] is data = #Builder { initial: world, scope: world -> scope }
+        \\type Builder [world,scope] is data = $Builder { initial: world, scope: world -> scope }
         \\const empty = func () => return do:
         \\  let scope = func world => return func action => return do:
         \\    use result <- action ()
         \\    break (world,result)
-        \\  break #Builder { initial: (), scope }
+        \\  break $Builder { initial: (), scope }
         \\const insert = func initial => return func builder => return do:
-        \\  let #Builder { initial: previous_initial, scope: previous_scope } = builder
+        \\  let $Builder { initial: previous_initial, scope: previous_scope } = builder
         \\  let scope = func world => return func action => return do:
         \\    let (current,previous) = world
         \\    use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
         \\    let (next,(previous_next,result)) = outcome
         \\    break ((next,previous_next),result)
-        \\  break #Builder { initial: (initial,previous_initial), scope }
+        \\  break $Builder { initial: (initial,previous_initial), scope }
         \\entry const builder = insert 42 (insert 1.5 (empty ()))
     );
     defer module.deinit(a);
@@ -2239,17 +2239,17 @@ fn retainedOwnRowScenario(allocator: std.mem.Allocator, module: *const core.Modu
 test "retained callable own latent row closes only after concrete operation proof" {
     var module = try lower(
         \\type State a is effect = { set: a -> Unit }
-        \\type Settings begin is data = #Settings { value: U32, begin: begin }
+        \\type Settings begin is data = $Settings { value: U32, begin: begin }
         \\const set = func value => return State.set value
         \\entry const begin = func () => return set 7
-        \\const settings = #Settings { value: 42, begin }
+        \\const settings = $Settings { value: 42, begin }
         \\const draw = func settings => return func () => return do:
-        \\  let #Settings { value } = settings
+        \\  let $Settings { value } = settings
         \\  break value
         \\entry const drawable = draw settings
         \\entry const answer = drawable ()
         \\const needs_callback = func callback => return @u32.add (callback ()) 1
-        \\entry const unbound = draw (#Settings { value: 42, begin: needs_callback })
+        \\entry const unbound = draw ($Settings { value: 42, begin: needs_callback })
         \\entry const increment = func value => return @u32.add value 1
         \\const compose = func left => return func right => return func value => return left (right value)
         \\entry const composed = compose increment increment
@@ -2336,7 +2336,7 @@ test "runtime dependency tracing demands named constants without executing runti
 }
 
 test "global dead-branch references are demanded but direct unselected traps are skipped" {
-    var direct = try lowerPreludeProducer("infixr 25 (&&) = _fixity_and\ninfix 30 (==) = _fixity_eq\nentry const selected = if false then @u32.div 1 0 else 42\nentry const logical = false && (@u32.div 1 0 == 0)\nconst _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @force right else false\nconst _fixity_eq = func left => return func right => return @type.call \"eq\" left right\n", &.{.eq});
+    var direct = try lowerPreludeProducer("infixr 25 (<&>) = _fixity_and\ninfix 30 (==) = _fixity_eq\nentry const selected = if false then @u32.div 1 0 else 42\nentry const logical = false <&> (@u32.div 1 0 == 0)\nconst _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false\nconst _fixity_eq = func left => return func right => return @type.call \"eq\" left right\n", &.{.eq});
     defer direct.deinit(a);
     try expectValue(&direct, "selected", .{ .scalar = .u32, .bits = 42 });
     try expectValue(&direct, "logical", .{ .scalar = .bool, .bits = 0 });
@@ -2462,11 +2462,11 @@ fn reentrantQueueScenario(allocator: std.mem.Allocator, module: *const core.Modu
 
 test "method lookup queues dependents until the active constant finishes and releases the drain guard on failure" {
     var module = try lower(
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const Box.get = func box => return case box of
-        \\  #Box value => value
+        \\  $Box value => value
         \\const read = func value => return value.get
-        \\const first = read (#Box 40)
+        \\const first = read ($Box 40)
         \\const second = @u32.add first 2
         \\entry const answer = func () => return @u32.add first second
     );
@@ -2586,9 +2586,9 @@ test "rich value slots child buffers snapshots and fuel limits release on alloca
 
 test "reference record field order and rebinding preserve immutable aliases" {
     var module = try lower(
-        \\type Point is data = #Point { x: U32, y: U32 }
+        \\type Point is data = $Point { x: U32, y: U32 }
         \\entry const answer = do:
-        \\  let point = #Point { y: 2, x: 1 }
+        \\  let point = $Point { y: 2, x: 1 }
         \\  let before = point
         \\  point.x := @u32.add self 1
         \\  break @u32.add before.x (@u32.mul point.x 10)
@@ -2599,13 +2599,13 @@ test "reference record field order and rebinding preserve immutable aliases" {
 
 test "reference parameterized variants preserve scalar payloads and empty constructors" {
     var module = try lower(
-        \\type Choice a is data = #Present a | #Absent
+        \\type Choice a is data = $Present a | $Absent
         \\const get = func fallback => return func candidate => return case candidate of
-        \\  #Present value => value
-        \\  #Absent => fallback
-        \\entry const integer = get 0 (#Present 42)
-        \\entry const floating = get 0.0 (#Present 1.5)
-        \\entry const empty = get 7 #Absent
+        \\  $Present value => value
+        \\  $Absent => fallback
+        \\entry const integer = get 0 ($Present 42)
+        \\entry const floating = get 0.0 ($Present 1.5)
+        \\entry const empty = get 7 $Absent
     );
     defer module.deinit(a);
     var session = try evaluator.Session.init(a, &.{module});
@@ -2618,10 +2618,10 @@ test "reference parameterized variants preserve scalar payloads and empty constr
 
 test "reference nested nominal record tuple patterns use canonical slots and wildcard holes" {
     var module = try lower(
-        \\type Point is data = #Point { x: U32, y: U32 }
-        \\type Pair [left, right] is data = #Pair (left, right)
+        \\type Point is data = $Point { x: U32, y: U32 }
+        \\type Pair [left, right] is data = $Pair (left, right)
         \\entry const answer = do:
-        \\  let #Pair (#Point { y, x }, amount) = #Pair (#Point { y: 20, x: 2 }, 20)
+        \\  let $Pair ($Point { y, x }, amount) = $Pair ($Point { y: 20, x: 2 }, 20)
         \\  break @u32.add x (@u32.add y amount)
     );
     defer module.deinit(a);
@@ -2630,15 +2630,15 @@ test "reference nested nominal record tuple patterns use canonical slots and wil
 
 test "reference ordered constructor alternatives and failed guards fall through once" {
     var module = try lower(
-        \\type Choice is data = #First U32 | #Second U32 | #Empty
+        \\type Choice is data = $First U32 | $Second U32 | $Empty
         \\const choose = func candidate => return case candidate of
-        \\  #First value | #Second value if @u32.lt 39 value => value
-        \\  #First value | #Second value => @u32.add value 2
-        \\  #Empty => 0
-        \\entry const guarded = choose (#Second 42)
-        \\entry const fallback = choose (#First 40)
-        \\entry const low = choose (#Second 39)
-        \\entry const empty = choose #Empty
+        \\  $First value | $Second value if @u32.lt 39 value => value
+        \\  $First value | $Second value => @u32.add value 2
+        \\  $Empty => 0
+        \\entry const guarded = choose ($Second 42)
+        \\entry const fallback = choose ($First 40)
+        \\entry const low = choose ($Second 39)
+        \\entry const empty = choose $Empty
     );
     defer module.deinit(a);
     try expectValue(&module, "guarded", .{ .scalar = .u32, .bits = 42 });
@@ -2666,7 +2666,7 @@ test "rich nominal snapshot identities erase generic arguments and distinguish d
     var floating: evaluator.ValueId = undefined;
     var snapshot: evaluator.Snapshot = undefined;
     {
-        var module = try lower("type Box a is data = #Box a\ntype Other a is data = #Other a\nentry const integer = #Box 41\nentry const floating = #Box 1.5\nentry const other = #Other 41\n");
+        var module = try lower("type Box a is data = $Box a\ntype Other a is data = $Other a\nentry const integer = $Box 41\nentry const floating = $Box 1.5\nentry const other = $Other 41\n");
         defer module.deinit(a);
         var session = try evaluator.Session.init(a, &.{module});
         defer session.deinit();
@@ -2692,22 +2692,22 @@ test "rich nominal snapshot identities erase generic arguments and distinguish d
 
 test "refutable patterns and conditional matches preserve exiting suites and branch merges" {
     var module = try lower(
-        \\type Choice a is data = #Present a | #Absent
+        \\type Choice a is data = $Present a | $Absent
         \\const unpack = func candidate => return do:
-        \\  let #Present value = candidate else:
+        \\  let $Present value = candidate else:
         \\    break 0
         \\  break value
         \\const choose = func candidate => return do:
         \\  let total = 1
-        \\  if let #Present value = candidate:
+        \\  if let $Present value = candidate:
         \\    total := @u32.add value 1
         \\  else:
         \\    total := 2
         \\  break total
-        \\entry const unpacked = unpack (#Present 42)
-        \\entry const missing = unpack #Absent
-        \\entry const selected = choose (#Present 42)
-        \\entry const fallback = choose #Absent
+        \\entry const unpacked = unpack ($Present 42)
+        \\entry const missing = unpack $Absent
+        \\entry const selected = choose ($Present 42)
+        \\entry const fallback = choose $Absent
     );
     defer module.deinit(a);
     try expectValue(&module, "unpacked", .{ .scalar = .u32, .bits = 42 });
@@ -2718,23 +2718,23 @@ test "refutable patterns and conditional matches preserve exiting suites and bra
 
 test "statement case arms carry rebinding through nested level merges during immutable evaluation" {
     var module = try lower(
-        \\type Tri is data = #Rise | #Fall | #Still
+        \\type Tri is data = $Rise | $Fall | $Still
         \\const choose = func beat => return do:
         \\  let total = 1
         \\  let other = 100
         \\  case beat of
-        \\    #Rise => do:
+        \\    $Rise => do:
         \\      total := 7
-        \\    #Fall => do:
+        \\    $Fall => do:
         \\      other := 200
         \\      break ()
-        \\    #Still => do:
+        \\    $Still => do:
         \\      if @u32.lt total 5:
         \\        total := @u32.add self 10
         \\  break @u32.add total other
-        \\entry const rise = choose #Rise
-        \\entry const fall = choose #Fall
-        \\entry const still = choose #Still
+        \\entry const rise = choose $Rise
+        \\entry const fall = choose $Fall
+        \\entry const still = choose $Still
     );
     defer module.deinit(a);
     try expectValue(&module, "rise", .{ .scalar = .u32, .bits = 107 });
@@ -2744,13 +2744,13 @@ test "statement case arms carry rebinding through nested level merges during imm
 
 test "nested field paths copy only immutable descendants and retain omitted pattern slots" {
     var module = try lower(
-        \\type Point is data = #Point { x: U32, y: U32 }
-        \\type Holder is data = #Holder { point: Point, flag: Bool }
+        \\type Point is data = $Point { x: U32, y: U32 }
+        \\type Holder is data = $Holder { point: Point, flag: Bool }
         \\entry const answer = do:
-        \\  let holder = #Holder { flag: true, point: #Point { y: 3, x: 1 } }
+        \\  let holder = $Holder { flag: true, point: $Point { y: 3, x: 1 } }
         \\  let before = holder
         \\  holder.point.x := @u32.add self 1
-        \\  let #Holder { point: #Point { y } } = holder
+        \\  let $Holder { point: $Point { y } } = holder
         \\  break @u32.add (@u32.mul before.point.x 10) (@u32.add holder.point.x y)
     );
     defer module.deinit(a);
@@ -2771,14 +2771,14 @@ fn nominalAllocationScenario(allocator: std.mem.Allocator, module: *const core.M
 
 test "aggregate matching path copies and snapshots release on every allocation failure" {
     var module = try lower(
-        \\type Point is data = #Point { x: U32, y: U32 }
-        \\type Choice a is data = #Present a | #Absent
+        \\type Point is data = $Point { x: U32, y: U32 }
+        \\type Choice a is data = $Present a | $Absent
         \\const change = func (candidate: Choice Point) => return do:
-        \\  let #Present point = candidate else:
-        \\    break #Point { x: 0, y: 0 }
+        \\  let $Present point = candidate else:
+        \\    break $Point { x: 0, y: 0 }
         \\  point.x := @u32.add self 1
         \\  break point
-        \\entry const answer = change (#Present (#Point { y: 9, x: 41 }))
+        \\entry const answer = change ($Present ($Point { y: 9, x: 41 }))
     );
     defer module.deinit(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nominalAllocationScenario, .{&module});
@@ -2786,8 +2786,8 @@ test "aggregate matching path copies and snapshots release on every allocation f
 
 test "record operands execute written order before declaration-order permutation" {
     const source =
-        \\type Point is data = #Point { x: U32, y: U32 }
-        \\const point = #Point { y: @u32.div 2 0, x: @u32.div 1 0 }
+        \\type Point is data = $Point { x: U32, y: U32 }
+        \\const point = $Point { y: @u32.div 2 0, x: @u32.div 1 0 }
         \\entry const answer = point.x
     ;
     var module = try lower(source);
@@ -2801,10 +2801,10 @@ test "record operands execute written order before declaration-order permutation
 
 test "product literal projections and sum-record fields follow their typed variant slot" {
     var module = try lower(
-        \\type Position is data = #First { x: U32, y: U32 } | #Second { y: U32, x: U32 }
+        \\type Position is data = $First { x: U32, y: U32 } | $Second { y: U32, x: U32 }
         \\const coordinate = func (point: Position) => return point.x
-        \\entry const first = coordinate (#First { y: 9, x: 21 })
-        \\entry const second = coordinate (#Second { x: 42, y: 8 })
+        \\entry const first = coordinate ($First { y: 9, x: 21 })
+        \\entry const second = coordinate ($Second { x: 42, y: 8 })
         \\entry const tuple = @product.get (99, 42) 1
     );
     defer module.deinit(a);
@@ -2840,8 +2840,8 @@ test "reference array literals fill and set preserve cached immutable snapshots"
 
 test "reference arrays carry nominal and nested array handles without mutating aliases" {
     var module = try lower(
-        \\type Box is data = #Box { x: U32 }
-        \\const values = #[#Box { x: 40 }, #Box { x: 2 }]
+        \\type Box is data = $Box { x: U32 }
+        \\const values = #[$Box { x: 40 }, $Box { x: 2 }]
         \\const rows = #[#[1, 2], #[3, 4]]
         \\const next = @array.set rows 1 (@array.set (@array.get rows 1) 0 42)
         \\entry const answer = @u32.add (@array.get values 0).x (@array.get values 1).x
@@ -3012,14 +3012,14 @@ test "reference partial named calls and staged selected functions share cached c
 
 test "reference first-class constructors and ordinary primitive wrappers remain callable" {
     var module = try lower(
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\const apply = func transform => return func value => return transform value
-        \\const box = #Box
+        \\const box = $Box
         \\const add = func left => return func right => return @u32.add left right
         \\const increment = add 40
         \\const fill = func value => return @array.fill 2 value
         \\entry const boxed = case apply box 42 of
-        \\  #Box value => value
+        \\  $Box value => value
         \\entry const scalar = increment 2
         \\entry const length = @array.length (fill 7)
     );
@@ -3092,13 +3092,13 @@ fn evidenceAllocationScenario(allocator: std.mem.Allocator, module: *const core.
 
 test "exact evidence keeps generic fields and associated member calls independent across uses" {
     var module = try lower(
-        \\type Point a is data = #Point {x:a}
-        \\type FloatPoint is data = #FloatPoint {x:F32}
-        \\const Point.combine = func (left:Point U32) => return func (right:Point U32) => return #Point {x:@u32.add left.x right.x}
+        \\type Point a is data = $Point {x:a}
+        \\type FloatPoint is data = $FloatPoint {x:F32}
+        \\const Point.combine = func (left:Point U32) => return func (right:Point U32) => return $Point {x:@u32.add left.x right.x}
         \\const combine = func left => return func right => return @type.call "combine" left right
         \\const coordinate = func point => return point.x
-        \\entry const answer = coordinate (combine (#Point {x:20}) (#Point {x:22}))
-        \\entry const floating = coordinate (#FloatPoint {x:1.25})
+        \\entry const answer = coordinate (combine ($Point {x:20}) ($Point {x:22}))
+        \\entry const floating = coordinate ($FloatPoint {x:1.25})
     );
     defer module.deinit(a);
     try expectValue(&module, "answer", .{ .scalar = .u32, .bits = 42 });
@@ -3109,14 +3109,14 @@ test "exact evidence keeps generic fields and associated member calls independen
 test "phantom nominal arguments control ordered method admission before implementation effects" {
     var module = try lowerPreludeProducer(
         \\infixl 60 (+) = _fixity_add
-        \\type Phantom a is data = #Phantom Unit
-        \\type Right is data = #Right Unit
+        \\type Phantom a is data = $Phantom Unit
+        \\type Right is data = $Right Unit
         \\const Phantom.add = func (left:Phantom U32) => return func (right:Right) => return @u32.div 1 0
         \\const Right.add = func (left:Phantom F32) => return func (right:Right) => return 42
         \\const plus = func left => return func right => return left + right
-        \\const integer:Phantom U32 = #Phantom ()
-        \\const floating:Phantom F32 = #Phantom ()
-        \\entry const answer = plus floating (#Right ())
+        \\const integer:Phantom U32 = $Phantom ()
+        \\const floating:Phantom F32 = $Phantom ()
+        \\entry const answer = plus floating ($Right ())
         \\entry const integer_view = integer
         \\entry const floating_view = floating
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
@@ -3140,10 +3140,10 @@ test "phantom nominal arguments control ordered method admission before implemen
 test "authoritative scalar primitives bypass source methods while generic operators select them" {
     var module = try lowerPreludeProducer(
         \\infixl 60 (+) = _fixity_add
-        \\type Point is data = #Point {x:U32}
-        \\const Point.add = func left => return func right => return #Point {x:@u32.add left.x right.x}
+        \\type Point is data = $Point {x:U32}
+        \\const Point.add = func left => return func right => return $Point {x:@u32.add left.x right.x}
         \\const plus = func left => return func right => return left + right
-        \\entry const nominal = (plus (#Point {x:20}) (#Point {x:22})).x
+        \\entry const nominal = (plus ($Point {x:20}) ($Point {x:22})).x
         \\entry const scalar = plus 20 22
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     , &.{.add});
@@ -3155,7 +3155,7 @@ test "authoritative scalar primitives bypass source methods while generic operat
 test "unused generic bodies remain principal and a concrete dead-branch use rejects missing methods" {
     var unused = try lowerPreludeProducer(
         \\infixl 60 (+) = _fixity_add
-        \\type Empty is data = #Empty
+        \\type Empty is data = $Empty
         \\const bad = func value => return if false then value + value else 42
         \\entry const answer = 42
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
@@ -3164,9 +3164,9 @@ test "unused generic bodies remain principal and a concrete dead-branch use reje
     try expectValue(&unused, "answer", .{ .scalar = .u32, .bits = 42 });
     const source =
         \\infixl 60 (+) = _fixity_add
-        \\type Empty is data = #Empty
+        \\type Empty is data = $Empty
         \\const bad = func value => return if false then value + value else 42
-        \\entry const answer = bad #Empty
+        \\entry const answer = bad $Empty
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     ;
     var tokens = try lexer.lex(a, source);
@@ -3190,16 +3190,16 @@ test "unused generic bodies remain principal and a concrete dead-branch use reje
 test "staged phantom captures and curried named partials retain exact type evidence" {
     var module = try lowerPreludeProducer(
         \\infixl 60 (+) = _fixity_add
-        \\type Phantom a is data = #Phantom Unit
-        \\type Right is data = #Right Unit
+        \\type Phantom a is data = $Phantom Unit
+        \\type Right is data = $Right Unit
         \\const Phantom.add = func (left:Phantom U32) => return func (right:Right) => return @u32.div 1 0
         \\const Right.add = func (left:Phantom F32) => return func (right:Right) => return 42
         \\const plus = func left => return func right => return left + right
         \\const make = func marker => return func () => return marker
-        \\const floating:Phantom F32 = #Phantom ()
+        \\const floating:Phantom F32 = $Phantom ()
         \\const ready = make floating
         \\const partial = plus (ready ())
-        \\entry const answer = partial (#Right ())
+        \\entry const answer = partial ($Right ())
         \\entry const function = ready
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     , &.{.add});
@@ -3241,22 +3241,22 @@ fn witnessScenario(allocator: std.mem.Allocator, module: *const core.Module) !vo
 
 test "type witnesses retain phantom arguments while excluding their uncalled arrow rows" {
     var module = try lower(
-        \\type Count is data = #Count U32
-        \\type Other is data = #Other U32
-        \\type Cell value is data = #Cell value
-        \\type Phantom value is data = #Phantom
-        \\type Type witness is data = #Type witness
+        \\type Count is data = $Count U32
+        \\type Other is data = $Other U32
+        \\type Cell value is data = $Cell value
+        \\type Phantom value is data = $Phantom
+        \\type Type witness is data = $Type witness
         \\const same = func left => return func right => return @type.same left right
         \\const Type.eq = func left => return func right => return case left, right of
-        \\  #Type first, #Type second => @type.same first second
-        \\entry const constructor = same #Count (#Count 42)
-        \\entry const nominal = same #Count #Other
-        \\entry const generic = same (#Cell 1) (#Cell 1.0)
+        \\  $Type first, $Type second => @type.same first second
+        \\entry const constructor = same $Count ($Count 42)
+        \\entry const nominal = same $Count $Other
+        \\entry const generic = same ($Cell 1) ($Cell 1.0)
         \\entry const array = same #[1,2] #[42]
         \\entry const product = same (1,true) (1.0,true)
-        \\entry const cell = same (#Cell 42) (func () : Cell U32 => return @panic "uncalled witness")
-        \\entry const distinct = same (func () : Phantom U32 => return #Phantom) (func () : Phantom F32 => return #Phantom)
-        \\entry const equal = same (func () : Phantom U32 => return #Phantom) (func () : Phantom U32 => return #Phantom)
+        \\entry const cell = same ($Cell 42) (func () : Cell U32 => return @panic "uncalled witness")
+        \\entry const distinct = same (func () : Phantom U32 => return $Phantom) (func () : Phantom F32 => return $Phantom)
+        \\entry const equal = same (func () : Phantom U32 => return $Phantom) (func () : Phantom U32 => return $Phantom)
         \\entry const colon = Type.eq (:1) (:2)
         \\entry const ordered = @type.same (func () : U32 => return @panic "uncalled witness") (@panic "right witness")
     );
@@ -3267,12 +3267,12 @@ test "type witnesses retain phantom arguments while excluding their uncalled arr
 
 test "private code evidence retains uncalled type witnesses inside generic calls" {
     var module = try lower(
-        \\type Cell value is data = #Cell value
-        \\type Phantom value is data = #Phantom
+        \\type Cell value is data = $Cell value
+        \\type Phantom value is data = $Phantom
         \\const same = func left => return func right => return @type.same left right
-        \\entry const run = func () => return same (#Cell 42) (func () : Cell U32 => return @panic "uncalled witness")
-        \\entry const phantom = func () => return same (func () : Phantom U32 => return #Phantom) (func () : Phantom F32 => return #Phantom)
-        \\entry const equal = func () => return same (func () : Phantom U32 => return #Phantom) (func () : Phantom U32 => return #Phantom)
+        \\entry const run = func () => return same ($Cell 42) (func () : Cell U32 => return @panic "uncalled witness")
+        \\entry const phantom = func () => return same (func () : Phantom U32 => return $Phantom) (func () : Phantom F32 => return $Phantom)
+        \\entry const equal = func () => return same (func () : Phantom U32 => return $Phantom) (func () : Phantom U32 => return $Phantom)
     );
     defer module.deinit(a);
     var session = try evaluator.Session.init(a, &.{module});
@@ -3289,11 +3289,11 @@ test "private code evidence retains uncalled type witnesses inside generic calls
 
 test "selected generic associated producers demand constants from unselected method branches" {
     var module = try lower(
-        \\type Point is data = #Point U32
+        \\type Point is data = $Point U32
         \\const failure = @u32.div 1 0
         \\const Point.combine = func left => return func right => return if false then failure else 42
         \\const combine = func left => return func right => return @type.call "combine" left right
-        \\entry const answer = combine (#Point 1) (#Point 2)
+        \\entry const answer = combine ($Point 1) ($Point 2)
     );
     defer module.deinit(a);
     const result = try evaluator.evaluate(a, &.{module}, target(&module, "answer"), .{});
@@ -3304,11 +3304,11 @@ test "selected generic associated producers demand constants from unselected met
 test "generic record closure snapshots retain storage names independently of semantic field order" {
     var module = try lower(
         \\const prime = func value => return value.a
-        \\type Point is data = #Point {z:U32,a:U32}
+        \\type Point is data = $Point {z:U32,a:U32}
         \\const capture = func value => return func () => return value
         \\const make = func value => return case value of
-        \\  #Point {z,a} => capture (#Point {z,a})
-        \\const ready = make (#Point {z:40,a:2})
+        \\  $Point {z,a} => capture ($Point {z,a})
+        \\const ready = make ($Point {z:40,a:2})
         \\entry const answer = @u32.add (prime (ready ())) (ready ()).z
         \\entry const function = ready
     );
@@ -3356,17 +3356,17 @@ test "unreferenced concrete method predicates stay lazy and demanded functions r
 
 const staged_builder_source =
     \\infixl 60 (+) = _fixity_add
-    \\type Builder callback is data = #Builder {run:callback}
+    \\type Builder callback is data = $Builder {run:callback}
     \\const add_step = func amount => return func builder => return do:
-    \\  let #Builder {run:previous} = builder
-    \\  break #Builder {run:func value => return previous value + amount}
+    \\  let $Builder {run:previous} = builder
+    \\  break $Builder {run:func value => return previous value + amount}
     \\const staged = do:
-    \\  let builder = #Builder {run:func value => return value}
+    \\  let builder = $Builder {run:func value => return value}
     \\  builder := add_step 10 self
     \\  builder := add_step 20 self
     \\  break builder
     \\const floating = do:
-    \\  let builder = #Builder {run:func value => return value}
+    \\  let builder = $Builder {run:func value => return value}
     \\  builder := add_step 1.5 self
     \\  builder := add_step 2.5 self
     \\  break builder
@@ -3413,11 +3413,11 @@ test "owned closure evidence region specializes unannotated staged builders with
 
 test "closure evidence region resolves nested accessor fields and captured aggregate callbacks" {
     var module = try lower(
-        \\type Box value is data = #Box {value:value}
+        \\type Box value is data = $Box {value:value}
         \\const Box.get = func (self:Box value) => return self.value
         \\const nested = .get.value
         \\const make = func box => return func value => return box.value value
-        \\const ready = make (#Box {value:func value=> return value})
+        \\const ready = make ($Box {value:func value=> return value})
         \\entry const accessor = nested
         \\entry const captured = ready
     );
@@ -3454,10 +3454,10 @@ test "demand evaluation skips bodies, caches aliases and retains lexical capture
         \\  let value=start
         \\  let deferred=delay value
         \\  value:=@u32.add self 1
-        \\  break @force deferred
+        \\  break @demand deferred
         \\entry const suspension=pending
-        \\entry const first=@force pending
-        \\entry const second=@force pending
+        \\entry const first=@demand pending
+        \\entry const second=@demand pending
         \\entry const ignored=ignore (@panic "unused")
         \\entry const captured=before 42
     );
@@ -3495,7 +3495,7 @@ fn demandAllocationScenario(allocator: std.mem.Allocator, module: *const core.Mo
 
 test "staged closures preserve shared demand memo slots through specialization and every allocation failure" {
     var module = try lower(
-        \\const capture = func ~value=> return func ()=> return @force value
+        \\const capture = func ~value=> return func ()=> return @demand value
         \\const ready=capture (@u32.add 40 2)
         \\entry const function=ready
         \\entry const answer=ready ()
@@ -3511,8 +3511,8 @@ test "forcing a demand traces named dependencies lazily and never publishes fail
         \\const bad=@panic "named deferred failure"
         \\const pending=delay (if false then bad else 42)
         \\entry const suspension=pending
-        \\entry const forced=@force pending
-        \\entry const direct=@force (delay (if false then @panic "unselected" else 42))
+        \\entry const forced=@demand pending
+        \\entry const direct=@demand (delay (if false then @panic "unselected" else 42))
     );
     defer module.deinit(a);
     try expectValue(&module, "direct", .{ .scalar = .u32, .bits = 42 });
@@ -3539,7 +3539,7 @@ test "owned demand snapshots retain aggregate memo values after source and sessi
         \\const delay=func ~value=> return value
         \\const pending=delay #[20,22]
         \\entry const suspension=pending
-        \\entry const forced=@force pending
+        \\entry const forced=@demand pending
     );
     var session = try evaluator.Session.init(a, &.{module});
     const pending = try session.richValue(target(&module, "suspension"));
@@ -3562,7 +3562,7 @@ test "owned demand snapshots retain aggregate memo values after source and sessi
 
 test "closure evidence writable fields ignore associated read members" {
     var module = try lower(
-        \\type Box value is data=#Box {value:value}
+        \\type Box value is data= $Box {value:value}
         \\const Box.value=func (self:Box value)=> return self
         \\const change=func box=> return do:
         \\  box.value:=@u32.add self 1
@@ -3602,8 +3602,8 @@ fn resultClosureRegionScenario(allocator: std.mem.Allocator, module: *const core
 
 test "closure evidence resolves result-associated constraints through captured generic producers" {
     var module = try lower(
-        \\type Box value is data=#Box value
-        \\const Box.from=func value=> return #Box value
+        \\type Box value is data= $Box value
+        \\const Box.from=func value=> return $Box value
         \\const from=func value=> return @type.result "from" value
         \\const make=func callback=> return func value=> return callback value
         \\entry const function=make from
@@ -3615,7 +3615,7 @@ test "closure evidence resolves result-associated constraints through captured g
 
 test "declared type tokens and generic monad factories retain exact source producer identity" {
     var module = try lower(
-        \\type Wrap value is data=#Wrap value
+        \\type Wrap value is data= $Wrap value
         \\const alias=Wrap
         \\const monad=func constructor=> return @do.monad constructor
         \\entry const token=alias
@@ -3636,12 +3636,12 @@ test "declared type tokens and generic monad factories retain exact source produ
 
 test "resolver binds invoke ordinary continuations repeatedly with independent lexical rebindings" {
     var module = try lower(
-        \\type Wrap value is data=#Wrap value
-        \\const Wrap.pure=func value=> return #Wrap value
+        \\type Wrap value is data= $Wrap value
+        \\const Wrap.pure=func value=> return $Wrap value
         \\const Wrap.bind=func candidate=> return func next=> return do:
-        \\  let #Wrap first=next candidate
-        \\  let #Wrap second=next (@u32.add candidate 1)
-        \\  break #Wrap (@u32.add first second)
+        \\  let $Wrap first=next candidate
+        \\  let $Wrap second=next (@u32.add candidate 1)
+        \\  break $Wrap (@u32.add first second)
         \\const monad=func constructor=> return @do.monad constructor
         \\const provider=monad Wrap
         \\const run=func ()=> return do provider:
@@ -3650,7 +3650,7 @@ test "resolver binds invoke ordinary continuations repeatedly with independent l
         \\  amount:=@u32.add self value
         \\  break amount
         \\entry const answer=case run () of
-        \\  #Wrap result=>result
+        \\  $Wrap result=>result
     );
     defer module.deinit(a);
     try expectValue(&module, "answer", .{ .scalar = .u32, .bits = 81 });
@@ -3658,20 +3658,20 @@ test "resolver binds invoke ordinary continuations repeatedly with independent l
 
 test "resolver producers control ignored continuations forwarding and falling through" {
     var module = try lower(
-        \\type Wrap value is data=#Wrap value
-        \\const Wrap.pure=func value=> return #Wrap value
-        \\const Wrap.bind=func (candidate:U32)=> return func (next:U32->Wrap U32)=> return #Wrap 42
+        \\type Wrap value is data= $Wrap value
+        \\const Wrap.pure=func value=> return $Wrap value
+        \\const Wrap.bind=func (candidate:U32)=> return func (next:U32->Wrap U32)=> return $Wrap 42
         \\const monad=func constructor=> return @do.monad constructor
         \\const provider=monad Wrap
         \\entry const skipped=case (do provider:
         \\  use value<-0
         \\  break @panic "unused continuation"
         \\) of
-        \\  #Wrap value=>value
+        \\  $Wrap value=>value
         \\entry const forwarded=case (do provider:
-        \\  break $ #Wrap 42
+        \\  break $ $Wrap 42
         \\) of
-        \\  #Wrap value=>value
+        \\  $Wrap value=>value
         \\entry const fallback=do provider:
         \\  let value=42
     );
@@ -3686,8 +3686,8 @@ test "resolver producers control ignored continuations forwarding and falling th
 }
 
 const resolver_capture_source =
-    \\type Wrap value is data=#Wrap value
-    \\const Wrap.pure=func value=> return #Wrap value
+    \\type Wrap value is data= $Wrap value
+    \\const Wrap.pure=func value=> return $Wrap value
     \\const Wrap.bind=func candidate=> return func next=> return next candidate
     \\const monad=func constructor=> return @do.monad constructor
     \\const make=func provider=> return func value=> return do provider:
@@ -3735,14 +3735,14 @@ test "captured resolver callbacks preserve exact independent evidence and snapsh
 }
 
 const private_body_source =
-    \\type Box value is data=#Box {value:value}
+    \\type Box value is data= $Box {value:value}
     \\const Box.get=func (self:Box value)=> return self.value
     \\const nested=.get.value
-    \\const Box.pure=func value=> return #Box {value:value}
+    \\const Box.pure=func value=> return $Box {value:value}
     \\const Box.bind=func candidate=> return func next=> return next candidate.value
     \\const monad=func constructor=> return @do.monad constructor
     \\const sequence=func (candidate:U32)=> return do (monad Box):
-    \\  use value<-#Box {value:candidate}
+    \\  use value<- $Box {value:candidate}
     \\  break @u32.add value 2
     \\entry const accessor=nested
     \\entry const function=sequence
@@ -3830,14 +3830,14 @@ test "generic cursor evidence retains array and list element relationships witho
 
 test "an absent input's independent phantom type remains unresolved instead of adopting the output type" {
     var module = try lower(
-        \\type Option value is data=#Present value | #Absent
-        \\const Option.pure=func value=> return #Present value
+        \\type Option value is data= $Present value | $Absent
+        \\const Option.pure=func value=> return $Present value
         \\const Option.bind=func candidate=> return func next=> return case candidate of
-        \\  #Present value=>next value
-        \\  #Absent=>#Absent
+        \\  $Present value=>next value
+        \\  $Absent=> $Absent
         \\entry const sequence=func (flag:Bool)=> return do (@do.monad Option):
         \\  if flag:
-        \\    use #Absent
+        \\    use $Absent
         \\  break 42
     );
     defer module.deinit(a);
@@ -3871,11 +3871,11 @@ test "an absent input's independent phantom type remains unresolved instead of a
 test "frozen body evidence separates generic call instances and closes recursive type dependencies without evaluation" {
     var module = try lowerPreludeProducer(
         \\infix 30 (==) = _fixity_eq
-        \\type Box value is data=#Box {value:value}
+        \\type Box value is data= $Box {value:value}
         \\const get=func box=> return box.value
         \\const alias=get
         \\const repeat=func (value:U32):U32=> return if value==0 then 42 else repeat (@u32.sub value 1)
-        \\entry const mixed=func ()=> return (alias (#Box {value:42}),alias (#Box {value:1.5}))
+        \\entry const mixed=func ()=> return (alias ($Box {value:42}),alias ($Box {value:1.5}))
         \\entry const recursive=repeat
         \\const _fixity_eq = func left => return func right => return @type.call "eq" left right
     , &.{.eq});
@@ -4193,7 +4193,7 @@ const provider_execution_source =
     \\const provider = @effect.provider Read (func () => return 42)
     \\const read = func () => return Read ()
     \\const invoke = func callback => return callback ()
-    \\const force = func ~value => return @force value
+    \\const force = func ~value => return @demand value
     \\const ignore = func ~value => return 42
     \\const direct = func () => return do provider:
     \\  break read ()
@@ -4350,12 +4350,12 @@ fn recordEvidenceScenario(allocator: std.mem.Allocator, module: *const core.Modu
 
 test "staged heterogeneous schemas recover concrete record evidence beside generic callbacks" {
     var module = try lower(
-        \\type End is data = #End
-        \\type Entry {head,tail} is data = #Entry{head,tail}
-        \\type Builder [world,scope,schema] is data = #Builder{initial:world,scope:world->scope,schema:schema}
+        \\type End is data = $End
+        \\type Entry {head,tail} is data = $Entry{head,tail}
+        \\type Builder [world,scope,schema] is data = $Builder{initial:world,scope:world->scope,schema:schema}
         \\const End.contains = func (end:End) => return func witness => return false
         \\const Entry.contains = func entry => return func witness => return do:
-        \\  let #Entry{head,tail}=entry
+        \\  let $Entry{head,tail}=entry
         \\  if @type.same head witness:
         \\    break true
         \\  break tail.contains(witness)
@@ -4363,26 +4363,26 @@ test "staged heterogeneous schemas recover concrete record evidence beside gener
         \\  let scope=func world => return func action => return do:
         \\    use result <- action ()
         \\    break (world,result)
-        \\  break #Builder{initial:(),scope,schema:#End}
+        \\  break $Builder{initial:(),scope,schema:$End}
         \\const insert_cell=func initial => return func builder => return do:
-        \\  let #Builder{initial:previous_initial,scope:previous_scope,schema}=builder
+        \\  let $Builder{initial:previous_initial,scope:previous_scope,schema}=builder
         \\  let scope=func world => return func action => return do:
         \\    let (current,previous)=world
         \\    break previous_scope previous action
-        \\  break #Builder{initial:(initial,previous_initial),scope,schema}
+        \\  break $Builder{initial:(initial,previous_initial),scope,schema}
         \\const insert=func value => return func builder => return do:
-        \\  let #Builder{schema}=builder
+        \\  let $Builder{schema}=builder
         \\  if schema.contains(value):
         \\    break @panic "duplicate"
-        \\  let #Builder{initial,scope}=insert_cell value builder
-        \\  break #Builder{initial,scope,schema:#Entry{head:value,tail:schema}}
+        \\  let $Builder{initial,scope}=insert_cell value builder
+        \\  break $Builder{initial,scope,schema:$Entry{head:value,tail:schema}}
         \\const staged=do:
         \\  let builder=empty ()
         \\  builder := insert 42 self
         \\  builder := insert 1.0 self
         \\  break builder
         \\entry const answer=func () => return do:
-        \\  let #Builder{schema}=staged
+        \\  let $Builder{schema}=staged
         \\  break if schema.contains(1.0) then 42 else 0
         \\
         \\entry const folded = answer ()
@@ -4409,13 +4409,13 @@ test "generic imported producer dispatch uses the exact nominal declaration owne
     try tmp.dir.writeFile(io, .{ .sub_path = "producer.blot", .data = "const multiply=func left=> return func right=> return @type.call \"mul\" left right\n" });
     try tmp.dir.writeFile(io, .{ .sub_path = "main.blot", .data =
         \\import { multiply } from "./producer"
-        \\type Vec is data=#Vec F32
+        \\type Vec is data= $Vec F32
         \\const Vec.mul:Vec->F32->Vec=func value=> return func scale=> return do:
-        \\  let #Vec number=value
-        \\  break #Vec (@f32.mul number scale)
-        \\const scaled=multiply (#Vec 21.0) 2.0
+        \\  let $Vec number=value
+        \\  break $Vec (@f32.mul number scale)
+        \\const scaled=multiply ($Vec 21.0) 2.0
         \\entry const answer=do:
-        \\  let #Vec number=scaled
+        \\  let $Vec number=scaled
         \\  break number
     });
     const filename = try tmp.dir.realPathFileAlloc(io, "main.blot", a);
@@ -4443,12 +4443,12 @@ test "generic imported producer dispatch uses the exact nominal declaration owne
 }
 test "staged generic record publication preserves written field permutations" {
     var module = try lower(
-        \\type End is data = #End
-        \\type Entry {head,tail} is data = #Entry{head,tail}
-        \\type Builder [world,scope,schema] is data = #Builder{initial:world,scope:world->scope,schema:schema}
+        \\type End is data = $End
+        \\type Entry {head,tail} is data = $Entry{head,tail}
+        \\type Builder [world,scope,schema] is data = $Builder{initial:world,scope:world->scope,schema:schema}
         \\const End.contains = func (end:End) => return func witness => return false
         \\const Entry.contains = func entry => return func witness => return do:
-        \\  let #Entry{head,tail}=entry
+        \\  let $Entry{head,tail}=entry
         \\  if @type.same head witness:
         \\    break true
         \\  break tail.contains(witness)
@@ -4456,26 +4456,26 @@ test "staged generic record publication preserves written field permutations" {
         \\  let scope=func world => return func action => return do:
         \\    use result <- action ()
         \\    break (world,result)
-        \\  break #Builder{initial:(),scope,schema:#End}
+        \\  break $Builder{initial:(),scope,schema:$End}
         \\const insert_cell=func initial => return func builder => return do:
-        \\  let #Builder{initial:previous_initial,scope:previous_scope,schema}=builder
+        \\  let $Builder{initial:previous_initial,scope:previous_scope,schema}=builder
         \\  let scope=func world => return func action => return do:
         \\    let (current,previous)=world
         \\    break previous_scope previous action
-        \\  break #Builder{initial:(initial,previous_initial),scope,schema}
+        \\  break $Builder{initial:(initial,previous_initial),scope,schema}
         \\const insert=func value => return func builder => return do:
-        \\  let #Builder{schema}=builder
+        \\  let $Builder{schema}=builder
         \\  if schema.contains(value):
         \\    break @panic "duplicate"
-        \\  let #Builder{initial,scope}=insert_cell value builder
-        \\  break #Builder{initial,scope,schema:#Entry{tail:schema,head:value}}
+        \\  let $Builder{initial,scope}=insert_cell value builder
+        \\  break $Builder{initial,scope,schema:$Entry{tail:schema,head:value}}
         \\const staged=do:
         \\  let builder=empty ()
         \\  builder := insert 42 self
         \\  builder := insert 1.0 self
         \\  break builder
         \\entry const answer=func () => return do:
-        \\  let #Builder{schema}=staged
+        \\  let $Builder{schema}=staged
         \\  break if schema.contains(1.0) then 42 else 0
         \\
         \\entry const folded = answer ()
@@ -4582,21 +4582,21 @@ fn namedBinaryEffectScenario(allocator: std.mem.Allocator, module: *const core.M
 
 test "named binary calls retain producer effect and demanded operand rows" {
     var module = try lower(
-        \\infixl 20 (&&) = choose
+        \\infixl 20 (<&>) = choose
         \\infixl 60 (%%) = combine
         \\effect Read: Unit -> U32
         \\effect Touch: U32 -> Unit
-        \\const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @force right else false
+        \\const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
         \\const combine = func (left: U32) => return func (right: U32) => return do:
         \\  use Touch left
         \\  break @u32.add left right
         \\entry const receive = func (flag: Bool) => return do:
-        \\  let go = flag && false
+        \\  let go = flag <&> false
         \\  if go:
         \\    break ()
         \\  use Touch 7
         \\  break ()
-        \\entry const selected = func (flag: Bool) => return flag && (do:
+        \\entry const selected = func (flag: Bool) => return flag <&> (do:
         \\  use value <- Read ()
         \\  break @u32.eq value 42)
         \\entry const merge = func () => return 20 %% 22
@@ -4607,7 +4607,7 @@ test "named binary calls retain producer effect and demanded operand rows" {
         \\  break 20 %% 22
         \\entry const loaded = do reader:
         \\  break selected true
-        \\entry const unforced = false && @panic "not demanded"
+        \\entry const unforced = false <&> @panic "not demanded"
     );
     defer module.deinit(a);
     const frozen_nodes = try a.dupe(core.Node, module.nodes);
@@ -4707,10 +4707,10 @@ const closed_data_alias_source =
     \\entry const wrong = func (index: U32) : U32 => return do:
     \\  let x = scaled index + 0.5
     \\  break @u32.add x 1
-    \\type Box a is data = #Box {x: a}
+    \\type Box a is data = $Box {x: a}
     \\entry const wrapped = func (index: U32) => return do:
     \\  let x = scaled index + 0.5
-    \\  let box: Box F32 = #Box {x: x}
+    \\  let box: Box F32 = $Box {x: x}
     \\  let items = #[box]
     \\  break (items, items)
     \\entry const independent = func () => return do:
@@ -5213,11 +5213,11 @@ fn lexicalAliasScenario(allocator: std.mem.Allocator, module: *const core.Module
 
 test "lexical summary inputs preserve shared aggregate slots instead of merging equal separate captures" {
     var module = try lower(
-        \\type Box is data = #Box { value: U32 }
+        \\type Box is data = $Box { value: U32 }
         \\const make = func left => return func right => return func () => return @u32.add left.value right.value
-        \\const box = #Box { value: 20 }
+        \\const box = $Box { value: 20 }
         \\entry const shared = make box box
-        \\entry const separate = make (#Box { value: 20 }) (#Box { value: 20 })
+        \\entry const separate = make ($Box { value: 20 }) ($Box { value: 20 })
         \\entry const answer = @u32.add (shared ()) (separate ())
     );
     defer module.deinit(a);
@@ -5258,7 +5258,7 @@ fn lexicalDemandScenario(allocator: std.mem.Allocator, module: *const core.Modul
 
 test "lexical keys distinguish pending demand creation and decline changed cached memo state" {
     var module = try lower(
-        \\const make = func ~(value: U32) => return func () => return @force value
+        \\const make = func ~(value: U32) => return func () => return @demand value
         \\entry const first = make (@u32.add 40 2)
         \\entry const other = make (@u32.add 40 2)
         \\entry const answer = first ()
@@ -5571,15 +5571,15 @@ test "canonical proof hit publishes atomically and retries every allocation fail
 
 test "canonical capture keys preserve aggregate aliases nominal identities and settings" {
     var module = try lower(
-        \\type Box is data = #Box { value: U32 }
-        \\type Other is data = #Other { value: U32 }
+        \\type Box is data = $Box { value: U32 }
+        \\type Other is data = $Other { value: U32 }
         \\const make = func left => return func right => return func () => return @u32.add left.value right.value
-        \\const box = #Box { value: 20 }
+        \\const box = $Box { value: 20 }
         \\entry const shared = make box box
         \\entry const shared_again = make box box
-        \\entry const separate = make (#Box { value: 20 }) (#Box { value: 20 })
-        \\entry const separate_again = make (#Box { value: 20 }) (#Box { value: 20 })
-        \\entry const nominal = make (#Other { value: 20 }) (#Other { value: 20 })
+        \\entry const separate = make ($Box { value: 20 }) ($Box { value: 20 })
+        \\entry const separate_again = make ($Box { value: 20 }) ($Box { value: 20 })
+        \\entry const nominal = make ($Other { value: 20 }) ($Other { value: 20 })
     );
     defer module.deinit(a);
     var session = try evaluator.Session.init(a, &.{module});

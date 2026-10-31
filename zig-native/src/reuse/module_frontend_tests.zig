@@ -310,13 +310,13 @@ test "module interface cutoff keeps nominal collections effects and compile time
     try fixture.write("changed.blot", producer);
     try fixture.write("left.blot",
         \\import {adjust} from "./changed"
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
         \\type Read a is effect = { get: Unit -> a }
         \\const listed = func () => return do:
-        \\  let #Box values = #Box [41]
+        \\  let $Box values = $Box [41]
         \\  break adjust (@array.from_list values)[0]
         \\const arrayed = func () => return do:
-        \\  let #Box values = #Box #[43]
+        \\  let $Box values = $Box #[43]
         \\  break adjust values[0]
         \\const effect_value = func () : U32 => return @effect.reader Read.get 0 (func () => return adjust 1) (func () => return Read.get ())
     );
@@ -425,22 +425,22 @@ test "prepared entry Core removes the second frontend pass and keeps publication
 
 test "prepared entry Core retains generic List Array nominal and effect code across producer and simultaneous entry edits" {
     const producer =
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
         \\const changed = func (value: U32) : U32 => return @u32.add value 7
     ;
     const consumer =
         \\import {Box, changed} from "./changed"
         \\import {fixed} from "./right"
         \\const factory = func value => return func () => return value
-        \\const listed = factory (#Box [41])
-        \\const arrayed = factory (#Box #[43])
+        \\const listed = factory ($Box [41])
+        \\const arrayed = factory ($Box #[43])
         \\type Read a is effect = { get: Unit -> a }
         \\const callback = func () => return Read.get ()
         \\entry const list_value = func (index: U32) => return do:
-        \\  let #Box values = listed ()
+        \\  let $Box values = listed ()
         \\  break changed (@array.from_list values)[index]
         \\entry const array_value = func (index: U32) => return do:
-        \\  let #Box values = arrayed ()
+        \\  let $Box values = arrayed ()
         \\  break @u32.add values[index] fixed
         \\entry const effect_value = func () : U32 => return @effect.reader Read.get 0 (func () => return changed 1) callback
         \\entry const staged = changed 2
@@ -719,7 +719,7 @@ test "owner-scoped validation reuse releases every failing candidate allocation"
 test "module interface cutoff reuses opaque callers when every dependency is dirty through OOM" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    const producer = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token (@u32.add value offset)\nconst read: Token -> U32 = func (#Token value) => return value\n";
+    const producer = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
     try fixture.write("changed.blot", producer);
     try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = func (value: U32) => return read (make value)\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = func (value: U32) => return bridge value\n");
@@ -740,12 +740,12 @@ test "module interface cutoff reuses opaque callers when every dependency is dir
     try std.testing.expectEqual(@as(usize, 1), session.last.fallback.entry_cutoff.reused);
 }
 
-const opaque_storage_original = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token (@u32.add value offset)\nconst read: Token -> U32 = func (#Token value) => return value\n";
-const opaque_storage_float = "opaque type Token = F32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token (@u32.to_f32 (@u32.add value offset))\nconst read: Token -> U32 = func (#Token value) => return @f32.to_u32 value\n";
-const opaque_storage_reference = "opaque type Token = Array U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token #[@u32.add value offset]\nconst read: Token -> U32 = func (#Token value) => return value[0]\n";
-const opaque_storage_record = "opaque type Token = {word: U32}\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token {word: @u32.add value offset}\nconst read: Token -> U32 = func (#Token value) => return value.word\n";
-const opaque_storage_renamed = "opaque type Token = {renamed: U32}\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token {renamed: @u32.add value offset}\nconst read: Token -> U32 = func (#Token value) => return value.renamed\n";
-const opaque_storage_alpha = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func argument => return #Token (@u32.add argument offset)\nconst read: Token -> U32 = func (#Token value) => return value\n";
+const opaque_storage_original = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
+const opaque_storage_float = "opaque type Token = F32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.to_f32 (@u32.add value offset))\nconst read: Token -> U32 = func ($Token value) => return @f32.to_u32 value\n";
+const opaque_storage_reference = "opaque type Token = Array U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token #[@u32.add value offset]\nconst read: Token -> U32 = func ($Token value) => return value[0]\n";
+const opaque_storage_record = "opaque type Token = {word: U32}\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token {word: @u32.add value offset}\nconst read: Token -> U32 = func ($Token value) => return value.word\n";
+const opaque_storage_renamed = "opaque type Token = {renamed: U32}\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token {renamed: @u32.add value offset}\nconst read: Token -> U32 = func ($Token value) => return value.renamed\n";
+const opaque_storage_alpha = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func argument => return $Token (@u32.add argument offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
 
 test "module interface cutoff relocates owned caller references after private binding insertion and movement through OOM" {
     var fixture = try Fixture.init();
@@ -757,10 +757,10 @@ test "module interface cutoff relocates owned caller references after private bi
     defer session.deinit();
     try initialize(&session, &fixture);
     const inserted = "private const unrelated = 7\n" ++ opaque_storage_original;
-    const inserted_type = "private type Spare is data = #Spare U32\n" ++ inserted;
+    const inserted_type = "private type Spare is data = $Spare U32\n" ++ inserted;
     const inserted_effect = "private type PrivateRead is effect = Unit -> U32\n" ++ inserted;
     const inserted_contract = "private type Hidden a is contract = {type_rep a}\n" ++ inserted;
-    const moved = "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token (@u32.add value offset)\nconst read: Token -> U32 = func (#Token value) => return value\nprivate const offset = 2\n";
+    const moved = "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\nprivate const offset = 2\n";
     for ([_][]const u8{ inserted, inserted_type, inserted_effect, inserted_contract, moved, opaque_storage_original }) |text| {
         try fixture.write("changed.blot", text);
         var expected = try fresh(&fixture);
@@ -778,9 +778,9 @@ test "module interface cutoff relocates owned caller references after private bi
 test "module interface cutoff preserves generic parameter alpha correspondence through OOM" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    const original_generic = "opaque type Token element = element\nconst make: a -> Token a = func value => return #Token value\nconst read: Token a -> a = func (#Token value) => return value\n";
-    const renamed_type = "opaque type Token payload = payload\nconst make: a -> Token a = func value => return #Token value\nconst read: Token a -> a = func (#Token value) => return value\n";
-    const renamed_scheme = "opaque type Token payload = payload\nconst make: item -> Token item = func argument => return #Token argument\nconst read: Token item -> item = func (#Token argument) => return argument\n";
+    const original_generic = "opaque type Token element = element\nconst make: a -> Token a = func value => return $Token value\nconst read: Token a -> a = func ($Token value) => return value\n";
+    const renamed_type = "opaque type Token payload = payload\nconst make: a -> Token a = func value => return $Token value\nconst read: Token a -> a = func ($Token value) => return value\n";
+    const renamed_scheme = "opaque type Token payload = payload\nconst make: item -> Token item = func argument => return $Token argument\nconst read: Token item -> item = func ($Token argument) => return argument\n";
     try fixture.write("changed.blot", original_generic);
     try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\nconst bridge = func (value: U32) => return do:\n  let wrapped: Token U32 = make value\n  break @u32.add (read wrapped) 2\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = func (value: U32) => return bridge value\n");
@@ -806,7 +806,7 @@ test "module interface cutoff preserves public effect parameter alpha through OO
     defer fixture.deinit();
     const effect_original = "type PublicRead element is effect = Unit -> element\n";
     const effect_alpha = "type PublicRead payload is effect = Unit -> payload\n";
-    const opaque_body = "opaque type Token = U32\nconst make: Unit -> Token = func () => return #Token 42\nconst read: Token -> Unit = func (#Token value) => return ()\n";
+    const opaque_body = "opaque type Token = U32\nconst make: Unit -> Token = func () => return $Token 42\nconst read: Token -> Unit = func ($Token value) => return ()\n";
     try fixture.write("changed.blot", effect_original ++ opaque_body);
     try fixture.write("left.blot", "import {PublicRead, make, read} from \"./changed\"\nconst consume = func () : U32 => return do (@effect.provider (PublicRead U32) (func () => return 42)):\n  read (make ())\n  break PublicRead U32 ()\n");
     try fixture.write("main.blot", "import {consume} from \"./left\"\nentry const answer = func () => return consume ()\n");
@@ -870,8 +870,8 @@ fn derivedStorageFailure(allocator: std.mem.Allocator, fixture: *Fixture, sessio
 test "opaque derived storage producers refresh their recipes while semantic callers reuse through OOM" {
     const envelope =
         \\opaque type Envelope = Token
-        \\const pack = func value => return #Envelope (make value)
-        \\const unpack = func (#Envelope value) => return read value
+        \\const pack = func value => return $Envelope (make value)
+        \\const unpack = func ($Envelope value) => return read value
         \\const factories = #[pack, func value => return pack value]
         \\const readers = #[unpack, func value => return unpack value]
         \\const carry = func (value: U32) => return (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)
@@ -1070,8 +1070,8 @@ test "derived opaque recipe validation uses the original producer" {
     try fixture.write("changed.blot", opaque_storage_float);
     try fixture.write("left.blot", "import {Token, make, read} from \"./changed\"\n" ++
         "opaque type Envelope = Token\n" ++
-        "const pack = func value => return #Envelope (make value)\n" ++
-        "const unpack = func (#Envelope value) => return read value\n" ++
+        "const pack = func value => return $Envelope (make value)\n" ++
+        "const unpack = func ($Envelope value) => return read value\n" ++
         "const bridge = func (value: U32) => return unpack (pack value)\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = func (value: U32) => return bridge value\n");
     var session = try retained.Session.initEmpty(a, .{});
@@ -1113,15 +1113,15 @@ test "derived opaque recipe validation resolves producer parameter selectors" {
     defer fixture.deinit();
     try fixture.write("changed.blot",
         \\opaque type Token [left, right] = right
-        \\const make = func value => return #Token value
-        \\const read = func (#Token value) => return value
+        \\const make = func value => return $Token value
+        \\const read = func ($Token value) => return value
         \\
     );
     try fixture.write("left.blot",
         \\import {Token, make, read} from "./changed"
         \\opaque type Envelope = Token [U32, F32]
-        \\const pack = func (value: F32) => return #Envelope (make value)
-        \\const unpack = func (#Envelope value) => return read value
+        \\const pack = func (value: F32) => return $Envelope (make value)
+        \\const unpack = func ($Envelope value) => return read value
         \\const bridge = func (value: F32) => return unpack (pack value)
         \\
     );
@@ -1163,13 +1163,13 @@ test "derived opaque recipe validation resolves producer parameter selectors" {
 test "inert principal suffixes retain opaque callers through private local edits and OOM" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    const producer = "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token (@u32.add value 2)\nconst read: Token -> U32 = func (#Token value) => return value\n";
+    const producer = "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token (@u32.add value 2)\nconst read: Token -> U32 = func ($Token value) => return value\n";
     try fixture.write("changed.blot", producer);
     try fixture.write("left.blot", "import {make, read} from \"./changed\"\nconst bridge = func (value: U32) => return read (make value)\n");
     try fixture.write("main.blot", "import {bridge} from \"./left\"\nentry const answer = func (value: U32) => return bridge value\n");
     for ([_][]const u8{
-        "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token (@u32.add value 2)\nconst read: Token -> U32 = func (#Token value) => return do:\n  let fresh_private_adjustment = @u32.add value 1\n  break fresh_private_adjustment\n",
-        "opaque type Token = U32\nconst make: U32 -> Token = func value => return do:\n  let fresh_private_adjustment = @u32.add value 1\n  break #Token (@u32.add fresh_private_adjustment 2)\nconst read: Token -> U32 = func (#Token value) => return value\n",
+        "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token (@u32.add value 2)\nconst read: Token -> U32 = func ($Token value) => return do:\n  let fresh_private_adjustment = @u32.add value 1\n  break fresh_private_adjustment\n",
+        "opaque type Token = U32\nconst make: U32 -> Token = func value => return do:\n  let fresh_private_adjustment = @u32.add value 1\n  break $Token (@u32.add fresh_private_adjustment 2)\nconst read: Token -> U32 = func ($Token value) => return value\n",
     }) |changed| {
         var session = try retained.Session.initEmpty(a, .{});
         defer session.deinit();
@@ -1849,9 +1849,9 @@ test "shared scoped dependency validation observes global invocation catalog act
     }
 }
 
-const qualified_producer = "const pad: U32 = 1\ntype Box is data = #Box { first: U32 }\nconst first = func value => return value.first\nconst value: U32 = first (#Box { first: 41 })\n";
-const qualified_moved = "const pad: U32 = 10\ntype Box is data = #Box { first: U32 }\nconst first = func value => return value.first\nconst value: U32 = first (#Box { first: 41 })\n";
-const qualified_reader = "import {value, first, Box} from \"./changed\"\nconst read: Unit -> U32 = func () => return @u32.add value (first (#Box { first: 1 }))\n";
+const qualified_producer = "const pad: U32 = 1\ntype Box is data = $Box { first: U32 }\nconst first = func value => return value.first\nconst value: U32 = first ($Box { first: 41 })\n";
+const qualified_moved = "const pad: U32 = 10\ntype Box is data = $Box { first: U32 }\nconst first = func value => return value.first\nconst value: U32 = first ($Box { first: 41 })\n";
+const qualified_reader = "import {value, first, Box} from \"./changed\"\nconst read: Unit -> U32 = func () => return @u32.add value (first ($Box { first: 1 }))\n";
 fn producerInterface(fixture: *Fixture) !@import("principal_interface.zig").Interface {
     var source = try project.load(a, io, fixture.path, .{});
     defer source.deinit(a);
@@ -1910,7 +1910,7 @@ test "module interface cutoff preserves public contract recipes and forwarded ca
         var fixture = try Fixture.init();
         defer fixture.deinit();
         const keep = "const keep: a -> a where {Public a} = func value => return value\n";
-        const payload = if (used_contract) "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return #Token (keep (@u32.add value offset))\nconst read: Token -> U32 = func (#Token value) => return value\n" else opaque_storage_original;
+        const payload = if (used_contract) "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (keep (@u32.add value offset))\nconst read: Token -> U32 = func ($Token value) => return value\n" else opaque_storage_original;
         const header = "type Public a is contract = {type_rep a}\n" ++ (if (used_contract) keep else "");
         const alpha = "type Public item is contract = {type_rep item}\n" ++ (if (used_contract) keep else "");
         try fixture.write("changed.blot", header ++ payload);
@@ -1939,8 +1939,8 @@ test "module interface cutoff preserves public contract recipes and forwarded ca
     }
 }
 
-const associated_storage_original = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = func value => return #Token value\nconst make_other: U32 -> Other = func value => return #Other value\nconst Token.read: Token -> U32 = func (#Token value) => return value\nconst Other.read: Other -> U32 = func (#Other value) => return @u32.add value 1\n";
-const associated_storage_alpha = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = func item => return #Token item\nconst make_other: U32 -> Other = func item => return #Other item\nconst Token.read: Token -> U32 = func (#Token item) => return item\nconst Other.read: Other -> U32 = func (#Other item) => return @u32.add item 1\n";
+const associated_storage_original = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = func value => return $Token value\nconst make_other: U32 -> Other = func value => return $Other value\nconst Token.read: Token -> U32 = func ($Token value) => return value\nconst Other.read: Other -> U32 = func ($Other value) => return @u32.add value 1\n";
+const associated_storage_alpha = "opaque type Token = U32\nopaque type Other = U32\nconst make: U32 -> Token = func item => return $Token item\nconst make_other: U32 -> Other = func item => return $Other item\nconst Token.read: Token -> U32 = func ($Token item) => return item\nconst Other.read: Other -> U32 = func ($Other item) => return @u32.add item 1\n";
 
 test "module interface cutoff preserves public associated relationships and original targets through OOM" {
     var fixture = try Fixture.init();
@@ -1953,7 +1953,7 @@ test "module interface cutoff preserves public associated relationships and orig
     try initialize(&session, &fixture);
     for ([_][]const u8{
         "private const unrelated = 7\n" ++ associated_storage_original,
-        "private type Spare is data = #Spare U32\n" ++ associated_storage_original,
+        "private type Spare is data = $Spare U32\n" ++ associated_storage_original,
         associated_storage_alpha,
         associated_storage_original,
     }) |text| {
@@ -1972,8 +1972,8 @@ test "module interface cutoff preserves public associated relationships and orig
 
 const implementation_storage_header = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\n";
 const implementation_storage_private = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\n";
-const implementation_storage_unused = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n";
-const implementation_storage_used = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return Source.first value\n";
+const implementation_storage_unused = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n";
+const implementation_storage_used = implementation_storage_header ++ "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n";
 
 test "module interface cutoff preserves bounded implementation catalogs selected callers and original producers through OOM" {
     for ([_][]const u8{ implementation_storage_unused, implementation_storage_used }) |initial_source| {

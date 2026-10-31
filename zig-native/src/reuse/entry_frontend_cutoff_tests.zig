@@ -151,15 +151,15 @@ test "entry interface cutoff allocation failures keep the old publication availa
 test "entry interface cutoff rejects reordered nominal constructors before reusing case tags" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    const before = "type Choice is data = #A | #B\nconst value = #A\n";
-    const after = "type Choice is data = #B | #A\nconst value = #A\n";
+    const before = "type Choice is data = $A | $B\nconst value = $A\n";
+    const after = "type Choice is data = $B | $A\nconst value = $A\n";
     try fixture.write("changed.blot", before);
     try fixture.write("main.blot",
         \\import {Choice, A, B, value} from "./changed"
         \\import {fixed} from "./right"
         \\entry const answer = case value of
-        \\  #A => @u32.add 41 fixed
-        \\  #B => 9
+        \\  $A => @u32.add 41 fixed
+        \\  $B => 9
     );
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
@@ -226,7 +226,7 @@ test "module abstraction publication OOM preserves old opaque owners and retry" 
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const consumer = "import {Token, make, read} from \"./changed\"\nentry const answer = read (make 41)\n";
-    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = func value => return #Token (@u32.add value offset)\nconst read: Token -> U32 = func (#Token value) => return value\n";
+    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
     try fixture.write("main.blot", consumer);
     try fixture.write("changed.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});

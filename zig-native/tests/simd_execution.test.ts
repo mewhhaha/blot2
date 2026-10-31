@@ -115,7 +115,7 @@ function counters(bytes: Uint8Array<ArrayBuffer>) {
 Deno.test("private SIMD values stay out of the heap and box once where they escape", async () => {
   await compileAndRun(`
 import * as simd from "std/simd"
-type Holder is data = #Holder { lanes: simd.F32x4, count: U32 }
+type Holder is data = $Holder { lanes: simd.F32x4, count: U32 }
 // An Array result exports guest memory, whose size the test watches.
 entry const exported = func (n: U32) : Array U32 => return #[n]
 entry const accumulate = func (n: U32) : F32 => return do:
@@ -154,12 +154,12 @@ entry const held = func (n: U32) : F32 => return do:
   let acc = simd.f32_splat 1.0
   for i in 0..n:
     acc := simd.f32_add acc acc
-  let holder = #Holder { lanes: acc, count: n }
-  let #Holder { lanes, count } = holder
-  let maybe = if count > 0 then #Some lanes else #Nothing
+  let holder = $Holder { lanes: acc, count: n }
+  let $Holder { lanes, count } = holder
+  let maybe = if count > 0 then $Some lanes else $Nothing
   let sum = func (offset: F32) => return simd.f32_sum (simd.f32_add lanes (offset, offset, offset, offset))
   let rows = #[lanes, acc]
-  let #Some kept = maybe else:
+  let $Some kept = maybe else:
     break sum 0.0
   break simd.f32_sum kept + sum 1.0 + simd.f32_dot rows[0] rows[1]
 `, (_, bytes) => {
@@ -621,7 +621,7 @@ entry const dots = func (seed: F32) : Array F32 => return do:
   let right = (0.3, seed, -1e30, 2.25)
   let (ax, ay, az, aw) = left
   let (bx, by, bz, bw) = right
-  let vector = #Vec3 { x: ax, y: ay, z: az }.dot(#Vec3 { x: bx, y: by, z: bz })
+  let vector = $Vec3 { x: ax, y: ay, z: az }.dot($Vec3 { x: bx, y: by, z: bz })
   break #[simd.f32_dot3 left right, vector, simd.f32_dot left right, ((ax * bx + ay * by) + az * bz) + aw * bw]
 entry const madd = func (seed: F32) : Array F32 => return do:
   let (a, b, c, d) = simd.f32_relaxed_madd (seed, 1.0, 2.0, 3.0) (3.0, 0.1, 0.5, 0.25) (1.0, 0.2, -1.0, 0.0)

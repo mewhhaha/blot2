@@ -94,12 +94,12 @@ Deno.test("break value leaves do through a loop while bare break leaves only the
 Deno.test("return exits through if let, let else, and a loop", async () => {
   await compileAndRun(
     `entry const matched = func (flag: Bool) : U32 => return do:
-  let candidate = if flag then #Some 42 else #Nothing
-  if let #Some value = candidate:
+  let candidate = if flag then $Some 42 else $Nothing
+  if let $Some value = candidate:
     return value
   break 7
 entry const fallback = func (flag: Bool) : U32 => return do:
-  let #Some value = if flag then #Some 42 else #Nothing else:
+  let $Some value = if flag then $Some 42 else $Nothing else:
     return 9
   break value
 entry const looped = func (flag: Bool) : U32 => return do:
@@ -123,14 +123,14 @@ Deno.test("return across a monadic continuation has a source diagnostic", async 
   const source = `const choose = func (flag: Bool) : Maybe U32 => return do:
   let wrapped = do (monad Maybe):
     if flag:
-      return #Some 42
+      return $Some 42
     break 7
   break wrapped
 entry const answer = func (flag: Bool) : U32 => return Maybe.unwrap_or 0 (choose flag)
 `;
-  const start = source.indexOf("return #Some 42");
+  const start = source.indexOf("return $Some 42");
   await compileExpectedFailure(source, "return_across_continuation", undefined, {
-    span: [start, start + "return #Some 42".length],
+    span: [start, start + "return $Some 42".length],
   });
 });
 

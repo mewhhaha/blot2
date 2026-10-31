@@ -55,15 +55,15 @@ const cases = [_]Case{
     .{ .source = "@[4294967296]\nconst answer=missing\n", .code = .unknown_value, .point = 27 }, // tag-name-before-overflow
     .{ .source = "@[missing]\nconst answer=4294967296\n", .code = .integer_range, .point = 24 }, // tag-overflow-before-name
     .{ .source = "const answer=func value=> return case value of\n  (4294967296,_)=>42\n  _=>0\n", .code = .integer_range, .point = 50 }, // grouped-pattern-overflow
-    .{ .source = "type Wrapped is data=#Wrapped {value:U32}\nconst answer=func value=> return case value of\n  #Wrapped {value:4294967296}=>42\n", .code = .integer_range, .point = 107 }, // record-pattern-overflow
+    .{ .source = "type Wrapped is data= $Wrapped {value:U32}\nconst answer=func value=> return case value of\n  $Wrapped {value:4294967296}=>42\n", .code = .integer_range, .point = 108 }, // record-pattern-overflow
     .{ .source = "const answer:Missing=1e999\n", .code = .unsupported_type, .point = 13 }, // float-unknown-annotation
     .{ .source = "const first=1e999\nconst later=missing\n", .code = .unknown_value, .point = 30 }, // float-before-name
     .{ .source = "const answer=@f32.add 1e999\n", .code = .call_arity, .point = 13 }, // float-primitive-arity
-    .{ .source = "type Box a is data=#Box a\nconst answer=Box 4294967296\n", .code = .integer_range, .point = 43 }, // nominal-type-argument-overflow
-    .{ .source = "type Box a is data=#Box a\nconst answer=Box {value:4294967296}\n", .code = .constructor_marker, .point = 39 }, // nominal-record-type-argument-overflow
-    .{ .source = "type Box a is data=#Box a\nconst answer=Box (missing,4294967296)\n", .code = .unknown_value, .point = 44 }, // nominal-type-argument-name-before-overflow
-    .{ .source = "type Box a is data=#Box a\nconst answer=Box (4294967296,missing)\n", .code = .integer_range, .point = 44 }, // nominal-type-argument-overflow-before-name
-    .{ .source = "type Box a is data=#Box a\nconst answer=#Box 4294967296\n", .code = .integer_range, .point = 44 }, // nominal-constructor-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=Box 4294967296\n", .code = .integer_range, .point = 44 }, // nominal-type-argument-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=Box {value:4294967296}\n", .code = .constructor_marker, .point = 40 }, // nominal-record-type-argument-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=Box (missing,4294967296)\n", .code = .unknown_value, .point = 45 }, // nominal-type-argument-name-before-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=Box (4294967296,missing)\n", .code = .integer_range, .point = 45 }, // nominal-type-argument-overflow-before-name
+    .{ .source = "type Box a is data= $Box a\nconst answer= $Box 4294967296\n", .code = .integer_range, .point = 46 }, // nominal-constructor-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick 4294967296\n", .code = .effect_member, .point = 50 }, // effect-family-argument-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick 1e999\n", .code = .effect_member, .point = 50 }, // effect-family-argument-float-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick.read 4294967296 ()\n", .code = .integer_range, .point = 60 }, // effect-operation-argument-overflow
@@ -73,13 +73,13 @@ const cases = [_]Case{
     .{ .source = "@[4294967296]\ninfixl 60 (+)=add\nconst add=func left=> return func right=> return @u32.add left right\n", .code = .unsupported_attribute, .point = 0 }, // fixity-attribute-literal-overflow
     .{ .source = "import * as dependency from \"./missing\"\nconst answer:Missing=4294967296\n", .code = .module_loader_required, .point = 0 }, // explicit-type-import-overflow
     .{ .source = "const answer=do:\n  let 4294967296=42 else:\n    break 0\n  break 42\n", .code = .integer_range, .point = 23 }, // local-pattern-overflow
-    .{ .source = "type Box a is data=#Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 61 }, // nominal-record-known-types
-    .{ .source = "type Box {value:a} is data=#Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 69 }, // nominal-record-structured-pattern
-    .{ .source = "type Box a is data=#Box a\nconst first=4294967296\nconst later=Box Missing\n", .code = .unknown_value, .point = 65 }, // nominal-bare-argument-unknown
-    .{ .source = "type Box a is data=#Box a\nconst Box=func value=> return value\nconst answer=Box 4294967296\n", .code = .duplicate_name, .point = 19 }, // nominal-value-shadow-argument
-    .{ .source = "type Box a is data=#Box a\nconst first=4294967296\nconst later=Box U32\n", .code = .unknown_value, .point = 65 }, // nominal-value-known-type-before-overflow
-    .{ .source = "type Box a is data=#Box a\nconst answer=(Box) 4294967296\n", .code = .integer_range, .point = 45 }, // nominal-grouped-application-overflow
-    .{ .source = "type Box a is data=#Box a\nconst answer=Box U32 4294967296\n", .code = .unknown_value, .point = 43 }, // nominal-second-argument-overflow
+    .{ .source = "type Box a is data= $Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 62 }, // nominal-record-known-types
+    .{ .source = "type Box {value:a} is data= $Box a\nconst first=4294967296\nconst later=Box {value:U32}\n", .code = .constructor_marker, .point = 70 }, // nominal-record-structured-pattern
+    .{ .source = "type Box a is data= $Box a\nconst first=4294967296\nconst later=Box Missing\n", .code = .unknown_value, .point = 66 }, // nominal-bare-argument-unknown
+    .{ .source = "type Box a is data= $Box a\nconst Box=func value=> return value\nconst answer=Box 4294967296\n", .code = .duplicate_name, .point = 20 }, // nominal-value-shadow-argument
+    .{ .source = "type Box a is data= $Box a\nconst first=4294967296\nconst later=Box U32\n", .code = .unknown_value, .point = 66 }, // nominal-value-known-type-before-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=(Box) 4294967296\n", .code = .integer_range, .point = 46 }, // nominal-grouped-application-overflow
+    .{ .source = "type Box a is data= $Box a\nconst answer=Box U32 4294967296\n", .code = .unknown_value, .point = 44 }, // nominal-second-argument-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick.read U32 4294967296\n", .code = .integer_range, .point = 64 }, // operation-known-type-then-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick.read Missing 4294967296\n", .code = .unknown_value, .point = 60 }, // operation-unknown-type-before-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=(Tick.read) 4294967296 ()\n", .code = .integer_range, .point = 62 }, // operation-grouped-overflow
@@ -90,27 +90,27 @@ const cases = [_]Case{
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=(Tick) 4294967296\n", .code = .effect_member, .point = 51 }, // family-grouped-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick\n", .code = .effect_member, .point = 72 }, // family-bare-overflow-later
     .{ .source = "const answer=4294967296\nconst answer=42\n", .code = .duplicate_name, .point = 0 }, // duplicate-global-overflow
-    .{ .source = "type Box is data=#Box U32\nconst answer=Box 4294967296\n", .code = .integer_range, .point = 43 }, // constructor-marker-before-overflow
-    .{ .source = "type Box is data=#Box {value:U32}\nconst answer=#Box {unknown:4294967296}\n", .code = .unknown_record_field, .point = 53 }, // record-unknown-field-before-overflow
-    .{ .source = "type Box is data=#Box {value:U32}\nconst answer=#Box {value:4294967296,value:0}\n", .code = .integer_range, .point = 59 }, // record-duplicate-field-overflow-first
-    .{ .source = "type Box is data=#Box {value:U32}\nconst answer=#Box {value:0,value:4294967296}\n", .code = .duplicate_record_field, .point = 61 }, // record-duplicate-field-overflow-later
-    .{ .source = "type Box is data=#Box {value:U32,other:U32}\nconst answer=#Box {value:4294967296}\n", .code = .integer_range, .point = 69 }, // record-missing-field-after-overflow
-    .{ .source = "type Choice is data=#First U32|#Second U32\nconst answer=func x=> return case x of\n  #First 4294967296|#Missing _=>42\n", .code = .integer_range, .point = 91 }, // alternative-pattern-overflow-first
-    .{ .source = "type Choice is data=#First U32|#Second U32\nconst answer=func x=> return case x of\n  #Missing _|#First 4294967296=>42\n", .code = .unknown_value, .point = 85 }, // alternative-pattern-overflow-later
+    .{ .source = "type Box is data= $Box U32\nconst answer=Box 4294967296\n", .code = .integer_range, .point = 44 }, // constructor-marker-before-overflow
+    .{ .source = "type Box is data= $Box {value:U32}\nconst answer= $Box {unknown:4294967296}\n", .code = .unknown_record_field, .point = 55 }, // record-unknown-field-before-overflow
+    .{ .source = "type Box is data= $Box {value:U32}\nconst answer= $Box {value:4294967296,value:0}\n", .code = .integer_range, .point = 61 }, // record-duplicate-field-overflow-first
+    .{ .source = "type Box is data= $Box {value:U32}\nconst answer= $Box {value:0,value:4294967296}\n", .code = .duplicate_record_field, .point = 63 }, // record-duplicate-field-overflow-later
+    .{ .source = "type Box is data= $Box {value:U32,other:U32}\nconst answer= $Box {value:4294967296}\n", .code = .integer_range, .point = 71 }, // record-missing-field-after-overflow
+    .{ .source = "type Choice is data= $First U32| $Second U32\nconst answer=func x=> return case x of\n  $First 4294967296| $Missing _=>42\n", .code = .integer_range, .point = 93 }, // alternative-pattern-overflow-first
+    .{ .source = "type Choice is data= $First U32| $Second U32\nconst answer=func x=> return case x of\n  $Missing _| $First 4294967296=>42\n", .code = .unknown_value, .point = 87 }, // alternative-pattern-overflow-later
     .{ .source = "const answer=func x=> return case x of\n  4294967296=>missing\n", .code = .integer_range, .point = 41 }, // case-body-name-before-pattern-overflow
     .{ .source = "const text=\"🙂é\"\nconst answer=4294967296\n", .code = .integer_range, .point = 33 }, // unicode-numeric-origin
     .{ .source = "const answer=(42,{value:4294967296})\n", .code = .integer_range, .point = 24 }, // nested-ordinary-record-overflow
     .{ .source = "const answer=func f=> return f {value:4294967296}\n", .code = .integer_range, .point = 38 }, // nested-record-callee-overflow
-    .{ .source = "type Box {value:a} is data=#Box a\nconst first=4294967296\nconst later=Box {other:U32}\n", .code = .constructor_marker, .point = 69 }, // nominal-record-missing-field-type
-    .{ .source = "type Box {value:a} is data=#Box a\nconst first=4294967296\nconst later=Box {}\n", .code = .constructor_marker, .point = 69 }, // nominal-record-empty
+    .{ .source = "type Box {value:a} is data= $Box a\nconst first=4294967296\nconst later=Box {other:U32}\n", .code = .constructor_marker, .point = 70 }, // nominal-record-missing-field-type
+    .{ .source = "type Box {value:a} is data= $Box a\nconst first=4294967296\nconst later=Box {}\n", .code = .constructor_marker, .point = 70 }, // nominal-record-empty
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {other:U32} ()\n", .code = .unknown_value, .point = 97 }, // operation-record-missing-field
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:U32,value:U32} ()\n", .code = .unknown_value, .point = 97 }, // operation-record-duplicate-field
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {} ()\n", .code = .integer_range, .point = 57 }, // operation-record-empty
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:Missing} ()\n", .code = .unknown_value, .point = 97 }, // operation-record-unbound-value
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:@u32.add} ()\n", .code = .call_arity, .point = 97 }, // operation-record-intrinsic-value
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst answer=Tick.read {value:1e999} ()\n", .code = .float_range, .point = 75 }, // operation-record-float-overflow
-    .{ .source = "const Box=func value=> return value\ntype Box a is data=#Box a\nconst answer=4294967296\n", .code = .duplicate_name, .point = 0 }, // nominal-value-collision-reverse
-    .{ .source = "const answer=#Missing {value:4294967296}\n", .code = .unknown_constructor, .point = 14 }, // unknown-record-before-overflow
+    .{ .source = "const Box=func value=> return value\ntype Box a is data= $Box a\nconst answer=4294967296\n", .code = .duplicate_name, .point = 0 }, // nominal-value-collision-reverse
+    .{ .source = "const answer= $Missing {value:4294967296}\n", .code = .unknown_constructor, .point = 15 }, // unknown-record-before-overflow
     .{ .source = "const f=func value=> return value\nconst answer=f {value:4294967296}\n", .code = .integer_range, .point = 56 }, // record-ordinary-callee-before-overflow
     .{ .source = "type Tick a is effect={read:Unit->a}\nconst answer=Tick.missing 4294967296\n", .code = .effect_member, .point = 50 }, // qualified-name-argument-overflow
     .{ .source = "const first=4294967296\nconst later=\"bad\"\n", .code = .integer_range, .point = 12 }, // text-after-overflow
@@ -183,7 +183,7 @@ test "numeric diagnostic-only publication releases all failed allocations and st
 fn importedOwnership(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    const producer_source = "type Box a is data=#Box a\ntype Tick {value:a} is effect={read:Unit->a}\nconst Box.keep=func value=> return value\nconst identity=func value=> return value\n";
+    const producer_source = "type Box a is data= $Box a\ntype Tick {value:a} is effect={read:Unit->a}\nconst Box.keep=func value=> return value\nconst identity=func value=> return value\n";
     var producer_lexed = try lexer.lex(allocator, producer_source);
     defer producer_lexed.deinit(allocator);
     var producer_tree = try parser.parse(allocator, producer_source, producer_lexed.tokens.items, &pool);

@@ -96,21 +96,21 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
       sources: {
         [entry]: `
 const change = func candidate => return Result.map (func value => return value + 1) candidate
-entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change (#Ok value))
+entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change ($Ok value))
 entry const alias = func (value: U32) => return do:
   let child = #[value, value + 1]
-  let candidate = #Err child
+  let candidate = $Err child
   let mapped = change candidate
   for index in 0..200:
     let pressure = @array.fill 8192 index
     if pressure[0] != index:
       @panic "lost pressure"
   break case mapped of
-    #Ok _ => @panic "changed the variant"
-    #Err same => #[same[0], child[1]]
+    $Ok _ => @panic "changed the variant"
+    $Err same => #[same[0], child[1]]
 const adapter = monad Maybe
 const resolve = func () => return do adapter:
-  use value <- #Some 42
+  use value <- $Some 42
   break value
 entry const resolver = func () => return Maybe.unwrap_or 0 (resolve ())
 `,
@@ -229,13 +229,13 @@ Deno.test("checked field updates preserve variant layouts aliases captures and r
         for (const offset of [0, 10, 0]) {
           const sources = {
             [entry]: `
-type Shape is data = #Small {child: Array U32, value: U32} | #Large {alpha: F32, child: Array U32, value: U32, tail: U32}
+type Shape is data = $Small {child: Array U32, value: U32} | $Large {alpha: F32, child: Array U32, value: U32, tail: U32}
 const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1 + ${offset}]
   shape.value := self + 2
   break shape
 entry const run = func (mode: U32) => return do:
-  let original = if mode == 0 then #Small {child: #[40], value: 7} else #Large {alpha: -0.0, child: #[40], value: 7, tail: 3}
+  let original = if mode == 0 then $Small {child: #[40], value: 7} else $Large {alpha: -0.0, child: #[40], value: 7, tail: 3}
   let captured = func () => return original.child[0]
   let changed = replace original
   for index in 0..32:
@@ -252,9 +252,9 @@ entry const packed = func (value: U32) => return do:
   items[0] := {x: self.x + 1, y: self.y + 2}
   break #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
 entry const floating = func (value: F32) => return do:
-  let original = #Large {alpha: value, child: #[40], value: 7, tail: 3}
+  let original = $Large {alpha: value, child: #[40], value: 7, tail: 3}
   let changed = replace original
-  let #Large {alpha, child: _, value: _, tail: _} = changed else:
+  let $Large {alpha, child: _, value: _, tail: _} = changed else:
     break 0.0
   break alpha
 `,

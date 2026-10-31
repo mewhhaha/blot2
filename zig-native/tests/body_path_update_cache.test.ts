@@ -10,11 +10,11 @@ const source = (
   prefix = "",
   point = "{ x: U32, y: Array U32 }",
 ) =>
-  `${prefix}type Point is data = #Point ${point}
-type Bucket is data = #Bucket { points: Array Point }
+  `${prefix}type Point is data = $Point ${point}
+type Bucket is data = $Bucket { points: Array Point }
 const seed = ${seed}
 const update = func (index: U32) : Array U32 => return do:
-  let bucket = #Bucket { points: #[#Point { y: #[10], x: ${spine} }, #Point { y: #[20], x: ${spine} }] }
+  let bucket = $Bucket { points: #[$Point { y: #[10], x: ${spine} }, $Point { y: #[20], x: ${spine} }] }
   let before = bucket
   bucket.points[index].y[0] := @u32.add self seed
   break #[before.points[index].y[0], bucket.points[index].y[0]]

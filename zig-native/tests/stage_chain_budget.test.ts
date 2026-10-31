@@ -20,7 +20,7 @@ function chain(length: number): string {
       `const s${index} = func () => return @u32.add (holder ()).g (s${index - 1} ())`,
     );
   }
-  return `const holder = func () => return #{\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
+  return `const holder = func () => return {\n  ${fields.join(",\n  ")},\n  g: 4\n}\n` +
     stages.join("\n") + `\nentry const e = func () => return s${length - 1} ()\n`;
 }
 

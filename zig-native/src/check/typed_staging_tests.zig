@@ -134,22 +134,22 @@ test "typed staging refuses a lifted live skolem before code publication through
 
 test "typed staging nominal descriptors expose only common public constructor fields" {
     const source =
-        \\data Packet a = #Packet {payload: a, flag: Bool}
-        \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
-        \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: true})).result
-        \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: true})).result
+        \\type Packet a is data = $Packet {payload: a, flag: Bool}
+        \\type Choice a is data = $Left {shared: a, left: Bool} | $Right {shared: a, right: U32}
+        \\const packet = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 40, flag: true})).result
+        \\const choice = @descriptor.fields (@code.describe (@code.quote $Left {shared: 40, left: true})).result
         \\const scalar = (@code.describe (@code.quote 1)).result
         \\const answer = if @descriptor.same packet.payload scalar then if @descriptor.same choice.shared scalar then 42 else 0 else 0
     ;
     try law(std.testing.allocator, source, null);
     try evaluatedSource(std.testing.allocator, source);
     try law(std.testing.allocator,
-        \\private data Packet = #Packet {payload: U32}
-        \\const bad = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 1})).result
+        \\private type Packet is data = $Packet {payload: U32}
+        \\const bad = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 1})).result
     , .descriptor_private);
     try law(std.testing.allocator,
         \\opaque type Packet = {payload: U32}
-        \\const bad = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 1})).result
+        \\const bad = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 1})).result
     , .descriptor_private);
 }
 

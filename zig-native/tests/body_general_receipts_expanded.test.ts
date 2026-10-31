@@ -8,8 +8,8 @@ const library = (seed: string, delta: number, prefix = "") =>
   `infixl 60 (%%) = both
 infixl 60 (??) = ignore
 ${prefix}const seed = ${seed}
-type Number is data = #Number U32
-const Number.next = func (#Number value) => return @u32.add value ${delta}
+type Number is data = $Number U32
+const Number.next = func ($Number value) => return @u32.add value ${delta}
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 effect Read: U32 -> U32
 const state = func (initial: U32) => return @effect.run State.get State.set initial (func () => return do:
@@ -39,7 +39,7 @@ const request = func (host: U32 -> U32 ! {Foreign}) => return do:
 const effect_count = func () => return @effect.count (@effect.of scoped)
 const count = effect_count ()
 const rich = func (host: U32 -> U32 ! {Foreign}) => return @u32.add (@product.get (state seed) 1) (@u32.add (scoped ()) (@u32.add (borrow 40) (@u32.add (resource ()) (@u32.add (request host) count))))
-const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@force left) (@force left)) (@force right)
+const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@demand left) (@demand left)) (@demand right)
 const ignore = func ~(left: U32) => return func ~(right: U32) => return 7
 const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
 const selected = func (flag: Bool) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
@@ -64,19 +64,19 @@ const item: Item = pack [U32] seed as Item
 const package_read = func (item: Item) => return unpack item as [a] value in Render.show value
 const decorate = func (value: U32) => return func () => return @u32.add value seed
 @[func (callback: Unit -> U32) => return func () => return @u32.add (callback ()) 1] @[decorate] const tagged: Unit -> U32 = 40
-type Maybe a is data = #Some a | #Nothing
-type Counter is data = #Counter U32
+type Maybe a is data = $Some a | $Nothing
+type Counter is data = $Counter U32
 const Counter.iter = func (cursor: Counter) => return cursor
-const Counter.next = func (#Counter value) => return if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
+const Counter.next = func ($Counter value) => return if @u32.lt value 4 then $Some (value, $Counter (@u32.add value 1)) else $Nothing
 const iterator_total = func (first: U32) => return do:
   let result = seed
-  for value in #Counter first:
+  for value in $Counter first:
     result := @u32.add self value
   break result
 const describe = func (value: U32) => return do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
-  break @record.merge record {next: (#Number value).next}
+  break @record.merge record {next: ($Number value).next}
 `;
 const main =
   `import {operate, describe, rich, selected, lookup, item, package_read, tagged, iterator_total} from "./logic"

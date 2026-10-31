@@ -139,10 +139,10 @@ test "recursive frontend scheduled allocation failures release frames and staged
 test "recursive frontend scheduled child diagnostics keep their original reference order" {
     for ([_][]const u8{
         scheduled_diagnostic_source,
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const parent: U32 -> U32 = func value => return do:
         \\  let first: U32 = 1.5
-        \\  let selected = (#Box 1).read
+        \\  let selected = ($Box 1).read
         \\  let last: U32 = 1.5
         \\  break value
         \\const Box.read: Box -> U32 = func box => return do:
@@ -170,11 +170,11 @@ test "recursive frontend scheduled child diagnostics keep their original referen
 
 test "recursive frontend waits for the preferred left dispatch before right fallback" {
     var fixture = try Fixture.init(
-        \\type L is data = #L U32
-        \\type R is data = #R U32
-        \\type X is data = #X U32
-        \\const prime = @type.call "merge" (#X 1) (#R 2)
-        \\entry const answer: U32 = @type.call "merge" (#L 1) (#R 2)
+        \\type L is data = $L U32
+        \\type R is data = $R U32
+        \\type X is data = $X U32
+        \\const prime = @type.call "merge" ($X 1) ($R 2)
+        \\entry const answer: U32 = @type.call "merge" ($L 1) ($R 2)
         \\const L.merge: L -> R -> U32 = func left => return func right => return 1
         \\const R.merge: a -> R -> F32 = func left => return func right => return 1.0
     );
@@ -189,10 +189,10 @@ test "recursive frontend waits for the preferred left dispatch before right fall
 
 test "recursive frontend retries publish only owned final scheme predicates" {
     var fixture = try Fixture.init(
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\const choose: a -> Box where { associated "merge" Box Box Box } = func value => return @type.call "merge" value value
         \\const Box.merge: Box -> Box -> Box = func left => return func right => return left
-        \\entry const answer: Box = choose (#Box 1)
+        \\entry const answer: Box = choose ($Box 1)
     );
     defer fixture.deinit();
     try fixture.valid();
@@ -208,17 +208,17 @@ test "recursive frontend retries publish only owned final scheme predicates" {
 
 test "recursive frontend queued method preserves declaration and call diagnostics" {
     const prefix =
-        \\type Seed is data = #Seed
-        \\type Box a is data = #Box a
-        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-        \\const wrap = func value => return @type.call "build" value #Seed
+        \\type Seed is data = $Seed
+        \\type Box a is data = $Box a
+        \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+        \\const wrap = func value => return @type.call "build" value $Seed
         \\const parent: U32 -> U32 = func value => return if @u32.eq value 0 then 1.5 else (wrap value).read
         \\const Box.read: Box U32 -> U32 = func box => return case box of
     ;
     const bodies = [_][]const u8{
-        "  #Box value => parent (@u32.sub value 1)\n",
-        "  #Box value => do:\n    let next = @u32.sub value 1\n    break parent next\n",
-        "  #Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)\n",
+        "  $Box value => parent (@u32.sub value 1)\n",
+        "  $Box value => do:\n    let next = @u32.sub value 1\n    break parent next\n",
+        "  $Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)\n",
     };
     for (bodies) |body| {
         const source = try std.mem.concat(a, u8, &.{ prefix, "\n", body, "entry const run: U32 -> U32 = func value => return parent value\n" });
@@ -243,13 +243,13 @@ test "recursive frontend queued method preserves declaration and call diagnostic
 }
 
 const late_recursive_source =
-    \\type Seed is data = #Seed
-    \\type Box a is data = #Box a
-    \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-    \\const f_0 = func value => return @type.call "build" value #Seed
+    \\type Seed is data = $Seed
+    \\type Box a is data = $Box a
+    \\const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+    \\const f_0 = func value => return @type.call "build" value $Seed
     \\const parent: a -> a = func value => return (f_0 value).read
     \\const Box.read: Box a -> a = func box => return case box of
-    \\  #Box value => parent value
+    \\  $Box value => parent value
     \\entry const generic = func value => return parent value
 ;
 
@@ -341,7 +341,7 @@ test "pending callback selections wait for their unknown receivers" {
             \\const mul = func left => return func right => return @type.call "mul" left right
             \\const div = func left => return func right => return @type.call "div" left right
             \\const U32.add = func left => return func right => return @u32.add left right
-            \\const holder = func () => return #{
+            \\const holder = func () => return {
             \\
         );
         for (0..16) |index| try text.print(a, "f{d}: func x => return x * 2.0 + x / 3.0,\n", .{index});
@@ -364,15 +364,15 @@ const header =
 ;
 /// A nominal counter whose `+` resolves through an associated member.
 const counter =
-    \\type N is data = #N U32
+    \\type N is data = $N U32
     \\const N.add = func left => return func right => return case left, right of
-    \\  #N a, #N b => #N (@u32.add a b)
+    \\  $N a, $N b => $N (@u32.add a b)
     \\
 ;
 const box =
-    \\type Box a is data = #Box a
+    \\type Box a is data = $Box a
     \\const Box.add = func left => return func right => return case left, right of
-    \\  #Box a, #Box b => #Box (a + b)
+    \\  $Box a, $Box b => $Box (a + b)
     \\
 ;
 const Fixture = struct {
@@ -418,7 +418,7 @@ fn diamond(depth: usize) ![]u8 {
     errdefer out.deinit(a);
     try out.appendSlice(a, header);
     try out.appendSlice(a, counter);
-    try out.appendSlice(a, "const f_0 = func x => return x + (#N 1)\n");
+    try out.appendSlice(a, "const f_0 = func x => return x + ($N 1)\n");
     for (1..depth + 1) |i| try out.print(a, "const f_{d} = func x => return f_{d} (f_{d} x)\n", .{ i, i - 1, i - 1 });
     try out.print(a, "entry const main = func (x: N) : N => return f_{d} x\n", .{depth});
     return out.toOwnedSlice(a);
@@ -428,8 +428,8 @@ fn chain(depth: usize) ![]u8 {
     errdefer out.deinit(a);
     try out.appendSlice(a, header);
     try out.appendSlice(a, counter);
-    try out.appendSlice(a, "const f_0 = func x => return x + (#N 1)\n");
-    for (1..depth + 1) |i| try out.print(a, "const f_{d} = func x => return f_{d} x + (#N 1)\n", .{ i, i - 1 });
+    try out.appendSlice(a, "const f_0 = func x => return x + ($N 1)\n");
+    for (1..depth + 1) |i| try out.print(a, "const f_{d} = func x => return f_{d} x + ($N 1)\n", .{ i, i - 1 });
     try out.print(a, "entry const main = func (x: N) : N => return f_{d} x\n", .{depth});
     return out.toOwnedSlice(a);
 }
@@ -498,8 +498,8 @@ test "left operand dispatch wins through a shared callee" {
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\
-        \\entry const answer = func (value: F32) => return case wide (#Box value) of
-        \\  #Box result => result
+        \\entry const answer = func (value: F32) => return case wide ($Box value) of
+        \\  $Box result => result
         \\
     );
     var f = try Fixture.init(source.items);
@@ -541,7 +541,7 @@ test "shared written requirements retain the local computation reference origin"
     try std.testing.expectEqual(@as(u32, 1), answer.scheme.obligations.len);
     const requirement = f.checked.obligations[answer.scheme.obligations.start];
     try std.testing.expectEqual(@import("types.zig").ObligationKind.callee_use, requirement.kind);
-    try std.testing.expectEqualDeep(ast.Span{ .start = 654, .end = 665 }, f.tree.span(requirement.source));
+    try std.testing.expectEqualDeep(ast.Span{ .start = 662, .end = 673 }, f.tree.span(requirement.source));
 }
 
 test "a conflicting operand reports the same outcome through a shared callee" {
@@ -555,8 +555,8 @@ test "a conflicting operand reports the same outcome through a shared callee" {
     try wideSum(&source, "right", 20);
     try source.appendSlice(a,
         \\
-        \\entry const answer = func (value: F32) => return case wide (#Box value) 1 of
-        \\  #Box result => result
+        \\entry const answer = func (value: F32) => return case wide ($Box value) 1 of
+        \\  $Box result => result
         \\
     );
     var f = try Fixture.init(source.items);
@@ -572,8 +572,8 @@ test "return type polymorphism preserves independent expected results through sh
     defer source.deinit(a);
     try source.appendSlice(a, header);
     try source.appendSlice(a,
-        \\type Box value is data = #Box value
-        \\const Box.from = func value => return #Box value
+        \\type Box value is data = $Box value
+        \\const Box.from = func value => return $Box value
         \\const from = func value => return @type.result "from" value
         \\
     );
@@ -582,10 +582,10 @@ test "return type polymorphism preserves independent expected results through sh
     try source.appendSlice(a,
         \\)
         \\entry const integer = func () => return do:
-        \\  let #Box value:Box U32 = wide 21
+        \\  let $Box value:Box U32 = wide 21
         \\  break value
         \\entry const floating = func () => return do:
-        \\  let #Box value:Box F32 = wide 1.5
+        \\  let $Box value:Box F32 = wide 1.5
         \\  break value
         \\
     );
@@ -626,7 +626,7 @@ test "mutually recursive generic functions keep flat obligations" {
     try source.appendSlice(a, counter);
     try source.appendSlice(a, "const left = func value => return (");
     try wideSum(&source, "value", 40);
-    try source.appendSlice(a, ") + right value\nconst right = func value => return left (value + (#N 1))\n");
+    try source.appendSlice(a, ") + right value\nconst right = func value => return left (value + ($N 1))\n");
     try source.appendSlice(a, "entry const main = func (value: N) : N => return left value\n");
     var f = try Fixture.init(source.items);
     defer f.deinit();
@@ -649,7 +649,7 @@ test "higher order callees are solved at their use" {
     try wideSum(&source, "value", 40);
     try source.appendSlice(a,
         \\)
-        \\entry const main = func (value: N) : N => return apply (func total => return total + (#N 1)) value
+        \\entry const main = func (value: N) : N => return apply (func total => return total + ($N 1)) value
         \\
     );
     var f = try Fixture.init(source.items);
@@ -697,7 +697,7 @@ test "a lexical closure over outer variables expands its shared callee in place"
         \\
         \\entry const main = func (outer: N) : N => return do:
         \\  let inner = func value => return wide (value + outer)
-        \\  break inner (#N 1)
+        \\  break inner ($N 1)
         \\
     );
     var f = try Fixture.init(source.items);

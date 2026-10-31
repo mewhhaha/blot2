@@ -101,28 +101,28 @@ test "ordinary rolling and summary trees preserve Core and deterministic retaine
 // leaves. Pool publication/replacement has its own code_artifacts law too.
 test "rolling state preserves Core and output through every emission allocation failure" {
     try faultLaw(
-        \\type State is data = #State { values: Array U32, advance: U32 -> U32, width: U32 }
-        \\const next = func (#State { values, advance, width }) => return
-        \\  #State { values, advance, width: advance width }
+        \\type State is data = $State { values: Array U32, advance: U32 -> U32, width: U32 }
+        \\const next = func ($State { values, advance, width }) => return
+        \\  $State { values, advance, width: advance width }
         \\entry const run = func (values: Array U32) => return do:
-        \\  let state = #State { values, advance: func width => return @u32.add width (@array.length values), width: 1 }
-        \\  let #State { values: retained, width } = next state
+        \\  let state = $State { values, advance: func width => return @u32.add width (@array.length values), width: 1 }
+        \\  let $State { values: retained, width } = next state
         \\  break @array.concat retained #[width]
     , false);
 }
 
 test "summary reference replacement preserves Core and output through every emission allocation failure" {
     try faultLaw(
-        \\type Tree a is data = #Leaf a | #Branch (Tree a, Tree a, a)
+        \\type Tree a is data = $Leaf a | $Branch (Tree a, Tree a, a)
         \\const total = func tree => return case tree of
-        \\  #Leaf value => value
-        \\  #Branch (_, _, value) => value
+        \\  $Leaf value => value
+        \\  $Branch (_, _, value) => value
         \\const replace = func value => return func tree => return case tree of
-        \\  #Leaf _ => #Leaf value
-        \\  #Branch (left, right, _) => do:
+        \\  $Leaf _ => $Leaf value
+        \\  $Branch (left, right, _) => do:
         \\    let changed = replace value left
-        \\    break #Branch (changed, right, @array.concat (total changed) (total right))
-        \\const original = #Branch (#Leaf #[1], #Leaf #[2], #[1, 2])
+        \\    break $Branch (changed, right, @array.concat (total changed) (total right))
+        \\const original = $Branch ($Leaf #[1], $Leaf #[2], #[1, 2])
         \\entry const run = func (values: Array U32) => return total (replace values original)
     , true);
 }

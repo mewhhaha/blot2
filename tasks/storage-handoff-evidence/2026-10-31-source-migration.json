@@ -1,0 +1,76 @@
+{
+  "scope": "Blot current syntax, source generators, editor and positive/semantic-negative test inputs; historical evidence and deliberate spelling rejections preserved",
+  "changed_paths": 386,
+  "native": {
+    "compiled_inventory": 2716,
+    "executed_affected": 1816,
+    "passed": 1805,
+    "failed": [
+      "reuse.rejected_revision_tests.test.retained revisions with errors publish the ordinary lane's diagnostic",
+      "reuse.rejected_revision_tests.test.every allocation failure of a portable rejection leaves the diagnostic or fails cleanly",
+      "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+      "backend.runtime_operation_backend_tests.test.project emission requires complete actual owners and independently solves noisy evidence without changing frozen Core",
+      "backend.runtime_operation_backend_tests.test.shared RC source collection construction and publication preserve frozen Core through every allocation failure",
+      "eval.core_eval_tests.test.closed result directed diamonds propagate destinations before expanding shared edges",
+      "backend.collection_tests.test.chunk scalar publications retain complete ownership through static chains",
+      "backend.collection_tests.test.executed memory profile owns detached origins metadata and instrumentation through all allocation failures",
+      "backend.owned_arrays_tests.test.exclusive owned array survives nested carries and backend allocation failures after frontend teardown",
+      "backend.persistent_roots_tests.test.in-place Array-returning loops emit no per-iteration journal operations through replay checkpoint and OOM",
+      "backend.persistent_roots_tests.test.shared carries, fresh replacements and owning element stores keep their loop journal operations"
+    ],
+    "leaks": 0,
+    "fault_mode": "sampled",
+    "all_residual_failures_reproduced_in_retained_baseline": true,
+    "baseline_native_sha256": "a1cb73e9ce6bea47bc51042bcbbeca74ef9e9adc8f4e413e081f7cb8c3b57bf8",
+    "current_native_sha256": "a2ff8bde134842cc74bec41973769a52cd186e085e50062c09914657bb677fe0"
+  },
+  "standalone_and_guide_parse": {
+    "count": 229,
+    "failures": 0
+  },
+  "module_check": {
+    "count": 68,
+    "failures": 0
+  },
+  "guide_build": {
+    "blocks": 42,
+    "entry_modules_emitted": 36,
+    "library_modules_without_entry": 6,
+    "other_failures": 0
+  },
+  "executed_guest": {
+    "passed": 63,
+    "failed": 0
+  },
+  "editor": {
+    "corpus": 8,
+    "highlight_files": 18,
+    "example_parses": 4,
+    "helix_tests": 6,
+    "lsp_tests": 8
+  },
+  "client_type_check": {
+    "files": [
+      "compiler/assets.ts",
+      "compiler/lsp.ts"
+    ],
+    "passed": true
+  },
+  "lint": {
+    "findings": 25,
+    "known_baseline_count": 25
+  },
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 package fetch from npm.jsr.io fails through configured proxy (unsuccessful tunnel); no lock/manifest/TLS changes"
+  },
+  "additional_blockers": {
+    "formatter_parser_derivation_tests": "Same Baba dependency unavailable",
+    "example_ecs_cache_law": "Existing emit storage_unsupported at1230..1320: The scoped body lacks complete type evidence; assertion preserved",
+    "legacy_task_references": "Legacy backend removal remains task 120 in tasks/STORAGE_REWRITE.md."
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine limits unchanged; no real-main/GPU rebuild performed",
+  "date": "2026-10-31",
+  "qualification": "Affected source/editor/guest migration checks only; full compiler gate and real-main rebuild remain pending. The native run used sampled allocation faults."
+}

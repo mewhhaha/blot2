@@ -16,10 +16,10 @@ const a = std.testing.allocator;
 const compiler: [32]u8 = @splat(29);
 
 const source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const open = func (box: Box) : U32 => return case box of
-    \\  #Box value => value
-    \\const factory = func number => return func extra => return @u32.add number (open (#Box extra))
+    \\  $Box value => value
+    \\const factory = func number => return func extra => return @u32.add number (open ($Box extra))
     \\const callback = factory 42
     \\const other = 0
     \\entry const schema: U32 = 7

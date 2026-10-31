@@ -9,27 +9,27 @@ entry const lists = func (input: U32) => return iter.fold_left (func total => re
 entry const references = func (seed: U32) => return do:
   let original = #[#[seed, seed + 1], #[9, 10]].iter
   use step <- original.next
-  let #Some (value, rest) = step else:
+  let $Some (value, rest) = step else:
     break #[999]
   for index in 0..24:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "pressure"
   use again <- original.next
-  let #Some (saved, _) = again else:
+  let $Some (saved, _) = again else:
     break #[998]
   use next <- rest.next
-  let #Some (second, _) = next else:
+  let $Some (second, _) = next else:
     break #[997]
   break #[value[0], value[1], saved[0], second[0]]
 entry const retained = func (seed: U32) => return do:
   use step <- #[seed, seed + 1].iter.next
-  let #Some (first, rest) = step else:
+  let $Some (first, rest) = step else:
     break 999
   use next <- rest.next
-  let #Some (second, _) = next else:
+  let $Some (second, _) = next else:
     break 998
-  let #Some (again, _) = step else:
+  let $Some (again, _) = step else:
     break 997
   break first + second + again
 const make = func (host: U32 -> U32 ! {Foreign}) => return do:
@@ -37,7 +37,7 @@ const make = func (host: U32 -> U32 ! {Foreign}) => return do:
   break (@array.fill 2 seed).iter
 entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use step <- (make host).next
-  let #Some (value, rest) = step else:
+  let $Some (value, rest) = step else:
     break 999
   use result <- host value
   break result
@@ -45,7 +45,7 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
 
 function directPatterns(text: string) {
   return text.replaceAll(
-    /  use (\w+) <- ([^\n]+)\n  let (#Some [^\n]+) = \1 else:/g,
+    /  use (\w+) <- ([^\n]+)\n  let ($Some [^\n]+) = \1 else:/g,
     "  let $3 = $2 else:",
   );
 }
@@ -62,8 +62,8 @@ for (const direct of [false, true]) {
       adjacentSource.slice(start, end) +
       source.slice(source.indexOf("const make"));
     source = source.replace(
-      "  let #Some (value, rest) = (make host).next else:",
-      "  use cursor <- make host\n  let #Some (value, rest) = cursor.next else:",
+      "  let $Some (value, rest) = (make host).next else:",
+      "  use cursor <- make host\n  let $Some (value, rest) = cursor.next else:",
     );
     label = "direct";
   }
@@ -181,15 +181,15 @@ for (const direct of [false, true]) {
     const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
     const stdRoot = new URL("../../std", import.meta.url).pathname;
     const original = await Deno.readTextFile(prelude);
-    const needle = "then #Some (@cursor.value cursor, @cursor.advance cursor)";
+    const needle = "then $Some (@cursor.value cursor, @cursor.advance cursor)";
     const changed = original.replace(
       needle,
-      "then #Some (@u32.add (@cursor.value cursor) 1, @cursor.advance cursor)",
+      "then $Some (@u32.add (@cursor.value cursor) 1, @cursor.advance cursor)",
     );
     assert.notEqual(original, changed);
     let text = `entry const pull = func (seed: U32) => return do:
   use step <- (@array.fill 1 seed).iter.next
-  let #Some (value, _) = step else:
+  let $Some (value, _) = step else:
     break 999
   break value
 `;

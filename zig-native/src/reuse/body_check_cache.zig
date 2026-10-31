@@ -3262,7 +3262,7 @@ fn captureLocal(a: A, checked: *const check.Checked, pool: *const symbols.Pool, 
 
 test "body check cache recipe memo preserves exact depth budget and exhaustion guards" {
     const allocator = std.testing.allocator;
-    const text = "type Token is data = #Token U32\n";
+    const text = "type Token is data = $Token U32\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     var tokens = try @import("../parse/lexer.zig").lex(allocator, text);

@@ -24,16 +24,16 @@ entry const answer = func () => return @code.emit generated
     const library = (value: number) => {
       if (consumerQuote) {
         return `opaque type Token = U32
-const make = func () => return #Token ${value}
+const make = func () => return $Token ${value}
 const read = func (value: Token) => return case value of
-  #Token number => number
+  $Token number => number
 `;
       }
-      return `private data Packet a = #Packet {payload: a}
+      return `private type Packet a is data = $Packet {payload: a}
 opaque type Token = U32
-private const make = func value => return #Packet {payload: #Token value}
+private const make = func value => return $Packet {payload: $Token value}
 private const token = func (value: Token) => return case value of
-  #Token number => number
+  $Token number => number
 private const read = func () => return token (make ${value}).payload
 const generated = @code.quote (read ())
 `;
@@ -81,7 +81,7 @@ const generated = @code.quote (read ())
               const failed = await retained.build({
                 sources: {
                   ...sources,
-                  [entry]: source + "const forbidden = #Token 0\n",
+                  [entry]: source + "const forbidden = $Token 0\n",
                 },
               });
               assert(!failed.success, JSON.stringify(failed));

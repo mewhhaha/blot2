@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const source = `data Maybe = #Some U32 | #None
+const source = `type Maybe is data = $Some U32 | $None
 const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
 const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
 const later: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> Unit -> U32 = func values => return func index => return func proof => return func unused => return @array.get values index
@@ -76,7 +76,7 @@ entry const predecessor = func (index: U32) => return do:
   break @array.get values (@u32.sub index 1)
 entry const fallback = func (index: U32) => return do:
   let values = #[8]
-  let #Some selected = if @u32.eq index 0 then #None else #Some 42 else:
+  let $Some selected = if @u32.eq index 0 then $None else $Some 42 else:
     let valid = @proof.index values index
     break 0
   break @array.get values index
@@ -198,11 +198,11 @@ Deno.test("numeric public proof helpers survive source and compiled dependency b
   const archive = `${directory}/proof.blotdep`;
   const boundary = source.indexOf("entry const lookup");
   const library = source.slice(0, boundary).replace(
-    "data Maybe = #Some U32 | #None\n",
+    "type Maybe is data = $Some U32 | $None\n",
     "",
   );
   const main = 'import {witness, at, later, invoke, within} from "./proof"\n' +
-    "data Maybe = #Some U32 | #None\n" +
+    "type Maybe is data = $Some U32 | $None\n" +
     source.slice(boundary);
   try {
     await Deno.writeTextFile(entry, main);
@@ -379,7 +379,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/index.blot`;
     const archive = `${directory}/index.blotdep`;
-    const library = `type Probe is data = #Probe U32
+    const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let copied = index
   break copied
@@ -391,10 +391,10 @@ const access = func probe => return func (index: U32) => return do:
   break 0
 `;
     const main = `import {access, Probe} from "./index"
-entry const lookup = func (index: U32) => return access (#Probe 42) index
+entry const lookup = func (index: U32) => return access ($Probe 42) index
 entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
-  let selected = access (#Probe first) 1
+  let selected = access ($Probe first) 1
   use final <- host 2
   break @u32.add selected final
 `;
@@ -522,7 +522,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/index.blot`;
     const archive = `${directory}/index.blotdep`;
-    const library = `type Probe is data = #Probe U32
+    const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
   let zero = @u32.sub index index
   let copied = @u32.add 0 index
@@ -536,11 +536,11 @@ const access = func probe => return func (index: U32) => return do:
   break 0
 `;
     const main = `import {access, decode, Probe} from "./index"
-entry const lookup = func (index: U32) => return access (#Probe 42) index
-entry const identity = func (index: U32) => return decode (#Probe 42) index
+entry const lookup = func (index: U32) => return access ($Probe 42) index
+entry const identity = func (index: U32) => return decode ($Probe 42) index
 entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   use first <- host 1
-  let selected = access (#Probe first) 1
+  let selected = access ($Probe first) 1
   use final <- host 2
   break @u32.add selected final
 `;

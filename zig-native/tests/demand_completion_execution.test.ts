@@ -67,18 +67,18 @@ entry const pure = func () => return 7
 
 const recursiveSource = `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Node is data = #End | #Next (Unit -> U32 ! {State.get Node})
+type Node is data = $End | $Next (Unit -> U32 ! {State.get Node})
 const keep = func ~value => return func () => return @demand value
 const get = func (witness: Unit -> a) : a => return State.get ()
 entry const answer = func () => return do:
-  let (_, result) = @effect.run State.get State.set #End (func () => return do:
+  let (_, result) = @effect.run State.get State.set $End (func () => return do:
     let delayed = keep (do:
-      use link <- get (func () => return #End)
+      use link <- get (func () => return $End)
       break case link of
-        #End => 0
-        #Next callback => callback ()
+        $End => 0
+        $Next callback => callback ()
     )
-    use State.set (#Next delayed)
+    use State.set ($Next delayed)
     break delayed ()
   )
   break result

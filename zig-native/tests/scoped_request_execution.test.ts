@@ -48,7 +48,7 @@ entry const cancelled = func () => return @effect.scope (func (s: State U32) => 
         break value
 )
 type Validate is effect = {check: U32 -> U32}
-const keep = func ~value => return func () => return @force value
+const keep = func ~value => return func () => return @demand value
 entry const retry = func () => return do:
   let delayed = keep (@effect.scope (func (s: State U32) => return do:
     use nested <- do (@effect.state s.get s.set 7):

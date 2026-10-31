@@ -126,12 +126,12 @@ Deno.test("wide ownership selects exact bitmap and size for differently shaped c
         const result = await compiler.build({
           sources: {
             [entry]: `
-type Shape is data = #Small {child: Array U32, value: U32} | #Large {${types}}
+type Shape is data = $Small {child: Array U32, value: U32} | $Large {${types}}
 const replace = func (shape: Shape) => return do:
   shape.child := #[self[0] + 1]
   break shape
 entry const run = func (mode: U32) => return do:
-  let before = if mode == 0 then #Small {child: #[40], value: 7} else #Large {${values}}
+  let before = if mode == 0 then $Small {child: #[40], value: 7} else $Large {${values}}
   let captured = func () => return before.child[0]
   let changed = replace before
   for index in 0..32:

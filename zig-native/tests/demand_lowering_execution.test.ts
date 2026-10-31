@@ -40,16 +40,16 @@ const disjunction = func (condition: Bool) => return func ~(value: Bool) => retu
   if condition then true else @demand value
 `;
     const source = `import { alias, alternate } from "./forward"
-infixr 35 (&&) = alias
-infixr 34 (||) = alternate
-entry const conjunction = func (value: U32) => return (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10)
-entry const disjunction = func (value: U32) => return (@u32.eq value 0) || (@u32.eq (@u32.div 100 value) 10)
+infixr 35 (<&>) = alias
+infixr 34 (<|>) = alternate
+entry const conjunction = func (value: U32) => return (@u32.eq value 10) <&> (@u32.eq (@u32.div 100 value) 10)
+entry const disjunction = func (value: U32) => return (@u32.eq value 0) <|> (@u32.eq (@u32.div 100 value) 10)
 entry const explicit_and = func (value: U32) => return if @u32.eq value 10 then @u32.eq (@u32.div 100 value) 10 else false
 entry const explicit_or = func (value: U32) => return if @u32.eq value 0 then true else @u32.eq (@u32.div 100 value) 10
 entry const loop = func (value: U32) => return do:
   let total = 0
   for index in 0..8:
-    total := @u32.add total (if (@u32.eq value 10) && (@u32.eq (@u32.div 100 value) 10) then 1 else 0)
+    total := @u32.add total (if (@u32.eq value 10) <&> (@u32.eq (@u32.div 100 value) 10) then 1 else 0)
   break total
 `;
     try {
@@ -107,11 +107,11 @@ const alternate = func (condition: Bool) => return func ~(value: Bool) => return
           assert(report.sites.every((site) => site.lowering === "direct"));
           for (const value of [0, 1, 10, 100]) {
             assert.equal(
-              await execute(result.bytes, "and", value),
+              await execute(result.bytes, "conjunction", value),
               await execute(result.bytes, "explicit_and", value),
             );
             assert.equal(
-              await execute(result.bytes, "or", value),
+              await execute(result.bytes, "disjunction", value),
               await execute(result.bytes, "explicit_or", value),
             );
             let total = 0;
@@ -132,7 +132,7 @@ const alternate = func (condition: Bool) => return func ~(value: Bool) => return
           assert(ordinaryEdit.success);
           assert.deepEqual(edited.bytes, ordinaryEdit.bytes);
           noStorage(edited.bytes);
-          assert.equal(await execute(edited.bytes, "and", 10), false);
+          assert.equal(await execute(edited.bytes, "conjunction", 10), false);
           const fresh = await createZigProjectCompiler(options);
           try {
             const rebuilt = await fresh.build({ sources: { [leaf]: changed } });
@@ -210,12 +210,12 @@ for (const codegenTier of ["development", "optimized"] as const) {
       });
       try {
         for (const count of [1, 8, 64, 256]) {
-          const and = booleanChain(count, "&&");
-          const or = booleanChain(count, "||");
-          const source = `infixl 35 (&&) = conjunction
-infixl 34 (||) = disjunction
-const conjunction = func (condition: Bool) => return func ~(value: Bool) => return if condition then @demand value else false
-const disjunction = func (condition: Bool) => return func ~(value: Bool) => return if condition then true else @demand value
+          const and = booleanChain(count, "<&>");
+          const or = booleanChain(count, "<|>");
+          const source = `infixl 35 (<&>) = and_then
+infixl 34 (<|>) = or_else
+const and_then = func (condition: Bool) => return func ~(value: Bool) => return if condition then @demand value else false
+const or_else = func (condition: Bool) => return func ~(value: Bool) => return if condition then true else @demand value
 entry const conjunction = func (value: U32) => return ${and}
 entry const disjunction = func (value: U32) => return ${or}
 entry const loop = func (value: U32) => return do:
@@ -362,7 +362,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       );
       await Deno.writeTextFile(
         entry,
-        'import { alias } from "./library"\nentry const run = func (value: U32) => return alias (value != 0) (100 / value == 10)\nentry const explicit = func (value: U32) => return if value != 0 then 100 / value == 10 else #False\n',
+        'import { alias } from "./library"\nentry const run = func (value: U32) => return alias (value != 0) (100 / value == 10)\nentry const explicit = func (value: U32) => return if value != 0 then 100 / value == 10 else false\n',
       );
       const compiler = await createZigProjectCompiler({
         executable,

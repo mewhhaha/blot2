@@ -14,23 +14,23 @@ entry const alternatives = func input => return do:
     let selected = do:
       if mode % 3 == 0:
         break case round % 3, round % 2 of
-          0, 0 => #Nothing
-          0, _ => #Some (round * 3 + 1, round + 7)
-          _, _ => #Some (round * 3 + 1, round + 7)
+          0, 0 => $Nothing
+          0, _ => $Some (round * 3 + 1, round + 7)
+          _, _ => $Some (round * 3 + 1, round + 7)
       else:
         if mode % 3 == 1:
           if round % 2 == 0:
-            break #Some (round * 3 + 1, round + 7)
+            break $Some (round * 3 + 1, round + 7)
           else:
             if round % 5 == 0:
-              break #Some (round * 3 + 1, round + 7)
-            break #Nothing
+              break $Some (round * 3 + 1, round + 7)
+            break $Nothing
         else:
           for inner in 0..3:
             if inner == round % 3:
-              break #Some (round * 3 + 1, round + 7)
-          break #Nothing
-    if let #Some (left, right) = selected:
+              break $Some (round * 3 + 1, round + 7)
+          break $Nothing
+    if let $Some (left, right) = selected:
       total := self + left + right
   break total
 entry const snapshots = func count => return do:

@@ -8,15 +8,15 @@ import { decodeText } from "../../compiler/text.ts";
 
 Deno.test("written result interfaces select the destination through aliases contracts and local templates", async () => {
   await compileAndRun(`
-type Box a is data = #Box a
-const Box.from = func value => return #Box value
+type Box a is data = $Box a
+const Box.from = func value => return $Box value
 type Convert (a, b) is contract = { result "from" a b }
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 const alias: a -> b where { Convert (a, b) } = convert
 entry const answer = func () => return do:
   let local: a -> b where { result "from" a b ! {} } = alias
-  let #Box first: Box U32 = local 40
-  let #Box second: Box F32 = local 2.5
+  let $Box first: Box U32 = local 40
+  let $Box second: Box F32 = local 2.5
   break @u32.add first (@f32.to_u32 second)
 `, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
   await compileAndRun(`
@@ -28,40 +28,40 @@ entry const answer = func () => return @u32.add (convert (floor 40.5)) (convert 
 Deno.test("written result interfaces propagate selected effects and reject missing or incompatible evidence", async () => {
   const header = `
 type Read is effect = Unit -> U32
-type Box is data = #Box U32
+type Box is data = $Box U32
 const Box.from: Unit -> Box ! {Read} = func () => return do:
   use value <- Read ()
-  break #Box value
+  break $Box value
 const convert: a -> b ! {|e} where { result "from" a b ! {|e} } = func value => return @type.result "from" value
 `;
   await compileAndRun(header + `
 entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
-  let #Box value = box
+  let $Box value = box
   break value
 `, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
   await compileAndRun(`
 type Tick is effect = Unit -> Unit
-type Box is data = #Box U32
-const Box.from = func (value: U32) => return #Box value
+type Box is data = $Box U32
+const Box.from = func (value: U32) => return $Box value
 const convert: a -> b ! {Tick} where { result "from" a b ! {} } = func value => return do:
   use Tick ()
   break @type.result "from" value
 entry const answer = func () => return do (@effect.provider Tick (func () => return ())):
   use box: Box <- convert 42
-  let #Box value = box
+  let $Box value = box
   break value
 `, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
   await compileExpectedFailure(`
-type Source is data = #Source U32
-type Target is data = #Target U32
-const Source.from = func value => return #Target 42
+type Source is data = $Source U32
+type Target is data = $Target U32
+const Source.from = func value => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
-entry const answer: Target = convert (#Source 1)
+entry const answer: Target = convert ($Source 1)
 `, "missing_associated", undefined, { prelude: "none" });
   await compileExpectedFailure(`
-type Target is data = #Target U32
-const Target.from = func (value: F32) => return #Target 42
+type Target is data = $Target U32
+const Target.from = func (value: F32) => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 entry const answer: Target = convert 1
 `, "type_mismatch", undefined, { prelude: "none" });
@@ -70,7 +70,7 @@ entry const answer: Target = convert 1
   ) + `
 entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
-  let #Box value = box
+  let $Box value = box
   break value
 `, "effect_mismatch", undefined, { prelude: "none" });
 });

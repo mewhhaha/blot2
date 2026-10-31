@@ -8,7 +8,7 @@ entry const answer=ignore (@panic "not forced")
   },
   {
     name: "aliases_and_callback",
-    source: `const twice=func ~(value:U32)=> return @u32.add (@force value) (@force value)
+    source: `const twice=func ~(value:U32)=> return @u32.add (@demand value) (@demand value)
 const alias=twice
 const call=func (callback:~U32->U32)=> return callback (@u32.add 20 1)
 entry const folded=call alias
@@ -19,7 +19,7 @@ entry const run=func(value:U32)=> return alias value
   },
   {
     name: "partial_application",
-    source: `const first=func ~(left:U32)=> return func ~(right:U32)=> return @force left
+    source: `const first=func ~(left:U32)=> return func ~(right:U32)=> return @demand left
 const choose=first 42
 entry const answer=choose (@panic "second never forced")
 `,
@@ -28,11 +28,11 @@ entry const answer=choose (@panic "second never forced")
   {
     name: "captured_versions",
     source: `const delay=func ~value=> return value
-const capture=func ~value=> return func ()=> return @force value
+const capture=func ~value=> return func ()=> return @demand value
 entry const answer=func ()=> return do:
   let amount=20
   let pending=delay (@u32.add amount 1)
-  let thunk=capture (@u32.add (@force pending) 21)
+  let thunk=capture (@u32.add (@demand pending) 21)
   amount:=99
   break @u32.add (thunk ()) (thunk ())
 `,
@@ -40,15 +40,15 @@ entry const answer=func ()=> return do:
   },
   {
     name: "forward_existing",
-    source: `const twice=func ~(value:U32)=> return @u32.add (@force value) (@force value)
-const forward=func ~(value:U32)=> return twice (@force value)
+    source: `const twice=func ~(value:U32)=> return @u32.add (@demand value) (@demand value)
+const forward=func ~(value:U32)=> return twice (@demand value)
 entry const answer=forward 21
 `,
     expected: {"answer": 42},
   },
   {
     name: "force_eager",
-    source: `entry const answer=@force 42
+    source: `entry const answer=@demand 42
 `,
     error: "type_mismatch",
   },
@@ -69,14 +69,14 @@ entry const answer=ignore true
   },
   {
     name: "partial_force",
-    source: `const force=@force
+    source: `const force=@demand
 entry const answer=42
 `,
     error: "call_arity",
   },
   {
     name: "unknown_callback_is_eager",
-    source: `const lazy=func ~(value:U32)=> return @force value
+    source: `const lazy=func ~(value:U32)=> return @demand value
 const call=func callback=> return callback 42
 entry const answer=call lazy
 `,
@@ -84,7 +84,7 @@ entry const answer=call lazy
   },
   {
     name: "demand_reference_not_forward",
-    source: `const lazy=func ~(value:U32)=> return @force value
+    source: `const lazy=func ~(value:U32)=> return @demand value
 const forward=func ~(value:U32)=> return lazy value
 entry const answer=forward 42
 `,
@@ -106,7 +106,7 @@ entry const answer=func()=> return do:
   {
     name: "both_demand_infix",
     source: `infixl 60 (+) = choose
-const choose = func ~(left:U32) => return func ~(right:U32) => return @force left
+const choose = func ~(left:U32) => return func ~(right:U32) => return @demand left
 entry const answer = 42 + (@panic "right never forced")
 entry const run = func (value:U32) => return value + (@panic "runtime right never forced")
 `,
@@ -116,7 +116,7 @@ entry const run = func (value:U32) => return value + (@panic "runtime right neve
   },
   {
     name: "global_array_memo",
-    source: `const keep = func ~value => return func () => return @force value
+    source: `const keep = func ~value => return func () => return @demand value
 const saved = keep #[40, 2]
 const alias = saved
 entry const read = func () => return do:

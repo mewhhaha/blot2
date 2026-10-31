@@ -13,7 +13,7 @@ const source =
     \\const pending = delay (@array.fill 3 40)
     \\let saved = @array.fill 3 40
     \\entry const run = func (index: U32) => return do:
-    \\  let cached = @force pending
+    \\  let cached = @demand pending
     \\  break @u32.add saved[index] cached[index]
 ;
 const Fixture = struct {
@@ -109,11 +109,11 @@ test "single-reference named environments preserve static captures replay change
 
 test "immutable algebraic shapes keep acyclic claims through replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
-        \\type Link a is data = #End | #Next (Link a, a)
+        \\type Link a is data = $End | $Next (Link a, a)
         \\const grow = func (count: U32) => return do:
-        \\  let root: Link U32 = #End
+        \\  let root: Link U32 = $End
         \\  for index in 0..count:
-        \\    root := #Next (self, index)
+        \\    root := $Next (self, index)
         \\  break root
         \\entry const run = func (count: U32) => return do:
         \\  let root = grow count
@@ -143,11 +143,11 @@ test "immutable algebraic shapes keep acyclic claims through replay checkpoint a
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
     const changed_source =
-        \\type Link a is data = #End | #Next (Link a, a) | #Later (Unit -> a)
+        \\type Link a is data = $End | $Next (Link a, a) | $Later (Unit -> a)
         \\const grow = func (count: U32) => return do:
-        \\  let root: Link U32 = #End
+        \\  let root: Link U32 = $End
         \\  for index in 0..count:
-        \\    root := #Next (self, index)
+        \\    root := $Next (self, index)
         \\  break root
         \\entry const run = func (count: U32) => return do:
         \\  let root = grow count
@@ -172,11 +172,11 @@ test "immutable algebraic shapes keep acyclic claims through replay checkpoint a
 
 test "single-use generic local storage keeps exact private roles through replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
-        \\type Box f is data = #Box f
-        \\const box = func value => return #Box value
+        \\type Box f is data = $Box f
+        \\const box = func value => return $Box value
         \\entry const run = func (seed: U32) => return do:
         \\  let stored = box (func value => return {item: value})
-        \\  let #Box mapper = stored
+        \\  let $Box mapper = stored
         \\  break @u32.add (mapper seed).item 1
     );
     defer fixture.deinit();
@@ -203,11 +203,11 @@ test "single-use generic local storage keeps exact private roles through replay 
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, null, first.bytes });
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitScenario, .{ &fixture, &first.capture.?, first.bytes });
     var reference_fixture = try Fixture.initSource(
-        \\type Box f is data = #Box f
-        \\const box = func value => return #Box value
+        \\type Box f is data = $Box f
+        \\const box = func value => return $Box value
         \\entry const run = func (seed: Array U32) => return do:
         \\  let stored = box (func value => return {item: value})
-        \\  let #Box mapper = stored
+        \\  let $Box mapper = stored
         \\  break @array.length (mapper seed).item
     );
     defer reference_fixture.deinit();
@@ -257,12 +257,12 @@ test "dynamic Array copies admit exact owners through replay checkpoint and OOM"
 
 test "immutable nullary constructor cells preserve changed tags replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
-        \\type Token is data = #Left | #Right
+        \\type Token is data = $Left | $Right
         \\entry const run = func (value: U32) => return do:
-        \\  let token = if @u32.eq value 0 then #Left else #Right
+        \\  let token = if @u32.eq value 0 then $Left else $Right
         \\  break case token of
-        \\    #Left => 11
-        \\    #Right => 22
+        \\    $Left => 11
+        \\    $Right => 22
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -287,12 +287,12 @@ test "immutable nullary constructor cells preserve changed tags replay checkpoin
     defer replayed.deinit(a);
     try std.testing.expectEqualSlices(u8, first.bytes, replayed.bytes);
     var changed = try Fixture.initSource(
-        \\type Token is data = #Right | #Left
+        \\type Token is data = $Right | $Left
         \\entry const run = func (value: U32) => return do:
-        \\  let token = if @u32.eq value 0 then #Left else #Right
+        \\  let token = if @u32.eq value 0 then $Left else $Right
         \\  break case token of
-        \\    #Left => 11
-        \\    #Right => 22
+        \\    $Left => 11
+        \\    $Right => 22
     );
     defer changed.deinit();
     var fresh = try changed.emit(a, null, null);
@@ -428,23 +428,23 @@ test "changed State value roles preserve retained artifact and checkpoint roots 
 test "strong cycle source owns full helper bodies across retained checkpoint replay and OOM" {
     var fixture = try Fixture.initSource(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+        \\type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
         \\const keep = func ~value => return func () => return @demand value
         \\const get = func (witness: Unit -> a) : a => return State.get ()
         \\entry const run = func (seed: U32) => return do:
-        \\  let (_, result) = @effect.run State.get State.set #End (func () => return do:
-        \\    let delayed = keep (get (func () => return #End))
-        \\    use State.set (#Next delayed)
+        \\  let (_, result) = @effect.run State.get State.set $End (func () => return do:
+        \\    let delayed = keep (get (func () => return $End))
+        \\    use State.set ($Next delayed)
         \\    use first <- delayed ()
-        \\    use State.set #End
+        \\    use State.set $End
         \\    use cached <- delayed ()
         \\    break case cached of
-        \\      #End => @panic "the demand lost its memoized cycle"
-        \\      #Next same => do:
+        \\      $End => @panic "the demand lost its memoized cycle"
+        \\      $Next same => do:
         \\        use again <- same ()
         \\        break case again of
-        \\          #End => @panic "the retained closure lost its memo"
-        \\          #Next _ => seed
+        \\          $End => @panic "the retained closure lost its memo"
+        \\          $Next _ => seed
         \\  )
         \\  break result
     );
@@ -588,12 +588,12 @@ test "static scalar list seeds preserve word roles through growth replay and com
 }
 
 const static_capture_source =
-    \\type Pack [unused, selected] is data = #Pack {unused: unused, selected: selected}
+    \\type Pack [unused, selected] is data = $Pack {unused: unused, selected: selected}
     \\const identity = func value => return value
-    \\const packed = #Pack {unused: identity, selected: func (value: U32) => return @u32.add value 1}
+    \\const packed = $Pack {unused: identity, selected: func (value: U32) => return @u32.add value 1}
     \\const invoke = func callback => return callback 1
     \\const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
-    \\  let #Pack {selected} = packed
+    \\  let $Pack {selected} = packed
     \\  break selected (@u32.add value extra))
     \\const work = func (value: U32) => return do:
     \\  let total = 0
@@ -664,9 +664,9 @@ test "static captured value graphs admit executable closure replay independently
 
 test "promoted generalized local initializers retain fresh code and exact wrapper body dependencies" {
     var fixture = try Fixture.initSource(
-        \\type Box f is data = #Box f
-        \\const box = func value => return #Box value
-        \\const get = func (#Box mapper) => return mapper
+        \\type Box f is data = $Box f
+        \\const box = func value => return $Box value
+        \\const get = func ($Box mapper) => return mapper
         \\entry const run = func (seed: U32) => return do:
         \\  let stored = box (func value => return {item: value})
         \\  let read = func (value: U32) => return (get stored value).item
@@ -735,28 +735,28 @@ test "generalized runtime locals used at different layouts evaluate one checked 
 test "promoted generalized builder chains serialize curried callbacks through replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
-        \\type App [world, scope, render] is data = #App { initial: world, scope: world -> scope, render: render }
-        \\type Trace is data = #Trace (Array U32)
+        \\type App [world, scope, render] is data = $App { initial: world, scope: world -> scope, render: render }
+        \\type Trace is data = $Trace (Array U32)
         \\const empty = func () => return do:
         \\  let scope = func world => return func action => return do:
         \\    use outcome <- @effect.run State.get State.set world action
         \\    break outcome
-        \\  break #App { initial: #Trace #[], scope, render: func (frame: U32) => return frame }
+        \\  break $App { initial: $Trace #[], scope, render: func (frame: U32) => return frame }
         \\const note = func (value: U32) => return do:
         \\  use current <- State.get ()
-        \\  let #Trace values = current
-        \\  break State.set (#Trace #[...values, value])
+        \\  let $Trace values = current
+        \\  break State.set ($Trace #[...values, value])
         \\const with_render = func render => return func app => return do:
-        \\  let #App { initial, scope } = app
-        \\  break #App { initial, scope, render }
+        \\  let $App { initial, scope } = app
+        \\  break $App { initial, scope, render }
         \\const initial = func app => return do:
-        \\  let #App { initial } = app
+        \\  let $App { initial } = app
         \\  break initial
         \\const play = func app => return func world => return func action => return do:
-        \\  let #App { scope } = app
+        \\  let $App { scope } = app
         \\  break scope world action
         \\const draw = func app => return func frame => return do:
-        \\  let #App { render } = app
+        \\  let $App { render } = app
         \\  break render 2 frame
         \\entry const run = func (seed: U32) => return do:
         \\  let app = empty ()
@@ -764,7 +764,7 @@ test "promoted generalized builder chains serialize curried callbacks through re
         \\    use note frame
         \\    break @u32.mul frame scale) self
         \\  let (trace, doubled) = play app (initial app) (func () => return draw app seed)
-        \\  let #Trace values = trace
+        \\  let $Trace values = trace
         \\  break @u32.add doubled (@array.length values)
     );
     defer fixture.deinit();
@@ -797,20 +797,20 @@ test "promoted generalized builder chains serialize curried callbacks through re
 // hole still takes one instance per layout.
 test "ambiguous holes at generalized local uses take word storage through replay checkpoint and OOM" {
     var fixture = try Fixture.initSource(
-        \\type B [w, s] is data = #B { initial: w, s: w -> s }
-        \\type System [route, start] is data = #Route route | #Start start
-        \\type App [engine, system] is data = #App { engine: engine, systems: Array system }
+        \\type B [w, s] is data = $B { initial: w, s: w -> s }
+        \\type System [route, start] is data = $Route route | $Start start
+        \\type App [engine, system] is data = $App { engine: engine, systems: Array system }
         \\const empty = func () => return do:
         \\  let scope = func world => return func action => return do:
         \\    use result <- action ()
         \\    break (world, result)
-        \\  break #B { initial: (), s: scope }
+        \\  break $B { initial: (), s: scope }
         \\const enter = func b => return func action => return do:
-        \\  let #B { initial, s } = b
+        \\  let $B { initial, s } = b
         \\  break s initial action
-        \\const new_with = func route => return #App { engine: empty (), systems: #[#Route route, #Start (func () => return ())] }
+        \\const new_with = func route => return $App { engine: empty (), systems: #[$Route route, $Start (func () => return ())] }
         \\const create = func app => return func () => return do:
-        \\  let #App { engine, systems } = app
+        \\  let $App { engine, systems } = app
         \\  let (world, _) = enter engine (func () => return @array.length systems)
         \\  break world
         \\entry const run = func (seed: U32) => return do:
@@ -998,17 +998,17 @@ test "retained caller cleanup rejects changed checked callee result roles" {
 
 test "unchanged variant descriptors preserve erased types through fresh retained checkpoint and OOM" {
     var fixture = try Fixture.initSource(
-        \\type Choice [a, b] is data = #Left a | #Right b
+        \\type Choice [a, b] is data = $Left a | $Right b
         \\const map = func transform => return func candidate => return case candidate of
-        \\  #Left value => #Left (transform value)
-        \\  #Right error => do:
-        \\    break #Right error
+        \\  $Left value => $Left (transform value)
+        \\  $Right error => do:
+        \\    break $Right error
         \\entry const run = func (value: U32) => return do:
-        \\  let candidate = #Left #[value, @u32.add value 1]
+        \\  let candidate = $Left #[value, @u32.add value 1]
         \\  let mapped = map (func array => return array) candidate
         \\  break case mapped of
-        \\    #Left array => array[0]
-        \\    #Right _ => 0
+        \\    $Left array => array[0]
+        \\    $Right _ => 0
     );
     defer fixture.deinit();
     const nodes = try a.dupe(core.Node, fixture.units[0].nodes);
@@ -1066,7 +1066,7 @@ fn genericWordEmission(allocator: std.mem.Allocator, fixture: *const Fixture) !v
 
 test "unobserved generic identities keep complete ownership through replay and allocation failure" {
     var fixture = try Fixture.initSource(
-        \\const holder = func () => return #{ f0: func x => return x, f1: func x => return x, g: 4 }
+        \\const holder = func () => return { f0: func x => return x, f1: func x => return x, g: 4 }
         \\const s0 = func () => return (holder ()).g
         \\const s1 = func () => return @u32.add (holder ()).g (s0 ())
         \\entry const run = func () => return s1 ()
@@ -1235,13 +1235,13 @@ fn ownedFieldAdmission(allocator: std.mem.Allocator, conflict: bool) !void {
 
 test "single-use selected member storage retains private checked fields through replay and OOM" {
     var fixture = try Fixture.initSource(
-        \\type Box f is data = #Box f
-        \\type Factory a is data = #Factory a
-        \\const Factory.boxed = func (factory: Factory a) => return #Box (func value => return {item: value, factory: factory})
+        \\type Box f is data = $Box f
+        \\type Factory a is data = $Factory a
+        \\const Factory.boxed = func (factory: Factory a) => return $Box (func value => return {item: value, factory: factory})
         \\entry const run = func (seed: U32) => return do:
-        \\  let factory = #Factory seed
+        \\  let factory = $Factory seed
         \\  let stored = factory.boxed
-        \\  let #Box mapper = stored
+        \\  let $Box mapper = stored
         \\  break @u32.add (mapper seed).item 1
     );
     defer fixture.deinit();
@@ -1521,16 +1521,16 @@ test "shared carries, fresh replacements and owning element stores keep their lo
 }
 
 const constructor_capture_programs = [_][]const u8{
-    \\data Box a = #Box { value: a }
+    \\type Box a is data = $Box { value: a }
     \\const invoke = func constructor => return func value => return case constructor value of
-    \\  #Box payload => payload
-    \\const ready = invoke #Box
+    \\  $Box payload => payload
+    \\const ready = invoke $Box
     \\entry const answer = func (value: U32) => return ready value
     ,
-    \\data Box a = #Box { value: a }
+    \\type Box a is data = $Box { value: a }
     \\const invoke = func constructors => return func value => return case constructors.build value of
-    \\  #Box payload => payload
-    \\const ready = invoke { build: #Box }
+    \\  $Box payload => payload
+    \\const ready = invoke { build: $Box }
     \\entry const answer = func (value: U32) => return ready value
     ,
 };

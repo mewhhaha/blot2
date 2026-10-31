@@ -7,12 +7,12 @@ for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate original (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       `
-data Maybe a = #Some a | #Nothing
+type Maybe a is data = $Some a | $Nothing
 const identity = func value => return value
-const empty = #Nothing
-const nested = #Some (#Some 42)
+const empty = $Nothing
+const nested = $Some ($Some 42)
 const reference = identity
-const constructor = #Some
+const constructor = $Some
 const closure = (func captured => return func value => return @u32.add captured value) 2
 entry const answer = func () => return closure 40
 entry const probe = func () => return do:
@@ -34,17 +34,17 @@ entry const probe = func () => return do:
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate eager-order (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
-      `data Count value = #Count value
+      `type Count value is data = $Count value
 const witness = func () : Count U32 => return @panic "witness ran"
 const identity = func value => return value
-const keep = func ~value => return func () => return @force value
+const keep = func ~value => return func () => return @demand value
 const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
-  let #Count old = previous
-  use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
+  let $Count old = previous
+  use @state.set ($Count (@u32.add (@u32.mul old 10) digit))
   break @u32.to_f32 digit
 entry const answer = func () => return do:
-  let (#Count count, _) = @state.run (#Count 0) (func () => return do:
+  let ($Count count, _) = @state.run ($Count 0) (func () => return do:
     let delayed = keep (mark 7)
     use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), func () => return @panic "unused body ran"))
     break ()
@@ -74,7 +74,7 @@ entry const folded = answer ()
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate implicit-uses (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
-      `data Box = #Box (U32, U32)
+      `type Box is data = $Box (U32, U32)
 entry const capture = func () => return do:
   let kept = (40, 2)
   let use_it = func () => return @u32.add (@product.get kept 0) (@product.get kept 1)
@@ -118,14 +118,14 @@ entry const value_pattern = func () => return do:
 for (const asynchronous of [false, true]) {
   Deno.test(`unused aggregate requests-abort (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
-      `data Count value = #Count value
+      `type Count value is data = $Count value
 type Stop is effect = { read: Unit -> U32 }
 const witness = func () : Count U32 => return @panic "witness ran"
 const identity = func value => return value
 const mark = func (digit: U32) => return do:
   use previous <- @state.get witness
-  let #Count old = previous
-  use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
+  let $Count old = previous
+  use @state.set ($Count (@u32.add (@u32.mul old 10) digit))
   break digit
 const handled = func computation => return do:
   for request in @requests computation:
@@ -135,7 +135,7 @@ const handled = func computation => return do:
       complete value =>
         break value
 entry const answer = func () => return do:
-  let (#Count count, value) = @state.run (#Count 0) (func () => return handled (@computation (func () => return do:
+  let ($Count count, value) = @state.run ($Count 0) (func () => return handled (@computation (func () => return do:
     use ignored <- (identity, (mark 1, Stop.read (), mark 2))
     break 0
   )))
@@ -215,7 +215,7 @@ entry const answer = func (value: U32) => return do:
 }
 Deno.test("unused aggregate retains panic-order", async () => {
   await compileExpectedFailure(
-    `data Maybe a = #Some a | #Nothing
+    `type Maybe a is data = $Some a | $Nothing
 const identity = func value => return value
 const bad = @panic "constant operand"
 entry const answer = func () => return do:

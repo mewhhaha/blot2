@@ -1080,6 +1080,11 @@ callbacks, demands and ownership therefore use the parenthesized call path. An
 explicit local or inherited `$` fixity still selects ordinary binary operator
 dispatch. The prelude does not override this default.
 
+The following task contracts describe the retained legacy backend. Language
+tasks are retired from the owned-storage model, which uses copied-packet host
+workers. These constraints remain regression requirements until the legacy task
+implementation is removed; they grant no ABI 8 task authority.
+
 Spark expansion retains an unbound `task_region` leaf until checking. It has no
 source spelling and resolves to the exact active task-scope parameter, including
 under local shadowing. Ordinary nested lambdas do not inherit that permission.

@@ -1,7 +1,7 @@
 import {compileAndRun, compileExpectedFailure, equal} from './compile_helpers.ts';
 
 export const bottomFlowSource = `
-data Maybe a=#Some a|#None
+type Maybe a is data= $Some a| $None
 const stop=func value=> return @panic "first-body"
 const ignore=func ~(value:U32)=> return 42
 entry const direct:Unit->U32=func()=> return do:
@@ -9,11 +9,11 @@ entry const direct:Unit->U32=func()=> return do:
   break 42
 entry const strict:Unit->U32=func()=> return stop 1 (@panic "later-arg")
 entry const product=func(flag:Bool)=> return do:
-  let #Some value=if flag then #Some 42 else #None else:
+  let $Some value=if flag then $Some 42 else $None else:
     let stop=(@panic "product",0)
   break value
 entry const array=func(flag:Bool)=> return do:
-  let #Some value=if flag then #Some 42 else #None else:
+  let $Some value=if flag then $Some 42 else $None else:
     let stop=#[0,@panic "array"]
   break value
 entry const merge=func(flag:Bool)=> return do:

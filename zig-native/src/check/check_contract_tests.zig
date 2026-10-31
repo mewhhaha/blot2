@@ -9,11 +9,11 @@ fn law(allocator: std.mem.Allocator) !void {
         \\type Read a is contract = { field "value" a U32 }
         \\type ReadAgain a is contract = { Read a }
         \\type Scalar = U32
-        \\type Box is data = #Box { value: Scalar }
-        \\type Different is data = #Different { value: U32, enabled: Bool }
+        \\type Box is data = $Box { value: Scalar }
+        \\type Different is data = $Different { value: U32, enabled: Bool }
         \\const read: a -> U32 where { ReadAgain a } = func value => return value.value
-        \\entry const first = func () => return read (#Box { value: 42 })
-        \\entry const second = func () => return read (#Different { value: 11, enabled: true })
+        \\entry const first = func () => return read ($Box { value: 42 })
+        \\entry const second = func () => return read ($Different { value: 11, enabled: true })
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -98,10 +98,10 @@ test "associated type members normalize defined nested and generic alias recipes
 test "associated type members reject arity names binder leaks identity mismatches and all cycles" {
     const allocator = std.testing.allocator;
     const cases = [_]struct { source: []const u8, code: check.Code }{
-        .{ .source = "type Source s is contract = { type Item }\ntype Stored is data = #Stored (Source.Item U32)\n", .code = .missing_implementation },
+        .{ .source = "type Source s is contract = { type Item }\ntype Stored is data = $Stored (Source.Item U32)\n", .code = .missing_implementation },
         .{ .source = "type Source s is contract = { type Item }\nconst invalid: (Source.Item a) -> U32 where { Source b } = func value => return @panic \"unused\"\n", .code = .missing_predicate },
         .{ .source = "private type Hidden a is contract = { type Item = a }\nconst leaked: (Hidden.Item a) -> a = func value => return value\n", .code = .private_identity_escape },
-        .{ .source = "type Source s is contract = { type Item }\ntype Box a is data = #Box (Source.Item a)\n", .code = .missing_predicate },
+        .{ .source = "type Source s is contract = { type Item }\ntype Box a is data = $Box (Source.Item a)\n", .code = .missing_predicate },
         .{ .source = "type Source s is contract = { type Item }\ntype Bad = Source.Missing U32\n", .code = .missing_type_member },
         .{ .source = "type Identity a is contract = { type Item = a }\ntype Bad = Identity.Item\n", .code = .associated_arity },
         .{ .source = "type Identity a is contract = { type Item = a }\ntype Bad = Identity.Item U32 F32\n", .code = .associated_arity },

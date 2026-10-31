@@ -1,8 +1,8 @@
-data First = #First { value: U32 }
-data Second = #Second { value: U32 }
+type First is data = $First { value: U32 }
+type Second is data = $Second { value: U32 }
 const First.plus = func box => return func delta => return @u32.add box.value delta
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = func box => return do:
   let bound = box.plus
   break bound 1
-entry const answer = func () => return @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))
+entry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))
 entry const folded = answer ()

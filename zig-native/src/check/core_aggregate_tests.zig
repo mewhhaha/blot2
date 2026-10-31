@@ -36,11 +36,11 @@ const Fixture = struct {
 };
 const records_source = "infixl 60 (+) = _fixity_add\n" ++ records_body ++ "\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n";
 const records_body =
-    \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
+    \\type Vec2 is data = $Vec2 { x: F32, y: F32 }
     \\const sum = func point => return do:
-    \\  let #Vec2 { x, y } = point
+    \\  let $Vec2 { x, y } = point
     \\  break x + y
-    \\const origin = #Vec2 { y: 2.0, x: 20.0 }
+    \\const origin = $Vec2 { y: 2.0, x: 20.0 }
     \\entry const answer = func () : F32 => return sum origin
     \\entry const projected = func () : F32 => return origin.x
     \\entry const tuple = func () : U32 => return @product.get (20, 22) 1
@@ -85,12 +85,12 @@ test "owned nominal core preserves written values canonical pattern fields and t
 
 const alternatives_source = "infix 30 (>=) = _fixity_ge\ninfixl 60 (+) = _fixity_add\n" ++ alternatives_body ++ "\nconst _fixity_ge = func left => return func right => return @type.call \"ge\" left right\nconst _fixity_add = func left => return func right => return @type.call \"add\" left right\n";
 const alternatives_body =
-    \\type Choice is data = #First U32 | #Second U32 | #Empty
+    \\type Choice is data = $First U32 | $Second U32 | $Empty
     \\const choose = func candidate => return case candidate of
-    \\  #First value | #Second value if value >= 40 => value
-    \\  #First value | #Second value => value + 2
-    \\  #Empty => 0
-    \\entry const choice_answer = choose (#Second 42)
+    \\  $First value | $Second value if value >= 40 => value
+    \\  $First value | $Second value => value + 2
+    \\  $Empty => 0
+    \\entry const choice_answer = choose ($Second 42)
 ;
 test "ordered alternatives share their checked binding guard and body" {
     var fixture = try Fixture.init(alternatives_source);
@@ -114,15 +114,15 @@ test "ordered alternatives share their checked binding guard and body" {
 }
 
 const nullary_nominal_source =
-    \\type Mode is data = #On | #Off
-    \\type Level is data = #Low | #High
+    \\type Mode is data = $On | $Off
+    \\type Level is data = $Low | $High
     \\const keep = func (mode: Mode) : Mode => return mode
     \\const level = func (mode: Mode) : Level => return case mode of
-    \\  #On => #High
-    \\  #Off => #Low
+    \\  $On => $High
+    \\  $Off => $Low
     \\const twice = func (mode: Mode) : Mode => return keep (keep mode)
     \\const both = func (mode: Mode) : (Mode, Level) => return (twice mode, level mode)
-    \\entry const answer = both #On
+    \\entry const answer = both $On
 ;
 fn nullaryNominalPublication(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
     var module = try fixture.lower(allocator);
@@ -154,9 +154,9 @@ test "argument-free nominal types publish one node each" {
 
 test "variant field projections retain constructor-specific canonical indices" {
     var fixture = try Fixture.init(
-        \\type Point is data = #Left { x: U32, y: F32 } | #Right { y: F32, x: U32 }
+        \\type Point is data = $Left { x: U32, y: F32 } | $Right { y: F32, x: U32 }
         \\const pick = func (point: Point) : U32 => return point.x
-        \\entry const answer = pick (#Right { x: 42, y: 1.5 })
+        \\entry const answer = pick ($Right { x: 42, y: 1.5 })
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);
@@ -173,14 +173,14 @@ test "variant field projections retain constructor-specific canonical indices" {
 
 test "refutable let and conditional matches preserve the outer return boundary" {
     var fixture = try Fixture.init(
-        \\type Choice is data = #Some U32 | #Nothing
+        \\type Choice is data = $Some U32 | $Nothing
         \\const pick = func candidate => return do:
-        \\  let #Some value = candidate else:
+        \\  let $Some value = candidate else:
         \\    break 0
-        \\  if let #Some other = candidate:
+        \\  if let $Some other = candidate:
         \\    break other
         \\  break value
-        \\entry const answer = pick (#Some 42)
+        \\entry const answer = pick ($Some 42)
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);

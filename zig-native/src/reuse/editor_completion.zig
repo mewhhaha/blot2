@@ -175,7 +175,7 @@ fn makeItem(a: Allocator, loaded: *P.Project, project_checked: *PC.CheckedProjec
             item.deinit(a);
             return null;
         }
-        item.insertText = try std.mem.concat(a, u8, &.{ "#", text });
+        item.insertText = try std.mem.concat(a, u8, &.{ "$", text });
     } else item.insertText = try a.dupe(u8, text);
     if (name.identity.unit != 0 and name.identity.unit <= loaded.units.items.len) {
         item.filename = try a.dupe(u8, loaded.filename(name.identity.unit));
@@ -266,7 +266,7 @@ const Lexical = struct {
         }
         var item: Item = .{ .label = try self.a.dupe(u8, name), .insertText = &.{}, .kind = kind, .detail = null, .match = .unknown, .distance = distance, .filename = &.{}, .start = self.loaded.unit(self.unit).tree.span(node).start };
         errdefer item.deinit(self.a);
-        if (kind == .constructor and self.probe.kind != .constructor) item.insertText = try std.mem.concat(self.a, u8, &.{ "#", name }) else item.insertText = try self.a.dupe(u8, name);
+        if (kind == .constructor and self.probe.kind != .constructor) item.insertText = try std.mem.concat(self.a, u8, &.{ "$", name }) else item.insertText = try self.a.dupe(u8, name);
         item.filename = try self.a.dupe(u8, self.loaded.filename(self.unit));
         try self.items.append(self.a, item);
     }
@@ -513,14 +513,14 @@ test "editor completion follows named aliases namespace boundaries fields constr
         .{ .text = "import { value as renamed } from \"./library\"\nconst work = func () : F32 => return ren", .offered = "renamed", .absent = "value", .match = .exact },
         .{ .text = "import * as lib from \"./library\"\nconst work = func () : F32 => return lib.", .offered = "value", .absent = "lib", .match = .exact },
         .{ .text = "type Point = { x: U32, y: F32 }\nconst work = func (point: Point) : F32 => return point.", .offered = "y", .absent = "point", .match = .exact },
-        .{ .text = "import * as lib from \"./library\"\nconst work: lib.Choice = #lib.", .offered = "Chosen", .absent = "#Chosen", .match = .exact },
+        .{ .text = "import * as lib from \"./library\"\nconst work: lib.Choice = $lib.", .offered = "Chosen", .absent = "$Chosen", .match = .exact },
         .{ .text = "const work: F = 1.0", .offered = "F32", .absent = "false", .match = .exact },
         .{ .text = "type U32 = F32\nconst work: U = 1", .offered = "U32", .absent = "false", .match = .exact },
     };
     for (cases) |case| {
         var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
             .{ .path = "/editor/main.blot", .contents = case.text },
-            .{ .path = "/editor/library.blot", .contents = "const value = 1.0\ntype Choice is data = #Chosen | #Other\n" },
+            .{ .path = "/editor/library.blot", .contents = "const value = 1.0\ntype Choice is data = $Chosen | $Other\n" },
         });
         defer snapshot.deinit();
         var position: u32 = @intCast(case.text.len);
@@ -537,7 +537,7 @@ test "editor completion follows named aliases namespace boundaries fields constr
 
 test "module abstraction completion keeps source origins without exposing constructors or fields" {
     const a = std.testing.allocator;
-    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = func value => return #Token { secret: value }\n";
+    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = func value => return $Token { secret: value }\n";
     for ([_][]const u8{
         "import * as lib from \"./library\"\nconst work = lib.",
         "import {Token} from \"./library\"\nconst work = func (value: Token) => return value.",
@@ -553,7 +553,7 @@ test "module abstraction completion keeps source origins without exposing constr
         try std.testing.expectEqual(@as(usize, 0), result.diagnostics.len);
         try std.testing.expect(find(result, "hidden") == null);
         try std.testing.expect(find(result, "secret") == null);
-        if (index < 2) try std.testing.expect(find(result, "#Token") == null);
+        if (index < 2) try std.testing.expect(find(result, "$Token") == null);
         if (index != 1) {
             const item = find(result, "Token") orelse return error.MissingCompletion;
             var filename: []const u8 = "/editor/library.blot";

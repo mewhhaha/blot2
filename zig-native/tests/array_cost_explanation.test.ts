@@ -3,8 +3,8 @@ import { observeGuestAllocations } from "../../scripts/bench/guest_heap_observer
 
 const source = `
 import * as array from "std/array"
-type Box is data = #Box { a: U32, b: U32 }
-const boxed = func value => return #Box { a: value, b: value + 1 }
+type Box is data = $Box { a: U32, b: U32 }
+const boxed = func value => return $Box { a: value, b: value + 1 }
 const read_box = func (row: Box) => return row.a + row.b
 entry const nominal = func value => return read_box (boxed value)
 const choose = func x => return if x > 0 then (func y => return y + x) else (func y => return y + 1)
@@ -89,10 +89,10 @@ Deno.test("allocation remarks locate array edits, nominal storage and closure ca
       record.kind === "allocation_sites"
     );
     assert.equal(emissions.length, 1);
-    const constructor = source.indexOf("#Box { a: value, b: value + 1 }");
+    const constructor = source.indexOf("$Box { a: value, b: value + 1 }");
     const nominalSites = (emissions[0].sites as EmissionSite[]).filter((site) =>
       site.filename === entry && site.start === constructor &&
-      site.end === constructor + "#Box { a: value, b: value + 1 }".length
+      site.end === constructor + "$Box { a: value, b: value + 1 }".length
     );
     assert.deepEqual(
       nominalSites.map((

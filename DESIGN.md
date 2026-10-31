@@ -66,7 +66,7 @@ const squared = func (value: F32) => return do:
 
 let initial_position = do:
   let spawn = choose_spawn level
-  break #Vec2 { x: spawn.x, y: spawn.y + 1.0 }
+  break $Vec2 { x: spawn.x, y: spawn.y + 1.0 }
 ```
 
 In plain `do:`, `break value` supplies that expression's result and falling
@@ -95,8 +95,8 @@ callback boundary and receives the same diagnostic.
 
 ```blot
 const move = func () => return do:
-  use velocity <- ecs.get #Velocity
-  use position <- ecs.get #Position
+  use velocity <- ecs.get $Velocity
+  use position <- ecs.get $Position
   let next = advance (position, velocity)
   use _ <- ecs.set next
   break ()
@@ -148,26 +148,26 @@ resolver from its source-defined `bind` and `pure` operations.
 
 For `monad Maybe`:
 
-- `use value <- expression` expects `Maybe a`. `#Some value` continues the
-  block; `#Nothing` ends that block with `#Nothing` without running its
+- `use value <- expression` expects `Maybe a`. `$Some value` continues the
+  block; `$Nothing` ends that block with `$Nothing` without running its
   remainder.
 - `use expression` has the same behavior, discarding the successful payload. In
-  particular, `use #Nothing` still short-circuits.
-- `break value` lifts the value with `Maybe.pure`, producing `#Some value`.
+  particular, `use $Nothing` still short-circuits.
+- `break value` lifts the value with `Maybe.pure`, producing `$Some value`.
 - `break $ expression` forwards an existing `Maybe` result without another
   wrapper. `$` here is block-exit syntax, not an overloadable application
   operator.
 - `let value = expression` stays an ordinary pure binding and does not unwrap
   anything. There is no implicit choice between lifting and binding a value.
-- Falling through lifts Unit, producing `#Some ()`. Ordinary expression
+- Falling through lifts Unit, producing `$Some ()`. Ordinary expression
   statements merely discard their result; use `use` to perform a monadic bind.
 
 The inner block above is equivalent to:
 
 ```blot
 case my_maybe of
-  #Nothing => #Nothing
-  #Some value => my_other_maybe value
+  $Nothing => $Nothing
+  $Some value => my_other_maybe value
 ```
 
 This is immediate sequencing, not a deferred action object. The resolver
@@ -194,8 +194,8 @@ steps. A source implementation may skip the continuation or invoke it more than
 once. Resolver expressions are evaluated once.
 
 Loops additionally require `M.iterate initial step`. Its callback returns
-`M (Iteration state result)`: `#Continue state` advances to another step and
-`#Done result` finishes. The prelude supplies the nominal `Iteration` type and
+`M (Iteration state result)`: `$Continue state` advances to another step and
+`$Done result` finishes. The prelude supplies the nominal `Iteration` type and
 iterative implementations for `Maybe` and `Result`. Each step finishes before
 the next begins, so these loops use constant call stack. A custom implementation
 must agree with its monad's `pure` and `bind` and provide the same stack
@@ -262,22 +262,22 @@ request constructors, monad adapter, or prelude declarations. See
 ```blot
 const unwrap_or_else = func value => return func ~fallback => return
   case value of
-    #Some found => found
-    #Nothing => @force fallback
+    $Some found => found
+    $Nothing => @demand fallback
 
 const duplicate_if = func enabled => return func ~value => return
   case enabled of
-    false => #Nothing
-    true => #Some (@force value, @force value)
+    false => $Nothing
+    true => $Some (@demand value, @demand value)
 ```
 
 Calling such a function captures the argument expression without evaluating it.
 The parameter names a suspended computation, not its computed value; merely
-referencing it does not force it. The first `@force` evaluates that computation,
-and subsequent forces of the same parameter binding reuse the result. An
-unforced argument is never evaluated. Ordinary parameters remain eager; calling
-a function directly or through an operator does not change its parameter's
-demand mode.
+referencing it does not force it. The first `@demand` evaluates that
+computation, and subsequent forces of the same parameter binding reuse the
+result. An unforced argument is never evaluated. Ordinary parameters remain
+eager; calling a function directly or through an operator does not change its
+parameter's demand mode.
 
 Demand mode belongs in the function's checked signature so higher-order calls
 and partial application preserve it. Deferred computations retain their effects;
@@ -302,7 +302,7 @@ import { Vec2 } from "./math.blot"
 import { clamp as clamp_value } from "./numeric.blot"
 import * as render from "engine/render"
 
-const origin = #Vec2 { x: 0.0, y: 0.0 }
+const origin = $Vec2 { x: 0.0, y: 0.0 }
 const identity = func value => return value
 ```
 
@@ -316,39 +316,39 @@ struct is the one-constructor case. Separate `struct` and `enum` declarations
 are unnecessary.
 
 ```blot
-data Vec2 = #Vec2 { x: F32, y: F32 }
+type Vec2 is data = $Vec2 { x: F32, y: F32 }
 
-data Maybe a = #Some a | #Nothing
+type Maybe a is data = $Some a | $Nothing
 
-type Result [value, error] is data = #Ok value | #Err error
+type Result [value, error] is data = $Ok value | $Err error
 
-data EntityId = #EntityId U32
+type EntityId is data = $EntityId U32
 
-data Contact =
-  | #Separated
-  | #Touching { point: Vec2, normal: Vec2 }
-  | #Overlapping { depth: F32, normal: Vec2 }
+type Contact is data =
+  | $Separated
+  | $Touching { point: Vec2, normal: Vec2 }
+  | $Overlapping { depth: F32, normal: Vec2 }
 ```
 
 Construction mirrors the declaration:
 
 ```blot
-let position = #Vec2 { x: 1.0, y: 2.0 }
-let selected = #Some position
+let position = $Vec2 { x: 1.0, y: 2.0 }
+let selected = $Some position
 ```
 
 Data constructor names require `#` in declarations, construction, and patterns,
-including `#Some`, `#Nothing`, `true`, and `false`. Qualified constructors put
-the marker before the whole name: `#math.Vec3`. Types stay unmarked; generic
+including `$Some`, `$Nothing`, `true`, and `false`. Qualified constructors put
+the marker before the whole name: `$math.Vec3`. Types stay unmarked; generic
 type application uses forms such as `Maybe Vec2` and `Array (Maybe Vec2)`.
 
 Types and effects accept at most one argument at each application stage, like
 functions. A list, tuple, or record can bind several type values:
 
 ```blot
-type Pair [left, right] is data = #Pair (left, right)
-type Entry { head, tail } is data = #Entry { head, tail }
-type Curried left => type right is data = #Curried (left, right)
+type Pair [left, right] is data = $Pair (left, right)
+type Entry { head, tail } is data = $Entry { head, tail }
+type Curried left => type right is data = $Curried (left, right)
 ```
 
 These argument shapes can nest. Record arguments match by field name.
@@ -384,8 +384,8 @@ inputs. Single-input cases also use `of`, not `:`.
 ```blot
 const choose = func first => return func enabled => return func fallback => return
   case first, enabled, fallback of
-    #Some value, true, _ => value
-    _, _, #Some value => value
+    $Some value, true, _ => value
+    _, _, $Some value => value
     _, _, _ => 0
 ```
 
@@ -398,18 +398,18 @@ require a heap allocation.
 ## Pattern tests and guarded bindings
 
 `if let pattern = expression:` tests a pattern and introduces its bindings in
-the successful branch. `#Some(x)` and `#Some x` spell the same constructor
+the successful branch. `$Some(x)` and `$Some x` spell the same constructor
 pattern; parentheses group its payload, not a new multi-argument calling form.
 
 ```blot
 const double_if_present = func (candidate: Maybe U32) : U32 => return do:
-  if let #Some(value) = candidate:
+  if let $Some(value) = candidate:
     break value * 2
   else:
     break 0
 
 const double_or_zero = func (candidate: Maybe U32) : U32 => return do:
-  let #Some(value) = candidate else:
+  let $Some(value) = candidate else:
     break 0
   break value * 2
 ```
@@ -435,7 +435,7 @@ adapted to Blot's nearest-`do` result boundary and its selected resolver.
 
 Ordinary `let pattern = expression` requires a pattern that cannot fail for the
 currently known type. Refutable patterns need `else` or a conditional match;
-there is no implicit panic or `#Nothing` result on failure.
+there is no implicit panic or `$Nothing` result on failure.
 
 Narrowing tracks finite constructor/union alternatives of immutable bindings,
 not arbitrary predicates. It can also describe a stable field path of an
@@ -444,8 +444,8 @@ creates a new version; facts about the old version do not automatically apply to
 it. At joins, retain only facts valid on every reachable incoming path.
 
 Failed partial patterns must not remove a whole constructor. For example,
-failure of `#Some(#Some(x))` still allows `#Some #Nothing`; only a pattern
-covering every payload of `#Some` can exclude that constructor on failure.
+failure of `$Some($Some(x))` still allows `$Some $Nothing`; only a pattern
+covering every payload of `$Some` can exclude that constructor on failure.
 Guards likewise do not prove a constructor absent when only the guard fails.
 This bounded flow analysis does not reinstate the deferred predicate-refinement
 solver.
@@ -540,7 +540,7 @@ const Vec2.magnitude = func (value: Vec2) : F32 => return
   sqrt (value.x * value.x + value.y * value.y)
 
 const Vec2.scaled = func (value: Vec2) => return func (factor: F32) : Vec2 => return
-  #Vec2 { x: value.x * factor, y: value.y * factor }
+  $Vec2 { x: value.x * factor, y: value.y * factor }
 
 let distance = Vec2.magnitude position
 let enlarged = Vec2.scaled position 2.0
@@ -656,29 +656,26 @@ reflection. Generic definitions carry the inferred operation requirement and its
 effects. The compiler checks that requirement at callers; a missing operation is
 a type error. Aliases do not introduce separate dispatch identities.
 
-Short-circuiting follows from demand-driven parameters, not from compiler
-knowledge of particular operator spellings:
+`and` and `or` are the current short-circuit operators. Ordinary demand
+parameters also support source-defined conditional functions:
 
 ```blot
-infixr 20 (||) = or
-infixr 25 (&&) = and
-
-const and = func (left: Bool) => return func ~right => return do:
+const and_then = func (left: Bool) -> ~(right: Bool) => return do:
   if left:
-    break @force right
+    break @demand right
   break false
 
-const or = func (left: Bool) => return func ~right => return do:
+const or_else = func (left: Bool) -> ~(right: Bool) => return do:
   if left:
     break true
-  break @force right
+  break @demand right
 ```
 
-`and condition expression` has the same demand behavior as
-`condition && expression`. The parameter mechanism works for any source
+`and_then condition expression` has the same demand behavior as
+`condition and expression`. The parameter mechanism works for any source
 function, including lazy fallbacks and conditional computations. The generic
-`add` wrapper, by contrast, has eager parameters and cannot become lazy merely
-because a selected associated operation has a deferred parameter.
+`add` wrapper has eager parameters and cannot become lazy merely because a
+selected associated operation has a deferred parameter.
 
 Fixity import/export rules, conflicting declarations, and the prelude-loading
 policy remain open. The showcase colocates library definitions with game code
@@ -848,12 +845,12 @@ must preserve it. Updating a flat contiguous array may then require copying.
 Game update functions produce the next world:
 
 ```blot
-data Particle = Particle {
+type Particle is data = Particle {
   position: Vec2,
   velocity: Vec2,
 }
 
-data World = World { particles: Array Particle }
+type World is data = World { particles: Array Particle }
 
 const advance = func (particle: Particle, dt: F32) => return do:
   let next = particle
@@ -1043,53 +1040,19 @@ production.
 
 ## Implementation status
 
-The repository contains a Deno project, Baba 9.0.1, generated lexer/parser
-artifacts, and a [Zig compiler](zig-native/README.md). The executable
-`grammar.baba`/`baba.json` describe the generic functional core and executable
-provider, monadic resolver, and request-handler blocks. They no longer claim to
-accept the old Blot language. The broader syntax design is preserved here. Files
-under `examples/` use the currently supported language.
+This document preserves design requirements and proposals. The current
+executable surface is specified by [the language guide](compiler/guide.md),
+`grammar.baba`, the native compiler tests and `std/`. The separate Tree-sitter
+grammar provides editor highlighting and is not a validating compiler frontend.
 
-A separate, permissive Tree-sitter grammar supports Helix highlighting of the
-showcase, including proposals. It is editor support, not a validating compiler
-frontend; see the
-[Helix setup](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/README.md#helix).
+Current guest interfaces use ABI 8 and session protocol 2. Named storage owners,
+invocation-local borrows and copied numeric host packets are documented in
+[the storage contract](zig-native/SCOPED_STORAGE.md) and
+[the host boundary](compiler/guest-abi.md). Language tasks are retired; isolated
+host workers and data queues remain in scope.
 
-| Area                    | Current status                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                                                                                         |
-| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                                                                                                  |
-| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                                                                                                |
-| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.                                                                                 |
-| Data declarations       | Generic `data` with mandatory `#Constructor` markers in declarations, values and patterns; no `type` aliases yet.                                                                    |
-| Pattern narrowing       | Single/multi-value `case … of`, alternatives and guards, nested tuple/record patterns, `if let`, guarded `let`.                                                                      |
-| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                                                                                           |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; memoized `~` parameters and `@force`.                                                                                        |
-| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                                                                                                       |
-| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                                                         |
-| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                                                          |
-| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                                                                    |
-| Layout and AST          | Indented continuations, a structure-preserving formatter, native syntax tables; native name resolution and Core lowering.                                                            |
-| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                                                           |
-| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                                                           |
-| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `break $` execute; request loops handle captured computations with reply or cancellation.                               |
-| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                                                                  |
-| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                                                             |
-| Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; nominal type-constructor values; no declaration-descriptor transforms or general type computations. |
-| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future.                                                                          |
-| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.                                                                                        |
-| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                                                                                                      |
-
-`generated/wasm` belongs to Baba's lexer/parser tooling. Separately, `just demo`
-compiles [examples/prelude.blot](examples/prelude.blot) and executes it as Wasm.
-[The generic effects example](examples/generic_effects.blot) tests scoped
-providers, effectful callbacks, and closed compile-time reflection.
-`just bench-native` measures the generic core's full builds, declaration edits,
-and cache reuse; historical ECS numbers do not describe this new boundary.
-
-[Explicit host callbacks](examples/host_io.blot) execute with a sealed `Foreign`
-effect; `just demo-host` tests a host-backed provider and a pure source mock.
-[Guest ABI 2](compiler/guest-abi.md) scopes opaque callback references to one
-instance and invocation and copies numeric arrays across the host boundary.
-Other composite host values and persistent guest handles remain future work. The
-ABI does not settle persistent game state or hot-reload schema migration.
+One real Gdev main frame has run in native Pen with an inspected PNG. The exact
+candidate and pending compiler, library/game, recovery, browser and performance
+qualification are recorded in [CONTINUE.md](CONTINUE.md). Historical tables and
+measurements qualify their own pinned candidates; they are not current feature
+or performance claims.

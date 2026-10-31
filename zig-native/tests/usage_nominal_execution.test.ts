@@ -3,16 +3,16 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Box is data = #Box (unique U32)
+const library = `type Box is data = $Box (unique U32)
 opaque type Secret = unique U32
 opaque type Shared = shared U32
-const make_box = func (owner: unique U32) => return #Box owner
-const read_box = func (#Box owner) => return @usage.borrow owner (func loan => return @usage.read loan)
-const make_secret = func (owner: unique U32) => return #Secret owner
-const make_shared = func (owner: unique U32) => return #Shared (@usage.share owner)
-const read_shared = func (#Shared owner) => return @usage.read owner
+const make_box = func (owner: unique U32) => return $Box owner
+const read_box = func ($Box owner) => return @usage.borrow owner (func loan => return @usage.read loan)
+const make_secret = func (owner: unique U32) => return $Secret owner
+const make_shared = func (owner: unique U32) => return $Shared (@usage.share owner)
+const read_shared = func ($Shared owner) => return @usage.read owner
 const repeat_shared = func (owner: Shared) => return @u32.add (read_shared owner) (read_shared owner)
-const read_secret = func (#Secret owner) => return @usage.borrow owner (func loan => return @usage.read loan)
+const read_secret = func ($Secret owner) => return @usage.borrow owner (func loan => return @usage.read loan)
 `;
 const source =
   `import {Box, Secret, make_box, read_box, make_secret, read_secret, make_shared, repeat_shared} from "./owners"

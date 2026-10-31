@@ -13,12 +13,12 @@ Deno.test("named contracts compose ordinary operations and shaped field requirem
 type Add a is contract = { associated "add" a a a }
 type Arithmetic a is contract = { Add a, associated "mul" a a a }
 type Project [owner, value] is contract = { field "value" owner value }
-type Box a is data = #Box { value: a }
+type Box a is data = $Box { value: a }
 const contract = 1
 const twice: a -> a where { Arithmetic a } = func value => return value + value
 const read: a -> b where { Project [a, b] } = func box => return box.value
-entry const answer = func () => return twice (read (#Box { value: 21 }))
-entry const fraction = func () => return twice (read (#Box { value: 1.5 }))
+entry const answer = func () => return twice (read ($Box { value: 21 }))
+entry const fraction = func () => return twice (read ($Box { value: 1.5 }))
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -50,11 +50,11 @@ const invoke = func (action: Action a) => return action ()
   const source = `
 import { Read, Action, invoke } from "./contracts"
 import * as contracts from "./contracts"
-type Box is data = #Box { value: U32 }
+type Box is data = $Box { value: U32 }
 const local: a -> U32 where { Read a } = func box => return box.value
 const qualified: a -> U32 where { contracts.Project [a, U32] } = func box => return box.value
 const call = func (action: Action U32) => return invoke action
-entry const answer = func () => return call (func () => return qualified (#Box { value: local (#Box { value: 42 }) }))
+entry const answer = func () => return call (func () => return qualified ($Box { value: local ($Box { value: 42 }) }))
 entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func () => return send 41)
 `;
   await Deno.writeTextFile(library, librarySource);
@@ -121,15 +121,15 @@ Deno.test("a contract's invocation effects remain distinct at each use", async (
   await compileAndRun(
     `
 type Run [owner, result] is contract = { receiver "run" owner Unit (Unit -> result ! {| e}) }
-type Pure is data = #Pure U32
-type Sending is data = #Sending (U32 -> U32 ! {Foreign})
+type Pure is data = $Pure U32
+type Sending is data = $Sending (U32 -> U32 ! {Foreign})
 const Pure.run = func value => return func () => return case value of
-  #Pure number => number
+  $Pure number => number
 const Sending.run = func value => return func () => return case value of
-  #Sending send => send 41
+  $Sending send => send 41
 const run: a -> b ! {| e} where { Run [a, b] } = func value => return value.run ()
-entry const answer = func () => return run (#Pure 42)
-entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return run (#Sending send)
+entry const answer = func () => return run ($Pure 42)
+entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return run ($Sending send)
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);

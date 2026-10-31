@@ -43,29 +43,29 @@ fn target(module: *const core.Module, name: []const u8) core.BindingRef {
 }
 
 const pattern_source =
-    \\type Pair is data = #Pair (U32,U32)
-    \\type Fields is data = #Fields { first: U32, second: U32 }
+    \\type Pair is data = $Pair (U32,U32)
+    \\type Fields is data = $Fields { first: U32, second: U32 }
     \\const first = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
-    \\    #Pair (expected,^expected) => expected
+    \\    $Pair (expected,^expected) => expected
     \\    _ => 0
     \\const second = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
-    \\    #Pair (^expected,expected) => expected
+    \\    $Pair (^expected,expected) => expected
     \\    _ => 0
     \\const fields = func actual => return do:
     \\  let expected = 7
     \\  break case actual of
-    \\    #Fields { first: expected, second: ^expected } => expected
+    \\    $Fields { first: expected, second: ^expected } => expected
     \\    _ => 0
-    \\entry const first_hit = first (#Pair (42,7))
-    \\entry const first_miss = first (#Pair (7,42))
-    \\entry const second_hit = second (#Pair (7,42))
-    \\entry const second_miss = second (#Pair (42,7))
-    \\entry const fields_hit = fields (#Fields { first: 42, second: 7 })
-    \\entry const fields_miss = fields (#Fields { first: 7, second: 42 })
+    \\entry const first_hit = first ($Pair (42,7))
+    \\entry const first_miss = first ($Pair (7,42))
+    \\entry const second_hit = second ($Pair (7,42))
+    \\entry const second_miss = second ($Pair (42,7))
+    \\entry const fields_hit = fields ($Fields { first: 42, second: 7 })
+    \\entry const fields_miss = fields ($Fields { first: 7, second: 42 })
 ;
 fn patternScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var session = try evaluator.Session.init(allocator, &.{module.*});

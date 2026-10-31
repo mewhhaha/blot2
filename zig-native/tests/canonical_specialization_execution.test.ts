@@ -4,15 +4,15 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
 function source(amount: number): string {
-  return `type Box is data = #Box { value: U32 }
-type Other is data = #Other { value: U32 }
+  return `type Box is data = $Box { value: U32 }
+type Other is data = $Other { value: U32 }
 const make = func left => return func right => return func (value: U32) => return @u32.add (@u32.add left.value right.value) value
-const box = #Box { value: ${amount} }
+const box = $Box { value: ${amount} }
 const shared = make box box
 const shared_again = make box box
-const separate = make (#Box { value: ${amount} }) (#Box { value: ${amount} })
-const separate_again = make (#Box { value: ${amount} }) (#Box { value: ${amount} })
-const nominal = make (#Other { value: ${amount + 1} }) (#Other { value: ${
+const separate = make ($Box { value: ${amount} }) ($Box { value: ${amount} })
+const separate_again = make ($Box { value: ${amount} }) ($Box { value: ${amount} })
+const nominal = make ($Other { value: ${amount + 1} }) ($Other { value: ${
     amount + 1
   } })
 const capture = func captured => return func (value: U32) => return captured value

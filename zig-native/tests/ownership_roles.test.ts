@@ -14,7 +14,7 @@ const prelude = `${repo}std/prelude.blot`;
 // constructor cells, records, arrays, request loops and state providers.
 // Retained builds equal fresh ones through an edit.
 const program = (offset: number) => `
-type Shape is data = #Circle U32 | #Square { side: U32, label: Shape }
+type Shape is data = $Circle U32 | $Square { side: U32, label: Shape }
 type Validate is effect = { check: U32 -> U32 }
 
 entry const callback_identity = func (host: U32 -> U32 ! {Foreign}) => return host (41 + ${offset})
@@ -26,20 +26,20 @@ entry const templates = func (v: U32) : U32 => return do:
   break thrice 1
 
 entry const cells = func (v: U32) : U32 => return do:
-  let shape = #Square { side: v, label: #Circle 2 }
+  let shape = $Square { side: v, label: $Circle 2 }
   let pair = (shape, v)
-  let (#Square { side, label }, extra) = pair else:
+  let ($Square { side, label }, extra) = pair else:
     break 0
   let inner = case label of
-    #Circle r => r
-    #Square _ => 0
+    $Circle r => r
+    $Square _ => 0
   break side + inner + extra
 
 entry const arrays = func (v: U32) : U32 => return do:
-  let items = [#Circle v, #Circle 1, #Circle 2]
+  let items = [$Circle v, $Circle 1, $Circle 2]
   let total = 0
   for item in items:
-    let #Circle r = item else:
+    let $Circle r = item else:
       break 0
     total := self + r
   break total

@@ -44,7 +44,7 @@ const cases = [
   {
     name: "one_resource",
     builder:
-      "ecs.insert_resource #Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
+      "ecs.insert_resource $Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
     body:
       "  use advance (func () => return ecs.checkpoint engine) delta\n  break ()",
     expected: (x: number, _edited: boolean) => x,
@@ -52,18 +52,18 @@ const cases = [
   {
     name: "two_resources",
     builder:
-      "ecs.insert_resource (#Counter 7) (ecs.insert_resource (#Clock { tick: 0, remainder: 0.25 }) (ecs.new ()))",
+      "ecs.insert_resource ($Counter 7) (ecs.insert_resource ($Clock { tick: 0, remainder: 0.25 }) (ecs.new ()))",
     body:
-      "  use advance (func () => return ecs.checkpoint engine) delta\n  use clock <- ecs.get #Clock\n  let #Clock { remainder } = clock\n  use counter <- ecs.get #Counter\n  let #Counter count = counter\n  break delta + remainder + U32.to_f32 count",
+      "  use advance (func () => return ecs.checkpoint engine) delta\n  use clock <- ecs.get $Clock\n  let $Clock { remainder } = clock\n  use counter <- ecs.get $Counter\n  let $Counter count = counter\n  break delta + remainder + U32.to_f32 count",
     expected: (x: number, edited: boolean) =>
       Math.fround(Math.fround(x + (edited ? .5 : .25)) + 7),
   },
   {
     name: "snapshot_resource",
     builder:
-      "ecs.insert_snapshotted_resource #Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
+      "ecs.insert_snapshotted_resource $Clock { tick: 0, remainder: 0.25 } (ecs.new ())",
     body:
-      "  use ecs.set #Clock { tick: 1, remainder: delta }\n  use advance (func () => return ecs.checkpoint engine) delta\n  use snapshot <- ecs.previous #Clock\n  let #Clock { remainder } = snapshot\n  break remainder",
+      "  use ecs.set $Clock { tick: 1, remainder: delta }\n  use advance (func () => return ecs.checkpoint engine) delta\n  use snapshot <- ecs.previous $Clock\n  let $Clock { remainder } = snapshot\n  break remainder",
     expected: (x: number, _edited: boolean) => x,
   },
 ];
@@ -88,8 +88,8 @@ for (const c of cases) {
   await Deno.mkdir(dir);
   const entry = dir + "/main.blot";
   const source = `import * as ecs from "ink/ecs"
-type Clock is data = #Clock { tick: U32, remainder: F32 }
-type Counter is data = #Counter U32
+type Clock is data = $Clock { tick: U32, remainder: F32 }
+type Counter is data = $Counter U32
 const advance = func checkpoint => return func (delta: F32) => return do:
   use checkpoint ()
   break ()

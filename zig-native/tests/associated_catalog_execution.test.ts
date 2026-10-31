@@ -49,13 +49,13 @@ Deno.test("ordinary primitive names keep lexical meaning while nominal methods e
     { prelude: "none" },
   );
   await compileAndRun(
-    `type Box is data=#Box U32
+    `type Box is data= $Box U32
 const Box.add=func left=> return func right=> return do:
-  let #Box a=left
-  let #Box b=right
-  break #Box (@u32.add a b)
-entry const answer=func()=> return case @type.call "add" (#Box 21) (#Box 21) of
-  #Box value=>value
+  let $Box a=left
+  let $Box b=right
+  break $Box (@u32.add a b)
+entry const answer=func()=> return case @type.call "add" ($Box 21) ($Box 21) of
+  $Box value=>value
 entry const folded=answer ()
 `,
     (guest) => {

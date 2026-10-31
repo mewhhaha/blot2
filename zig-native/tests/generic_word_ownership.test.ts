@@ -18,34 +18,34 @@ for (const codegenTier of ["optimized", "development"] as const) {
     });
     try {
       const source = `
-type Choice [a, b] is data = #Left a | #Right b
+type Choice [a, b] is data = $Left a | $Right b
 const reconstruct = func candidate => return case candidate of
-  #Left value => do:
-    break #Left value
-  #Right error => do:
-    break #Right error
-entry const phantom = func (value: U32) => return case reconstruct (#Left value) of
-  #Left result => result
-  #Right _ => 0
+  $Left value => do:
+    break $Left value
+  $Right error => do:
+    break $Right error
+entry const phantom = func (value: U32) => return case reconstruct ($Left value) of
+  $Left result => result
+  $Right _ => 0
 entry const changed = func (value: U32) => return do:
-  let candidate = #Right #[value]
+  let candidate = $Right #[value]
   let changed = case candidate of
-    #Left missing => #Left missing
-    #Right values => do:
-      break #Right #[@u32.add values[0] 1]
+    $Left missing => $Left missing
+    $Right values => do:
+      break $Right #[@u32.add values[0] 1]
   break case changed of
-    #Left _ => 0
-    #Right values => values[0]
+    $Left _ => 0
+    $Right values => values[0]
 entry const retagged = func (value: U32) => return do:
-  let candidate = #Left value
+  let candidate = $Left value
   let changed = case candidate of
-    #Left payload => do:
-      break #Right payload
-    #Right payload => #Right payload
+    $Left payload => do:
+      break $Right payload
+    $Right payload => $Right payload
   break case changed of
-    #Left payload => payload
-    #Right payload => @u32.add payload 100
-const holder = func () => return #{ identity: func x => return x, unseen: func x => return x, g: 4 }
+    $Left payload => payload
+    $Right payload => @u32.add payload 100
+const holder = func () => return { identity: func x => return x, unseen: func x => return x, g: 4 }
 const forward = func value => return (holder ()).identity value
 entry const unobserved = func () => return (holder ()).g
 entry const integer = func (value: U32) => return forward value

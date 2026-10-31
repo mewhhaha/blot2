@@ -54,10 +54,10 @@ for (
       }
       if (annotation === "associated") {
         text =
-          "type Number is data = #Number U32\nconst Number.twice = func (#Number value) => return func (delta: U32) => return @u32.add value delta\n" +
+          "type Number is data = $Number U32\nconst Number.twice = func ($Number value) => return func (delta: U32) => return @u32.add value delta\n" +
           text.replace(
             `@u32.add (${spine("value")}) 7`,
-            `@type.call "twice" (#Number (${spine("value")})) 7`,
+            `@type.call "twice" ($Number (${spine("value")})) 7`,
           );
       }
       return text;
@@ -166,7 +166,7 @@ impl ScalarSource : Source U32 where { Ready U32 } = {
           [source(), 88],
           [
             source() +
-            "\ntype Float is data = #Float F32\nconst Float.twice = func (#Float value) => return func (delta: F32) => return @f32.add value delta\n",
+            "\ntype Float is data = $Float F32\nconst Float.twice = func ($Float value) => return func (delta: F32) => return @f32.add value delta\n",
             88,
           ],
           [source(), 88],

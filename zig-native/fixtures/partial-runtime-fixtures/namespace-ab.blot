@@ -2,7 +2,7 @@ import * as alpha from "./a"
 import * as beta from "./b"
 effect Local: Unit -> F32
 const reader = @effect.provider Local (func () => return 0.75)
-data Cell = #Cell U32
+type Cell is data = $Cell U32
 const evaluate = func () => return do:
   let first = do alpha.reader:
     break alpha.Lib ()
@@ -10,7 +10,7 @@ const evaluate = func () => return do:
     break beta.Lib ()
   let third = do reader:
     break Local ()
-  let (_, #Cell count) = @state.run (#Cell 1) (func () => return @state.get #Cell)
+  let (_, $Cell count) = @state.run ($Cell 1) (func () => return @state.get $Cell)
   break @f32.add (@f32.add (@f32.add first second) third) (@u32.to_f32 count)
 entry const answer = func () => return evaluate ()
 entry const folded = evaluate ()

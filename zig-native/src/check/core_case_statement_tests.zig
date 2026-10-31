@@ -9,16 +9,16 @@ const a = std.testing.allocator;
 
 // The second arm leaves `count` alone; the third keeps its own local.
 const source =
-    \\type Tri is data = #Rise | #Fall | #Still
+    \\type Tri is data = $Rise | $Fall | $Still
     \\entry const run = func (n: U32) : U32 => return do:
-    \\  let beat = if @u32.eq n 0 then #Fall else if @u32.eq n 1 then #Rise else #Still
+    \\  let beat = if @u32.eq n 0 then $Fall else if @u32.eq n 1 then $Rise else $Still
     \\  let count = 0
     \\  case beat of
-    \\    #Rise => do:
+    \\    $Rise => do:
     \\      count := 7
-    \\    #Fall => do:
+    \\    $Fall => do:
     \\      let unused = 1
-    \\    #Still => do:
+    \\    $Still => do:
     \\      count := @u32.add self 11
     \\  break count
 ;
@@ -121,16 +121,16 @@ test "statement case arms carry rebinding through one binary merge per nested le
 
 test "statement case arms reject a nested return but end at a direct one" {
     const nested =
-        \\type Beat is data = #Up | #Down
+        \\type Beat is data = $Up | $Down
         \\entry const run = func (n: U32) : U32 => return do:
-        \\  let beat = if @u32.lt 0 n then #Up else #Down
+        \\  let beat = if @u32.lt 0 n then $Up else $Down
         \\  let count = 0
         \\  case beat of
-        \\    #Up => do:
+        \\    $Up => do:
         \\      count := 7
         \\      if @u32.lt 4 n:
         \\        break ()
-        \\    #Down => do:
+        \\    $Down => do:
         \\      count := 3
         \\      break ()
         \\  break count
@@ -151,13 +151,13 @@ test "a plain nested do keeps its scope and an arm local stays dead" {
         \\    count := @u32.add self 1
         \\  break count
         ,
-        \\type Maybe a is data = #None | #Some a
+        \\type Maybe a is data = $None | $Some a
         \\entry const run = func (n: U32) : U32 => return do:
         \\  let count = 0
-        \\  case #Some n of
-        \\    #Some value => do:
+        \\  case $Some n of
+        \\    $Some value => do:
         \\      value := @u32.add self 1
-        \\    #None => do:
+        \\    $None => do:
         \\      count := 3
         \\  break count
     }) |text| {

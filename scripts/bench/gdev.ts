@@ -197,9 +197,9 @@ export const gameScenarios: readonly Scenario[] = [
       {
         file: "src/robots.blot",
         search:
-          "type Carry is data = #Carry { depth: F32, width: F32, height: F32, age: F32, random: U32 }",
+          "type Carry is data = $Carry { depth: F32, width: F32, height: F32, age: F32, random: U32 }",
         replace:
-          "type Carry is data = #Carry { depth: F32, width: F32, height: F32, age: F32, random: U32, spare: F32 }",
+          "type Carry is data = $Carry { depth: F32, width: F32, height: F32, age: F32, random: U32, spare: F32 }",
       },
       {
         file: "src/robots.blot",
@@ -230,9 +230,9 @@ export const gameScenarios: readonly Scenario[] = [
     name: "unused_export",
     replacements: [{
       file: "ink/math.blot",
-      search: "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\n",
+      search: "const zero2 = $Vec2 { x: 0.0, y: 0.0 }\n",
       replace:
-        "const zero2 = #Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = func (x: F32) => return x + 1.0\n",
+        "const zero2 = $Vec2 { x: 0.0, y: 0.0 }\nconst probe_unused_export = func (x: F32) => return x + 1.0\n",
     }],
   },
 ];

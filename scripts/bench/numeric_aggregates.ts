@@ -21,15 +21,15 @@ export function numericAggregateSources() {
       ? `{${axes.map((a) => `${a}: ${vector}`).join(", ")}}`
       : `{${fields.map((f) => `${f.name}: F32`).join(", ")}}`;
     if (nominal) {
-      if (nested) shapes += `type Vector is data = #Vector ${vector}\n`;
+      if (nested) shapes += `type Vector is data = $Vector ${vector}\n`;
       const body = nested
         ? `{${axes.map((a) => `${a}: Vector`).join(", ")}}`
         : structure;
-      shapes += `type ${name} is data = #${name} ${body}\n`;
+      shapes += `type ${name} is data = $${name} ${body}\n`;
     }
     const payload = nested
       ? axes.map((a, i) =>
-        `${a}: ${nominal ? "#Vector " : ""}{${
+        `${a}: ${nominal ? "$Vector " : ""}{${
           lanes.map((l, j) => `${l}: seed + ${i * 4 + j}.0`).join(", ")
         }}`
       ).join(", ")

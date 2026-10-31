@@ -3,18 +3,18 @@ import { createCompiler, instantiateGuest } from "../../mod.ts";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const declarations = `
-type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
+type Pack [unused, selected] is data = $Pack { unused: unused, selected: selected }
 const identity = func value => return value
-const packed = #Pack { unused: identity, selected: func (value: U32) => return value + 1 }
+const packed = $Pack { unused: identity, selected: func (value: U32) => return value + 1 }
 const invoke = func callback => return callback 1
 const sum = func packed => return func (left: U32) => return func (right: U32) => return do:
-  let #Pack { selected } = packed
+  let $Pack { selected } = packed
   break selected (left + right)
 const run = func packed => return func (value: U32) => return do:
-  let #Pack { selected } = packed
+  let $Pack { selected } = packed
   break selected value
 const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
-  let #Pack { selected } = packed
+  let $Pack { selected } = packed
   break selected (value + extra))
 `;
 
@@ -57,16 +57,16 @@ Deno.test("stored curried callbacks close their own effect rows and still use th
   await compileAndRun(
     `
 type Clock is effect = { tick: Unit -> U32 }
-type Pack callback is data = #Pack { callback: callback, marker: U32 }
+type Pack callback is data = $Pack { callback: callback, marker: U32 }
 const prepare = func (amount: U32) => return func (value: U32) => return do:
   use current <- Clock.tick ()
   break current + value + amount
-const packed = #Pack { callback: prepare, marker: 42 }
+const packed = $Pack { callback: prepare, marker: 42 }
 const read = func pack => return do:
-  let #Pack { marker } = pack
+  let $Pack { marker } = pack
   break marker
 const invoke = func pack => return do:
-  let #Pack { callback } = pack
+  let $Pack { callback } = pack
   break callback 1 2
 entry const marker = func () => return read packed
 entry const answer = func (value: U32) => return do:
@@ -85,17 +85,17 @@ entry const answer = func (value: U32) => return do:
 Deno.test("constant collections infer concrete callbacks in variants the consumer does not call", async () => {
   await compileAndRun(
     `
-type Action value is data = #Ignored (value -> Unit) | #Chosen (Unit -> U32)
+type Action value is data = $Ignored (value -> Unit) | $Chosen (Unit -> U32)
 const unused = func value => return do:
   let next = value * 0.25
   break ()
-const actions = #[#Ignored unused, #Chosen (func () => return 42)]
+const actions = #[$Ignored unused, $Chosen (func () => return 42)]
 entry const answer = func () => return do:
   let total = 0
   for action in actions:
     total := total + (case action of
-      #Ignored _ => 0
-      #Chosen run => run ())
+      $Ignored _ => 0
+      $Chosen run => run ())
   break total
 `,
     (guest) => equal(guest.call("answer", null), 42),

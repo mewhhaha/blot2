@@ -183,7 +183,7 @@ const grown = build 8193
 entry const ends = do:
   let (forward, backward, packed) = grown
   break forward[8192] + backward[0] + packed[8192]
-const selected = array.filter_map (func x => return if x % 2 == 0 then #Some x else #Nothing) (array.generate 4097 identity)
+const selected = array.filter_map (func x => return if x % 2 == 0 then $Some x else $Nothing) (array.generate 4097 identity)
 entry const selected_last = selected[2048]
 const branches = do:
   let values = [20]
@@ -206,25 +206,25 @@ Deno.test("Result iteration stops on errors and allows distinct state result and
   await compileAndRun(
     `
 entry const run = func (count: U32) => return Result.unwrap_or 0 (Result.iterate 0 (func i => return
-  #Ok (if i < count then #Continue (i + 1) else #Done i)))
+  $Ok (if i < count then $Continue (i + 1) else $Done i)))
 entry const stop = func (host: U32 -> Bool ! {Foreign}) => return do:
   use outcome <- Result.iterate 0 (func i => return do:
     use failed <- host i
     if failed:
-      break #Err i
+      break $Err i
     if i == 10:
-      break #Ok (#Done #[42.0])
-    break #Ok (#Continue (i + 1)))
+      break $Ok ($Done #[42.0])
+    break $Ok ($Continue (i + 1)))
   break case outcome of
-    #Ok value => value[0]
-    #Err error => F32.from error
+    $Ok value => value[0]
+    $Err error => F32.from error
 const keep = func host => return func candidate => return case candidate of
-  #Ok value => do:
+  $Ok value => do:
     use observed <- host value
-    break #Ok value
-  #Err error => #Err error
+    break $Ok value
+  $Err error => $Err error
 entry const prefix = func (host: U32 -> Bool ! {Foreign}) => return do:
-  use candidate <- keep host (#Ok 7)
+  use candidate <- keep host ($Ok 7)
   break Result.unwrap_or 0 candidate
 `,
     (guest) => {

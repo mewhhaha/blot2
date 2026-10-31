@@ -27,9 +27,9 @@ const aliases = func unused => return func retained => return do:
   let version = retained
   break {nested: #[version]}
 opaque type Wrapper a = a
-const wrap = func unused => return func retained => return #Wrapper retained
+const wrap = func unused => return func retained => return $Wrapper retained
 const unwrap = func unused => return func wrapped => return case wrapped of
-  #Wrapper retained => retained
+  $Wrapper retained => retained
 `;
 const main =
   `import {State, identity, keep, aliases, wrap, unwrap, fields, select, select_pure, take_array, take_second, provider, state, computation} from "./values"

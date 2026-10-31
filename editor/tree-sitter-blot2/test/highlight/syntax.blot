@@ -18,13 +18,13 @@ const identity = func value => return value
 //               ^ keyword.function
 //                    ^ variable.parameter
 
-data Maybe a = #Some a | #Nothing
+type Maybe a is data = $Some a | $Nothing
 // <- keyword.storage.type
-//   ^ type
-//              ^ constructor
-//                     ^ operator
+//     ^ type
+//                      ^ constructor
+//                             ^ operator
 
-type Maybe a is data = #Some a | #Nothing
+type Maybe a is data = $Some a | $Nothing
 // <- keyword.storage.type
 //   ^ type
 //           ^ keyword.storage.type
@@ -37,23 +37,23 @@ type State a is effect = { get: Unit -> a, set: a -> Unit }
 //              ^ keyword.storage.type
 //                         ^ variable.other.member
 
-type Get a is effect = #Unit -> a
+type Get a is effect = $Unit -> a
 // <- keyword.storage.type
 //   ^ type
 //         ^ keyword.storage.type
 //            ^ keyword.storage.type
 
-type Positions = #Array Vec2
+type Positions = $Array Vec2
 // <- keyword.storage.type
 //   ^ type
 //                ^ constructor
 
-type Reading = #F64 | #Text
+type Reading = $F64 | $Text
 // <- keyword.storage.type
 //   ^ type
 //              ^ constructor
 //                  ^ operator
-//                     ^ constructor
+//                      ^ constructor
 
 const read_score = func (ready: Bool) : F64 | Text => return do:
 //                 ^ keyword.function
@@ -63,7 +63,7 @@ const read_score = func (ready: Bool) : F64 | Text => return do:
 //                                          ^ operator
 //                                            ^ type
 
-if let #Some(x) = y:
+if let $Some(x) = y:
 // <- keyword.control.conditional
 // ^ keyword.storage.type
 //      ^ constructor
@@ -73,7 +73,7 @@ if let #Some(x) = y:
 //                ^ variable
   break x
 
-let #Some(x) = y else:
+let $Some(x) = y else:
 // <- keyword.storage.type
 //   ^ constructor
 //       ^ punctuation.bracket
@@ -84,7 +84,7 @@ let #Some(x) = y else:
   break 0
 //^ keyword.control.return
 
-if let #Some x = y:
+if let $Some x = y:
 // <- keyword.control.conditional
 //      ^ constructor
 //           ^ variable
@@ -133,7 +133,7 @@ case first, second, third of
 //   ^ variable
 //        ^ punctuation.delimiter
 //                        ^ keyword.control.conditional
-  #Some value, true, _ => value
+  $Some value, true, _ => value
 // ^ constructor
 
 "if let Some(x) = y else: F64 | Text"
@@ -162,7 +162,7 @@ infixl 60 (+) = add
 //         ^ operator
 //              ^ variable
 
-infixr 22 (||) = either
+infixr 22 (<|>) = either
 // <- keyword.directive
 //          ^ operator
 
@@ -195,10 +195,10 @@ const either = func left => return func ~right => return do:
 //                                       ^ variable.parameter
   if left:
     break true
-  break @force right
+  break @demand right
 //       ^ function.builtin
 
-const force = func ~value => return @force value
+const force = func ~value => return @demand value
 //    ^ function
 //                 ^ operator
 //                  ^ variable.parameter
@@ -320,7 +320,7 @@ const enabled = true
 const disabled = false
 //                ^ constant.builtin.boolean
 
-"@force and ~right are text, ${@force right}"
+"@demand and ~right are text, ${@demand right}"
 // <- string
 // ^ !function.builtin
 //                             ^ string
@@ -348,11 +348,11 @@ effect Random.next: Unit -> U32
 @[component]
 // <- punctuation.special
 //^ attribute
-data Position = #Position { x: F32 }
+type Position is data = $Position { x: F32 }
 
 @[resource]
 //^ attribute
-data Time = #Time { seconds: F32 }
+type Time is data = $Time { seconds: F32 }
 
 "// still text ${world}"
 // <- string

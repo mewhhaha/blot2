@@ -40,7 +40,7 @@ entry const forks = func () => return do:
   let total = 0
   for ever:
     use step <- cursor.next
-    let #Some (value, rest) = step else:
+    let $Some (value, rest) = step else:
       break
     cursor := rest
     total := self + value
@@ -127,8 +127,8 @@ Deno.test("resolved collection iteration rechecks exact cursor producers through
       try {
         for (const offset of [0, 10, 0]) {
           const changed = original.replace(
-            "#Some (@cursor.value cursor, @cursor.advance cursor)",
-            `#Some (@u32.add (@cursor.value cursor) ${offset}, @cursor.advance cursor)`,
+            "$Some (@cursor.value cursor, @cursor.advance cursor)",
+            `$Some (@u32.add (@cursor.value cursor) ${offset}, @cursor.advance cursor)`,
           );
           const sources = {
             [entry]: `${fold}entry const run = func () => return fold add 0 [0, 1, 2]\n`,
@@ -166,8 +166,8 @@ Deno.test("effectful collection iter and next retain written pulls and early exi
       "const List.iter = func values => return do:\n  use Audit.pull 1\n  break @list.cursor values",
     )
     .replace(
-      "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then #Some (@cursor.value cursor, @cursor.advance cursor)\n  else #Nothing",
-      "const Cursor.next = func cursor => return do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break #Some (@cursor.value cursor, @cursor.advance cursor)\n  break #Nothing",
+      "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then $Some (@cursor.value cursor, @cursor.advance cursor)\n  else $Nothing",
+      "const Cursor.next = func cursor => return do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break $Some (@cursor.value cursor, @cursor.advance cursor)\n  break $Nothing",
     ) + "\ntype Audit is effect = { pull: U32 -> Unit }\n";
   const source = `${fold}
 const measured = func action => return do:
@@ -239,11 +239,11 @@ Deno.test("resolved collection iteration applies in units above 4,096 Core nodes
 const smallest = func entries => return do:
   let closest = 1000000
   for entry in entries:
-    if let #Some value = entry:
+    if let $Some value = entry:
       if value < closest:
         closest := value
   break closest
-entry const optional = func (count: U32) => return smallest (@array.generate count (func index => return if index % 3 == 0 then #Nothing else #Some (count - index)))
+entry const optional = func (count: U32) => return smallest (@array.generate count (func index => return if index % 3 == 0 then $Nothing else $Some (count - index)))
 `, (guest) => {
     for (const count of [0, 1, 2, 3, 4, 245, 4096]) {
       const sum = (count * (count - 1) / 2) >>> 0;

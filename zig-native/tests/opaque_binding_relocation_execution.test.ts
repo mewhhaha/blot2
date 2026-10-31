@@ -27,12 +27,12 @@ function library(edit: Edit) {
     : edit === "insert_contract"
     ? "private type Hidden a is contract = {type_rep a}\n"
     : edit === "insert_type"
-    ? "private type Spare is data = #Spare U32\n"
+    ? "private type Spare is data = $Spare U32\n"
     : "";
   return inserted + privateType + (edit === "move" ? "" : offset) +
     `opaque type Token ${parameter} = ${parameter}\n` +
-    `const make: ${variable} -> Token ${variable} = func ${argument} => return #Token ${argument}\n` +
-    `const read: Token ${variable} -> ${variable} = func (#Token ${argument}) => return ${argument}\n` +
+    `const make: ${variable} -> Token ${variable} = func ${argument} => return $Token ${argument}\n` +
+    `const read: Token ${variable} -> ${variable} = func ($Token ${argument}) => return ${argument}\n` +
     "const adjust: U32 -> U32 = func value => return @u32.add value offset\n" +
     (edit === "move" ? offset : "");
 }
@@ -49,8 +49,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const tokens = directory + "/tokens.blot";
       const bundle = directory + "/dependencies.blotdep";
       const body = "opaque type Token = U32\n" +
-        "const make: Unit -> Token = func () => return #Token 42\n" +
-        "const read: Token -> Unit = func (#Token value) => return ()\n";
+        "const make: Unit -> Token = func () => return $Token 42\n" +
+        "const read: Token -> Unit = func ($Token value) => return ()\n";
       const producer = (name: string) =>
         "type PublicRead " + name + " is effect = Unit -> " + name + "\n" +
         body;

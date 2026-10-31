@@ -3,24 +3,24 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 import { readMemoryProfile } from "../../compiler/memory_profile.ts";
 
-const helper = `type Row is data = #Blank | #Present {value: U32, other: U32}
-const row = func (i: U32) : Row => return if i % 2 == 0 then #Blank else #Present {value: i, other: i + 1}
+const helper = `type Row is data = $Blank | $Present {value: U32, other: U32}
+const row = func (i: U32) : Row => return if i % 2 == 0 then $Blank else $Present {value: i, other: i + 1}
 const lane = func (i: U32) => return func (j: U32) => return i * 24 + j
 const flatten = func chunks => return @array.flatten chunks
 `;
 const source = `import * as array from "std/array"
 import {Row, Blank, Present, row, lane, flatten} from "./helper"
-type Command is data = #Command {lanes: Array U32}
+type Command is data = $Command {lanes: Array U32}
 entry const variants = func (count: U32) => return do:
   let values = array.generate count row
   let sum = 0
   for value in values:
     sum := self + case value of
-      #Blank => 0
-      #Present (a, b) => a + b
+      $Blank => 0
+      $Present (a, b) => a + b
   break sum
 entry const pipeline = func (count: U32) => return do:
-  let commands = array.generate count (func i => return #Command {lanes: array.generate 24 (func j => return lane i j)})
+  let commands = array.generate count (func i => return $Command {lanes: array.generate 24 (func j => return lane i j)})
   let chunks = array.map (func command => return command.lanes) commands
   let values = flatten chunks
   break array.fold_left (func sum -> value => return sum + value) 0 values

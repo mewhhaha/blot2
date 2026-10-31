@@ -4,12 +4,12 @@ import { observeGuestAllocations } from "../../scripts/bench/guest_heap_observer
 
 const source = `
 import * as array from "std/array"
-type Box is data = #Box { a: U32, b: U32 }
+type Box is data = $Box { a: U32, b: U32 }
 const fields = func value => return { a: value, b: value + 1 }
 const read = func row => return row.a + row.b
 const named = read
 const apply = func callback -> row => return callback row
-const boxed = func value => return #Box { a: value, b: value + 1 }
+const boxed = func value => return $Box { a: value, b: value + 1 }
 const read_box = func (row: Box) => return row.a + row.b
 entry const direct = func value => return do:
   let row = fields value

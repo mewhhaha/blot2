@@ -3,10 +3,10 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const source =
-  `type Row is data = #Row {a: U32, b: U32, c: U32, d: U32, e: U32, f: U32, g: U32, h: U32, i: U32}
-type Vector is data = #Vector {x: F32, y: F32}
-type Nested is data = #Nested {head: {value: Vector, stamp: U32}, tail: U32}
-const row = func index => return #Row {a: index, b: 2, c: 3, d: 4, e: @u32.add index 7, f: 6, g: 7, h: 8, i: 9}
+  `type Row is data = $Row {a: U32, b: U32, c: U32, d: U32, e: U32, f: U32, g: U32, h: U32, i: U32}
+type Vector is data = $Vector {x: F32, y: F32}
+type Nested is data = $Nested {head: {value: Vector, stamp: U32}, tail: U32}
+const row = func index => return $Row {a: index, b: 2, c: 3, d: 4, e: @u32.add index 7, f: 6, g: 7, h: 8, i: 9}
 entry const array = func (index: U32) => return (@array.generate 513 row)[index].e
 entry const list = func (index: U32) => return do:
   let cursor = @list.cursor (@list.generate 513 row)
@@ -19,13 +19,13 @@ entry const snapshot = func (index: U32) => return do:
   values[index].e := 1000
   break @u32.add old[index].e values[index].e
 entry const nested_bits = func (value: F32) => return do:
-  let rows = @array.fill 2 (#Nested {head: {value: #Vector {x: value, y: 2.0}, stamp: 3}, tail: 4})
+  let rows = @array.fill 2 ($Nested {head: {value: $Vector {x: value, y: 2.0}, stamp: 3}, tail: 4})
   break #[rows[1].head.value.x, rows[0].head.value.y]
 entry const escaped = func (value: F32) => return do:
-  let rows = @list.fill 2 (#Nested {head: {value: #Vector {x: value, y: 2.0}, stamp: 3}, tail: 4})
+  let rows = @list.fill 2 ($Nested {head: {value: $Vector {x: value, y: 2.0}, stamp: 3}, tail: 4})
   let selected = (@cursor.value (@list.cursor rows)).head
   break #[selected.value.x, selected.value.y]
-entry const checked_index = func (divisor: U32) => return (@array.fill 1 (#Row {a: 1, b: 2, c: 3, d: 4, e: 7, f: 6, g: 7, h: 8, i: 9}))[@u32.div 0 divisor].e
+entry const checked_index = func (divisor: U32) => return (@array.fill 1 ($Row {a: 1, b: 2, c: 3, d: 4, e: 7, f: 6, g: 7, h: 8, i: 9}))[@u32.div 0 divisor].e
 `;
 
 for (const codegenTier of ["development", "optimized"] as const) {

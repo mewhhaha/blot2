@@ -122,22 +122,22 @@ export const editSuite: SyntheticProject = {
   entry: "main.blot",
   files: {
     "math.blot": lines([
-      "type Vec2 is data = #Vec2 { x: F32, y: F32 }",
-      "const zero = #Vec2 { x: 0.0, y: 0.0 }",
-      "const unit = #Vec2 { x: 1.0, y: 1.0 }",
+      "type Vec2 is data = $Vec2 { x: F32, y: F32 }",
+      "const zero = $Vec2 { x: 0.0, y: 0.0 }",
+      "const unit = $Vec2 { x: 1.0, y: 1.0 }",
       "const dot = func (a: Vec2) => return func (b: Vec2) => return a.x * b.x + a.y * b.y",
-      "const scale = func (k: F32) => return func (v: Vec2) => return #Vec2 { x: k * v.x, y: k * v.y }",
-      "const add = func (a: Vec2) => return func (b: Vec2) => return #Vec2 { x: a.x + b.x, y: a.y + b.y }",
+      "const scale = func (k: F32) => return func (v: Vec2) => return $Vec2 { x: k * v.x, y: k * v.y }",
+      "const add = func (a: Vec2) => return func (b: Vec2) => return $Vec2 { x: a.x + b.x, y: a.y + b.y }",
     ]),
     "robots.blot": lines([
       'import * as math from "./math"',
-      "type Carry is data = #Carry { depth: F32, width: F32 }",
+      "type Carry is data = $Carry { depth: F32, width: F32 }",
       "const floor_half_extent = 60.0",
-      "const step = func (carry: Carry) => return #Carry { depth: carry.depth + 0.5, width: carry.width }",
+      "const step = func (carry: Carry) => return $Carry { depth: carry.depth + 0.5, width: carry.width }",
       "const reach = func (v: math.Vec2) => return math.dot v v * floor_half_extent",
       "const walk = func (phase: F32) => return floor phase + 1.0",
       "const carried = func (x: F32) => return do:",
-      "  let #Carry { depth, width } = step (#Carry { depth: x, width: 1.0 })",
+      "  let $Carry { depth, width } = step ($Carry { depth: x, width: 1.0 })",
       "  break depth + width",
     ]),
     "hud.blot": lines([
@@ -192,8 +192,8 @@ export const editSuite: SyntheticProject = {
       replacements: [
         {
           file: "robots.blot",
-          search: "#Carry { depth: F32, width: F32 }",
-          replace: "#Carry { depth: F32, width: F32, spare: F32 }",
+          search: "$Carry { depth: F32, width: F32 }",
+          replace: "$Carry { depth: F32, width: F32, spare: F32 }",
         },
         {
           file: "robots.blot",
@@ -207,8 +207,8 @@ export const editSuite: SyntheticProject = {
         },
         {
           file: "robots.blot",
-          search: "let #Carry { depth, width }",
-          replace: "let #Carry { depth, width, spare }",
+          search: "let $Carry { depth, width }",
+          replace: "let $Carry { depth, width, spare }",
         },
       ],
     },

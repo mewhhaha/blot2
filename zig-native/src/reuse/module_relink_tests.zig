@@ -14,19 +14,19 @@ const Allocator = std.mem.Allocator;
 const key: format.Key = .{ .compiler = @as([32]u8, @splat(1)), .settings = @as([32]u8, @splat(2)), .source = @as([32]u8, @splat(3)), .dependencies = @as([32]u8, @splat(4)) };
 
 const producer =
-    \\data Pair = #Pair { zebra: U32, alpha: F32 }
-    \\data Box a = #Box { value: a }
+    \\type Pair is data = $Pair { zebra: U32, alpha: F32 }
+    \\type Box a is data = $Box { value: a }
     \\const Box.get = func box => return box.value
     \\type Read a is effect = { get: Unit -> a }
     \\type Mapper { input: a, output: b } is effect = { map: a -> b }
     \\const reader = @effect.provider (Read.get U32) (func () => return 41)
     \\const mapper = @effect.provider (Mapper.map { output: F32, input: U32 }) (func value => return @u32.to_f32 value)
-    \\const make = func value => return #Pair { alpha: 2.5, zebra: value }
-    \\const stored = #Pair (40, 2.5)
+    \\const make = func value => return $Pair { alpha: 2.5, zebra: value }
+    \\const stored = $Pair (40, 2.5)
     \\const fold = func pair => return case pair of
-    \\  #Pair (zebra, alpha) => @f32.add (@u32.to_f32 zebra) alpha
+    \\  $Pair (zebra, alpha) => @f32.add (@u32.to_f32 zebra) alpha
     \\const named = func pair => return case pair of
-    \\  #Pair { alpha, zebra } => @f32.add (@u32.to_f32 zebra) alpha
+    \\  $Pair { alpha, zebra } => @f32.add (@u32.to_f32 zebra) alpha
     \\const duplicate = func value => return #[value, value]
 ;
 const application =
@@ -34,10 +34,10 @@ const application =
     \\entry const named_pattern: Unit -> F32 = func () => return named (make 40)
     \\entry const retained = fold stored
     \\entry const dynamic: U32 -> F32 = func value => return fold (make value)
-    \\entry const fresh: Unit -> F32 = func () => return case #Pair { alpha: 2.5, zebra: 40 } of
-    \\  #Pair (zebra, alpha) => @f32.add (@u32.to_f32 zebra) alpha
-    \\entry const associated: Unit -> U32 = func () => return (#Box { value: 42 }).get
-    \\entry const associated_float: Unit -> F32 = func () => return (#Box { value: 42.5 }).get
+    \\entry const fresh: Unit -> F32 = func () => return case $Pair { alpha: 2.5, zebra: 40 } of
+    \\  $Pair (zebra, alpha) => @f32.add (@u32.to_f32 zebra) alpha
+    \\entry const associated: Unit -> U32 = func () => return ($Box { value: 42 }).get
+    \\entry const associated_float: Unit -> F32 = func () => return ($Box { value: 42.5 }).get
     \\entry const array: Unit -> U32 = func () => return @array.get (duplicate 42) 0
     \\entry const handled: Unit -> U32 = func () => return do reader:
     \\  use value <- Read.get U32 ()

@@ -70,7 +70,7 @@ Deno.test("retained nested source owners preserve unrelated edits consumed closu
   const entry = `${directory}/main.blot`;
   const library = `${directory}/library.blot`;
   const source = (divisor: number, unused: number) =>
-    `const force = func ~(value: U32) => return @force value
+    `const force = func ~(value: U32) => return @demand value
 const make = func (seed: U32) => return do:
   let captured = func (value: U32) => return @u32.div (@u32.add seed (force value)) ${divisor}
   break captured
@@ -445,9 +445,9 @@ Deno.test("completed inferred interfaces preserve current conversions body edits
   });
   const entry = `${directory}/main.blot`;
   const source = (rounding: string, member = "from", written = false) =>
-    `type Token is data = #Token U32
-const Token.from = func value => return #Token (@f32.to_u32 value)
-const Token.fail = func value => return #Token (@u32.div (@f32.to_u32 value) 0)
+    `type Token is data = $Token U32
+const Token.from = func value => return $Token (@f32.to_u32 value)
+const Token.fail = func value => return $Token (@u32.div (@f32.to_u32 value) 0)
 const from${
       written ? `: a -> b where { result "${member}" a b }` : ""
     } = func value => return @type.result "${member}" value
@@ -457,7 +457,7 @@ const floor = floor_impl
 const ceil = ceil_impl
 const local = func value => return from (${rounding} value)
 entry const answer: U32 where { type_rep U32 } = case local 41.25 of
-  #Token value => value
+  $Token value => value
 `;
   try {
     await Deno.writeTextFile(entry, source("floor"));

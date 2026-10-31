@@ -7,10 +7,10 @@ const core = @import("../check/core.zig");
 const backend = @import("core_backend.zig");
 
 const iterator =
-    \\type Maybe a is data = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const Array.iter = func values => return @array.cursor values
     \\const Cursor.next = func cursor => return
-    \\  if @cursor.has cursor then #Some (@cursor.value cursor, @cursor.advance cursor) else #Nothing
+    \\  if @cursor.has cursor then $Some (@cursor.value cursor, @cursor.advance cursor) else $Nothing
     \\const count = func xs => return do:
     \\  let n = 0
     \\  for x in xs:
@@ -20,7 +20,7 @@ const iterator =
 ;
 const cases = [_][]const u8{
     iterator ++ "entry const create = func () => return count #[]\n",
-    iterator ++ "type Box [a, b] is data = #A a | #B b\nentry const create = func () => return @u32.add (count #[]) (@u32.mul (count #[#A 1, #A 2]) 10)\n",
+    iterator ++ "type Box [a, b] is data = $A a | $B b\nentry const create = func () => return @u32.add (count #[]) (@u32.mul (count #[$A 1, $A 2]) 10)\n",
     iterator ++ "const empty = #[]\nentry const create = func () => return @u32.add (count #[...empty, 1]) (count #[...empty, 2.0])\n",
 };
 

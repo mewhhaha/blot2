@@ -12,10 +12,10 @@ Deno.test("principal query replay preserves staged values, errors, and proof own
     prelude: null,
   };
   const source = (divisor: number) =>
-    `type Box is data = #Box U32
+    `type Box is data = $Box U32
 const extract = func (box: Box) : U32 => return case box of
-  #Box value => value
-entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box ${divisor}))
+  $Box value => value
+entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract ($Box ${divisor}))
 `;
   const retained = await createZigProjectCompiler({
     ...options,

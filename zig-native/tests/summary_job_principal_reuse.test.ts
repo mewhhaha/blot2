@@ -15,8 +15,8 @@ const stdRoot = `${repo}std`;
 const probe = (schema: number) => `
 const probe_with = func pick => return func value => return do:
   let (_, count) = run_scoped simulation (create ()) (func () => return do:
-    use time <- get #Time
-    let #Time { seconds } = time
+    use time <- get $Time
+    let $Time { seconds } = time
     break pick ())
   break value + value + count
 entry const probe_schema: U32 = ${schema}
@@ -73,7 +73,7 @@ Deno.test("principal inputs survive summary jobs drained inside the recorded reg
       for (
         const text of [
           ecs + probe(8),
-          `${ecs}${probe(8)}\nconst broken_probe: U32 = #Wrong\n`,
+          `${ecs}${probe(8)}\nconst broken_probe: U32 = $Wrong\n`,
           ecs + probe(9),
           ecs + probe(7),
         ]

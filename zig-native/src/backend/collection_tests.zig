@@ -86,10 +86,10 @@ fn packedEmissionFailures(a: std.mem.Allocator, units: []const core.Module) !voi
 test "numeric nominal adapters preserve frozen Core and types through emission allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\type Row is data = #Row {p: F32, q: F32, r: F32, s: F32}
-        \\type Matrix is data = #Matrix {a: Row, b: Row, c: Row, d: Row}
-        \\const row = func (x: F32) => return #Row {p: x, q: x, r: x, s: x}
-        \\const matrix = func (x: F32) => return #Matrix {a: row x, b: row x, c: row x, d: row x}
+        \\type Row is data = $Row {p: F32, q: F32, r: F32, s: F32}
+        \\type Matrix is data = $Matrix {a: Row, b: Row, c: Row, d: Row}
+        \\const row = func (x: F32) => return $Row {p: x, q: x, r: x, s: x}
+        \\const matrix = func (x: F32) => return $Matrix {a: row x, b: row x, c: row x, d: row x}
         \\const read = func (m: Matrix) => return
         \\  @f32.add (@f32.add (@f32.add m.a.p m.a.q) (@f32.add m.a.r m.a.s))
         \\    (@f32.add (@f32.add (@f32.add m.b.p m.b.q) (@f32.add m.b.r m.b.s))
@@ -114,9 +114,9 @@ test "numeric nominal adapters preserve frozen Core and types through emission a
 test "nested numeric collection rows preserve frozen evidence through emission and complete OOM" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\type Vector is data = #Vector {x: F32, y: F32}
-        \\type Matrix is data = #Matrix {a: Vector, b: Vector}
-        \\const matrix = func (x: F32) => return #Matrix {a: #Vector {x: x, y: 2.0}, b: #Vector {x: 3.0, y: 4.0}}
+        \\type Vector is data = $Vector {x: F32, y: F32}
+        \\type Matrix is data = $Matrix {a: Vector, b: Vector}
+        \\const matrix = func (x: F32) => return $Matrix {a: $Vector {x: x, y: 2.0}, b: $Vector {x: 3.0, y: 4.0}}
         \\const read = func (value: Matrix) => return value.a.x
         \\const saved = [matrix 1.0, matrix 5.0]
         \\entry const run = func (x: F32) => return do:
@@ -501,12 +501,12 @@ fn collectionIterationEmission(a: std.mem.Allocator, units: []const core.Module,
 test "resolved collection iteration preserves frozen Core retained replay and complete OOM ownership" {
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
-        \\data Maybe a = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const List.iter = func (values: List a) => return @list.cursor values
         \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
-        \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-        \\  else #Nothing
+        \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+        \\  else $Nothing
         \\const fold = func reduce => return func initial => return func values => return do:
         \\  let state = initial
         \\  for value in values:
@@ -531,19 +531,19 @@ test "resolved collection iteration preserves frozen Core retained replay and co
 test "empty ordinary cursor producer preserves partial layout Core replay and complete OOM" {
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
-        \\data Maybe a = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const List.iter = func (values: List a) => return @list.cursor values
         \\const Array.iter = func (values: Array a) => return @array.cursor values
         \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
-        \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-        \\  else #Nothing
+        \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+        \\  else $Nothing
         \\entry const list = func () => return case [].iter.next of
-        \\  #Nothing => 42
-        \\  #Some (_, _) => 0
+        \\  $Nothing => 42
+        \\  $Some (_, _) => 0
         \\entry const array = func () => return case #[].iter.next of
-        \\  #Nothing => 42
-        \\  #Some (_, _) => 0
+        \\  $Nothing => 42
+        \\  $Some (_, _) => 0
     , true);
     defer module.deinit(a);
     const before = @import("../check/core_snapshot_tests.zig").stamp(module);
@@ -561,12 +561,12 @@ test "empty ordinary cursor producer preserves partial layout Core replay and co
 test "leaf List traversal keeps reference carries outside its private root scope through emission failures" {
     const a = std.testing.allocator;
     var module = try lowerWithCatalog(a,
-        \\data Maybe a = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const List.iter = func (values: List a) => return @list.cursor values
         \\const Cursor.next = func (cursor: Cursor collection) => return
         \\  if @cursor.has cursor
-        \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-        \\  else #Nothing
+        \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+        \\  else $Nothing
         \\entry const run = func (count: U32) => return do:
         \\  let values = @list.generate count (func index => return index)
         \\  let carried = @array.fill 1 count
@@ -620,14 +620,14 @@ test "checked scalar builder publications preserve Core replay and every emissio
 }
 
 const immediateStepSource =
-    \\data Maybe a = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
-    \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-    \\  else #Nothing
+    \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+    \\  else $Nothing
     \\entry const run = func (values: Array U32) => return do:
     \\  use step <- (@array.cursor values).next
-    \\  let #Some (value, rest) = step else:
+    \\  let $Some (value, rest) = step else:
     \\    break 0
     \\  break @u32.add value (@u32.add (@cursor.value rest) (@cursor.value (@array.cursor values)))
 ;
@@ -662,8 +662,8 @@ test "immediate collection step requires exact producer constructor and a single
     try std.testing.expect((try stepSinkOf(&module, step)) == null);
     module.nodes[sink.pattern] = pattern;
     for ([_][]const u8{
-        "  let #Some (again, _) = step else:\n    break 0\n  break again\n",
-        "  let read = func () => return step\n  let #Some (again, _) = read () else:\n    break 0\n  break again\n",
+        "  let $Some (again, _) = step else:\n    break 0\n  break again\n",
+        "  let read = func () => return step\n  let $Some (again, _) = read () else:\n    break 0\n  break again\n",
     }) |tail| {
         const text = try std.mem.concat(a, u8, &.{ immediateStepSource[0..std.mem.find(u8, immediateStepSource, "  break @u32.add").?], tail });
         defer a.free(text);
@@ -714,11 +714,11 @@ test "immediate collection step releases every emission allocation failure" {
 }
 
 const localCursorSource =
-    \\data Maybe a = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
-    \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-    \\  else #Nothing
+    \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+    \\  else $Nothing
     \\const progress = func (values: Array U32) => return do:
     \\  let original = @array.cursor values
     \\  let cursor = original
@@ -727,7 +727,7 @@ const localCursorSource =
     \\    if @u32.lt 10000 total:
     \\      break
     \\    use step <- cursor.next
-    \\    let #Some (value, rest) = step else:
+    \\    let $Some (value, rest) = step else:
     \\      break
     \\    total := @u32.add self value
     \\    cursor := rest
@@ -886,7 +886,7 @@ test "persistent List snapshots lazily freeze the descriptor and preserve comple
 
 test "direct collection patterns eliminate transient cells with immutable Core replay and complete OOM" {
     const a = std.testing.allocator;
-    const text = try std.mem.replaceOwned(u8, a, immediateStepSource, "  use step <- (@array.cursor values).next\n  let #Some (value, rest) = step", "  let #Some (value, rest) = (@array.cursor values).next");
+    const text = try std.mem.replaceOwned(u8, a, immediateStepSource, "  use step <- (@array.cursor values).next\n  let $Some (value, rest) = step", "  let $Some (value, rest) = (@array.cursor values).next");
     defer a.free(text);
     var module = try lowerWithCatalog(a, text, true);
     defer module.deinit(a);
@@ -971,12 +971,12 @@ test "collection steps, loops and private cursors keep their physical forms abov
     }
     {
         const text = try padded(a,
-            \\data Maybe a = #Some a | #Nothing
+            \\type Maybe a is data = $Some a | $Nothing
             \\const List.iter = func (values: List a) => return @list.cursor values
             \\const Cursor.next = func (cursor: Cursor collection) => return
             \\  if @cursor.has cursor
-            \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-            \\  else #Nothing
+            \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+            \\  else $Nothing
             \\const fold = func reduce => return func initial => return func values => return do:
             \\  let state = initial
             \\  for value in values:
@@ -1133,12 +1133,12 @@ test "identity generation shares immutable storage without granting either alias
 test "tagged numeric rows preserve frozen evidence and release every emission allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\type Choice is data = #Empty | #One U32 | #Pair {x: U32, y: U32}
-        \\const make = func (i: U32) : Choice => return if @u32.eq i 0 then #Empty else if @u32.eq i 1 then #One i else #Pair {x: i, y: 7}
+        \\type Choice is data = $Empty | $One U32 | $Pair {x: U32, y: U32}
+        \\const make = func (i: U32) : Choice => return if @u32.eq i 0 then $Empty else if @u32.eq i 1 then $One i else $Pair {x: i, y: 7}
         \\const read = func (v: Choice) : U32 => return case v of
-        \\  #Empty => 0
-        \\  #One n => n
-        \\  #Pair (x, y) => @u32.add x y
+        \\  $Empty => 0
+        \\  $One n => n
+        \\  $Pair (x, y) => @u32.add x y
         \\entry const run = func (count: U32) => return do:
         \\  let rows = @array.generate count make
         \\  let total = 0
@@ -1160,9 +1160,9 @@ test "rectangular pipelines prove single use and preserve frozen evidence throug
         \\const generate = func count => return func f => return @array.generate count f
         \\const map = func f => return func values => return generate (@array.length values) (func i => return f values[i])
         \\const flatten = func (chunks: Array (Array a)) => return @array.flatten chunks
-        \\type Command is data = #Command {lanes: Array U32}
+        \\type Command is data = $Command {lanes: Array U32}
         \\entry const run = func (count: U32) => return do:
-        \\  let commands = generate count (func i => return #Command {lanes: generate 24 (func j => return @u32.add (@u32.mul i 24) j)})
+        \\  let commands = generate count (func i => return $Command {lanes: generate 24 (func j => return @u32.add (@u32.mul i 24) j)})
         \\  let chunks = map (func c => return c.lanes) commands
         \\  let lanes = flatten chunks
         \\  break lanes
@@ -1193,13 +1193,13 @@ fn profileEmissionFailures(a: std.mem.Allocator, units: []const core.Module) !vo
 test "executed memory profile owns detached origins metadata and instrumentation through all allocation failures" {
     const a = std.testing.allocator;
     var module = try lower(a,
-        \\type Pair is data = #Pair {a: U32, b: U32}
-        \\const make = func (value: U32) => return #Pair {a: value, b: @u32.add value 1}
+        \\type Pair is data = $Pair {a: U32, b: U32}
+        \\const make = func (value: U32) => return $Pair {a: value, b: @u32.add value 1}
         \\const generate = func count => return func make => return @array.generate count make
         \\entry const run = func (count: U32) => return do:
         \\  let values = generate count make
         \\  let old = values
-        \\  values[0] := #Pair {a: count, b: count}
+        \\  values[0] := $Pair {a: count, b: count}
         \\  break @u32.add old[0].a values[0].a
     );
     defer module.deinit(a);

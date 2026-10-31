@@ -60,8 +60,8 @@ order for physical storage. General runtime function values cannot be stored in
 arrays or exported as callbacks.
 
 Local scalar demands use invocation-local cache flags and scalar locals. They
-evaluate once even when several branches force them, preserving the prelude's
-`&&`/`||` short-circuit behavior without heap memo cells. Demands created by an
+evaluate once even when several branches force them, preserving
+`and`/`or` short-circuit behavior without heap memo cells. Demands created by an
 invocation cannot escape it; aggregate demand results remain unsupported.
 
 The operations remain compiler intrinsics: `@storage.push`, `pop`, `truncate`,
@@ -82,11 +82,12 @@ explicit snapshot. Array growth itself uses `@storage.push` on a capable owner.
 
 ## Application lifetime and host transport
 
-Reachable top-level arrays with literal initializers own permanent slots in each
-Wasm instance. Their scalar and inline-record elements survive exported calls.
-Initializers publish only after completion; a failed initializer can be retried.
-Invocation-local slots are recovered on the next call after a trap. Computed
-global initializers and arrays nested in global records remain pending.
+Reachable top-level arrays own named persistent pools in each Wasm instance.
+Computed initializers populate those pools; their elements survive exported
+calls. Initializers publish only after completion; a failed initializer can be
+retried. Invocation-local owners are recovered on the next call after a trap.
+Frame/access records borrow live pools and must remain within the invocation;
+retained snapshots require explicit copies.
 
 Numeric Array U32/F32 arguments, results and ordinary Foreign callbacks use the
 existing browser/Pen packet format with independent transport scratch. Every
@@ -108,21 +109,27 @@ old backend. Ordinary Foreign suspension remains supported.
 
 ## Data stacks and lifetime checking
 
-The compiler assigns the lowest available stack slot to each owner. A slot's
-addresses never move. Appending extends the initialized extent; there is no
-4096-word array reservation and no relocation. Scope exit releases temporary
-owners, including on return, loop break and continue. Sequential helper calls
-and loop iterations reuse their slots. An owned result preserves its assigned
-stack and transfers its lifetime to the caller. Blocks can return arrays and
-records, and branches retain every possible root behind a selected value.
+The runtime packs fixed extents into nonmoving byte regions and tracks each
+owner independently with an epoch-checked descriptor. Growers extend only at a
+region's top; their addresses never move. Scope exit releases temporary owners,
+including on return, loop break and continue. Sequential calls and loop
+iterations recover temporary extents. Owned results transfer their checked
+lifetime to the caller. Blocks can return arrays and records, and branches
+retain every possible root behind a selected value.
 
-The current planner assigns one stack to each simultaneous array owner. Packing
-several completed variable-sized values into one data stack is still pending.
-Each stack has a 1 MiB bound; Wasm memory is 64 KiB of metadata plus the
-compiled maximum stack count times 1 MiB, with at most 255 slots. Initial and
-maximum memory sizes are equal. Bounds, arithmetic overflow, overlapping growth
-and exhaustion trap before publishing a change. A later invocation recovers
-storage after a trap. Generation numbers never wrap; exhaustion traps instead of
+The current integration configures 2 MiB temporary storage, 256 KiB persistent
+storage, 2 MiB transport scratch and 4096 owner slots. These are the unchanged
+budgets used for the inspected Gdev first frame; see [CONTINUE.md](../CONTINUE.md).
+Unconfigured compiler defaults in `backend/storage_plan.zig` use 1 MiB each for
+temporary, grower and persistent storage, 2 MiB transport and 4096 owners.
+Per-pool persistent lane budgets and explicit reserve requests select the planned
+region capacities without increasing the configured limits.
+
+Wasm memory holds the region table and 28-byte owner entries, rounded up to a
+64 KiB boundary, followed by the planned region capacities. Initial and maximum
+memory sizes are equal. Bounds, arithmetic overflow, overlapping growth and
+exhaustion trap before publishing a change. A later invocation recovers storage
+after a trap. The split generation counter traps on exhaustion rather than
 reviving an old descriptor.
 
 Borrow admission tracks owner identities through aliases, branch joins, records,
@@ -150,25 +157,27 @@ storage contract.
 
 ## Remaining rewrite
 
-The following are not implemented by the new source path and must not be
-advertised as complete:
+The following still require broader implementation or qualification and must
+not be advertised as complete:
 
 - Variable-sized inline elements, single resizable aggregate tails, nominal
   graph-node layouts, and sequential traversal of variable-sized elements.
 - Complete source admission for lists, sum-type patterns, recursive functions,
   all generic layout instances, effects and the remaining collection APIs.
-- Computed/global aggregate initialization, aggregate loop carries and the
-  complete Ink/Gdev world and component-pool migration. Host packets support
-  numeric arrays; arbitrary records and borrowed host pointers are excluded.
-- Packing completed values on shared stacks, reusable function specialization
-  with destination-stack parameters, and tighter root/last-use summaries.
+- Complete library/game coverage beyond the inspected Gdev first frame, including
+  broader aggregate initialization, loop carries and generic call layouts. Host
+  packets support numeric arrays; arbitrary records and borrowed host pointers
+  are excluded.
+- Broader qualification of packed regions, reusable destination calls and
+  root/last-use summaries across the remaining fixtures.
 - Making this planner the default and removing the legacy counted backend,
   followed by full compiler and browser/Pen qualification.
 
 The previous agreed cuts remain: no arbitrary runtime escaping closures,
 escaping memoized demands, or general task execution. Unsupported forms produce
-a diagnostic, not a counted-heap fallback. The old application storage has not
-yet been replaced in Ink/Gdev, and no new gameplay performance claim is made.
+a diagnostic, not a counted-heap fallback. Ink and Gdev now use named owners and copied packets, and one real Gdev main
+frame passed in native Pen. Broader gameplay, recovery, browser and performance
+qualification remain pending; exact evidence lives in CONTINUE.md.
 
 ## Relative links
 

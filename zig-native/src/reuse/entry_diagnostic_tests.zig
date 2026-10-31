@@ -140,8 +140,8 @@ fn anonymousRecordScenario(allocator: std.mem.Allocator) !void {
         "const lower = 0\nentry const x = { lower }\n",
         "entry const x = ({ lower: missing }).lower\n",
         "entry const answer = ({ lower: 42 }).lower\n",
-        "entry const x = #Missing { lower: 0 }\n",
-        "type Box is data = #Box { lower: U32 }\nentry const x = (#Box { lower: 42 }).lower\n",
+        "entry const x = $Missing { lower: 0 }\n",
+        "type Box is data = $Box { lower: U32 }\nentry const x = ($Box { lower: 42 }).lower\n",
     }, 0..) |source, index| {
         var tokens = try lexer.lex(allocator, source);
         defer tokens.deinit(allocator);

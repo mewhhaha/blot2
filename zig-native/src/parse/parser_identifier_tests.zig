@@ -8,25 +8,25 @@ const Case = struct { source: []const u8, valid: bool, start: u32 = 0, end: u32 
 const cases = [_]Case{
     // record_type_upper
     .{ .source =
-    \\type Box is data = #Box { Upper: U32 }
+    \\type Box is data = $Box { Upper: U32 }
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // record_type_lower
     .{ .source =
-    \\type Box is data = #Box { lower: U32 }
+    \\type Box is data = $Box { lower: U32 }
     \\entry const answer = 42
     \\
     , .valid = true },
     // record_type_shorthand_upper
     .{ .source =
-    \\type Box { Upper } is data = #Box { Upper }
+    \\type Box { Upper } is data = $Box { Upper }
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // record_type_shorthand_lower
     .{ .source =
-    \\type Box { lower } is data = #Box { lower }
+    \\type Box { lower } is data = $Box { lower }
     \\entry const answer = 42
     \\
     , .valid = true },
@@ -54,14 +54,14 @@ const cases = [_]Case{
     , .valid = true },
     // named_record_upper
     .{ .source =
-    \\type Box is data = #Box { lower: U32 }
-    \\entry const answer = (#Box { Upper: 42 }).lower
+    \\type Box is data = $Box { lower: U32 }
+    \\entry const answer = ($Box { Upper: 42 }).lower
     \\
     , .valid = false, .start = 39, .end = 44 },
     // named_record_lower
     .{ .source =
-    \\type Box is data = #Box { lower: U32 }
-    \\entry const answer = (#Box { lower: 42 }).lower
+    \\type Box is data = $Box { lower: U32 }
+    \\entry const answer = ($Box { lower: 42 }).lower
     \\
     , .valid = true },
     // record_pun_upper
@@ -78,25 +78,13 @@ const cases = [_]Case{
     , .valid = true },
     // data_name_lower
     .{ .source =
-    \\type box is data = #Box U32
+    \\type box is data = $Box U32
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // data_name_upper
     .{ .source =
-    \\type Box is data = #Box U32
-    \\entry const answer = 42
-    \\
-    , .valid = true },
-    // legacy_data_name_lower
-    .{ .source =
-    \\data box = #Box U32
-    \\entry const answer = 42
-    \\
-    , .valid = false, .start = 0, .end = 4 },
-    // legacy_data_name_upper
-    .{ .source =
-    \\data Box = #Box U32
+    \\type Box is data = $Box U32
     \\entry const answer = 42
     \\
     , .valid = true },
@@ -114,62 +102,62 @@ const cases = [_]Case{
     , .valid = true },
     // data_name_qualified
     .{ .source =
-    \\type ns.Box is data = #Box U32
+    \\type ns.Box is data = $Box U32
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // constructor_decl_lower
     .{ .source =
-    \\type Box is data = #box U32
+    \\type Box is data = $box U32
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // constructor_decl_upper
     .{ .source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\entry const answer = 42
     \\
     , .valid = true },
     // constructor_decl_qualified
     .{ .source =
-    \\type Box is data = #Ns.Box U32
+    \\type Box is data = $Ns.Box U32
     \\entry const answer = 42
     \\
     , .valid = false, .start = 0, .end = 4 },
     // constructor_pattern_lower
     .{ .source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\entry const answer = func value => return case value of
-    \\  #box amount => amount
+    \\  $box amount => amount
     \\
     , .valid = false, .start = 28, .end = 33 },
     // constructor_pattern_qualified_lower
     .{ .source =
     \\entry const answer = func value => return case value of
-    \\  #ns.box amount => amount
+    \\  $ns.box amount => amount
     \\
     , .valid = false, .start = 0, .end = 5 },
     // constructor_pattern_upper
     .{ .source =
-    \\type Box is data = #Box U32
-    \\entry const answer = func () => return case #Box 42 of
-    \\  #Box amount => amount
+    \\type Box is data = $Box U32
+    \\entry const answer = func () => return case $Box 42 of
+    \\  $Box amount => amount
     \\
     , .valid = true },
     // qualified_selector_upper
     .{ .source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const Box.Upper = func box => return case box of
-    \\  #Box value => value
-    \\entry const answer = (#Box 42).Upper
+    \\  $Box value => value
+    \\entry const answer = ($Box 42).Upper
     \\
     , .valid = true },
     // bare_selector_upper
     .{ .source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const Box.Upper = func box => return case box of
-    \\  #Box value => value
-    \\entry const answer = .Upper (#Box 42)
+    \\  $Box value => value
+    \\entry const answer = .Upper ($Box 42)
     \\
     , .valid = true },
     // qualified_global_upper
@@ -342,17 +330,17 @@ const cases = [_]Case{
     , .valid = true },
     // constructor_record_pattern
     .{ .source =
-    \\type Box is data = #Box { first: U32 }
+    \\type Box is data = $Box { first: U32 }
     \\entry const answer = func () => return do:
-    \\  let #Box { first } = #Box { first: 42 }
+    \\  let $Box { first } = $Box { first: 42 }
     \\  break first
     \\
     , .valid = true },
     // constructor_record_pattern_upper_field
     .{ .source =
-    \\type Box is data = #Box { first: U32 }
+    \\type Box is data = $Box { first: U32 }
     \\entry const answer = func () => return do:
-    \\  let #Box { First } = #Box { first: 42 }
+    \\  let $Box { First } = $Box { first: 42 }
     \\  break 42
     \\
     , .valid = false, .start = 39, .end = 44 },
@@ -398,15 +386,15 @@ const cases = [_]Case{
     // named_constructor_upper_legal
     .{ .source =
     \\import { Box as Renamed } from "./library"
-    \\entry const answer = func () => return case #Renamed 42 of
-    \\  #Renamed value => value
+    \\entry const answer = func () => return case $Renamed 42 of
+    \\  $Renamed value => value
     \\
     , .valid = true },
     // qualified_constructor_upper_legal
     .{ .source =
     \\import * as library from "./library"
-    \\entry const answer = func () => return case #library.Box 42 of
-    \\  #library.Box value => value
+    \\entry const answer = func () => return case $library.Box 42 of
+    \\  $library.Box value => value
     \\
     , .valid = true },
 };

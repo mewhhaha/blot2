@@ -282,7 +282,7 @@ Private source, failures and measurements are retained at
 
 ## Direct constructor sinks, 15 October 2026
 
-A direct `let #Some (value, rest) = cursor.next` now uses the existing exact
+A direct `let $Some (value, rest) = cursor.next` now uses the existing exact
 ordinary producer proof and closed private cursor-family analysis, just like an
 immediately adjacent step binding. Both spellings preserve receiver evaluation,
 field order, failure control and normal owning reference publications. Saved

@@ -13,8 +13,8 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
   const depth = 6;
   const repetitions = 2 ** depth;
   const lib = [
-    "type Count is data = #Count U32",
-    "type Other is data = #Other U32",
+    "type Count is data = $Count U32",
+    "type Other is data = $Other U32",
   ];
   for (
     const [kind, invocation] of [
@@ -25,7 +25,7 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
   ) {
     lib.push(
       `const ${kind}_0 = func callback => return func value => return do:`,
-      "  let compared = @type.same #Count #Other",
+      "  let compared = @type.same $Count $Other",
       `  use result <- ${invocation}`,
       "  break result",
     );
@@ -166,12 +166,12 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
   const library = `${directory}/library.blot`;
   const source = (invalid: boolean) =>
     [
-      "type Count is data = #Count U32",
-      "const Count.add: Count -> Count -> Count = func left => return func right => return case left, right of\n  #Count a, #Count b => #Count (@u32.add a b)",
+      "type Count is data = $Count U32",
+      "const Count.add: Count -> Count -> Count = func left => return func right => return case left, right of\n  $Count a, $Count b => $Count (@u32.add a b)",
       `const callback: a -> a where { associated "${
         invalid ? "missing" : "add"
-      }" a Count a } = func value => return @type.call "add" value (#Count 1)`,
-      'const invoke_0 = func callback => return func value => return do:\n  use next <- callback value\n  break @type.call "add" next (#Count 1)',
+      }" a Count a } = func value => return @type.call "add" value ($Count 1)`,
+      'const invoke_0 = func callback => return func value => return do:\n  use next <- callback value\n  break @type.call "add" next ($Count 1)',
       ...Array.from({ length: 6 }, (_, i) =>
         `const invoke_${
           i + 1
@@ -185,9 +185,9 @@ Deno.test("predicate bearing callback witnesses remain mandatory for invoked and
       'import { Count, callback, factory, unused } from "./library"',
       "entry const answer = func (value: U32) => return do:",
       "  let checked: Count -> Count = callback",
-      `  let #Count result = ${
+      `  let $Count result = ${
         unused ? "unused" : "factory"
-      } checked (#Count value)`,
+      } checked ($Count value)`,
       "  break result",
       "",
     ].join("\n");

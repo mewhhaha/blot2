@@ -6,7 +6,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 const program = `import * as iter from "std/iter"
-type Log is data = #Log {calls: U32, trace: U32}
+type Log is data = $Log {calls: U32, trace: U32}
 const sum = iter.fold_left add 0
 const biased = iter.fold_left (func total => return func value => return total + value + 3) 10
 const add_float = func (total: F32) => return func (value: F32) => return @f32.add total value
@@ -16,8 +16,8 @@ const collect = iter.fold_left append [100]
 const collect_float = iter.fold_left append [1.25]
 const collect_refs = iter.fold_left (func values => return func value => return [...values, #[value, value + 1]]) [#[100, 101]]
 const traced_add = func total => return func value => return do:
-  use log <- @state.get #Log
-  use @state.set (#Log {calls: log.calls + 1, trace: log.trace * 31 + value + 1})
+  use log <- @state.get $Log
+  use @state.set ($Log {calls: log.calls + 1, trace: log.trace * 31 + value + 1})
   return total + value
 const traced_sum = iter.fold_left traced_add 0
 entry const pure = func count => return sum (iter.range 0 count)
@@ -37,16 +37,16 @@ entry const reference_rows = func count => return do:
     total := self + value[0] + value[1]
   return total + pressure[2047] - 99
 entry const effects = func count => return do:
-  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (func () => return traced_sum (iter.range 0 count))
+  let (log, answer) = @state.run ($Log {calls: 0, trace: 0}) (func () => return traced_sum (iter.range 0 count))
   return #[log.calls, log.trace, answer]
 const event = func value => return do:
-  use log <- @state.get #Log
-  use @state.set (#Log {calls: log.calls + 1, trace: log.trace * 31 + value})
+  use log <- @state.get $Log
+  use @state.set ($Log {calls: log.calls + 1, trace: log.trace * 31 + value})
   return value
 const apply = func callback => return func first => return func second => return callback first second
 const selected = apply add
 entry const argument_order = func seed => return do:
-  let (log, answer) = @state.run (#Log {calls: 0, trace: 0}) (func () => return do:
+  let (log, answer) = @state.run ($Log {calls: 0, trace: 0}) (func () => return do:
     use first <- event seed
     use second <- event (seed + 1)
     return selected first second)

@@ -1,8 +1,6 @@
 // The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
 // Operators use ordinary functions with compile-time associated dispatch.
 infixr 0 ($) = apply
-infixr 20 (||) = or
-infixr 25 (&&) = and
 infixl 5 (|>) = pipe
 infix 30 (==) = eq
 infix 30 (!=) = ne
@@ -39,10 +37,10 @@ const le = func left => return func right => return @type.call "le" left right
 const gt = func left => return func right => return @type.call "gt" left right
 const ge = func left => return func right => return @type.call "ge" left right
 
-type Maybe a is data = #Some a | #Nothing
-type Result [value, error] is data = #Ok value | #Err error
-type Iteration [state, result] is data = #Continue state | #Done result
-type Type witness is data = #Type witness
+type Maybe a is data = $Some a | $Nothing
+type Result [value, error] is data = $Ok value | $Err error
+type Iteration [state, result] is data = $Continue state | $Done result
+type Type witness is data = $Type witness
 
 // The expected result selects its type's ordinary `from` member.
 const from = func value => return @type.result "from" value
@@ -68,7 +66,7 @@ const Bool.not = func value => return case value of
   false => true
 
 const Type.eq = func left => return func right => return case left, right of
-  #Type a, #Type b => @type.same a b
+  $Type a, $Type b => @type.same a b
 const Type.ne = func left => return func right => return Bool.not (Type.eq left right)
 
 const U32.add = func left => return func right => return @u32.add left right
@@ -214,85 +212,79 @@ const smoothstep = func low => return func high => return func value => return d
   let t = saturate ((value - low) / (high - low))
   break t * t * (3.0 - 2.0 * t)
 
-const Maybe.pure = func value => return #Some value
+const Maybe.pure = func value => return $Some value
 const Maybe.map = func transform => return func candidate => return case candidate of
-  #Some value => #Some (transform value)
-  #Nothing => #Nothing
+  $Some value => $Some (transform value)
+  $Nothing => $Nothing
 const Maybe.bind = func candidate => return func next => return case candidate of
-  #Some value => next value
-  #Nothing => #Nothing
+  $Some value => next value
+  $Nothing => $Nothing
 // Finish each callback before advancing, so iteration uses constant stack.
 const Maybe.iterate = func initial => return func step => return do:
   let state = initial
   for ever:
     use candidate <- step state
-    if let #Some (#Done result) = candidate:
-      break #Some result
-    let #Some (#Continue next) = candidate else:
-      break #Nothing
+    if let $Some ($Done result) = candidate:
+      break $Some result
+    let $Some ($Continue next) = candidate else:
+      break $Nothing
     state := next
 const Maybe.unwrap_or = func fallback => return func candidate => return case candidate of
-  #Some value => value
-  #Nothing => fallback
+  $Some value => value
+  $Nothing => fallback
 const Maybe.is_some = func candidate => return case candidate of
-  #Some _ => true
-  #Nothing => false
+  $Some _ => true
+  $Nothing => false
 const Maybe.filter = func predicate => return func candidate => return case candidate of
-  #Some value => case predicate value of
+  $Some value => case predicate value of
     true => candidate
-    false => #Nothing
-  #Nothing => #Nothing
+    false => $Nothing
+  $Nothing => $Nothing
 const Maybe.flatten = func candidate => return case candidate of
-  #Some inner => inner
-  #Nothing => #Nothing
+  $Some inner => inner
+  $Nothing => $Nothing
 const Maybe.unwrap_or_else = func ~fallback => return func candidate => return case candidate of
-  #Some value => value
-  #Nothing => @force fallback
+  $Some value => value
+  $Nothing => @demand fallback
 const Maybe.to_result = func error => return func candidate => return case candidate of
-  #Some value => #Ok value
-  #Nothing => #Err error
+  $Some value => $Ok value
+  $Nothing => $Err error
 
-const Result.pure = func value => return #Ok value
+const Result.pure = func value => return $Ok value
 const Result.map = func transform => return func candidate => return case candidate of
-  #Ok value => #Ok (transform value)
-  #Err error => #Err error
+  $Ok value => $Ok (transform value)
+  $Err error => $Err error
 const Result.map_error = func transform => return func candidate => return case candidate of
-  #Ok value => #Ok value
-  #Err error => #Err (transform error)
+  $Ok value => $Ok value
+  $Err error => $Err (transform error)
 const Result.bind = func candidate => return func next => return case candidate of
-  #Ok value => next value
-  #Err error => #Err error
+  $Ok value => next value
+  $Err error => $Err error
 const Result.iterate = func initial => return func step => return do:
   let state = initial
   for ever:
     use candidate <- step state
     let (next, finished) = case candidate of
-      #Ok (#Continue next) => (next, #Nothing)
-      #Ok (#Done result) => (state, #Some (#Ok result))
-      #Err error => (state, #Some (#Err error))
-    if let #Some result = finished:
+      $Ok ($Continue next) => (next, $Nothing)
+      $Ok ($Done result) => (state, $Some ($Ok result))
+      $Err error => (state, $Some ($Err error))
+    if let $Some result = finished:
       break result
     state := next
 const Result.unwrap_or = func fallback => return func candidate => return case candidate of
-  #Ok value => value
-  #Err _ => fallback
+  $Ok value => value
+  $Err _ => fallback
 const Result.to_maybe = func candidate => return case candidate of
-  #Ok value => #Some value
-  #Err _ => #Nothing
+  $Ok value => $Some value
+  $Err _ => $Nothing
 
 const Array.length: Array a -> U32 = func values => return @array.length values
 const Array.is_empty: Array a -> Bool = func values => return Array.length values == 0
 const Array.get: Array a -> U32 -> Maybe a = func values => return func index => return do:
   if index < Array.length values:
-    break #Some (@array.get values index)
-  break #Nothing
+    break $Some (@array.get values index)
+  break $Nothing
 const Array.set: Array a -> U32 -> a -> Maybe (Array a) = func values => return func index => return func value => return do:
   if index < Array.length values:
-    break #Some (@array.set values index value)
-  break #Nothing
-
-// Ordinary source functions; the checked ~ parameter retains its demand mode.
-const and = func (left: Bool) => return func ~(right: Bool) => return
-  if left then @force right else false
-const or = func (left: Bool) => return func ~(right: Bool) => return
-  if left then true else @force right
+    break $Some (@array.set values index value)
+  break $Nothing

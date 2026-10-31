@@ -10,7 +10,7 @@ const source = `const progress = func count => return func values => return do:
     if index == count:
       break
     use step <- cursor.next
-    let #Some (_, rest) = step else:
+    let $Some (_, rest) = step else:
       break
     cursor := rest
     index := self + 1
@@ -30,7 +30,7 @@ entry const redirected = func (count: U32) => return do:
       cursor := (@list.fill 2 99).iter
       break
     use step <- cursor.next
-    let #Some (_, rest) = step else:
+    let $Some (_, rest) = step else:
       break
     cursor := rest
     index := self + 1
@@ -45,7 +45,7 @@ entry const references = func (count: U32) => return do:
     if index == count:
       break
     use step <- cursor.next
-    let #Some (value, rest) = step else:
+    let $Some (value, rest) = step else:
       break
     saved := value
     cursor := rest
@@ -64,7 +64,7 @@ entry const captured = func (count: U32) => return do:
     if index == count:
       break
     use step <- cursor.next
-    let #Some (_, rest) = step else:
+    let $Some (_, rest) = step else:
       break
     cursor := rest
     index := self + 1
@@ -78,7 +78,7 @@ entry const unknown = func (count: U32) => return do:
     if index == count:
       break
     use step <- cursor.next
-    let #Some (value, rest) = step else:
+    let $Some (value, rest) = step else:
       break
     total := self + observe cursor + value
     cursor := rest
@@ -91,7 +91,7 @@ entry const suspend = func (host: U32 -> U32 ! {Foreign}) => return do:
   let index = 0
   for index in 0..300:
     use step <- cursor.next
-    let #Some (value, rest) = step else:
+    let $Some (value, rest) = step else:
       break 999
     use actual <- host value
     total := self + actual

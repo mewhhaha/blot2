@@ -147,18 +147,18 @@ Deno.test("summary build pulls once and queries do not repull effects", async ()
   await compileAndRun(
     `
 import * as summary from "std/summary"
-type Input is data = #Input {index: U32, count: U32, host: U32 -> U32 ! {Foreign}}
+type Input is data = $Input {index: U32, count: U32, host: U32 -> U32 ! {Foreign}}
 const Input.iter = func (cursor: Input) => return do:
   use cursor.host 777
   break cursor
 const Input.next = func (cursor: Input) => return do:
   use value <- cursor.host cursor.index
   if @u32.eq cursor.index cursor.count:
-    break #Nothing
-  break #Some (value, #Input {index: @u32.add cursor.index 1, count: cursor.count, host: cursor.host})
+    break $Nothing
+  break $Some (value, $Input {index: @u32.add cursor.index 1, count: cursor.count, host: cursor.host})
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
 entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
-  use tree <- summary.build add 0 (#Input {index: 0, count: 7, host})
+  use tree <- summary.build add 0 ($Input {index: 0, count: 7, host})
   let changed = summary.set add 3 99 tree
   let joined = summary.concat add tree changed
   break #[summary.query add 0 0 7 tree, summary.query add 0 0 14 joined, summary.get 3 tree, summary.get 3 changed]
@@ -277,7 +277,7 @@ entry const old = func () => return summary.query combine #[] 0 32 original
 entry const updated = func (index: U32) => return summary.query combine #[] 0 32 (summary.set combine index #[99] original)
 entry const first = func () => return do:
   use step <- cursor.next
-  let #Some (value, _) = step else:
+  let $Some (value, _) = step else:
     break 999
   break value
 entry const pressure = func (count: U32) => return @array.fill count 88

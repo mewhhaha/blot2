@@ -102,7 +102,7 @@ fn rejectedRows(allocator: std.mem.Allocator) !void {
         .{ .source = "const outer = func () => return do:\n  let invoke = func (callback: Unit -> U32 ! {| e}) => return callback ()\n  break func (value: e) => return value\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let invoke" },
         .{ .source = "const outer = func () => return do:\n  let identity = func (value: e) => return value\n  break func (callback: Unit -> U32 ! {| e}) => return callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "let identity" },
         .{ .source = "type State a is effect = { get: Unit -> a }\nconst bad = func (callback: Unit -> U32 ! {State.get e | e}) => return callback ()\nentry const answer = 42\n", .code = .annotation_kind_mismatch, .marker = "e | e" },
-        .{ .source = "type Box is data = #Box { callback: Unit -> U32 ! {| e} }\nentry const answer = 42\n", .code = .invalid_effect_annotation, .marker = "e}" },
+        .{ .source = "type Box is data = $Box { callback: Unit -> U32 ! {| e} }\nentry const answer = 42\n", .code = .invalid_effect_annotation, .marker = "e}" },
         .{ .source = "const pure = func (callback: Unit -> U32) => return callback ()\nconst bad = func (callback: Unit -> U32 ! {Foreign | e}) => return pure callback\nentry const answer = 42\n", .code = .effect_mismatch, .marker = "pure callback" },
     };
     for (cases) |item| {

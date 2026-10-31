@@ -1,18 +1,18 @@
-data Maybe a = #Some a | #None
+type Maybe a is data = $Some a | $None
 entry const guard_bound = func (flag:Bool) => return do:
-  let #Some value = if flag then #Some 42 else #None else:
+  let $Some value = if flag then $Some 42 else $None else:
     let stop = @panic "bound"
   break value
 entry const guard_wild = func (flag:Bool) => return do:
-  let #Some value = if flag then #Some 42 else #None else:
+  let $Some value = if flag then $Some 42 else $None else:
     let _ = @panic "wildcard"
   break value
 entry const guard_tuple = func (flag:Bool) => return do:
-  let #Some value = if flag then #Some 42 else #None else:
+  let $Some value = if flag then $Some 42 else $None else:
     let (left,right) = @panic "tuple"
   break value
 entry const guard_float = func (flag:Bool) => return do:
-  let #Some value = if flag then #Some 42.5 else #None else:
+  let $Some value = if flag then $Some 42.5 else $None else:
     let (left,right) = @panic "float tuple"
   break value
 entry const tuple_panic: Unit -> U32 = func () => return do:
@@ -27,7 +27,7 @@ entry const partial_value = func (flag:Bool) => return do:
 entry const folded = guard_tuple (@u32.eq 1 1)
 entry const observed = func (host: Unit -> U32 ! {Foreign}) => return do:
   use flag <- host ()
-  let #Some value = if @u32.eq flag 0 then #None else #Some 42 else:
+  let $Some value = if @u32.eq flag 0 then $None else $Some 42 else:
     host ()
     let (left,right) = @panic "after host"
   break value

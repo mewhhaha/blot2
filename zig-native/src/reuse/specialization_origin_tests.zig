@@ -40,7 +40,7 @@ test "specialization dispatch keeps its definition beside the outermost use" {
         .{ .source = "const add=func a=> return func b=> return @type.call \"add\" a b\nconst forward=func a=> return func b=> return add a b\nentry const answer=func()=> return do:\n  let x=forward true false\n  break 7\n", .use = "forward true false", .definition = "@type.call \"add\" a b" },
         .{ .source = "const twice=func f=> return func x=> return f (f x)\nentry const answer=func()=> return do:\n  let x=twice (func v=> return @type.call \"add\" v v) true\n  break 7\n", .use = "twice (func v=> return @type.call \"add\" v v) true", .definition = "@type.call \"add\" v v" },
         .{ .source = "const add=func a=> return func b=> return @type.call \"add\" a b\nentry const answer=do:\n  let x=add true false\n  break 7\n", .use = "add true false", .definition = "@type.call \"add\" a b" },
-        .{ .source = "type Box is data=#Box U32\nconst convert=func v=> return @type.result \"from\" v\nentry const answer=func()=> return do:\n  let value: Box=convert 1\n  break 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
+        .{ .source = "type Box is data= $Box U32\nconst convert=func v=> return @type.result \"from\" v\nentry const answer=func()=> return do:\n  let value: Box=convert 1\n  break 7\n", .use = "convert 1", .definition = "@type.result \"from\" v" },
     };
     for (cases) |case| {
         const diagnostic = try diagnose(case.source);

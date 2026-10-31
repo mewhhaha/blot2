@@ -44,7 +44,7 @@ entry const floating = func (count: U32) : Array F32 => return do:
 Deno.test("persistent versions survive aliases captures state calls and iterator borrows", async () => {
   await compileAndRun(
     `
-data Cell value = #Cell value
+type Cell value is data = $Cell value
 const stored = #[1, 2]
 const read = func values => return values[1]
 const delay = func ~value => return value
@@ -62,7 +62,7 @@ entry const suspended = func () => return do:
   let values = #[1, 2]
   let before = delay values
   values[1] := 9
-  break @u32.add (@array.get (@force before) 1) values[1]
+  break @u32.add (@array.get (@demand before) 1) values[1]
 entry const iterator = func () => return do:
   let values = #[1, 2]
   let sum = 0
@@ -79,9 +79,9 @@ entry const global = func () => return do:
   break @u32.add stored[1] values[1]
 entry const retained = func () => return do:
   let values = #[1, 2]
-  let state = #Cell values
+  let state = $Cell values
   values[1] := 9
-  let (#Cell before, _) = @state.run state (func () => return ())
+  let ($Cell before, _) = @state.run state (func () => return ())
   break @u32.add before[1] values[1]
 entry const calls = func () => return do:
   let values = #[1, 2]
@@ -220,9 +220,9 @@ entry const match_read = func (n: U32) : F32 => return do:
 Deno.test("surviving aliases of a borrowed array keep the copy", async () => {
   await compileAndRun(
     `
-data Cell value = #Cell value
+type Cell value is data = $Cell value
 const pass = func values => return values
-const wrap = func values => return #Cell values
+const wrap = func values => return $Cell values
 const pair = func values => return (values, 1)
 const first = func values => return values[0]
 const reader = func values => return func index => return values[index]
@@ -256,7 +256,7 @@ entry const stored = func (n: U32) => return do:
   let values = @array.fill n 1
   let sum = 0
   for i in 0..n:
-    let #Cell before = wrap values
+    let $Cell before = wrap values
     values[i] := 9
     sum := sum + before[i]
   break sum

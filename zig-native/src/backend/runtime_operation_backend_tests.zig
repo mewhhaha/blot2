@@ -1743,9 +1743,9 @@ test "unrestricted associated equations reject direct and hidden lifetime author
         "type Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = shared U32 }\n",
         "type Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = once (Unit -> U32) }\n",
         "type Source a is contract = { type Item = shared U32 }\n",
-        "type Hidden is data = #Hidden (unique U32)\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
+        "type Hidden is data = $Hidden (unique U32)\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
         "opaque type Hidden = shared U32\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
-        "type Hidden is data = #Hidden (shared U32)\ntype Source a is contract = { type Item = Hidden }\n",
+        "type Hidden is data = $Hidden (shared U32)\ntype Source a is contract = { type Item = Hidden }\n",
         "type Source a is contract = { type Item }\nimpl All a : Source a = { type Item = a }\nconst keep: unique U32 -> (Source.Item (unique U32)) = func value => return value\n",
     };
     for (sources) |source| try rejectsAssociatedUsage(a, source);
@@ -1763,7 +1763,7 @@ fn expectAssociatedError(expected: anyerror, result: anytype) !void {
 
 fn associatedUsageReader(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
-        \\type Hidden is data = #Hidden (shared U32)
+        \\type Hidden is data = $Hidden (shared U32)
         \\opaque type Sealed = shared U32
         \\type Source a is contract = { type Item }
         \\impl Number : Source U32 = { type Item = U32 }
@@ -1827,7 +1827,7 @@ const AssociatedUsageHost = struct {
 };
 fn associatedUsageSelection(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
-        \\type Hidden is data = #Hidden (shared U32)
+        \\type Hidden is data = $Hidden (shared U32)
         \\type Source a is contract = { type Item }
         \\impl All a : Source a = { type Item = a }
         \\type Fixed a is contract = { type Item = a }
@@ -2114,7 +2114,7 @@ fn activationIntersectionMutants(module: *@import("wasm.zig").Module, model: @im
     }
     try std.testing.expect(field_mutant);
     const full = @import("fixtures").source("provider-fixtures/lifetime-cost.blot");
-    const changed = try std.mem.replaceOwned(u8, a, full, "get (func () => return #End)", "#End");
+    const changed = try std.mem.replaceOwned(u8, a, full, "get (func () => return $End)", "$End");
     defer a.free(changed);
     var changed_source = try lowerCatalog(a, changed, true);
     defer changed_source.deinit(a);

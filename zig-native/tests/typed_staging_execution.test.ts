@@ -447,21 +447,21 @@ const floating = @code.quote (choose true (identity 1.5) (identity 2.5))
       );
     }
     if (helper === "nominal") {
-      library = `type Packet a is data = #Packet {item: a}
+      library = `type Packet a is data = $Packet {item: a}
 const helper = func (value: U32) => return @u32.add value 2
-const twice = func (value: U32) => return #Packet {item: helper (helper value)}
+const twice = func (value: U32) => return $Packet {item: helper (helper value)}
 const make = func (value: U32) => return @code.quote (twice (@code.lift value)).item
 const callable = @code.quote (func (value: U32) => return (twice value).item)
 `;
     }
     if (nominalRead) {
-      library = `type Packet a is data = #Packet {item: a, shadow: a}
+      library = `type Packet a is data = $Packet {item: a, shadow: a}
 const helper = func (value: U32) => return @u32.add value 2
 const read = func (packet: Packet a) => return packet.item
-const twice = func (value: U32) => return read (#Packet {item: helper (helper value), shadow: 0})
+const twice = func (value: U32) => return read ($Packet {item: helper (helper value), shadow: 0})
 const make = func (value: U32) => return @code.quote (twice (@code.lift value))
 const callable = @code.quote (func (value: U32) => return twice value)
-const float_callable = @code.quote (func (value: F32) => return read (#Packet {shadow: 9.5, item: value}))
+const float_callable = @code.quote (func (value: F32) => return read ($Packet {shadow: 9.5, item: value}))
 `;
       source =
         source.replace("{make, callable}", "{make, callable, float_callable}") +
@@ -703,13 +703,13 @@ Deno.test("imported typed generators lift nominal payloads through edits and res
 entry const answer = func () => return @u32.add (@code.emit generated) (@code.emit empty)
 entry const same = @descriptor.same description.result (@code.describe generated).result
 `;
-  const library = `type Packet a is data = #Packet {item: a}
-type Option a is data = #Absent | #Present a
+  const library = `type Packet a is data = $Packet {item: a}
+type Option a is data = $Absent | $Present a
 const make = func (value: Option (Packet U32)) => return @code.quote (case @code.lift value of
-  #Absent => 0
-  #Present (#Packet item) => item)
-const generated = make (#Present (#Packet {item: 42}))
-const empty = make #Absent
+  $Absent => 0
+  $Present ($Packet item) => item)
+const generated = make ($Present ($Packet {item: 42}))
+const empty = make $Absent
 const description = @code.describe generated
 `;
   const options = {
@@ -789,10 +789,10 @@ const description = @code.describe generated
 
 Deno.test("nominal lifts reject hidden callable payloads before publication", async () => {
   await compileExpectedFailure(
-    `type Hidden is data = #Hidden (Unit -> U32)
-const generated = @code.quote (@code.lift (#Hidden (func () => return 42)))
+    `type Hidden is data = $Hidden (Unit -> U32)
+const generated = @code.quote (@code.lift ($Hidden (func () => return 42)))
 entry const answer = func () => return case @code.emit generated of
-  #Hidden callback => callback ()
+  $Hidden callback => callback ()
 `,
     "cross_stage_authority",
     undefined,
@@ -814,10 +814,10 @@ entry const same = @descriptor.same fields.item (@code.describe (@code.quote 1))
 entry const common = @descriptor.same shared.value (@code.describe (@code.quote true)).result
 entry const answer = func () => return (@code.emit future).item
 `;
-  const library = `type Packet a is data = #Packet {item: a, flag: Bool}
-type Choice a is data = #Left {value: a, left: U32} | #Right {value: a, right: Bool}
-const future = @code.quote #Packet {item: 42, flag: true}
-const choice = @code.quote #Left {value: true, left: 1}
+  const library = `type Packet a is data = $Packet {item: a, flag: Bool}
+type Choice a is data = $Left {value: a, left: U32} | $Right {value: a, right: Bool}
+const future = @code.quote $Packet {item: 42, flag: true}
+const choice = @code.quote $Left {value: true, left: 1}
 `;
   try {
     for (const codegenTier of ["optimized", "development"] as const) {

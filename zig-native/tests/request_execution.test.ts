@@ -109,7 +109,7 @@ entry const answer = func () => return do:
     name: "cancelled demand forcing remains suspended for a later handler",
     source: `
 type Validate is effect = { check: U32 -> U32 }
-const keep = func ~value => return func () => return @force value
+const keep = func ~value => return func () => return @demand value
 const checked = func stop => return func computation => return do:
   for request in @requests computation:
     case request of
@@ -750,10 +750,10 @@ entry const answer = func () => return do:
 Deno.test("request runtime: monadic block surrounds a plain request runner", async () => {
   await compileAndRun(
     `type Validate is effect = { check: U32 -> U32 }
-type Box value is data = #Box value
-const Box.pure = func value => return #Box value
+type Box value is data = $Box value
+const Box.pure = func value => return $Box value
 const Box.bind = func candidate => return func next => return case candidate of
-  #Box value => next value
+  $Box value => next value
 const checked = func computation => return do (@do.monad Box):
   let selected = do:
     for request in @requests computation:
@@ -766,7 +766,7 @@ const checked = func computation => return do (@do.monad Box):
           break 41.0
   break selected
 entry const answer = func (index: U32) => return do:
-  let #Box value = checked (@computation (func () => return do:
+  let $Box value = checked (@computation (func () => return do:
     use Validate.check index
     break ()
   ))
@@ -821,7 +821,7 @@ Deno.test("request runtime: factory capture snapshots survive later rebinding an
 
 Deno.test("request runtime: effectful action factory runs exactly once across repeated handlers", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst counted = func action => return do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 20\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    use computation <- counted (func () => return Tick.read ())\n    let first = handled computation\n    let second = handled computation\n    break @u32.add first second\n  )\n  break @u32.add count value\nentry const folded = answer ()\n',
+    'type Count value is data = $Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst counted = func action => return do:\n  use previous <- @state.get witness\n  let $Count old = previous\n  use @state.set ($Count (@u32.add old 1))\n  break @computation action\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 20\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let ($Count count, value) = @state.run ($Count 0) (func () => return do:\n    use computation <- counted (func () => return Tick.read ())\n    let first = handled computation\n    let second = handled computation\n    break @u32.add first second\n  )\n  break @u32.add count value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 41);
@@ -833,7 +833,7 @@ Deno.test("request runtime: effectful action factory runs exactly once across re
 
 Deno.test("request runtime: effectful factory creates its own unconstrained action once", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst make = func () => return do:\n  use previous <- @state.get witness\n  let #Count old = previous\n  use @state.set (#Count (@u32.add old 1))\n  break @computation (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled unconstrained computation continued"\n  )\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
+    'type Count value is data = $Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst make = func () => return do:\n  use previous <- @state.get witness\n  let $Count old = previous\n  use @state.set ($Count (@u32.add old 1))\n  break @computation (func () => return do:\n    use Tick.read ()\n    break @panic "cancelled unconstrained computation continued"\n  )\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let ($Count count, value) = @state.run ($Count 0) (func () => return do:\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 86);
@@ -986,7 +986,7 @@ Deno.test("request runtime: local retained factory selects the checked F32 actio
 
 Deno.test("request runtime: effectful local action factory executes once before repeated handlers", async () => {
   await compileAndRun(
-    'data Count value = #Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Count count, value) = @state.run (#Count 0) (func () => return do:\n    let make = func () => return do:\n      use previous <- @state.get witness\n      let #Count old = previous\n      use @state.set (#Count (@u32.add old 1))\n      break @computation (func () => return do:\n        use Tick.read ()\n        break @panic "cancelled unconstrained computation continued"\n      )\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
+    'type Count value is data = $Count value\ntype Tick is effect = { read: Unit -> U32 }\nconst witness = func () : Count U32 => return @panic "type witness executed"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        break 42.5\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let ($Count count, value) = @state.run ($Count 0) (func () => return do:\n    let make = func () => return do:\n      use previous <- @state.get witness\n      let $Count old = previous\n      use @state.set ($Count (@u32.add old 1))\n      break @computation (func () => return do:\n        use Tick.read ()\n        break @panic "cancelled unconstrained computation continued"\n      )\n    use computation <- make ()\n    let first = handled computation\n    let second = handled computation\n    break @f32.add first second\n  )\n  break @f32.add (@u32.to_f32 count) value\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 86);
@@ -1034,7 +1034,7 @@ Deno.test("request runtime: nested captured local factories retain source certif
 
 Deno.test("request runtime: factory-created demanded action retains source row and memo state", async () => {
   await compileAndRun(
-    "type Tick is effect = { read: Unit -> F32 }\nconst keep = func ~value => return func () => return @force value\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 42.5\n      complete value =>\n        break value\nconst create = func action => return do:\n  let delayed = keep (action ())\n  break @computation (func () => return delayed ())\nentry const answer = func () => return do:\n  let computation = create (func () => return Tick.read ())\n  break handled computation\nentry const folded = answer ()\n",
+    "type Tick is effect = { read: Unit -> F32 }\nconst keep = func ~value => return func () => return @demand value\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      effect Tick.read () =>\n        yield 42.5\n      complete value =>\n        break value\nconst create = func action => return do:\n  let delayed = keep (action ())\n  break @computation (func () => return delayed ())\nentry const answer = func () => return do:\n  let computation = create (func () => return Tick.read ())\n  break handled computation\nentry const folded = answer ()\n",
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);
@@ -1046,7 +1046,7 @@ Deno.test("request runtime: factory-created demanded action retains source row a
 
 Deno.test("request runtime: local factory bindings in distinct State scopes preserve nominal instances", async () => {
   await compileAndRun(
-    'data Cell value = #Cell value\nconst witness32 = func ignored : Cell U32 => return @panic "witness called"\nconst witnessf = func ignored : Cell F32 => return @panic "witness called"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (func () => return do:\n    let make = func (witness: Unit -> Cell U32) => return @computation (func () => return @state.get witness)\n    let computation = make witness32\n    break handled computation\n  )\n  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (func () => return do:\n    let make = func (witness: Unit -> Cell F32) => return @computation (func () => return @state.get witness)\n    let computation = make witnessf\n    break handled computation\n  )\n  break @f32.add (@u32.to_f32 value32) valuef\nentry const folded = answer ()\n',
+    'type Cell value is data = $Cell value\nconst witness32 = func ignored : Cell U32 => return @panic "witness called"\nconst witnessf = func ignored : Cell F32 => return @panic "witness called"\nconst handled = func computation => return do:\n  for request in @requests computation:\n    case request of\n      complete value =>\n        break value\nentry const answer = func () => return do:\n  let ($Cell state32, $Cell value32) = @state.run ($Cell 40) (func () => return do:\n    let make = func (witness: Unit -> Cell U32) => return @computation (func () => return @state.get witness)\n    let computation = make witness32\n    break handled computation\n  )\n  let ($Cell statef, $Cell valuef) = @state.run ($Cell 2.5) (func () => return do:\n    let make = func (witness: Unit -> Cell F32) => return @computation (func () => return @state.get witness)\n    let computation = make witnessf\n    break handled computation\n  )\n  break @f32.add (@u32.to_f32 value32) valuef\nentry const folded = answer ()\n',
     (guest) => {
       for (let iteration = 0; iteration < 100; iteration++) {
         equal(guest.call("answer", null), 42.5);

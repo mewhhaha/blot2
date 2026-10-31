@@ -4,13 +4,13 @@ import { compileAndRun } from "./compile_helpers.ts";
 Deno.test("immutable nullary cells keep nominal matches and persistent payload aliases under pressure", async () => {
   await compileAndRun(
     `
-type Token a is data = #Empty | #Full a
+type Token a is data = $Empty | $Full a
 const read = func token => return case token of
-  #Empty => 7
-  #Full values => values[0]
+  $Empty => 7
+  $Full values => values[0]
 entry const run = func (seed: U32) => return do:
-  let original = #[#Empty, #Full #[seed, seed + 1], #Empty]
-  let changed = @array.set original 1 #Empty
+  let original = #[$Empty, $Full #[seed, seed + 1], $Empty]
+  let changed = @array.set original 1 $Empty
   for index in 0..200:
     let discarded = @array.fill 8192 index
     if discarded[8191] != index:

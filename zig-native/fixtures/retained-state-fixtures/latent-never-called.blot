@@ -1,4 +1,4 @@
-data Cell value = #Cell value
+type Cell value is data = $Cell value
 type Tick is effect = { read: Unit -> U32 }
 const witness32 = func ignored : Cell U32 => return do:
   use Tick.read ()
@@ -12,12 +12,12 @@ const handled = func computation => return do:
       complete value =>
         break value
 entry const answer = func () => return do:
-  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (func () => return do:
+  let ($Cell state32, $Cell value32) = @state.run ($Cell 40) (func () => return do:
     let make = func witness => return @computation (func () => return @state.get witness)
     let computation = make witness32
     break handled computation
   )
-  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (func () => return do:
+  let ($Cell statef, $Cell valuef) = @state.run ($Cell 2.5) (func () => return do:
     let make = func witness => return @computation (func () => return @state.get witness)
     let computation = make witnessf
     break handled computation

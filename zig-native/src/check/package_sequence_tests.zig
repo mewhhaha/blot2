@@ -60,9 +60,9 @@ fn checkInput(allocator: std.mem.Allocator, input: []const u8, accepted: bool) !
 
 fn nominalBinderSource(allocator: std.mem.Allocator) !void {
     try checkInput(allocator,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\type Item = exists [a] => (Box a, Box a -> U32)
-        \\const make: U32 -> Item = func value => return pack [U32] (#Box value, func (#Box inner) => return inner) as Item
+        \\const make: U32 -> Item = func value => return pack [U32] ($Box value, func ($Box inner) => return inner) as Item
     , true);
 }
 
@@ -70,12 +70,12 @@ test "nominal package binders retain lexical scope and allocation failure owners
     try nominalBinderSource(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nominalBinderSource, .{});
     try checkInput(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\type Item = exists [a] => Box a
         \\const wrong: Item -> Box U32 = func item => return unpack item as [a] value in value
     , false);
     try checkInput(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\type Item = exists [a] => Box a
         \\const wrong: Item -> Item -> Unit = func left => return func right => return unpack left as [a] x in unpack right as [b] y in (func (other: Box a) => return ()) y
     , false);

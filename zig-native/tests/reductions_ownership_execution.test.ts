@@ -8,15 +8,15 @@ import * as rolling from "std/rolling"
 import * as summary from "std/summary"
 import * as iter from "std/iter"
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
 const keep = func ~value => return func () => return @demand value
 const get = func (witness: Unit -> a) : a => return State.get ()
 const cycle = func () => return do:
-  let (_, result) = @effect.run State.get State.set #End (func () => return do:
-    let delayed = keep (get (func () => return #End))
-    use State.set (#Next delayed)
+  let (_, result) = @effect.run State.get State.set $End (func () => return do:
+    let delayed = keep (get (func () => return $End))
+    use State.set ($Next delayed)
     use ready <- delayed ()
-    use State.set #End
+    use State.set $End
     break ready
   )
   break result
@@ -24,12 +24,12 @@ const combine = func (left: {sum: U32, node: Node}) => return func (right: {sum:
 const inverse = func (value: {sum: U32, node: Node}) => return {sum: @u32.sub 0 value.sum, node: value.node}
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
 const validate = func (node: Node) => return case node of
-  #End => @panic "summary lost its cycle"
-  #Next delayed => do:
-    let (_, value) = @effect.run State.get State.set #End (func () => return delayed ())
+  $End => @panic "summary lost its cycle"
+  $Next delayed => do:
+    let (_, value) = @effect.run State.get State.set $End (func () => return delayed ())
     break case value of
-      #End => @panic "summary lost its ready memo"
-      #Next _ => 0
+      $End => @panic "summary lost its ready memo"
+      $Next _ => 0
 entry const monoid = func (count: U32) => return do:
   let node = cycle ()
   let values = iter.map (func index => return {sum: index, node}) (iter.range 0 count)

@@ -154,11 +154,11 @@ entry const answer = func (value: U32) => return read (make value)
 
 Deno.test("package adapters convert tagged and recursive nominal payloads through owned helper edges", async () => {
   await compileAndRun(
-    `type Chain a is data = #End | #Link (a, Chain a)
+    `type Chain a is data = $End | $Link (a, Chain a)
 type Item = exists [a] => (Chain a, Chain a -> U32)
-const make: U32 -> Item = func value => return pack [U32] (#Link (value, #Link (13, #End)), func (chain: Chain U32) => return case chain of
-  #End => 0
-  #Link (head, tail) => head
+const make: U32 -> Item = func value => return pack [U32] ($Link (value, $Link (13, $End)), func (chain: Chain U32) => return case chain of
+  $End => 0
+  $Link (head, tail) => head
 ) as Item
 const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
 entry const answer = func (value: U32) => return read (make value)
@@ -184,8 +184,8 @@ Deno.test("package adapters preserve opaque nominal erasure across scalar and ab
   await compileAndRun(
     `opaque type Box a = a
 type Item = exists [a] => (Box a, Box a -> U32)
-const make: U32 -> Item = func value => return pack [U32] (#Box value, func (box: Box U32) => return case box of
-  #Box inner => inner
+const make: U32 -> Item = func value => return pack [U32] ($Box value, func (box: Box U32) => return case box of
+  $Box inner => inner
 ) as Item
 const read: Item -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
 entry const answer = func (value: U32) => return read (make value)
@@ -232,22 +232,22 @@ const nested: U32 -> Nested = func value => return pack [Array U32] (@array.fill
 const read: Nested -> U32 = func item => return unpack item as [a] body in (@product.get body 1) (@product.get body 0)
 entry const answer = func (value: U32) => return read (nested value)
 entry const snapshot = func (value: U32) => return #[read (nested value)]
-type Chain a is data = #End | #Link (a, Chain a)
+type Chain a is data = $End | $Link (a, Chain a)
 type Nominal = exists [a] => (Chain a, Chain a -> U32)
-const nominal: U32 -> Nominal = func value => return pack [Array U32] (if @u32.eq value 0 then #End else #Link (#[value], #Link (#[13], #End)), func chain => return case chain of
-  #End => 0
-  #Link (head, tail) => @array.get head 0
+const nominal: U32 -> Nominal = func value => return pack [Array U32] (if @u32.eq value 0 then $End else $Link (#[value], $Link (#[13], $End)), func chain => return case chain of
+  $End => 0
+  $Link (head, tail) => @array.get head 0
 ) as Nominal
 entry const tagged = func (value: U32) => return unpack (nominal value) as [a] body in (@product.get body 1) (@product.get body 0)
 opaque type Box a = a
 type Opaque = exists [a] => (Box a, Box a -> U32)
-const opaque: U32 -> Opaque = func value => return pack [Array U32] (#Box (@array.fill 3 value), func box => return case box of
-  #Box inner => @array.get inner 2
+const opaque: U32 -> Opaque = func value => return pack [Array U32] ($Box (@array.fill 3 value), func box => return case box of
+  $Box inner => @array.get inner 2
 ) as Opaque
 entry const boxed = func (value: U32) => return unpack (opaque value) as [a] body in (@product.get body 1) (@product.get body 0)
 type UnitBox = exists [a] => (Box a, Box a -> U32)
-const unit_box: Unit -> UnitBox = func () => return pack [Unit] (#Box (), func box => return case box of
-  #Box inner => 42
+const unit_box: Unit -> UnitBox = func () => return pack [Unit] ($Box (), func box => return case box of
+  $Box inner => 42
 ) as UnitBox
 entry const unit_boxed = func () => return unpack (unit_box ()) as [a] body in (@product.get body 1) (@product.get body 0)
 type Stop is effect = { check: U32 -> U32 }

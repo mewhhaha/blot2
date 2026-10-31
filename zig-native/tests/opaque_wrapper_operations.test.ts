@@ -138,10 +138,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
           record ? " a" : ""
         } = ${record ? "{value: a}" : "Array U32"}
 const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
-          opaque ? "#Token " : ""
+          opaque ? "$Token " : ""
         }${record ? "{value}" : "value"}
 const read: ${record ? "Token a -> a" : "Token -> Array U32"} = func ${
-          opaque ? "(#Token value)" : "value"
+          opaque ? "($Token value)" : "value"
         } => return ${record ? "value.value" : "value"}
 const capture = func value => return do:
   let saved = make value
@@ -185,11 +185,11 @@ entry const captured = func (value: U32) => return do:
       `opaque type Token = U32
 opaque type Pair = (U32, U32)
 entry const guarded = func (value: U32) => return do:
-  let #Token 7 = #Token value else:
+  let $Token 7 = $Token value else:
     break 99
   break 42
 entry const pair = func (value: U32) => return do:
-  let #Pair (left, right) = #Pair (value, 2)
+  let $Pair (left, right) = $Pair (value, 2)
   break @u32.add left right
 `,
       codegenTier,
@@ -217,9 +217,9 @@ for (const type of ["U32", "F32"]) {
       try {
         for (const opaque of [false, true]) {
           const source = `${opaque ? "opaque " : ""}type Token = ${type}
-const make: ${type} -> Token = func value => return ${opaque ? "#Token " : ""}value
+const make: ${type} -> Token = func value => return ${opaque ? "$Token " : ""}value
 const read: Token -> ${type} = func ${
-            opaque ? "(#Token value)" : "value"
+            opaque ? "($Token value)" : "value"
           } => return value
 entry const run = func (value: ${type}) => return read (make value)
 `;

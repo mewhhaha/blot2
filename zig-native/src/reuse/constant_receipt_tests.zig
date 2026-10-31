@@ -895,9 +895,9 @@ fn compoundAliasesSource(sibling: []const u8, seed: []const u8, delta: []const u
         expression = next;
     }
     return a.print(
-        \\data Box = #Box {{ value: U32 }}
+        \\type Box is data = $Box {{ value: U32 }}
         \\const seed = {s}
-        \\const ready = #Box {{ value: seed }}
+        \\const ready = $Box {{ value: seed }}
         \\entry const warmed = func () => return ready.value
         \\const compound = do:
         \\  let cost = {s}
@@ -969,7 +969,7 @@ test "constant receipts own ready nominal aliases and captured closure graphs" {
 
 fn compoundGrowthSource(sibling: []const u8, seed: []const u8) ![]u8 {
     return a.print(
-        \\data Bundle = #Bundle {{ earlier: List U32, current: List U32, alias: List U32, other: List U32, answer: U32 }}
+        \\type Bundle is data = $Bundle {{ earlier: List U32, current: List U32, alias: List U32, other: List U32, answer: U32 }}
         \\const seed = {s}
         \\const grown = do:
         \\  let values: List U32 = []
@@ -979,7 +979,7 @@ fn compoundGrowthSource(sibling: []const u8, seed: []const u8) ![]u8 {
         \\    values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
         \\    other := @list.append other (@u32.add index 100)
         \\    earlier := if @u32.eq index 30 then values else earlier
-        \\  break #Bundle {{ earlier: earlier, current: values, alias: values, other: other, answer: seed }}
+        \\  break $Bundle {{ earlier: earlier, current: values, alias: values, other: other, answer: seed }}
         \\const later = @list.prepend (@list.append grown.current 99) 100
         \\const branched = @list.append grown.earlier 200
         \\entry const first = func () => return @array.from_list grown.current
@@ -1520,7 +1520,7 @@ test "constant receipts preserve explicit quantified callable data without erasi
 
 fn quantifiedFieldSource(seed: []const u8) ![]u8 {
     return a.print(
-        \\type Maybe a is data = #Some a | #None
+        \\type Maybe a is data = $Some a | $None
         \\type Render a is contract = {{ const show: a -> U32 }}
         \\impl Number : Render U32 = {{ const show = func value => return @u32.add value 1 }}
         \\impl Flag : Render Bool = {{ const show = func value => return if value then 7 else 9 }}
@@ -1529,7 +1529,7 @@ fn quantifiedFieldSource(seed: []const u8) ![]u8 {
         \\  let ignored = @u32.add captured 1
         \\  break item
         \\const show: forall [a] where {{ Render a }} => a -> U32 = func value => return Render.show value
-        \\const wrap: forall [a] => a -> Maybe a = #Some
+        \\const wrap: forall [a] => a -> Maybe a = $Some
         \\const apply: forall [a, row e] => ((a -> a ! {{|e}}), a) -> a ! {{|e}} = func pair => return (@product.get pair 0) (@product.get pair 1)
         \\const concrete = func (value: U32) => return @u32.add value 1
         \\const seed = {s}
@@ -1542,8 +1542,8 @@ fn quantifiedFieldSource(seed: []const u8) ![]u8 {
         \\entry const fraction = func () => return packet.other 3.5
         \\entry const shown = func () => return @u32.add (packet.show 35) (packet.show true)
         \\entry const wrapped = func () => return case packet.wrap packet.cost of
-        \\  #Some value => value
-        \\  #None => 0
+        \\  $Some value => value
+        \\  $None => 0
         \\entry const host = func (callback: U32 -> U32 ! {{Foreign}}) => return packet.apply (callback, packet.cost)
         \\entry const unrelated = seed
         \\
@@ -1595,7 +1595,7 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     \\  let wrapped = do (@do.monad Box):
     \\    break base
     \\  let cost = case wrapped of
-    \\    #Box value => value
+    \\    $Box value => value
     , .hits = 1 },
     .{ .body =
     \\  let (_, cost) = @state.run base (func () => return base)
@@ -1607,8 +1607,8 @@ const temporary_programs = [_]struct { body: []const u8, hits: usize, changed_hi
     , .hits = 0 },
     .{ .body =
     \\  let pending = delayed base
-    \\  let cost = @force pending
-    \\  let again = @force pending
+    \\  let cost = @demand pending
+    \\  let again = @demand pending
     , .hits = 0 },
     .{ .body =
     \\  let cost = @effect.scope (func (state: State U32) => return base)
@@ -1622,8 +1622,8 @@ fn temporarySource(seed: []const u8, base: []const u8, body: []const u8) ![]u8 {
         \\effect Read: Unit -> U32
         \\type State a is effect = {{get: Unit -> a, set: a -> Unit}}
         \\const described: Unit -> U32 ! {{Read}} = func () => return Read ()
-        \\type Box a is data = #Box a
-        \\const Box.pure = func (value: U32) => return #Box value
+        \\type Box a is data = $Box a
+        \\const Box.pure = func (value: U32) => return $Box value
         \\const delayed = func ~value => return value
         \\const base = {s}
         \\const expensive = do:

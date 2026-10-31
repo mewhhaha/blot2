@@ -8,13 +8,13 @@ impl Number : Source U32 = { type Item = U32 }
 const keep: a -> (Source.Item a) -> (Source.Item a) where { Source a } = func witness => return func value => return value
 type Identity = forall [a] => a -> a
 const identity: Identity = func value => return value
-type Point is data = #Point { x: U32 }
+type Point is data = $Point { x: U32 }
 const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
 const combine = func left => return func right => return @type.call "add" left right
 const represented: a -> a where { type_rep a } = func value => return value
 const field = func value => return value.x
 const forward = func value => return combine value 22
-const calculate = func (value: U32) => return keep value (forward (#Point {x: represented (field {x: value})}))
+const calculate = func (value: U32) => return keep value (forward ($Point {x: represented (field {x: value})}))
 `;
 const consumer = `import {identity, calculate} from "./identity"
 entry const answer = func (value: U32) => return identity (calculate value)

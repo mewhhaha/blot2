@@ -31,11 +31,11 @@ entry const floating = func (value: F32) : F32 => return apply (combine value) 1
 
 Deno.test("runtime first-class constructors and local closure pattern bindings retain typed payloads", async () => {
   await compileAndRun(`
-type Box value is data = #Box value
+type Box value is data = $Box value
 entry const boxed = func (input: U32) : U32 => return do:
-  let wrap = #Box
+  let wrap = $Box
   let choose = func box : U32 => return case box of
-    #Box value => value + input
+    $Box value => value + input
   break choose (wrap 21)
 entry const direct = func (value: U32) : U32 => return (func (argument: U32) => return argument + 1) value
 `, guest => {

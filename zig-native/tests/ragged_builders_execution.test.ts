@@ -221,24 +221,24 @@ entry const closures = func (seed: U32) : U32 => return do:
   let copied = @array.from_list [value | value <- values, true]
   break copied[0] 1 + copied[1] 2
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
 const keep = func ~value => return func () => return @demand value
 const get = func (witness: Unit -> a) : a => return State.get ()
 const cycle = func (seed: U32) => return do:
-  let (_, result) = @effect.run State.get State.set #End (func () => return do:
-    let delayed = keep (get (func () => return #End))
-    use State.set (#Next delayed)
+  let (_, result) = @effect.run State.get State.set $End (func () => return do:
+    let delayed = keep (get (func () => return $End))
+    use State.set ($Next delayed)
     use first <- delayed ()
     let values = #[first, first]
     let copied = @array.from_list [value | value <- values, true]
-    use State.set #End
+    use State.set $End
     break case copied[1] of
-      #End => @panic "copied cycle disappeared"
-      #Next same => do:
+      $End => @panic "copied cycle disappeared"
+      $Next same => do:
         use again <- same ()
         break case again of
-          #End => @panic "copied memo disappeared"
-          #Next _ => seed
+          $End => @panic "copied memo disappeared"
+          $Next _ => seed
   )
   break result
 entry const cyclic = func (count: U32) : U32 => return do:

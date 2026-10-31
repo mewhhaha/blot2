@@ -1,5 +1,5 @@
-data Cell value = #Cell value
-data Count = #Count U32
+type Cell value is data = $Cell value
+type Count is data = $Count U32
 const witness32 = func ignored : Cell U32 => return @panic "witness called"
 const witnessf = func ignored : Cell F32 => return @panic "witness called"
 const handled = func computation => return do:
@@ -8,27 +8,27 @@ const handled = func computation => return do:
       complete value =>
         break value
 entry const answer = func () => return do:
-  let (#Count count, result) = @state.run (#Count 0) (func () => return do:
-    use result32 <- @state.run (#Cell 40) (func () => return do:
+  let ($Count count, result) = @state.run ($Count 0) (func () => return do:
+    use result32 <- @state.run ($Cell 40) (func () => return do:
       let make = func witness => return do:
-        use previous_cell <- @state.get #Count
-        let #Count previous = previous_cell
-        use @state.set (#Count (@u32.add previous 1))
+        use previous_cell <- @state.get $Count
+        let $Count previous = previous_cell
+        use @state.set ($Count (@u32.add previous 1))
         break @computation (func () => return @state.get witness)
       use computation <- make witness32
       break handled computation
     )
-    let (#Cell state32, #Cell value32) = result32
-    use resultf <- @state.run (#Cell 2.5) (func () => return do:
+    let ($Cell state32, $Cell value32) = result32
+    use resultf <- @state.run ($Cell 2.5) (func () => return do:
       let make = func witness => return do:
-        use previous_cell <- @state.get #Count
-        let #Count previous = previous_cell
-        use @state.set (#Count (@u32.add previous 1))
+        use previous_cell <- @state.get $Count
+        let $Count previous = previous_cell
+        use @state.set ($Count (@u32.add previous 1))
         break @computation (func () => return @state.get witness)
       use computation <- make witnessf
       break handled computation
     )
-    let (#Cell statef, #Cell valuef) = resultf
+    let ($Cell statef, $Cell valuef) = resultf
     break @f32.add (@u32.to_f32 value32) valuef
   )
   break @f32.add result (@u32.to_f32 count)

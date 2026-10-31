@@ -8,7 +8,7 @@ const source = `const scan = func values => return do:
   let total = 0
   for unused in values:
     use step <- cursor.next
-    let #Some (value, rest) = step else:
+    let $Some (value, rest) = step else:
       break
     total := self + value
     cursor := rest

@@ -13,7 +13,7 @@ import * as array from "../../std/array"
 entry const scan = func (values: Array U32) => return array.prefix_sums values
 entry const filter = func (values: Array U32) => return array.filter (func x => return x % 2 == 0) values
 entry const filter_map = func (values: Array U32) => return
-  array.filter_map (func x => return if x % 2 == 0 then #Some (x + 1) else #Nothing) values
+  array.filter_map (func x => return if x % 2 == 0 then $Some (x + 1) else $Nothing) values
 entry const indices = func (values: Array U32) => return array.indices (array.map (func x => return x % 2 == 0) values)
 entry const concat = func (values: Array U32) => return array.concat values values
 entry const flatten = func (values: Array U32) => return array.flatten
@@ -21,7 +21,7 @@ entry const flatten = func (values: Array U32) => return array.flatten
     {start: 0, count: values.length}, {start: values.length, count: 0}] values
 entry const push = func (values: Array U32) => return array.push 42 values
 entry const staged = (array.prefix_sums (array.generate 1025 identity))[1024]
-entry const staged_filter = (array.filter_map (func x => return if x == 1 then #Nothing else #Some x) #[1, 42])[0]
+entry const staged_filter = (array.filter_map (func x => return if x == 1 then $Nothing else $Some x) #[1, 42])[0]
 entry const snapshots = func () => return do:
   let input = #[1, 2, 3]
   let scan = array.prefix_sums input
@@ -169,8 +169,8 @@ entry const run = func (count: U32) => return do:
   let prior: List U32 = []
   for i in 0..count:
     let before = values
-    let candidate = if i % 2 == 0 then #Some i else #Nothing
-    if let #Some value = candidate:
+    let candidate = if i % 2 == 0 then $Some i else $Nothing
+    if let $Some value = candidate:
       values := [...self, value]
     else:
       values := [i, ...self]
@@ -325,14 +325,14 @@ const build = func (count: U32) => return do:
 Deno.test("Maybe and Result deferred fallbacks skip work on success and run on failure", async () => {
   await compileAndRun(
     `
-entry const some = Maybe.unwrap_or_else (@panic "unused fallback") (#Some 42)
-entry const ok = Result.unwrap_or_else (@panic "unused fallback") (#Ok 42)
-entry const nothing = Maybe.unwrap_or_else 42 #Nothing
-entry const error = Result.unwrap_or_else 42 (#Err false)
+entry const some = Maybe.unwrap_or_else (@panic "unused fallback") ($Some 42)
+entry const ok = Result.unwrap_or_else (@panic "unused fallback") ($Ok 42)
+entry const nothing = Maybe.unwrap_or_else 42 $Nothing
+entry const error = Result.unwrap_or_else 42 ($Err false)
 entry const success = func (host: Unit -> U32 ! {Foreign}) => return
-  Result.unwrap_or_else (host ()) (#Ok 42)
+  Result.unwrap_or_else (host ()) ($Ok 42)
 entry const failure = func (host: Unit -> U32 ! {Foreign}) => return
-  Result.unwrap_or_else (host ()) (#Err false)
+  Result.unwrap_or_else (host ()) ($Err false)
 `,
     (guest) => {
       for (const name of ["some", "ok", "nothing", "error"]) {
@@ -366,13 +366,13 @@ entry const trig = func (value: F32) => return do:
   let (s, c) = sin_cos value
   break #[sin value, cos value, tan value, s, c]
 entry const vector = func (values: Array F32) => return do:
-  let a = #Vec3 { x: values[0], y: values[1], z: values[2] }
-  let b = #Vec3 { x: values[3], y: values[4], z: values[5] }
+  let a = $Vec3 { x: values[0], y: values[1], z: values[2] }
+  let b = $Vec3 { x: values[3], y: values[4], z: values[5] }
   let v = lerp a b values[6]
-  let w = lerp (#Vec2 { x: a.x, y: a.y }) (#Vec2 { x: b.x, y: b.y }) values[6]
+  let w = lerp ($Vec2 { x: a.x, y: a.y }) ($Vec2 { x: b.x, y: b.y }) values[6]
   break #[v.x, v.y, v.z, w.x, w.y]
 entry const zero = func () => return do:
-  let v = (#Vec3 { x: 0.0, y: 0.0, z: 0.0 }).normalized
+  let v = ($Vec3 { x: 0.0, y: 0.0, z: 0.0 }).normalized
   break #[v.x, v.y, v.z]
 `,
     (guest) => {

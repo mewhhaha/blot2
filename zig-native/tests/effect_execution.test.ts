@@ -7,7 +7,7 @@ effect Read: Unit -> U32
 const provider = @effect.provider Read (func () => return 42)
 const read = func () => return Read ()
 const invoke = func callback => return callback ()
-const force = func ~value => return @force value
+const force = func ~value => return @demand value
 const ignore = func ~value => return 42
 entry const constant = do provider:
   break Read ()
@@ -107,21 +107,21 @@ entry const answer = func (value: U32) => return do first:
 
 Deno.test("named binary callbacks preserve demanded and required effect rows", async () => {
   await compileAndRun(`
-infixl 20 (&&) = choose
+infixl 20 (<&>) = choose
 infixl 60 (%%) = combine
 effect Read: Unit -> U32
 effect Touch: U32 -> Unit
-const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @force right else false
+const choose = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
 const combine = func (left: U32) => return func (right: U32) => return do:
   use Touch left
   break @u32.add left right
 const receive = func (flag: Bool) => return do:
-  let go = flag && false
+  let go = flag <&> false
   if go:
     break ()
   use Touch 7
   break ()
-const selected = func (flag: Bool) => return flag && (do:
+const selected = func (flag: Bool) => return flag <&> (do:
   use value <- Read ()
   break @u32.eq value 42)
 const merge = func () => return 20 %% 22
@@ -132,11 +132,11 @@ entry const answer = do touch:
   break 20 %% 22
 entry const loaded = do reader:
   break selected true
-entry const unforced = false && @panic "not demanded"
-type Holder a is data = #Holder a
-const callbacks = #Holder receive
+entry const unforced = false <&> @panic "not demanded"
+type Holder a is data = $Holder a
+const callbacks = $Holder receive
 entry const run = func (flag: Bool) : U32 => return do touch:
-  let #Holder action = callbacks
+  let $Holder action = callbacks
   use action flag
   break 20 %% 22
 `, guest => {

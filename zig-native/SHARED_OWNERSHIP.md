@@ -279,17 +279,17 @@ keep tracing removal blocked and require a revised strategy.
 
 ## Graph traces and counterexamples
 
-For the existing law, `S` is the active State cell, `N` the `#Next` value, `C`
+For the existing law, `S` is the active State cell, `N` the `$Next` value, `C`
 the retained closure and `D` its demand. Ownership edges are `S → N → C → D → N`
 after force. State supplies an incoming root; the smaller `N → C → D → N` cycle
 remains after State is cleared. The provider chain is not captured by `D`.
 
 | Step                                      | Observable result and ownership                                                 |
 | ----------------------------------------- | ------------------------------------------------------------------------------- |
-| Install `#Next delayed`                   | State owns `N`; `N` owns `C`; `C` owns `D`; local `delayed` roots `C`.          |
+| Install `$Next delayed`                   | State owns `N`; `N` owns `C`; `C` owns `D`; local `delayed` roots `C`.          |
 | First force; discard its temporary result | `D.cached` gains an owning `N` edge; memo stays ready.                          |
-| Set State to `#End`                       | Drop `S → N`; local `C` still roots the cycle.                                  |
-| Force again, invoke the cached closure    | Both return the same `#Next`; no reevaluation and no erased memo.               |
+| Set State to `$End`                       | Drop `S → N`; local `C` still roots the cycle.                                  |
+| Force again, invoke the cached closure    | Both return the same `$Next`; no reevaluation and no erased memo.               |
 | Drop cached locals and `delayed`          | Each cycle node has count 1 from its predecessor; a release queues a candidate. |
 | Trial deletion                            | Each trial count becomes 0; retire all three together.                          |
 

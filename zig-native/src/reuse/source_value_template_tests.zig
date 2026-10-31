@@ -140,19 +140,19 @@ const Generator = struct {
 };
 
 const fixture_source =
-    \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
+    \\type Bundle is data = $Bundle { answer: U32, read: U32 -> U32 }
     \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
     \\entry const schema: U32 = 7
-    \\const bundle = #Bundle { answer: 42, read: factory 40 }
+    \\const bundle = $Bundle { answer: 42, read: factory 40 }
     \\entry const answer: U32 = bundle.read 2
 ;
 const unsolved_source =
-    \\type Bundle read is data = #Bundle { read: read, callbacks: Array read }
+    \\type Bundle read is data = $Bundle { read: read, callbacks: Array read }
     \\const factory = func number => return func extra => return number
     \\entry const schema: U32 = 7
     \\const bundle = do:
     \\  let read = factory 42
-    \\  break #Bundle { read: read, callbacks: @array.generate 1 (func (index: U32) => return read) }
+    \\  break $Bundle { read: read, callbacks: @array.generate 1 (func (index: U32) => return read) }
     \\entry const answer: U32 = bundle.read ()
 ;
 fn successful(result: *const backend.Result) !void {
@@ -339,10 +339,10 @@ test "source template rejects a foreign fresh evaluator owner and quotas before 
 
 test "source template independently imports F32 captures without sharing U32 evidence ordinals" {
     const floating =
-        \\type Bundle is data = #Bundle { answer: F32, read: F32 -> F32 }
+        \\type Bundle is data = $Bundle { answer: F32, read: F32 -> F32 }
         \\const factory = func (number: F32) => return func (extra: F32) => return @f32.add number extra
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { answer: 42.0, read: factory 40.0 }
+        \\const bundle = $Bundle { answer: 42.0, read: factory 40.0 }
         \\entry const answer: F32 = bundle.read 2.0
     ;
     var before = try Fixture.init(floating);
@@ -409,7 +409,7 @@ test "source template declines active waiting values before admitting an indepen
         \\const keep = func ~(value: U32) => return value
         \\const pending = keep 42
         \\entry const schema: U32 = 7
-        \\entry const answer = func () => return @force pending
+        \\entry const answer = func () => return @demand pending
     ;
     var before = try Fixture.init(pending_source);
     defer before.deinit();
@@ -436,10 +436,10 @@ test "source template declines active waiting values before admitting an indepen
 
 test "source template rejects independently valid old pools even when source identity ordinals collide" {
     const alternate_source =
-        \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
+        \\type Bundle is data = $Bundle { answer: U32, read: U32 -> U32 }
         \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { answer: 42, read: factory 39 }
+        \\const bundle = $Bundle { answer: 42, read: factory 39 }
         \\entry const answer: U32 = bundle.read 2
     ;
     var before = try Fixture.init(fixture_source);
@@ -498,10 +498,10 @@ test "source template imported closure and record storage survive complete old a
 
 test "source template keeps generic source variables and empty rows attached to the exact closure owner" {
     const generic_source =
-        \\type Bundle is data = #Bundle { read: U32 -> U32 }
+        \\type Bundle is data = $Bundle { read: U32 -> U32 }
         \\const factory = func number => return func (extra: U32) => return number
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { read: factory 42 }
+        \\const bundle = $Bundle { read: factory 42 }
         \\entry const answer: U32 = bundle.read 2
     ;
     var before = try Fixture.init(generic_source);
@@ -525,10 +525,10 @@ test "source template keeps generic source variables and empty rows attached to 
 }
 test "source template preserves distinct captures of the same callback source" {
     const distinct_source =
-        \\type Bundle is data = #Bundle { first: U32 -> U32, second: U32 -> U32 }
+        \\type Bundle is data = $Bundle { first: U32 -> U32, second: U32 -> U32 }
         \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { first: factory 40, second: factory 2 }
+        \\const bundle = $Bundle { first: factory 40, second: factory 2 }
         \\entry const answer: U32 = @u32.add (bundle.first 0) (bundle.second 0)
     ;
     var before = try Fixture.init(distinct_source);
@@ -591,10 +591,10 @@ test "source template rejects malformed cycles and compiler-owned nominal identi
 }
 test "source template declines changed callback source despite identical capture representation and namespace ordinals" {
     const changed_source =
-        \\type Bundle is data = #Bundle { answer: U32, read: U32 -> U32 }
+        \\type Bundle is data = $Bundle { answer: U32, read: U32 -> U32 }
         \\const factory = func (number: U32) => return func (extra: U32) => return @u32.sub number extra
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { answer: 42, read: factory 40 }
+        \\const bundle = $Bundle { answer: 42, read: factory 40 }
         \\entry const answer: U32 = bundle.read 2
     ;
     var before = try Fixture.init(fixture_source);
@@ -679,10 +679,10 @@ test "source template unsolved graph exhaustive OOM leaves values and query publ
 }
 test "source template generic same-source callbacks retain distinct U32 and F32 scoped captures" {
     const source =
-        \\type Bundle [first, second] is data = #Bundle { first: first, second: second }
+        \\type Bundle [first, second] is data = $Bundle { first: first, second: second }
         \\const factory = func number => return func extra => return number
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { first: factory 42, second: factory 42.0 }
+        \\const bundle = $Bundle { first: factory 42, second: factory 42.0 }
         \\entry const answer: U32 = bundle.first ()
         \\entry const other: F32 = bundle.second ()
     ;
@@ -773,12 +773,12 @@ test "source template validates nominal tags record layouts and anonymous captur
 test "source template retains legitimate constructor callback source origins" {
     const cases = [_]struct { source: []const u8, origin: eval.ClosureOrigin }{
         .{ .origin = .constructor, .source =
-        \\type Wrap value is data = #Wrap value
-        \\type Bundle read is data = #Bundle { read: read }
+        \\type Wrap value is data = $Wrap value
+        \\type Bundle read is data = $Bundle { read: read }
         \\entry const schema: U32 = 7
-        \\const bundle = #Bundle { read: #Wrap }
+        \\const bundle = $Bundle { read: $Wrap }
         \\entry const answer: U32 = case bundle.read 42 of
-        \\  #Wrap number => number
+        \\  $Wrap number => number
         },
     };
     for (cases) |case| {
@@ -803,11 +803,11 @@ test "source template retains legitimate constructor callback source origins" {
 }
 test "source template local qualified callback follows changed global source dependencies" {
     const source =
-        \\type Bundle read is data = #Bundle read
+        \\type Bundle read is data = $Bundle read
         \\entry const schema: U32 = 7
         \\const bundle = do:
         \\  let read = func extra => return schema
-        \\  break #Bundle read
+        \\  break $Bundle read
         \\entry const answer: U32 = @array.length (@array.generate 1 (func (index: U32) => return bundle))
     ;
     var before = try Fixture.init(source);
@@ -836,13 +836,13 @@ fn anchorDir() !std.testing.TmpDir {
     ;
     const main =
         \\import * as values from "./values"
-        \\type Bundle read is data = #Bundle { read: read }
+        \\type Bundle read is data = $Bundle { read: read }
         \\const bundle = do:
         \\  let items = values.items
         \\  let alias = values.alias
         \\  let twin = values.twin
         \\  let read = func extra => return (items, alias, twin)
-        \\  break #Bundle { read: read }
+        \\  break $Bundle { read: read }
         \\entry const schema: U32 = 7
         \\entry const answer = func (index: U32) => return do:
         \\  let (first, second, third) = bundle.read ()
@@ -1206,7 +1206,7 @@ const independent_query_source = query_source ++
     \\const floating = func (number: F32) : F32 => return number
     \\const listed = func (items: List U32) : List U32 => return items
     \\const arrayed = func (items: Array U32) : Array U32 => return items
-    \\type CallablePayload is data = #CallablePayload (U32 -> U32)
+    \\type CallablePayload is data = $CallablePayload (U32 -> U32)
 ;
 
 fn independentQueryRead(old: *capture.Capture, target_: core.BindingRef, present: bool) !void {
@@ -1386,8 +1386,8 @@ test "independent semantic workers retain deterministic unpublished judgments an
 test "independent call proof preserves List versus Array nominal identity and required effects" {
     const source = independent_query_source ++
         \\
-        \\data Left = #Left U32
-        \\data Right = #Right U32
+        \\type Left is data = $Left U32
+        \\type Right is data = $Right U32
         \\const left = func (item: Left) : Left => return item
         \\type Read a is effect = { get: Unit -> a }
         \\const requested = func () : U32 => return Read.get ()
@@ -1489,8 +1489,8 @@ test "independent call proof retained dependencies survive semantic owner remapp
 }
 
 const plain_query_source =
-    \\type PlainPayload is data = #PlainPayload { xs: List U32, ys: Array U32 }
-    \\type CallablePayload is data = #CallablePayload (U32 -> U32)
+    \\type PlainPayload is data = $PlainPayload { xs: List U32, ys: Array U32 }
+    \\type CallablePayload is data = $CallablePayload (U32 -> U32)
 ++ "\n" ++ query_source;
 
 fn plainQueryKey(fixture: *const Fixture, name: []const u8) u64 {
@@ -1590,11 +1590,11 @@ const source_row_query =
 
 test "semantic catalog imports nominal evidence while executable layout remains rejected" {
     const source =
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
         \\entry const schema = func () : U32 => return 7
-        \\const boxed = #Box 42
+        \\const boxed = $Box 42
         \\entry const answer = func (value: U32) => return do:
-        \\  let #Box fixed = boxed
+        \\  let $Box fixed = boxed
         \\  break @u32.add value fixed
     ;
     var before = try Fixture.init(source);
@@ -2193,13 +2193,13 @@ test "source declared effect graph rejects generated labels and provider State o
 
 test "source declared effect query structurally remaps a nominal operation argument through current type and row prefix noise" {
     const source =
-        \\type Payload is data = #Payload { value: U32 }
+        \\type Payload is data = $Payload { value: U32 }
         \\type Read a is effect = { get: Unit -> a }
         \\const factory = func action => return func value => return action value
         \\const callback = factory (func () => return Read.get ())
         \\entry const schema: U32 = 7
         \\entry const answer = func () : U32 => return do:
-        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (func () => return #Payload { value: 42 }) callback
+        \\  let payload = @effect.reader Read.get ($Payload { value: 0 }) (func () => return $Payload { value: 42 }) callback
         \\  break payload.value
     ;
     var before = try Fixture.init(source);

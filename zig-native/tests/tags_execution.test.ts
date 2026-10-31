@@ -79,7 +79,7 @@ Deno.test("undemanded tagged declarations and uncalled tagged function bodies st
     (guest) => equal(guest.read("answer"), 42),
   );
   await compileExpectedFailure(
-    "@[func ~value=> return @force value] entry const answer:U32=42\n",
+    "@[func ~value=> return @demand value] entry const answer:U32=42\n",
     "type_mismatch",
   );
 });

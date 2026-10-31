@@ -29,9 +29,9 @@ const Fixture = struct {
         errdefer for (units[0..initialized]) |*unit| unit.deinit(a);
         for (units, 1..) |*unit, id| {
             const source = if (id == 1)
-                "data Cell = #Cell U32\neffect Read: Unit -> F32\nconst read = func () => return Read ()\nentry const answer = func (value: F32) => return value\n"
+                "type Cell is data = $Cell U32\neffect Read: Unit -> F32\nconst read = func () => return Read ()\nentry const answer = func (value: F32) => return value\n"
             else
-                "data Fresh = #Fresh U32\nentry const answer = func (value: F32) => return value\n";
+                "type Fresh is data = $Fresh U32\nentry const answer = func (value: F32) => return value\n";
             var tokens = try lexer.lex(a, source);
             defer tokens.deinit(a);
             var tree = try parser.parse(a, source, tokens.tokens.items, &pool);
@@ -386,7 +386,7 @@ fn namespaceFixture(reordered: bool) !Fixture {
     errdefer a.free(units);
     var initialized: usize = 0;
     errdefer for (units[0..initialized]) |*unit| unit.deinit(a);
-    const source = "type Cell is data = #Cell { right: F32, left: U32 }\neffect Read: Unit -> F32\nconst read = func () => return Read ()\nentry const answer = func (value: F32) => return value\n";
+    const source = "type Cell is data = $Cell { right: F32, left: U32 }\neffect Read: Unit -> F32\nconst read = func () => return Read ()\nentry const answer = func (value: F32) => return value\n";
     for (units, 1..) |*unit, id| {
         var tokens = try lexer.lex(a, source);
         defer tokens.deinit(a);

@@ -719,7 +719,7 @@ test "immutable boundary lifetime reader validates selected producer bounds inde
 }
 
 const deferred_migrate_source =
-    \\type Maybe a is data = #Nothing | #Some a
+    \\type Maybe a is data = $Nothing | $Some a
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const scope_feature = func () => return @effect.scope (func (s: State U32) => return do:
     \\  let ignored = s
@@ -727,11 +727,11 @@ const deferred_migrate_source =
     \\)
     \\const generate = func count => return func generator => return @array.generate count generator
     \\const migrate = func (version: U32) => return case version of
-    \\  1 => #Some (func (values: Array F32) => return generate (@array.length values) (func index => return if @u32.lt 0 index then (if @u32.eq (@u32.rem (@u32.sub index 1) 6) 4 then @f32.mul values[index] 2.0 else values[index]) else values[index]))
-    \\  _ => #Nothing
+    \\  1 => $Some (func (values: Array F32) => return generate (@array.length values) (func index => return if @u32.lt 0 index then (if @u32.eq (@u32.rem (@u32.sub index 1) 6) 4 then @f32.mul values[index] 2.0 else values[index]) else values[index]))
+    \\  _ => $Nothing
     \\entry const answer = func () => return case migrate 1 of
-    \\  #Some callback => @array.get (callback #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]) 5
-    \\  #Nothing => 0.0
+    \\  $Some callback => @array.get (callback #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]) 5
+    \\  $Nothing => 0.0
 ;
 fn derivedAbsent(allocator: std.mem.Allocator, module: *const C.Module, body: C.Body) !void {
     var terms: @import("capability_contracts.zig").Store = .{};
@@ -809,7 +809,7 @@ test "deferred ordinary named calls retain exact lexical construction captures t
 }
 
 fn nonfunctionGlobalContractLaw(allocator: std.mem.Allocator) !void {
-    const source = "const amount = @u32.to_f32 7\ntype Payload is data = #Payload {input: U32, amount: F32}\nconst make = func (input: U32) => return #Payload {input, amount}\nentry const answer = func () => return make 42\n";
+    const source = "const amount = @u32.to_f32 7\ntype Payload is data = $Payload {input: U32, amount: F32}\nconst make = func (input: U32) => return $Payload {input, amount}\nentry const answer = func () => return make 42\n";
     var module = try lower(allocator, source);
     defer module.deinit(allocator);
     var computed = false;

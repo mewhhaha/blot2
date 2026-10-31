@@ -7,15 +7,15 @@ const check = @import("check.zig");
 const T = @import("types.zig");
 const a = std.testing.allocator;
 const source =
-    \\type Box value is data = #Box value
-    \\const Box.from = func value => return #Box value
+    \\type Box value is data = $Box value
+    \\const Box.from = func value => return $Box value
     \\const from = func value => return @type.result "from" value
     \\const alias = from
     \\entry const integer = func () => return do:
-    \\  let #Box value:Box U32 = alias 42
+    \\  let $Box value:Box U32 = alias 42
     \\  break value
     \\entry const floating = func () => return do:
-    \\  let #Box value:Box F32 = alias 1.25
+    \\  let $Box value:Box F32 = alias 1.25
     \\  break value
 ;
 const Fixture = struct {
@@ -113,16 +113,16 @@ test "result directed schemes retain input and expected output across aliases an
 }
 test "result selection uses only the destination owner and retains missing unused requirements" {
     var f = try Fixture.init(a,
-        \\type Source is data = #Source U32
-        \\type Target is data = #Target U32
-        \\type Missing is data = #Missing U32
+        \\type Source is data = $Source U32
+        \\type Target is data = $Target U32
+        \\type Missing is data = $Missing U32
         \\const Source.from = func value => return @panic "input owner was selected"
         \\const Target.from = func (source:Source) => return do:
-        \\  let #Source value=source
-        \\  break #Target value
+        \\  let $Source value=source
+        \\  break $Target value
         \\const unused = func (value:U32) : Missing => return @type.result "from" value
         \\entry const answer = func () => return do:
-        \\  let #Target value:Target = @type.result "from" (#Source 42)
+        \\  let $Target value:Target = @type.result "from" ($Source 42)
         \\  break value
     );
     defer f.deinit(a);
@@ -142,8 +142,8 @@ test "result selection uses only the destination owner and retains missing unuse
 }
 test "a selected result method cannot fall back after input or output mismatch" {
     const cases = [_][]const u8{
-        "type Target is data = #Target U32\nconst Target.from = func (value:F32) => return #Target 42\nentry const answer:Target = @type.result \"from\" 1\n",
-        "type Target is data = #Target U32\nconst Target.from = func value => return 42\nentry const answer:Target = @type.result \"from\" 1\n",
+        "type Target is data = $Target U32\nconst Target.from = func (value:F32) => return $Target 42\nentry const answer:Target = @type.result \"from\" 1\n",
+        "type Target is data = $Target U32\nconst Target.from = func value => return 42\nentry const answer:Target = @type.result \"from\" 1\n",
     };
     for (cases) |text| {
         var f = try Fixture.init(a, text);
@@ -173,15 +173,15 @@ test "result scheme selection and principal publication release every failed all
 
 fn writtenResults(allocator: std.mem.Allocator) !void {
     const text =
-        \\type Box a is data = #Box a
-        \\const Box.from = func value => return #Box value
+        \\type Box a is data = $Box a
+        \\const Box.from = func value => return $Box value
         \\type Convert (a, b) is contract = { result "from" a b }
         \\const from: a -> b where { result "from" a b } = func value => return @type.result "from" value
         \\const alias: a -> b where { Convert (a, b) } = from
         \\entry const answer = func () => return do:
         \\  let local: a -> b where { result "from" a b ! {} } = alias
-        \\  let #Box first: Box U32 = local 42
-        \\  let #Box second: Box F32 = local 1.25
+        \\  let $Box first: Box U32 = local 42
+        \\  let $Box second: Box F32 = local 1.25
         \\  break (first, second)
     ;
     var f = try Fixture.init(allocator, text);

@@ -60,10 +60,10 @@ test "persisted generated origins own exact source nodes and reject forged catal
 // A captured callback specialized at a typed entry, a nominal payload and a
 // recursive helper: the selected receipt replays the closure graph.
 const source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const open = func (box: Box) : U32 => return case box of
-    \\  #Box value => value
-    \\const factory = func number => return func extra => return @u32.add number (open (#Box extra))
+    \\  $Box value => value
+    \\const factory = func number => return func extra => return @u32.add number (open ($Box extra))
     \\const callback = factory 42
     \\const count = func (n: U32) : U32 => return if @u32.eq n 0 then 0 else @u32.add 1 (count (@u32.sub n 1))
     \\entry const schema: U32 = 7
@@ -386,18 +386,18 @@ test "persisted typed staging seals package recipes and never exposes cached bou
 
 test "persisted typed staging reconstructs nominal constructor substitutions and payloads" {
     const staged_source =
-        \\type Packet a is data = #Packet {item: a}
-        \\type Option a is data = #Absent | #Present a
+        \\type Packet a is data = $Packet {item: a}
+        \\type Option a is data = $Absent | $Present a
         \\const make = func (value: Option (Packet U32)) => return @code.quote (@code.lift value)
-        \\const generated = make (#Present (#Packet {item: 42}))
-        \\const empty = make #Absent
-        \\const floating = @code.quote (@code.lift (#Packet {item: 2.0}))
+        \\const generated = make ($Present ($Packet {item: 42}))
+        \\const empty = make $Absent
+        \\const floating = @code.quote (@code.lift ($Packet {item: 2.0}))
         \\const inspected = @code.describe generated
         \\const same = @descriptor.same inspected.result (@code.describe empty).result
         \\const restored = @code.run generated
         \\const number = case restored of
-        \\  #Absent => 0
-        \\  #Present (#Packet value) => if same then value else 0
+        \\  $Absent => 0
+        \\  $Present ($Packet value) => if same then value else 0
         \\
     ;
     const ordinary = try std.mem.replaceOwned(u8, a, source, "factory 42", "factory number");
@@ -469,9 +469,9 @@ test "persisted typed staging reconstructs nominal constructor substitutions and
 test "persisted typed staging opaque record lifts preserve whole producer payloads through OOM" {
     const text =
         \\opaque type Token = {item: U32}
-        \\private const make = func (number: U32) => return #Token {item: number}
+        \\private const make = func (number: U32) => return $Token {item: number}
         \\private const open = func (token: Token) => return case token of
-        \\  #Token payload => payload.item
+        \\  $Token payload => payload.item
         \\const generated = @code.quote (@code.lift (make 42))
         \\const restored = @code.run generated
         \\const factory = func (number: U32) => return func (extra: U32) => return @u32.add number extra
@@ -506,8 +506,8 @@ test "persisted semantic owners follow edited bodies and failed sources like fre
     defer a.free(bytes);
     var loaded = try checkpoint.decode(a, compiler, bytes);
     defer loaded.deinit();
-    for ([_][]const u8{ "#Box value => @u32.add value 1", "factory 43", "@u32.eq n 1" }) |replacement| {
-        const anchor = if (std.mem.startsWith(u8, replacement, "#Box")) "#Box value => value" else if (std.mem.startsWith(u8, replacement, "factory")) "factory 42" else "@u32.eq n 0";
+    for ([_][]const u8{ "$Box value => @u32.add value 1", "factory 43", "@u32.eq n 1" }) |replacement| {
+        const anchor = if (std.mem.startsWith(u8, replacement, "$Box")) "$Box value => value" else if (std.mem.startsWith(u8, replacement, "factory")) "factory 42" else "@u32.eq n 0";
         const edited = try std.mem.replaceOwned(u8, a, source, anchor, replacement);
         defer a.free(edited);
         var fixture = try Fixture.init(edited);

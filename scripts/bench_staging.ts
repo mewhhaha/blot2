@@ -57,9 +57,9 @@ entry const answer = func () => return do:
 `;
         const library = (value: number, step: number) =>
           `opaque type Token = U32
-const make = func () => return #Token ${value}
+const make = func () => return $Token ${value}
 const read = func (value: Token) => return case value of
-  #Token number => number
+  $Token number => number
 const generated = ${staged ? "@code.quote (read (make ()))" : "read (make ())"}
 const build = func (value: U32) => return ${
             staged

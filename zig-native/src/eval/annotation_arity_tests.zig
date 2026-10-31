@@ -34,11 +34,11 @@ test "annotation application diagnoses unsaturated and extra type arguments at t
         .{ .source = "const values: Array U32 Bool = #[]\n", .point = 14, .detail = .extra },
         .{ .source = "const value: U32 Bool = 1\n", .point = 13, .detail = .extra },
         .{ .source = "const values: Array Array = #[]\n", .point = 14, .detail = .missing_array },
-        .{ .source = "type Maybe a is data = #Some a | #Nothing\nconst value: Maybe = #Nothing\n", .point = 55, .detail = .missing_nominal },
-        .{ .source = "type Maybe a is data = #Some a | #Nothing\nconst value: (Maybe) = #Nothing\n", .point = 55, .detail = .missing_nominal },
-        .{ .source = "type Maybe a is data = #Some a | #Nothing\nconst value: Maybe U32 Bool = #Nothing\n", .point = 55, .detail = .extra },
-        .{ .source = "type Maybe a is data = #Some a | #Nothing\nconst value: Maybe Array Bool = #Nothing\n", .point = 55, .detail = .missing_array },
-        .{ .source = "type Pair a => type b is data = #Pair (a,b)\nconst value: Pair U32 = #Pair (1,2)\n", .point = 57, .detail = .missing_nominal },
+        .{ .source = "type Maybe a is data = $Some a | $Nothing\nconst value: Maybe = $Nothing\n", .point = 55, .detail = .missing_nominal },
+        .{ .source = "type Maybe a is data = $Some a | $Nothing\nconst value: (Maybe) = $Nothing\n", .point = 55, .detail = .missing_nominal },
+        .{ .source = "type Maybe a is data = $Some a | $Nothing\nconst value: Maybe U32 Bool = $Nothing\n", .point = 55, .detail = .extra },
+        .{ .source = "type Maybe a is data = $Some a | $Nothing\nconst value: Maybe Array Bool = $Nothing\n", .point = 55, .detail = .missing_array },
+        .{ .source = "type Pair a => type b is data = $Pair (a,b)\nconst value: Pair U32 = $Pair (1,2)\n", .point = 57, .detail = .missing_nominal },
     }) |failure| {
         try reject(a, failure);
         try @import("../allocation_failures.zig").checkAllAllocationFailures(a, reject, .{failure});
@@ -67,13 +67,13 @@ test "annotation application resolves argument names before declaring a saturate
 
 test "annotation application preserves curried and shaped nominal constructor instantiation in frozen Core" {
     const source =
-        \\type Curried a => type b is data = #Curried (a,b)
-        \\type Shaped [a,b] is data = #Shaped (a,b)
-        \\const curried: Curried U32 F32 = #Curried (20,1.5)
-        \\const shaped: Shaped [U32,F32] = #Shaped (22,2.5)
+        \\type Curried a => type b is data = $Curried (a,b)
+        \\type Shaped [a,b] is data = $Shaped (a,b)
+        \\const curried: Curried U32 F32 = $Curried (20,1.5)
+        \\const shaped: Shaped [U32,F32] = $Shaped (22,2.5)
         \\entry const answer = do:
-        \\  let #Curried (left,_) = curried
-        \\  let #Shaped (right,_) = shaped
+        \\  let $Curried (left,_) = curried
+        \\  let $Shaped (right,_) = shaped
         \\  break @u32.add left right
     ;
     var tokens = try lexer.lex(a, source);

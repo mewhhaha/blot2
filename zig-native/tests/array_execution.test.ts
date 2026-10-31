@@ -20,13 +20,13 @@ entry const suffix = func (n: U32) : F32 => return do:
 
 Deno.test("generated arrays call captured scalar and aggregate callbacks in index order", async () => {
   await compileAndRun(`
-type Item is data = #Item { value: U32 }
+type Item is data = $Item { value: U32 }
 const indices = @array.generate 3 (func index => return @u32.add index 40)
 entry const staged: U32 = @array.get indices 2
 entry const generated = func (offset: U32) : Array U32 => return @array.generate 4 (func index => return @u32.add index offset)
 entry const floating = func (offset: F32) : Array F32 => return @array.generate 3 (func index => return @f32.add (@u32.to_f32 index) offset)
 entry const nested = func (offset: U32) : U32 => return do:
-  let items = @array.generate 3 (func index => return #Item { value: @u32.add index offset })
+  let items = @array.generate 3 (func index => return $Item { value: @u32.add index offset })
   break (@array.get items 2).value
 entry const empty = func () : Array U32 => return @array.generate 0 (func (index: U32) : U32 => return @panic "uncalled generator")
 `, guest => {

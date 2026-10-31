@@ -27,8 +27,8 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 }
 
 const declarations =
-    \\type B [w, s] is data = #B { initial: w, s: w -> s }
-    \\type System [route, start] is data = #Route route | #Start start
+    \\type B [w, s] is data = $B { initial: w, s: w -> s }
+    \\type System [route, start] is data = $Route route | $Start start
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
     \\type Render a is contract = { const show: a -> U32 }
     \\impl Number : Render U32 = { const show = func value => return value }
@@ -37,9 +37,9 @@ const declarations =
     \\  let scope = func world => return func action => return do:
     \\    use result <- action ()
     \\    break (world, result)
-    \\  break #B { initial: (), s: scope }
+    \\  break $B { initial: (), s: scope }
     \\const run = func b => return func action => return do:
-    \\  let #B { initial, s } = b
+    \\  let $B { initial, s } = b
     \\  break s initial action
     \\const counter = func () => return do:
     \\  use value <- State.get ()
@@ -49,7 +49,7 @@ const declarations =
     \\  let b = empty ()
     \\  let (_, r) = run b (func () => return x)
     \\  let boxed = #[b, b]
-    \\  let systems = #[#Route (func (e: u) => return e), #Start (func () => return ())]
+    \\  let systems = #[$Route (func (e: u) => return e), $Start (func () => return ())]
     \\  break @u32.add (@u32.add r (render x)) (@u32.add (@array.length boxed) (@array.length systems))
 ;
 
@@ -115,11 +115,11 @@ test "unit quantified variable sets agree with a scan of every declaration and s
 }
 
 const flows =
-    \\data Maybe a = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const Cursor.next = func (cursor: Cursor collection) => return
     \\  if @cursor.has cursor
-    \\  then #Some (@cursor.value cursor, @cursor.advance cursor)
-    \\  else #Nothing
+    \\  then $Some (@cursor.value cursor, @cursor.advance cursor)
+    \\  else $Nothing
     \\const progress = func (values: Array U32) => return do:
     \\  let original = @array.cursor values
     \\  let cursor = original
@@ -128,7 +128,7 @@ const flows =
     \\    if @u32.lt 10000 total:
     \\      break
     \\    use step <- cursor.next
-    \\    let #Some (value, rest) = step else:
+    \\    let $Some (value, rest) = step else:
     \\      break
     \\    total := @u32.add self value
     \\    cursor := rest

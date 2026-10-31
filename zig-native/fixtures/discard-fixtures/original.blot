@@ -1,10 +1,10 @@
 
-data Maybe a = #Some a | #Nothing
+type Maybe a is data = $Some a | $Nothing
 const identity = func value => return value
-const empty = #Nothing
-const nested = #Some (#Some 42)
+const empty = $Nothing
+const nested = $Some ($Some 42)
 const reference = identity
-const constructor = #Some
+const constructor = $Some
 const closure = (func captured => return func value => return @u32.add captured value) 2
 entry const answer = func () => return closure 40
 entry const probe = func () => return do:

@@ -34,8 +34,8 @@ const producer = (storage: Storage, parameter = "value") => {
     : "value";
   return `opaque type Token = ${representation}
 private const offset = 2
-const make: U32 -> Token = func ${parameter} => return #Token (${payload})
-const read: Token -> U32 = func (#Token value) => return ${observed}
+const make: U32 -> Token = func ${parameter} => return $Token (${payload})
+const read: Token -> U32 = func ($Token value) => return ${observed}
 `;
 };
 // Runtime selection keeps the opaque argument/result inside real closure calls.
@@ -49,8 +49,8 @@ const main = `import {transform} from "./bridge"
 entry const answer = func (value: U32) => return transform value
 `;
 const carrier = `opaque type Envelope = Token
-const pack = func value => return #Envelope (make value)
-const unpack = func (#Envelope value) => return read value
+const pack = func value => return $Envelope (make value)
+const unpack = func ($Envelope value) => return read value
 const factories = #[pack, func value => return pack value]
 const readers = #[unpack, func value => return unpack value]
 const carry = func (value: U32) => return (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)

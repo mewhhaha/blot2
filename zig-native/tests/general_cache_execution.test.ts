@@ -2,12 +2,12 @@ import { strict as assert } from "node:assert";
 import { createCompiler, instantiateGuest } from "../../mod.ts";
 
 const declarations = `
-type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
+type Pack [unused, selected] is data = $Pack { unused: unused, selected: selected }
 const identity = func value => return value
-const packed = #Pack { unused: identity, selected: func (value: U32) => return value + 1 }
+const packed = $Pack { unused: identity, selected: func (value: U32) => return value + 1 }
 const invoke = func callback => return callback 1
 const capture = func packed => return func (value: U32) => return invoke (func extra => return do:
-  let #Pack { selected } = packed
+  let $Pack { selected } = packed
   break selected (value + extra))
 const work = func (value: U32) => return do:
   let total = 0

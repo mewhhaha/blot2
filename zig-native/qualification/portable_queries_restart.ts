@@ -32,10 +32,10 @@ for (const entry of [...Deno.readDirSync(`${repo}/examples`)].sort((a, b) => a.n
 // Principal-heavy families: each entry records a complete principal proof with
 // a call publication; rows families add inferred effect-row mappings.
 function principalFamily(count: number): string {
-  const lines = ["type Box is data = #Box U32"];
+  const lines = ["type Box is data = $Box U32"];
   for (let i = 0; i < count; i++) {
-    lines.push(`const extract${i} = func (box: Box) : U32 => return case box of\n  #Box value => @u32.add value ${i}`);
-    lines.push(`entry const answer${i}: U32 where { type_rep U32 } = @u32.div 8 (extract${i} (#Box 2))`);
+    lines.push(`const extract${i} = func (box: Box) : U32 => return case box of\n  $Box value => @u32.add value ${i}`);
+    lines.push(`entry const answer${i}: U32 where { type_rep U32 } = @u32.div 8 (extract${i} ($Box 2))`);
   }
   return lines.join("\n") + "\n";
 }

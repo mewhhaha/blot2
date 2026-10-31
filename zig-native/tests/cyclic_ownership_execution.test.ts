@@ -5,23 +5,23 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const cycleDefinitions = `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
 const keep = func ~value => return func () => return @demand value
 const get = func (witness: Unit -> a) : a => return State.get ()
 const cycle = func (seed: U32) => return do:
-  let (_, result) = @effect.run State.get State.set #End (func () => return do:
-    let delayed = keep (get (func () => return #End))
-    use State.set (#Next delayed)
+  let (_, result) = @effect.run State.get State.set $End (func () => return do:
+    let delayed = keep (get (func () => return $End))
+    use State.set ($Next delayed)
     use first <- delayed ()
-    use State.set #End
+    use State.set $End
     use cached <- delayed ()
     break case cached of
-      #End => @panic "the demand lost its memoized cycle"
-      #Next same => do:
+      $End => @panic "the demand lost its memoized cycle"
+      $Next same => do:
         use again <- same ()
         break case again of
-          #End => @panic "the retained closure lost its memo"
-          #Next _ => seed
+          $End => @panic "the retained closure lost its memo"
+          $Next _ => seed
   )
   break result
 `;
@@ -136,8 +136,8 @@ Deno.test("source State and strong demand cycles retire locally during sustained
 Deno.test("an unconfined State graph retains real local cycle collection under sustained execution", async () => {
   await compileCyclesInBothTiers(
     cycleSource.replace(
-      "    use State.set #End",
-      "    use State.set (#Next delayed)",
+      "    use State.set $End",
+      "    use State.set ($Next delayed)",
     ),
     (bytes) => {
       const module = new WebAssembly.Module(bytes);
@@ -237,22 +237,22 @@ Deno.test("a large retained heap preserves its owner while local cycle passes us
 const suspendedSource = `${cycleDefinitions}
 
 entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:
-  use outcome <- @effect.run State.get State.set #End (func () => return do:
-    let delayed = keep (get (func () => return #End))
-    use State.set (#Next delayed)
+  use outcome <- @effect.run State.get State.set $End (func () => return do:
+    let delayed = keep (get (func () => return $End))
+    use State.set ($Next delayed)
     use first <- delayed ()
-    use State.set #End
+    use State.set $End
     for index in 0..4000:
       let discarded = cycle index
     use seed <- host ()
     use cached <- delayed ()
     break case cached of
-      #End => @panic "the suspended memo lost its cycle"
-      #Next same => do:
+      $End => @panic "the suspended memo lost its cycle"
+      $Next same => do:
         use again <- same ()
         break case again of
-          #End => @panic "the suspended closure lost its memo"
-          #Next _ => seed
+          $End => @panic "the suspended closure lost its memo"
+          $Next _ => seed
   )
   let (_, result) = outcome
   break result
@@ -332,18 +332,18 @@ entry const run = func (count: U32) => return do:
   let sum = 0
   for index in 0..count:
     let work = @computation (func () => return do:
-      use outcome <- @effect.run State.get State.set #End (func () => return do:
-        let delayed = keep (get (func () => return #End))
-        use State.set (#Next delayed)
+      use outcome <- @effect.run State.get State.set $End (func () => return do:
+        let delayed = keep (get (func () => return $End))
+        use State.set ($Next delayed)
         use first <- delayed ()
-        use State.set #End
+        use State.set $End
         for pressure in 0..64:
           let discarded = cycle pressure
         use resumed <- Tick.read index
         use cached <- delayed ()
         break case cached of
-          #End => @panic "the request lost its ready memo"
-          #Next _ => resumed
+          $End => @panic "the request lost its ready memo"
+          $Next _ => resumed
       )
       let (_, result) = outcome
       break result

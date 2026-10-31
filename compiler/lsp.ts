@@ -318,7 +318,7 @@ export class CompletionBridge {
               textDocumentSync: { openClose: true, change: 1 },
               completionProvider: {
                 resolveProvider: false,
-                triggerCharacters: [".", "#"],
+                triggerCharacters: [".", "$"],
               },
             },
             serverInfo: { name: "blot" },

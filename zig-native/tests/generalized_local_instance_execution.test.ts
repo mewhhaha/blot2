@@ -3,11 +3,11 @@ import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.
 // Issue #10: generalized locals whose instances agree on one layout prepare
 // checked storage at that instance instead of an erased payload.
 const builder = `
-type B [w, s] is data = #B { initial: w, s: w -> s }
+type B [w, s] is data = $B { initial: w, s: w -> s }
 const base = func world => return func action => return (world, action ())
-const empty = func () => return #B { initial: (), s: base }
+const empty = func () => return $B { initial: (), s: base }
 const run = func b => return func action => return do:
-  let #B { initial, s } = b
+  let $B { initial, s } = b
   break s initial action
 `;
 
@@ -65,8 +65,8 @@ entry const main = func (x: U32) => return do:
 });
 
 const cells = `
-type Builder [world, scope, schema] is data = #Builder { initial: world, scope: world -> scope, schema: schema }
-type End is data = #End
+type Builder [world, scope, schema] is data = $Builder { initial: world, scope: world -> scope, schema: schema }
+type End is data = $End
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -74,17 +74,17 @@ type State a is effect = {
 const empty_scope = func world => return func action => return do:
   use result <- action ()
   break (world, result)
-const empty = func () => return #Builder { initial: (), scope: empty_scope, schema: #End }
+const empty = func () => return $Builder { initial: (), scope: empty_scope, schema: $End }
 const insert_cell = func initial => return func builder => return do:
-  let #Builder { initial: previous_initial, scope: previous_scope, schema } = builder
+  let $Builder { initial: previous_initial, scope: previous_scope, schema } = builder
   let scope = func world => return func action => return do:
     let (current, previous) = world
     use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
     let (next, (previous_next, result)) = outcome
     break ((next, previous_next), result)
-  break #Builder { initial: (initial, previous_initial), scope, schema }
+  break $Builder { initial: (initial, previous_initial), scope, schema }
 const create = func builder => return func action => return do:
-  let #Builder { initial, scope } = builder
+  let $Builder { initial, scope } = builder
   break scope initial action
 `;
 
@@ -283,25 +283,25 @@ type State a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type App [world, scope, render] is data = #App { initial: world, scope: world -> scope, render: render }
-type Trace is data = #Trace (Array U32)
+type App [world, scope, render] is data = $App { initial: world, scope: world -> scope, render: render }
+type Trace is data = $Trace (Array U32)
 const empty = func () => return do:
   let scope = func world => return func action => return do:
     use outcome <- @effect.run State.get State.set world action
     break outcome
-  break #App { initial: #Trace #[], scope, render: func (frame: U32) => return frame }
+  break $App { initial: $Trace #[], scope, render: func (frame: U32) => return frame }
 const note = func (value: U32) => return do:
   use current <- State.get ()
-  let #Trace values = current
-  break State.set (#Trace #[...values, value])
+  let $Trace values = current
+  break State.set ($Trace #[...values, value])
 const with_render = func render => return func app => return do:
-  let #App { initial, scope } = app
-  break #App { initial, scope, render }
+  let $App { initial, scope } = app
+  break $App { initial, scope, render }
 const initial = func app => return do:
-  let #App { initial } = app
+  let $App { initial } = app
   break initial
 const run = func app => return func world => return func action => return do:
-  let #App { scope } = app
+  let $App { scope } = app
   break scope world action
 entry const memory = func () : Array U32 => return #[]
 `;
@@ -320,14 +320,14 @@ async function returnsArgumentWithMemory(source: string): Promise<void> {
 Deno.test("promoted builders serialize curried callbacks whose rows a use leaves open", async () => {
   await returnsArgumentWithMemory(`${app}
 const render = func app => return func frame => return do:
-  let #App { render } = app
+  let $App { render } = app
   break render 2 frame
 entry const main = func (x: U32) => return do:
   let app = with_render (func (scale: U32) => return func (frame: U32) => return do:
     use note frame
     break frame * scale) (empty ())
   let (trace, doubled) = run app (initial app) (func () => return render app x)
-  let #Trace values = trace
+  let $Trace values = trace
   break doubled - x + values.length - 1
 `);
 });
@@ -338,7 +338,7 @@ entry const main = func (x: U32) => return do:
 Deno.test("rebinding links that read a promoted builder are promoted with it", async () => {
   await returnsArgumentWithMemory(`${app}
 const render = func app => return func frame => return do:
-  let #App { render } = app
+  let $App { render } = app
   break render frame
 entry const main = func (x: U32) => return do:
   let app = empty ()
@@ -346,7 +346,7 @@ entry const main = func (x: U32) => return do:
     use note frame
     break frame + 1) self
   let (trace, next) = run app (initial app) (func () => return render app x)
-  let #Trace values = trace
+  let $Trace values = trace
   break next + values.length - 2
 `);
 });
@@ -357,14 +357,14 @@ entry const main = func (x: U32) => return do:
 // scope's action result open; before this, `b` was serialized at an erased
 // result and reported `ownership_unproved`.
 const scoped = `
-type B [w, s] is data = #B { initial: w, s: w -> s }
+type B [w, s] is data = $B { initial: w, s: w -> s }
 const empty = func () => return do:
   let scope = func world => return func action => return do:
     use result <- action ()
     break (world, result)
-  break #B { initial: (), s: scope }
+  break $B { initial: (), s: scope }
 const run = func b => return func action => return do:
-  let #B { initial, s } = b
+  let $B { initial, s } = b
   break s initial action
 entry const memory = func () : Array U32 => return #[]
 `;
@@ -431,19 +431,19 @@ entry const main = func (x: U32) => return do:
 // systems whole. The promoted builders serialize it as a pure `U32 -> U32`.
 Deno.test("promoted builders serialize a polymorphic callback no use applies", async () => {
   await returnsArgumentWithMemory(`${scoped}
-type System [route, start] is data = #Route route | #Start start
-type App [engine, system] is data = #App { engine: engine, systems: Array system }
-const new_with = func route => return #App { engine: empty (), systems: #[#Route route, #Start (func () => return ())] }
+type System [route, start] is data = $Route route | $Start start
+type App [engine, system] is data = $App { engine: engine, systems: Array system }
+const new_with = func route => return $App { engine: empty (), systems: #[$Route route, $Start (func () => return ())] }
 const finish = func app => return do:
-  let #App { engine, systems } = app
-  break #App { engine, systems }
+  let $App { engine, systems } = app
+  break $App { engine, systems }
 const run_start = func systems => return func () => return do:
   for system in systems:
     use case system of
-      #Start start => start ()
+      $Start start => start ()
       _ => ()
 const create = func app => return func () => return do:
-  let #App { engine, systems } = app
+  let $App { engine, systems } = app
   let (world, _) = run engine (run_start systems)
   break world
 entry const main = func (x: U32) => return do:
@@ -460,7 +460,7 @@ entry const main = func (x: U32) => return do:
 // their length once exhausted a per-body search budget and reported
 // `ownership_unproved`; every hole still takes word storage.
 Deno.test("a large unit still stores the ambiguous holes of its generalized locals as words", async () => {
-  const padding = Array.from({ length: 200 }, (_, unit) => `type Pad${unit} is data = ${Array.from({ length: 8 }, (_, tag) => `#P${unit}x${tag}`).join(" | ")}`).join("\n");
+  const padding = Array.from({ length: 200 }, (_, unit) => `type Pad${unit} is data = ${Array.from({ length: 8 }, (_, tag) => `$P${unit}x${tag}`).join(" | ")}`).join("\n");
   const locals = Array.from({ length: 20 }, (_, index) => `  let boxed${index} = #[b, b]`).join("\n");
   const lengths = Array.from({ length: 20 }, (_, index) => `boxed${index}.length`).join(" + ");
   await returnsArgumentWithMemory(`${scoped}${padding}

@@ -19,7 +19,7 @@ entry const changed = func seed => return do:
   let original = [seed, seed + 1, seed + 2, seed + 3, seed + 4]
   let saved = original.iter
   let changed = list.splice 1 2 [10, 11, 12] original
-  let #Some (first, _) = saved.next else:
+  let $Some (first, _) = saved.next else:
     break #[]
   let before = Array.from_list original
   let after = Array.from_list changed
@@ -92,12 +92,12 @@ Deno.test("cursor positions and retained collections are immutable snapshots", a
 import * as iter from "std/iter"
 import * as list from "std/list"
 const first = func cursor => return case cursor.next of
-  #Some (value, _) => value
-  #Nothing => 999
+  $Some (value, _) => value
+  $Nothing => 999
 const check = func (size: U32) => return do:
   let values = @list.generate size (func index => return index)
   let cursor = values.iter
-  let #Some (_, second) = cursor.next else:
+  let $Some (_, second) = cursor.next else:
     break 0
   values := [999, ...self]
   let from_start = iter.collect_list cursor
@@ -109,14 +109,14 @@ entry const array = func seed => return do:
   let values = #[seed, seed + 1, seed + 2]
   let cursor = values.iter
   values[0] := 1000
-  let #Some (_, second) = cursor.next else:
+  let $Some (_, second) = cursor.next else:
     break 0
   break first cursor + first second + values[0]
 const frozen_cursor = @cursor.advance [40, 41, 42].iter
 entry const frozen = func () => return first frozen_cursor
 entry const empty = func () => return case [].iter.next of
-  #Nothing => 42
-  #Some (_, _) => 0
+  $Nothing => 42
+  $Some (_, _) => 0
 `, guest => {
     equal(guest.call("run", 500), 1999);
     equal(guest.read("staged"), 1999);
@@ -129,42 +129,42 @@ entry const empty = func () => return case [].iter.next of
 Deno.test("iterator effects run in pull order and stop on take, break and return", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
-type Count is data = #Count U32
-type Counter is data = #Counter U32
+type Count is data = $Count U32
+type Counter is data = $Counter U32
 const Counter.iter = func (cursor: Counter) => return cursor
 const Counter.next = func (cursor: Counter) => return do:
-  let #Counter value = cursor
-  use count <- @state.get #Count
-  let #Count before = count
-  use @state.set (#Count (before + 1))
-  break #Some (value, #Counter (value + 1))
+  let $Counter value = cursor
+  use count <- @state.get $Count
+  let $Count before = count
+  use @state.set ($Count (before + 1))
+  break $Some (value, $Counter (value + 1))
 const sum = func limit => return do:
   let result = 0
-  for value in iter.take limit (#Counter 0):
+  for value in iter.take limit ($Counter 0):
     result := self + value
   break result
 entry const taken = func limit => return do:
-  let (#Count pulls, result) = @state.run (#Count 0) (func () => return sum limit)
+  let ($Count pulls, result) = @state.run ($Count 0) (func () => return sum limit)
   break pulls * 100 + result
 entry const broken = func limit => return do:
-  let (#Count pulls, result) = @state.run (#Count 0) (func () => return do:
+  let ($Count pulls, result) = @state.run ($Count 0) (func () => return do:
     let total = 0
-    for value in #Counter 0:
+    for value in $Counter 0:
       total := self + value
       if value == limit:
         break
     break total)
   break pulls * 100 + result
 entry const returned = func limit => return do:
-  let (#Count pulls, result) = @state.run (#Count 0) (func () => return do:
-    for value in #Counter 0:
+  let ($Count pulls, result) = @state.run ($Count 0) (func () => return do:
+    for value in $Counter 0:
       if value == limit:
         break value
     break 999)
   break pulls * 100 + result
 entry const filtered = func limit => return do:
-  let (#Count pulls, result) = @state.run (#Count 0) (func () => return
-    iter.fold_left add 0 (iter.take_while (func value => return value < limit) (iter.map (func value => return value * 2) (#Counter 0))))
+  let ($Count pulls, result) = @state.run ($Count 0) (func () => return
+    iter.fold_left add 0 (iter.take_while (func value => return value < limit) (iter.map (func value => return value * 2) ($Counter 0))))
   break pulls * 100 + result
 `, guest => {
     equal(guest.call("taken", 0), 0);
@@ -182,12 +182,12 @@ const sequence = func stop => return do (monad Maybe):
   let sum = 0
   for value in iter.range 0 5:
     if value == stop:
-      use missing <- #Nothing
+      use missing <- $Nothing
     sum := self + value
   break sum
 entry const run = func stop => return case sequence stop of
-  #Some value => value
-  #Nothing => 999
+  $Some value => value
+  $Nothing => 999
 entry const nested = func count => return do:
   let result = 0
   for outer in iter.range 0 count:
@@ -233,14 +233,14 @@ entry const adapted = func (values: Array F32) => return valid (iter.take 2 valu
 
 Deno.test("ordinary local cursor wrappers and finite loop carries use scalar storage", async () => {
   await compileAndRun(`
-type Moved a is data = #Moved a
-const move = func cursor => return #Moved (@cursor.advance cursor)
+type Moved a is data = $Moved a
+const move = func cursor => return $Moved (@cursor.advance cursor)
 entry const run = func count => return do:
   let values = @array.generate (count + 1) (func index => return index)
   let cursor = values.iter
   let total = 0
   for index in 0..count:
-    let #Moved next = move cursor
+    let $Moved next = move cursor
     total := self + @cursor.value next
     cursor := next
   break total

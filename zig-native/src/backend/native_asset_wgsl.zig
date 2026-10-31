@@ -379,7 +379,7 @@ const Reader = struct {
         }
         if (self.parameters) {
             if (self.fields.items.len > 4) return self.fail(self.fields.items[4].token, "asset_wgsl_parameters", "Parameters must contain at most four f32 fields");
-            try self.put(&self.header, "type Parameters is data = #Parameters { ");
+            try self.put(&self.header, "type Parameters is data = $Parameters { ");
             for (self.fields.items, 0..) |field, index| {
                 if (!std.mem.eql(u8, self.resolve(field.type_name), "f32")) return self.fail(field.token, "asset_wgsl_parameters", "Parameters fields must resolve to f32");
                 if (!blotName(field.name)) return self.fail(field.token, "asset_identifier", "WGSL field is not a Blot identifier");
@@ -876,7 +876,7 @@ fn identifierContinue(byte: u8) bool {
 }
 fn blotName(text: []const u8) bool {
     if (text.len == 0 or std.mem.eql(u8, text, "_") or !(std.ascii.isLower(text[0]) or text[0] == '_')) return false;
-    var words = std.mem.tokenizeScalar(u8, "const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where", ' ');
+    var words = std.mem.tokenizeScalar(u8, "const let type data effect is func do use return yield break for ever continue in case of if then else as import infix infixl infixr self where and or true false", ' ');
     while (words.next()) |word| if (std.mem.eql(u8, word, text)) return false;
     for (text) |byte| if (!identifierContinue(byte)) return false;
     return true;
@@ -1001,7 +1001,7 @@ fn expectSource(allocator: Allocator, input: []const u8, expected: []const u8) !
     }
 }
 test "WGSL reflection folds scalar constants and resolves Parameters aliases" {
-    try expectSource(std.testing.allocator, "alias Scalar = f32; struct Parameters { amount: Scalar, time: f32, } const integer: u32 = 2; const count = 1u + 2u; const amount = clamp(2.0, 0.0, 1.0); const origin = -4.0; const enabled = true and !false; const ignored = vec3f(1., 2., 3.); const lane = ignored.y;", "type Parameters is data = #Parameters { amount: F32, time: F32 }\nconst count: U32 = 3\nconst amount: F32 = 1.0\nconst origin: F32 = (-4.0)\nconst enabled: Bool = true\nconst lane: F32 = 2.0\n");
+    try expectSource(std.testing.allocator, "alias Scalar = f32; struct Parameters { amount: Scalar, time: f32, } const integer: u32 = 2; const count = 1u + 2u; const amount = clamp(2.0, 0.0, 1.0); const origin = -4.0; const enabled = true && !false; const ignored = vec3f(1., 2., 3.); const lane = ignored.y;", "type Parameters is data = $Parameters { amount: F32, time: F32 }\nconst count: U32 = 3\nconst amount: F32 = 1.0\nconst origin: F32 = (-4.0)\nconst enabled: Bool = true\nconst lane: F32 = 2.0\n");
 }
 test "WGSL syntax validates bodies and rejects malformed reflected declarations" {
     const inputs = [_][]const u8{ "struct Parameters { a: vec2f, }", "struct Parameters { a:f32,b:f32,c:f32,d:f32,e:f32 }", "@vertex fn main( -> {", "fn main() { let x = ; }", "/* unclosed", "const broken=1.0+;" };
@@ -1015,7 +1015,7 @@ test "WGSL syntax validates bodies and rejects malformed reflected declarations"
     try expectSource(std.testing.allocator, "@fragment fn main(@location(0) uv: vec2f) -> @location(0) vec4f { var n = 0u; for (var i = 0u; i < 4u; i++) { n += i; } if (n > 0u) { return vec4f(uv, f32(n), 1.0); } else { return vec4f(0.0); } }", "");
 }
 test "WGSL generated ownership survives every allocation failure" {
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, expectSource, .{ "struct Parameters { x:f32 } const x = sqrt(4.0);", "type Parameters is data = #Parameters { x: F32 }\nconst x: F32 = 2.0\n" });
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, expectSource, .{ "struct Parameters { x:f32 } const x = sqrt(4.0);", "type Parameters is data = $Parameters { x: F32 }\nconst x: F32 = 2.0\n" });
 }
 
 test "WGSL scalar and vector evaluation preserves the pinned reflector ABI" {
@@ -1023,8 +1023,8 @@ test "WGSL scalar and vector evaluation preserves the pinned reflector ABI" {
 }
 
 test "WGSL aliases comments attributes and structured statements remain syntax" {
-    try expectSource(std.testing.allocator, "/* outer /* inner */ */ alias Scalar=f32; struct Parameters { @align(16) gain: Scalar } const size=2u; @group(0) @binding(0) var<uniform> table: array<vec4f,size+2u>; fn work() { var i=0u; loop { i+=1u; if (i>=2u) { break; } continuing { break if i==3u; } } switch i { case 0u,1u: { return; } default: { discard; } } }", "type Parameters is data = #Parameters { gain: F32 }\nconst size: U32 = 2\n");
-    try expectSource(std.testing.allocator, "struct Parameters {} const n = 2; const n = 3u;", "type Parameters is data = #Parameters {  }\nconst n: U32 = 3\n");
+    try expectSource(std.testing.allocator, "/* outer /* inner */ */ alias Scalar=f32; struct Parameters { @align(16) gain: Scalar } const size=2u; @group(0) @binding(0) var<uniform> table: array<vec4f,size+2u>; fn work() { var i=0u; loop { i+=1u; if (i>=2u) { break; } continuing { break if i==3u; } } switch i { case 0u,1u: { return; } default: { discard; } } }", "type Parameters is data = $Parameters { gain: F32 }\nconst size: U32 = 2\n");
+    try expectSource(std.testing.allocator, "struct Parameters {} const n = 2; const n = 3u;", "type Parameters is data = $Parameters {  }\nconst n: U32 = 3\n");
 }
 
 fn expectIssue(allocator: Allocator, input: []const u8, code: []const u8) !void {

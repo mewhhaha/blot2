@@ -10,8 +10,8 @@ const hidden =
   "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\n";
 for (const selected of [false, true]) {
   const initial = header +
-    "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\n" +
-    `const read: Token -> U32 = func (#Token value) => return ${
+    "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\n" +
+    `const read: Token -> U32 = func ($Token value) => return ${
       selected ? "Source.first value" : "value"
     }\n`;
   const variants = [

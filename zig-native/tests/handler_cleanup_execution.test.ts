@@ -46,16 +46,16 @@ Deno.test("an escaping State payload survives private frame cleanup and later st
   await compileAndRun(
     `
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Thunk is data = #Thunk (Unit -> U32)
+type Thunk is data = $Thunk (Unit -> U32)
 const make = func (seed: U32) => return do:
-  let provider = @effect.state (State.get Thunk) (State.set Thunk) (#Thunk (func () => return seed))
+  let provider = @effect.state (State.get Thunk) (State.set Thunk) ($Thunk (func () => return seed))
   let (state, result) = do provider:
-    use State.set Thunk (#Thunk (func () => return seed + 1))
+    use State.set Thunk ($Thunk (func () => return seed + 1))
     break seed
   break state
 entry const exercise = func (seed: U32) => return do:
-  let #Thunk first = make seed
-  let #Thunk second = make (seed + 40)
+  let $Thunk first = make seed
+  let $Thunk second = make (seed + 40)
   break first () + second ()
 entry const memory = func () : Array U32 => return #[]
 `,

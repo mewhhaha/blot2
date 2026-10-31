@@ -30,7 +30,7 @@ Deno.test("trivia-only edits reuse output and later edits match fresh builds", a
     }`;
     const spaced = withComment.replace(" = ", " =   ");
     const added = `${original}\nconst trivia_probe_value: U32 = 1\n`;
-    const broken = `${withComment}\nconst broken_trivia_probe: U32 = #Wrong\n`;
+    const broken = `${withComment}\nconst broken_trivia_probe: U32 = $Wrong\n`;
     // [text, expected trivia reuse relative to the last compiled revision]
     const revisions: [string, boolean][] = [
       [original, false],

@@ -3,7 +3,7 @@ export const loopCases = [
     name: "continue_range_collection_and_pattern_guard",
     expected: { range: 18, collection: 8, nested: 6, guarded: 7, folded: 18 },
     source: `
-type Maybe a is data = #Some a | #None
+type Maybe a is data = $Some a | $None
 entry const range = func () => return do:
   let total = 0
   for index in 0..6:
@@ -29,8 +29,8 @@ entry const nested = func () => return do:
   break total
 entry const guarded = func () => return do:
   let total = 0
-  for candidate in #[#None, #Some 2, #Some 5]:
-    let #Some value = candidate else:
+  for candidate in #[$None, $Some 2, $Some 5]:
+    let $Some value = candidate else:
       continue
     total := @u32.add self value
   break total
@@ -342,6 +342,6 @@ entry const run = func () => return do:
     name: "array_refutable",
     error: "non_exhaustive_match",
     source:
-      "type Maybe a is data = #Some a | #None\nentry const run = func () => return do:\n  for #Some value in #[#Some 42, #None]:\n    use value\n  break 0\n",
+      "type Maybe a is data = $Some a | $None\nentry const run = func () => return do:\n  for $Some value in #[$Some 42, $None]:\n    use value\n  break 0\n",
   },
 ] as const;

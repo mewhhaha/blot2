@@ -10,7 +10,7 @@ const memory = @import("../runtime/memory.zig");
 const a = std.testing.allocator;
 
 fn effectFixture() !Fixture {
-    var fixture = try Fixture.init("entry const chronology = func () => return 42\nentry const principal = func ~(value: U32) => return @force value\n");
+    var fixture = try Fixture.init("entry const chronology = func () => return 42\nentry const principal = func ~(value: U32) => return @demand value\n");
     errdefer fixture.deinit();
     var store = &fixture.checked.types;
     const early = try store.internOperation(.{ .unit = 7, .decl = 9 }, &.{types.u32_type});
@@ -423,12 +423,12 @@ test "typed core owns export bytes types spans and control after syntax teardown
 
 test "lowering preserves unreachable traps and lazy Boolean control without evaluation" {
     var fixture = try Fixture.init(
-        \\infixr 25 (&&) = _fixity_and
+        \\infixr 25 (<&>) = _fixity_and
         \\infix 30 (==) = _fixity_eq
         \\const unused = @u32.div 1 0
-        \\entry const safe = (@u32.eq 0 1) && (@u32.div 1 0 == 0)
+        \\entry const safe = (@u32.eq 0 1) <&> (@u32.div 1 0 == 0)
         \\entry const chosen = if @u32.eq 1 1 then 42 else @u32.div 1 0
-        \\const _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @force right else false
+        \\const _fixity_and = func (left: Bool) => return func ~(right: Bool) => return if left then @demand right else false
         \\const _fixity_eq = func left => return func right => return @type.call "eq" left right
     );
     defer fixture.deinit();

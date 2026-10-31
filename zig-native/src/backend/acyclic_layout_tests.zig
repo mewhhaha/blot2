@@ -14,26 +14,26 @@ const proof = @import("acyclic_layout.zig");
 const a = std.testing.allocator;
 const io = std.testing.io;
 
-const prelude = "type Maybe a is data = #Nothing | #Some a\n";
+const prelude = "type Maybe a is data = $Nothing | $Some a\n";
 const link =
-    \\type Vec is data = #Vec { x: F32, y: F32 }
-    \\type Link a is data = #End | #Next (Link a, a)
+    \\type Vec is data = $Vec { x: F32, y: F32 }
+    \\type Link a is data = $End | $Next (Link a, a)
     \\
 ;
 const shapes =
     \\import * as link from "./link"
-    \\type Draw is data = #Draw { position: link.Vec, tint: Maybe link.Vec, extra: Array link.Vec, path: List link.Vec, chain: link.Link U32 }
-    \\type Tree is data = #Leaf U32 | #Branch (Array Tree)
-    \\type Callback is data = #Ready U32 | #Later (Unit -> U32)
+    \\type Draw is data = $Draw { position: link.Vec, tint: Maybe link.Vec, extra: Array link.Vec, path: List link.Vec, chain: link.Link U32 }
+    \\type Tree is data = $Leaf U32 | $Branch (Array Tree)
+    \\type Callback is data = $Ready U32 | $Later (Unit -> U32)
     \\entry const answer = func (value: U32) => return value
     \\
 ;
 const owner =
     \\import * as link from "./link"
     \\const grow = func (count: U32) => return do:
-    \\  let root: link.Link U32 = #link.End
+    \\  let root: link.Link U32 = $link.End
     \\  for index in 0..count:
-    \\    root := #link.Next (self, index)
+    \\    root := $link.Next (self, index)
     \\  break root
     \\entry const run = func (count: U32) => return do:
     \\  let root = grow count
@@ -219,8 +219,8 @@ test "a foreign closure constructor edit re-emits the owner without its acyclic 
     defer checkpoint.deinit();
     // The owner is unchanged; only the foreign family gains a closure variant.
     try write(tmp.dir, "link.blot",
-        \\type Vec is data = #Vec { x: F32, y: F32 }
-        \\type Link a is data = #End | #Next (Link a, a) | #Later (Unit -> a)
+        \\type Vec is data = $Vec { x: F32, y: F32 }
+        \\type Link a is data = $End | $Next (Link a, a) | $Later (Unit -> a)
         \\
     );
     var changed_ready = try lower(tmp.dir);

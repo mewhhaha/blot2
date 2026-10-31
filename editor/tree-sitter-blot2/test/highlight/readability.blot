@@ -6,10 +6,10 @@ const from = func value => return value
 entry const normalized = func value => return from value / 6555.0
 //                                            ^ variable
 
-const and = func left => return func ~(right: Bool) => return if left then @demand right else false
-//                                   ^ operator
-//                                    ^ punctuation.bracket
-//                                                                     ^ keyword.control.conditional
+const and_then = func left => return func ~(right: Bool) => return if left then @demand right else false
+//                                        ^ operator
+//                                         ^ punctuation.bracket
+//                                                                          ^ keyword.control.conditional
 
 const demand = func ~value => return @demand value
 //    ^^^^^^ function
@@ -17,11 +17,11 @@ const demand = func ~value => return @demand value
 //                   ^^^^^ variable.parameter
 //                                   ^^^^^^^ function.builtin
 
-const compatible = func ~value => return @force value
+const evaluated = func ~value => return @demand value
 //                                       ^^^^^^ function.builtin
 
 const same = func a => return func b => return if :a == :b then true else false
 const project = .x
 const choose = func value => return case value of
-  #Some a | #Some a if a > 0 => a
+  $Some a | $Some a if a > 0 => a
   _ => 0

@@ -104,13 +104,13 @@ test "changed entry dependency set declines without exposing an unused cached ca
 
 test "fresh entry nominal State operation and record order match ordinary conceptual owners" {
     const entry_source = files[0][1] ++
-        \\data EntryCell = #EntryCell U32
-        \\data EntryRecord = #EntryRecord { zebra: U32, alpha: F32 }
+        \\type EntryCell is data = $EntryCell U32
+        \\type EntryRecord is data = $EntryRecord { zebra: U32, alpha: F32 }
         \\effect Ask: Unit -> F32
         \\const evaluate = func () => return do (@effect.provider Ask (func () => return 0.5)):
-        \\  let (_, #EntryCell count) = @state.run (#EntryCell 42) (func () => return @state.get #EntryCell)
+        \\  let (_, $EntryCell count) = @state.run ($EntryCell 42) (func () => return @state.get $EntryCell)
         \\  use fraction <- Ask ()
-        \\  let record = #EntryRecord { zebra: count, alpha: fraction }
+        \\  let record = $EntryRecord { zebra: count, alpha: fraction }
         \\  break @f32.add (@u32.to_f32 record.zebra) record.alpha
         \\entry const owned: Unit -> F32 = func () => return evaluate ()
         \\entry const folded = evaluate ()
@@ -267,7 +267,7 @@ test "cached producer canonical effect witnesses outlive all input owners and re
             "pure evaluation cannot perform shared.blot::ask; sequence an operation with use inside a provider scope",
         },
         .{
-            "type Box {pair:(a,b)} is data=#Box (a,b)\ntype Reader a is effect={read:Unit->a}\n",
+            "type Box {pair:(a,b)} is data= $Box (a,b)\ntype Reader a is effect={read:Unit->a}\n",
             "import * as api from \"./shared\"\nentry const answer=42\n",
             "import * as api from \"./shared\"\nlet value=api.Reader.read (api.Box ({pair:(U32,F32)})) ()\nentry const answer=42\n",
             "", // Compare the complete canonical specialization with the source compiler below.
@@ -443,8 +443,8 @@ test "implementation and associated members preserve compiled forwarding opaque 
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }
         \\impl ArraySource a : Source (Array a) = { type Item = a, const first = func values => return @array.get values 0 }
         \\const keep: a -> (Identity.Item a) where { Identity a, type_eq (Identity.Item a) a } = func value => return value
-        \\const make: U32 -> Tokens.Item = func value => return #Token value
-        \\const read: Tokens.Item -> U32 = func (#Token value) => return value
+        \\const make: U32 -> Tokens.Item = func value => return $Token value
+        \\const read: Tokens.Item -> U32 = func ($Token value) => return value
     ;
     const facade = "export {Identity as Same, Tokens as Store, Source, ArraySource, make, read, keep} from \"./producer\"\n";
     var dir = std.testing.tmpDir(.{});

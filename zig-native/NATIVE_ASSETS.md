@@ -191,7 +191,7 @@ for example `import * as config from "./settings.json"` resolves its configured
 `settings.json.blot` virtual module.
 
 **JSON.** Export `value` and `Data`. An object root gives nominal
-`type Data is data = #Data { ... }`; other roots give a transparent `Data`
+`type Data is data = $Data { ... }`; other roots give a transparent `Data`
 alias. Nested object shapes use shared nominal `JsonRecordN` types. Object
 fields sort by spelling. Duplicate JSON members use the last value, like
 `JSON.parse`; this is distinct from protocol metadata, where duplicates reject.
@@ -278,7 +278,7 @@ rejected even though the pinned parser has accepted those forms. Syntax limits
 are 128 nesting levels, 1,000,000 tokens/work visits, and 16 MiB input. Shared
 constant graphs consume the same work budget.
 
-**Reference.** Export `type T is data = #T U32` and the configured value
+**Reference.** Export `type T is data = $T U32` and the configured value
 containing its positive snapshot handle. Capture the file unchanged, including
 arbitrary binary data. Only this reader contributes resources; it does not parse
 content.

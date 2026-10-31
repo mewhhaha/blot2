@@ -25,13 +25,13 @@ function sections(bytes: Uint8Array): Set<number> {
 Deno.test("known demand combinators compile to control flow without heap or thunk helpers", async () => {
   for (
     const [declarations, expression, expected] of [
-      ["", "(x < 100) && (x % 2 == 0)", (x: number) => x < 100 && x % 2 === 0],
+      ["", "(x < 100) and (x % 2 == 0)", (x: number) => x < 100 && x % 2 === 0],
       [
-        "const alias = and",
+        "const alias = func (left: Bool) -> ~(right: Bool) => return left and @demand right",
         "alias (x < 100) (x % 2 == 0)",
         (x: number) => x < 100 && x % 2 === 0,
       ],
-      ["", "(x < 100) || (x % 2 == 0)", (x: number) => x < 100 || x % 2 === 0],
+      ["", "(x < 100) or (x % 2 == 0)", (x: number) => x < 100 || x % 2 === 0],
       [
         "const choose = func (a: Bool) => return func ~(b: Bool) => return if a then @demand b else false",
         "choose (x < 100) (x % 2 == 0)",
@@ -116,7 +116,7 @@ entry const captured = func (x: U32) => return do:
 Deno.test("demand spelling retains force compatibility and demand-only typing", async () => {
   await compileAndRun(
     `
-const twice = func ~(value: U32) => return @u32.add (@force value) (@demand value)
+const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)
 entry const constant = twice 21
 entry const run = func (x: U32) => return twice x
 `,

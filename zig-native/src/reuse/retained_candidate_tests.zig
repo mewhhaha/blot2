@@ -242,17 +242,17 @@ const unaffected_query_edit =
 ;
 
 const catalog_producer =
-    \\data Box a = #Box a
+    \\type Box a is data = $Box a
     \\const changed = func (value: U32) : U32 => return @u32.add value 7
 ;
 const catalog_consumer =
     \\import {Box, changed} from "./dep"
 ++ "\n" ++ query_factory_unit ++ "\n" ++
-    \\const boxed = factory (#Box 42)
+    \\const boxed = factory ($Box 42)
     \\const listed = factory [41]
     \\const arrayed = factory #[43]
     \\entry const answer = func () => return do:
-    \\  let #Box value = boxed ()
+    \\  let $Box value = boxed ()
     \\  break value
     \\entry const list_value = func () => return (@array.from_list (listed ()))[0]
     \\entry const array_value = func () => return (arrayed ())[0]
@@ -298,7 +298,7 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     }
     try std.testing.expect(!std.mem.eql(u8, initial.result.compiled.bytes, session.current.?.output.?.bytes));
     const before = Stamp.read(&session);
-    try fixture.write("dep.blot", "data Box a = #Box a\nconst changed = func (value: U32) : U32 => return false\n");
+    try fixture.write("dep.blot", "type Box a is data = $Box a\nconst changed = func (value: U32) : U32 => return false\n");
     var rejected = try session.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
@@ -327,7 +327,7 @@ fn catalogQueryFailure(allocator: std.mem.Allocator, session: *retained.Session,
 
 test "catalog queries decline unrepresented imported effect operations and preserve fresh staging" {
     const producer =
-        \\type Payload is data = #Payload { value: U32 }
+        \\type Payload is data = $Payload { value: U32 }
         \\const changed = func (value: U32) : U32 => return @u32.add value 7
     ;
     const consumer =
@@ -336,7 +336,7 @@ test "catalog queries decline unrepresented imported effect operations and prese
         \\const factory = func action => return func value => return action value
         \\const callback = factory (func () => return Read.get ())
         \\entry const answer = func () : U32 => return do:
-        \\  let payload = @effect.reader Read.get (#Payload { value: 0 }) (func () => return #Payload { value: 42 }) callback
+        \\  let payload = @effect.reader Read.get ($Payload { value: 0 }) (func () => return $Payload { value: 42 }) callback
         \\  break payload.value
         \\entry const staged = changed 1
         \\const evaluated: U32 = answer ()
@@ -468,11 +468,11 @@ test "unaffected query revisions release every failed entry candidate and keep t
 
 test "unaffected query revisions keep List Array and nominal closure evidence distinct and reject changed collection interfaces" {
     const producer =
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
     ++ "\n" ++ query_factory_unit ++ "\n" ++
         \\const listed = factory [41]
         \\const arrayed = factory #[42]
-        \\const boxed = factory (#Box 43)
+        \\const boxed = factory ($Box 43)
     ;
     const consumer =
         \\import {listed, arrayed, boxed, Box} from "./dep"
@@ -481,7 +481,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
         \\entry const list_value = func () => return first_list (listed ())
         \\entry const array_value = func () => return first_array (arrayed ())
         \\entry const nominal_value = func () => return do:
-        \\  let #Box value = boxed ()
+        \\  let $Box value = boxed ()
         \\  break value
         \\entry const staged_list = first_list (listed ())
         \\entry const staged_array = first_array (arrayed ())
@@ -509,11 +509,11 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     try std.testing.expect(hits > 0);
     const previous = Stamp.read(&session);
     const wrong =
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
     ++ "\n" ++ query_factory_unit ++ "\n" ++
         \\const listed = factory #[41]
         \\const arrayed = factory #[42]
-        \\const boxed = factory (#Box 43)
+        \\const boxed = factory ($Box 43)
     ;
     try fixture.write("dep.blot", wrong);
     var rejected = try session.prepareRevision(io, fixture.path, null, .{});
@@ -530,7 +530,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
 
 test "refinement receipt preserves generic collection record State and captured computation evidence" {
     const generic =
-        \\type Point is data = #Point { x: U32, y: U32 }
+        \\type Point is data = $Point { x: U32, y: U32 }
         \\const fixed = 41
         \\const pair = func value => return (value, fixed)
         \\entry const integer = func (value: U32) => return do:
@@ -546,7 +546,7 @@ test "refinement receipt preserves generic collection record State and captured 
         \\  let (x, n) = pair #[value]
         \\  break @u32.add x[0] n
         \\entry const physical = func (value: U32) => return do:
-        \\  let (x, n) = pair (#Point { y: 2, x: value })
+        \\  let (x, n) = pair ($Point { y: 2, x: value })
         \\  break @u32.add (@u32.add x.x x.y) n
     ;
     const cases = [_][]const u8{
@@ -1651,7 +1651,7 @@ test "body check cache rebuilt seed replays portable qualified facts through all
     }
     const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = func value => return twice ({s})\nentry const answer = func (value: U32) => return read (wrapper (make value))\n", .{argument});
     defer a.free(entry);
-    const producer = "const earlier = func value => return value\ntype Number is data = #Number U32\nconst make = func value => return #Number value\nconst read = func (#Number value) => return value\nconst Number.add = func (#Number left) => return func (#Number right) => return #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
+    const producer = "const earlier = func value => return value\ntype Number is data = $Number U32\nconst make = func value => return $Number value\nconst read = func ($Number value) => return value\nconst Number.add = func ($Number left) => return func ($Number right) => return $Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
     try fixture.write("main.blot", entry);
     try fixture.write("dep.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});
@@ -1683,7 +1683,7 @@ test "body check cache producer ordinal changes preserve publication through all
     }
     const entry = try a.print("import {{Number, make, read, twice}} from \"./dep\"\nconst wrapper: a -> a where {{associated \"add\" a a a}} = func value => return twice ({s})\nentry const answer = func (value: U32) => return read (wrapper (make value))\n", .{argument});
     defer a.free(entry);
-    const producer = "type Number is data = #Number U32\nconst make = func value => return #Number value\nconst read = func (#Number value) => return value\nconst Number.add = func (#Number left) => return func (#Number right) => return #Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
+    const producer = "type Number is data = $Number U32\nconst make = func value => return $Number value\nconst read = func ($Number value) => return value\nconst Number.add = func ($Number left) => return func ($Number right) => return $Number (@u32.add left right)\nconst twice: a -> a where {associated \"add\" a a a} = func value => return @type.call \"add\" value value\n";
     try fixture.write("main.blot", entry);
     try fixture.write("dep.blot", producer);
     try fixture.write("pad.blot", "const ignored = 7\n");
@@ -1695,7 +1695,7 @@ test "body check cache producer ordinal changes preserve publication through all
     try std.testing.expect(session.current.?.prepared.body_caches[session.current.?.prepared.entry - 1].find("wrapper") != null);
     const changed_entry = try a.print("import {{ignored}} from \"./pad\"\n{s}", .{entry});
     defer a.free(changed_entry);
-    const changed_producer = "type Earlier is data = #Earlier F32\nconst earlier = 7\n" ++ producer;
+    const changed_producer = "type Earlier is data = $Earlier F32\nconst earlier = 7\n" ++ producer;
     try fixture.write("main.blot", changed_entry);
     try fixture.write("dep.blot", changed_producer);
     var expected = try fresh(&fixture, .{});
@@ -1804,7 +1804,7 @@ test "body cache directory relocates compiled modules and keeps first-edit repla
     try std.testing.expect(initial_index != reordered_index);
     try std.testing.expect(session.current.?.prepared.body_caches[reordered_index].find("stable") != null);
     const before = Stamp.read(&session);
-    try fixture.write("dep.blot", "const read = #Missing\n");
+    try fixture.write("dep.blot", "const read = $Missing\n");
     var failed = try session.prepareRevision(io, fixture.path, null, .{});
     defer failed.deinit();
     try std.testing.expect(failed == .rejected);

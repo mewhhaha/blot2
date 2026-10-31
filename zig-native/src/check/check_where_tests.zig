@@ -24,7 +24,7 @@ fn nominalTuple(store: *const T.Store, ty: T.Id) []const T.Id {
 }
 const source =
     \\infixl 60 (+) = _fixity_add
-    \\type Box a is data = #Box {value: a}
+    \\type Box a is data = $Box {value: a}
     \\type Signal a is effect = { get: Unit -> a }
     \\const twice: a -> a where { associated "add" a a a } = func value => return value + value
     \\const first: a -> b where { field "value" a b } = func box => return box.value
@@ -275,13 +275,13 @@ test "local template requirements move into their scheme and concrete uses retai
 
 fn changingUpdateLaws(allocator: std.mem.Allocator) !void {
     const text =
-        \\type Box (a, b) is data = #Box { value: a, keep: b }
+        \\type Box (a, b) is data = $Box { value: a, keep: b }
         \\const change = func (box: Box (U32, Bool)) => return do:
         \\  let current = box
         \\  current.value := 42.0
         \\  break current
         \\entry const answer = func () => return do:
-        \\  let #Box {value, keep} = change (#Box {value: 20, keep: true})
+        \\  let $Box {value, keep} = change ($Box {value: 20, keep: true})
         \\  break @f32.to_u32 value
     ;
     var tokens = try lexer.lex(allocator, text);

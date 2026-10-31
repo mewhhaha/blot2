@@ -284,7 +284,7 @@ test "source record payload declaration order survives prior symbol identities a
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {Pair} from \"./data\"\nentry const answer=42\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "const second=func value=> return value\ndata Pair=#Pair {first:U32,second:U32}\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "const second=func value=> return value\ntype Pair is data= $Pair {first:U32,second:U32}\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var source = try project.load(a, std.testing.io, path, .{});
@@ -314,7 +314,7 @@ test "principal publication keeps reusable globals and Core retains later-constr
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {make} from \"./data\"\nentry const answer: Unit -> U32=func()=> return @array.length (make ())\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "data Item=#Item U32\nconst make=func()=> return do:\n  let found=#[]\n  for item in #[#Item 42]:\n    found := #[item]\n  break found\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "data.blot", .data = "type Item is data= $Item U32\nconst make=func()=> return do:\n  let found=#[]\n  for item in #[$Item 42]:\n    found := #[item]\n  break found\n" });
     const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
     defer a.free(path);
     var source = try project.load(a, std.testing.io, path, .{});

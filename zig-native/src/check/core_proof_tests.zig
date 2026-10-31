@@ -315,9 +315,9 @@ test "numeric proof portable admission rejects coordinated result claims guard e
 
 fn portableLengthProofs(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\data Holder = #Holder { index: U32 }
+        \\type Holder is data = $Holder { index: U32 }
         \\const unwrap = func (holder: Holder) => return case holder of
-        \\  #Holder { index: i } => i
+        \\  $Holder { index: i } => i
         \\const at: (values: Array U32) -> (index: U32) -> (@proof.U32Lt index (@array.length values)) -> U32 = func values => return func index => return func proof => return @array.get values index
         \\const inspect = func (values: Array U32) => return func (index: U32) => return do:
         \\  let count = @array.length values
@@ -499,9 +499,9 @@ test "numeric proof check plans retain invalidated joins unrelated collections w
     try checkPlan(allocator, "entry const run = func (flag: Bool) => return func (values: Array U32) => return func (index: U32) => return if (if flag then @u32.lt index (@array.length values) else @u32.eq 0 0) then @array.get values index else 0", false, .{});
     try checkPlan(allocator, guarded, false, .{ .visits = 8 });
     try checkPlan(allocator,
-        \\data Maybe = #Some U32 | #None
+        \\type Maybe is data = $Some U32 | $None
         \\entry const run = func (values: Array U32) => return func (index: U32) => return do:
-        \\  let #Some selected = #Some 1 else:
+        \\  let $Some selected = $Some 1 else:
         \\    let valid = @proof.index values index
         \\    break 0
         \\  break @array.get values index
@@ -560,8 +560,8 @@ test "numeric proof preserves exact collection identity through opaque reference
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
         \\opaque type Token = Array U32
-        \\const make: Array U32 -> Token = func value => return #Token value
-        \\const read: Token -> Array U32 = func (#Token value) => return value
+        \\const make: Array U32 -> Token = func value => return $Token value
+        \\const read: Token -> Array U32 = func ($Token value) => return value
         \\entry const exact = func () => return (read (make #[42]))[0]
         \\entry const checked = func (index: U32) => return @array.get (read (make #[42])) index
     );
@@ -823,7 +823,7 @@ test "numeric proof selected conditional identity removes one check and preserve
 }
 
 const prepared_associated_operand =
-    \\type Probe is data = #Probe U32
+    \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return do:
     \\  let copied = index
     \\  break copied
@@ -833,7 +833,7 @@ const prepared_associated_operand =
     \\  if @type.call "within" probe index:
     \\    break @array.get values (@type.call "choose" probe index)
     \\  break 0
-    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup ($Probe 42) index
 ;
 fn preparedSelections(module: *const core.Module, storage: []@import("numeric_proof_core.zig").Selected) ![]const @import("numeric_proof_core.zig").Selected {
     var count: usize = 0;
@@ -901,9 +901,9 @@ test "numeric proof prepared selected targets decline forged body owners and for
 }
 test "numeric proof prepared selected operand removes only its exact bounds comparison in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return @u32.add index 1" ++ caller));
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return index" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return @u32.add index 1" ++ caller));
 }
 
 fn emittedPreparedOperand(allocator: std.mem.Allocator) !void {
@@ -922,14 +922,14 @@ test "numeric proof prepared selected body emission releases every allocation an
 test "numeric proof prepared associated bodies retain reusable code when ordinary facts already admit the check" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\type Probe is data = #Probe U32
+        \\type Probe is data = $Probe U32
         \\const Probe.bump = func (unused: Probe) => return func (index: U32) => return @u32.add index 1
         \\const lookup = func probe => return func (index: U32) => return do:
         \\  let unused = @type.call "bump" probe index
         \\  if @u32.lt index 2:
         \\    break @array.get #[8, 13] index
         \\  break 0
-        \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+        \\entry const run = func (index: U32) => return lookup ($Probe 42) index
     );
     defer module.deinit(allocator);
     const lookup = for (module.bodies[1..]) |body| {
@@ -998,8 +998,8 @@ test "numeric proof selected arithmetic identities decline forged primitives typ
 }
 test "numeric proof selected arithmetic identities remove only the exact access comparison in development IR" {
     const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
-    const head = "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return ";
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
+    const head = "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return ";
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add index 0" ++ caller));
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add 0 index" ++ caller));
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.sub index 0" ++ caller));
@@ -1027,13 +1027,13 @@ test "numeric proof selected arithmetic identity emission releases every allocat
 test "numeric proof prepared curried methods preserve caller identities through owned returned closures" {
     const allocator = std.testing.allocator;
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, curried_associated_operand));
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 0\n  break func (index: U32) => return @u32.add index copied" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 1\n  break func (index: U32) => return @u32.add index copied" ++ caller));
+    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
+    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 0\n  break func (index: U32) => return @u32.add index copied" ++ caller));
+    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 1\n  break func (index: U32) => return @u32.add index copied" ++ caller));
 }
 
 const curried_associated_operand =
-    \\type Probe is data = #Probe U32
+    \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return do:
     \\  let copied = 0
     \\  break func (index: U32) => return @u32.add index copied
@@ -1045,7 +1045,7 @@ const curried_associated_operand =
     \\  if @type.call "within" probe index:
     \\    break @array.get values (@type.call "choose" probe index)
     \\  break 0
-    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup ($Probe 42) index
 ;
 fn ownedCurriedOperand(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, curried_associated_operand);
@@ -1133,21 +1133,21 @@ test "numeric proof exact U32 identities remove bounds checks but preserve chang
 }
 
 const remaining_associated_arguments =
-    \\type Probe is data = #Probe U32
+    \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (last: Unit) => return index
     \\const lookup = func probe => return func (index: U32) => return do:
     \\  let values = #[8, 13]
     \\  if @u32.lt index 2:
     \\    break @array.get values ((@type.call "choose" probe index) ())
     \\  break 0
-    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup ($Probe 42) index
 ;
 test "numeric proof prepared methods preserve operands through remaining application arguments" {
     const allocator = std.testing.allocator;
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, remaining_associated_arguments));
-    const method = "type Probe is data = #Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta\n";
+    const method = "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta\n";
     const prefix = "const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call \"choose\" probe index) ";
-    const suffix = ") else 0\nentry const run = func (index: U32) => return lookup (#Probe 42) index";
+    const suffix = ") else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
     try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, method ++ prefix ++ "0" ++ suffix));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, method ++ prefix ++ "1" ++ suffix));
 }
@@ -1184,9 +1184,9 @@ test "numeric proof remaining method arguments preserve emission replay through 
 }
 
 const literal_associated_operand =
-    \\type Probe is data = #Probe U32
+    \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta
-    \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) 0) else 0
+    \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" ($Probe 42) index) 0) else 0
 ;
 test "numeric literal selected dispatch preserves remaining applications" {
     const allocator = std.testing.allocator;
@@ -1209,7 +1209,7 @@ test "numeric literal selected partial applications preserve replay through comp
 }
 
 const nested_finite_selected =
-    \\type Probe is data = #Probe U32
+    \\type Probe is data = $Probe U32
     \\const copy = func (value: U32) => return value
     \\const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)
     \\const forwarded = func (value: U32) => return advance (copy value) 0
@@ -1221,7 +1221,7 @@ const nested_finite_selected =
     \\  if @u32.lt index 2:
     \\    break @array.get values ((@type.call "choose" probe index) 0)
     \\  break 0
-    \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+    \\entry const run = func (index: U32) => return lookup ($Probe 42) index
 ;
 fn ownedNestedFiniteSelected(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, nested_finite_selected);
@@ -1258,18 +1258,18 @@ test "numeric finite nested helper checks distinguish exact identity changed ope
     defer allocator.free(changed);
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, changed));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\type Probe is data = #Probe U32
+        \\type Probe is data = $Probe U32
         \\const invoke = func callback => return func (index: U32) => return callback index
         \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
         \\const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) (func (value: U32) => return value)) else 0
-        \\entry const run = func (index: U32) => return lookup (#Probe 42) index
+        \\entry const run = func (index: U32) => return lookup ($Probe 42) index
     ));
     try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\type Probe is data = #Probe U32
+        \\type Probe is data = $Probe U32
         \\const invoke = func (callback: U32 -> U32 ! {Foreign}) => return func (index: U32) => return callback index
         \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
         \\const lookup = func probe => return func (index: U32) => return func callback => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) callback) else 0
-        \\entry const run = func (callback: U32 -> U32 ! {Foreign}) => return lookup (#Probe 42) 1 callback
+        \\entry const run = func (callback: U32 -> U32 ! {Foreign}) => return lookup ($Probe 42) 1 callback
     ));
 }
 
@@ -1363,13 +1363,13 @@ test "numeric finite work stays bounded and inactive no feature bodies allocate 
 
 fn iteratorCarryOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\type Maybe a is data = #Some a | #Nothing
-        \\type Counter is data = #Counter U32
+        \\type Maybe a is data = $Some a | $Nothing
+        \\type Counter is data = $Counter U32
         \\const Counter.iter = func (cursor: Counter) => return cursor
-        \\const Counter.next = func (#Counter value) => return if @u32.lt value 4 then #Some (value, #Counter (@u32.add value 1)) else #Nothing
+        \\const Counter.next = func ($Counter value) => return if @u32.lt value 4 then $Some (value, $Counter (@u32.add value 1)) else $Nothing
         \\const iterate = func (first: U32) => return do:
         \\  let result = 1
-        \\  for value in #Counter first:
+        \\  for value in $Counter first:
         \\    result := @u32.add self value
         \\  break result
         \\const bounded = func (value: U32) => return do:
@@ -1411,9 +1411,9 @@ test "numeric proof statement suites publish actual iterator carries while block
 
 fn patternFallbackOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\type Maybe a is data = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const pick = func (input: Maybe U32) => return do:
-        \\  let #Some value = input else:
+        \\  let $Some value = input else:
         \\    break 3
         \\  let bounded = @proof.lt value 10
         \\  break value
@@ -1471,9 +1471,9 @@ test "numeric proof pattern fallback owns only outer bindings and must exit thro
 
 fn foreverFallbackOwners(allocator: std.mem.Allocator) !void {
     var module = try lowerSource(allocator,
-        \\type Maybe a is data = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const pick = func (input: Maybe U32) => return do:
-        \\  let #Some value = input else:
+        \\  let $Some value = input else:
         \\    for ever:
         \\      break 3
         \\  let bounded = @proof.lt value 10

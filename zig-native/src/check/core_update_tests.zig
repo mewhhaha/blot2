@@ -8,8 +8,8 @@ const core = @import("core.zig");
 const a = std.testing.allocator;
 
 const source =
-    \\type Point is data = #Point { x: U32 }
-    \\type Bucket is data = #Bucket { points: Array Point }
+    \\type Point is data = $Point { x: U32 }
+    \\type Bucket is data = $Bucket { points: Array Point }
     \\const make = func (initial: Bucket) => return do:
     \\  let bucket = initial
     \\  break func (index: U32) => return do:
@@ -18,7 +18,7 @@ const source =
     \\      other[0] := @u32.add self 2
     \\      break other[0]
     \\    break bucket.points[index].x
-    \\entry const run = func () : U32 => return (make (#Bucket { points: #[#Point { x: 1 }] })) 0
+    \\entry const run = func () : U32 => return (make ($Bucket { points: #[$Point { x: 1 }] })) 0
 ;
 
 const Fixture = struct {

@@ -8,7 +8,7 @@ const producer = (captured = "35", increment = "1", valid = true) => {
   let chosen = "value";
   if (!valid) chosen = "42";
   return `
-type Maybe a is data = #Some a | #None
+type Maybe a is data = $Some a | $None
 type Render a is contract = { const show: a -> U32 }
 impl Number : Render U32 = { const show = func value => return @u32.add value ${increment} }
 impl Flag : Render Bool = { const show = func value => return if value then 7 else 9 }
@@ -20,7 +20,7 @@ const trace: U32 -> (forall [a] => ((U32 -> U32 ! {Foreign}), a) -> a ! {Foreign
   (@product.get pair 0) captured
   break @product.get pair 1
 const show: forall [a] where { Render a } => a -> U32 = func value => return Render.show value
-const wrap: forall [a] => a -> Maybe a = #Some
+const wrap: forall [a] => a -> Maybe a = $Some
 const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
 const packet = do:
   let cost = 35
@@ -35,8 +35,8 @@ entry const whole = func () => return packet.choose packet.cost
 entry const fraction = func () => return packet.other 3.5
 entry const shown = func () => return @u32.add (packet.show 35) (packet.show true)
 entry const wrapped = func () => return case packet.wrap packet.cost of
-  #Some value => value
-  #None => 0
+  $Some value => value
+  $None => 0
 entry const host = func (callback: U32 -> U32 ! {Foreign}) => return packet.apply (callback, packet.cost)
 entry const captured = func (callback: U32 -> U32 ! {Foreign}) => return packet.traced (callback, 3.5)
 entry const sibling = ${seed}

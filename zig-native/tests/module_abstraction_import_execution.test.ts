@@ -7,11 +7,11 @@ const executable = Deno.args[0] ??
 const producer = (offset: number) =>
   `opaque type Token = F32
 private const offset = ${offset}.0
-const make: F32 -> Token = func value => return #Token (@f32.add value offset)
-const read: Token -> F32 = func (#Token value) => return value
+const make: F32 -> Token = func value => return $Token (@f32.add value offset)
+const read: Token -> F32 = func ($Token value) => return value
 const Token.observe = read
 private const Token.hidden = read
-private const Token.add = func left => return func right => return #Token (@f32.add (read left) (read right))
+private const Token.add = func left => return func right => return $Token (@f32.add (read left) (read right))
 const internal = func value => return read (@type.call "add" (make value) (make value))
 `;
 const main = `import {Token, make} from "./tokens"
@@ -90,7 +90,7 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
             "facade.read (pass (make value))",
             "reveal (make value)",
           ) + "const reveal = func value => return value.hidden\n",
-          'import {Token} from "./tokens"\nentry const answer = #Token 42.0\n',
+          'import {Token} from "./tokens"\nentry const answer = $Token 42.0\n',
         ]
       ) {
         const fromSource = await source.build({
@@ -162,7 +162,7 @@ Deno.test("opaque generic field requirements cannot derive hidden producer paylo
   try {
     await Deno.writeTextFile(
       `${directory}/library.blot`,
-      "opaque type Box = {value:U32}\nconst make = func value => return #Box {value:value}\n",
+      "opaque type Box = {value:U32}\nconst make = func value => return $Box {value:value}\n",
     );
     await Deno.writeTextFile(
       entry,
@@ -196,7 +196,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
     );
     await Deno.writeTextFile(
       library,
-      "opaque type Token = U32\nconst make: U32 -> Token = func value => return #Token value\nconst read: Token -> U32 = func (#Token value) => return value\n",
+      "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n",
     );
     const retained = await createZigProjectCompiler(options);
     try {
@@ -204,7 +204,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
       assert(scalar.success, JSON.stringify(scalar));
       await Deno.writeTextFile(
         library,
-        "opaque type Token = {word: U32}\nconst make: U32 -> Token = func value => return #Token {word: value}\nconst read: Token -> U32 = func (#Token value) => return value.word\n",
+        "opaque type Token = {word: U32}\nconst make: U32 -> Token = func value => return $Token {word: value}\nconst read: Token -> U32 = func ($Token value) => return value.word\n",
       );
       const reference = await retained.build();
       assert(reference.success, JSON.stringify(reference));

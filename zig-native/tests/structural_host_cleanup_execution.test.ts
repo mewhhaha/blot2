@@ -8,20 +8,20 @@ import {
 } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
+const library = `type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
 opaque type Secret = {items: Array U32, nonce: U32}
 const record = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.scope (func () => return {nonce: 7, items: #[1, 2]}) drop (func loan => return 42)
 const product = func (drop: cleanup ((unique (U32, Array F32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return (7, #[1.5, 2.5])) drop (func loan => return 42)
 const listed = func (drop: cleanup ((unique (List U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return [1, 2, 3]) drop (func loan => return 42)
 const rows = func (drop: cleanup ((unique (Array (U32, F32))) -> Unit ! {Foreign})) => return @resource.scope (func () => return #[(7, 1.5), (9, 2.5)]) drop (func loan => return 42)
 const row_list = func (drop: cleanup ((unique (List (U32, F32))) -> Unit ! {Foreign})) => return @resource.scope (func () => return [(7, 1.5), (9, 2.5)]) drop (func loan => return 42)
-type Vector is data = #Vector {x: F32, y: F32}
-type Matrix is data = #Matrix {a: Vector, b: Vector}
-const matrix = #Matrix {a: #Vector {x: 1.5, y: 2.5}, b: #Vector {x: 3.5, y: 4.5}}
+type Vector is data = $Vector {x: F32, y: F32}
+type Matrix is data = $Matrix {a: Vector, b: Vector}
+const matrix = $Matrix {a: $Vector {x: 1.5, y: 2.5}, b: $Vector {x: 3.5, y: 4.5}}
 const matrix_rows = func (drop: cleanup ((unique (Array Matrix)) -> Unit ! {Foreign})) => return @resource.scope (func () => return #[matrix, matrix]) drop (func loan => return 42)
 const matrix_list = func (drop: cleanup ((unique (List Matrix)) -> Unit ! {Foreign})) => return @resource.scope (func () => return [matrix, matrix]) drop (func loan => return 42)
-const tree = func (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Branch (#Leaf 7, #Leaf 9)) drop (func loan => return 42)
-const opaque_data = func (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => return @resource.scope (func () => return #Secret {items: #[1, 2], nonce: 7}) drop (func loan => return 42)
+const tree = func (drop: cleanup ((unique (Tree U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return $Branch ($Leaf 7, $Leaf 9)) drop (func loan => return 42)
+const opaque_data = func (drop: cleanup ((unique Secret) -> Unit ! {Foreign})) => return @resource.scope (func () => return $Secret {items: #[1, 2], nonce: 7}) drop (func loan => return 42)
 const make = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.acquire (func () => return {nonce: 7, items: #[1, 2]}) drop
 const release = func (owner: unique {items: Array U32, nonce: U32}) => return @resource.release owner
 `;

@@ -155,10 +155,10 @@ for (const shape of cases) {
   const lib = (opaque: boolean, bonus: number) =>
     `${opaque ? "opaque " : ""}type ${nominal} = ${representation}
 const make: ${input} -> ${nominal} = func value => return ${
-      opaque ? "#Token " : ""
+      opaque ? "$Token " : ""
     }${generic ? "{value}" : "value"}
 const read: ${nominal} -> ${input} = func ${
-      opaque ? "(#Token value)" : "value"
+      opaque ? "($Token value)" : "value"
     } => ${generic ? "value.value" : "value"}
 const capture = func value => return do:
   let saved = make value

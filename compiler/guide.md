@@ -297,8 +297,9 @@ values. Constructors themselves are values/functions. The prelude defines
 `Maybe a = $Some a | $Nothing` and
 `Result [value, error] = $Ok value | $Err error`.
 
-Constructors use `$` in declarations, expressions and patterns: `type Choice is data = $Some U32 | $None` and `$Some 42`. Booleans use
-plain `true` and `false`, without a constructor marker. Keep `$` adjacent to the
+Constructors use `$` in declarations, expressions and patterns:
+`type Choice is data = $Some U32 | $None` and `$Some 42`. Booleans use plain
+`true` and `false`, without a constructor marker. Keep `$` adjacent to the
 constructor name. A spaced `f $ value` remains ordinary operator application.
 Arrays keep their `#[...]` spelling and lists use `[...]`.
 
@@ -422,10 +423,10 @@ comparisons `== != < <= > >=` (30), bitwise `|` (40), `^` (45), `&` (50), shifts
 associate right; comparisons are non-associative; the others associate left. The
 default `f $ g x` is application syntax for `f (g x)`, with identical
 evaluation, demand and scoped-callback checks. It works without the prelude,
-including callbacks such as `apply $ func value => return value`. An explicit fixity declaration for
-`$` overrides this default with an ordinary operator call. Backticks call
-ordinary functions infix. Declare custom fixities before other declarations:
-`infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
+including callbacks such as `apply $ func value => return value`. An explicit
+fixity declaration for `$` overrides this default with an ordinary operator
+call. Backticks call ordinary functions infix. Declare custom fixities before
+other declarations: `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
 `infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
 
 Arithmetic/comparison operators call generic prelude functions. `add` uses
@@ -702,9 +703,11 @@ collections can need a `List T` or `Array T` annotation.
 
 `array.flatten ranges payload` copies selected ranges from one readable payload
 into an independent destination. Each range has `start` and `count` fields;
-bounds and total length are checked before copying. `array.flatten_read read
-length ranges` accepts a pure indexed reader over the same range representation.
-This avoids retaining an array of borrowed child collections.
+bounds and total length are checked before copying.
+`array.flatten_read read
+length ranges` accepts a pure indexed reader over the
+same range representation. This avoids retaining an array of borrowed child
+collections.
 
 ```blot
 import * as array from "std/array"
@@ -1524,18 +1527,18 @@ sharing can provide extra physical capacity, which is not promised. Owners
 without a request continue to use the configured default budget.
 
 These features select a data-stack backend with checked scalar and aggregate
-layouts, generic helpers, known callbacks and lexical storage reuse. Named global
-pools, including computed initializers, persist per instance.
-Numeric arrays cross browser/Pen boundaries by copy; ordinary Foreign callbacks
-can suspend while the guest adapter excludes reentry. Inline records copy by
-value, while indexed updates write through array aliases. Use `@storage.copy`
-when an independent snapshot is needed. It checks borrowed results and permits
-shrinking after a local borrow’s final use. Language task execution is excluded
-from this model; host worker jobs and data queues remain in scope.
+layouts, generic helpers, known callbacks and lexical storage reuse. Named
+global pools, including computed initializers, persist per instance. Numeric
+arrays cross browser/Pen boundaries by copy; ordinary Foreign callbacks can
+suspend while the guest adapter excludes reentry. Inline records copy by value,
+while indexed updates write through array aliases. Use `@storage.copy` when an
+independent snapshot is needed. It checks borrowed results and permits shrinking
+after a local borrow’s final use. Language task execution is excluded from this
+model; host worker jobs and data queues remain in scope.
 
 The replacement does not yet cover the whole language; unsupported forms fail
-compilation. Ordinary programs still use the original storage path. Ink and
-Gdev use named owners and copied packets; one real Gdev main frame has passed in
+compilation. Ordinary programs still use the original storage path. Ink and Gdev
+use named owners and copied packets; one real Gdev main frame has passed in
 native Pen, while broader application qualification remains pending. See the
 [scoped storage migration](../zig-native/SCOPED_STORAGE.md) for the exact
 supported operations, lifetime checks, capacity limits and remaining work.
@@ -1654,10 +1657,11 @@ Not yet executable: collection patterns, general text, F64, general type-valued
 computation, and exposed continuation values. Do not infer availability from
 editor highlighting or design examples.
 
-Hosts use `compiler/guest.ts` and guest ABI 2 or 3. ABI 3 adds private
-invocation ownership hooks while preserving the same host value types. Numeric
-arrays cross as copied typed arrays; host callbacks are explicit scalar or
-numeric-array capabilities. Async capabilities suspend a guest invocation
+Hosts use `compiler/guest.ts`. The owned-storage integration uses guest ABI 8
+and session protocol 2. Ordinary programs can still emit earlier profiles while
+the legacy backend is being retired; the host rejects mixed-profile modules.
+Numeric arrays cross as copied typed arrays; host callbacks are explicit scalar
+or numeric-array capabilities. Async capabilities suspend a guest invocation
 without discarding its local state. A guest closure capturing a host callback
 stays bound to that invocation: calling it after the invocation ends fails; a
 later host argument cannot rebind it. Records, general arrays and persistent
@@ -1707,8 +1711,8 @@ step on its own line.
 `func ~value => return body` captures an argument without evaluating it. A typed
 parameter is `func ~(value: U32) => return body`. `@demand value` evaluates the
 captured expression once; later demands share its result. Returning a closure
-that captures a demand is supported.
-Merely referencing a demand does not force it.
+that captures a demand is supported. Merely referencing a demand does not force
+it.
 
 ```blot
 const twice = func ~(value: U32) => return @u32.add (@demand value) (@demand value)

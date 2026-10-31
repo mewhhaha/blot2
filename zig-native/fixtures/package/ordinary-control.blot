@@ -25,4 +25,4 @@ const loop = func (first: U32) => return do:
 const choose = func (value: U32) => return case value of
   0 => 7
   other => @u32.add other 1
-const demand = func ~(value: U32) => return @u32.add (@force value) (@force value)
+const demand = func ~(value: U32) => return @u32.add (@demand value) (@demand value)

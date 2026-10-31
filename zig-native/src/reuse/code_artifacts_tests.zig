@@ -405,12 +405,12 @@ const Fixture = struct {
     left: u32,
     fn init() !Fixture {
         const source =
-            \\type Cell is data = #Cell { right: F32, left: U32 }
+            \\type Cell is data = $Cell { right: F32, left: U32 }
             \\effect Read: Unit -> F32
             \\const reader = @effect.provider Read (func () => return 42.5)
             \\const factory = func amount => return func extra => return @f32.add amount extra
             \\const retained = factory 40.0
-            \\const item = #Cell { right: 42.5, left: 1 }
+            \\const item = $Cell { right: 42.5, left: 1 }
             \\entry const folded = do reader:
             \\  break Read ()
             \\entry const answer = func () => return folded

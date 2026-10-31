@@ -21,14 +21,14 @@ const bodies = [
   `  let wrapped = do (@do.monad Box):
     break base
   let cost = case wrapped of
-    #Box value => value`,
+    $Box value => value`,
   `  let (_, cost) = @state.run base (func () => return base)`,
   `  let cost = do (@effect.provider Read (func () => return base)):
     use result <- Read ()
     break result`,
   `  let pending = delayed base
-  let cost = @force pending
-  let again = @force pending`,
+  let cost = @demand pending
+  let again = @demand pending`,
   `  let cost = @effect.scope (func (state: State U32) => return base)`,
   `  let cost = @code.run (@code.quote (@code.lift base))`,
 ];
@@ -37,8 +37,8 @@ function logic(base = "1", row = "Read") {
 effect Other: Unit -> U32
 type State a is effect = {get: Unit -> a, set: a -> Unit}
 const described: Unit -> U32 ! {${row}} = func () => return Read ()
-type Box a is data = #Box a
-const Box.pure = func (value: U32) => return #Box value
+type Box a is data = $Box a
+const Box.pure = func (value: U32) => return $Box value
 const delayed = func ~value => return value
 const base = ${base}
 ${

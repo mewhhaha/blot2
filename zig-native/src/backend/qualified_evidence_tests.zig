@@ -24,19 +24,19 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return result;
 }
 const fixture =
-    \\data Cell value = #Cell value
-    \\type Increment is data = #Increment U32
+    \\type Cell value is data = $Cell value
+    \\type Increment is data = $Increment U32
     \\const Increment.add = func left => return func right => return do:
-    \\  let #Increment a = left
-    \\  let #Increment b = right
-    \\  break #Increment (@u32.add a b)
+    \\  let $Increment a = left
+    \\  let $Increment b = right
+    \\  break $Increment (@u32.add a b)
     \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
     \\entry const answer = func () => return do:
     \\  let unused: a -> a where { associated "missing" a a a } = func value => return value
     \\  let read_local = func witness => return @state.get witness
-    \\  let (_, #Cell count) = @state.run (#Cell 40) (func () => return read_local (func ignored : Cell U32 => return @panic "unused"))
+    \\  let (_, $Cell count) = @state.run ($Cell 40) (func () => return read_local (func ignored : Cell U32 => return @panic "unused"))
     \\  let local = twice
-    \\  let #Increment delta = local (#Increment 1)
+    \\  let $Increment delta = local ($Increment 1)
     \\  break @u32.add count delta
 ;
 fn backendScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {

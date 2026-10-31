@@ -1,4 +1,4 @@
-data Box = #Box (U32, U32)
+type Box is data = $Box (U32, U32)
 entry const capture = func () => return do:
   let kept = (40, 2)
   let use_it = func () => return @u32.add (@product.get kept 0) (@product.get kept 1)

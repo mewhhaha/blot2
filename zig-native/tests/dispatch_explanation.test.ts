@@ -215,11 +215,11 @@ entry const broken = func (value: F32) : F32 => return do:
 Deno.test("mixed-type associated subtraction remains valid in both tiers", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
-  const source = `type Meters is data = #Meters F32
+  const source = `type Meters is data = $Meters F32
 const Meters.sub = func (left: Meters) => return func (right: F32) => return do:
-  let #Meters amount = left
+  let $Meters amount = left
   break amount - right
-entry const distance = func (value: F32) : F32 => return (#Meters value) - 1.0
+entry const distance = func (value: F32) : F32 => return ($Meters value) - 1.0
 `;
   try {
     for (const codegenTier of ["development", "optimized"] as const) {
@@ -247,11 +247,11 @@ entry const distance = func (value: F32) : F32 => return (#Meters value) - 1.0
   }
 });
 
-const library = "type Meters is data=#Meters F32\n" +
-  "const meters = func (value: F32) => return #Meters value\n";
+const library = "type Meters is data= $Meters F32\n" +
+  "const meters = func (value: F32) => return $Meters value\n";
 const method = "const Meters.add = func left => return func right => return do:\n" +
-  "  let #Meters a = left\n  let #Meters b = right\n" +
-  "  break #Meters (@f32.add a b)\n";
+  "  let $Meters a = left\n  let $Meters b = right\n" +
+  "  break $Meters (@f32.add a b)\n";
 const main = (annotation: string) =>
   'import { meters } from "./library"\n' +
   "entry const answer = func () => return do:\n" +

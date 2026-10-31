@@ -1,5 +1,5 @@
 type Tick is effect = { read: Unit -> F32 }
-const keep = func ~value => return func () => return @force value
+const keep = func ~value => return func () => return @demand value
 const handled = func computation => return do:
   for request in @requests computation:
     case request of

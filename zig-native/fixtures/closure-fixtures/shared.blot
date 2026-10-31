@@ -2,7 +2,7 @@ infixl 60 (+) = combine
 const combine = func left => return func right => return @u32.add left right
 const U32.add = func left => return func right => return @u32.add left right
 const F32.add = func left => return func right => return @f32.add left right
-data Box a = #Box { value: a }
+type Box a is data = $Box { value: a }
 const Box.get = func receiver => return receiver.value
 type Cell a is effect = { get: Unit -> a, set: a -> Unit }
 const reader = @effect.provider (Cell.get U32) (func () => return 40)

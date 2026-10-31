@@ -47,14 +47,14 @@ for (
 }
 
 Deno.test("implementation witness proofs preserve anonymous callback rows without executing prerequisites", async () => {
-  const artifact = await compile(`type Token a is data = #Token a
+  const artifact = await compile(`type Token a is data = $Token a
 const Token.add = func (left: Token a) => return func (right: Token a) => return case left of
-  #Token witness => @state.reader witness (func () => return @panic "proof executed") (func () => return do:
+  $Token witness => @state.reader witness (func () => return @panic "proof executed") (func () => return do:
     use unused <- @state.get witness
     break left)
 type Source s is contract = { associated "add" s s s ! {}, type Item, const first: s -> (Source.Item s) }
 impl TokenSource a : Source (Token a) = { type Item = U32, const first = func value => return 42 }
-entry const answer: Unit -> U32 = func () => return Source.first (#Token (func () : U32 => return 7))
+entry const answer: Unit -> U32 = func () => return Source.first ($Token (func () : U32 => return 7))
 `);
   const guest = await instantiateGuest(artifact.bytes);
   try {

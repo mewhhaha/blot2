@@ -8,15 +8,15 @@ const library = (seed: string, delta: number, prefix = "") =>
   `infixl 60 (%%) = both
 infixl 60 (??) = ignore
 ${prefix}const seed = ${seed}
-type Number is data = #Number U32
-const Number.next = func (#Number value) => return @u32.add value ${delta}
-const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@force left) (@force left)) (@force right)
+type Number is data = $Number U32
+const Number.next = func ($Number value) => return @u32.add value ${delta}
+const both = func ~(left: U32) => return func ~(right: U32) => return @u32.add (@u32.add (@demand left) (@demand left)) (@demand right)
 const ignore = func ~(left: U32) => return func ~(right: U32) => return 7
 const operate = func (host: U32 -> U32 ! {Foreign}) => return @u32.add ((host seed) %% (host (@u32.add seed 1))) ((host 999) ?? (host 998))
 const describe = func (value: U32) => return do:
   let record = {value, values: #[value, seed]}
   record.value := @u32.add self 1
-  break @record.merge record {next: (#Number value).next}
+  break @record.merge record {next: ($Number value).next}
 `;
 const main = `import {operate, describe} from "./logic"
 entry const run = func (host: U32 -> U32 ! {Foreign}) => return operate host

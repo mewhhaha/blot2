@@ -3,13 +3,13 @@ import { monadCases } from "./monad_cases.ts";
 
 Deno.test("native monad lowering handles long flat statement sequences", async () => {
   const count = 1536;
-  const source = `type Box value is data = #Box value
-const Box.pure = func value => return #Box value
+  const source = `type Box value is data = $Box value
+const Box.pure = func value => return $Box value
 const sequence = func () => return do (@do.monad Box):
   let total = 0
 ${"  total := @u32.add self 1\n".repeat(count)}  break total
 entry const answer = func () => return do:
-  let #Box value = sequence ()
+  let $Box value = sequence ()
   break value
 `;
   await compileAndRun(source, guest => equal(guest.call("answer", null), count));

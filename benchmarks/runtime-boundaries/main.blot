@@ -1,7 +1,7 @@
 import {Row, make_row} from "./rows"
 import * as array from "std/array"
-type Pair is data = #Pair {a: U32, b: U32}
-type Command is data = #Command {lanes: Array U32}
+type Pair is data = $Pair {a: U32, b: U32}
+type Command is data = $Command {lanes: Array U32}
 entry const direct = func (steps: U32) : U32 => return do:
   let rows = array.generate 2000 make_row
   let total = 0
@@ -25,7 +25,7 @@ entry const indexed = func (steps: U32) : U32 => return do:
       total := self + rows[index].count
   break total
 entry const nominal_generate = func (count: U32) : U32 => return do:
-  let rows = array.generate count (func index => return #Pair {a: index + 1, b: index + 1})
+  let rows = array.generate count (func index => return $Pair {a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     total := self + row.a
@@ -37,7 +37,7 @@ entry const wide_generate = func (count: U32) : U32 => return do:
     total := self + row.count
   break total
 entry const pair_fixed = func (ignored: U32) : U32 => return do:
-  let rows = array.generate 2000 (func index => return #Pair {a: index + 1, b: index + 1})
+  let rows = array.generate 2000 (func index => return $Pair {a: index + 1, b: index + 1})
   let total = 0
   for row in rows:
     total := self + row.a
@@ -49,10 +49,10 @@ entry const scalar_generate = func (count: U32) : U32 => return do:
     total := self + row.a
   break total
 entry const optional_generate = func (count: U32) : U32 => return do:
-  let rows = array.generate count (func index => return #Some (#Pair {a: index + 1, b: index + 1}))
+  let rows = array.generate count (func index => return $Some ($Pair {a: index + 1, b: index + 1}))
   let total = 0
   for row in rows:
-    if let #Some value = row:
+    if let $Some value = row:
       total := self + value.a
   break total
 entry const optional_scalar = func (count: U32) : U32 => return do:
@@ -63,12 +63,12 @@ entry const optional_scalar = func (count: U32) : U32 => return do:
       total := self + row.a
   break total
 entry const pipeline = func (count: U32) : U32 => return do:
-  let commands = array.generate count (func index => return #Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
+  let commands = array.generate count (func index => return $Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
   let chunks = array.map (func command => return command.lanes) commands
   let lanes = array.flatten chunks
   break array.fold_left (func total -> value => return total + value) 0 lanes
 entry const pipeline_values = func (count: U32) : Array U32 => return do:
-  let commands = array.generate count (func index => return #Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
+  let commands = array.generate count (func index => return $Command {lanes: array.generate 24 (func lane => return index * 24 + lane)})
   let chunks = array.map (func command => return command.lanes) commands
   let lanes = array.flatten chunks
   break lanes

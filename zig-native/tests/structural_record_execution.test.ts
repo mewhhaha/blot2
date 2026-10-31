@@ -11,7 +11,7 @@ Deno.test("structural records preserve shapes, field order and type-changing nes
   await compileAndRun(
     `
 type Point = { x: U32, y: F32 }
-type Box a is data = #Box a
+type Box a is data = $Box a
 const read = func record => return record.x
 const replace = func record => return do:
   record.x := true
@@ -25,7 +25,7 @@ entry const answer = func (value: U32) => return do:
   let nested = { point, retained: 40 }
   nested.point.x := 2.0
   let { point: { x: fraction } } = nested
-  let #Box boxed = #Box original
+  let $Box boxed = $Box original
   break if updated.x then @f32.add fraction (@u32.to_f32 (@u32.add nested.retained (@u32.sub (read boxed) x))) else y
 entry const reordered = func () => return read { y: true, x: 42 }
 entry const array = func () => return do:
@@ -147,7 +147,7 @@ Deno.test("record extension rejects non-records and omitted written merge requir
   for (
     const source of [
       "entry const answer = @record.merge 42 { x: 1 }\n",
-      "type Box is data = #Box { x: U32 }\nentry const answer = @record.merge (#Box 42) {}\n",
+      "type Box is data = $Box { x: U32 }\nentry const answer = @record.merge ($Box 42) {}\n",
     ]
   ) {
     await compileExpectedFailure(source, "type_mismatch", undefined, {

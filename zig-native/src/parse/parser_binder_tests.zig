@@ -107,9 +107,9 @@ const cases = [_]Case{
     , .valid = true },
     // uppercase_constructor_pattern
     .{ .source =
-    \\type T is data = #X U32
+    \\type T is data = $X U32
     \\entry const x = do:
-    \\  let #X value = #X 0
+    \\  let $X value = $X 0
     \\  break value
     \\
     , .valid = true },

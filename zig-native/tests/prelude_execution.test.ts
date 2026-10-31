@@ -9,7 +9,7 @@ const F32.add = func left => return func right => return @f32.add left right
 const U32.to_f32 = func (value: U32) => return @u32.to_f32 value
 const convert = func value => return value.to_f32
 const identity = func value => return value
-type Maybe value is data = #Some value | #Nothing
+type Maybe value is data = $Some value | $Nothing
 `;
 
 async function fixture(run: (dir: string) => Promise<void>): Promise<void> {
@@ -24,9 +24,9 @@ entry const primitive = func () : U32 => return @u32.add 40 2
 entry const floating = func () : F32 => return identity (1.5 + 2.5)
 entry const converted = func (value: U32) : F32 => return convert value
 entry const accessor = func (value: U32) : F32 => return (.to_f32) value
-entry const nominal = func (value: U32) : U32 => return case #Some value of
-  #Some item => identity item
-  #Nothing => 0
+entry const nominal = func (value: U32) : U32 => return case $Some value of
+  $Some item => identity item
+  $Nothing => 0
 `);
     await run(dir);
   } finally { await Deno.remove(dir, { recursive: true }); }

@@ -18,7 +18,7 @@ pub fn main(init: std.process.Init) !void {
     const edited = try std.mem.replaceOwned(u8, arena, original, args[4], args[5]);
     if (std.mem.eql(u8, edited, original)) return error.EditNotFound;
     const rounds = try std.fmt.parseInt(usize, args[6], 10);
-    const broken = try std.mem.concat(arena, u8, &.{ original, "\nconst broken_probe: U32 = #Wrong\n" });
+    const broken = try std.mem.concat(arena, u8, &.{ original, "\nconst broken_probe: U32 = $Wrong\n" });
     const options: @import("project.zig").Options = .{ .prelude_path = args[2], .std_root = args[3] };
     var tracked: memory.TrackedAllocator = .{ .backing = std.heap.smp_allocator };
     var buffer: [1 << 16]u8 = undefined;

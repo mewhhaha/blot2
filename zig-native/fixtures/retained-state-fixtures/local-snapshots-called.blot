@@ -1,31 +1,31 @@
-data Cell value = #Cell value
+type Cell value is data = $Cell value
 const handled = func computation => return do:
   for request in @requests computation:
     case request of
       complete value =>
         break value
 entry const answer = func () => return do:
-  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (func () => return do:
+  let ($Cell state32, $Cell value32) = @state.run ($Cell 40) (func () => return do:
     let captured = 41
-    let witness = func ignored => return #Cell captured
+    let witness = func ignored => return $Cell captured
     let make = func witness => return @computation (func () => return do:
       use current <- @state.get witness
-      let #Cell stored = current
-      let #Cell captured = witness ()
-      break #Cell (@u32.add stored captured)
+      let $Cell stored = current
+      let $Cell captured = witness ()
+      break $Cell (@u32.add stored captured)
     )
     let computation = make witness
     captured := 99
     break handled computation
   )
-  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (func () => return do:
+  let ($Cell statef, $Cell valuef) = @state.run ($Cell 2.5) (func () => return do:
     let captured = 3.5
-    let witness = func ignored => return #Cell captured
+    let witness = func ignored => return $Cell captured
     let make = func witness => return @computation (func () => return do:
       use current <- @state.get witness
-      let #Cell stored = current
-      let #Cell captured = witness ()
-      break #Cell (@f32.add stored captured)
+      let $Cell stored = current
+      let $Cell captured = witness ()
+      break $Cell (@f32.add stored captured)
     )
     let computation = make witness
     captured := 199.5

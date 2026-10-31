@@ -6,20 +6,20 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 const source = `entry const list = func () => return case [].iter.next of
-  #Nothing => 42
-  #Some (_, _) => 0
+  $Nothing => 42
+  $Some (_, _) => 0
 entry const array = func () => return case #[].iter.next of
-  #Nothing => 42
-  #Some (_, _) => 0
+  $Nothing => 42
+  $Some (_, _) => 0
 `;
 
 Deno.test("empty cursor result preserves erased source types and exact method edits in both tiers", async () => {
   const original = await Deno.readTextFile(prelude);
   const method =
-    "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then #Some (@cursor.value cursor, @cursor.advance cursor)\n  else #Nothing";
+    "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then $Some (@cursor.value cursor, @cursor.advance cursor)\n  else $Nothing";
   const changed = original.replace(
     method,
-    method.replace("else #Nothing", "else #Some (77, cursor)"),
+    method.replace("else $Nothing", "else $Some (77, cursor)"),
   );
   const changedIter = original.replace(
     "const List.iter = func values => return @list.cursor values",

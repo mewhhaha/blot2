@@ -4,7 +4,7 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Probe is data = #Probe U32
+const library = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return do:
   let copied = 0
   break func (index: U32) => return @u32.add index copied
@@ -16,7 +16,7 @@ const lookup = func probe => return func (index: U32) => return do:
   if @type.call "within" probe index:
     break @array.get values (@type.call "choose" probe index)
   break 0
-const run = func index => return lookup (#Probe 42) index
+const run = func index => return lookup ($Probe 42) index
 `;
 const source = `import {run} from "./logic"
 entry const answer = func (index: U32) => return run index
@@ -40,12 +40,12 @@ const remainingArgumentsLibrary = library
     '((@type.call "choose" probe index) ())',
   );
 
-const literalReceiverLibrary = `type Probe is data = #Probe U32
+const literalReceiverLibrary = `type Probe is data = $Probe U32
 const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta
 const run = func (index: U32) => return do:
   let copied = 0
   if @u32.lt index 2:
-    break @array.get #[8, 13] ((@type.call "choose" (#Probe 42) index) copied)
+    break @array.get #[8, 13] ((@type.call "choose" ($Probe 42) index) copied)
   break 0
 `;
 

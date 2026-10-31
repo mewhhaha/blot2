@@ -85,7 +85,7 @@ const cases = [_]Cases{
     .{ .name = "no-import", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = 42\nentry const answer = func () => return first\n" }} },
     .{ .name = "source", .mode = .source, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: U32 = 42\nentry const answer = func () => return first\n" }} },
     .{ .name = "import", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "helper.blot", .text = "const supply: U32 = 0\n" }, .{ .name = "main.blot", .text = "import {supply} from \"./helper\"\nlet local: U32 = 42\nentry const answer = func () => return identity (@u32.add supply local)\n" } } },
-    .{ .name = "nominal", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "type Box is data = #Box U32\nlet local: U32 = 42\nlet boxed = #Box local\nentry const answer = func () => return case boxed of\n  #Box value => identity value\n" } } },
+    .{ .name = "nominal", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "type Box is data = $Box U32\nlet local: U32 = 42\nlet boxed = $Box local\nentry const answer = func () => return case boxed of\n  $Box value => identity value\n" } } },
     .{ .name = "effect", .has_prelude = true, .sources = &.{ .{ .name = "prelude.blot", .text = prelude_source }, .{ .name = "main.blot", .text = "effect Read: Unit -> U32\nlet local: U32 = 42\nconst reader = @effect.provider Read (func () => return local)\nentry const answer = func () => return do reader:\n  break Read ()\n" } } },
     .{ .name = "mismatch", .semantic_reject = true, .sources = &.{.{ .name = "main.blot", .text = "const first: U32 = second\nconst second: F32 = 1.25\nentry const answer = func () => return 42\n" }} },
     .{ .name = "cycle", .sources = &.{.{ .name = "main.blot", .text = "let first: U32 = second\nlet second: U32 = first\nentry const answer = func () => return first\n" }} },
@@ -235,8 +235,8 @@ test "project alias forwarding preserves ordinary partial preparation qualified 
     const Dependency = @import("frozen_dependency.zig").FrozenDependency;
     var fixture = try Fixture.init(&.{
         .{ .name = "prelude.blot", .text = prelude_source },
-        .{ .name = "helper.blot", .text = "type Box is data = #Box U32\nconst wrap = func (value: U32) => return #Box value\n" },
-        .{ .name = "main.blot", .text = "import {Box, wrap} from \"./helper\"\nlet scalar: U32 = 42\nconst boxed = wrap 42\nentry const answer = func () => return case boxed of\n  #Box value => identity value\n" },
+        .{ .name = "helper.blot", .text = "type Box is data = $Box U32\nconst wrap = func (value: U32) => return $Box value\n" },
+        .{ .name = "main.blot", .text = "import {Box, wrap} from \"./helper\"\nlet scalar: U32 = 42\nconst boxed = wrap 42\nentry const answer = func () => return case boxed of\n  $Box value => identity value\n" },
     }, true);
     defer fixture.deinit();
     var source = try project.load(a, io, fixture.path, fixture.options(.project));

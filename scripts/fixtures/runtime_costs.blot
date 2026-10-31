@@ -2,7 +2,7 @@ import * as array from "std/array"
 import * as list from "std/list"
 import { Vec3 } from "std/vector"
 
-type Columns is data = #Columns { values: Array U32 }
+type Columns is data = $Columns { values: Array U32 }
 
 entry const replace = func (count: U32) => return do:
   let values = array.fill count 0
@@ -13,13 +13,13 @@ entry const replace = func (count: U32) => return do:
 entry const checked = func (count: U32) => return do:
   let values = array.fill count 0
   for i in 0..count:
-    let #Some next = values.set(i)(i + 1) else:
+    let $Some next = values.set(i)(i + 1) else:
       break values
     values := next
   break values
 
 entry const nested = func (count: U32) => return do:
-  let world = #Columns { values: array.fill count 0 }
+  let world = $Columns { values: array.fill count 0 }
   for i in 0..count:
     world.values[i] := i + 1
   break world.values
@@ -60,16 +60,16 @@ entry const singleton_arrays = func (count: U32) => return do:
 entry const maybe_demand = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
-    total := self + Maybe.unwrap_or_else (i + 1) (#Some i)
+    total := self + Maybe.unwrap_or_else (i + 1) ($Some i)
   break total
 
 entry const maybe_match = func (count: U32) => return do:
   let total = 0
   for i in 0..count:
-    let value = #Some i
+    let value = $Some i
     total := self + (case value of
-      #Some x => x
-      #Nothing => i + 1)
+      $Some x => x
+      $Nothing => i + 1)
   break total
 
 entry const mapped = func (values: Array U32) => return array.map (func x => return x + 1) values
@@ -80,7 +80,7 @@ entry const mapped_loop = func (values: Array U32) => return do:
   break result
 
 entry const vector_loop = func (count: U32) => return do:
-  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }
+  let v = $Vec3 { x: 1.0, y: 2.0, z: 3.0 }
   for i in 0..count:
-    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5
+    v := lerp v ($Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5
   break #[v.x, v.y, v.z]

@@ -26,23 +26,23 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 }
 
 const shapes =
-    \\type Pair [a, b] is data = #Pair { left: a, right: b }
-    \\type Shape is data = #Circle F32 | #Box { width: F32, height: F32 }
+    \\type Pair [a, b] is data = $Pair { left: a, right: b }
+    \\type Shape is data = $Circle F32 | $Box { width: F32, height: F32 }
     \\type State a is effect = { get: Unit -> a, set: a -> Unit }
     \\const area = func (shape: Shape) => return case shape of
-    \\  #Circle radius => @f32.mul radius radius
-    \\  #Box { width, height } => @f32.mul width height
+    \\  $Circle radius => @f32.mul radius radius
+    \\  $Box { width, height } => @f32.mul width height
     \\const swap = func pair => return do:
-    \\  let #Pair { left, right } = pair
-    \\  break #Pair { left: right, right: left }
+    \\  let $Pair { left, right } = pair
+    \\  break $Pair { left: right, right: left }
     \\const total = func (values: Array (Pair [U32, F32])) => return @array.length values
     \\const counter = func () => return do:
     \\  use value <- State.get ()
     \\  State.set (@u32.add value 1)
     \\  break value
     \\entry const run = func (x: U32) => return do:
-    \\  let shapes = #[#Circle 1.0, #Box { width: 2.0, height: 3.0 }]
-    \\  let pair = swap (#Pair { left: 2.5, right: x })
+    \\  let shapes = #[$Circle 1.0, $Box { width: 2.0, height: 3.0 }]
+    \\  let pair = swap ($Pair { left: 2.5, right: x })
     \\  break @u32.add (total #[pair]) (@array.length shapes)
 ;
 

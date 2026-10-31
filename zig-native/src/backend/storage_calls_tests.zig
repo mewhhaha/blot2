@@ -501,11 +501,11 @@ test "selected inline data helpers reuse checked record results" {
 }
 
 test "readonly descriptor records reuse caller result slots across owners" {
-    const helper = "type Bundle is data = #Bundle {rows: &[U32], bias: U32}\nconst folded = func (input: Bundle) => return do:\n  let total = input.bias\n  for index in 0..@storage.length input.rows:\n    total := @u32.add self (@storage.read input.rows index)\n  return {total, count: @storage.length input.rows}\n";
+    const helper = "type Bundle is data = $Bundle {rows: &[U32], bias: U32}\nconst folded = func (input: Bundle) => return do:\n  let total = input.bias\n  for index in 0..@storage.length input.rows:\n    total := @u32.add self (@storage.read input.rows index)\n  return {total, count: @storage.length input.rows}\n";
     const entry = "entry const answer = func (): U32 => return do:\n  let first: ResizeArray U32 = #[7, 9]\n  let second: ResizeArray U32 = #[11]\n";
-    var once = try lower(a, helper ++ entry ++ "  let value = folded (#Bundle {rows: &first[0..2], bias: 1})\n  return value.total\n");
+    var once = try lower(a, helper ++ entry ++ "  let value = folded ($Bundle {rows: &first[0..2], bias: 1})\n  return value.total\n");
     defer once.deinit(a);
-    var twice = try lower(a, helper ++ entry ++ "  let left = folded (#Bundle {rows: &first[0..2], bias: 1})\n  let right = folded (#Bundle {rows: &second[0..1], bias: 2})\n  return @u32.add left.total right.total\n");
+    var twice = try lower(a, helper ++ entry ++ "  let left = folded ($Bundle {rows: &first[0..2], bias: 1})\n  let right = folded ($Bundle {rows: &second[0..1], bias: 2})\n  return @u32.add left.total right.total\n");
     defer twice.deinit(a);
     var left = try scoped.compile(a, &.{once}, 1);
     defer left.deinit(a);
@@ -553,13 +553,13 @@ test "static readonly callback arguments reuse selected helpers across owners" {
 }
 
 test "returned reader descriptors reuse alias maps without fresh owner results" {
-    const helper = "type Buffer is data = #Buffer {rows: ResizeArray U32, label: U32}\nconst chosen = func (input: Buffer): Buffer => return input\n";
+    const helper = "type Buffer is data = $Buffer {rows: ResizeArray U32, label: U32}\nconst chosen = func (input: Buffer): Buffer => return input\n";
     const entry = "entry const answer = func (): U32 => return do:\n  let first: ResizeArray U32 = #[7]\n  let second: ResizeArray U32 = #[9]\n";
     var baseline = try lower(a, entry ++ "  return @u32.add first[0] second[0]\n");
     defer baseline.deinit(a);
-    var once = try lower(a, helper ++ entry ++ "  let value = chosen (#Buffer {rows: first, label: 1})\n  return value.rows[0]\n");
+    var once = try lower(a, helper ++ entry ++ "  let value = chosen ($Buffer {rows: first, label: 1})\n  return value.rows[0]\n");
     defer once.deinit(a);
-    var twice = try lower(a, helper ++ entry ++ "  let left = chosen (#Buffer {rows: first, label: 1})\n  let right = chosen (#Buffer {rows: second, label: 2})\n  return @u32.add left.rows[0] right.rows[0]\n");
+    var twice = try lower(a, helper ++ entry ++ "  let left = chosen ($Buffer {rows: first, label: 1})\n  let right = chosen ($Buffer {rows: second, label: 2})\n  return @u32.add left.rows[0] right.rows[0]\n");
     defer twice.deinit(a);
     var base = try scoped.compile(a, &.{baseline}, 1);
     defer base.deinit(a);

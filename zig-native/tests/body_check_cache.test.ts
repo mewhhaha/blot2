@@ -278,8 +278,8 @@ Deno.test("body checker reuse relocates opaque receipts through source and compi
   const producer = `${directory}/tokens.blot`;
   const bundle = `${directory}/tokens.blotdep`;
   const library = `opaque type Token = U32
-const make = func (value: U32) => return #Token value
-const read = func (#Token value) => return value
+const make = func (value: U32) => return $Token value
+const read = func ($Token value) => return value
 `;
   const source = (seed: number, prefix = "") =>
     `import {Token, make, read} from "./tokens"
@@ -338,8 +338,8 @@ entry const run = func (value: U32) => return @u32.add (read (make (${
           }
         }
         const referenceLibrary = `opaque type Token = Array U32
-const make = func (value: U32) => return #Token #[value]
-const read = func (#Token value) => return @array.get value 0
+const make = func (value: U32) => return $Token #[value]
+const read = func ($Token value) => return @array.get value 0
 `;
         await Deno.writeTextFile(producer, referenceLibrary);
         if (dependencies !== undefined) {
@@ -400,8 +400,8 @@ Deno.test("body checker reuse relocates generic opaque scalar and owning referen
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", helper = "make") =>
     `${prefix}opaque type Box a = a
-const make = func value => return #Box value
-const read = func (#Box value) => return value
+const make = func value => return $Box value
+const read = func ($Box value) => return value
 const identity = func (value: Box a) : Box a => return ${genericSpine("value")}
 type Pair [left, right] = (left, right)
 const shaped = func (value: Pair [U32, F32]) : U32 => return ${genericSpine("40")}
@@ -428,7 +428,7 @@ entry const reference = func (value: U32) => return read (identity (${helper} #[
       const [index, text] of [
         source(),
         source(
-          "type Earlier is data = #Earlier Bool\nconst fresh_spelling = 2.0\n",
+          "type Earlier is data = $Earlier Bool\nconst fresh_spelling = 2.0\n",
         ),
         source("", "missing_name"),
         source(),
@@ -485,10 +485,10 @@ Deno.test("body checker reuse reconstructs shared predicates and revokes selecte
   const source = (prefix = "", operation = "@u32.add", annotated = false) => {
     let annotation = "";
     if (annotated) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `${prefix}type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} (${
+    return `${prefix}type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} (${
       primitiveSpine("left")
     }) right)
 const add = func left => return func right => return @type.call "add" (${
@@ -569,8 +569,8 @@ Deno.test("body checker reuse relocates shaped records with owning payloads and 
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", read = "read") =>
     `${prefix}opaque type Entry { head, tail } = { head: head, tail: tail }
-const make = func value => return #Entry value
-const read = func (#Entry { tail }) => return tail
+const make = func value => return $Entry value
+const read = func ($Entry { tail }) => return tail
 entry const unsigned = func (value: U32) => return ${read} (make { head: value, tail: #[${
       primitiveSpine("value")
     }] })
@@ -644,10 +644,10 @@ Deno.test("body checker reuse relocates shared producer schemes through source a
   const producer = `${directory}/numbers.blot`;
   const bundle = `${directory}/numbers.blotdep`;
   const library = (operation = "@u32.add") =>
-    `type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+    `type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const add = func left => return func right => return @type.call "add" left right
 const forwarded = func left => return func right => return add left right
 `;
@@ -749,10 +749,10 @@ Deno.test("body checker reuse recreates declared qualifications with current evi
   ) => {
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `${prefix}type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+    return `${prefix}type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const twice: a -> a where { ${clause} } = func value => return @type.call "add" (${
       genericSpine("value")
     }) value
@@ -832,10 +832,10 @@ Deno.test("body checker reuse preserves portable qualified producer origins afte
     clause = 'associated "add" a a a',
   ) =>
     `const earlier = func value => return ${earlier}
-type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const twice: a -> a where { ${clause} } = func value => return @type.call "add" value value
 `;
   const source = (prefix = "", target = "twice") =>
@@ -1011,16 +1011,16 @@ Deno.test("body checker reuse preserves owning constructor case payloads across 
   const directory = await Deno.makeTempDir({ prefix: "blot-body-patterns-" });
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", increment = "1", variant = false) => {
-    let recipe = "#Packet { head: U32, tail: Array U32 }";
+    let recipe = "$Packet { head: U32, tail: Array U32 }";
     let fallback = "";
     if (variant) {
-      recipe = "#Unused | " + recipe;
-      fallback = "\n  #Unused => #[0]";
+      recipe = "$Unused | " + recipe;
+      fallback = "\n  $Unused => #[0]";
     }
     return `${prefix}type Packet is data = ${recipe}
-const make = func (value: U32) => return #Packet { head: value, tail: #[value, @u32.add value ${increment}] }
+const make = func (value: U32) => return $Packet { head: value, tail: #[value, @u32.add value ${increment}] }
 const read = func (packet: Packet) => return case packet of
-  #Packet { tail } => ${genericSpine("tail")}${fallback}
+  $Packet { tail } => ${genericSpine("tail")}${fallback}
 entry const run = func (value: U32) => return read (make value)
 `;
   };
@@ -1251,12 +1251,12 @@ Deno.test("body checker reuse relocates concrete postfix field variants and owni
     constructor = "Packet",
     extra = "",
   ) =>
-    `${prefix}type Packet is data = #Packet { head: U32, tail: Array U32 } | #Alternate { tail: Array U32, head: U32 } ${extra}
+    `${prefix}type Packet is data = $Packet { head: U32, tail: Array U32 } | $Alternate { tail: Array U32, head: U32 } ${extra}
 const get = func (value: { head: U32, tail: Array U32 }) => return ${
       genericSpine("(value).tail")
     }
 const read = func (value: Packet) => return ${genericSpine("(value).tail")}
-const make = func (value: U32) => return #${constructor} { head: value, tail: #[value, @u32.add value ${increment}] }
+const make = func (value: U32) => return $${constructor} { head: value, tail: #[value, @u32.add value ${increment}] }
 entry const run = func (value: U32) => return read (make value)
 entry const plain = func (value: U32) => return get { head: value, tail: #[value] }
 `;
@@ -1269,7 +1269,7 @@ entry const plain = func (value: U32) => return get { head: value, tail: #[value
         [source("const earlier_spelling = { tail: 3.0, head: 2 }\n"), [40, 41]],
         [source("", "2", "Alternate"), [40, 42]],
         [source("", "missing_name"), null],
-        [source("", "2", "Packet", "| #Missing { head: U32 }"), null],
+        [source("", "2", "Packet", "| $Missing { head: U32 }"), null],
         [source("", "2"), [40, 42]],
         [source(), [40, 41]],
       ] as const
@@ -1319,8 +1319,8 @@ Deno.test("body checker reuse restores chained dotted nominal paths from source 
   const producer = `${directory}/packets.blot`;
   const bundle = `${directory}/packets.blotdep`;
   const library = (increment = "1", extra = "") =>
-    `type Packet is data = #Packet { head: U32, nested: { tail: Array U32, marker: F32 } } | #Alternate { nested: { marker: F32, tail: Array U32 }, head: U32 } ${extra}
-const make = func value => return #Alternate { nested: { marker: 1.0, tail: #[value, @u32.add value ${increment}] }, head: value }
+    `type Packet is data = $Packet { head: U32, nested: { tail: Array U32, marker: F32 } } | $Alternate { nested: { marker: F32, tail: Array U32 }, head: U32 } ${extra}
+const make = func value => return $Alternate { nested: { marker: 1.0, tail: #[value, @u32.add value ${increment}] }, head: value }
 `;
   const source = (prefix = "", body = "value.nested.tail") =>
     `import {Packet, make} from "./packets"
@@ -1363,7 +1363,7 @@ entry const pack = func (value: U32) => return value
             [source(prefix), library(), [40, 41]],
             [source(prefix), library("2"), [40, 42]],
             [source(prefix, "missing_name"), library("2"), null],
-            [source(prefix), library("2", "| #Missing { head: U32 }"), null],
+            [source(prefix), library("2", "| $Missing { head: U32 }"), null],
             [source(prefix), library("2"), [40, 42]],
             [source(), library(), [40, 41]],
           ] as const).entries()
@@ -1432,18 +1432,18 @@ Deno.test("body checker reuse owns inferred local associated principals and cand
     member = "add",
     extra = "",
   ) =>
-    `${prefix}type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
-type FloatNumber is data = #FloatNumber F32
-const make_float = func value => return #FloatNumber value
-const read_float = func (#FloatNumber value) => return value
-const FloatNumber.add = func (#FloatNumber left) => return func (#FloatNumber right) => return #FloatNumber (@f32.add left right)
-type Numbers is data = #Numbers (Array U32)
-const make_numbers = func value => return #Numbers value
-const read_numbers = func (#Numbers value) => return value
-const Numbers.add = func (#Numbers left) => return func (#Numbers right) => return #Numbers (@array.concat left right)
+    `${prefix}type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
+type FloatNumber is data = $FloatNumber F32
+const make_float = func value => return $FloatNumber value
+const read_float = func ($FloatNumber value) => return value
+const FloatNumber.add = func ($FloatNumber left) => return func ($FloatNumber right) => return $FloatNumber (@f32.add left right)
+type Numbers is data = $Numbers (Array U32)
+const make_numbers = func value => return $Numbers value
+const read_numbers = func ($Numbers value) => return value
+const Numbers.add = func ($Numbers left) => return func ($Numbers right) => return $Numbers (@array.concat left right)
 ${extra}const twice = func value => return do:
   let local = func amount => return @type.call "${member}" (${
       genericSpine("amount")
@@ -1455,7 +1455,7 @@ entry const packed = func (value: U32) => return read_numbers (twice (make_numbe
 `;
   const prefix = "const earlier_spelling = { tail: 3.0, head: 2 }\n";
   const extra =
-    "type Extra is data = #Extra U32\nconst Extra.add = func (#Extra left) => return func (#Extra right) => return #Extra left\n";
+    "type Extra is data = $Extra U32\nconst Extra.add = func ($Extra left) => return func ($Extra right) => return $Extra left\n";
   const retained = await createZigProjectCompiler({
     executable,
     entry,
@@ -1535,10 +1535,10 @@ Deno.test("body checker reuse revokes local principals for source and compiled s
   const library = (operation = "@u32.add", foreign = false) => {
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+    return `type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 `;
   };
   const source = (prefix = "", name = "local") =>
@@ -1637,9 +1637,9 @@ Deno.test("body checker reuse owns result directed local principals", async () =
   });
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", increment = "0", member = "from") =>
-    `${prefix}type Number is data = #Number U32
-const Number.from = func (value: U32) => return #Number (@u32.add value ${increment})
-const read = func (#Number value) => return value
+    `${prefix}type Number is data = $Number U32
+const Number.from = func (value: U32) => return $Number (@u32.add value ${increment})
+const read = func ($Number value) => return value
 const convert = func (value: U32) : Number => return do:
   let local = func amount => return @type.result "${member}" (${genericSpine("amount")})
   break local value
@@ -1709,10 +1709,10 @@ Deno.test("body checker reuse preserves selected Foreign traces in inferred loca
   const source = (prefix = "", operation = "@u32.add", callbackType = "Host") =>
     `${prefix}type Host = U32 -> U32 ! {Foreign}
 type Pure = U32 -> U32
-type Input is data = #Input { value: U32, callback: ${callbackType} }
-const make = func callback => return #Input { value: 40, callback: callback }
+type Input is data = $Input { value: U32, callback: ${callbackType} }
+const make = func callback => return $Input { value: 40, callback: callback }
 const read = func (value: Input) => return (value).value
-const Input.add = func (#Input { value: left, callback: invoke }) => return func (#Input { value: right, callback: ignored }) => return #Input { value: invoke (${operation} left right), callback: invoke }
+const Input.add = func ($Input { value: left, callback: invoke }) => return func ($Input { value: right, callback: ignored }) => return $Input { value: invoke (${operation} left right), callback: invoke }
 const twice = func value => return do:
   let local = func amount => return @type.call "add" (${genericSpine("amount")}) amount
   break local value
@@ -1803,10 +1803,10 @@ Deno.test("body checker reuse relocates written local association and representa
   ) => {
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `${prefix}type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+    return `${prefix}type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const twice = func value => return do:
   let identity: a -> a where { type_rep a } = func amount => return ${
       genericSpine("amount")
@@ -1892,10 +1892,10 @@ Deno.test("body checker reuse preserves exported local qualification origins in 
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     return `const earlier = func value => return ${earlier}
-type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const factory = func amount => return do:
   let local: a -> a where { associated "${clause}" a a a } = func value => return @type.call "add" value value
   break local amount
@@ -2023,19 +2023,19 @@ Deno.test("body checker reuse relocates producer units and bindings through sour
     let prefix = "";
     if (inserted) {
       prefix =
-        "type Earlier is data = #Earlier F32\nconst earlier = { tail: 3.0, head: 2 }\n";
+        "type Earlier is data = $Earlier F32\nconst earlier = { tail: 3.0, head: 2 }\n";
     }
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
-    return `${prefix}type Number is data = #Number U32
-const make = func value => return #Number value
-const read = func (#Number value) => return value
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+    return `${prefix}type Number is data = $Number U32
+const make = func value => return $Number value
+const read = func ($Number value) => return value
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const factory = func amount => return do:
   let local: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
   break local amount
-type Box is data = #Box {payload: Number, tail: Array U32}
-const make_box = func value => return #Box {payload: make value, tail: #[value, @u32.add value 1]}
+type Box is data = $Box {payload: Number, tail: Array U32}
+const make_box = func value => return $Box {payload: make value, tail: #[value, @u32.add value 1]}
 const scalar = func (value: U32) => return @u32.add value 2
 `;
   };
@@ -2179,13 +2179,13 @@ Deno.test("body checker reuse resolves imported annotation heads with exact sour
   const library = (inserted = false, concrete = false) => {
     let prefix = "";
     if (inserted) {
-      prefix = "type Earlier is data = #Earlier F32\nconst earlier = 7\n";
+      prefix = "type Earlier is data = $Earlier F32\nconst earlier = 7\n";
     }
     let element = "a";
     if (concrete) element = "U32";
-    return `${prefix}type Wrapper a is data = #Wrapper {value: a, owning: Array U32}
+    return `${prefix}type Wrapper a is data = $Wrapper {value: a, owning: Array U32}
 type Alias a = Wrapper ${element}
-const make = func value => return #Wrapper {value, owning: #[value, @u32.add value 1]}
+const make = func value => return $Wrapper {value, owning: #[value, @u32.add value 1]}
 `;
   };
   const imports = (mode: string, inserted: boolean) => {
@@ -2218,10 +2218,10 @@ const make = func value => return #Wrapper {value, owning: #[value, @u32.add val
     return `${imports(mode, inserted)}const marker = ${marker}
 const hold = func (value: ${head} U32) => return ${genericSpine("value")}
 entry const run = func (value: U32) => return do:
-  let #${constructor} {value: result, owning: items} = hold (${make} value)
+  let $${constructor} {value: result, owning: items} = hold (${make} value)
   break @u32.add result (@array.length items)
 entry const owned = func (value: U32) => return do:
-  let #${constructor} {value: result, owning: items} = hold (${make} value)
+  let $${constructor} {value: result, owning: items} = hold (${make} value)
   break items
 `;
   };
@@ -2348,25 +2348,25 @@ Deno.test("body checker reuse owns shared local relays through source and compil
   ) => {
     let prefix = "";
     if (inserted) {
-      prefix = "type Earlier is data = #Earlier F32\nconst earlier = 7\n";
+      prefix = "type Earlier is data = $Earlier F32\nconst earlier = 7\n";
     }
     let annotation = "";
     if (foreign) annotation = ": Number -> Number -> Number ! {Foreign}";
     let payload = "U32";
-    let make = "#Number value";
+    let make = "$Number value";
     let read = "value";
     if (owning) {
       payload = "Array U32";
-      make = "#Number #[value, @u32.add value 1]";
+      make = "$Number #[value, @u32.add value 1]";
       read = "@array.length value";
       operation = "@array.concat";
     }
     let twice = '@type.call "add" amount amount';
     if (!qualified) twice = "amount";
-    return `${prefix}type Number is data = #Number ${payload}
+    return `${prefix}type Number is data = $Number ${payload}
 const make = func (value: U32) => return ${make}
-const read = func (#Number value) => return ${read}
-const Number.add${annotation} = func (#Number left) => return func (#Number right) => return #Number (${operation} left right)
+const read = func ($Number value) => return ${read}
+const Number.add${annotation} = func ($Number left) => return func ($Number right) => return $Number (${operation} left right)
 const twice = func amount => return ${twice}
 `;
   };
@@ -2775,14 +2775,14 @@ Deno.test("body checker reuse owns generic explicit and dotted fields through so
     let annotation = "";
     if (candidate === "foreign") annotation = ": Scalar -> U32 ! {Foreign}";
     let member =
-      `const Scalar.item${annotation} = func (#Scalar value) => return ${operation} value 1\n`;
+      `const Scalar.item${annotation} = func ($Scalar value) => return ${operation} value 1\n`;
     if (candidate === true) {
       member += "const F32.item = func (value: F32) => return value\n";
     }
-    return `type Scalar is data = #Scalar U32
-const wrap = func (value: U32) => return #Scalar value
-type Box is data = #Box {${fields}}
-const make = func (value: U32) => return #Box {${values}}
+    return `type Scalar is data = $Scalar U32
+const wrap = func (value: U32) => return $Scalar value
+type Box is data = $Box {${fields}}
+const make = func (value: U32) => return $Box {${values}}
 const project: a -> b where { field "item" a b } = func value => return ${
       genericSpine("value.item")
     }
@@ -3000,10 +3000,10 @@ Deno.test("body checker reuse owns if let joins captures and effect traces throu
   const bundle = `${directory}/maybe.blotdep`;
   const library = (variant = false) => {
     let extra = "";
-    if (variant) extra = "#Earlier | ";
-    return `type Maybe a is data = ${extra}#None | #Some a
-const some = func value => return #Some value
-const none = #None
+    if (variant) extra = "$Earlier | ";
+    return `type Maybe a is data = ${extra}$None | $Some a
+const some = func value => return $Some value
+const none = $None
 `;
   };
   const source = (seed = "2", inserted = false, fallback = "3") => {
@@ -3013,14 +3013,14 @@ const none = #None
 ${prefix}const seed = ${seed}
 const choose = func (value: Maybe U32) => return do:
   let result = seed
-  if let #Some amount = value:
+  if let $Some amount = value:
     result := @u32.add (${genericSpine("amount")}) seed
   else:
     result := ${fallback}
   break result
 const pack = func (value: Maybe (Array U32)) => return do:
   let result = #[seed]
-  if let #Some amount = value:
+  if let $Some amount = value:
     result := @array.identity (${genericSpine("amount")})
   break result
 const negative = func (value: F32) => return -(${genericSpine("value")})
@@ -3033,7 +3033,7 @@ const listed = func (value: U32) => return @list.from_array (@array.from_list (@
 const generated = func (value: U32) => return @array.generate 2 (func (index: U32) => return @u32.add value index)
 const projected = func (value: U32) => return @product.get (3.0, value) 1
 const action = func callback => return func (value: Maybe U32) => return do:
-  if let #Some amount = value:
+  if let $Some amount = value:
     break callback (${genericSpine("amount")})
   break callback seed
 entry const fraction = func (value: F32) => return negative value

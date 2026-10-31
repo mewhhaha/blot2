@@ -7,8 +7,8 @@ const executable = Deno.args[0] ??
 const producer = (offset: number) =>
   `opaque type Token = U32
 private const offset = ${offset}
-const make: U32 -> Token = func value => return #Token (@u32.add value offset)
-const read: Token -> U32 = func (#Token value) => return value
+const make: U32 -> Token = func value => return $Token (@u32.add value offset)
+const read: Token -> U32 = func ($Token value) => return value
 `;
 const bridge = `import {make, read} from "./tokens"
 const transform = func (value: U32) => return read (make value)
@@ -71,14 +71,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
             let source = producer(offset);
             if (index === 2) {
               source = source.replace(
-                "func (#Token value) => return value",
-                "func (#Token value) => return do:\n  let fresh_private_adjustment = @u32.add value 0\n  break fresh_private_adjustment",
+                "func ($Token value) => return value",
+                "func ($Token value) => return do:\n  let fresh_private_adjustment = @u32.add value 0\n  break fresh_private_adjustment",
               );
             }
             if (index === 3) {
               source = source.replace(
-                "func value => return #Token (@u32.add value offset)",
-                "func value => return do:\n  let fresh_private_adjustment = @u32.add value 0\n  break #Token (@u32.add fresh_private_adjustment offset)",
+                "func value => return $Token (@u32.add value offset)",
+                "func value => return do:\n  let fresh_private_adjustment = @u32.add value 0\n  break $Token (@u32.add fresh_private_adjustment offset)",
               );
             }
             const sources = { [tokens]: source };

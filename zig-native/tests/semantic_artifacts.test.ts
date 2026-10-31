@@ -54,7 +54,7 @@ const factory = func number => return func extra => return do:
   return @u32.add number query_copy_32
 const callback = factory ${offset}
 entry const answer = func (extra: U32) : U32 => return callback extra
-entry const present = func () => return Maybe.unwrap_or 0 (lib.add_present (#Some 1) (#Some 2))
+entry const present = func () => return Maybe.unwrap_or 0 (lib.add_present ($Some 1) ($Some 2))
 `;
 
 async function project() {
@@ -141,7 +141,7 @@ Deno.test("dependency-loaded projects restart from persisted semantic owners and
       for (
         const text of [
           entrySource("41"),
-          entrySource("#Wrong"),
+          entrySource("$Wrong"),
           entrySource("40"),
         ]
       ) {

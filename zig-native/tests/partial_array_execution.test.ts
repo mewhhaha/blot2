@@ -19,7 +19,7 @@ Deno.test("real array library retains generic empty chunks alongside ordinary fi
 import * as array from "./array"
 const numbers = #[1, 2, 3, 4, 5]
 const even = func value => return value % 2 == 0
-const choose = func value => return if even value then #Some (value * 10) else #Nothing
+const choose = func value => return if even value then $Some (value * 10) else $Nothing
 entry const answer = func () => return do:
   let selected = array.filter even numbers
   let mapped = array.filter_map choose numbers

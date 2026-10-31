@@ -11,9 +11,9 @@ for (const usedContract of [false, true]) {
       ? "const keep: a -> a where {Public a} = func value => return value\n"
       : "") +
     (usedContract
-      ? "const make: U32 -> Token = func value => return #Token (keep value)\n"
-      : "const make: U32 -> Token = func value => return #Token value\n") +
-    "const read: Token -> U32 = func (#Token value) => return value\n";
+      ? "const make: U32 -> Token = func value => return $Token (keep value)\n"
+      : "const make: U32 -> Token = func value => return $Token value\n") +
+    "const read: Token -> U32 = func ($Token value) => return value\n";
   const initial = header + body;
   const variants = [
     initial,

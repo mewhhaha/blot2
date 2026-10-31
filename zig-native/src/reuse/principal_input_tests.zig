@@ -206,15 +206,15 @@ test "checked requirement observations retain transitive headers through body ed
 
 test "completed inferred result interfaces preserve body edits and reverts without recollecting principals through OOM" {
     const prefix =
-        "type Token is data = #Token U32\n" ++
-        "const Token.from = func value => return #Token (@f32.to_u32 value)\n" ++
+        "type Token is data = $Token U32\n" ++
+        "const Token.from = func value => return $Token (@f32.to_u32 value)\n" ++
         "const from = func value => return @type.result \"from\" value\n" ++
         "const floor_impl = func value => return @f32.floor value\n" ++
         "const ceil_impl = func value => return @f32.ceil value\n" ++
         "const floor = floor_impl\n" ++
         "const ceil = ceil_impl\n" ++
         "const local = func value => return from (";
-    const suffix = " value)\nentry const answer: U32 where { type_rep U32 } = case local 41.25 of\n  #Token value => value\n";
+    const suffix = " value)\nentry const answer: U32 where { type_rep U32 } = case local 41.25 of\n  $Token value => value\n";
     var before = try Fixture.init(prefix ++ "floor" ++ suffix);
     defer before.deinit();
     var after = try Fixture.init(prefix ++ "ceil" ++ suffix);
@@ -430,7 +430,7 @@ test "principal nominal inputs retain absence negatives and final publications u
 }
 
 test "principal nominal replay requires exact memo inputs and publishes atomically" {
-    var fixture = try Fixture.init("type Box is data = #Box U32\nentry const answer = 7\n");
+    var fixture = try Fixture.init("type Box is data = $Box U32\nentry const answer = 7\n");
     defer fixture.deinit();
     var failure = std.testing.FailingAllocator.init(a, .{});
     var session = try eval.Session.init(failure.allocator(), &fixture.units);
@@ -452,10 +452,10 @@ test "principal nominal replay requires exact memo inputs and publishes atomical
 }
 
 const nominal_prelude =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const extract = func (box: Box) : U32 => return case box of
-    \\  #Box value => value
-    \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box
+    \\  $Box value => value
+    \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract ($Box
 ;
 
 test "principal input replay restores nominal and closed call publications across edits errors and recovery" {

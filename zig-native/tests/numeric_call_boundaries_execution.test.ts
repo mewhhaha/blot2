@@ -27,10 +27,10 @@ entry const unknown_choice = func (choice: U32) => return do:
   for row in rows:
     total := self + read row
   break total
-type Vector is data = #Vector {x: F32, y: F32}
+type Vector is data = $Vector {x: F32, y: F32}
 entry const selected_bits = func (seed: F32) => return do:
   let read = if seed == 0.0 then (func (value: Vector) : F32 => return value.x) else (func (value: Vector) : F32 => return value.y)
-  let values = array.fill 2 (#Vector {x: seed, y: seed})
+  let values = array.fill 2 ($Vector {x: seed, y: seed})
   let result = 0.0
   for value in values:
     result := read value

@@ -42,7 +42,7 @@ entry const resume = func () => return do:
         yield 33
       complete value =>
         break value
-const keep = func ~value => return func () => return @force value
+const keep = func ~value => return func () => return @demand value
 entry const retry = func () => return do:
   let delayed = keep (do:
     use owner <- @resource.acquire (func () => return 9) (func resource => return ())

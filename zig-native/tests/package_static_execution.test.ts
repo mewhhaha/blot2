@@ -189,10 +189,10 @@ entry const snapshot = func (value: U32) => return #[value]
 
 Deno.test("static package nominal payloads retain constructor witnesses", async () => {
   await compileAndRun(
-    `type Box a is data = #Box a
-const unwrap = func (#Box value) => return value
+    `type Box a is data = $Box a
+const unwrap = func ($Box value) => return value
 type Item = exists [a] => (Box a, a -> U32)
-const item: Item = pack [U32] (#Box 42, func value => return value) as Item
+const item: Item = pack [U32] ($Box 42, func value => return value) as Item
 const read = func (value: Item) => return unpack value as [a] payload in (@product.get payload 1) (unwrap (@product.get payload 0))
 entry const answer = func () => return read item
 `,

@@ -4,9 +4,9 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 
 const definitions = `
-type Box f is data = #Box f
-const box = func value => return #Box value
-const get = func (#Box mapper) => return mapper
+type Box f is data = $Box f
+const box = func value => return $Box value
+const get = func ($Box mapper) => return mapper
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {
@@ -23,26 +23,26 @@ for (const codegenTier of ["optimized", "development"] as const) {
     });
     try {
       const source = `
-type Maybe value is data = #Nothing | #Just value
+type Maybe value is data = $Nothing | $Just value
 entry const loop = func (limit: U32) => return do:
-  let pending = (#Nothing, #[1])
+  let pending = ($Nothing, #[1])
   let index = 0
   for ever:
     let (state, request) = pending
     if @u32.eq index limit:
       break case state of
-        #Nothing => request[0]
-        #Just value => @u32.add value request[0]
-    pending := (#Just index, #[@u32.add index 2])
+        $Nothing => request[0]
+        $Just value => @u32.add value request[0]
+    pending := ($Just index, #[@u32.add index 2])
     index := @u32.add self 1
 entry const branch = func (value: U32) => return do:
-  let pending = (#Nothing, #[1])
+  let pending = ($Nothing, #[1])
   if @u32.lt 0 value:
-    pending := (#Just value, #[2])
+    pending := ($Just value, #[2])
   let (state, request) = pending
   break case state of
-    #Nothing => request[0]
-    #Just item => @u32.add item request[0]
+    $Nothing => request[0]
+    $Just item => @u32.add item request[0]
 `;
       const result = await compiler.build({ sources: { [entry]: source } });
       if (!result.success) throw new Error(JSON.stringify(result.diagnostics));
@@ -85,7 +85,7 @@ Deno.test("single-use local creators preserve selected scalar and reference fiel
       definitions + `
 entry const run = func (seed: ${type}) => return do:
   let stored = box (func value => return {item: value})
-  let #Box mapper = stored
+  let $Box mapper = stored
   break ${read}
 `,
       (guest, bytes) => {
@@ -153,9 +153,9 @@ entry const run = func (seed: U32) => return do:
 Deno.test("local storage promotion preserves runtime captures traps and eager host order", async () => {
   await compileExpectedFailure(
     definitions + `
-type Phantom value is data = #Phantom
+type Phantom value is data = $Phantom
 entry const run = func () => return do:
-  let stored: Box (Phantom (unique U32)) = box #Phantom
+  let stored: Box (Phantom (unique U32)) = box $Phantom
   break ()
 `,
     "multiplicity_unknown",
@@ -167,7 +167,7 @@ entry const run = func () => return do:
     definitions + `
 entry const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: @u32.add value seed})
-  let #Box mapper = stored
+  let $Box mapper = stored
   break (mapper 3).item
 `,
     (guest) => {
@@ -181,7 +181,7 @@ entry const run = func (seed: U32) => return do:
     definitions + `
 entry const run = func (seed: U32) => return do:
   let stored = box (func value => return {item: @u32.div value 0})
-  let #Box mapper = stored
+  let $Box mapper = stored
   break (mapper seed).item
 `,
     (guest) => {
@@ -194,7 +194,7 @@ entry const run = func (seed: U32) => return do:
     definitions + `
 entry const run = func (seed: U32) => return do:
   let stored = box ((func value => return {item: value}), @u32.div seed 0)
-  let #Box (mapper, _) = stored
+  let $Box (mapper, _) = stored
   break (mapper 7).item
 `,
     (guest) => {
@@ -208,7 +208,7 @@ entry const run = func (seed: U32) => return do:
 entry const run = func (host: Unit -> U32 ! {Foreign}) => return do:
   use before <- host ()
   use stored <- box ((func value => return {item: value}), host ())
-  let #Box (mapper, during) = stored
+  let $Box (mapper, during) = stored
   use after <- host ()
   break @u32.add (@u32.mul before 100) (@u32.add (@u32.mul during 10) (@u32.add after (mapper 7).item))
 `,
@@ -257,10 +257,10 @@ Deno.test("closed local wrapper body edits retain fresh failure recovery and res
     prelude: null,
   };
   const cached = { ...options, cacheDirectory: `${directory}/cache` };
-  const library = `type Box f is data = #Box (f, U32)
-const box = func value => return #Box (value, 1)
-const get = func (#Box (mapper, _)) => return mapper
-const stamp = func (#Box (_, value)) => return value
+  const library = `type Box f is data = $Box (f, U32)
+const box = func value => return $Box (value, 1)
+const get = func ($Box (mapper, _)) => return mapper
+const stamp = func ($Box (_, value)) => return value
 `;
   const source = `import {Box, box, get, stamp} from "./wrapper"
 entry const run = func (seed: U32) => return do:

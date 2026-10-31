@@ -26,17 +26,17 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return result;
 }
 const constructor_source =
-    \\data Box a=#Box {value:a}
-    \\data Pair=#Pair {x:U32,y:F32}
-    \\data Phantom a=#Phantom {value:F32}
-    \\const wrap=#Box
-    \\const pair=#Pair
+    \\type Box a is data= $Box {value:a}
+    \\type Pair is data= $Pair {x:U32,y:F32}
+    \\type Phantom a is data= $Phantom {value:F32}
+    \\const wrap= $Box
+    \\const pair= $Pair
     \\const unbox=func box=> return case box of
-    \\  #Box value=>value
+    \\  $Box value=>value
     \\const total=func selected=> return case selected of
-    \\  #Pair (x,y)=>@f32.add (@u32.to_f32 x) y
+    \\  $Pair (x,y)=>@f32.add (@u32.to_f32 x) y
     \\const capture=func constructor=> return func value=> return unbox (constructor value)
-    \\const ready=capture #Box
+    \\const ready=capture $Box
     \\entry const generic=@f32.add (@u32.to_f32 (ready 40)) (ready 2.5)
     \\entry const scalar=unbox (wrap 42.5)
     \\entry const tuple=total (pair (40,2.5))
@@ -46,9 +46,9 @@ const constructor_source =
     \\  selected.x:=99
     \\  break @f32.add (@u32.to_f32 (@product.get original 0)) selected.y
     \\) ()
-    \\const phantom: F32 -> Phantom U32=#Phantom
+    \\const phantom: F32 -> Phantom U32= $Phantom
     \\entry const phantom_value=case phantom 42.5 of
-    \\  #Phantom value=>value
+    \\  $Phantom value=>value
     \\entry const runtime=func (value:F32)=> return unbox (wrap value)
 ;
 
@@ -124,12 +124,12 @@ test "canonical scalar and product headers keep record storage names and frozen 
 }
 fn negativeScenario(allocator: std.mem.Allocator) !void {
     for ([_]struct { source: []const u8, code: checker.Code }{
-        .{ .source = "type Read is effect={read:Unit -> U32}\ndata Box=#Box {action:Unit -> U32}\nentry const answer=#Box (func()=> return Read.read ())\n", .code = .effect_mismatch },
-        .{ .source = "data One=#One {value:F32}\nentry const answer=#One 42\n", .code = .type_mismatch },
-        .{ .source = "data Pair=#Pair {x:U32,y:F32}\nentry const answer=#Pair 42\n", .code = .type_mismatch },
-        .{ .source = "data Empty=#Empty {}\nentry const answer=case #Empty {} of\n  #Empty payload=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:true,left:false} of\n  #Pair (true,_)=>0\n  #Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
+        .{ .source = "type Read is effect={read:Unit -> U32}\ntype Box is data= $Box {action:Unit -> U32}\nentry const answer= $Box (func()=> return Read.read ())\n", .code = .effect_mismatch },
+        .{ .source = "type One is data= $One {value:F32}\nentry const answer= $One 42\n", .code = .type_mismatch },
+        .{ .source = "type Pair is data= $Pair {x:U32,y:F32}\nentry const answer= $Pair 42\n", .code = .type_mismatch },
+        .{ .source = "type Empty is data= $Empty {}\nentry const answer=case $Empty {} of\n  $Empty payload=>42\n", .code = .constructor_arity },
+        .{ .source = "type Pair is data= $Pair {x:U32,y:U32}\nentry const answer=case $Pair {x:40,y:2} of\n  $Pair=>42\n", .code = .constructor_arity },
+        .{ .source = "type Pair is data= $Pair {left:Bool,right:Bool}\nentry const answer=case $Pair {right:true,left:false} of\n  $Pair (true,_)=>0\n  $Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
     }) |case| {
         var lexed = try lexer.lex(allocator, case.source);
         defer lexed.deinit(allocator);
@@ -152,7 +152,7 @@ test "canonical constructor calls preserve incompatible shape and coverage rejec
 fn importedScenario(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    const producer_source = "data Imported value = #Imported {value:value}\n";
+    const producer_source = "type Imported value is data = $Imported {value:value}\n";
     var producer_lexed = try lexer.lex(allocator, producer_source);
     defer producer_lexed.deinit(allocator);
     var producer_tree = try parser.parse(allocator, producer_source, producer_lexed.tokens.items, &pool);
@@ -168,9 +168,9 @@ fn importedScenario(allocator: std.mem.Allocator) !void {
     tree_live = false;
     const consumer_source =
         \\const unbox = func box => return case box of
-        \\  #Imported value => value
-        \\entry const unsigned = unbox (#Imported 42)
-        \\entry const floating = unbox (#Imported 42.5)
+        \\  $Imported value => value
+        \\entry const unsigned = unbox ($Imported 42)
+        \\entry const floating = unbox ($Imported 42.5)
     ;
     var lexed = try lexer.lex(allocator, consumer_source);
     defer lexed.deinit(allocator);
@@ -201,10 +201,10 @@ test "imported canonical constructor arrows keep producer identity after source 
 }
 
 const wide_source =
-    \\data Wide=#Wide {f0: U32,f1: U32,f2: U32,f3: U32,f4: U32,f5: U32,f6: U32,f7: U32,f8: U32,f9: U32,f10: U32,f11: U32,f12: U32,f13: U32,f14: U32,f15: U32,f16: U32,f17: U32,f18: U32,f19: U32,f20: U32,f21: U32,f22: U32,f23: U32,f24: U32,f25: U32,f26: U32,f27: U32,f28: U32,f29: U32,f30: U32,f31: U32,f32: U32,f33: U32,f34: U32,f35: F32}
-    \\const wrap=#Wide
+    \\type Wide is data= $Wide {f0: U32,f1: U32,f2: U32,f3: U32,f4: U32,f5: U32,f6: U32,f7: U32,f8: U32,f9: U32,f10: U32,f11: U32,f12: U32,f13: U32,f14: U32,f15: U32,f16: U32,f17: U32,f18: U32,f19: U32,f20: U32,f21: U32,f22: U32,f23: U32,f24: U32,f25: U32,f26: U32,f27: U32,f28: U32,f29: U32,f30: U32,f31: U32,f32: U32,f33: U32,f34: U32,f35: F32}
+    \\const wrap= $Wide
     \\entry const answer=case wrap (40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2.5) of
-    \\  #Wide payload=>@f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 35)
+    \\  $Wide payload=>@f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 35)
 ;
 
 fn wideScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {

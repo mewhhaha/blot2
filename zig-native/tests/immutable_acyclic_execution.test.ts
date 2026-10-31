@@ -7,19 +7,19 @@ const std = new URL("../../std", import.meta.url).pathname;
 
 const tree = `
 const grow = func (count: U32) => return do:
-  let root: Link = #End
+  let root: Link = $End
   for index in 0..count:
-    root := #Next (self, index)
+    root := $Next (self, index)
   break root
 entry const run = func (count: U32) => return do:
   let original = grow count
-  let changed = #Next (original, 8192)
+  let changed = $Next (original, 8192)
   let saved = case original of
-    #Next (_, value) => value
+    $Next (_, value) => value
     _ => 0
   break case changed of
-    #Next (tail, value) => case tail of
-      #Next (_, latest) => @u32.add value (@u32.add latest saved)
+    $Next (tail, value) => case tail of
+      $Next (_, latest) => @u32.add value (@u32.add latest saved)
       _ => 0
     _ => 0
 entry const memory = func () : Array U32 => return #[]
@@ -104,20 +104,20 @@ const foreignTree = (link: string) =>
   buildProject({
     "link.blot": link,
     "main.blot": 'import * as link from "./link"\n' +
-      tree.replaceAll("Link", "link.Link").replaceAll("#End", "#link.End")
-        .replaceAll("#Next", "#link.Next"),
+      tree.replaceAll("Link", "link.Link").replaceAll("$End", "$link.End")
+        .replaceAll("$Next", "$link.Next"),
   });
 
 Deno.test("immutable source trees preserve aliases and skip all trial work", async () => {
   await compileAndRun(
-    "type Link is data = #End | #Next (Link, U32)\n" + tree,
+    "type Link is data = $End | $Next (Link, U32)\n" + tree,
     (_, bytes) => inspect(bytes, true),
   );
 });
 
 Deno.test("foreign constructor definitions keep the immutable proof", async () => {
   inspect(
-    await foreignTree("type Link is data = #End | #Next (Link, U32)\n"),
+    await foreignTree("type Link is data = $End | $Next (Link, U32)\n"),
     true,
   );
 });
@@ -126,7 +126,7 @@ Deno.test("foreign constructors that can close a cycle decline the proof", async
   // The unused closure variant alone makes every Link cycle-capable.
   inspect(
     await foreignTree(
-      "type Link is data = #End | #Next (Link, U32) | #Later (Unit -> U32)\n",
+      "type Link is data = $End | $Next (Link, U32) | $Later (Unit -> U32)\n",
     ),
     false,
   );
@@ -136,11 +136,11 @@ Deno.test("temporary containers of proven elements skip candidacy", async () => 
   const frames = 100;
   await compileAndRun(
     `import * as array from "std/array"
-type Scalar is data = #Scalar { a: U32, b: F32 }
+type Scalar is data = $Scalar { a: U32, b: F32 }
 entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
-    let items = #[#Scalar { a: index, b: 1.0 } | index <- array.generate 4000 identity]
+    let items = #[$Scalar { a: index, b: 1.0 } | index <- array.generate 4000 identity]
     total := self + items[3].a
   break total
 entry const memory = func () : Array U32 => return #[]
@@ -163,15 +163,15 @@ Deno.test("trial passes skip proven payloads of candidate elements", async () =>
   const frames = 100;
   await compileAndRun(
     `import * as array from "std/array"
-type Scalar is data = #Scalar { a: U32, b: F32 }
-type Item is data = #Plain Scalar | #Lazy (Unit -> U32)
+type Scalar is data = $Scalar { a: U32, b: F32 }
+type Item is data = $Plain Scalar | $Lazy (Unit -> U32)
 const value = func (item: Item) : U32 => return case item of
-  #Plain (#Scalar { a, b }) => a
-  #Lazy later => later ()
+  $Plain ($Scalar { a, b }) => a
+  $Lazy later => later ()
 entry const run = func (frames: U32) : U32 => return do:
   let total = 0
   for frame in 0..frames:
-    let items = #[#Plain (#Scalar { a: index, b: 1.0 }) | index <- array.generate 4000 identity]
+    let items = #[$Plain ($Scalar { a: index, b: 1.0 }) | index <- array.generate 4000 identity]
     total := self + value items[3]
   break total
 entry const memory = func () : Array U32 => return #[]
@@ -197,32 +197,32 @@ entry const memory = func () : Array U32 => return #[]
 
 // Issue #16: per-frame draw records built in nested comprehensions and
 // flattened, with math types in another module and Maybe/Array fields.
-const gmath = `type Vec4 is data = #Vec4 { x: F32, y: F32, z: F32, w: F32 }
-type Mat4 is data = #Mat4 { x: Vec4, y: Vec4, z: Vec4, w: Vec4 }
-const Mat4.translation = func (x: F32) => return func (y: F32) => return func (z: F32) => return #Mat4 {
-  x: #Vec4 { x: 1.0, y: 0.0, z: 0.0, w: 0.0 },
-  y: #Vec4 { x: 0.0, y: 1.0, z: 0.0, w: 0.0 },
-  z: #Vec4 { x: 0.0, y: 0.0, z: 1.0, w: 0.0 },
-  w: #Vec4 { x: x, y: y, z: z, w: 1.0 },
+const gmath = `type Vec4 is data = $Vec4 { x: F32, y: F32, z: F32, w: F32 }
+type Mat4 is data = $Mat4 { x: Vec4, y: Vec4, z: Vec4, w: Vec4 }
+const Mat4.translation = func (x: F32) => return func (y: F32) => return func (z: F32) => return $Mat4 {
+  x: $Vec4 { x: 1.0, y: 0.0, z: 0.0, w: 0.0 },
+  y: $Vec4 { x: 0.0, y: 1.0, z: 0.0, w: 0.0 },
+  z: $Vec4 { x: 0.0, y: 0.0, z: 1.0, w: 0.0 },
+  w: $Vec4 { x: x, y: y, z: z, w: 1.0 },
 }
 `;
 const frames = `import * as array from "std/array"
 import * as m from "./gmath"
-type Stack is data = #Stack { x: F32, z: F32, count: U32 }
-type Draw is data = #Draw { mesh: U32, material: U32, matrix: m.Mat4, parameters: Maybe m.Vec4, extra: Array m.Vec4, path: List m.Vec4 }
-const draw_of = func (stack: Stack) => return func (above: U32) => return #Draw {
+type Stack is data = $Stack { x: F32, z: F32, count: U32 }
+type Draw is data = $Draw { mesh: U32, material: U32, matrix: m.Mat4, parameters: Maybe m.Vec4, extra: Array m.Vec4, path: List m.Vec4 }
+const draw_of = func (stack: Stack) => return func (above: U32) => return $Draw {
   mesh: 1,
   material: above,
   matrix: m.Mat4.translation stack.x (U32.to_f32 above) stack.z,
-  parameters: #Some (#m.Vec4 { x: stack.x, y: 0.0, z: stack.z, w: 1.0 }),
+  parameters: $Some ($m.Vec4 { x: stack.x, y: 0.0, z: stack.z, w: 1.0 }),
   extra: #[],
-  path: [#m.Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }],
+  path: [$m.Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }],
 }
 const stack_draws = func (stack: Stack) => return
   #[draw_of stack above | above <- array.generate stack.count identity]
 const frame = func (stacks: Array Stack) => return do:
   let parts = #[part | stack <- stacks, part <- stack_draws stack]
-  let origin = #Stack { x: 0.0, z: 0.0, count: 1 }
+  let origin = $Stack { x: 0.0, z: 0.0, count: 1 }
   let head = #[draw_of origin 0]
   let payload = array.concat head parts
   let flat = array.flatten #[{start: 0, count: head.length}, {start: head.length, count: parts.length}] payload
@@ -231,7 +231,7 @@ const frame = func (stacks: Array Stack) => return do:
     sum := self + d.material
   break sum
 entry const run = func (frames: U32) : U32 => return do:
-  let stacks = array.generate 64 (func i => return #Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
+  let stacks = array.generate 64 (func i => return $Stack { x: U32.to_f32 i, z: 0.5, count: 2 })
   let total = 0
   for f in 0..frames:
     total := self + frame stacks
@@ -265,9 +265,9 @@ Deno.test("frame draws with foreign math, Maybe, Array and List fields skip cycl
 Deno.test("List copies, slices, concatenations and conversions keep the element proof", async () => {
   await compileAndRun(
     `import * as list from "std/list"
-type Point is data = #Point { x: U32, y: Maybe U32 }
-type Bag is data = #Bag { items: List Point, extra: Array Point }
-const point = func (index: U32) => return #Point { x: index, y: #Some index }
+type Point is data = $Point { x: U32, y: Maybe U32 }
+type Bag is data = $Bag { items: List Point, extra: Array Point }
+const point = func (index: U32) => return $Point { x: index, y: $Some index }
 const sum = func (values: List Point) : U32 => return list.fold_left (func total => return func (p: Point) => return @u32.add total p.x) 0 values
 entry const run = func (frames: U32) : U32 => return do:
   let total = 0
@@ -277,7 +277,7 @@ entry const run = func (frames: U32) : U32 => return do:
     let joined = list.concat base grown
     let middle = list.slice 100 700 joined
     let even = list.filter (func (p: Point) => return @u32.rem p.x 2 == 0) middle
-    let bag = #Bag { items: even, extra: list.to_array middle }
+    let bag = $Bag { items: even, extra: list.to_array middle }
     let back = list.from_array bag.extra
     total := self + sum back + sum bag.items + base.length
   break total

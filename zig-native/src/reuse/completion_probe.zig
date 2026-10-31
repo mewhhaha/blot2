@@ -112,7 +112,7 @@ pub fn capture(a: Allocator, source: []const u8, position: u32) !?Probe {
             if (!std.ascii.isAlphanumeric(byte) and byte != '_' and byte != '.') break;
             start -= 1;
         }
-        if (start != 0 and source[start - 1] == '#') kind = .constructor;
+        if (start != 0 and source[start - 1] == '$') kind = .constructor;
     }
 
     var closing: [8]u8 = undefined;

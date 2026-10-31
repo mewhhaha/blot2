@@ -442,7 +442,7 @@ Deno.test("native asset wire: deterministic content handles, binary frames and o
       ],
     });
     const source =
-      'import * as a from "./a.bin"\nimport * as alias from "./alias"\nentry const answer = case a.content of\n  #a.Content id => id\nentry const same = case alias.content of\n  #alias.Content id => id\n';
+      'import * as a from "./a.bin"\nimport * as alias from "./alias"\nentry const answer = case a.content of\n  $a.Content id => id\nentry const same = case alias.content of\n  $alias.Content id => id\n';
     const first = await peer.build([[peer.entry, source]], [[aPath, a], [
       bPath,
       b,

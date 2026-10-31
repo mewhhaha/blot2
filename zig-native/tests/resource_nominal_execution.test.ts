@@ -3,14 +3,14 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Box a is data = #Box a
+const library = `type Box a is data = $Box a
 opaque type Secret = {left: U32, right: Array U32}
-type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)
-const inspect = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return ()) (func loan => return 42)
-const make_secret = func (value: U32) => return @resource.acquire (func () => return #Secret {right: #[value, 8], left: value}) (func owner => return ())
+type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
+const inspect = func (value: U32) => return @resource.scope (func () => return $Box #[value, 7]) (func owner => return ()) (func loan => return 42)
+const make_secret = func (value: U32) => return @resource.acquire (func () => return $Secret {right: #[value, 8], left: value}) (func owner => return ())
 const finish_secret = func (owner: unique Secret) => return @resource.release owner
-const tree = func (value: U32) => return @resource.scope (func () => return #Branch (#Leaf value, #Leaf 9)) (func owner => return ()) (func loan => return 42)
-const failing = func (value: U32) => return @resource.scope (func () => return #Box #[value, 7]) (func owner => return @panic "nominal cleanup failure") (func loan => return 42)
+const tree = func (value: U32) => return @resource.scope (func () => return $Branch ($Leaf value, $Leaf 9)) (func owner => return ()) (func loan => return 42)
+const failing = func (value: U32) => return @resource.scope (func () => return $Box #[value, 7]) (func owner => return @panic "nominal cleanup failure") (func loan => return 42)
 `;
 const source =
   `import {inspect, make_secret, finish_secret, tree, failing} from "./cleanup"

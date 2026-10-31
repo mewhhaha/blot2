@@ -35,8 +35,6 @@ export default grammar({
         $.forward_break,
         $.declaration_tag,
         $.constructor_reference,
-        $.dollar_constructor,
-        $.constructor_marker,
         $.staging_marker,
         $.where_clause,
         $.contract_header,
@@ -295,11 +293,9 @@ export default grammar({
         "`",
       ),
 
-    forward_break: (_) => seq("break", "$"),
+    forward_break: (_) => seq("break", alias(token(/\$[ \t]+/), "$")),
 
-    constructor_marker: (_) => prec(-1, "#"),
-    dollar_constructor: (_) =>
-      token(/\$[A-Za-z_][A-Za-z_0-9]*(\.[A-Za-z_][A-Za-z_0-9]*)*/),
+    constructor_marker: (_) => prec(-1, "$"),
     staging_marker: (_) => token(prec(3, choice("#run", "#do"))),
     constructor_reference: ($) =>
       prec.right(
@@ -307,12 +303,23 @@ export default grammar({
         seq(
           $.constructor_marker,
           repeat(seq(
-            field("qualifier", choice($.identifier, $.type_identifier)),
-            ".",
+            field(
+              "qualifier",
+              choice(
+                alias(token.immediate(/[a-z_][A-Za-z_0-9]*/), $.identifier),
+                alias($._constructor_type_identifier, $.type_identifier),
+              ),
+            ),
+            token.immediate("."),
           )),
-          field("name", $.type_identifier),
+          field(
+            "name",
+            alias($._constructor_type_identifier, $.type_identifier),
+          ),
         ),
       ),
+
+    _constructor_type_identifier: (_) => token.immediate(/[A-Z][A-Za-z_0-9]*/),
 
     declaration_tag: ($) =>
       seq(
@@ -380,7 +387,8 @@ export default grammar({
         "impl",
       ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
-    operator: (_) => choice("and", "or", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
+    operator: (_) =>
+      choice("and", "or", "$", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(

@@ -23,27 +23,27 @@ const append = func value => return func values => return [...values, value]
 const prepend = func value => return func values => return [value, ...values]
 //                                                                 ^^^ operator
 
-const named: time.Clock = #time.Clock { ticks: 42 }
+const named: time.Clock = $time.Clock { ticks: 42 }
 //                        ^ punctuation.special
 //                         ^^^^ namespace
 //                              ^^^^^ constructor
 //                                      ^^^^^ variable.other.member
 
-const nested = #library.time.Clock { ticks: 42 }
+const nested = $library.time.Clock { ticks: 42 }
 //              ^^^^^^^ namespace
 //                      ^^^^ namespace
 //                           ^^^^^ constructor
 
-if let #Some value = candidate:
+if let $Some value = candidate:
 //      ^^^^ constructor
 
-  break #Ok value
+  break $Ok value
 //        ^^ constructor
 
-let #Done value = result else:
+let $Done value = result else:
 //   ^^^^ constructor
 
-  break #Err 0
+  break $Err 0
 //        ^^^ constructor
 
 @[library.decorate 2]
@@ -55,7 +55,7 @@ entry const answer = 42
 // <- keyword.storage.modifier
 //    ^^^^^ keyword.storage.type
 
-"#[1] @[tag] #time.Clock @demand"
+"#[1] @[tag] $time.Clock @demand"
 //      ^^^ string
 //      ^^^ !attribute
 //            ^^^^ !namespace

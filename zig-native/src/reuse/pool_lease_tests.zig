@@ -11,10 +11,10 @@ const memory = @import("../runtime/memory.zig");
 const a = std.testing.allocator;
 
 const source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const open = func (box: Box) : U32 => return case box of
-    \\  #Box value => value
-    \\const factory = func number => return func extra => return @u32.add number (open (#Box extra))
+    \\  $Box value => value
+    \\const factory = func number => return func extra => return @u32.add number (open ($Box extra))
     \\const callback = factory 42
     \\entry const schema: U32 = 7
     \\entry const answer = func (extra: U32) : U32 => return callback (@u32.add extra 1)

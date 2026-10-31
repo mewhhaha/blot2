@@ -18,9 +18,9 @@ Deno.test("generic array iteration represents empty elements and unused data par
     },
   );
   await compileAndRun(
-    count + `type Box [a, b] is data = #A a | #B b
-entry const create = func () => return count #[] + count #[#A 1, #A 2] * 10
-entry const mixed = func () => return count #[#A 1, #B true]
+    count + `type Box [a, b] is data = $A a | $B b
+entry const create = func () => return count #[] + count #[$A 1, $A 2] * 10
+entry const mixed = func () => return count #[$A 1, $B true]
 `,
     (guest) => {
       equal(guest.call("create", null), 20);
@@ -31,28 +31,28 @@ entry const mixed = func () => return count #[#A 1, #B true]
 
 Deno.test("generic cursors reconcile nested callback shapes across staged builders", async () => {
   await compileAndRun(
-    `type System [start, event, update, render] is data = #Start start | #Event event | #Update update | #Render render
-type Builder system is data = #Builder (Array system)
+    `type System [start, event, update, render] is data = $Start start | $Event event | $Update update | $Render render
+type Builder system is data = $Builder (Array system)
 const add = func stage => return func action => return func builder => return do:
-  let #Builder systems = builder
-  break #Builder #[...systems, stage action]
+  let $Builder systems = builder
+  break $Builder #[...systems, stage action]
 const build = func builder => return do:
-  let #Builder systems = builder
+  let $Builder systems = builder
   let n = 0
   for system in systems:
     case system of
-      #Start run => run ()
-      #Update run => run 1.0
-      #Render run => do:
+      $Start run => run ()
+      $Update run => run 1.0
+      $Render run => do:
         let ignored = run () 1.0
         break ()
       _ => ()
     n := self + 1
   break n
 entry const create = func () => return do:
-  let builder = #Builder #[]
-  builder := add #Event (func (event: U32) => return ()) self
-  builder := add #Start (func () => return ()) self
+  let builder = $Builder #[]
+  builder := add $Event (func (event: U32) => return ()) self
+  builder := add $Start (func () => return ()) self
   break build builder
 `,
     (guest) => {
@@ -64,12 +64,12 @@ entry const create = func () => return do:
 Deno.test("partial collection shapes preserve generic reuse and unresolved dispatch diagnostics", async () => {
   await compileAndRun(
     count + `const empty = #[]
-const nothing = #Nothing
+const nothing = $Nothing
 const result = func candidate => return Result.unwrap_or 0 candidate
 entry const create = func () => return count #[...empty, 1] + count #[...empty, 2.0] * 10
-entry const maybe = func () => return Maybe.unwrap_or 40 nothing + Maybe.unwrap_or 2 (#Some 2)
-entry const ok = func () => return result (#Ok 42)
-entry const error = func () => return result (#Err false)
+entry const maybe = func () => return Maybe.unwrap_or 40 nothing + Maybe.unwrap_or 2 ($Some 2)
+entry const ok = func () => return result ($Ok 42)
+entry const error = func () => return result ($Err false)
 `,
     (guest) => {
       equal(guest.call("create", null), 11);

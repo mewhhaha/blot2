@@ -20,7 +20,7 @@ fn importedShapes(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
     const producer_text =
-        \\type Bundle {input: [a,b], output: c} is data = #Bundle
+        \\type Bundle {input: [a,b], output: c} is data = $Bundle
         \\type Read {input: [a,b], output: c} is effect = a -> c
     ;
     // The helper releases producer syntax before consumers import its owned patterns.
@@ -32,7 +32,7 @@ fn importedShapes(allocator: std.mem.Allocator) !void {
     const extra = try allocator.dupe(u32, producer.parameter_patterns.extra.items);
     defer allocator.free(extra);
     const consumer_text =
-        \\const witness: Bundle {output:F32,input:[U32,Bool]} = #Bundle
+        \\const witness: Bundle {output:F32,input:[U32,Bool]} = $Bundle
         \\const provider = @effect.provider (Read {output:F32,input:[U32,Bool]}) (func value => return @u32.to_f32 value)
         \\entry const answer = func () => return do provider:
         \\  use value <- Read {input:[U32,Bool],output:F32} 42
@@ -60,12 +60,12 @@ test "nested parameter pattern import releases every failed allocation" {
 
 test "tuple and array type parameter shapes remain distinct from structural records" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
-        .{ .source = "type Box (a,a) is data = #Box\n", .code = .duplicate_type_parameter },
-        .{ .source = "type Box {a,a} is data = #Box\n", .code = .duplicate_type_field },
-        .{ .source = "type Box {a,b} is data = #Box\nconst value: Box {a:U32,a:F32} = #Box\n", .code = .duplicate_type_field },
-        .{ .source = "type Box [a,b] is data = #Box\nconst value: Box (U32,F32) = #Box\n", .code = .type_argument },
-        .{ .source = "type Box (a,b) is data = #Box\nconst value: Box [U32,F32] = #Box\n", .code = .type_argument },
-        .{ .source = "type Box U32 is data = #Box\n", .code = .type_parameter },
+        .{ .source = "type Box (a,a) is data = $Box\n", .code = .duplicate_type_parameter },
+        .{ .source = "type Box {a,a} is data = $Box\n", .code = .duplicate_type_field },
+        .{ .source = "type Box {a,b} is data = $Box\nconst value: Box {a:U32,a:F32} = $Box\n", .code = .duplicate_type_field },
+        .{ .source = "type Box [a,b] is data = $Box\nconst value: Box (U32,F32) = $Box\n", .code = .type_argument },
+        .{ .source = "type Box (a,b) is data = $Box\nconst value: Box [U32,F32] = $Box\n", .code = .type_argument },
+        .{ .source = "type Box U32 is data = $Box\n", .code = .type_parameter },
         .{ .source = "type Read is effect = Unit -> [U32,F32]\n", .code = .type_argument },
     };
     for (cases) |case_| {

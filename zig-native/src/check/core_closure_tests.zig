@@ -111,12 +111,12 @@ test "closure captures exclude own lexical patterns and include nested pinned re
 
 test "unary constructor values retain catalog and instantiated function type" {
     var fixture = try Fixture.init(
-        \\type Box value is data = #Box value
+        \\type Box value is data = $Box value
         \\entry const boxed = func () : U32 => return do:
-        \\  let wrap = #Box
+        \\  let wrap = $Box
         \\  let result = wrap 42
         \\  break case result of
-        \\    #Box value => value
+        \\    $Box value => value
     );
     defer fixture.deinit();
     var module = try fixture.lower(a);

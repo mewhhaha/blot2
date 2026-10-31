@@ -15,7 +15,7 @@ const block = #do:
   let value = 40
   break value + 2
 const qualified = $run.Some 42
-const legacy_qualified = #run.Some 42
+const legacy_qualified = $run.Some 42
 `;
   const frontend = await createFrontend();
   try {

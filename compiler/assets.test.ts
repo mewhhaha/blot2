@@ -140,11 +140,11 @@ Deno.test("shader parser exports input types and content handles with tracked in
   });
   const source = `import * as shader from "./shader.wgsl"
 const read = func (value: shader.Inputs) => return value.scale
-entry const answer = func () => return read (#shader.Inputs { scale: shader.scale })
+entry const answer = func () => return read ($shader.Inputs { scale: shader.scale })
 entry const handle = func () => return case shader.shader of
-  #shader.Shader id => id
+  $shader.Shader id => id
 entry const upload = func (send: U32 -> U32 ! {Foreign}) => return case shader.shader of
-  #shader.Shader id => send id
+  $shader.Shader id => send id
 `;
   const shader =
     "@vertex fn main() -> @builtin(position) vec4f { return vec4f(0); }";
@@ -449,7 +449,7 @@ Deno.test("asset IDs and snapshots are deterministic across parser order and sha
   });
   const sources = {
     [entry]:
-      'import * as a from "./a"\nimport * as b from "./b"\nentry const answer = func () => return case a.shader of\n  #a.Shader id => id\n',
+      'import * as a from "./a"\nimport * as b from "./b"\nentry const answer = func () => return case a.shader of\n  $a.Shader id => id\n',
   };
   const options = (shader = "first") => ({
     sources,

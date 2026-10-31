@@ -14,13 +14,13 @@ Deno.test("generic receiver calls select members of a caller's type their module
     const built = await compiler.build({
       sources: {
         [entry]: `import * as mix from "./mix"
-type Gauge is data = #Gauge F32
+type Gauge is data = $Gauge F32
 const Gauge.lerp = func (a: Gauge) => return func (b: Gauge) => return func (t: F32) => return do:
-  let #Gauge x = a
-  let #Gauge y = b
-  break #Gauge (x + (y - x) * t)
+  let $Gauge x = a
+  let $Gauge y = b
+  break $Gauge (x + (y - x) * t)
 entry const main = func (x: F32) : F32 => return do:
-  let #Gauge v = mix.halfway (#Gauge 0.0) (#Gauge x)
+  let $Gauge v = mix.halfway ($Gauge 0.0) ($Gauge x)
   break v
 `,
         [helper]: "const halfway = func a => return func b => return a.lerp b 0.5\n",

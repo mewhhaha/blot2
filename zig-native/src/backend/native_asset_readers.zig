@@ -264,7 +264,7 @@ const Reader = struct {
         return id;
     }
     fn identifier(self: *Reader, id: u32, name: []const u8) Error!void {
-        const keywords = " const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where ";
+        const keywords = " const let type data effect is func do use return yield break for ever continue in case of if then else as import infix infixl infixr self where and or true false ";
         var valid = name.len > 0 and !std.mem.eql(u8, name, "_");
         if (valid) valid = std.ascii.isLower(name[0]) or name[0] == '_';
         for (name) |byte| if (!std.ascii.isAlphanumeric(byte) and byte != '_') {
@@ -400,7 +400,7 @@ const Reader = struct {
             .f32_value => try self.put(out, "F32"),
             .utf8 => {
                 if (!shape.emitted) {
-                    try self.put(&self.header, "type Utf8 is data = #Utf8 { bytes: (Array U32) }\n");
+                    try self.put(&self.header, "type Utf8 is data = $Utf8 { bytes: (Array U32) }\n");
                     self.shapes.items[id].emitted = true;
                 }
                 try self.put(out, "Utf8");
@@ -424,7 +424,7 @@ const Reader = struct {
                     var declaration: Text = .empty;
                     try self.put(&declaration, "type ");
                     try self.put(&declaration, shape.name);
-                    try self.put(&declaration, " is data = #");
+                    try self.put(&declaration, " is data = $");
                     try self.put(&declaration, shape.name);
                     try self.put(&declaration, " { ");
                     for (shape.fields, 0..) |field, index| {
@@ -448,13 +448,13 @@ const Reader = struct {
         switch (node.tag) {
             .null_value => try self.put(out, "()"),
             .boolean => {
-                if (node.boolean) try self.put(out, "#True") else try self.put(out, "#False");
+                if (node.boolean) try self.put(out, "true") else try self.put(out, "false");
             },
             .number => {
                 if (node.shape == 2) try self.integer(out, @as(u32, @intFromFloat(node.number))) else try self.float32(out, node.number);
             },
             .string => {
-                try self.put(out, "(#Utf8 { bytes: #[");
+                try self.put(out, "($Utf8 { bytes: #[");
                 for (node.text, 0..) |byte, index| {
                     try self.budget(depth + 2);
                     if (index > 0) try self.put(out, ", ");
@@ -474,7 +474,7 @@ const Reader = struct {
                 }
             },
             .object => {
-                try self.put(out, "(#");
+                try self.put(out, "($");
                 try self.put(out, shape.name);
                 try self.put(out, " { ");
                 for (node.members, 0..) |item, index| {
@@ -507,14 +507,14 @@ const Reader = struct {
     fn recordStart(self: *Reader, name: []const u8, value: []const u8) Error!void {
         try self.put(&self.header, "type ");
         try self.put(&self.header, name);
-        try self.put(&self.header, " is data = #");
+        try self.put(&self.header, " is data = $");
         try self.put(&self.header, name);
         try self.put(&self.header, " { ");
         try self.put(&self.body, "const ");
         try self.put(&self.body, value);
         try self.put(&self.body, ": ");
         try self.put(&self.body, name);
-        try self.put(&self.body, " = (#");
+        try self.put(&self.body, " = ($");
         try self.put(&self.body, name);
         try self.put(&self.body, " { ");
     }
@@ -786,10 +786,10 @@ fn sourceLaw(a: Allocator, kind: Kind, input: []const u8, expected: []const u8) 
     try std.testing.expectEqualStrings(expected, result.source);
 }
 fn allocationLaw(a: Allocator) !void {
-    try sourceLaw(a, .json, "{\"z\":[{\"a\":1},{\"a\":2}],\"label\":\"å\",\"zero\":-0}", "type Utf8 is data = #Utf8 { bytes: (Array U32) }\n" ++
-        "type JsonRecord1 is data = #JsonRecord1 { a: U32 }\n" ++
-        "type Data is data = #Data { label: Utf8, z: (Array JsonRecord1), zero: F32 }\n" ++
-        "const value: Data = (#Data { label: (#Utf8 { bytes: #[195, 165] }), z: #[(#JsonRecord1 { a: 1 }), (#JsonRecord1 { a: 2 })], zero: (-0.0) })\n");
+    try sourceLaw(a, .json, "{\"z\":[{\"a\":1},{\"a\":2}],\"label\":\"å\",\"zero\":-0}", "type Utf8 is data = $Utf8 { bytes: (Array U32) }\n" ++
+        "type JsonRecord1 is data = $JsonRecord1 { a: U32 }\n" ++
+        "type Data is data = $Data { label: Utf8, z: (Array JsonRecord1), zero: F32 }\n" ++
+        "const value: Data = ($Data { label: ($Utf8 { bytes: #[195, 165] }), z: #[($JsonRecord1 { a: 1 }), ($JsonRecord1 { a: 2 })], zero: (-0.0) })\n");
     var issue = try generate(a, .text, "{\"greeting\":\"😀😀\\n\"}");
     defer deinit(a, &issue);
     try std.testing.expect(issue == .issue);
@@ -802,14 +802,14 @@ test "native assets infer shared records and release success and issue allocatio
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, allocationLaw, .{});
 }
 test "native assets preserve last-wins JSON and exact tuples and float spelling" {
-    try sourceLaw(std.testing.allocator, .json, "{\"x\":false,\"x\":true,\"n\":0.1,\"items\":[1,false],\"empty\":[]}", "type Data is data = #Data { empty: (), items: (U32, Bool), n: F32, x: Bool }\nconst value: Data = (#Data { empty: (), items: (1, false), n: 0.10000000149011612, x: true })\n");
-    try sourceLaw(std.testing.allocator, .json, "{\"x\":\"\\ud800\",\"x\":1}", "type Data is data = #Data { x: U32 }\nconst value: Data = (#Data { x: 1 })\n");
+    try sourceLaw(std.testing.allocator, .json, "{\"x\":false,\"x\":true,\"n\":0.1,\"items\":[1,false],\"empty\":[]}", "type Data is data = $Data { empty: (), items: (U32, Bool), n: F32, x: Bool }\nconst value: Data = ($Data { empty: (), items: (1, false), n: 0.10000000149011612, x: true })\n");
+    try sourceLaw(std.testing.allocator, .json, "{\"x\":\"\\ud800\",\"x\":1}", "type Data is data = $Data { x: U32 }\nconst value: Data = ($Data { x: 1 })\n");
     try sourceLaw(std.testing.allocator, .json, "-0", "type Data = F32\nconst value: F32 = (-0.0)\n");
     try sourceLaw(std.testing.allocator, .json, "[[1]]", "type Data = (Array (Array U32))\nconst value: (Array (Array U32)) = #[#[1]]\n");
 }
 test "native assets catalog suffixes indexes and text codepoints" {
-    try sourceLaw(std.testing.allocator, .catalog, "{\"meshes\":[\"small.box.mesh.json\",\"other-name.json\"],\"ignored\":true}", "type Meshes is data = #Meshes { small_box: U32, other_name: U32 }\ntype Materials is data = #Materials {  }\ntype Sounds is data = #Sounds {  }\nconst meshes: Meshes = (#Meshes { small_box: 0, other_name: 1 })\nconst materials: Materials = (#Materials {  })\nconst sounds: Sounds = (#Sounds {  })\n");
-    try sourceLaw(std.testing.allocator, .text, "{\"z\":[\"å\",\"\"],\"empty\":[]}", "type Text is data = #Text { z: (Array (Array U32)), empty: (Array (Array U32)) }\nconst text: Text = (#Text { z: #[#[229], #[]], empty: #[] })\n");
+    try sourceLaw(std.testing.allocator, .catalog, "{\"meshes\":[\"small.box.mesh.json\",\"other-name.json\"],\"ignored\":true}", "type Meshes is data = $Meshes { small_box: U32, other_name: U32 }\ntype Materials is data = $Materials {  }\ntype Sounds is data = $Sounds {  }\nconst meshes: Meshes = ($Meshes { small_box: 0, other_name: 1 })\nconst materials: Materials = ($Materials {  })\nconst sounds: Sounds = ($Sounds {  })\n");
+    try sourceLaw(std.testing.allocator, .text, "{\"z\":[\"å\",\"\"],\"empty\":[]}", "type Text is data = $Text { z: (Array (Array U32)), empty: (Array (Array U32)) }\nconst text: Text = ($Text { z: #[#[229], #[]], empty: #[] })\n");
 }
 fn issueLaw(a: Allocator, kind: Kind, input: []const u8, code: []const u8) !void {
     var result = try generate(a, kind, input);

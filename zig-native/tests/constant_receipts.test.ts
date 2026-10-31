@@ -358,9 +358,9 @@ Deno.test("compound receipts preserve ready nominal aliases, captured callbacks 
   const source = (sibling = "1", seed = "2", delta = "0", ready = true) => {
     let qualifier = "";
     if (ready) qualifier = "entry ";
-    return `data Box = #Box { value: U32 }
+    return `type Box is data = $Box { value: U32 }
 const seed = ${seed}
-const ready = #Box { value: seed }
+const ready = $Box { value: seed }
 ${qualifier}const warmed = func () => return ready.value
 const compound = do:
   let cost = ${cost}
@@ -447,7 +447,7 @@ Deno.test("compound buffer receipts retain aliases branches and cold reads in bo
   });
   const entry = `${directory}/main.blot`;
   const source = (sibling = "1", seed = "2", count = 32) => `
-data Bundle = #Bundle { earlier: List U32, current: List U32, alias: List U32, other: List U32, answer: U32 }
+type Bundle is data = $Bundle { earlier: List U32, current: List U32, alias: List U32, other: List U32, answer: U32 }
 const seed = ${seed}
 const grown = do:
   let values: List U32 = []
@@ -457,7 +457,7 @@ const grown = do:
     values := if @u32.lt index 16 then @list.append values index else @list.prepend values index
     other := @list.append other (@u32.add index 100)
     earlier := if @u32.eq index 30 then values else earlier
-  break #Bundle { earlier: earlier, current: values, alias: values, other: other, answer: seed }
+  break $Bundle { earlier: earlier, current: values, alias: values, other: other, answer: seed }
 const later = @list.prepend (@list.append grown.current 99) 100
 const branched = @list.append grown.earlier 200
 entry const first = func () => return @array.from_list grown.current

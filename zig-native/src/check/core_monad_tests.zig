@@ -8,17 +8,17 @@ const core = @import("core.zig");
 const T = @import("types.zig");
 const a = std.testing.allocator;
 const source =
-    \\type Box value is data = #Box value
-    \\const Box.pure = func value => return #Box value
+    \\type Box value is data = $Box value
+    \\const Box.pure = func value => return $Box value
     \\const Box.bind = func candidate => return func next => return case candidate of
-    \\  #Box value => next value
+    \\  $Box value => next value
     \\const sequence = func () => return do (@do.monad Box):
     \\  let total = 20
-    \\  use value <- #Box 22
+    \\  use value <- $Box 22
     \\  total := @u32.add self value
     \\  break total
     \\entry const answer = func () => return do:
-    \\  let #Box value = sequence ()
+    \\  let $Box value = sequence ()
     \\  break value
 ;
 const Fixture = struct {
@@ -110,37 +110,37 @@ test "resolver protocol and continuation allocation failures release every owned
 }
 
 const iteration_source =
-    \\type Iteration [state,result] is data = #Continue state | #Done result
-    \\type Maybe value is data = #Some value | #Nothing
+    \\type Iteration [state,result] is data = $Continue state | $Done result
+    \\type Maybe value is data = $Some value | $Nothing
     \\const monad = func constructor => return @do.monad constructor
-    \\const Maybe.pure = func value => return #Some value
+    \\const Maybe.pure = func value => return $Some value
     \\const Maybe.bind = func candidate => return func next => return case candidate of
-    \\  #Some value => next value
-    \\  #Nothing => #Nothing
+    \\  $Some value => next value
+    \\  $Nothing => $Nothing
     \\const Maybe.iterate = func initial => return func step => return do:
     \\  let state = initial
     \\  for ever:
     \\    use candidate <- step state
-    \\    if let #Some (#Done result) = candidate:
-    \\      break #Some result
-    \\    let #Some (#Continue next) = candidate else:
-    \\      break #Nothing
+    \\    if let $Some ($Done result) = candidate:
+    \\      break $Some result
+    \\    let $Some ($Continue next) = candidate else:
+    \\      break $Nothing
     \\    state := next
     \\const sequence = func forwarded => return do (monad Maybe):
     \\  let total = 20
     \\  for outer in 0..2:
     \\    for inner in 0..2:
-    \\      use value <- #Some 1
+    \\      use value <- $Some 1
     \\      total := @u32.add self value
     \\      if forwarded:
-    \\        break $ #Some (@u32.add total 21)
+    \\        break $ $Some (@u32.add total 21)
     \\      if @u32.eq inner 1:
     \\        break @u32.add total 20
     \\      break
     \\  break total
     \\entry const answer = func () => return case sequence true of
-    \\  #Some value => value
-    \\  #Nothing => 0
+    \\  $Some value => value
+    \\  $Nothing => 0
 ;
 const IterationFixture = struct {
     tree: ast.Tree,
@@ -221,8 +221,8 @@ test "flat monadic statement sequences do not consume the nested expression dept
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
     try text.appendSlice(a,
-        \\type Box value is data = #Box value
-        \\const Box.pure = func value => return #Box value
+        \\type Box value is data = $Box value
+        \\const Box.pure = func value => return $Box value
         \\const sequence = func () => return do (@do.monad Box):
         \\  let total = 0
     );
@@ -231,7 +231,7 @@ test "flat monadic statement sequences do not consume the nested expression dept
     try text.appendSlice(a,
         \\  break total
         \\entry const answer = func () => return do:
-        \\  let #Box value = sequence ()
+        \\  let $Box value = sequence ()
         \\  break value
     );
     var fixture = try IterationFixture.initSource(text.items);

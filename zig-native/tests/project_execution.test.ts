@@ -49,8 +49,8 @@ Deno.test("namespace-qualified values retain field projections", async () => {
     main: `import * as s from "./defaults"
 entry const main = func () : F32 => return s.defaults.x
 `,
-    defaults: `type Defaults is data = #Defaults { x: F32 }
-const defaults = #Defaults { x: 3.0 }
+    defaults: `type Defaults is data = $Defaults { x: F32 }
+const defaults = $Defaults { x: 3.0 }
 `,
   }, async (bytes) => {
     const guest = await instantiateGuest(bytes);
@@ -119,18 +119,18 @@ Deno.test("builtin State shares exact identities across imported helpers and sep
   await project({
     main: `import { read, write, Cell } from "./library"
 entry const answer = func () => return do:
-  let (#Cell final, (#Cell floating, value)) = @state.run (#Cell 40) (func () => return
-    @state.run (#Cell 1.0) (func () => return do:
-      use integer <- read (func () => return #Cell 0)
-      let #Cell count = integer
-      use amount <- read (func () => return #Cell 0.0)
-      let #Cell fraction = amount
-      use write (#Cell (@u32.add count 1))
-      use write (#Cell (@f32.add fraction 0.5))
+  let ($Cell final, ($Cell floating, value)) = @state.run ($Cell 40) (func () => return
+    @state.run ($Cell 1.0) (func () => return do:
+      use integer <- read (func () => return $Cell 0)
+      let $Cell count = integer
+      use amount <- read (func () => return $Cell 0.0)
+      let $Cell fraction = amount
+      use write ($Cell (@u32.add count 1))
+      use write ($Cell (@f32.add fraction 0.5))
       break count))
   break @f32.add (@u32.to_f32 final) (@f32.add floating (@u32.to_f32 value))
 `,
-    library: `data Cell value = #Cell value
+    library: `type Cell value is data = $Cell value
 const read = func witness => return @state.get witness
 const write = func value => return @state.set value
 `,

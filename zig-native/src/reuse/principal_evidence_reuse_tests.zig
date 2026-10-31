@@ -203,7 +203,7 @@ test "principal cache globally rejects type and associated catalog edits but kee
     ;
     const provider_prefix = "type State a is effect = { get: Unit -> a, set: a -> Unit }\n";
     const cases = [_]struct { label: []const u8, before: []const u8, after: []const u8, global: bool }{
-        .{ .label = "type", .before = type_prefix ++ "\ntype Cell is data = #Cell U32\n" ++ positive_source, .after = type_prefix ++ "\ntype Cell is data = #Cell F32\n" ++ positive_source, .global = true },
+        .{ .label = "type", .before = type_prefix ++ "\ntype Cell is data = $Cell U32\n" ++ positive_source, .after = type_prefix ++ "\ntype Cell is data = $Cell F32\n" ++ positive_source, .global = true },
         .{ .label = "catalog", .before = associated_prefix ++ "\nconst U32.add = func left => return func right => return @u32.add left right\n" ++ positive_source, .after = associated_prefix ++ "\nconst U32.sub = func left => return func right => return @u32.add left right\n" ++ positive_source, .global = true },
         // The operation catalog is unchanged: only the provider declaration
         // differs, so the independent `builder` proof stays reusable.

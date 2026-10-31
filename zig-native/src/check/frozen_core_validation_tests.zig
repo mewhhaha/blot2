@@ -9,8 +9,8 @@ const check = @import("check.zig");
 const V = @import("frozen_core_validation.zig");
 const a = std.testing.allocator;
 const mixed_source =
-    \\type Point is data = #Point { x: U32 }
-    \\type Bucket is data = #Bucket { points: Array Point }
+    \\type Point is data = $Point { x: U32 }
+    \\type Bucket is data = $Bucket { points: Array Point }
     \\const make = func (initial: Bucket) => return do:
     \\  let bucket = initial
     \\  break func (index: U32) => return do:
@@ -19,7 +19,7 @@ const mixed_source =
     \\      other[0] := @u32.add self 2
     \\      break other[0]
     \\    break bucket.points[index].x
-    \\entry const run = func () : U32 => return (make (#Bucket { points: #[#Point { x: 1 }] })) 0
+    \\entry const run = func () : U32 => return (make ($Bucket { points: #[$Point { x: 1 }] })) 0
 ;
 
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
@@ -1068,7 +1068,7 @@ test "normal frozen Core admits generic recursion, record payloads, loops, State
     const sources = [_][]const u8{
         "entry const identity = func value => return value\nentry const answer = func () => return identity 42\n",
         "const even = func (n: U32) : U32 => return if @u32.eq n 0 then 42 else odd (@u32.sub n 1)\nconst odd = func (n: U32) : U32 => return if @u32.eq n 0 then 42 else even (@u32.sub n 1)\nentry const answer = func () => return even 42\n",
-        "data Pair = #Pair {left: U32, right: U32}\nentry const answer = func () => return do:\n  let #Pair payload = #Pair {left: 40, right: 2}\n  break @u32.add (@product.get payload 0) (@product.get payload 1)\n",
+        "type Pair is data = $Pair {left: U32, right: U32}\nentry const answer = func () => return do:\n  let $Pair payload = $Pair {left: 40, right: 2}\n  break @u32.add (@product.get payload 0) (@product.get payload 1)\n",
         "entry const answer = func () => return do:\n  let count = 0\n  for index in 0..10:\n    count := @u32.add self index\n  for ever:\n    if @u32.eq count 45:\n      break\n    count := 45\n  break count\n",
         @import("fixtures").source("request-fixtures/shadow-completion_payload_shadow.blot"),
         @import("fixtures").source("request-fixtures/template-local-effects.blot"),
@@ -1184,7 +1184,7 @@ test "bounds reject overflow and every Core tag's interpreted reference before i
 }
 
 test "frozen demanded diagnostic display ranges reject stale and overflowing names" {
-    var m = try lower(a, "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n");
+    var m = try lower(a, "type Box is data = $Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select ($Box 1)\n");
     defer m.deinit(a);
     try V.validateBounds(&m, .{});
     for (m.projections) |projection| {
@@ -1379,7 +1379,7 @@ test "decoded catalogs reject malformed lists, references and contradictory loca
     try badField(&requests, "request_arms", "operation");
     try badField(&requests, "operation_values", "signature");
     try badField(&requests, "loop_carries", "iteration");
-    var matched = try lower(a, "data Pair = #Pair {left: U32, right: U32}\nentry const answer = func () => return case #Pair {left: 40, right: 2} of\n  #Pair payload => @product.get payload 0\n");
+    var matched = try lower(a, "type Pair is data = $Pair {left: U32, right: U32}\nentry const answer = func () => return case $Pair {left: 40, right: 2} of\n  $Pair payload => @product.get payload 0\n");
     defer matched.deinit(a);
     try badSpan(&matched, "match_arms", "rows");
     try badSpan(&matched, "pattern_rows", "patterns");
@@ -1813,10 +1813,10 @@ test "portable typed staging producer data rejects runtime foreign and cyclic ow
 }
 
 const nominal_descriptor_source =
-    \\data Packet a = #Packet {payload: a, flag: Bool}
-    \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
-    \\const packet = @descriptor.fields (@code.describe (@code.quote #Packet {payload: 40, flag: true})).result
-    \\const choice = @descriptor.fields (@code.describe (@code.quote #Left {shared: 40, left: true})).result
+    \\type Packet a is data = $Packet {payload: a, flag: Bool}
+    \\type Choice a is data = $Left {shared: a, left: Bool} | $Right {shared: a, right: U32}
+    \\const packet = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 40, flag: true})).result
+    \\const choice = @descriptor.fields (@code.describe (@code.quote $Left {shared: 40, left: true})).result
     \\const scalar = (@code.describe (@code.quote 1)).result
     \\const answer = if @descriptor.same packet.payload scalar then if @descriptor.same choice.shared scalar then 42 else 0 else 0
 ;
@@ -1999,7 +1999,7 @@ test "foreign invocation authority declines validation context reuse under alloc
 fn unrelatedContextLaw(allocator: std.mem.Allocator) !void {
     var caller = try lower(allocator, "entry const identity = func (value: U32) => return value\n");
     defer caller.deinit(allocator);
-    var sibling = try lower(allocator, "data Token = #Token U32\nconst identity = func (value: U32) => return value\n");
+    var sibling = try lower(allocator, "type Token is data = $Token U32\nconst identity = func (value: U32) => return value\n");
     defer sibling.deinit(allocator);
     sibling.unit = 2;
     const context: V.Context = .{ .units = &.{ &caller, &sibling } };
@@ -2041,17 +2041,17 @@ test "ordinary validation contexts ignore unrelated feature owners and own exact
 }
 
 const nominal_helper_source =
-    \\data Packet a = #Packet {payload: a, flag: Bool}
-    \\data Marker = #Marker {}
-    \\data Choice a = #Left {shared: a, left: Bool} | #Right {shared: a, right: U32}
-    \\data Single a = #Single {item: a}
-    \\data Option a = #Absent | #Present a
-    \\const make = func value => return #Packet {payload: value, flag: true}
-    \\const positional = func value => return #Packet (value, true)
-    \\const single = func value => return #Single value
-    \\const present = func value => return #Present value
-    \\const marker = func () => return #Marker {}
-    \\const choose = func (flag: Bool) => return func value => return if flag then #Left {shared: value, left: flag} else #Right {shared: value, right: 0}
+    \\type Packet a is data = $Packet {payload: a, flag: Bool}
+    \\type Marker is data = $Marker {}
+    \\type Choice a is data = $Left {shared: a, left: Bool} | $Right {shared: a, right: U32}
+    \\type Single a is data = $Single {item: a}
+    \\type Option a is data = $Absent | $Present a
+    \\const make = func value => return $Packet {payload: value, flag: true}
+    \\const positional = func value => return $Packet (value, true)
+    \\const single = func value => return $Single value
+    \\const present = func value => return $Present value
+    \\const marker = func () => return $Marker {}
+    \\const choose = func (flag: Bool) => return func value => return if flag then $Left {shared: value, left: flag} else $Right {shared: value, right: 0}
     \\const generated = @code.quote (make 42)
     \\const marked = @code.quote (marker ())
     \\const chosen = @code.quote (choose true 42)
@@ -2124,9 +2124,9 @@ test "portable typed staging nominal helpers retain private producer rights and 
 }
 test "portable typed staging nominal helpers admit closed callable payloads and reject unowned rows and forged payload types" {
     var m = try lower(a,
-        \\data Hidden = #Hidden {read: Unit -> U32}
+        \\type Hidden is data = $Hidden {read: Unit -> U32}
         \\const relay = func value => return value
-        \\const generated = @code.quote (relay (#Hidden {read: func () => return 42}))
+        \\const generated = @code.quote (relay ($Hidden {read: func () => return 42}))
     );
     defer m.deinit(a);
     try verified(a, &m);
@@ -2187,9 +2187,9 @@ test "portable typed staging nominal helpers admit closed callable payloads and 
 
 fn malformedApplyCaptureLaw(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
-        \\type Application is data = #Application {reset: Unit -> U32}
+        \\type Application is data = $Application {reset: Unit -> U32}
         \\const reset_scoped = func application => return func () => return do:
-        \\  let #Application {reset} = application
+        \\  let $Application {reset} = application
         \\  break reset ()
     );
     defer module.deinit(allocator);
@@ -2288,12 +2288,12 @@ test "portable typed staging collection helpers reject forged inputs outputs and
 }
 
 const nominal_read_source =
-    \\type Packet a is data = #Packet {item: a, shadow: a}
-    \\type Choice a is data = #Left {item: a, flag: Bool} | #Right {padding: U32, item: a}
+    \\type Packet a is data = $Packet {item: a, shadow: a}
+    \\type Choice a is data = $Left {item: a, flag: Bool} | $Right {padding: U32, item: a}
     \\const read = func (packet: Packet a) => return packet.item
     \\const shared = func (choice: Choice a) => return choice.item
-    \\const add = func (value: U32) => return @u32.add (read (#Packet {shadow: 9, item: value})) (shared (#Right {padding: 9, item: 2}))
-    \\const floating = @code.quote (read (#Packet {item: 1.5, shadow: 9.5}))
+    \\const add = func (value: U32) => return @u32.add (read ($Packet {shadow: 9, item: value})) (shared ($Right {padding: 9, item: 2}))
+    \\const floating = @code.quote (read ($Packet {item: 1.5, shadow: 9.5}))
     \\const generated = @code.quote (add 40)
     \\const answer: U32 = @code.run generated
 ;
@@ -2572,10 +2572,10 @@ test "portable typed staging generic operation rows match permutations and retai
 
 test "portable typed staging lifts preserve nominal usage authority before executable admission" {
     var module = try lower(a,
-        \\type Box is data = #Box U32
+        \\type Box is data = $Box U32
         \\opaque type Other = U32
-        \\const lifted = @code.quote (@code.lift (#Box 42))
-        \\const sealed = @code.quote (@code.lift (#Other 43))
+        \\const lifted = @code.quote (@code.lift ($Box 42))
+        \\const sealed = @code.quote (@code.lift ($Other 43))
     );
     defer module.deinit(a);
     const S = @import("staging_core.zig");
@@ -2746,17 +2746,17 @@ const named_composition_sources = [_][]const u8{
     \\const generated = @code.quote (checked (@computation (func () => return Read 41)))
     \\const answer = @code.run generated
     ,
-    \\type Box a is data = #Box a
-    \\const Box.pure = func value => return #Box value
+    \\type Box a is data = $Box a
+    \\const Box.pure = func value => return $Box value
     \\const Box.bind = func candidate => return func next => return case candidate of
-    \\  #Box value => next value
+    \\  $Box value => next value
     \\const try = @do.monad Box
     \\const sequence = func (value: Box U32) => return do try:
     \\  use number <- value
     \\  break @u32.add number 1
     \\const unwrap = func value => return case value of
-    \\  #Box number => number
-    \\const generated = @code.quote (unwrap (sequence (#Box 41)))
+    \\  $Box number => number
+    \\const generated = @code.quote (unwrap (sequence ($Box 41)))
     \\const answer = @code.run generated
     ,
     \\effect Read: U32 -> U32
@@ -2885,11 +2885,11 @@ test "portable named resolver composition rejects forged selected methods and re
 
 test "portable named resolver composition proves actual Foreign execution beneath pure selected headers" {
     var m = try lower(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\const Box.pure = func value => return do:
         \\  use owner <- @resource.acquire (func () => return 1) (func value => return ())
         \\  use @resource.release owner
-        \\  break #Box value
+        \\  break $Box value
         \\const selected = @do.monad Box
         \\const helper = func () => return do selected:
         \\  break 42
@@ -2916,20 +2916,20 @@ test "portable named resolver composition proves actual Foreign execution beneat
 
 test "portable named resolver composition carries effectful continuations" {
     var m = try lower(a,
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\const Box.pure = func value => return do:
         \\  use owner <- @resource.acquire (func () => return 1) (func value => return ())
         \\  use @resource.release owner
-        \\  break #Box value
+        \\  break $Box value
         \\const Box.bind = func candidate => return func next => return case candidate of
-        \\  #Box value => next value
+        \\  $Box value => next value
         \\const identity = func value => return value
         \\const selected = identity (@do.monad (identity Box))
         \\const sequence = func (value: U32) => return do selected:
-        \\  use number <- #Box value
+        \\  use number <- $Box value
         \\  break @u32.add number 40
         \\const helper = func (value: U32) => return case sequence value of
-        \\  #Box result => result
+        \\  $Box result => result
         \\const generated = @code.quote (func (value: U32) => return helper value)
         \\const generated_task = generated
         \\const evaluated: U32 = 42
@@ -2959,17 +2959,17 @@ test "portable named resolver composition rejects same shaped foreign method sub
 
 test "portable named qualified resolver composition owns actual predicates in task helpers" {
     var m = try lower(a,
-        \\type Box a is data = #Box a
-        \\const Box.pure = func value => return #Box value
+        \\type Box a is data = $Box a
+        \\const Box.pure = func value => return $Box value
         \\const Box.bind = func candidate => return func next => return case candidate of
-        \\  #Box value => next value
+        \\  $Box value => next value
         \\const monad = func constructor => return @do.monad constructor
         \\const selected = monad Box
         \\const sequence = func selected => return func candidate => return do selected:
         \\  use value <- candidate
         \\  break @u32.add value 2
-        \\const helper = func (value: U32) => return case sequence selected (#Box value) of
-        \\  #Box number => number
+        \\const helper = func (value: U32) => return case sequence selected ($Box value) of
+        \\  $Box number => number
         \\const generated = @code.quote (func (value: U32) => return helper value)
         \\entry const run = func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value)))
         \\const answer = 42

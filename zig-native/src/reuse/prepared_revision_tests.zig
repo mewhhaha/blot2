@@ -14,7 +14,7 @@ const source = @import("fixtures").source("partial-runtime-fixtures/namespace-ab
 const second_source = blk: {
     @setEvalBranchQuota(10000);
     const at = std.mem.find(u8, replace_provider, "effect Local").?;
-    break :blk replace_provider[0..at] ++ "const unrelated=func value=> return identity value\ndata Before=#Before U32\n" ++ replace_provider[at..];
+    break :blk replace_provider[0..at] ++ "const unrelated=func value=> return identity value\ntype Before is data= $Before U32\n" ++ replace_provider[at..];
 };
 const replace_provider = blk: {
     @setEvalBranchQuota(10000);
@@ -55,7 +55,7 @@ fn preparedContext(allocator: std.mem.Allocator, path: []const u8) !void {
 fn contextFixture() !std.testing.TmpDir {
     var dir = std.testing.tmpDir(.{});
     errdefer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "renamed.blot", .data = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select (#Box 1)\n" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "renamed.blot", .data = "type Box is data = $Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\nentry const answer = func () => return select ($Box 1)\n" });
     return dir;
 }
 
@@ -557,7 +557,7 @@ test "retained history keeps prior ownership through error correction revert and
         \\import * as alpha from "./a"
         \\import * as beta from "./b"
         \\effect Added: Unit -> Unit
-        \\data Extra = #Extra U32
+        \\type Extra is data = $Extra U32
         \\entry const answer: F32 -> F32 = func value => return do:
         \\  let add = factory value
         \\  break identity (add 1.25)

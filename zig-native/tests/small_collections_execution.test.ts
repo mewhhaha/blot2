@@ -61,18 +61,18 @@ entry const merged = func seed => return changed [seed, seed + 1] seed
 Deno.test("small collection elimination preserves eager order, unused elements, traps and early exits", async () => {
   await compileAndRun(
     `
-type Trace is data = #Trace U32
+type Trace is data = $Trace U32
 const mark = func number => return do:
-  use previous <- @state.get #Trace
-  let #Trace before = previous
-  use @state.set (#Trace (before * 10 + number))
+  use previous <- @state.get $Trace
+  let $Trace before = previous
+  use @state.set ($Trace (before * 10 + number))
   break number
 const first = func (values: List U32) => return do:
   for value in values:
     break value
   break 0
 entry const ordered = func () => return do:
-  let (#Trace trace, answer) = @state.run (#Trace 0) (func () => return first [mark 1, mark 2, mark 3])
+  let ($Trace trace, answer) = @state.run ($Trace 0) (func () => return first [mark 1, mark 2, mark 3])
   break trace * 10 + answer
 entry const trapped = func denominator => return first [7, @u32.div 1 denominator]
 entry const empty = func (seed: U32) => return do:

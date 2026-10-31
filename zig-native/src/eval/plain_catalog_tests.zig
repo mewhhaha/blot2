@@ -27,12 +27,12 @@ fn fixture(a: std.mem.Allocator, text: []const u8) !core.Module {
 test "positive catalog proofs cover List Array generic and nested data but decline callables cycles unknown owners and depth exhaustion" {
     const a = std.testing.allocator;
     var module = try fixture(a,
-        \\type Payload a is data = #Payload { xs: List a, ys: Array a }
-        \\type Acyclic is data = #Acyclic (Payload U32)
-        \\type Callback is data = #Callback (U32 -> U32)
-        \\type Recursive is data = #Recursive (List Recursive)
-        \\type NestedCallback is data = #NestedCallback (Payload (U32 -> U32))
-        \\type Empty is data = #Empty
+        \\type Payload a is data = $Payload { xs: List a, ys: Array a }
+        \\type Acyclic is data = $Acyclic (Payload U32)
+        \\type Callback is data = $Callback (U32 -> U32)
+        \\type Recursive is data = $Recursive (List Recursive)
+        \\type NestedCallback is data = $NestedCallback (Payload (U32 -> U32))
+        \\type Empty is data = $Empty
         \\entry const run = 0
     );
     defer module.deinit(a);
@@ -58,8 +58,8 @@ test "positive catalog proofs cover List Array generic and nested data but decli
 test "a changed constructor payload is revalidated independently of prior positive answers" {
     const a = std.testing.allocator;
     var module = try fixture(a,
-        \\type Value is data = #Value U32
-        \\type Callback is data = #Callback (U32 -> U32)
+        \\type Value is data = $Value U32
+        \\type Callback is data = $Callback (U32 -> U32)
         \\entry const run = 0
     );
     defer module.deinit(a);

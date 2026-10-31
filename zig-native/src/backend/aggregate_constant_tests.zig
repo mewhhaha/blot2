@@ -12,12 +12,12 @@ const a = std.testing.allocator;
 // `unrelated` is the edited body.
 const source =
     \\const table: Array U32 = #[10, 20, 30]
-    \\type Pair is data = #Pair { left: U32, right: U32 }
-    \\const pair = #Pair { left: 20, right: 22 }
+    \\type Pair is data = $Pair { left: U32, right: U32 }
+    \\const pair = $Pair { left: 20, right: 22 }
     \\const other = 0
     \\entry const pick = func (i: U32) => return table[i]
     \\entry const first = func () => return do:
-    \\  let #Pair { left, right } = pair
+    \\  let $Pair { left, right } = pair
     \\  break @u32.add left right
     \\entry const unrelated = func () => return other
 ;
@@ -117,11 +117,11 @@ test "aggregate constants with changed values aliases or nominal payloads rebuil
 const interleaved =
     \\const table: Array U32 = #[10, 20, 30]
     \\const second: Array U32 = #[1, 2, 3]
-    \\type Pair is data = #Pair { left: U32, right: U32 }
-    \\const pair = #Pair { left: 20, right: 22 }
+    \\type Pair is data = $Pair { left: U32, right: U32 }
+    \\const pair = $Pair { left: 20, right: 22 }
     \\const other = 0
     \\entry const three = func (i: U32) => return do:
-    \\  let #Pair { left, right } = pair
+    \\  let $Pair { left, right } = pair
     \\  let low = @u32.add table[i] left
     \\  break @u32.add low (@u32.add second[i] right)
     \\entry const unrelated = func () => return other

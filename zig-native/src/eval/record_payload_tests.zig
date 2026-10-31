@@ -26,26 +26,26 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return result;
 }
 const record_source =
-    \\data Pair = #Pair { x: U32, y: F32 }
-    \\data One = #One { value: F32 }
-    \\data Box a = #Box { value: a }
-    \\data Wrapped = #Wrapped { value: (U32,F32) }
-    \\data Empty = #Empty {}
+    \\type Pair is data = $Pair { x: U32, y: F32 }
+    \\type One is data = $One { value: F32 }
+    \\type Box a is data = $Box { value: a }
+    \\type Wrapped is data = $Wrapped { value: (U32,F32) }
+    \\type Empty is data = $Empty {}
     \\const unbox = func box => return case box of
-    \\  #Box value => value
-    \\entry const pair = case #Pair { y: 2.5, x: 40 } of
-    \\  #Pair payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-    \\entry const tuple = case #Pair { y: 2.5, x: 40 } of
-    \\  #Pair (x,y) => @f32.add (@u32.to_f32 x) y
-    \\entry const named = case #Pair { y: 2.5, x: 40 } of
-    \\  #Pair { y, x } => @f32.add (@u32.to_f32 x) y
-    \\entry const one = case #One {value:42.5} of
-    \\  #One value => value
-    \\entry const generic = @f32.add (@u32.to_f32 (unbox (#Box {value:40}))) (unbox (#Box {value:2.5}))
-    \\entry const product_field = case #Wrapped {value:(40,2.5)} of
-    \\  #Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
-    \\entry const empty = case #Empty {} of
-    \\  #Empty => 42
+    \\  $Box value => value
+    \\entry const pair = case $Pair { y: 2.5, x: 40 } of
+    \\  $Pair payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
+    \\entry const tuple = case $Pair { y: 2.5, x: 40 } of
+    \\  $Pair (x,y) => @f32.add (@u32.to_f32 x) y
+    \\entry const named = case $Pair { y: 2.5, x: 40 } of
+    \\  $Pair { y, x } => @f32.add (@u32.to_f32 x) y
+    \\entry const one = case $One {value:42.5} of
+    \\  $One value => value
+    \\entry const generic = @f32.add (@u32.to_f32 (unbox ($Box {value:40}))) (unbox ($Box {value:2.5}))
+    \\entry const product_field = case $Wrapped {value:(40,2.5)} of
+    \\  $Wrapped payload => @f32.add (@u32.to_f32 (@product.get payload 0)) (@product.get payload 1)
+    \\entry const empty = case $Empty {} of
+    \\  $Empty => 42
 ;
 fn target(module: *const core.Module, name: []const u8) core.BindingRef {
     for (module.bodies) |body| if (body.exported and std.mem.eql(u8, module.name(body.export_name), name)) return .{ .unit = if (module.unit == 0) 1 else module.unit, .binding = body.binding };
@@ -113,11 +113,11 @@ test "record payload views retain immutable Core types names and patterns during
 }
 fn negativeScenario(allocator: std.mem.Allocator) !void {
     for ([_]struct { source: []const u8, code: checker.Code }{
-        .{ .source = "data One=#One {value:U32}\nentry const answer=case #One {value:42} of\n  #One payload=>@product.get payload 0\n", .code = .type_mismatch },
-        .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair payload=>@u32.add payload 0\n", .code = .type_mismatch },
-        .{ .source = "data Empty=#Empty {}\nentry const answer=case #Empty {} of\n  #Empty payload=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {x:U32,y:U32}\nentry const answer=case #Pair {x:40,y:2} of\n  #Pair=>42\n", .code = .constructor_arity },
-        .{ .source = "data Pair=#Pair {left:Bool,right:Bool}\nentry const answer=case #Pair {right:true,left:false} of\n  #Pair (true,_)=>0\n  #Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
+        .{ .source = "type One is data= $One {value:U32}\nentry const answer=case $One {value:42} of\n  $One payload=>@product.get payload 0\n", .code = .type_mismatch },
+        .{ .source = "type Pair is data= $Pair {x:U32,y:U32}\nentry const answer=case $Pair {x:40,y:2} of\n  $Pair payload=>@u32.add payload 0\n", .code = .type_mismatch },
+        .{ .source = "type Empty is data= $Empty {}\nentry const answer=case $Empty {} of\n  $Empty payload=>42\n", .code = .constructor_arity },
+        .{ .source = "type Pair is data= $Pair {x:U32,y:U32}\nentry const answer=case $Pair {x:40,y:2} of\n  $Pair=>42\n", .code = .constructor_arity },
+        .{ .source = "type Pair is data= $Pair {left:Bool,right:Bool}\nentry const answer=case $Pair {right:true,left:false} of\n  $Pair (true,_)=>0\n  $Pair {left:false,right:false}=>42\n", .code = .non_exhaustive_match },
     }) |case| {
         var lexed = try lexer.lex(allocator, case.source);
         defer lexed.deinit(allocator);
@@ -140,7 +140,7 @@ test "canonical constructor views preserve arity scalar and exhaustive coverage 
 fn importedScenario(allocator: std.mem.Allocator) !void {
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
-    const producer_source = "data Imported value = #Imported {value:value}\n";
+    const producer_source = "type Imported value is data = $Imported {value:value}\n";
     var producer_lexed = try lexer.lex(allocator, producer_source);
     defer producer_lexed.deinit(allocator);
     var producer_tree = try parser.parse(allocator, producer_source, producer_lexed.tokens.items, &pool);
@@ -156,9 +156,9 @@ fn importedScenario(allocator: std.mem.Allocator) !void {
     tree_live = false;
     const consumer_source =
         \\const unbox = func box => return case box of
-        \\  #Imported value => value
-        \\entry const unsigned = unbox (#Imported {value:42})
-        \\entry const floating = unbox (#Imported {value:42.5})
+        \\  $Imported value => value
+        \\entry const unsigned = unbox ($Imported {value:42})
+        \\entry const floating = unbox ($Imported {value:42.5})
     ;
     var lexed = try lexer.lex(allocator, consumer_source);
     defer lexed.deinit(allocator);
@@ -187,15 +187,15 @@ test "imported generic record payload views keep producer identity after source 
 }
 
 const generic_record_source =
-    \\type Pack [unused, selected] is data = #Pack { unused: unused, selected: selected }
+    \\type Pack [unused, selected] is data = $Pack { unused: unused, selected: selected }
     \\const identity = func value => return value
-    \\const packed = #Pack { unused: identity, selected: func (value: U32) => return @u32.add value 1 }
+    \\const packed = $Pack { unused: identity, selected: func (value: U32) => return @u32.add value 1 }
     \\const invoke = func callback => return callback 1
     \\const sum = func packed => return func (left: U32) => return func (right: U32) => return do:
-    \\  let #Pack { selected } = packed
+    \\  let $Pack { selected } = packed
     \\  break selected (@u32.add left right)
     \\const run = func packed => return func (value: U32) => return invoke (func extra => return do:
-    \\  let #Pack { selected } = packed
+    \\  let $Pack { selected } = packed
     \\  break selected (@u32.add value extra))
     \\entry const answer = func (value: U32) => return run packed value
     \\entry const partial = func (value: U32) => return invoke (sum packed value)
@@ -205,13 +205,13 @@ const generic_record_source =
 ;
 const curried_record_source =
     \\type Clock is effect = { tick: Unit -> U32 }
-    \\type Pack callback is data = #Pack { callback: callback, marker: U32 }
+    \\type Pack callback is data = $Pack { callback: callback, marker: U32 }
     \\const prepare = func (amount: U32) => return func (value: U32) => return do:
     \\  use current <- Clock.tick ()
     \\  break @u32.add current (@u32.add value amount)
-    \\const packed = #Pack { callback: prepare, marker: 42 }
+    \\const packed = $Pack { callback: prepare, marker: 42 }
     \\const read = func pack => return do:
-    \\  let #Pack { marker } = pack
+    \\  let $Pack { marker } = pack
     \\  break marker
     \\entry const answer = func () => return read packed
 ;

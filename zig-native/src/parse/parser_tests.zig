@@ -38,7 +38,7 @@ fn stagedSurface(allocator: std.mem.Allocator) !void {
         \\  let value = 40
         \\  break @u32.add value 2
         \\const qualified = $run.Some 42
-        \\const legacy_qualified = #run.Some 42
+        \\const legacy_qualified = $run.Some 42
     ;
     var pool: symbols.Pool = .{};
     defer pool.deinit(allocator);
@@ -380,12 +380,12 @@ test "operator reduction retains each subtree span rather than the full chain sp
 
 test "surface syntax preserves nested blocks patterns loops and handlers" {
     try clean(
-        \\type Pair [a, b] is data = #Pair (a, b)
+        \\type Pair [a, b] is data = $Pair (a, b)
         \\type Counter a is effect = { advance: a -> a }
         \\const run = func (value: Pair [U32, Bool]) : U32 => return do:
-        \\  let #Pair (number, flag) = value else:
+        \\  let $Pair (number, flag) = value else:
         \\    break 0
-        \\  if let #Some next = #Some number:
+        \\  if let $Some next = $Some number:
         \\    number := next
         \\  else:
         \\    number := self + 1
@@ -404,8 +404,8 @@ test "surface syntax preserves nested blocks patterns loops and handlers" {
     );
 }
 
-test "type witnesses anonymous constructor records and array arguments remain distinct" {
-    try clean("const witness = function :U32\nconst anonymous = #{ field: 2 }\nconst run = func () => return do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
+test "type witnesses structural records and array arguments remain distinct" {
+    try clean("const witness = function :U32\nconst anonymous = { field: 2 }\nconst run = func () => return do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
 }
 
 test "argument projections and adjacent indexes bind before application" {

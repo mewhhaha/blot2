@@ -30,7 +30,7 @@ entry const suspended_copy = func (size: U32) => return do:
   let copied = array.generate saved.length (func index => return saved[index])
   let before = delayed copied
   saved[0] := 99
-  break (@force before)[0]
+  break (@demand before)[0]
 entry const nested_copy = func (size: U32) => return do:
   let saved = array.generate size (func index => return #[index + 1])
   let copied = array.generate saved.length (func index => return saved[index])

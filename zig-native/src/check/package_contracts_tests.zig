@@ -1446,17 +1446,17 @@ fn ordinaryPredicateSchemeScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\type Identity = forall [a] => a -> a
         \\const identity: Identity = func value => return value
-        \\type Point is data = #Point { x: U32 }
+        \\type Point is data = $Point { x: U32 }
         \\const Point.add = func (left: Point) => return func (right: U32) => return @u32.add left.x right
-        \\const Point.from = func (value: U32) => return #Point {x: value}
+        \\const Point.from = func (value: U32) => return $Point {x: value}
         \\const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
         \\const converted: Point = convert 20
         \\const combine = func left => return func right => return @type.call "add" left right
         \\const represented: a -> a where { type_rep a } = func value => return value
         \\const field = func value => return value.x
         \\const forward = func value => return combine value 22
-        \\const answer = forward (#Point { x: represented (field {x: 20}) })
-        \\const named = field (#Point {x: 7})
+        \\const answer = forward ($Point { x: represented (field {x: 20}) })
+        \\const named = field ($Point {x: 7})
     ;
     var tokens = try lexer.lex(allocator, source);
     defer tokens.deinit(allocator);
@@ -1566,12 +1566,12 @@ test "ordinary scheme publication preserves a bijection of variables rows and go
 fn ordinaryRightOwnerScenario(allocator: std.mem.Allocator) !void {
     const source =
         \\const identity: forall [a] => a -> a = func value => return value
-        \\type Left is data = #Left {value: U32}
-        \\type Right is data = #Right {value: U32}
+        \\type Left is data = $Left {value: U32}
+        \\type Right is data = $Right {value: U32}
         \\const Left.add = func (left: Left) => return func (right: U32) => return @u32.add left.value right
         \\const Right.add = func (left: Left) => return func (right: Right) => return @u32.add left.value right.value
         \\const combine = func left => return func right => return @type.call "add" left right
-        \\const answer = identity (combine (#Left {value: 20}) (#Right {value: 22}))
+        \\const answer = identity (combine ($Left {value: 20}) ($Right {value: 22}))
     ;
     var module = try lowerSource(allocator, source);
     defer module.deinit(allocator);
@@ -2207,16 +2207,16 @@ test "exact Foreign inference views publish only complete endpoints and preserve
 }
 
 const named_ordinary_owner_source =
-    \\type Maybe a is data = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const identity: forall [a] => a -> a = func value => return value
     \\const same = func left => return func right => return @type.same left right
     \\const inspect = func (candidate: Maybe U32) => return do:
-    \\  let #Some value = candidate else:
+    \\  let $Some value = candidate else:
     \\    break 0
-    \\  if let #Some extra = candidate:
+    \\  if let $Some extra = candidate:
     \\    use same value extra
     \\  break value
-    \\const helper = func (value: U32) => return inspect (#Some value)
+    \\const helper = func (value: U32) => return inspect ($Some value)
     \\const generated = @code.quote (func (value: U32) => return helper value)
     \\entry const run = func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value)))
 ;
@@ -2312,9 +2312,9 @@ test "ordinary type witnesses reject opened abstract representation through OOM"
 test "generic cursor primitives require actual collection predicates and element identities through OOM" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\type Maybe a is data = #Some a | #Nothing
+        \\type Maybe a is data = $Some a | $Nothing
         \\const identity: forall [a] => a -> a = func value => return value
-        \\const next = func cursor => return if @cursor.has cursor then #Some (@cursor.value cursor, @cursor.advance cursor) else #Nothing
+        \\const next = func cursor => return if @cursor.has cursor then $Some (@cursor.value cursor, @cursor.advance cursor) else $Nothing
     );
     defer module.deinit(allocator);
     try packageWorkspace(allocator, &module);

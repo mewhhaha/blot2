@@ -98,13 +98,13 @@ test "pattern-conditional append transfers ownership only without surviving alia
     const a = std.testing.allocator;
     for ([_]bool{ false, true }) |aliased| {
         const source = try a.print(
-            \\type Maybe a is data = #Some a | #Nothing
+            \\type Maybe a is data = $Some a | $Nothing
             \\entry const run = func (count: U32) => return do:
             \\  let values: List U32 = []
             \\  for index in 0..count:
             \\    {s}
-            \\    let candidate = if @u32.lt index 10 then #Some index else #Nothing
-            \\    if let #Some value = candidate:
+            \\    let candidate = if @u32.lt index 10 then $Some index else $Nothing
+            \\    if let $Some value = candidate:
             \\      values := [...self, value]
             \\    {s}
             \\  break @array.from_list values
@@ -173,9 +173,9 @@ test "read-only callees and dropped generator closures borrow an exclusive array
 
 test "returned stored captured and later-read arguments keep the copy" {
     const prefix =
-        \\data Cell value = #Cell value
+        \\type Cell value is data = $Cell value
         \\const pass = func values => return values
-        \\const wrap = func values => return #Cell values
+        \\const wrap = func values => return $Cell values
         \\const pair = func values => return (values, 1)
         \\const reader = func values => return func index => return values[index]
         \\const keep = func values => return pass values
@@ -196,7 +196,7 @@ test "returned stored captured and later-read arguments keep the copy" {
     ;
     const cases = [_][]const u8{
         "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let before = pass values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
-        "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let #Cell before = wrap values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
+        "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let $Cell before = wrap values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
         "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let (before, _) = pair values\n  values[0] := 9\n  break @u32.add before[0] values[0]\n",
         "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let read = reader values\n  values[0] := 9\n  break @u32.add (read 0) values[0]\n",
         "entry const run = func (count: U32) => return do:\n  let values = @array.fill count 1\n  let read = func index => return values[index]\n  let doubled = @array.generate count read\n  values[0] := 9\n  break @u32.add (read 0) doubled[0]\n",

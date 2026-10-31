@@ -74,7 +74,6 @@
 (escape_sequence) @constant.character.escape
 
 (constructor_marker) @punctuation.special
-(dollar_constructor) @constructor
 (staging_marker) @keyword.directive
 (constructor_reference qualifier: (_) @namespace)
 (constructor_reference name: (type_identifier) @constructor)

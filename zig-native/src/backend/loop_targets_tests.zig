@@ -21,7 +21,7 @@ const source =
     \\    else:
     \\      let branch = 0
     \\      branch := 4
-    \\    if let #Some payload = candidate:
+    \\    if let $Some payload = candidate:
     \\      payload := 5
     \\      conditional := 6
     \\    else:
@@ -39,10 +39,10 @@ const source =
     \\    object.field := 13
     \\    array[0] := 14
     \\    case candidate of
-    \\      #Some arm_payload => do:
+    \\      $Some arm_payload => do:
     \\        arm_payload := 17
     \\        carried := 18
-    \\      #None => do:
+    \\      $None => do:
     \\        let arm_local = 0
     \\        arm_local := 19
     \\        carried_other := 20

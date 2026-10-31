@@ -32,7 +32,7 @@ entry const answer = func () => return do:
       return `const helper = func (value: U32) => return Maybe.unwrap_or 0 (do (monad Maybe):
   let total = ${base}
   for index in 0..value:
-    use item <- #Some 1
+    use item <- $Some 1
     total := @u32.add self item
   break total)
 const generated = @code.quote (func (value: U32) => return helper value)
@@ -59,31 +59,31 @@ const evaluated: U32 = @code.run (@code.quote (helper 2))
     }
     let finish = "break @u32.add number " + base;
     if (recipe === "resolver forwarding") {
-      finish = "break $ #Box (@u32.add number " + base + ")";
+      finish = "break $ $Box (@u32.add number " + base + ")";
     }
-    let pure = "const Box.pure = func value => return #Box value";
+    let pure = "const Box.pure = func value => return $Box value";
     if (recipe === "resolver effects") {
       pure = `const Box.pure = func value => return do:
   use owner <- @resource.acquire (func () => return 1) (func value => return ())
   use @resource.release owner
-  break #Box value`;
+  break $Box value`;
     }
     let generatedTask =
       "@code.quote (func (value: U32) => return @task.scope (func group => return @task.join (@task.spawn group (func () => return helper value))))";
     if (recipe === "resolver effects") generatedTask = "generated";
     let evaluated = "@code.run (@code.quote (helper 2))";
     if (recipe === "resolver effects") evaluated = String(base + 2);
-    return `type Box a is data = #Box a
+    return `type Box a is data = $Box a
 ${pure}
 const Box.bind = func candidate => return func next => return case candidate of
-  #Box value => next value
+  $Box value => next value
 const identity = func value => return value
 const selected = identity (@do.monad (identity Box))
 const sequence = func (value: U32) => return do selected:
-  use number <- #Box value
+  use number <- $Box value
   ${finish}
 const helper = func (value: U32) => return case sequence value of
-  #Box result => result
+  $Box result => result
 const generated = @code.quote (func (value: U32) => return helper value)
 const generated_task = ${generatedTask}
 const evaluated: U32 = ${evaluated}

@@ -83,7 +83,7 @@ test "tag and original initializer diagnostics retain their distinct source owne
         .{ .text = "@[func value=> return true] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "U32" },
         .{ .text = "const expected=(1,2)\n@[func value=> return case value of\n  ^expected=>1\n  _=>0] entry const answer=expected\n", .code = .value_pattern_type, .marker = "@[" },
         .{ .text = "const expected=(1,2)\n@[func value=> return value] entry const answer=case expected of\n  ^expected=>1\n  _=>0\n", .code = .value_pattern_type, .marker = "case" },
-        .{ .text = "@[func ~value=> return @force value] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "@[" },
+        .{ .text = "@[func ~value=> return @demand value] entry const answer:U32=42\n", .code = .type_mismatch, .marker = "@[" },
     };
     for (cases) |item| {
         var tokens = try lexer.lex(a, item.text);

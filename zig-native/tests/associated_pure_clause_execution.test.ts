@@ -6,14 +6,14 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = (offset: number, effect = "") =>
   `const identity: forall [a] => a -> a = func value => return value
-type Number is data = #Number U32
-const Number.add = func (#Number left) => return func (#Number right) => return do:
-${effect}  break #Number (@u32.add (@u32.add left right) ${offset})
+type Number is data = $Number U32
+const Number.add = func ($Number left) => return func ($Number right) => return do:
+${effect}  break $Number (@u32.add (@u32.add left right) ${offset})
 const twice: a -> a where {associated "add" a a a} = func value => return @type.call "add" value value
 const alias = twice
 const generic = func value => return alias value
-const answer = func () => return case generic (#Number 21) of
-  #Number value => identity value
+const answer = func () => return case generic ($Number 21) of
+  $Number value => identity value
 `;
 
 for (const codegenTier of ["development", "optimized"] as const) {

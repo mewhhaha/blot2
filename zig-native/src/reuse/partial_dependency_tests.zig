@@ -9,18 +9,18 @@ const core = @import("../check/core.zig");
 const backend = @import("../backend/core_backend.zig");
 const a = std.testing.allocator;
 const key: format.Key = .{ .compiler = @as([32]u8, @splat(7)), .settings = @as([32]u8, @splat(8)), .source = @as([32]u8, @splat(9)), .dependencies = @as([32]u8, @splat(10)) };
-const prelude = "infixl 60 (+) = plus\nconst plus = func left => return func right => return @u32.add left right\nconst identity = func value => return value\ndata Box a = #Box a\n";
+const prelude = "infixl 60 (+) = plus\nconst plus = func left => return func right => return @u32.add left right\nconst identity = func value => return value\ntype Box a is data = $Box a\n";
 const seed = "entry const initial:Unit->U32 = func () => return 42\n";
-const shared = "const unwrap = func box => return case box of\n  #Box value => identity value\n";
-const left = "import {unwrap} from \"./shared\"\nconst first = func value => return unwrap (#Box value)\n";
-const right = "import {unwrap} from \"./shared\"\nconst second = func value => return unwrap (#Box value)\n";
+const shared = "const unwrap = func box => return case box of\n  $Box value => identity value\n";
+const left = "import {unwrap} from \"./shared\"\nconst first = func value => return unwrap ($Box value)\n";
+const right = "import {unwrap} from \"./shared\"\nconst second = func value => return unwrap ($Box value)\n";
 const entry = "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer:Unit->U32 = func () => return first 20 + second 22\nentry const fraction:Unit->F32 = func () => return first 0.5\n";
 
-const field_library = "type Box is data = #Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\n";
-const field_entry = "import {Box, select} from \"./library\"\nentry const answer = func () => return select (#Box 1)\n";
+const field_library = "type Box is data = $Box U32\nconst Box.read = func value => return 42\nconst select: a -> b where {field \"read\" a b} = func value => return value.read\n";
+const field_entry = "import {Box, select} from \"./library\"\nentry const answer = func () => return select ($Box 1)\n";
 const field_prelude = "const prelude_identity = func value => return value\n";
-const field_renamed_entry = "import {Box, select} from \"./producer\"\nentry const answer = func () => return select (#Box 1)\n";
-const field_entry_nominal = "import {select} from \"./producer\"\ntype EntryBox is data = #EntryBox U32\nconst EntryBox.read = func value => return 42\nentry const answer = func () => return select (#EntryBox 1)\n";
+const field_renamed_entry = "import {Box, select} from \"./producer\"\nentry const answer = func () => return select ($Box 1)\n";
+const field_entry_nominal = "import {select} from \"./producer\"\ntype EntryBox is data = $EntryBox U32\nconst EntryBox.read = func value => return 42\nentry const answer = func () => return select ($EntryBox 1)\n";
 const FieldMode = enum { source, prelude, full, full_consumer };
 const FieldControl = enum { library, renamed, entry_nominal };
 
@@ -409,7 +409,7 @@ const numeric_sources = [_][]const u8{
     "entry const answer=identity 4294967296\n",
     "// 雪🙂\r\nentry const answer=identity 0x1_0000_0000\r\n",
     "entry const answer=func()=> return identity 1e999\n",
-    "const untouched=func()=> return identity 42\nconst overflow=#Box 4294967296\nentry const answer:Unit->U32=func()=> return 42\n",
+    "const untouched=func()=> return identity 42\nconst overflow= $Box 4294967296\nentry const answer:Unit->U32=func()=> return 42\n",
 };
 test "partial fresh numeric validation retains source publication and cached generic nominal headers" {
     var fixture = try Fixture.init();

@@ -148,7 +148,7 @@ fn specializedProjectSnapshot(allocator: std.mem.Allocator, path: []const u8) !v
 test "canonical purity imported shaped nominal effect snapshots outlive all project owners and fail safely" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "type Box {pair:(a,b)} is data=#Box (a,b)\ntype Reader a is effect={read:Unit->a}\n" });
+    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "type Box {pair:(a,b)} is data= $Box (a,b)\ntype Reader a is effect={read:Unit->a}\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import * as api from \"./dependency\"\nlet value=api.Reader.read (api.Box ({pair:(U32,F32)})) ()\nentry const answer=42\n" });
     var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try tmp.dir.realPath(std.testing.io, &buffer);

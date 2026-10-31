@@ -15,12 +15,12 @@ const prelude = `${repo}std/prelude.blot`;
 // shape through preparation. Statically known accessor closures are exercised
 // by typed_path_execution.test.ts.
 const program = (offset: number) => `
-type Vec is data = #Vec U32
+type Vec is data = $Vec U32
 const Vec.add = func (left: Vec) => return do:
-  let #Vec x = left
+  let $Vec x = left
   break func (right: Vec) : Vec => return do:
-    let #Vec y = right
-    break #Vec (x + y + ${offset})
+    let $Vec y = right
+    break $Vec (x + y + ${offset})
 const adder = func (x: U32) => return do:
   break func (y: U32) : U32 => return x + y + ${offset}
 const twice = func (f: U32 -> U32) => return func (x: U32) : U32 => return f (f x)
@@ -34,9 +34,9 @@ entry const named_over = func (v: U32) : U32 => return adder v 2
 entry const indirect = func (v: U32) : U32 => return twice (func (y: U32) => return y + 3) v
 entry const closure_constant = func (v: U32) : U32 => return twice shift v
 entry const operator = func (v: U32) : U32 => return do:
-  let #Vec total = #Vec v + #Vec 5
+  let $Vec total = $Vec v + $Vec 5
   break total
-entry const resolver = func (v: U32) : U32 => return Maybe.unwrap_or 0 (both (#Some v) (#Some 1))
+entry const resolver = func (v: U32) : U32 => return Maybe.unwrap_or 0 (both ($Some v) ($Some 1))
 entry const captured = func (v: U32) : U32 => return do:
   let step = func (y: U32) => return y * 2
   let apply = func (g: U32 -> U32) => return g v

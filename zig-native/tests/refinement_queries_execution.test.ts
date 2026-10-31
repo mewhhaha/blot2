@@ -22,16 +22,16 @@ Deno.test("owned refinement queries preserve dependency edits catalog relocation
     [entry]: `import {Box, fixed, read} from "./dep"
 const factory = func value => return func extra => return value
 const scalar = factory fixed
-const nominal = factory (#Box fixed)
+const nominal = factory ($Box fixed)
 entry const run = func (value: U32) => return @u32.add (read value) ${changed}
 entry const captured = func (value: U32) => return scalar value
 entry const boxed = func () => return do:
-  let #Box value = nominal 0
+  let $Box value = nominal 0
   break value
 `,
     [dependency]: `${
       reordered ? "const unrelated = func value => return value\n" : ""
-    }data Box a = #Box a
+    }type Box a is data = $Box a
 const fixed = ${fixed}
 const read = func (value: U32) => return @u32.add value fixed
 ${reordered ? "" : "const unrelated = func value => return value\n"}`,

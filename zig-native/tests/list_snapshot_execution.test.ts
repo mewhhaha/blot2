@@ -30,10 +30,10 @@ entry const references = func (seed: U32) => return do:
   break #[(@cursor.value left)[0], (@cursor.value right)[0], (@cursor.value (@cursor.advance right))[0], changed[0][0], values.length]
 entry const windows = func (count: U32) => return do:
   let stream = iter.windows 3 (iter.range 0 count)
-  let #Some (first, next) = stream.next else:
+  let $Some (first, next) = stream.next else:
     break 0
   let saved = first.iter
-  let #Some (second, _) = next.next else:
+  let $Some (second, _) = next.next else:
     break 0
   break @cursor.value saved + iter.fold_left add 0 first + iter.fold_left add 0 second
 entry const constant = func () => return @cursor.value [40, 41, 42].iter

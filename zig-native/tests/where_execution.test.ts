@@ -28,7 +28,7 @@ entry const answer = func () => return do:
 Deno.test("qualified fields receivers and updates prove physical and selected members", async () => {
   await compileAndRun(
     `
-type Box a is data = #Box { value: a }
+type Box a is data = $Box { value: a }
 const Box.plus = func (box: Box U32) => return func (amount: U32) => return @u32.add box.value amount
 const first: a -> b where { field "value" a b } = func box => return box.value
 const bind: a -> (U32 -> U32) where { receiver "plus" a Unit (U32 -> U32) } = func box => return box.plus
@@ -36,9 +36,9 @@ const replace: a -> b -> c where { update "value" a b c } = func box => return f
   let current = box
   current.value := value
   break current
-entry const answer = func () => return @u32.add (first (#Box { value: 20 })) ((bind (#Box { value: 20 })) 2)
+entry const answer = func () => return @u32.add (first ($Box { value: 20 })) ((bind ($Box { value: 20 })) 2)
 entry const changed = func () => return do:
-  let #Box { value } = replace (#Box { value: 20 }) 42.0
+  let $Box { value } = replace ($Box { value: 20 }) 42.0
   break value
 `,
     (guest) => {

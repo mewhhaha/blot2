@@ -77,7 +77,7 @@ fn excluded(allocator: std.mem.Allocator, module: *const core.Module) !void {
 }
 test "nominal payloads containing callables need richer evidence and do not enter this cache" {
     var module = try lower(
-        \\type Box is data = #Box { run: Unit -> U32 }
+        \\type Box is data = $Box { run: Unit -> U32 }
         \\const invoke = func (box: Box) : U32 => return box.run ()
         \\entry const first = func (box: Box) : U32 => return invoke box
         \\entry const second = func (box: Box) : U32 => return invoke box

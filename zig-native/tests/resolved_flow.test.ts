@@ -14,13 +14,13 @@ const prelude = `${repo}std/prelude.blot`;
 // executes as written, retained and fresh builds agree through an edit, and
 // fresh builds count every plan shape, including cleanup discharged by exits.
 const program = (offset: number) => `
-type Shape is data = #Circle U32 | #Square U32
+type Shape is data = $Circle U32 | $Square U32
 type Validate is effect = { check: U32 -> U32 }
 
 const area = func (shape: Shape) : U32 => return case shape of
-  #Circle r if r > 10 => r * 3
-  #Circle r => r
-  #Square s => s * s
+  $Circle r if r > 10 => r * 3
+  $Circle r => r
+  $Square s => s * s
 
 entry const joins = func (v: U32) : U32 => return do:
   let total = if v > 5 then v else 5
@@ -29,12 +29,12 @@ entry const joins = func (v: U32) : U32 => return do:
     bonus := self + 7
   else:
     bonus := self + 1
-  let big = if v > 100 then #Some v else #Nothing
-  if let #Some s = big:
+  let big = if v > 100 then $Some v else $Nothing
+  if let $Some s = big:
     bonus := self + 2
   else:
     bonus := self + 1
-  break total + bonus + area (#Circle v) + area (#Square 2)
+  break total + bonus + area ($Circle v) + area ($Square 2)
 
 entry const loops = func (end: U32) : U32 => return do:
   let total = 0

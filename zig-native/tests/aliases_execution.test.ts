@@ -11,10 +11,10 @@ Deno.test("aliases use the underlying layout, dispatch and independent type inst
 type Number = U32
 type Pair a = (a, a)
 type Value = Box Number
-type Box a is data = #Box { value: a }
+type Box a is data = $Box { value: a }
 const Box.read = func box => return func () => return box.value
 const first = func (pair: Pair a) => return @product.get pair 0
-const number: Value = #Box { value: 40 }
+const number: Value = $Box { value: 40 }
 entry const answer = func () => return @u32.add (number.read ()) (first (2, 3))
 entry const fraction = func () => return first (1.5, 2.5)
 `,
@@ -77,14 +77,14 @@ Deno.test("aliases freshen shaped parameters and latent effect rows independentl
     `
 type Pair [a, b] = (a, b)
 type Action a = Unit -> a ! {| e}
-type Carry f is data = #Carry f
+type Carry f is data = $Carry f
 const first = func (pair: Pair [a, b]) => return @product.get pair 0
 const invoke = func (action: Action a) => return action ()
 const packed = func (carry: Carry (Action a)) => return case carry of
-  #Carry action => action ()
+  $Carry action => action ()
 entry const answer = func () => return invoke (func () => return first (42, true))
 entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return invoke (func () => return send 41)
-entry const carried = func (send: U32 -> U32 ! {Foreign}) => return packed (#Carry (func () => return send 41))
+entry const carried = func (send: U32 -> U32 ! {Foreign}) => return packed ($Carry (func () => return send 41))
 `,
     (guest) => {
       equal(guest.call("answer", null), 42);
@@ -98,7 +98,7 @@ entry const carried = func (send: U32 -> U32 ! {Foreign}) => return packed (#Car
     },
   );
   await compileExpectedFailure(
-    "type Action a = Unit -> a ! {| e}\ntype Box is data = #Box (Action U32)\nentry const answer = 42\n",
+    "type Action a = Unit -> a ! {| e}\ntype Box is data = $Box (Action U32)\nentry const answer = 42\n",
     "unbound_alias_row",
   );
 });

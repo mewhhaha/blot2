@@ -22,7 +22,7 @@ fn valid(loaded: *const project.Project, checked: *const semantic.CheckedProject
 }
 const prelude_source =
     \\infixr 90 (++) = add
-    \\type Maybe a is data = #Some a | #Nothing
+    \\type Maybe a is data = $Some a | $Nothing
     \\const add = func left => return func right => return @type.call "add" left right
     \\const U32.add = func left => return func right => return @u32.add left right
     \\const F32.add = func left => return func right => return @f32.add left right
@@ -32,7 +32,7 @@ const entry_source =
     \\import { answer } from "./helper"
     \\entry const integer = func () : U32 => return identity (20 ++ answer)
     \\entry const floating = func () : F32 => return 1.5 ++ 2.5
-    \\const maybe: Maybe U32 = #Some 42
+    \\const maybe: Maybe U32 = $Some 42
 ;
 
 test "implicit prelude is a real producer shared by modules and syntax fixities" {

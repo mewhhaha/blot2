@@ -9,7 +9,7 @@ Deno.test("shaped effects retain array record curried and empty source parameter
 type Convert [input, output] is effect = input -> output
 type Curried input => type output is effect = input -> output
 type Named {input, output} is effect = input -> output
-type Token () is data = #Token
+type Token () is data = $Token
 type Ping () is effect = Unit -> U32
 const convert = func value => return Convert value
 const explicit = func (value:a) : b => return Named {output:b,input:a} value
@@ -18,7 +18,7 @@ entry const answer = func () => return do (@effect.provider (Convert [U32,F32]) 
   break do (@effect.provider ((Curried U32) F32) (func value => return @u32.to_f32 value)):
     break do (@effect.provider (Named {output:F32,input:U32}) (func value => return @u32.to_f32 value)):
       break do (@effect.provider (Ping ()) (func () => return 42)):
-        let token: Token () = #Token
+        let token: Token () = $Token
         use first <- convert 20
         use second <- explicit 12
         use third <- ((Curried U32) F32) 10
@@ -49,8 +49,8 @@ entry const answer = func () => return do (@effect.provider (Inspect U32) (func 
 Deno.test("bare structural annotations and mismatched source argument patterns are rejected", async () => {
   for (
     const source of [
-      "type Box [a,b] is data = #Box\nconst value: Box (U32,F32) = #Box\nentry const answer = 42\n",
-      "type Box (a,b) is data = #Box\nconst value: Box [U32,F32] = #Box\nentry const answer = 42\n",
+      "type Box [a,b] is data = $Box\nconst value: Box (U32,F32) = $Box\nentry const answer = 42\n",
+      "type Box (a,b) is data = $Box\nconst value: Box [U32,F32] = $Box\nentry const answer = 42\n",
       "type Read is effect = Unit -> [U32,F32]\nentry const answer = 42\n",
     ]
   ) {

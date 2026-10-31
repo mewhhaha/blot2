@@ -13,15 +13,15 @@ const a = std.testing.allocator;
 const io = std.testing.io;
 
 const prelude =
-    \\type Box a is data = #Box a
+    \\type Box a is data = $Box a
     \\const Box.map = func transform => return func box => return case box of
-    \\  #Box value => #Box (transform value)
+    \\  $Box value => $Box (transform value)
     \\const F32.lerp = func left => return func right => return func weight => return @f32.add left (@f32.mul (@f32.sub right left) weight)
     \\const apply = func function => return func value => return function value
 ;
 const vec =
-    \\type P is data = #P { x: F32 }
-    \\const P.mix = func (a: P) => return func (b: P) => return func (t: F32) => return #P { x: F32.lerp a.x b.x t }
+    \\type P is data = $P { x: F32 }
+    \\const P.mix = func (a: P) => return func (b: P) => return func (t: F32) => return $P { x: F32.lerp a.x b.x t }
 ;
 const mid =
     \\import { P } from "./vec"

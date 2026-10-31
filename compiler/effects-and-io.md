@@ -55,7 +55,7 @@ resolver protocol; user-defined data types can provide their own `pure` and
 retain direct sequencing and block-result rules.
 
 Monadic loops call the selected type's `iterate initial step` member. Steps
-return wrapped `#Continue state` or `#Done result` values of the prelude's
+return wrapped `$Continue state` or `$Done result` values of the prelude's
 `Iteration state result` type. `Maybe` and `Result` implement this with ordinary
 loops and constant call stack, preserving early returns, error propagation, and
 callback effects. Custom monads supply `iterate` when they support loops; `pure`
@@ -156,17 +156,17 @@ type State a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type Counter is data = #Counter U32
+type Counter is data = $Counter U32
 const get = func (witness: p -> a) : a => return State.get ()
 const set = func value => return State.set value
 
 const advance = func () => return do:
-  use counter <- get #Counter
-  let #Counter value = counter
-  break set (#Counter (value + 1))
+  use counter <- get $Counter
+  let $Counter value = counter
+  break set ($Counter (value + 1))
 
 const answer = func () => return do:
-  let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) advance
+  let ($Counter next, _) = @effect.run State.get State.set ($Counter 41) advance
   break next
 ```
 
@@ -238,7 +238,7 @@ entry const main = func (advance: U32 -> U32 ! {Foreign}) => return do:
 ```
 
 Run `just demo-host`; [the executable example](../examples/host_io.blot) also
-forwards a source operation through that callback. [Guest ABI 2](guest-abi.md)
+forwards a source operation through that callback. [Guest ABI](guest-abi.md)
 defines the manifest, value codecs, opaque references, lifetime and failure
 rules. The compiler does not recognize `main`, `advance`, or any service name.
 

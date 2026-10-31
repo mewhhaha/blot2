@@ -34,18 +34,18 @@ Deno.test("specialization uses survive fresh CLI, retained project rejection and
     const cases = [
       {
         source:
-          "type Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=#Box 1 + #Box 2\n  break 7\n",
-        use: "#Box 1 + #Box 2",
+          "type Box is data= $Box U32\nentry const answer=func()=> return do:\n  let result= $Box 1 + $Box 2\n  break 7\n",
+        use: "$Box 1 + $Box 2",
       },
       {
         source:
-          'import { plus } from "./library"\ntype Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=plus (#Box 1) (#Box 2)\n  break 7\n',
-        use: "plus (#Box 1) (#Box 2)",
+          'import { plus } from "./library"\ntype Box is data= $Box U32\nentry const answer=func()=> return do:\n  let result=plus ($Box 1) ($Box 2)\n  break 7\n',
+        use: "plus ($Box 1) ($Box 2)",
       },
       {
         source:
-          'import { nested } from "./library"\ntype Box is data=#Box U32\nentry const answer=func()=> return do:\n  let result=nested (#Box 1) (#Box 2)\n  break 7\n',
-        use: "nested (#Box 1) (#Box 2)",
+          'import { nested } from "./library"\ntype Box is data= $Box U32\nentry const answer=func()=> return do:\n  let result=nested ($Box 1) ($Box 2)\n  break 7\n',
+        use: "nested ($Box 1) ($Box 2)",
       },
       {
         source:

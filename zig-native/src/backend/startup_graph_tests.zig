@@ -120,7 +120,7 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 const backend = @import("core_backend.zig");
 const Control = struct { source: []const u8, code: ?backend.Code, point: ?u32 = null, message: ?[]const u8 = null };
 const controls = [_]Control{
-    .{ .source = "let base = 1\nconst saved = 41\nconst delay = func ~value => return value\nentry const answer = func () => return @u32.add base (@force (delay saved))\n", .code = null },
+    .{ .source = "let base = 1\nconst saved = 41\nconst delay = func ~value => return value\nentry const answer = func () => return @u32.add base (@demand (delay saved))\n", .code = null },
     .{ .source = "let first: U32 = second\nlet second = first\nentry const answer = if true then 42 else first\n", .code = .initialization_cycle, .point = 28 },
     .{ .source = "let first: U32 = second\nlet second = first\nentry const answer: Unit -> U32 = func () => return first\nentry const bad: U32 = @panic \"later\"\n", .code = .const_panic, .point = 0, .message = "later" },
     .{ .source = "let first: U32 = second\nlet second = first\nlet saved = 42\nentry const answer: Unit -> U32 = func () => return first\nentry const bad = saved\n", .code = .const_runtime_dependency, .point = 0 },

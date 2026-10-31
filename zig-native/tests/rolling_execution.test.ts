@@ -101,18 +101,18 @@ entry const group = func (width: U32) => return #[code value | value <- rolling.
 entry const forks = func (width: U32) => return do:
   let original = rolling.monoid add 0 width (@array.generate 32 (func index => return index))
   use first <- original.next
-  let #Some (a, rest) = first else:
+  let $Some (a, rest) = first else:
     break #[]
   let saved = rest
   use second <- rest.next
-  let #Some (b, next) = second else:
+  let $Some (b, next) = second else:
     break #[]
   let pressure = @array.fill 8192 99
   use repeated <- saved.next
-  let #Some (again, _) = repeated else:
+  let $Some (again, _) = repeated else:
     break #[]
   use third <- next.next
-  let #Some (c, _) = third else:
+  let $Some (c, _) = third else:
     break #[]
   break #[a, b, again, c]
 entry const references = func (count: U32) => return do:
@@ -220,25 +220,25 @@ Deno.test("rolling input and reducer effects keep pull order and no prefetch", a
     `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-type Input is data = #Input {index: U32, count: U32, pull: U32 -> U32 ! {Foreign}}
+type Input is data = $Input {index: U32, count: U32, pull: U32 -> U32 ! {Foreign}}
 const Input.iter = func (cursor: Input) => return do:
   use cursor.pull 777
   break cursor
 const Input.next = func (cursor: Input) => return do:
   use value <- cursor.pull cursor.index
   if @u32.eq cursor.index cursor.count:
-    break #Nothing
-  break #Some (value, #Input {index: @u32.add cursor.index 1, count: cursor.count, pull: cursor.pull})
+    break $Nothing
+  break $Some (value, $Input {index: @u32.add cursor.index 1, count: cursor.count, pull: cursor.pull})
 const add = func (left: U32) => return func (right: U32) => return @u32.add left right
 const inverse = func (value: U32) => return @u32.sub 0 value
 const sequential = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return do:
-  let values = #Input {index: 0, count, pull: host}
+  let values = $Input {index: 0, count, pull: host}
   let step = func total => return func value => return do:
     use observed <- host (@u32.add value 100)
     break @u32.add total (@u32.sub observed 100)
   break iter.collect_array (iter.take limit (rolling.fold step 0 width values))
-const monoid = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.monoid add 0 width (#Input {index: 0, count, pull: host})))
-const group = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.group add inverse 0 width (#Input {index: 0, count, pull: host})))
+const monoid = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.monoid add 0 width ($Input {index: 0, count, pull: host})))
+const group = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) => return func (count: U32) => return func (limit: U32) => return iter.collect_array (iter.take limit (rolling.group add inverse 0 width ($Input {index: 0, count, pull: host})))
 ` + ["sequential", "monoid", "group"].flatMap((name) => [
         `entry const ${name}_none = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 9 0`,
         `entry const ${name}_short = func (host: U32 -> U32 ! {Foreign}) => return ${name} host 3 2 9`,
@@ -306,14 +306,14 @@ const group = func (host: U32 -> U32 ! {Foreign}) => return func (width: U32) =>
 const foreignSource = `
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
-type Input is data = #Input {index: U32, pull: U32 -> U32 ! {Foreign}}
+type Input is data = $Input {index: U32, pull: U32 -> U32 ! {Foreign}}
 const Input.iter = func (cursor: Input) => return cursor
 const Input.next = func (cursor: Input) => return do:
   use value <- cursor.pull cursor.index
-  break #Some (#[value], #Input {index: @u32.add cursor.index 1, pull: cursor.pull})
+  break $Some (#[value], $Input {index: @u32.add cursor.index 1, pull: cursor.pull})
 const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
 entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
-  let windows = rolling.monoid combine #[] 3 (#Input {index: 0, pull: host})
+  let windows = rolling.monoid combine #[] 3 ($Input {index: 0, pull: host})
   break iter.collect_array (iter.map (func window => return @u32.add (@u32.add window[0] window[1]) window[2]) (iter.take 2 windows))
 `;
 
@@ -391,11 +391,11 @@ Deno.test("rolling request cancellation releases reference buffers and leaves bo
 import * as rolling from "std/rolling"
 import * as iter from "std/iter"
 type Tick is effect = { read: U32 -> U32 }
-type Input is data = #Input U32
+type Input is data = $Input U32
 const Input.iter = func cursor => return cursor
-const Input.next = func (#Input index) => return do:
+const Input.next = func ($Input index) => return do:
   use value <- Tick.read index
-  break #Some (#[value], #Input (@u32.add index 1))
+  break $Some (#[value], $Input (@u32.add index 1))
 const combine = func (left: Array U32) => return func (right: Array U32) => return @array.concat left right
 const cancel = func computation => return do:
   for request in @requests computation:
@@ -410,7 +410,7 @@ const cancel = func computation => return do:
 entry const run = func (count: U32) => return do:
   let total = 0
   for index in 0..count:
-    let work = @computation (func () => return iter.fold_left (func sum => return func value => return @u32.add sum value[0]) 0 (rolling.monoid combine #[] 3 (#Input 0)))
+    let work = @computation (func () => return iter.fold_left (func sum => return func value => return @u32.add sum value[0]) 0 (rolling.monoid combine #[] 3 ($Input 0)))
     total := @u32.add self (cancel work)
   break total
 entry const memory = func () : Array U32 => return #[]

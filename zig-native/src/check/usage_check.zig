@@ -696,7 +696,7 @@ fn Walker(comptime Engine: type) type {
                     var callee_source = node.a;
                     while (self.engine.tree.node(callee_source).tag == .group) callee_source = self.engine.tree.node(callee_source).a;
                     const callee_node = self.engine.tree.node(callee_source);
-                    if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.share") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@resource.release") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@demand") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@force"))) return self.expression(node.b, depth + 1);
+                    if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.share") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@resource.release") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@demand") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@demand"))) return self.expression(node.b, depth + 1);
                     if (node.tag == .apply and callee_node.tag == .intrinsic and (std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.read") or std.mem.eql(u8, self.engine.pool.get(callee_node.a), "@usage.length"))) {
                         var operand = node.b;
                         while (self.engine.tree.node(operand).tag == .group) operand = self.engine.tree.node(operand).a;

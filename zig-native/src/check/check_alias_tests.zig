@@ -9,9 +9,9 @@ fn law(allocator: std.mem.Allocator) !void {
         \\type Position = Vec2
         \\type Pair a = (a, a)
         \\type NumberPair = Pair U32
-        \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
+        \\type Vec2 is data = $Vec2 { x: F32, y: F32 }
         \\type Action a = Unit -> a ! {| e}
-        \\const position: Position = #Vec2 { x: 1.0, y: 2.0 }
+        \\const position: Position = $Vec2 { x: 1.0, y: 2.0 }
         \\const first = func (pair: NumberPair) => return @product.get pair 0
         \\const apply = func (action: Action U32) => return action ()
         \\entry const answer = func () => return first (42, 1)
@@ -44,7 +44,7 @@ test "recursive and invalid unused aliases fail explicitly" {
         "type Missing = Unknown\nentry const answer = 42\n",
         "type Missing = a\nentry const answer = 42\n",
         "type Pair a = (a, a)\nconst bad: Pair = ()\nentry const answer = 42\n",
-        "type Action a = Unit -> a ! {| e}\ntype Box is data = #Box (Action U32)\nentry const answer = 42\n",
+        "type Action a = Unit -> a ! {| e}\ntype Box is data = $Box (Action U32)\nentry const answer = 42\n",
         "type Action a = Unit -> a ! {| e}\ntype Read is effect = Unit -> (Action U32)\nentry const answer = 42\n",
     }) |source| {
         var tokens = try lexer.lex(allocator, source);

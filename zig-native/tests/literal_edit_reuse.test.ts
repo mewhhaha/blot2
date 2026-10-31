@@ -16,7 +16,7 @@ const edits: [string, string, string][] = [
   ["scalar", "@u32.add 20 21", "@u32.add 20 22"],
   ["ecs", "x: 10.0", "x: 11.0"],
   ["tags", "entry const answer: U32 = 20", "entry const answer: U32 = 21"],
-  ["monads", "#Some 40", "#Some 41"],
+  ["monads", "$Some 40", "$Some 41"],
   ["lists", "[1, 2, 3]", "[1, 2, 4]"],
   ["requests", "if value == 0", "if value == 1"],
   ["generic_effects", "reader 40", "reader 41"],
@@ -30,7 +30,7 @@ Deno.test("literal edits in public examples match fresh builds and keep unaffect
     const original = await Deno.readTextFile(entry);
     const edited = original.replaceAll(search, replace);
     assert.notEqual(edited, original, name);
-    const broken = `${original}\nconst broken_literal_probe: U32 = #Wrong\n`;
+    const broken = `${original}\nconst broken_literal_probe: U32 = $Wrong\n`;
     const options = { executable, entry, prelude, stdRoot };
     const retained = await createZigProjectCompiler(options);
     try {

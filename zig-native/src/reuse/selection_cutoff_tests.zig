@@ -11,10 +11,10 @@ const a = std.testing.allocator;
 const io = std.testing.io;
 
 const shapes =
-    \\type Box is data = #Box { value: U32 }
+    \\type Box is data = $Box { value: U32 }
     \\const Box.size = func (box: Box) : U32 => return @u32.add box.value 1
-    \\const Box.add = func (left: Box) => return func (right: Box) : Box => return #Box { value: @u32.add left.value right.value }
-    \\const Box.from = func (value: U32) : Box => return #Box { value: @u32.add value 1 }
+    \\const Box.add = func (left: Box) => return func (right: Box) : Box => return $Box { value: @u32.add left.value right.value }
+    \\const Box.from = func (value: U32) : Box => return $Box { value: @u32.add value 1 }
     \\const measure = func box => return box.size
     \\const combine = func left => return func right => return @type.call "add" left right
     \\const convert = func value => return @type.result "from" value
@@ -22,9 +22,9 @@ const shapes =
 ;
 const main =
     \\import {Box, measure, combine, convert, unrelated} from "./shapes"
-    \\entry const measured = func (value: U32) : U32 => return (#Box { value }).size
-    \\entry const generic = func (value: U32) : U32 => return measure (#Box { value })
-    \\entry const summed = func (value: U32) : U32 => return (combine (#Box { value }) (#Box { value: 2 })).value
+    \\entry const measured = func (value: U32) : U32 => return ($Box { value }).size
+    \\entry const generic = func (value: U32) : U32 => return measure ($Box { value })
+    \\entry const summed = func (value: U32) : U32 => return (combine ($Box { value }) ($Box { value: 2 })).value
     \\entry const converted = func (value: U32) : U32 => return do:
     \\  let box: Box = convert value
     \\  break box.value

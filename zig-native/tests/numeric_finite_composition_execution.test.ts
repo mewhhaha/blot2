@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-const library = `type Probe is data = #Probe U32
+const library = `type Probe is data = $Probe U32
 const copy = func (value: U32) => return value
 const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)
 const forwarded = func (value: U32) => return advance (copy value) 0
@@ -21,9 +21,9 @@ const lookup = func probe => return func (index: U32) => return do:
   break 0
 const lookup_unknown = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "unknown" probe index) (func (value: U32) => return value)) else 0
 const lookup_foreign = func probe => return func (callback: U32 -> U32 ! {Foreign}) => return @array.get #[8, 13] ((@type.call "foreign" probe 1) callback)
-const run = func (index: U32) => return lookup (#Probe 42) index
-const run_unknown = func (index: U32) => return lookup_unknown (#Probe 42) index
-const run_foreign = func callback => return lookup_foreign (#Probe 42) callback
+const run = func (index: U32) => return lookup ($Probe 42) index
+const run_unknown = func (index: U32) => return lookup_unknown ($Probe 42) index
+const run_foreign = func callback => return lookup_foreign ($Probe 42) callback
 `;
 const source = `import {run, run_unknown, run_foreign} from "./logic"
 entry const answer = func (index: U32) => return run index

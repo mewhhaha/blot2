@@ -50,7 +50,7 @@ test "typed holes report contextual functions and effects after solving" {
     for ([_]struct { source: []const u8, expected: []const u8 }{
         .{ .source = "entry const answer: U32 -> Bool ! {Foreign} = @hole\n", .expected = "(U32 -> Bool ! {Foreign})" },
         .{ .source = "entry const answer = func () => return @u32.add @hole 2\n", .expected = "U32" },
-        .{ .source = "type Box a is data = #Box a\nconst unused: Box U32 = @hole\nentry const answer = 42\n", .expected = "Box U32" },
+        .{ .source = "type Box a is data = $Box a\nconst unused: Box U32 = @hole\nentry const answer = 42\n", .expected = "Box U32" },
         .{ .source = "const unused: Array F32 = @hole\nentry const answer = 42\n", .expected = "Array F32" },
     }) |item| {
         var tokens = try lexer.lex(allocator, item.source);
@@ -98,7 +98,7 @@ test "typed hole graphs preserve nominal arguments, effect identities and generi
     const allocator = std.testing.allocator;
     const source =
         \\type Read a is effect = Unit -> a
-        \\type Box a is data = #Box a
+        \\type Box a is data = $Box a
         \\type Add a is contract = { associated "add" a a a }
         \\const unfinished: a -> a where { Add a } = func value => return do:
         \\  let other = value

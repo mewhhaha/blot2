@@ -110,9 +110,9 @@ const edits: [string, string, string][] = [
   [
     "syntax",
     "if left then @demand right else false",
-    "if left then (@demand right) && left else false",
+    "if left then (@demand right) and left else false",
   ],
-  ["monads", "#Some 40", "#Some (40 + 0)"],
+  ["monads", "$Some 40", "$Some (40 + 0)"],
 ];
 Deno.test("body edits in public examples match fresh builds", async () => {
   const hits: Record<string, number> = {};
@@ -121,7 +121,7 @@ Deno.test("body edits in public examples match fresh builds", async () => {
     const original = await Deno.readTextFile(entry);
     const edited = original.replaceAll(search, replace);
     assert.notEqual(edited, original, name);
-    const broken = `${original}\nconst broken_body_probe: U32 = #Wrong\n`;
+    const broken = `${original}\nconst broken_body_probe: U32 = $Wrong\n`;
     const options = { executable, entry, prelude, stdRoot };
     const retained = await createZigProjectCompiler(options);
     try {

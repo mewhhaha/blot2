@@ -699,7 +699,7 @@ test "principal gate rejects missing erased source metadata even when dependency
 }
 
 const selecting =
-    \\type Pair is data = #Pair { left: U32, right: U32 }
+    \\type Pair is data = $Pair { left: U32, right: U32 }
     \\entry const schema: U32 = 7
     \\entry const direct: U32 = schema
     \\entry const transitive: U32 = direct
@@ -938,7 +938,7 @@ const query_importer = @import("artifact_import.zig").Importer;
 
 test "semantic catalog identity survives body edits without granting executable owner identity" {
     const source =
-        \\data Box a = #Box a
+        \\type Box a is data = $Box a
         \\type Read a is effect = Unit -> a
         \\entry const schema = func (value: U32) : U32 => return @u32.add value 7
         \\entry const builder = func (value: U32) : U32 => return value
@@ -969,14 +969,14 @@ test "semantic catalog identity survives body edits without granting executable 
 
 test "semantic catalog admission rejects payload constructor and effect argument changes" {
     const old_source =
-        \\data Choice = #First (List U32) | #Second (Array U32)
+        \\type Choice is data = $First (List U32) | $Second (Array U32)
         \\type Read a is effect = Unit -> a
         \\entry const schema = func (value: U32) : U32 => return @u32.add value 7
     ;
     const cases = [_][]const u8{
-        "data Choice = #First (Array U32) | #Second (Array U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
-        "data Choice = #Second (Array U32) | #First (List U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
-        "data Choice = #First (List U32) | #Second (Array U32)\ntype Read a is effect = a -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
+        "type Choice is data = $First (Array U32) | $Second (Array U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
+        "type Choice is data = $Second (Array U32) | $First (List U32)\ntype Read a is effect = Unit -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
+        "type Choice is data = $First (List U32) | $Second (Array U32)\ntype Read a is effect = a -> a\nentry const schema = func (value: U32) : U32 => return @u32.add value 7\n",
     };
     var before = try Fixture.init(a, &.{old_source});
     defer before.deinit(a);
@@ -1279,10 +1279,10 @@ test "declaration principal projection preserves an unchanged sibling and reject
 
 test "declaration principal projection checks call arguments record destinations tags and binding metadata" {
     const source =
-        \\data Pair = #Pair { left: U32, right: U32 }
+        \\type Pair is data = $Pair { left: U32, right: U32 }
         \\entry const identity = func (value: U32) : U32 => return value
         \\entry const schema = func (value: U32) : U32 => return identity (@u32.add value 7)
-        \\entry const builder = func (value: U32) => return #Pair { left: value, right: 7 }
+        \\entry const builder = func (value: U32) => return $Pair { left: value, right: 7 }
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);

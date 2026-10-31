@@ -7,8 +7,8 @@ opaque type Box a = { value: a }
 private type Alias = U32
 private type Protocol a is contract = { type_rep a }
 private effect Hidden: Unit -> U32
-private entry const run = func (value: U32) => return #Token value
-const read = func (#Token value) => return value
+private entry const run = func (value: U32) => return $Token value
+const read = func ($Token value) => return value
 export { Token as Ticket, read } from "./tokens"
 
 ---

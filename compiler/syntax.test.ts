@@ -177,13 +177,13 @@ export {Token as Ticket, make} from "./tokens"
 private opaque type Token = U32
 opaque type Box a = {value: a}
 private type Alias = U32
-private type Choice is data = #Choice U32
+private type Choice is data = $Choice U32
 private type Read a is contract = {type_rep a}
 private effect Hidden: Unit -> U32
 private type HiddenFamily is effect = {ask: Unit -> U32}
 private const private = func opaque => return opaque
 private entry const exported = func export => return private export
-const unwrap = func (#Box value) => return value.value
+const unwrap = func ($Box value) => return value.value
 const typed = func (value: U32) => return value
 const ordinary = func opaque => return func private => return func export => return (opaque, private, export)
 export {Box} from "./tokens"
@@ -236,7 +236,7 @@ export {Box} from "./tokens"
         'private export {Token} from "./tokens"\n',
         'export * as tokens from "./tokens"\n',
         "private private const value = 42\n",
-        "opaque type Token is data = #Token U32\n",
+        "opaque type Token is data = $Token U32\n",
         'const value = 42\nimport {Token} from "./tokens"\n',
       ]
     ) throws(() => frontend.parse(text));
@@ -249,8 +249,8 @@ Deno.test("kinded declarations and applied effect rows preserve their CST shape"
   const frontend = await createFrontend();
   try {
     const root = frontend.parse(`
-data Old a = #Old a
-type Maybe a is data = #Some a | #Nothing
+type Old a is data = $Old a
+type Maybe a is data = $Some a | $Nothing
 type Get a is effect = Unit -> a
 type State a is effect = {
   get: Unit -> a,

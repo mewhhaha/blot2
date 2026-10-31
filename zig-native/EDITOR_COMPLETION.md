@@ -395,13 +395,13 @@ exact, x is incompatible. Without a known callback receiver, the query returns
 no invented receiver members and context/matches stay unknown.
 
 Import fixture `/p/library.blot` contains `const visible = 7`,
-`type Choice is data = #Picked U32 | #Empty`, and
+`type Choice is data = $Picked U32 | $Empty`, and
 `const helper = func value => return value`. All are public under current language rules:
 
 | Query                                                                                    | Required visibility                                                                    |
 | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `import { visible as renamed, Choice } from "./library"`, expression prefix `re<cursor>` | renamed appears; visible does not                                                      |
-| Same imports, constructor prefix `#Pi<cursor>`                                           | Picked is absent: differently named constructor was not imported                       |
+| Same imports, constructor prefix `$Pi<cursor>`                                           | Picked is absent: differently named constructor was not imported                       |
 | `import * as lib from "./library"`, `lib.<cursor>`                                       | visible and helper offered, preserving qualified lookup; no unqualified visible/helper |
 | Same namespace import, local `let lib = { local: 1 }`, then `lib.<cursor>`               | only receiver field local; namespace does not win                                      |
 | Namespace import plus type-position `const work: lib.Ch<cursor> = @hole`                 | Choice offered as type; insertion excludes lib.                                        |

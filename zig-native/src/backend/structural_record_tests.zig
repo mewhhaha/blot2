@@ -11,12 +11,12 @@ const types = @import("../check/types.zig");
 
 const source =
     \\type Point = { x: U32, y: F32 }
-    \\type Box a is data = #Box a
+    \\type Box a is data = $Box a
     \\const identity = func (point: Point) => return point
     \\const merge = func left => return func right => return @record.merge left right
     \\const source = merge { y: 2.0, x: false } { x: 40 }
     \\entry const answer = do:
-    \\  let #Box point = #Box (identity source)
+    \\  let $Box point = $Box (identity source)
     \\  point.x := @u32.add self 2
     \\  let { x } = point
     \\  break x

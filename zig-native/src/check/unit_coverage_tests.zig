@@ -35,7 +35,7 @@ test "Unit zero-arity variant matches sixteen actual constant runtime nested and
     }
 }
 test "Unit coverage constructor field specialization releases successful and failing allocations" {
-    const source = "type Pair is data = #Pair {token: Unit, value: (Unit, U32)}\nentry const answer = case #Pair {token: (), value: ((), 42)} of\n  #Pair {token: (), value: ((), result)} => result\n";
+    const source = "type Pair is data = $Pair {token: Unit, value: (Unit, U32)}\nentry const answer = case $Pair {token: (), value: ((), 42)} of\n  $Pair {token: (), value: ((), result)} => result\n";
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, checkSource, .{ source, true });
     const partial = "entry const answer = case ((), ((), 42)) of\n  ((), ((), 42)) => 42\n";
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, checkSource, .{ partial, false });

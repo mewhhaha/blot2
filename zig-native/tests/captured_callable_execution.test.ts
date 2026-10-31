@@ -3,28 +3,28 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 Deno.test("retained callable bound-method sync", async () => {
-  await compileAndRun("\ntype Box is data = #Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return invoke (#Box { value: 41 })\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return invoke ($Box { value: 41 })\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-method JSPI", async () => {
-  await compileAndRun("\ntype Box is data = #Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return invoke (#Box { value: 41 })\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("\ntype Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return invoke ($Box { value: 41 })\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
 });
 
 Deno.test("retained callable bound-snapshot sync", async () => {
-  await compileAndRun("data Box = #Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nentry const answer = func () => return do:\n  let box = #Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nentry const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 42);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-snapshot JSPI", async () => {
-  await compileAndRun("data Box = #Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nentry const answer = func () => return do:\n  let box = #Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("type Box is data = $Box { value: U32 }\nconst Box.plus = func box => return func delta => return @u32.add box.value delta\nentry const answer = func () => return do:\n  let box = $Box { value: 41 }\n  let bound = box.plus\n  box.value := 99\n  break bound 1\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 42);
   }, { prelude: "none", asynchronous: true });
@@ -45,14 +45,14 @@ Deno.test("retained callable captured-snapshot JSPI", async () => {
 });
 
 Deno.test("retained callable bound-cache-nominals sync", async () => {
-  await compileAndRun("data First = #First { value: U32 }\ndata Second = #Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(guest.call("answer", null), 83);
   }, { prelude: "none", asynchronous: false });
 });
 
 Deno.test("retained callable bound-cache-nominals JSPI", async () => {
-  await compileAndRun("data First = #First { value: U32 }\ndata Second = #Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst Second.plus = func box => return func delta => return @u32.add box.value (@u32.mul delta 2)\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 83);
     for (let count = 0; count < 100; count++) equal(await guest.callAsync("answer", null), 83);
   }, { prelude: "none", asynchronous: true });
@@ -123,7 +123,7 @@ Deno.test("retained callable captured-original JSPI", async () => {
 });
 
 Deno.test("retained callable rejects bound-cache-missing", async () => {
-  await compileExpectedFailure("data First = #First { value: U32 }\ndata Second = #Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))\nentry const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [362, 368] });
+  await compileExpectedFailure("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nentry const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [386, 392] });
 });
 
 Deno.test("retained callable rejects captured-wrong-row", async () => {
@@ -141,12 +141,12 @@ Deno.test("retained callable rejects captured-unknown-source", async () => {
 Deno.test("curried callable environments stay owned until consumption and retire after each invocation", async () => {
   await compileAndRun(
     `
-type Box is data = #Box { value: U32 }
+type Box is data = $Box { value: U32 }
 const Box.plus = func box => return func delta => return @u32.add box.value delta
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = func box => return do:
   let bound = box.plus
   break bound 1
-entry const answer = func (value: U32) => return invoke (#Box { value: value })
+entry const answer = func (value: U32) => return invoke ($Box { value: value })
 entry const memory = func () : Array U32 => return #[]
 `,
     (_guest, bytes) => {

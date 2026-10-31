@@ -26,8 +26,8 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return module;
 }
 
-const entry_cycle = "type Box is data = #Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = func () => return pick (#Box 1)\n";
-const entry_valid = "type Left is data = #Left U32\ntype Right is data = #Right U32\nconst Left.read = func value => return second\nconst Right.read = func value => return first\nconst pick = func value => return value.read\nlet first: U32 = pick (#Left 1)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return pick (#Left 1)\n";
+const entry_cycle = "type Box is data = $Box U32\nconst Box.read = func value => return second\nconst pick = func value => return value.read\nlet second: U32 = second\nentry const answer: Unit -> U32 = func () => return pick ($Box 1)\n";
+const entry_valid = "type Left is data = $Left U32\ntype Right is data = $Right U32\nconst Left.read = func value => return second\nconst Right.read = func value => return first\nconst pick = func value => return value.read\nlet first: U32 = pick ($Left 1)\nlet second: U32 = 42\nentry const answer: Unit -> U32 = func () => return pick ($Left 1)\n";
 
 fn selectedEntry(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var session = try eval.Session.init(allocator, &.{module.*});

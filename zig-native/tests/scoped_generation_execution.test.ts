@@ -5,9 +5,9 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type State a is effect = {get: Unit -> a, set: a -> Unit}
-type Application is data = #Application {reset: Unit -> U32}
+type Application is data = $Application {reset: Unit -> U32}
 const reset_scoped = func application => return func () => return do:
-  let #Application {reset} = application
+  let $Application {reset} = application
   break reset ()
 const choose = func flag => return func (left: State a) => return func (right: State a) => return if flag then left else right
 const forward = func flag => return func (left: State a) => return func (right: State a) => return choose flag left right
@@ -36,7 +36,7 @@ const bundle = func flag => return func (left: State a) => return func (right: S
 `;
 const main =
   `import {State, choose, forward, freeze, bundle, staged, returned_forward, Application, reset_scoped, call, call_second, partial, wide, wide16, twice, invoke_input, bury_input, input_identity, input_first, input_box, input_project} from "./generation"
-entry const pattern_capture = func () => return reset_scoped (#Application {reset: func () => return 42}) ()
+entry const pattern_capture = func () => return reset_scoped ($Application {reset: func () => return 42}) ()
 entry const answer = func (host: U32 -> U32 ! {Foreign}) => return @effect.scope (func (left: State U32) => return @effect.scope (func (right: State U32) => return do:
   let first = bundle true left right 7
   let second = bundle false left right 100

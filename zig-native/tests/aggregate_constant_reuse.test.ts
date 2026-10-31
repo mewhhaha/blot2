@@ -21,13 +21,13 @@ Deno.test("retained callers relocate aggregate constants through movement, traps
   const source = (prefix: string, tail: string, other: string) =>
     `import * as dep from "./dep"
 ${prefix}const table: Array U32 = #[10, 20, ${tail}]
-type Pair is data = #Pair { left: U32, right: U32 }
-const pair = #Pair { left: 20, right: 22 }
+type Pair is data = $Pair { left: U32, right: U32 }
+const pair = $Pair { left: 20, right: 22 }
 const aliased = (table, table)
 const other = ${other}
 entry const pick = func (i: U32) => return table[i]
 entry const first = func () => return do:
-  let #Pair { left, right } = pair
+  let $Pair { left, right } = pair
   break @u32.add left right
 entry const sum_alias = func (i: U32) => return do:
   let (left, right) = aliased

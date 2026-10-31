@@ -206,7 +206,7 @@ pub const Session = struct {
         for (candidate.modules.items) |*module| {
             if (module.definition.kind == .reference) {
                 for (candidate.resources.items) |resource| if (std.mem.eql(u8, resource.path, module.canonical) and std.mem.eql(u8, resource.mediaType, module.definition.mediaType.?)) {
-                    module.source = try a.print("type {s} is data = #{s} U32\nconst {s}: {s} = (#{s} {d})\n", .{ module.definition.type.?, module.definition.type.?, module.definition.@"export".?, module.definition.type.?, module.definition.type.?, resource.id });
+                    module.source = try a.print("type {s} is data = ${s} U32\nconst {s}: {s} = (${s} {d})\n", .{ module.definition.type.?, module.definition.type.?, module.definition.@"export".?, module.definition.type.?, module.definition.type.?, resource.id });
                     break;
                 };
             }

@@ -5,14 +5,14 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const executable = Deno.args[0];
 assert(executable);
 const initial = "opaque type Token = U32\nopaque type Other = U32\n" +
-  "const make: U32 -> Token = func value => return #Token value\n" +
-  "const make_other: U32 -> Other = func value => return #Other value\n" +
-  "const Token.read: Token -> U32 = func (#Token value) => return value\n" +
-  "const Other.read: Other -> U32 = func (#Other value) => return @u32.add value 1\n";
+  "const make: U32 -> Token = func value => return $Token value\n" +
+  "const make_other: U32 -> Other = func value => return $Other value\n" +
+  "const Token.read: Token -> U32 = func ($Token value) => return value\n" +
+  "const Other.read: Other -> U32 = func ($Other value) => return @u32.add value 1\n";
 const variants = [
   initial,
   "private const unrelated = 99\n" + initial,
-  "private type Spare is data = #Spare U32\n" + initial,
+  "private type Spare is data = $Spare U32\n" + initial,
   initial.replaceAll("value", "item"),
   initial,
 ];
@@ -125,8 +125,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
           for (
             const changed of [
               initial.replace(
-                "const Token.read: Token -> U32 = func (#Token value) => return value",
-                "const Token.read: Token -> F32 = func (#Token value) => return @u32.to_f32 value",
+                "const Token.read: Token -> U32 = func ($Token value) => return value",
+                "const Token.read: Token -> F32 = func ($Token value) => return @u32.to_f32 value",
               ),
               initial.replace("const Token.read", "private const Token.read"),
             ]

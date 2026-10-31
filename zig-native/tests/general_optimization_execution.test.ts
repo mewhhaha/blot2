@@ -4,21 +4,21 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("user-defined checked edits and nested paths retain snapshots across early exits", async () => {
   await compileAndRun(
     `
-type Outcome a is data = #Updated a | #Refused
+type Outcome a is data = $Updated a | $Refused
 const replace_if = func index => return func value => return func values => return do:
   if index < @array.length values:
-    break #Updated (@array.set values index value)
-  break #Refused
-type Store is data = #Store { left: Array U32, right: Array U32 }
+    break $Updated (@array.set values index value)
+  break $Refused
+type Store is data = $Store { left: Array U32, right: Array U32 }
 entry const checked = func (count: U32) => return do:
   let values = @array.fill count 0
   for i in 0..(count + 1):
-    let #Updated next = replace_if i (i + 1) values else:
+    let $Updated next = replace_if i (i + 1) values else:
       break values
     values := next
   break values
 entry const nested = func (count: U32) => return do:
-  let store = #Store { left: @array.fill count 0, right: @array.fill count 1 }
+  let store = $Store { left: @array.fill count 0, right: @array.fill count 1 }
   for i in 0..count:
     if i == 2049:
       break
@@ -35,7 +35,7 @@ entry const forever = func (count: U32) => return do:
   break values
 entry const versions = func () => return do:
   let leaf = #[1, 2]
-  let store = #Store { left: leaf, right: leaf }
+  let store = $Store { left: leaf, right: leaf }
   let saved = func () => return store.left[0]
   for i in 0..2:
     store.left[i] := 9
@@ -86,21 +86,21 @@ entry const after_break = func () => return do:
 Deno.test("scalar replacement preserves record loop versions, branches and mixed scalar bits", async () => {
   await compileAndRun(
     `
-type Pair is data = #Pair { count: U32, value: F32 }
-const advance = func pair => return #Pair { count: pair.count + 1, value: pair.value + 0.25 }
+type Pair is data = $Pair { count: U32, value: F32 }
+const advance = func pair => return $Pair { count: pair.count + 1, value: pair.value + 0.25 }
 entry const iterate = func (count: U32) => return do:
-  let value = #Pair { count: 0, value: -0.5 }
+  let value = $Pair { count: 0, value: -0.5 }
   let previous = value
   for i in 0..count:
     previous := value
     value := advance value
   break #[F32.from value.count, value.value, F32.from previous.count, previous.value]
 entry const branch = func (flag: Bool) => return do:
-  let original = #Pair { count: 7, value: -0.0 }
-  let changed = if flag then advance original else #Pair { count: 3, value: 1.5 }
+  let original = $Pair { count: 7, value: -0.0 }
+  let changed = if flag then advance original else $Pair { count: 3, value: 1.5 }
   break #[F32.from original.count, original.value, F32.from changed.count, changed.value]
 entry const captured = func () => return do:
-  let value = #Pair { count: 1, value: 1.0 }
+  let value = $Pair { count: 1, value: 1.0 }
   let read = func () => return value.count
   value := advance value
   break read () + value.count
@@ -138,16 +138,16 @@ entry const captured = func () => return do:
 Deno.test("user constructor demand matches and known callbacks preserve effects and lexical captures", async () => {
   await compileAndRun(
     `
-type Choice a is data = #Chosen a | #Absent
+type Choice a is data = $Chosen a | $Absent
 const select = func ~(fallback: U32) => return func choice => return case choice of
-  #Chosen value if @u32.lt 0 value => value
-  #Chosen _ => @u32.add (@demand fallback) (@demand fallback)
-  #Absent => @demand fallback
+  $Chosen value if @u32.lt 0 value => value
+  $Chosen _ => @u32.add (@demand fallback) (@demand fallback)
+  $Absent => @demand fallback
 const generate = func count => return func callback => return @array.generate count callback
 entry const demand = func (host: U32 -> U32 ! {Foreign}) => return do:
-  use a <- select (host 10) (#Chosen 42)
-  use b <- select (host 11) (#Chosen 0)
-  use c <- select (host 12) #Absent
+  use a <- select (host 10) ($Chosen 42)
+  use b <- select (host 11) ($Chosen 0)
+  use c <- select (host 12) $Absent
   break #[a, b, c]
 entry const callback = func (host: U32 -> U32 ! {Foreign}) => return do:
   use amount <- host 10

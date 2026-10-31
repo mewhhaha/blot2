@@ -9,7 +9,7 @@ const core = @import("../check/core.zig");
 const backend = @import("../backend/core_backend.zig");
 const format = @import("dependency_format.zig");
 const a = std.testing.allocator;
-const input = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer: Unit -> U32 = func () => return (#Box 1).read ()\n";
+const input = "type Box is data = $Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer: Unit -> U32 = func () => return ($Box 1).read ()\n";
 const native_message = "cannot unify (Unit -> U32 ! {| ?e2}) with U32";
 
 const Observation = struct {
@@ -96,9 +96,9 @@ test "member token origin survives independent prefix text and whitespace withou
     const prefix = "// unrelated offset\nconst unrelated = 99\n";
     const shifted = prefix ++ input;
     try compileScenario(a, shifted, prefix.len + 128);
-    const spaced = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.  read\nentry const answer: Unit -> U32 = func () => return (#Box 1).read ()\n";
+    const spaced = "type Box is data = $Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.  read\nentry const answer: Unit -> U32 = func () => return ($Box 1).read ()\n";
     try compileScenario(a, spaced, 130);
-    const unused = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer = 42\n";
+    const unused = "type Box is data = $Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\nentry const answer = 42\n";
     var module = try lower(a, unused);
     defer module.deinit(a);
     var result = try backend.compile(a, &.{module}, 1);
@@ -107,10 +107,10 @@ test "member token origin survives independent prefix text and whitespace withou
     try std.testing.expect(result.bytes.len > 8);
 }
 test "a demanded body mismatch follows caller order and does not replace a prior owned diagnostic" {
-    const definitions = "type Box is data = #Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\n" ++
-        "type Other is data = #Other U32\nconst Other.read: Other -> (Unit -> F32) where {} = func (value: Other) => return func () => return value.read\n";
-    const first_box = definitions ++ "entry const first: Unit -> U32 = func () => return (#Box 1).read ()\nentry const second: Unit -> F32 = func () => return (#Other 1).read ()\n";
-    const first_other = definitions ++ "entry const second: Unit -> F32 = func () => return (#Other 1).read ()\nentry const first: Unit -> U32 = func () => return (#Box 1).read ()\n";
+    const definitions = "type Box is data = $Box U32\nconst Box.read: Box -> (Unit -> U32) where {} = func (value: Box) => return func () => return value.read\n" ++
+        "type Other is data = $Other U32\nconst Other.read: Other -> (Unit -> F32) where {} = func (value: Other) => return func () => return value.read\n";
+    const first_box = definitions ++ "entry const first: Unit -> U32 = func () => return ($Box 1).read ()\nentry const second: Unit -> F32 = func () => return ($Other 1).read ()\n";
+    const first_other = definitions ++ "entry const second: Unit -> F32 = func () => return ($Other 1).read ()\nentry const first: Unit -> U32 = func () => return ($Box 1).read ()\n";
     for ([_][]const u8{ first_box, first_other }, 0..) |source, index| {
         var module = try lower(a, source);
         defer module.deinit(a);

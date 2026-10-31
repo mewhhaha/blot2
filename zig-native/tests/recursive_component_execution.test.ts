@@ -42,24 +42,24 @@ entry const floating: U32 -> F32 = func depth => return repeat 1.5 depth
 });
 
 Deno.test("late selected recursive methods terminate and rejected leaves can be corrected", async () => {
-  const source = `type Seed is data = #Seed
-type Box a is data = #Box a
-const Seed.build: a -> Seed -> Box a = func value => return func seed => return #Box value
-const wrap = func value => return @type.call "build" value #Seed
+  const source = `type Seed is data = $Seed
+type Box a is data = $Box a
+const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
+const wrap = func value => return @type.call "build" value $Seed
 const parent: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else (wrap value).read
 const Box.read: Box U32 -> U32 = func box => return case box of
-  #Box value => parent (@u32.sub value 1)
+  $Box value => parent (@u32.sub value 1)
 entry const run: U32 -> U32 = func value => return parent value
 `;
   for (
     const body of [
-      "  #Box value => parent (@u32.sub value 1)",
-      "  #Box value => do:\n    let next = @u32.sub value 1\n    break parent next",
-      "  #Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)",
+      "  $Box value => parent (@u32.sub value 1)",
+      "  $Box value => do:\n    let next = @u32.sub value 1\n    break parent next",
+      "  $Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)",
     ]
   ) {
     const selected = source.replace(
-      "  #Box value => parent (@u32.sub value 1)",
+      "  $Box value => parent (@u32.sub value 1)",
       body,
     );
     await compileExpectedFailure(
@@ -92,11 +92,11 @@ Deno.test("unresolved diamonds retain invalid witness diagnostics before budget 
 
 Deno.test("queued associated methods preserve left dispatch priority", async () => {
   await compileAndRun(
-    `type L is data = #L U32
-type R is data = #R U32
-type X is data = #X U32
-const prime = @type.call "merge" (#X 1) (#R 2)
-entry const answer: U32 = @type.call "merge" (#L 1) (#R 2)
+    `type L is data = $L U32
+type R is data = $R U32
+type X is data = $X U32
+const prime = @type.call "merge" ($X 1) ($R 2)
+entry const answer: U32 = @type.call "merge" ($L 1) ($R 2)
 const L.merge: L -> R -> U32 = func left => return func right => return 1
 const R.merge: a -> R -> F32 = func left => return func right => return 1.0
 `,

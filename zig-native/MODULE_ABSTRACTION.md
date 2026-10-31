@@ -88,8 +88,8 @@ Use ordinary constructor application and matching inside the defining module:
 
 ```blot
 opaque type Token = U32
-const make: U32 -> Token = func value => return #Token value
-const read: Token -> U32 = func (#Token value) => return value
+const make: U32 -> Token = func value => return $Token value
+const read: Token -> U32 = func ($Token value) => return value
 ```
 
 The constructor is total over exactly the checked representation. It is always
@@ -203,8 +203,8 @@ same public identity:
 // tokens.blot
 opaque type Token = U32
 private const offset = 1
-const make: U32 -> Token = func value => return #Token (value + offset)
-const read: Token -> U32 = func (#Token value) => return value
+const make: U32 -> Token = func value => return $Token (value + offset)
+const read: Token -> U32 = func ($Token value) => return value
 
 // facade.blot
 export { Token as Ticket, make, read } from "./tokens"
@@ -221,7 +221,7 @@ entry const answer = facade.read forwarded
 ```
 
 The result is 42. Importing offset, importing/re-exporting the hidden Token
-constructor, matching `#Token` in main, or passing 42 where Ticket is expected
+constructor, matching `$Token` in main, or passing 42 where Ticket is expected
 must reject at that use. A different module's `opaque type Token = U32` remains
 a distinct type, even through a same-spelled forwarding alias.
 
@@ -264,7 +264,7 @@ The tests below are requirements for 052–053, not observed compiler behavior:
 | Existing modules with no new syntax                                          | Same visibility, diagnostics, type graphs and guest behavior                               |
 | Import public make/read/Token and round-trip 42                              | Result 42; no wrapper allocation/tag; Token remains distinct from U32                      |
 | Import private constructor or access opaque payload field                    | Positioned private-access error; no payload graph in details/completion                    |
-| Match `#Token` in an importer, alias or re-export client                     | Private-access error at the constructor use                                                |
+| Match `$Token` in an importer, alias or re-export client                     | Private-access error at the constructor use                                                |
 | Namespace alias and two re-export hops                                       | Same producer identity and privacy; no constructor imported with the type                  |
 | Two producer modules each declare opaque Token                               | Their values fail to unify; same spelling never merges identities                          |
 | Export a signature mentioning private InternalToken                          | Reject private identity escape before publication                                          |

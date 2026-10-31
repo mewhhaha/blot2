@@ -36,11 +36,11 @@ const Fixture = struct {
 };
 pub const records_source =
     \\infixl 60 (+) = _fixity_add
-    \\type Vec2 is data = #Vec2 { x: F32, y: F32 }
+    \\type Vec2 is data = $Vec2 { x: F32, y: F32 }
     \\const sum = func point => return do:
-    \\  let #Vec2 { x, y } = point
+    \\  let $Vec2 { x, y } = point
     \\  break x + y
-    \\const origin = #Vec2 { y: 2.0, x: 20.0 }
+    \\const origin = $Vec2 { y: 2.0, x: 20.0 }
     \\entry const answer = func () : F32 => return sum origin
     \\entry const projected = func () : F32 => return origin.x
     \\entry const tuple = func () : U32 => return @product.get (20, 22) 1
@@ -71,17 +71,17 @@ test "nominal record source has canonical field order and independently owned co
 }
 test "generic nominal payloads and shaped annotations retain principal variables across scalar uses" {
     var f = try Fixture.init(
-        \\type Box a is data = #Box a
-        \\type Pair [left, right] is data = #Pair (left, right)
+        \\type Box a is data = $Box a
+        \\type Pair [left, right] is data = $Pair (left, right)
         \\const unbox = func box => return do:
-        \\  let #Box value = box
+        \\  let $Box value = box
         \\  break value
         \\const first = func (pair: Pair [U32, a]) => return do:
-        \\  let #Pair (value, _) = pair
+        \\  let $Pair (value, _) = pair
         \\  break value
-        \\entry const integer = func () => return unbox (#Box 42)
-        \\entry const floating = func () => return unbox (#Box 1.25)
-        \\entry const paired = func () => return first (#Pair (42, true))
+        \\entry const integer = func () => return unbox ($Box 42)
+        \\entry const floating = func () => return unbox ($Box 1.25)
+        \\entry const paired = func () => return first ($Pair (42, true))
     );
     defer f.deinit();
     try f.valid();
@@ -90,9 +90,9 @@ test "generic nominal payloads and shaped annotations retain principal variables
 }
 test "record constructor diagnostics retain duplicate missing and wrong nominal identity" {
     for ([_]struct { source: []const u8, code: check.Code }{
-        .{ .source = "type P is data = #P {x:U32,y:U32}\nentry const x=#P {x:1,x:2,y:3}\n", .code = .duplicate_record_field },
-        .{ .source = "type P is data = #P {x:U32,y:U32}\nentry const x=#P {x:1}\n", .code = .missing_record_field },
-        .{ .source = "type P is data = #P U32\ntype Q is data = #Q U32\nentry const x:P=#Q 1\n", .code = .type_mismatch },
+        .{ .source = "type P is data = $P {x:U32,y:U32}\nentry const x= $P {x:1,x:2,y:3}\n", .code = .duplicate_record_field },
+        .{ .source = "type P is data = $P {x:U32,y:U32}\nentry const x= $P {x:1}\n", .code = .missing_record_field },
+        .{ .source = "type P is data = $P U32\ntype Q is data = $Q U32\nentry const x:P= $Q 1\n", .code = .type_mismatch },
     }) |case_| {
         var f = try Fixture.init(case_.source);
         defer f.deinit();
@@ -105,8 +105,8 @@ test "record constructor diagnostics retain duplicate missing and wrong nominal 
 }
 test "array element projections retain nominal result through unary primitive applications" {
     var f = try Fixture.init(
-        \\type Box is data = #Box { x: U32 }
-        \\const values = #[#Box { x: 40 }, #Box { x: 2 }]
+        \\type Box is data = $Box { x: U32 }
+        \\const values = #[$Box { x: 40 }, $Box { x: 2 }]
         \\entry const answer = @u32.add (@array.get values 0).x (@array.get values 1).x
     );
     defer f.deinit();
@@ -116,14 +116,14 @@ test "array element projections retain nominal result through unary primitive ap
 test "deferred fields and associated operators remain principal across distinct nominal uses" {
     var f = try Fixture.init(
         \\infixl 60 (+) = _fixity_add
-        \\type Point is data = #Point {x:U32}
-        \\type FloatPoint is data = #FloatPoint {x:F32}
-        \\const Point.add = func left => return func right => return #Point {x: @u32.add left.x right.x}
+        \\type Point is data = $Point {x:U32}
+        \\type FloatPoint is data = $FloatPoint {x:F32}
+        \\const Point.add = func left => return func right => return $Point {x: @u32.add left.x right.x}
         \\const coordinate = func point => return point.x
         \\const plus = func left => return func right => return left + right
-        \\entry const integer = coordinate (#Point {x:42})
-        \\entry const floating = coordinate (#FloatPoint {x:1.25})
-        \\entry const aggregate = (plus (#Point {x:20}) (#Point {x:22})).x
+        \\entry const integer = coordinate ($Point {x:42})
+        \\entry const floating = coordinate ($FloatPoint {x:1.25})
+        \\entry const aggregate = (plus ($Point {x:20}) ($Point {x:22})).x
         \\entry const scalar = plus 20 22
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
@@ -146,11 +146,11 @@ test "deferred fields and associated operators remain principal across distinct 
 test "associated binary admission checks ordered operands and does not backtrack on chosen result" {
     var admitted = try Fixture.init(
         \\infixl 60 (+) = _fixity_add
-        \\type Left is data = #Left U32
-        \\type Right is data = #Right U32
+        \\type Left is data = $Left U32
+        \\type Right is data = $Right U32
         \\const Left.add = func (left:Left) => return func (right:Left) => return 1
         \\const Right.add = func (left:Left) => return func (right:Right) => return 42
-        \\entry const answer = #Left 1 + #Right 2
+        \\entry const answer = $Left 1 + $Right 2
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer admitted.deinit();
@@ -172,11 +172,11 @@ test "associated binary admission checks ordered operands and does not backtrack
     try std.testing.expect(selected);
     var rejected = try Fixture.init(
         \\infixl 60 (+) = _fixity_add
-        \\type Left is data = #Left U32
-        \\type Right is data = #Right U32
+        \\type Left is data = $Left U32
+        \\type Right is data = $Right U32
         \\const Left.add = func (left:Left) => return func (right:Right) => return 1
         \\const Right.add = func (left:Left) => return func (right:Right) => return 42.0
-        \\entry const answer:F32 = #Left 1 + #Right 2
+        \\entry const answer:F32 = $Left 1 + $Right 2
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     );
     defer rejected.deinit();
@@ -217,12 +217,12 @@ test "panic literals type check in unused functions without executing and preser
 
 fn nominalAllocationScenario(allocator: std.mem.Allocator) !void {
     const source =
-        \\type Point a is data = #Point {x:a}
-        \\const Point.combine = func left => return func right => return #Point {x:@u32.add left.x right.x}
+        \\type Point a is data = $Point {x:a}
+        \\const Point.combine = func left => return func right => return $Point {x:@u32.add left.x right.x}
         \\const combine = func left => return func right => return @type.call "combine" left right
         \\const coordinate = func point => return point.x
         \\entry const answer = do:
-        \\  let point = combine (#Point {x:20}) (#Point {x:21})
+        \\  let point = combine ($Point {x:20}) ($Point {x:21})
         \\  point.x := @u32.add self 1
         \\  break coordinate point
     ;
@@ -247,20 +247,20 @@ test "latent staged callback intermediates are fresh per scalar evidence use" {
         \\infixl 60 (+) = _fixity_add
         \\const U32.add = func left => return func right => return @u32.add left right
         \\const F32.add = func left => return func right => return @f32.add left right
-        \\type Builder callback is data = #Builder {run:callback}
+        \\type Builder callback is data = $Builder {run:callback}
         \\const add_step = func amount => return func builder => return do:
-        \\  let #Builder {run:previous} = builder
-        \\  break #Builder {run:func value => return previous value + amount}
+        \\  let $Builder {run:previous} = builder
+        \\  break $Builder {run:func value => return previous value + amount}
         \\const make = func amount => return do:
-        \\  let builder = #Builder {run:func value => return value}
+        \\  let builder = $Builder {run:func value => return value}
         \\  builder := add_step amount self
         \\  builder := add_step amount self
         \\  break builder
         \\entry const integer = func () => return do:
-        \\  let #Builder {run} = make 10
+        \\  let $Builder {run} = make 10
         \\  break run 22
         \\entry const floating = func () => return do:
-        \\  let #Builder {run} = make 1.5
+        \\  let $Builder {run} = make 1.5
         \\  break run 39.0
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
         \\entry const integer_result: U32 = integer ()
@@ -340,9 +340,9 @@ test "missing named dispatch remains an owned predicate in an unreachable typed 
 }
 
 const indexed_update_source =
-    \\type Box is data = #Box {x:U32}
+    \\type Box is data = $Box {x:U32}
     \\entry const answer = func () => return do:
-    \\  let values = #[#Box {x:20}, #Box {x:21}]
+    \\  let values = #[$Box {x:20}, $Box {x:21}]
     \\  let original = values
     \\  values[@u32.sub (@array.length self) 1].x := @u32.add self 1
     \\  break @u32.add original[1].x values[1].x

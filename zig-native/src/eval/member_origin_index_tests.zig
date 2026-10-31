@@ -7,14 +7,14 @@ const core = @import("../check/core.zig");
 const evaluator = @import("core_eval.zig");
 const a = std.testing.allocator;
 
-const unique_definitions = "type Leaf is data = #Leaf {value: U32}\n" ++
-    "type Box is data = #Box {inner: Leaf}\n" ++
-    "const root = #Box {inner: #Leaf {value: 42}}\n";
+const unique_definitions = "type Leaf is data = $Leaf {value: U32}\n" ++
+    "type Box is data = $Box {inner: Leaf}\n" ++
+    "const root = $Box {inner: $Leaf {value: 42}}\n";
 const unique = unique_definitions ++ "entry const answer = root.inner.value\n";
 const spaced = unique_definitions ++ "entry const answer = root. inner.  value\n";
-const repeated = "type Leaf is data = #Leaf {same: U32}\n" ++
-    "type Box is data = #Box {same: Leaf}\n" ++
-    "const root = #Box {same: #Leaf {same: 42}}\n" ++
+const repeated = "type Leaf is data = $Leaf {same: U32}\n" ++
+    "type Box is data = $Box {same: Leaf}\n" ++
+    "const root = $Box {same: $Leaf {same: 42}}\n" ++
     "entry const answer = root.same.same\n";
 
 fn pathScenario(allocator: std.mem.Allocator, source: []const u8, expected: [2]u32) !void {

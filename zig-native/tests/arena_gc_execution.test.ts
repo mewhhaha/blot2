@@ -4,23 +4,23 @@ import { compileAndRun, equal } from "./compile_helpers.ts";
 Deno.test("state and memoized demands can form cycles that must be reclaimed after their scope", async () => {
   await compileAndRun(`
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Node is data = #End | #Next (Unit -> Node ! {State.get Node})
+type Node is data = $End | $Next (Unit -> Node ! {State.get Node})
 const keep = func ~value => return func () => return @demand value
 const get = func (witness: Unit -> a) : a => return State.get ()
 const cycle = func (seed: U32) => return do:
-  let (_, result) = @effect.run State.get State.set #End (func () => return do:
-    let delayed = keep (get (func () => return #End))
-    use State.set (#Next delayed)
+  let (_, result) = @effect.run State.get State.set $End (func () => return do:
+    let delayed = keep (get (func () => return $End))
+    use State.set ($Next delayed)
     use first <- delayed ()
-    use State.set #End
+    use State.set $End
     use cached <- delayed ()
     break case cached of
-      #End => @panic "the demand lost its memoized cycle"
-      #Next same => do:
+      $End => @panic "the demand lost its memoized cycle"
+      $Next same => do:
         use again <- same ()
         break case again of
-          #End => @panic "the retained closure lost its memo"
-          #Next _ => seed
+          $End => @panic "the retained closure lost its memo"
+          $Next _ => seed
   )
   break result
 entry const run = func (count: U32) => return do:

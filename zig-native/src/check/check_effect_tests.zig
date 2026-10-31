@@ -165,7 +165,7 @@ test "retained row certificate publication releases every failed allocation" {
 fn ambientReadScenario(allocator: std.mem.Allocator) !void {
     const text =
         \\const ignore = func ~value => return 42
-        \\const force = func ~value => return @force value
+        \\const force = func ~value => return @demand value
         \\entry const ignored = ignore (read ())
         \\entry const forced = func () => return force (read ())
     ;
@@ -240,10 +240,10 @@ test "pure initializer and callback constraints retain their distinct effect dia
 }
 test "anonymous pure witnesses get exact certificates while callback connected lambdas stay open" {
     const text =
-        \\type Phantom a is data = #Phantom
+        \\type Phantom a is data = $Phantom
         \\const same = func left => return func right => return @type.same left right
         \\const invoke = func callback => return callback ()
-        \\entry const answer = same (func () : Phantom U32 => return #Phantom) (func () : Phantom F32 => return #Phantom)
+        \\entry const answer = same (func () : Phantom U32 => return $Phantom) (func () : Phantom F32 => return $Phantom)
     ;
     var tokens = try lexer.lex(a, text);
     defer tokens.deinit(a);
@@ -277,12 +277,12 @@ test "anonymous pure witnesses get exact certificates while callback connected l
 test "immediate binary unary and result associated selections publish their actual invocation rows" {
     const text =
         \\infixl 60 (+) = _fixity_add
-        \\type N is data = #N U32
+        \\type N is data = $N U32
         \\const N.add = func left => return func right => return read ()
         \\const N.get = func value => return read ()
-        \\const N.make = func () => return #N (read ())
-        \\entry const binary = func () => return #N 1 + #N 2
-        \\entry const unary = func () => return (#N 1).get
+        \\const N.make = func () => return $N (read ())
+        \\entry const binary = func () => return $N 1 + $N 2
+        \\entry const unary = func () => return ($N 1).get
         \\entry const result = func () : N => return @type.result "make" ()
         \\const _fixity_add = func left => return func right => return @type.call "add" left right
     ;
@@ -360,7 +360,7 @@ fn sourceOperationValues(allocator: std.mem.Allocator) !void {
         \\effect Counter: Unit -> U32
         \\type Reader a is effect = { ask: Unit -> a }
         \\type PairRead [left,right] is effect = { first: Unit -> left }
-        \\type Phantom a is data = #Phantom
+        \\type Phantom a is data = $Phantom
         \\const counter = Counter
         \\const ask = Reader.ask
         \\const read = func () : U32 => return ask ()
@@ -457,7 +457,7 @@ fn providerSource(allocator: std.mem.Allocator) !void {
         \\const provider = @effect.provider Read (func () => return 42)
         \\const read = func () => return Read ()
         \\const invoke = func callback => return callback ()
-        \\const force = func ~value => return @force value
+        \\const force = func ~value => return @demand value
         \\const ignore = func ~value => return 42
         \\entry const direct = func () => return do provider:
         \\  break read ()
@@ -830,7 +830,7 @@ test "a handled inferred operation closes the exported reader principal and comp
 fn foreignAnnotations(allocator: std.mem.Allocator) !void {
     const text =
         \\effect Read: Unit -> U32
-        \\type Callback is data = #Callback { invoke:U32 -> U32 ! {Foreign} }
+        \\type Callback is data = $Callback { invoke:U32 -> U32 ! {Foreign} }
         \\const invoke = func action => return action 7
         \\const call = func (io:U32 -> U32 ! {Foreign}) => return invoke io
         \\const retain = func (io:U32 -> U32 ! {Foreign}) => return func value => return io value
@@ -915,7 +915,7 @@ test "sealed Foreign annotations keep exact negative admission and ordinary shad
         try std.testing.expect(checked.diagnostics.len != 0);
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
     }
-    const text = "type Foreign is data = #Foreign\nconst Foreign=42\nconst read=func (io:U32 -> U32 ! {Foreign})=> return io 1\nconst result=func () : U32 ! {Foreign} => return 42\n";
+    const text = "type Foreign is data = $Foreign\nconst Foreign=42\nconst read=func (io:U32 -> U32 ! {Foreign})=> return io 1\nconst result=func () : U32 ! {Foreign} => return 42\n";
     var tokens = try lexer.lex(a, text);
     defer tokens.deinit(a);
     var pool: symbols.Pool = .{};
@@ -1745,11 +1745,11 @@ const precise_path_source = scoped_state_header ++
     \\const select = func value => return value.retained
     \\opaque type Wrapper a = a
     \\const unwrap = func value => return case value of
-    \\  #Wrapper retained => retained
+    \\  $Wrapper retained => retained
     \\entry const answer = func () => return @effect.scope (func (older: State U32) => return do:
     \\  let callback = @effect.scope (func (younger: State U32) => return do:
     \\    let fields = bundle younger older
-    \\    break select (unwrap (#Wrapper fields))
+    \\    break select (unwrap ($Wrapper fields))
     \\  )
     \\  let (state, result) = do (@effect.state older.get older.set 7):
     \\    break callback ()

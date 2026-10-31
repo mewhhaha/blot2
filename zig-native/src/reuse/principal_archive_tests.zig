@@ -11,10 +11,10 @@ const principal = @import("principal_archive.zig");
 const a = std.testing.allocator;
 const compiler: [32]u8 = @splat(17);
 const source =
-    \\type Box is data = #Box U32
+    \\type Box is data = $Box U32
     \\const extract = func (box: Box) : U32 => return case box of
-    \\  #Box value => value
-    \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box 2))
+    \\  $Box value => value
+    \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract ($Box 2))
 ;
 const Fixture = struct {
     units: [1]core.Module,

@@ -13,11 +13,11 @@ const a = std.testing.allocator;
 const io = std.testing.io;
 
 const shapes =
-    \\data Box a = #Box a
-    \\type Pair is data = #Pair { left: F32, right: F32 }
-    \\const pair = func (left: F32) => return func (right: F32) => return #Pair { left, right }
-    \\const swap = func (value: Pair) => return #Pair { left: value.right, right: value.left }
-    \\const boxed = func value => return #Box value
+    \\type Box a is data = $Box a
+    \\type Pair is data = $Pair { left: F32, right: F32 }
+    \\const pair = func (left: F32) => return func (right: F32) => return $Pair { left, right }
+    \\const swap = func (value: Pair) => return $Pair { left: value.right, right: value.left }
+    \\const boxed = func value => return $Box value
 ;
 const dep =
     \\import {Pair, pair, swap, boxed} from "./shapes"
@@ -39,7 +39,7 @@ const main =
     \\entry const answer: U32 = mid.read_twice ()
     \\entry const right = func (value: F32) : F32 => return (mid.chosen value).right
     \\entry const kept = func (value: F32) : F32 => return do:
-    \\  let #Box held = dep.keep value
+    \\  let $Box held = dep.keep value
     \\  break held.left
 ;
 

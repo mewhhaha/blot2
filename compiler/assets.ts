@@ -107,7 +107,7 @@ const encoder = new TextEncoder();
 const limit = 16 * 1024 * 1024;
 const totalLimit = 64 * 1024 * 1024;
 const keywords = new Set(
-  "const let type data effect is func do use return yield break for ever in case of if then else as import infix infixl infixr self where"
+  "const let type data effect is func do use return yield break for ever continue in case of if then else as import infix infixl infixr self where and or true false"
     .split(" "),
 );
 function identifier(name: string, upper: boolean): string {
@@ -217,7 +217,7 @@ function prepareModule(
             `${identifier(field, false)}: ${type(shape, depth + 1)}`
           ).join(", ")
         } }`;
-      const declaration = `type ${name} is data = #${name} ${body}\n`;
+      const declaration = `type ${name} is data = $${name} ${body}\n`;
       const previous = declarations.get(name);
       if (previous && previous !== declaration) {
         throw new TypeError(`Conflicting asset type: ${name}`);
@@ -270,7 +270,7 @@ function prepareModule(
       }
       const key = resourceKey(resource);
       resources.set(key, resource);
-      chunks.push(`(#${shape.reference} `, { key }, ")");
+      chunks.push(`($${shape.reference} `, { key }, ")");
     } else if ("array" in shape || "tuple" in shape) {
       if (!Array.isArray(data)) {
         throw new TypeError("Expected an asset array/tuple");
@@ -298,7 +298,7 @@ function prepareModule(
         Object.keys(object).length !== fields.length ||
         fields.some(([name]) => !Object.hasOwn(object, name))
       ) throw new TypeError(`Fields do not match asset type ${shape.name}`);
-      chunks.push(`(#${shape.name} { `);
+      chunks.push(`($${shape.name} { `);
       fields.forEach(([name, ty], index) => {
         if (index) chunks.push(", ");
         chunks.push(`${name}: `);

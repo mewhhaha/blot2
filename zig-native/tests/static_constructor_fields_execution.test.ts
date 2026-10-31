@@ -9,13 +9,13 @@ Deno.test("private tagged steps preserve forks saved results reference fields an
     `
 import * as iter from "std/iter"
 const first = func step => return case step of
-  #Some (value, _) => value
-  #Nothing => 999
+  $Some (value, _) => value
+  $Nothing => 999
 entry const forks = func count => return do:
   let cursor = iter.range 0 count
   let saved = cursor.next
   let alias = cursor
-  let #Some (_, rest) = saved else:
+  let $Some (_, rest) = saved else:
     break 999
   let total = 0
   for index in 0..count:
@@ -29,19 +29,19 @@ entry const references = func count => return do:
     let garbage = @array.generate 8192 identity
     total := self + value.length + value[0]
   break total
-type Choice is data = #Present (Array U32, U32) | #Absent
+type Choice is data = $Present (Array U32, U32) | $Absent
 entry const old_alias = func seed => return do:
-  let saved = #Present (#[seed], seed + 1)
+  let saved = $Present (#[seed], seed + 1)
   let result = do:
     if seed == 0:
-      break #Absent
+      break $Absent
     break saved
-  let #Present (values, _) = saved else:
+  let $Present (values, _) = saved else:
     break 999
   let garbage = @array.generate 8192 identity
   break case result of
-    #Present (_, value) => values[0] + value
-    #Absent => values[0] + 100
+    $Present (_, value) => values[0] + value
+    $Absent => values[0] + 100
 entry const empty = func count => return do:
   let source = iter.range 0 count
   let stored = #[source.next, (iter.range 0 0).next]
@@ -88,20 +88,20 @@ entry const run = func count => return do:
       let checkpoint;
       const sources = (emptyFirst: boolean) => {
         let declarations =
-          "type Sequence is data = #Running (U32, U32) | #Finished\n";
+          "type Sequence is data = $Running (U32, U32) | $Finished\n";
         if (emptyFirst) {
           declarations =
-            "type Sequence is data = #Finished | #Running (U32, U32)\n";
+            "type Sequence is data = $Finished | $Running (U32, U32)\n";
         }
         return {
           [entry]: program,
           [helper]: declarations + `
-const make = func end => return #Running (0, end)
+const make = func end => return $Running (0, end)
 const Sequence.iter = func (cursor: Sequence) => return cursor
 const Sequence.next = func (cursor: Sequence) => return case cursor of
-  #Finished => #Nothing
-  #Running (value, end) => if value >= end then #Nothing
-    else #Some (value, #Running (value + 1, end))
+  $Finished => $Nothing
+  $Running (value, end) => if value >= end then $Nothing
+    else $Some (value, $Running (value + 1, end))
 `,
         };
       };
@@ -174,38 +174,38 @@ const third = func values => return @cursor.value (@cursor.advance (@cursor.adva
 entry const chained = func count => return do:
   let cursor = iter.enumerate (iter.take (count / 2) (iter.map (func value => return value + 7) (iter.filter (func value => return value % 2 == 0) (iter.range 0 count))))
   let saved = cursor.next
-  let #Some ((index, first), rest) = saved else:
+  let $Some ((index, first), rest) = saved else:
     break 999
   let total = 0
   for (_, value) in rest:
     let garbage = @array.generate 8192 identity
     total := self + value
-  let #Some ((_, again), _) = cursor.next else:
+  let $Some ((_, again), _) = cursor.next else:
     break 999
   break index + first + again + total
 entry const references = func (seed: U32) => return do:
   let values = @array.generate 4 (func index => return #[seed + index, index])
   let cursor = iter.take 3 (iter.filter (func (value: Array U32) => return value.length == 2) (iter.map identity values))
   let saved = cursor.next
-  let #Some (first, rest) = saved else:
+  let $Some (first, rest) = saved else:
     break 999
   let total = 0
   for value in rest:
     let garbage = @array.generate 8192 identity
     total := self + value[0] + value.length
-  let #Some (again, _) = cursor.next else:
+  let $Some (again, _) = cursor.next else:
     break 999
   break total + first[0] + first.length + again[0] + again.length
 entry const windows = func count => return do:
   let cursor = iter.windows 3 (iter.range 0 count)
   let saved = cursor.next
-  let #Some (first, rest) = saved else:
+  let $Some (first, rest) = saved else:
     break 999
   let total = 0
   for window in rest:
     let garbage = @array.generate 8192 identity
     total := self + head window
-  let #Some (second, _) = rest.next else:
+  let $Some (second, _) = rest.next else:
     break head first + total + third first + 100
   break third first + head second + total
 `,
@@ -245,9 +245,9 @@ entry const replay = func count => return do:
   for repeat in 0..3:
     total := self + iter.fold_left sum_pair 0 cursor
     let garbage = @array.generate 8192 identity
-  let #Some ((index, value), rest) = saved else:
+  let $Some ((index, value), rest) = saved else:
     break total + 999
-  let #Some ((again, second), _) = rest.next else:
+  let $Some ((again, second), _) = rest.next else:
     break total + index + value + 100
   break total + index + value + again + second
 entry const references = func (seed: U32) => return do:
@@ -260,7 +260,7 @@ entry const references = func (seed: U32) => return do:
       let (values, index) = pair
       break accumulator + values.length + values[0] + index) 0 cursor
     let garbage = @array.generate 8192 identity
-  let #Some ((first, index), _) = saved else:
+  let $Some ((first, index), _) = saved else:
     break 999
   break total + first.length + first[0] + index
 entry const floats = func seed => return iter.fold_left (func total => return func pair => return do:

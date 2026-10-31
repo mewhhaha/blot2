@@ -6,10 +6,10 @@ const core_builder = @import("../check/core_builder.zig");
 const parallel_lowering = @import("../check/parallel_lowering.zig");
 const structural = @import("../structural.zig");
 
-const prelude = "infixl 60 (+) = plus\nconst plus = func left => return func right => return @u32.add left right\ndata Box a = #Box a\n";
-const shared = "const unwrap = func box => return case box of\n  #Box value => value\nconst twice = func value => return value + value\n";
-const left = "import {unwrap, twice} from \"./shared\"\nconst first = func value => return twice (unwrap (#Box value))\nconst third = func value => return first value + 1\n";
-const right = "import {unwrap} from \"./shared\"\nconst second = func value => return unwrap (#Box (value + 2))\n";
+const prelude = "infixl 60 (+) = plus\nconst plus = func left => return func right => return @u32.add left right\ntype Box a is data = $Box a\n";
+const shared = "const unwrap = func box => return case box of\n  $Box value => value\nconst twice = func value => return value + value\n";
+const left = "import {unwrap, twice} from \"./shared\"\nconst first = func value => return twice (unwrap ($Box value))\nconst third = func value => return first value + 1\n";
+const right = "import {unwrap} from \"./shared\"\nconst second = func value => return unwrap ($Box (value + 2))\n";
 const entry = "import {first, third} from \"./left\"\nimport {second} from \"./right\"\nentry const answer:Unit->U32 = func () => return first 20 + second 22 + third 1\n";
 
 const Fixture = struct {

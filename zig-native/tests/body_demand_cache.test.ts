@@ -4,17 +4,17 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url).pathname;
-let spine = "@force value";
+let spine = "@demand value";
 for (let index = 0; index < 16; index++) spine = `@u32.add (${spine}) 0`;
-const argumentSpine = spine.replaceAll("@force value", "marker");
+const argumentSpine = spine.replaceAll("@demand value", "marker");
 const library = `const marker = 2
-const twice = func ~(value: U32) => return @u32.add (${spine}) (@force value)
+const twice = func ~(value: U32) => return @u32.add (${spine}) (@demand value)
 const ignore = func ~(value: U32) => return do:
-  let unused = func () => return @force value
+  let unused = func () => return @demand value
   break 7
 const keep = func ~(values: Array U32) => return do:
-  let first = @force values
-  let second = @force values
+  let first = @demand values
+  let second = @demand values
   break #[@array.get first 0, @array.get second 1]
 const apply = func (host: U32 -> U32 ! {Foreign}) => return @u32.add (twice (host (${argumentSpine}))) (ignore (host 999))
 `;
@@ -132,7 +132,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               "const ignore = func (value: U32)",
             )
               .replace(
-                "let unused = func () => return @force value",
+                "let unused = func () => return @demand value",
                 "let unused = func () => return value",
               );
           }

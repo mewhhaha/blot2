@@ -8,8 +8,8 @@ entry const copy = func (xs: Array U32) => return Array.from_list (List.from_arr
 entry const nested = func (x: U32) => return (Array.from_list ((Array.from_list [[x], [2]])[0]))[0]
 entry const method = func (x: U32) => return [x, 2].length
 entry const empty_length = [].length
-entry const different_kinds = #Type [1] != #Type #[1]
-entry const same_kind = #Type [1] == #Type [2]
+entry const different_kinds = $Type [1] != $Type #[1]
+entry const same_kind = $Type [1] == $Type [2]
 const first = func xs => return xs[0]
 const copied = func xs => return [x | x <- xs]
 const replace_first = func xs => return func value => return do:
@@ -69,7 +69,7 @@ entry const captured = func (xs: Array U32) => return
 
 Deno.test("list spreads and array updates preserve aliases across chunk boundaries", async () => {
   await compileAndRun(`
-type Item is data = #Item { value: U32 }
+type Item is data = $Item { value: U32 }
 entry const grow = func (count: U32) => return do:
   let xs: List U32 = []
   for i in 0..count:
@@ -84,7 +84,7 @@ entry const snapshot = func (count: U32) => return do:
 entry const array_spread = func (x: U32) => return #[x, ...#[2, 3], 4]
 entry const legacy_cons = func (x: U32) => return Array.from_list [x | [2, 3]]
 entry const aggregate = func (x: U32) => return do:
-  let xs = Array.from_list [#Item { value: x }, #Item { value: 2 }]
+  let xs = Array.from_list [$Item { value: x }, $Item { value: 2 }]
   xs[0].value := 42
   break xs[0].value
 `, guest => {
@@ -109,8 +109,8 @@ Deno.test("list construction works during staging and preserves F32 values", asy
   await compileAndRun(`
 const staged = [x + 1 | x <- [40, 41]]
 const large = @list.generate 513 (func i => return i)
-type Item is data = #Item { value: U32 }
-const stored = @list.generate 8193 (func i => return #Item { value: i })
+type Item is data = $Item { value: U32 }
+const stored = @list.generate 8193 (func i => return $Item { value: i })
 entry const frozen_item = func (index: U32) => return (Array.from_list stored)[index].value
 entry const frozen_edit = func (value: U32) => return do:
   let xs = Array.from_list stored
@@ -180,7 +180,7 @@ Deno.test("lists reject indexed reads updates and public indexing intrinsics", a
     "entry const run = [1, 2][0]",
     "const first = func xs => return xs[0]\nentry const run = first [1, 2]",
     "entry const run = func () => return do:\n  let xs = [1, 2]\n  xs[0] := 3\n  break xs.length",
-    "type Item is data = #Item { value: U32 }\nentry const run = func () => return do:\n  let xs = [#Item { value: 1 }]\n  xs[0].value := 3\n  break xs.length",
+    "type Item is data = $Item { value: U32 }\nentry const run = func () => return do:\n  let xs = [$Item { value: 1 }]\n  xs[0].value := 3\n  break xs.length",
   ];
   for (const source of rejected) await compileExpectedFailure(source + "\n", "type_mismatch");
   for (const source of ["@list.get [1] 0", "@list.set [1] 0 2"]) {
@@ -193,14 +193,14 @@ Deno.test("lists reject indexed reads updates and public indexing intrinsics", a
 
 Deno.test("collector traces chunk links snapshots and aggregate elements with bounded storage", async () => {
   await compileAndRun(`
-type Item is data = #Item { value: U32 }
+type Item is data = $Item { value: U32 }
 const sum = func (values: List Item) => return do:
   let result = 0
   for item in values:
     result := self + item.value
   break result
 entry const run = func (limit: U32) => return do:
-  let older = @list.generate 513 (func i => return #Item { value: i })
+  let older = @list.generate 513 (func i => return $Item { value: i })
   let read = func () => return sum older
   let values = older
   let index = 0
@@ -208,7 +208,7 @@ entry const run = func (limit: U32) => return do:
     if index == limit:
       break #[read (), sum values, values.length]
     let discarded = @list.fill 8192 index
-    values := [#Item { value: index }, ...older, #Item { value: index + 1 }]
+    values := [$Item { value: index }, ...older, $Item { value: index + 1 }]
     index := self + 1
 `, guest => {
     const original = 512 * 513 / 2;

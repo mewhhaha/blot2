@@ -1,7 +1,7 @@
-type Tree is data = #Leaf U32 | #Branch (Tree, Tree)
+type Tree is data = $Leaf U32 | $Branch (Tree, Tree)
 const make_tree = func (depth: U32) -> (seed: U32) : Tree => return
-  if depth == 0 then #Leaf seed else #Branch (make_tree (depth - 1) (seed * 3 + 1), make_tree (depth - 1) (seed * 5 + 7))
+  if depth == 0 then $Leaf seed else $Branch (make_tree (depth - 1) (seed * 3 + 1), make_tree (depth - 1) (seed * 5 + 7))
 const sum_tree = func (tree: Tree) : U32 => return case tree of
-  #Leaf value => value
-  #Branch (left, right) => sum_tree left + sum_tree right
+  $Leaf value => value
+  $Branch (left, right) => sum_tree left + sum_tree right
 entry const run = func (seed: U32) : U32 => return sum_tree (make_tree 10 seed)
