@@ -14163,12 +14163,15 @@ const Engine = struct {
             } else {
                 const pending_start = self.pending.items.len;
                 const projected = try self.projectField(ty, selector.b, access, first_index == reverse.items.len or part >= first_index, null);
-                // The updater proves this physical selector. Its old leaf is
-                // available to `self`, independently of the replacement type.
-                for (self.pending.items[pending_start..]) |*pending| if (pending.value.kind == .writable_field and pending.value.source == access) {
-                    pending.covered = true;
-                    pending.suspended = true;
-                };
+                // Ordinary rebinding can replace a field's type. An indexed
+                // mutation must retain the element's field equation as well
+                // as the old leaf supplied to `self`.
+                if (first_index == reverse.items.len) {
+                    for (self.pending.items[pending_start..]) |*pending| if (pending.value.kind == .writable_field and pending.value.source == access) {
+                        pending.covered = true;
+                        pending.suspended = true;
+                    };
+                }
                 ty = projected.ty;
                 projection = projected.projection;
             }
@@ -14193,7 +14196,11 @@ const Engine = struct {
             if (selector.tag == .index_access) {
                 try self.constrain(types_.items[remaining + 1], updated, id);
                 updated = owner;
-            } else if (first_index < reverse.items.len and remaining < first_index) {
+            } else if (first_index < reverse.items.len) {
+                // Fields inside an indexed element mutate in place. Keep the
+                // old field and owner types rather than inventing a structural
+                // update requirement for an otherwise unknown element type.
+                if (remaining > first_index) try self.constrain(types_.items[remaining + 1], updated, id);
                 updated = owner;
             } else if (try self.updatedFieldType(owner, selector.b, updated, reverse.items[remaining])) |result| {
                 updated = result;

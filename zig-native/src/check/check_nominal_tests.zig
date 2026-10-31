@@ -393,3 +393,108 @@ fn indexedUpdateAllocationScenario(allocator: std.mem.Allocator) !void {
 test "mixed immutable updates release path metadata at every allocation failure" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, indexedUpdateAllocationScenario, .{});
 }
+
+const generic_indexed_field_source =
+    \\type Mode is data = $Play | $Edit
+    \\type Editor is data = $Editor {mode: Mode}
+    \\const set_mode = func access => return do:
+    \\  access.editor[0].mode := $Edit
+    \\entry const answer = func (): U32 => return do:
+    \\  let editor: Array Editor = #[$Editor {mode: $Play}]
+    \\  set_mode {editor}
+    \\  return case editor[0].mode of
+    \\    $Edit => 1
+    \\    $Play => 0
+;
+
+fn genericIndexedFieldScenario(allocator: std.mem.Allocator) !void {
+    var tokens = try lexer.lex(allocator, generic_indexed_field_source);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, generic_indexed_field_source, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{});
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var module = try @import("core.zig").lower(allocator, &tree, &pool, &checked);
+    defer module.deinit(allocator);
+    module.unit = 1;
+    var remaining: usize = 1_000_000;
+    const units = [_]*const @import("core.zig").Module{&module};
+    for (module.bodies) |body| {
+        if (module.binding(body.binding).kind != .global) continue;
+        try @import("package_core.zig").checkedInterfaceBody(&module, body.binding, .{ .units = &units }, &remaining, allocator);
+    }
+    var emitted = try @import("../backend/scoped_backend.zig").compile(allocator, &.{module}, 1);
+    defer emitted.deinit(allocator);
+    try std.testing.expect(emitted.diagnostic == null);
+    try std.testing.expect(emitted.bytes.len > 8);
+}
+
+test "generic indexed fields retain invariant source equations through allocation failure" {
+    try genericIndexedFieldScenario(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, genericIndexedFieldScenario, .{});
+}
+
+test "indexed field invariance rejects incompatible writes while ordinary rebinding changes types" {
+    var invalid = try Fixture.init(
+        \\type Mode is data = $Play | $Edit
+        \\type Editor is data = $Editor {mode: Mode}
+        \\const invalid = func access => return do:
+        \\  access.editor[0].mode := 7
+        \\entry const answer = func (): U32 => return do:
+        \\  let editor: Array Editor = #[$Editor {mode: $Play}]
+        \\  invalid {editor}
+        \\  return 0
+    );
+    defer invalid.deinit();
+    var mismatch = false;
+    for (invalid.checked.diagnostics) |diagnostic| if (diagnostic.code == .type_mismatch) {
+        mismatch = true;
+    };
+    try std.testing.expect(mismatch);
+    var ordinary = try Fixture.init(
+        \\const replace = func record => return do:
+        \\  record.value := true
+        \\  return record
+        \\entry const answer = func (): Bool => return (replace {value: 7}).value
+    );
+    defer ordinary.deinit();
+    try ordinary.valid();
+}
+
+test "multiple indexed boundaries retain each selected element equation in source Core" {
+    const source =
+        \\type Mode is data = $Play | $Edit
+        \\type Editor is data = $Editor {mode: Mode}
+        \\type Group is data = $Group {editors: Array Editor}
+        \\const set_mode = func access => return do:
+        \\  access.groups[0].editors[0].mode := $Edit
+        \\const apply = func (groups: Array Group) => return set_mode {groups}
+    ;
+    var fixture = try Fixture.init(source);
+    defer fixture.deinit();
+    try fixture.valid();
+    var module = try @import("core.zig").lower(a, &fixture.tree, &fixture.pool, &fixture.checked);
+    defer module.deinit(a);
+    module.unit = 1;
+    const units = [_]*const @import("core.zig").Module{&module};
+    var remaining: usize = 1_000_000;
+    for (module.bodies) |body| {
+        if (module.binding(body.binding).kind != .global) continue;
+        try @import("package_core.zig").checkedInterfaceBody(&module, body.binding, .{ .units = &units }, &remaining, a);
+    }
+    // Nested owners are checked as source equations here; this law does not
+    // ask the emitter to admit nested owning arrays into inline storage.
+    const incompatible = try std.mem.replaceOwned(u8, a, source, ":= $Edit", ":= 7");
+    defer a.free(incompatible);
+    var invalid = try Fixture.init(incompatible);
+    defer invalid.deinit();
+    var mismatch = false;
+    for (invalid.checked.diagnostics) |diagnostic| if (diagnostic.code == .type_mismatch) {
+        mismatch = true;
+    };
+    try std.testing.expect(mismatch);
+}

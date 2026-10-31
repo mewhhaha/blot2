@@ -1,0 +1,55 @@
+{
+  "change": "Indexed mutation preserves original owner and selected child type equations throughout the path. Retain writable-field obligations rather than suppressing them as structural rebinding. Nonindexed type-changing rebinding remains unchanged.",
+  "source_paths": [
+    "zig-native/src/check/check.zig",
+    "zig-native/src/check/check_nominal_tests.zig",
+    "zig-native/tests/scoped_indexed_field_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-field-fix/bin/blotc",
+    "sha256": "a95d75e1aa7da26d0a4fa94e1c64a10e836f28b4be7366e0c8996137deda9c15",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-field-native-dev/bin/blot-tests",
+    "sha256": "ce84d0caf754be10291a90d76872712d4b058f9eaf77af33674742dca017d410",
+    "compiled_inventory": 2727,
+    "selected": 342,
+    "passed": 341,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "focused_passed": 3,
+    "focused_coverage": [
+      "generic indexed nominal field setter checked through source Core and emission",
+      "full allocation-failure sweep through lexer/parser/checker/Core-proof/emission",
+      "incompatible field replacement type rejected",
+      "ordinary type-changing record rebinding still accepted",
+      "two indices and intervening field preserve exact element equations in Core",
+      "multiple-index incompatible leaf rejected without requesting nested-owner emission"
+    ]
+  },
+  "guest": {
+    "passed": 57,
+    "failed": 0,
+    "coverage": "Prior48 scoped regression laws plus2 new generic indexed field laws both tiers and sync/JSPI, plus7 original structural record laws including type-changing nested updates and imported recovery. New laws cover aliases,self,nested fields before/after index,incompatible scalar/nominal writes,opaque field privacy,and byte-identical recovery."
+  },
+  "integration": {
+    "pinned_affordances": "No tracked source edits. Moves past station_ui mode setter to untyped Site callback proof; typed Site callback input/result supplied only as in-memory overlay and build still in progress. No complete affordances pass claimed."
+  },
+  "review": "Astra exact21-line checker review approved code boundary; requested multiple-index Core proof/incompatible leaf law now passes. No package_core coercion or physical projection authority added.",
+  "lint": {
+    "new_native": "zero analyzer findings",
+    "checker": "four returning-local-slice warnings at7096,7146,7227,7253 exactly reproduced on HEAD source, unchanged by diff",
+    "format": "Zig formatting, TS deno fmt --no-config and git diff whitespace pass"
+  },
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 npm.jsr.io dependency fetch blocked before tests by Operation not permitted; no manifest/dependency/TLS changes"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy owners, casts, opacity fallback, type-proof coercion, Gdev/Ink/Pen source edits, or main/GPU build. Temporary restore diagnostic server instrumentation is OUTSIDE this source manifest and will be reverted after dedicated binary build.",
+  "date": "2026-10-31",
+  "qualification": "Generic indexed mutation and independent source/Core equation checks; full original affordance execution remains pending."
+}
