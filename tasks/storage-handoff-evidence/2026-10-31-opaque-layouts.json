@@ -1,0 +1,65 @@
+{
+  "change": "Imported closed opaque nominal layouts use the exact validated defining Core and closed actual arguments to materialize inactive variant fields, preserving public semantic identity and opacity.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/src/backend/scoped_opaque_tests.zig",
+    "zig-native/fixtures/scoped-opaque/tokens.blot",
+    "zig-native/fixtures/scoped-opaque/facade.blot",
+    "zig-native/fixtures/scoped-opaque/main.blot",
+    "zig-native/tests/scoped_opaque_layout_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-behavior-fix/bin/blotc",
+    "sha256": "150c979bd5801661dafcf23286a29da43d39b2e3528d4b86237bfeb4b74045de",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-opaque-native-dev/bin/blot-tests",
+    "sha256": "ec18e9d8f907dd375128e11ba4d2eb859bafe15364f617a05e5f13d9ea8180ec",
+    "compiled_inventory": 2719,
+    "affected_selected": 213,
+    "passed": 212,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "new_laws": "Two new native laws pass with exhaustive emission allocation failures and five forged/missing producer metadata rejections; filtered binary six tests pass, no leaks."
+  },
+  "guest": {
+    "passed": 16,
+    "failed": 0,
+    "coverage": [
+      "development and optimized tiers",
+      "sync and JSPI",
+      "dynamic Some/Nothing and all four Handle numeric identity fields",
+      "zero, maximum U32 and signed-zero/NaN F32 kind values",
+      "different generic record shapes and field orders",
+      "owning-array opaque payload",
+      "private fields and constructors stay inaccessible",
+      "borrowed, callable, usage and open actual arguments rejected",
+      "opaque owning-array borrowed escape rejected",
+      "private representation edit/revert matches fresh builds",
+      "failed revision publishes no bytes and recovers identical output"
+    ]
+  },
+  "real_reduction": {
+    "baseline": "emit storage_unsupported at0:0",
+    "candidate_wasm_bytes": 50078
+  },
+  "review": "Astra migration_plan approved the implementation direction with exact-origin/closed-argument/opacity/budget constraints; required focused coverage now passes.",
+  "lint": "Three changed Zig files each have zero findings; Zig format, TS format and git diff whitespace checks pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 fetch through configured proxy: unsuccessful tunnel; no dependency/manifest/TLS changes"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine budgets unchanged. No cast, legacy opaque_storage recipe fallback, dummy owner, or main/GPU build.",
+  "next_frontiers": [
+    "std/simd literal lane forwarding through canonical wrappers",
+    "actual Maybe loop value selection/comparator ties",
+    "custom Codec/Format contract member lowering"
+  ],
+  "date": "2026-10-31",
+  "qualification": "Affected opaque layout tests only; full compiler gate and actual Gdev main requalification remain pending."
+}

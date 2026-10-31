@@ -6,6 +6,9 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
+test {
+    _ = @import("scoped_opaque_tests.zig");
+}
 fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
     defer result.deinit(allocator);

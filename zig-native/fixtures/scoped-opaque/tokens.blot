@@ -1,0 +1,10 @@
+opaque type Handle kind = { kind: kind, region: U32, origin: U32, slot: U32, generation: U32 }
+const make = func kind -> (region: U32) -> (origin: U32) -> (slot: U32) -> (generation: U32) => return
+  $Handle {kind, region, origin, slot, generation}
+const words = func (handle: Handle kind) : Array U32 => return
+  #[handle.region, handle.origin, handle.slot, handle.generation]
+const kind = func (handle: Handle kind) : kind => return handle.kind
+
+opaque type Wrapped value = value
+const wrap = func (value: a) : Wrapped a => return $Wrapped value
+const unwrap = func ($Wrapped value) => return value

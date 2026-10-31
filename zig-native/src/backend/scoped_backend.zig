@@ -392,6 +392,42 @@ const Generator = struct {
         }
         return result;
     }
+    // Closed-storage facts are independently validated against their producer
+    // before emission. An opaque layout may use them only after every actual
+    // argument has resolved in its own caller environment; a phantom parameter
+    // does not license an unknown, callable or borrowed argument.
+    fn closedLayoutArgument(self: *Generator, input: TypeRef, remaining: *usize, depth: usize) Error!bool {
+        if (remaining.* == 0 or depth > 128) return false;
+        remaining.* -= 1;
+        const actual = try self.resolveType(input, 0);
+        const owner = try self.unit(actual.unit);
+        const node = owner.types.node(actual.ty);
+        switch (node.tag) {
+            .unit, .boolean, .u32, .f32 => return true,
+            .array, .list => return self.closedLayoutArgument(.{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, remaining, depth + 1),
+            .product, .record => {
+                for (0..node.b) |index| {
+                    const child = if (node.tag == .record) owner.types.recordField(node, index).ty else owner.types.list(.{ .start = node.a, .len = node.b })[index];
+                    if (!try self.closedLayoutArgument(.{ .unit = actual.unit, .ty = child, .environment = actual.environment }, remaining, depth + 1)) return false;
+                }
+                return true;
+            },
+            .nominal => {
+                for (owner.nominals) |nominal| {
+                    if (remaining.* == 0) return false;
+                    remaining.* -= 1;
+                    if (nominal.identity.unit != node.a or nominal.identity.decl != node.b) continue;
+                    if (!nominal.closed_storage or nominal.has_usage) return false;
+                    const arguments = owner.types.nominalArguments(node);
+                    if (arguments.len != nominal.parameters.len) return false;
+                    for (arguments) |argument| if (!try self.closedLayoutArgument(.{ .unit = actual.unit, .ty = argument, .environment = actual.environment }, remaining, depth + 1)) return false;
+                    return true;
+                }
+                return false;
+            },
+            else => return false,
+        }
+    }
     fn shapeUncached(self: *Generator, m: *const core.Module, id: core.Id, ty: T.Id, depth: usize) Error!Value {
         const n = m.types.node(ty);
         if (n.tag == .unit or n.tag == .u32 or n.tag == .boolean or n.tag == .f32) return .{ .word = .{ .id = 0 }, .floating = n.tag == .f32, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = &.{} } };
@@ -431,22 +467,51 @@ const Generator = struct {
         };
         if (n.tag == .nominal) for (m.nominals, 0..) |nominal, ordinal| {
             if (nominal.identity.unit != n.a or nominal.identity.decl != n.b) continue;
-            const constructors = m.nominalConstructors(@intCast(ordinal));
-            if (constructors.len == 0) return self.unsupported(m, id);
-            const parameters = m.types.list(nominal.parameters);
+            var source = m;
+            var source_ordinal: u32 = @intCast(ordinal);
+            var caller_environment: ?[]const TypeArgument = null;
+            if (m.nominalConstructors(source_ordinal).len == 0) {
+                if (!nominal.is_opaque or !nominal.closed_storage or nominal.has_usage or nominal.identity.unit == m.unit) return self.unsupported(m, id);
+                caller_environment = try self.captureTypes();
+                var remaining = 100_000 - self.layout_steps;
+                for (m.types.nominalArguments(n)) |argument| {
+                    if (!try self.closedLayoutArgument(.{ .unit = m.unit, .ty = argument, .environment = caller_environment }, &remaining, depth + 1)) {
+                        self.layout_steps = 100_000 - remaining;
+                        return self.unsupported(m, id);
+                    }
+                }
+                source = try self.unit(nominal.identity.unit);
+                if (source.unit != nominal.identity.unit) return self.unsupported(m, id);
+                var found: ?u32 = null;
+                for (source.nominals, 0..) |definition, index| {
+                    if (remaining == 0) return self.fail(m, id, .storage_unsupported, "Storage layout exceeded its checked node budget");
+                    remaining -= 1;
+                    if (!std.meta.eql(definition.identity, nominal.identity)) continue;
+                    if (found != null or !definition.is_opaque or !definition.closed_storage or definition.has_usage or source.nominalConstructors(@intCast(index)).len != 1) return self.unsupported(m, id);
+                    found = @intCast(index);
+                }
+                self.layout_steps = 100_000 - remaining;
+                source_ordinal = found orelse return self.unsupported(m, id);
+            }
+            const definition = source.nominal(source_ordinal);
+            const constructors = source.nominalConstructors(source_ordinal);
+            if (constructors.len == 0) {
+                return self.unsupported(m, id);
+            }
+            const parameters = source.types.list(definition.parameters);
             const arguments = m.types.nominalArguments(n);
-            if (parameters.len != arguments.len) return self.unsupported(m, id);
+            if (parameters.len != arguments.len or parameters.len != nominal.parameters.len) return self.unsupported(m, id);
             const before = self.type_arguments.items.len;
             defer self.type_arguments.shrinkRetainingCapacity(before);
-            for (parameters, arguments) |parameter, argument| try self.mapTypes(.{ .unit = m.unit, .ty = parameter }, .{ .unit = m.unit, .ty = argument }, 0);
+            for (parameters, arguments) |parameter, argument| try self.mapTypesUnder(.{ .unit = source.unit, .ty = parameter }, .{ .unit = m.unit, .ty = argument }, caller_environment, 0);
             const fields = try self.arena.allocator().alloc(Value, constructors.len);
             const tags: []u32 = if (constructors.len > 1) try self.arena.allocator().alloc(u32, constructors.len) else &.{};
             for (constructors, fields, 0..) |constructor_id, *field, index| {
-                const constructor = m.constructor(constructor_id);
-                const signature = m.types.node(constructor.scheme.root);
+                const constructor = source.constructor(constructor_id);
+                const signature = source.types.node(constructor.scheme.root);
                 const result_type = if (signature.tag == .function) signature.b else constructor.scheme.root;
-                try self.mapTypes(.{ .unit = m.unit, .ty = result_type }, .{ .unit = m.unit, .ty = ty }, 0);
-                field.* = if (constructor.payload == 0) .{ .word = .{ .id = 0 } } else try self.shape(m, id, constructor.payload, depth + 1);
+                try self.mapTypesUnder(.{ .unit = source.unit, .ty = result_type }, .{ .unit = m.unit, .ty = ty }, caller_environment, 0);
+                field.* = if (constructor.payload == 0) .{ .word = .{ .id = 0 } } else try self.shape(source, if (source == m) id else 0, constructor.payload, depth + 1);
                 if (constructors.len > 1) tags[index] = constructor.tag;
             }
             return .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = fields, .nominal = nominal.identity, .variant_tags = tags };

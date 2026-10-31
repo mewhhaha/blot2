@@ -1,0 +1,43 @@
+import * as token from "./facade"
+type Maybe a is data = $Some a | $Nothing
+type WordKind is data = $WordKind U32
+type FloatKind is data = $FloatKind F32
+type Delivery kind is data = $Delivery {target: token.Handle kind, amount: U32}
+
+const select = func (flag: Bool) -> local => return if flag then $Some local else $Nothing
+const word_handle = func (packet: View U32) => return
+  token.make ($WordKind packet[0]) packet[1] packet[2] packet[3] packet[4]
+
+entry const roundtrip = func (packet: Array U32) : Array U32 => return do:
+  let input = &packet[0..@array.length packet]
+  if (if @u32.eq (@storage.length input) 5 then false else true):
+    return #[0, 0, 0, 0]
+  let local = $Delivery {target: word_handle input, amount: packet[0]}
+  let $Some selected = select (if @u32.eq input[0] 0 then false else true) local else:
+    return #[0, 0, 0, 0]
+  return token.words selected.target
+
+entry const floating = func (value: F32) : F32 => return do:
+  let handle = token.make ($FloatKind value) 12 13 14 15
+  let $Some selected = select true ($Delivery {target: handle, amount: 7}) else:
+    return 99.0
+  let $FloatKind result = token.kind selected.target
+  return result
+
+entry const records = func (value: U32) : U32 => return do:
+  let first = token.wrap {tail: 2.5, head: value}
+  let second = token.wrap {extra: true, tail: value, head: 3.5}
+  let $Some left = select true first else:
+    return 0
+  let $Some right = select true second else:
+    return 0
+  let a = token.unwrap left
+  let b = token.unwrap right
+  return @u32.add a.head b.tail
+
+entry const owned = func (value: U32) : U32 => return do:
+  let original = #[value]
+  let wrapped = token.wrap original
+  let $Some kept = select true wrapped else:
+    return 0
+  return (token.unwrap kept)[0]
