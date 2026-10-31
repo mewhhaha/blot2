@@ -72,5 +72,22 @@
   },
   "frozen_contracts": "ABI8/session2/storage/work/engine limits unchanged; no real-main/GPU rebuild performed",
   "date": "2026-10-31",
-  "qualification": "Affected source/editor/guest migration checks only; full compiler gate and real-main rebuild remain pending. The native run used sampled allocation faults."
+  "qualification": "Affected source/editor/guest migration checks only; full compiler gate and real-main rebuild remain pending. The native run used sampled allocation faults.",
+  "owned_profile_guide_followup": {
+    "date": "2026-10-31",
+    "compiler_sha256": "9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929",
+    "guide_sha256": "5c4c94a1e17a976c3c7f0784aefab1c8ff1a3d5d75fb8233fed1508ca05ce333",
+    "change": "Remove normative legacy implicit-snapshot/COW/refcount/collector optimizer prose; document named owners, aliases and explicit copies, preserving grammar, evaluation order, constant-evaluator and numeric contracts. Explicitly retain unfinished ABI3/task120 transition.",
+    "astra_review": "Read-only cleanup plan approved; no claim of universal backend cutover.",
+    "independent_blot_blocks": 42,
+    "original_export_modules_emitted": 36,
+    "library_only_modules_checked": 6,
+    "executed_owned_module": {
+      "guest_abi": 8,
+      "total": 14,
+      "snapshot": 42,
+      "snapshot_policy": "Explicit @storage.copy; original element1 retained while mutable copy becomes41."
+    },
+    "qualification": "Guide code blocks only; full compiler/library qualification remains separate."
+  }
 }

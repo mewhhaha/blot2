@@ -4,8 +4,14 @@ Read this before writing Blot. This describes the current executable language;
 `DESIGN.md` also contains proposals. Each `blot` code block below is an
 independent, compilable module.
 
-The handwritten Zig compiler implements the language and collection syntax in
-this guide.
+The handwritten Zig compiler implements the source syntax in this guide. Current
+applications use the owned-storage profile described below: named owners, shared
+aliases, explicit copies and invocation-local borrows. Cutover is unfinished:
+ordinary pure programs can still select the legacy ABI 3 backend. Its implicit
+snapshot/collector behavior is being retired under task 120 and is not the
+contract for new application code. See
+[the current profile](../zig-native/SCOPED_STORAGE.md) for supported forms and
+[the rewrite task](../tasks/STORAGE_REWRITE.md) for remaining work.
 
 ## Commands
 
@@ -35,8 +41,9 @@ behaves the same; release builds use the default optimized tier. See
 Indent suites after `do:`, `if ...:`, and `case ... of`. No suite braces,
 semicolons, or implicit final-expression returns in `do`. `//` starts a line
 comment. Values use `snake_case`; types/constructors use `PascalCase`. Names are
-lexically scoped and values immutable. `F32.sqrt` names a function, not a method
-on an implicit receiver.
+lexically scoped. Scalar and inline aggregate values copy by value; named array
+owners permit explicit mutation through aliases. `F32.sqrt` names a function,
+not a method on an implicit receiver.
 
 Scalars: `Unit` (`()`), `Bool` (`true`, `false`), `U32` (`42`, `0xFF`, `4_096`),
 and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32 arithmetic wraps
@@ -550,28 +557,21 @@ entry const answer = func (value: F32) => return case twice ($Box value) of
 
 ## Lists, arrays, and libraries
 
-Lists and arrays are distinct homogeneous, immutable types. `[]`, `[1, 2]`, and
-`[[1], [2]]` construct `List` values. `#[]`, `#[1, 2]`, and `#[#[1], #[2]]`
-construct `Array` values. Use `List T` and `Array T` in annotations. Passing one
-to a function expecting the other is a type error. `List.from_array values` and
-`Array.from_list values` explicitly copy between representations.
+Lists and arrays are distinct homogeneous types. `[]`, `[1, 2]`, and
+`[[1], [2]]` construct `List` values. `#[]` and `#[1, 2]` construct `Array`
+values. Use `List T` and `Array T` in annotations. Passing one to a function
+expecting the other is a type error. Explicit conversions copy elements;
+conversion support depends on the selected backend. List syntax and constant
+evaluation remain available, but general runtime Lists are not promised by the
+owned-storage profile.
 
-The Zig runtime backs lists with balanced trees of dense leaves. Small leaves
-grow with demand, up to 244 words. Exclusive end edits reuse storage; shared
-edits copy one leaf and its tree path, preserving earlier versions. Traversal
-caches the current leaf; word-element loops traverse a whole leaf before
-resolving the next one. Arrays stay contiguous with constant-time indexing;
-array append/prepend copies the contents.
-
-Lists and arrays can store small numeric aggregates as consecutive scalar words,
-including nested tuples, records and non-opaque data with one constructor. The
-checked plan admits up to sixteen scalar leaves; open, hidden, reference-bearing
-or larger shapes keep their ordinary representation. Reads still produce
-immutable values: keeping a row, capturing it or editing the array preserves the
-earlier value. Lengths and slices count logical elements, and List/Array
-conversion copies row words. See
-[numeric layouts](../zig-native/NUMERIC_LAYOUTS.md) for the exact limits and
-which reads avoid reconstructing a row.
+Arrays have contiguous checked row storage. `Array T` fixes the extent while
+allowing element writes; `GrowArray T` permits append and `ResizeArray T` also
+permits shrinking. Named payload owners and fixed spans replace arrays of fresh
+owning child collections. Reads of inline scalar/record rows copy their values;
+owner and borrowed descriptors retain aliases. Copy payloads explicitly when
+retaining an independent version. Exact layout and lifetime support is in
+[the owned-storage profile](../zig-native/SCOPED_STORAGE.md).
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
@@ -606,12 +606,10 @@ const selected = [square | x <- [1, 2, 3], x > 1, let square = x * x]
 Generators run from left to right, with the leftmost as the outer loop. Later
 sources can use earlier bindings. A Bool guard skips every subsequent qualifier
 and the result expression when false. Bindings stay inside the comprehension;
-each generator source sees the scope before its own binding. The output is built
-with a private growing list, then copied once if the requested result is an
-array. For rectangular generators with total, allocation-free bounds and no
-intermediate observations, the compiler can allocate the exact final storage
-directly. Filters, ragged generators and observable intermediate values keep the
-growing-list path; iteration and element evaluation order stay the same.
+each generator source sees the scope before its own binding. The owned backend
+constructs results in a checked destination while preserving iteration and
+element evaluation order. Do not depend on a particular temporary builder or
+implicit snapshots of mutable input owners.
 
 `for` and comprehension generators also accept user-defined iterables. The
 ordinary associated `iter` function creates a cursor once; its `next` function
@@ -639,13 +637,13 @@ body, and `break` or `return` stops further pulls. Nested loops and
 `do (monad Maybe)` retain their normal control flow. Array/list loops and
 numeric ranges keep their direct traversal paths.
 
-`values.iter` gives an immutable snapshot cursor for a List or Array. Copying a
-cursor preserves its position; advancing one never changes another. Later
-updates to the original collection preserve the cursor's snapshot. The opaque
-types are `Cursor (List a)` and `Cursor (Array a)`. The low-level operations
-`@cursor.has cursor`, `@cursor.value cursor` and `@cursor.advance cursor` expose
-the same sequential interface; value/advance on an exhausted cursor trap. They
-do not add indexing to List.
+A cursor keeps its own traversal position; copying a cursor does not advance the
+original. In the owned profile an Array cursor reads the same owner rather than
+preserving an independent payload snapshot. Borrow and mutation checks still
+apply. Copy the input first when traversal needs an earlier version. The
+low-level operations `@cursor.has cursor`, `@cursor.value cursor` and
+`@cursor.advance cursor` provide sequential traversal; value/advance on an
+exhausted cursor trap. They do not add indexing to List.
 
 `std/iter` supplies ordinary source functions. Adapters take the iterable last:
 
@@ -663,10 +661,9 @@ The module includes `range start end`, `map`, `filter`, `take`, `take_while`,
 when either input ends and polls left before right; if the right ends first, one
 unpaired left value may have been consumed. `zip_strict` polls both and traps on
 unequal lengths. `windows width input` requires positive width and returns only
-complete sliding List windows. Saved windows remain immutable. These pipelines
-avoid intermediate collections explicitly. Bounded ordinary inlining and scalar
-replacement remove eligible local wrappers and step values; escaping or opaque
-state can still allocate.
+complete sliding List windows. Saved List values remain immutable. These
+pipelines compose explicit traversal; owned-profile support still follows the
+checked cursor and layout rules.
 
 `std/list` provides structural operations with the collection last:
 
@@ -679,13 +676,11 @@ const prefix = list.take 20 joined         // clamps to the length
 const suffix = list.drop 2 joined          // [3, 4, 5]
 ```
 
-Concatenation shares complete subtrees and rebuilds the boundary paths. Slices
-copy partial boundary leaves, so a one-element slice does not retain a large
-discarded leaf or its original root. Tiny adjacent leaves may be combined with a
-bounded copy. `slice start count` and `split_at index` check their ranges;
-`take` and `drop` clamp. `@list.concat` and `@list.slice` provide the underlying
-operations. `std/array` also exposes `concat` and `slice`; arrays copy
-contiguous storage. List/array conversion copies whole leaf spans.
+`slice start count` and `split_at index` check their ranges; `take` and `drop`
+clamp. `@list.concat` and `@list.slice` provide the underlying operations.
+`std/array` also exposes `concat` and `slice`, which copy selected elements into
+independent storage. Preserve separately borrowed payload lifetimes when the
+copied elements contain descriptors.
 
 Direct array reads and updates check bounds at runtime and fail during constant
 evaluation for an invalid index. `values.get(index)` returns `$Some value` or
@@ -718,194 +713,35 @@ entry const answer = func () => return do:
   break copied[0] + copied[1] + copied[2]
 ```
 
-Small closed numeric variants can share inline row storage: at most four
-constructors and sixteen words, with a discriminant and space for the largest
-active arm. Inactive padding is zero; F32 words preserve their exact bits. Known
-producers and scalar readers avoid per-element boxes, including borrowed payload
-binders. Escaping values reconstruct their ordinary owned representation; empty
-constructors retain their immortal representation. Reference-bearing, opaque,
-private, recursive and over-budget shapes use the ordinary layout. Array/List
-conversion and slicing use the same checked row plan.
+### Named owners and explicit copies
 
-An optimized exact identity copy, such as
-`array.generate values.length (func index => return values[index])`, may share
-the existing immutable array. Both versions remain valid snapshots; later edits
-to either preserve the other's values. This avoids repeated per-element
-ownership work when the elements contain references.
+Declare independent owners and keep their payloads alive through every borrowed
+use. Assigning an owner to another binding, placing it in an access record or
+capturing it in a known callback preserves its identity. Indexed updates write
+through those aliases. Inline records and scalar values copy by value.
 
-Wasm reuses locally allocated storage when its last reference is consumed,
-including a single array carried through a loop. It copies when uniqueness
-cannot be established: for example, live aliases, captured arrays, function
-parameters, module values, or arrays reached through another collection. Reuse
-is an optimization, not a change to immutable semantics. Record updates
-reconstruct the record; they do not mutate it.
+`@storage.copy source` creates independent array storage. Use it for retained
+history and previous-state data; copy separately referenced payloads as needed.
+A view records a borrowed range and length, not a snapshot of its contents.
+`@storage.freeze` removes growth authority across aliases; it does not copy the
+payload. Keep fresh result owners in caller-supplied destinations or within a
+known consumer's lifetime. Do not return borrowed rows into younger storage or
+carry a fresh owner through a loop.
 
-Passing an array to a saturated direct call is not an alias once the call
-returns if the callee only reads that parameter: lengths, element or
-`@simd.load` lane reads, finite traversal, or passing it on to another such
-parameter. A closure literal that `@array.generate` or such a call runs and then
-drops borrows the captures its body only reads in the same way. The proof
-follows each callee's body, whether or not it is inlined, so a later
-`values[i] := x` updates in place. Returning the argument, storing it in a
-value, capturing it in a closure that survives, generic dispatch the proof
-cannot resolve, or an edit of the same array in a later argument of that call
-keeps the copy. A non-scalar element the callee reads still blocks nested
-in-place edits, as a direct read does.
+The planner checks fixed rows, owner capacities and lexical reuse. Capacity
+exhaustion traps; it does not trigger collection or implicit growth beyond the
+plan. Configured temporary, persistent and transport budgets remain distinct
+from the standard Wasm memory declaration, which includes reserved regions. Zero
+runtime growth is not a claim that total linear memory fits the temporary budget
+alone.
 
-Pass `--explain-allocations` to `blotc build-project` (or `blotc build`) for
-bounded JSON-lines `allocation_sites` and `array_costs` records. An
-`allocation_sites` entry points to a source expression at which an allocator
-call was emitted before Wasm optimization. Its `kind` identifies closure,
-constructor, aggregate, boxed-constant, call, or array storage;
-`requested_bytes` is the immediate request size when known, and `emissions`
-counts emitted sites across code instances, not executions. Later optimization
-can remove these allocations. Allocations inside runtime helpers or without a
-source site are absent, so this record is not a complete runtime count. The
-executed-Wasm allocation tests give measured traffic after optimization.
-
-Each `array_costs` site points to a recognized array edit with UTF-8 byte
-offsets. `reuse_eligible` means the Core ownership proof admits updating that
-local version in place; `copy_required` means it cannot prove exclusive
-ownership. The `reason` names the failed condition: `escaped`,
-`multiple_consumers`, `later_read`, `no_fresh_origin`, `unanchored`,
-`nested_alias`, or `nonexclusive_predecessor`. A retained pre-edit snapshot in a
-loop normally appears as `nonexclusive_predecessor`, because that earlier
-version can still be observed. The report covers only edits recognized by this
-proof, including checked edits an entry may never reach. It is a source-level
-decision, not measured allocator traffic: later optimization may remove an edit
-or its copy. `omitted` counts sites beyond the 256-site limit, and the requested
-source is listed before imported modules.
-
-For proven local temporaries, the compiler releases storage after the final
-borrowed read or write. This also covers objects larger than the scalar
-replacement limit, branches, early returns and loop exits. Direct calls can
-borrow storage or transfer a proven fresh result to their caller. Escapes,
-unknown addresses, recursive calls without a usable summary and opaque calls
-keep the existing reclamation policy. When references stay within a proven group
-of allocations, each member's temporary owner is released after the group's
-final use. Other owners remain valid. Numeric array payloads and numeric List
-leaves have no child pointers; pointer-looking integer bits stay scalar.
-
-Dynamic sharing uses counted strong edges, journal leases and a nonmoving
-allocator in linear memory. Trial deletion reclaims real unreachable cycles.
-Plain data never enters it: records, data types from any module, arrays and
-lists whose types reach no State, closure, demand, provider or erased value
-cannot form a cycle, so their allocations are not cycle candidates. Loop frames
-own incoming and outgoing carries; allocation traffic does not trigger a
-separate production tracing scan. Invocation retirement releases temporary
-owners while preserving module initialization values and independently held
-results. Generated host callbacks, suspended requests and demand memos keep
-counted roots until completion or cancellation. Production emission requires
-complete ownership facts and returns a diagnostic when that proof is incomplete.
-See `zig-native/TRACING_REPLACEMENT.md`, `zig-native/PERSISTENT_ROOTS.md` and
-`zig-native/SUSPENDED_OWNERSHIP.md` for ownership and qualification records.
-
-**Collector-free builds.** `blot build main.blot --require-collector-free`
-requires a proof covering the complete module's arena: every source export,
-initializer and emitted callee. The current certificate accepts scalar host
-inputs and direct calls whose user allocations have no owning fields, with
-checked administrative root/RC helpers. It rejects unknown calls, host imports,
-public arena access, mutable static graphs and reference-bearing allocations.
-This is deliberately conservative: a rejected program may still execute zero
-collector work. A numeric-array host ABI exposes the public arena and therefore
-also declines this first certificate.
-
-Every module includes `blot:collector-contract` JSON with the proof version,
-covered roots, assumptions and either a certificate or an explicit decline
-reason. Strict builds include compiler identity and pinned source digests;
-failure reports `collector_free_unproved`. The certificate assumes calls through
-the ownership ABI, without modifying raw memory/tables/runtime globals or
-calling private helpers. It belongs to the complete Wasm module, not an
-arbitrary export sharing an arena with other code. Certified modules omit
-graph-collection work; reference counting and destruction still run.
-Collector-free does not mean allocation-free, constant-time destruction or
-constant memory use. Ordinary builds preserve legal State, closure and
-strong-demand cycles and collect them with trial deletion; no syntax or
-memoization rule changes.
-
-**Executed memory profiles.** Build with `--profile-memory` to instrument the
-surviving optimized instructions. This is separate from `--explain-allocations`,
-which describes emitted sites before optimization. For an import-free scalar
-entry, run:
-
-```sh
-deno task blot build main.blot build/profile.wasm --profile-memory
-deno run -A scripts/bench/profile_memory.ts --wasm build/profile.wasm \
-  --entry run --argument 2000 --iterations 5 --output build/memory.json
-```
-
-Application hosts can call `memoryProfileReport(bytes, instance.exports)` from
-`compiler/memory_profile.ts` after their normal ownership boundary. The report
-pins the exact Wasm SHA-256 and checks an instance fingerprint before reading
-counter addresses. Supply its optional expected Wasm hash when loading a saved
-artifact. Recompute reports after external `wasm-opt`; an old hash or old module
-metadata must never describe a different binary. Instrumented modules include a
-standard Wasm function-name section with source-function and runtime-helper
-names, using final function indices.
-
-Counters distinguish allocation traffic from current/peak requested live bytes;
-they include rounded bytes, frees, retain/release/retirement traffic, copied and
-filled bytes, loads/stores, allocator reuse versus fresh blocks, and cycle
-candidates/passes/vertices/edges/reclaimed bytes. Allocator reuse is distinct
-from an in-place collection edit. Source rows include pinned BLAKE3 source
-digests, UTF-8 spans and up to four source-emission inline callers. Later
-machine-inlined copies of one origin aggregate into that row; truncated contexts
-are explicit. Runtime-helper categories provide a separate accounting of the
-same totals. Cycle candidates identify owning objects without a lifetime-stable
-acyclic flag; they do not prove a cycle exists. Birth sites own live/freed
-bytes, while the executing source operation owns retain/release and copy work.
-
-The report reconciles source and helper totals independently. Per-site peaks
-occur at different times and cannot be added. Unknown runtime work has an
-explicit row. Counter overflow, missing allocation origins or a full diagnostic
-shadow table make the report incomplete. Profiling reserves separate diagnostic
-memory and adds substantial instruction traffic; its tables and their own
-accesses are excluded from program traffic counts. Measure profiling overhead
-separately and use uninstrumented release modules for performance comparisons.
-
-Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
-ownership optimization. One plain source forwarding wrapper may reach the
-primitive through an alias and may reorder its parameters, provided it passes
-each parameter exactly once and does no other work. For example,
-`func values -> index -> value => return array.replace index value values`
-retains the same in-place opportunity as the direct call. Arguments still
-evaluate in their written order. Arbitrary higher-order wrappers remain
-conservative. If an old array version is still observed after the edit,
-replacement copies the whole array; doing so on every iteration of a growing
-loop can be quadratic. Keep an exclusive loop carry when only the final version
-is needed.
-
-For collection construction,
-`@array.generate count (func index => return value)` allocates one fixed-size
-contiguous result, and `@array.fill` does the same with one evaluated fill
-value. A List loop using an exclusive carry and `[...self, value]` grows through
-the List's bounded leaves, then `Array.from_list` copies the final contents once
-if an Array is needed. Avoid repeated Array append/prepend: each step copies the
-contiguous payload. If older List versions remain live, path copying preserves
-them, so the exclusive-growth cost bound no longer applies. A comprehension is
-another documented construction form when its result expression fits the
-generator syntax.
-
-Small pure structural helpers and locally named or inline callbacks can be
-allocation-free in optimized code. A generic callback whose callee cannot be
-resolved, a surviving closure capture, an erased argument needing a box, or a
-nominal constructor can still allocate. Development codegen keeps some
-allocations that optimized scalar replacement removes. Use the executed-Wasm
-allocation matrix in `zig-native/tests/allocation_cost_matrix.test.ts` for
-concrete tier and size comparisons; no source spelling alone guarantees those
-record or closure allocations will disappear. In the qualified scalar-record
-fixture, locally bound, global named, and globally aliased callbacks passed
-through `apply` have zero optimized allocator traffic. The global path's direct
-callable adapter and its scalar reader are inlined under bounded proofs before
-scalar replacement. A dynamically unknown callback still keeps the conservative
-call boundary.
-
-Constant evaluation uses a separate representation. Append/prepend can extend
-the latest collection version into unused buffer slots, with geometric growth;
-all previously published elements remain immutable. Branches from older versions
-and indexed replacements copy. Consequently, sequential staged builders are
-linear, while large staged indexed-update loops can still be quadratic. Unused
-reserved slots count against the evaluator's storage limit.
+Runtime allocation/collector measurements from the retired backend are
+historical evidence, not cost guarantees for this profile. Preserve their exact
+source/binary identities in Git history. Qualify the current backend through
+executed ownership, bounds and numerical laws, then measure fresh release
+artifacts separately. See
+[storage requirements](../zig-native/SCOPED_STORAGE.md) and
+[qualification](../tasks/121-qualify-and-measure-owned-applications.md).
 
 Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 `at index values`, `replace index value values`, `get index values`,
@@ -920,7 +756,7 @@ const squares = array.generate 4 (func index => return index * index)
 entry const total = func () => return array.fold_left U32.add 0 squares
 entry const snapshot = func () => return do:
   let values = #[1, 2]
-  let original = values
+  let original = @storage.copy values
   values[0] := self + 40
   break original[0] + values[0]
 const checked = func index => return squares.get(index)
@@ -1053,9 +889,9 @@ lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
   and is never chosen implicitly.
 - `load index values` and `store index lanes values` read or replace four
   consecutive U32, F32 or Bool elements after one range check, which precedes
-  the index arithmetic. A store keeps the Array snapshot contract and edits in
-  place when the Array is exclusive; a direct `load` wrapper call only reads its
-  Array, so it does not force a later update to copy.
+  the index arithmetic. In the owned profile a store mutates the named Array
+  through its aliases. A load reads the existing lanes without copying the
+  owner. Copy explicitly before retaining an independent version.
 
 Explicit compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their
 full argument lists, like the scalar compiler operations;
@@ -1063,16 +899,10 @@ full argument lists, like the scalar compiler operations;
 index` and `@simd.store values index lanes` take the Array
 first.
 
-In the optimized tier a private four-lane value lives in a v128 local: tuple
-construction, destructuring, operations, loop carries and copies of parameters,
-call results and fields need no heap object. A value boxes once where it leaves
-the function (a non-inlined call, a stored record or closure field, a return)
-when that point runs no more often than the value was produced; otherwise it
-keeps ordinary refcounted storage. A private function whose parameter or result
-such operations prove to be four lanes takes and returns it as a v128 value at
-direct calls, so a non-inlined helper, recursion or a pipeline into a named
-function allocates nothing. Closure calls, including partial applications and
-pipelines into them, keep the boxed ABI and box the value once per call.
+The owned backend lowers supported closed four-lane values and operations
+without changing lane order, bit reinterpretation or rounding contracts. Exact
+support for calls, stored aggregates and callbacks follows its checked layout
+rules; source spelling alone does not guarantee allocation-free execution.
 
 Eligible independent numeric array-construction kernels automatically use
 four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary
@@ -1488,6 +1318,14 @@ entry const answer = func () => return #do:
 ```
 
 Both forms use the existing evaluator. They do not allow runtime host effects.
+
+Constant evaluation uses a separate representation. Append/prepend can extend
+the latest collection version into unused buffer slots, with geometric growth;
+all previously published elements remain immutable. Branches from older versions
+and indexed replacements copy. Consequently, sequential staged builders are
+linear, while large staged indexed-update loops can still be quadratic. Unused
+reserved slots count against the evaluator's storage limit.
+
 `#if` is still pending. The initial scoped storage profile uses the same array
 literal for all length modes:
 
