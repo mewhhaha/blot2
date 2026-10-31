@@ -176,6 +176,7 @@ const Generator = struct {
     plain_layouts: std.AutoHashMapUnmanaged(u64, Value) = .empty,
     reader_results: std.AutoHashMapUnmanaged(u32, Value) = .empty,
     writer_facts: std.AutoHashMapUnmanaged(u32, []const WriterEvent) = .empty,
+    writer_regions: std.AutoHashMapUnmanaged(u32, []const usize) = .empty,
     // Borrowed only while compiling one selected writer specialization.
     writer_trace: ?*WriterTrace = null,
     planning_writer: bool = false,
@@ -206,6 +207,9 @@ const Generator = struct {
         // Event shapes belong to the generator arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.writer_facts.deinit(self.allocator);
+        // Scratch footprints belong to the generator arena.
+        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
+        self.writer_regions.deinit(self.allocator);
         self.bindings.deinit(self.allocator);
         self.controls.deinit(self.allocator);
         self.loops.deinit(self.allocator);
@@ -2715,6 +2719,20 @@ const Generator = struct {
     fn writerOrdinal(owners: []const usize, owner_id: usize) Error!usize {
         return std.mem.findScalar(usize, owners, owner_id) orelse error.Declined;
     }
+    fn writerCacheEntry(self: *Generator, m: *const core.Module, id: core.Id, key: call_plan.Key) Error!?usize {
+        for (self.calls.entries.items, 0..) |entry, index| {
+            if (entry.key.unit != key.unit or entry.key.binding != key.binding or !std.mem.eql(u32, entry.key.evidence, key.evidence)) continue;
+            if (entry.building) return index;
+            const regions = self.writer_regions.get(entry.function) orelse return self.unsupported(m, id);
+            var available = true;
+            for (regions) |region| if (region < self.stacks.items.len and self.stacks.items[region]) {
+                available = false;
+                break;
+            };
+            if (available) return index;
+        }
+        return null;
+    }
     fn writerInput(self: *Generator, value: *Value, owners: []const usize, assigned: []bool) Error!void {
         value.literal = null;
         value.depth = 0;
@@ -2778,7 +2796,7 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
         const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
-        const index = if (self.calls.find(key)) |found| found else blk: {
+        const index = if (try self.writerCacheEntry(m, body.root, key)) |found| found else blk: {
             const function = self.module.addTypedFunction(&.{.i32}, .i32, .scalar) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.unsupported(m, body.root),
@@ -2803,11 +2821,13 @@ const Generator = struct {
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
+                .max_stacks = self.max_stacks,
                 .writer_trace = &trace,
                 .c = .{ .module = self.module, .function = function },
             };
             defer child.deinit();
             try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            try child.stacks.appendSlice(self.allocator, self.stacks.items);
             for (owners.items) |owner_id| {
                 const original = self.roots.items[owner_id];
                 var row = try child.cloneShape(original.element);
@@ -2828,11 +2848,18 @@ const Generator = struct {
                 return err;
             };
             try child.c.value(try child.scalar(m, body.root, output));
+            self.max_stacks = @max(self.max_stacks, child.max_stacks);
+            var regions: std.ArrayList(usize) = .empty;
+            defer regions.deinit(self.allocator);
+            // Closed scratch roots still describe regions used at runtime.
+            for (child.roots.items[owners.items.len..]) |owner| if (owner.dedicated and std.mem.findScalar(usize, regions.items, owner.stack) == null) try regions.append(self.allocator, owner.stack);
+
             const facts = try self.arena.allocator().alloc(WriterEvent, trace.events.items.len);
             var copies: EnvironmentCopies = .empty;
             defer copies.deinit(self.allocator);
             for (facts, trace.events.items) |*fact, original| fact.* = .{ .owner = original.owner, .kind = original.kind, .shape = try self.retainReaderResult(original.shape, 0, &copies, true, 0) };
             try self.writer_facts.put(self.allocator, function, facts);
+            try self.writer_regions.put(self.allocator, function, try self.arena.allocator().dupe(usize, regions.items));
             self.calls.entries.items[inserted].building = false;
             break :blk inserted;
         };

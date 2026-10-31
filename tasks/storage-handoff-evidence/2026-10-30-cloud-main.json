@@ -1138,7 +1138,7 @@
     }
   },
   "one_million_emission_experiment": {
-    "status": "running",
+    "status": "stopped at a concrete semantic/layout diagnostic after passing the old root allowance",
     "date": "2026-10-31",
     "source_checkpoint": "66a2fc1113a6fb7d12ed3748082587c1b04f7c85",
     "gdev_checkpoint": "5538a4c68c9caec93e15ebcbf7361641e4049ce3",
@@ -1153,6 +1153,58 @@
     ],
     "initial_observation": "1m47s active,VmHWM861392kB; emission progressing normally",
     "resource_caution": "prior3.70GB capture counter is cumulative volume, not peak resident memory; allowance is per function, not a global work bound",
-    "next": "use result: success=>actualguest/frame; semantic/storageerror=>fixboundary; exhaustion/resourcegrowth=>measure specificdominator, do notraiseagain"
+    "next": "same1M build with checked source/region fixes; production default remains500k; no furtherautomaticincrease",
+    "result": {
+      "evidence": "/workspace/blot2/build/gdev-first-frame/main-29f12d755e093cf4",
+      "identity": "e03bd0e5cb44a42744736ca64cabe3538088ef8f1274a55acf7277c8f1d0633a",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/gdev/src/ui/output_chart.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "root_expression_count": 504593,
+    "final_profile": {
+      "numeric": 2720580,
+      "plan": 2990723,
+      "calls": 467876,
+      "data": 8256143,
+      "captures": 1308285,
+      "capture_scanned": 1096903448,
+      "capture_retained": 127845584,
+      "capture_bytes": 4091058688,
+      "max_snapshot": 186,
+      "hits": 75570,
+      "misses": 1607
+    }
+  },
+  "writer_scratch_regions": {
+    "bug": "Unitwriterchild allocated growth fromemptyavailability atregion0 and omittedchildhighwater fromparentplan; cachedscratchregioncouldalsooverlaplatercallerGrower",
+    "baseline": "persistentkeeper modifiedoriginalguestfixture:2runtimefailures; disablingwriteroutline:2passes",
+    "fix": "inheritavailability/max; parentmaxpropagation; parent-arena footprintall dedicatedroots includingclosed; exact-key variants selectedonlywhenallregionsfree; preservebuilding/ActiveCalls checks; missingmetadata rejected",
+    "executed": "2tiers pass sync/async repeatedcalls, livepersistentpool, two scratchgrowers, livecalleroccupyingfirstorsecondscratchregion, reuseafterscope; values/keeper/callergrowers retained",
+    "native": "3affectedlawsPASS; strengthenedlow512keeper/busy-grower law passesfullexhaustiveOOM; all2688inventorycompiles",
+    "affected_guests": "29PASS1confirmedbaselineassociatedlayoutfailure",
+    "review": "Astraxhigh finalreviewclear",
+    "lint": "2changedZigfiles0findings;TSformatpasses",
+    "full_gate": "attempted; lockedBabaproxyunsuccessfultunnelbeforetests"
+  },
+  "chart_owner_layout_api": {
+    "initial_diagnostic": "actual1Mmain output_chart unresolvedelementlayout; standalonereproduced",
+    "source": "5exactF32.lerp calls; advance_into accepts namedResizeArrayRow,ArrayF32rates andplainLayout; internallycreatesoldview andfinishesreadsbeforetruncate; oldborrow-bearingargumentremoved",
+    "callers": "Output.update eliminatesread_state/kept beforemutation; alltestcallersmigrated; distinct-history assertionspreserved byexplicitrowcopies",
+    "focused": "2PASS:oldrowstorage,changingratesy/shareinterpolation,stableties,stillsnapandphasereset",
+    "broader": "output.blot missing_file atminor_support/owned beforeexecution; notqualified",
+    "review": "Astraxhigh finalreviewclear",
+    "contracts": "framing26,ABI8/session2,activecodecs/capacitiesunchanged"
   }
 }

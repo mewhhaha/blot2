@@ -2,17 +2,32 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The normal `main-213d2fc24abd7fc7` attempt advanced beyond ray/box math and
-hit the 500,000-expression root emission allowance in station UI code. No
-successful main Wasm or frame yet. The checked compiler is `66a2fc1`.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The first bounded 1,000,000-expression experiment (`main-29f12d755e093cf4`)
+passed the former root cap and stopped at504,593 with an unresolved element
+layout in output_chart. The production default is still500,000; this is not a
+policy qualification or a successful main Wasm/frame. Next rebuild the same
+1M experiment with the checked writer-region and chart fixes below, then follow
+the actual main to a real Pen PNG. No further automatic cap increase.
 
-Astra xhigh reviewed one bounded **1,000,000-expression experiment** after that
-result. It is running as `main-29f12d755e093cf4`; this is not a default change.
-The production default remains 500,000. ABI, ownership/source proofs, layout,
-depth, key and guest storage limits are unchanged. Keep the instrumented
-phase/work/resource evidence; choose the next action from this result. Do not
-raise it again automatically. On success, run the actual Pen guest and inspect
-the PNG; a new semantic/storage diagnostic takes priority over policy changes.
+A persistent-pool witness exposed scratch Grow/Resize regions overlapping a
+named pool in outlined Unit writers. Children now inherit caller availability
+and the region high-water mark; cached writers require their complete dedicated
+scratch footprint to be free. Busy contexts compile/reuse another exact-key
+variant. Closed scratch roots count, metadata publishes before completion, and
+the parent memory plan includes child regions. Both tiers/sync-async pass live
+persistent pools, two growers, busy-first/busy-second regions and reuse after
+scope exit. Three affected native laws pass, including exhaustive OOM; all2,688
+compile. The broad guest batch remains29passes/1known baseline failure. Astra
+xhigh reviewed the fix; lint/format pass and the required full gate was attempted
+but is registry blocked.
+
+Chart interpolation uses the existing F32.lerp family explicitly. advance_into
+now takes the named row owner, rates owner and plain Layout, creates its old-row
+view internally, and completes reads before shrinking. Callers are migrated;
+retained-history fixtures copy rows into separate owners. Two standalone checks
+pass, including overtaking interpolation, stable ties and still-frame snapping.
+The broader output module is blocked by its existing missing helper import.
+ABI, proofs, layout/depth/key limits, schemas and guest capacities are unchanged.
 
 A direct real `ray_box` probe found `abs` declined solely because the getter
 planner required reader mode. It now validates the receiver in its original

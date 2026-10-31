@@ -4,6 +4,36 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 
 const longField = "x".repeat(7000);
 const source = `import * as array from "std/array"
+const keeper: Array U32 = #[123]
+const region_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
+  let first: GrowArray U32 = #[input]
+  let second: ResizeArray U32 = #[@u32.add input 1]
+  destination.push first[0]
+  destination.push second[0]
+entry const region_reuse = func (input: U32) => return do:
+  let destination: ResizeArray U32 = #[input]
+  region_writer destination input
+  do:
+    let busy: GrowArray U32 = #[77]
+    region_writer destination (@u32.add input 10)
+    busy.push 78
+    if busy[0] != 77 or busy[1] != 78:
+      @panic "writer changed a live caller region"
+    region_writer destination (@u32.add input 20)
+  region_writer destination (@u32.add input 30)
+  do:
+    let busy = do:
+      let temporary: GrowArray U32 = #[0]
+      let kept: GrowArray U32 = #[77]
+      break kept
+    region_writer destination (@u32.add input 40)
+    busy.push 78
+    if busy[0] != 77 or busy[1] != 78:
+      @panic "writer changed its second scratch region"
+  region_writer destination (@u32.add input 50)
+  if keeper[0] != 123:
+    @panic "writer changed a persistent pool"
+  return array.generate destination.length (func index => return destination[index])
 type Magnitude is data = $Magnitude F32
 const Magnitude.abs = func (value: Magnitude) => return case value of
   $Magnitude number => number.abs + 10.0
@@ -63,7 +93,7 @@ const encoded_writer = func (destination: ResizeArray U32) -> (input: U32) => re
 entry const scratch_writer = func (input: U32) => return do:
   let destination: ResizeArray U32 = #[]
   for index in 0 .. 100:
-    encoded_writer destination (@u32.add input index)
+    encoded_writer destination (@u32.add (@u32.add input (keeper[0] - 123)) index)
   return #[destination.length, destination[0], destination[1], destination[2], destination[297], destination[298], destination[299]]
 type LargeState = {${longField}: ResizeArray U32}
 const write_large = func (state: LargeState) -> (amount: U32) => return do:
@@ -140,6 +170,24 @@ for (const codegenTier of ["development", "optimized"] as const) {
             );
           }
           for (const input of [0, 1, 100]) {
+            assert.deepEqual(
+              await call("region_reuse", input),
+              new Uint32Array([
+                input,
+                input,
+                input + 1,
+                input + 10,
+                input + 11,
+                input + 20,
+                input + 21,
+                input + 30,
+                input + 31,
+                input + 40,
+                input + 41,
+                input + 50,
+                input + 51,
+              ]),
+            );
             assert.equal(await call("nested_readers", input), input == 1);
             assert.deepEqual(
               await call("answer", input),
