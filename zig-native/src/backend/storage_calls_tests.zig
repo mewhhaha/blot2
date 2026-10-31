@@ -54,6 +54,21 @@ test "loop header inline variants publish across entry backedge and continue all
     try publishSmallModule(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
+test "literal lane wrappers retain selector evidence across scoped numeric fallback allocation failures" {
+    var module = try lower(a, "const shuffle = func lanes -> left -> right => return @simd.f32x4.shuffle lanes (left, right)\n" ++
+        "const swizzle = func lanes -> values => return @simd.f32x4.swizzle lanes values\n" ++
+        "const broadcast = func lane -> values => return @simd.f32x4.broadcast values lane\n" ++
+        "entry const answer = func (values: Array F32): Array F32 => return do:\n" ++
+        "  let input = &values[0..4]\n" ++
+        "  let lanes = (input[0], input[1], input[2], input[3])\n" ++
+        "  let (a, b, c, d) = shuffle (0, 5, 2, 7) lanes (5.0, 6.0, 7.0, 8.0)\n" ++
+        "  let (e, f, g, h) = swizzle (3, 2, 1, 0) lanes\n" ++
+        "  let (i, j, k, l) = broadcast 3 lanes\n" ++
+        "  return #[a, b, c, d, e, f, g, h, i, j, k, l]\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "wide field refinement restores scoped indexes through allocation failures" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);

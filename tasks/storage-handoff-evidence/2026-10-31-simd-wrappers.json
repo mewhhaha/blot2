@@ -1,0 +1,47 @@
+{
+  "change": "Scoped numeric fallback declines literal-lane SIMD operations just as existing leafBody admission does. Wrappers remain inline with their actual literal selectors rather than outlining into word parameters that discard selector evidence. No selector/evaluation policy changed.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/tests/scoped_simd_wrappers_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-simd-fix/bin/blotc",
+    "sha256": "186c9de503bc291b6ebacf939a13d46962c06c6cef7367bc33a4d0ee72278634",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-simd-native-dev/bin/blot-tests",
+    "sha256": "3ebf32e1ee3a369f2cd042a583febdc94a4f18f193c1bf70efac00267551af53",
+    "compiled_inventory": 2721,
+    "selected": 215,
+    "passed": 214,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "new_law": "Exhaustive allocation-failure sweep passes local shuffle/swizzle/broadcast wrappers over a real borrowed input array."
+  },
+  "guest": {
+    "passed": 9,
+    "failed": 0,
+    "new_laws": "Both codegen tiers and sync/JSPI preserve all six standard F32/U32 lane wrappers, aliases, independent selector tuples, exact signed-zero and NaN payload words; reject out-of-range/dynamic selectors and recover exact prior successful bytes. Existing stale scalar-reference selector rejections still pass."
+  },
+  "integration": {
+    "Ink_tests_behavior": "emits successfully, original source unchanged",
+    "Ink_tests_next_improvements": "moves past SIMD to shapes.blot fixed inline Array layout frontier",
+    "logs": [
+      "/tmp/ink-built/tests_behavior.wasm.log",
+      "/tmp/ink-built/tests_next-improvements.wasm.log"
+    ]
+  },
+  "lint": "Both changed Zig files each zero analyzer findings; Zig/TS formatting and git diff whitespace pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 dependency fetch blocked before tests; dependencies/manifests/TLS unchanged"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy owner/cast/opaque fallback or Ink source edits; no main/GPU build.",
+  "date": "2026-10-31",
+  "qualification": "Affected SIMD wrapper laws; actual Ink/Gdev and final main qualification are separate."
+}

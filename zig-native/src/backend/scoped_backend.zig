@@ -1995,6 +1995,10 @@ const Generator = struct {
                 }
             },
             .scalar, .logical => {
+                // Reusable word parameters discard literal selector evidence.
+                // Keep lane-sensitive wrappers on the checked inline path,
+                // just as leafBody does before this numeric fallback.
+                if (n.tag == .scalar and @import("simd_intrinsics.zig").literalLanes(n.op)) return false;
                 if (!try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1) or !try self.numericExpression(m, n.b, remaining, active, used, readers, depth + 1)) return false;
             },
             .bind => {
