@@ -1624,7 +1624,7 @@
   },
   "current_native_pen": {
     "attempt": "build/storage-integration/gdev-one-frame/attempt-gf78rbfc",
-    "status": "running indexedcompiler+typedinstanceadapter; noframeclaim",
+    "status": "completed_failure_before_module_or_frame",
     "compiler_sha256": "e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd",
     "configured_identity": "f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954",
     "previous_attempt": {
@@ -1632,6 +1632,20 @@
       "status": "emitdiagnosticink/pen/host.blot198:18; returnednaturally",
       "peak_rss_kib": 16283644
     },
-    "log": "/tmp/gdev-pen-indexed-instance.log"
+    "log": "/tmp/gdev-pen-indexed-instance.log",
+    "diagnostic": {
+      "file": "std/prelude.blot",
+      "line": 48,
+      "code": "storage_unsupported",
+      "expression": "generic result-selected from"
+    },
+    "elapsed_seconds_approx": 2040,
+    "peak_sampled_child_rss_kib": 16413984
+  },
+  "wire_integer_conversions": {
+    "fix": "Pen templates emit explicit U32.to_f32 for remaining schemas/counts/tags/declared integer lanes; integer division precedes conversion unchanged",
+    "checks": "10 generator tests, cargo fmt --all --check, regeneration and current native pen codegen --project ../gdev --check pass; generated Rust output unchanged",
+    "pen_sha256": "a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014",
+    "focused_encoder": "in progress; no real frame qualified"
   }
 }

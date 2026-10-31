@@ -78,12 +78,16 @@ fix passes all 26 lanes, full U32 IDs, order boundaries, Some/Nothing parameters
 signed zero, rejection of extras/oversized order, and recovery after traps.
 Both tiers and sync/async pass (48 checks). Guards and conversion are unchanged.
 
-The current real Pen attempt is
-`build/storage-integration/gdev-one-frame/attempt-gf78rbfc`, using the installed
+The latest real Pen attempt,
+`build/storage-integration/gdev-one-frame/attempt-gf78rbfc`, used the installed
 indexed compiler (SHA-256 `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`)
-and the typed instance adapter. Its configured hello identity is
+and the typed instance adapter. Its configured hello identity was
 `f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954`.
-Resume this attempt before starting another compile. No PNG has completed yet.
+It finished after about34minutes at the generic result-selected `from` in
+`std/prelude.blot:48`; peak sampled RSS was16,413,984KiB. No module or PNG
+completed. Pen's remaining generated U32 schema/count/tag/integer conversions
+now use explicit `U32.to_f32`; generator tests, formatting and freshness pass.
+Complete the focused current-owner encoder witness before the next native run.
 
 Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
 the bounded cold build; production main has one unchanged gameplay export;
@@ -110,7 +114,7 @@ run must use the real main and produce an inspected native Pen PNG.
 
 ## Run and inspect the frame
 
-Resume the active native attempt above before launching another full compile.
+Use the current frontier above before launching another full compile.
 On a new machine, read `AGENTS.md`, `compiler/guide.md` and
 `zig-native/CONTRACT.md`; build the matching compiler, Pen and plugin using the
 pinned toolchains and existing sibling checkouts.
