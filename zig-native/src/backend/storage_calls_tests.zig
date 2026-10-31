@@ -12,6 +12,43 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+fn publishGeneratorModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 128 });
+    defer result.deinit(allocator);
+    if (result.diagnostic) |diagnostic| std.debug.print("GENERATOR_EMIT {any}\n", .{diagnostic});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
+test "unit writers plan fixed scratch generators without expanding repeated calls" {
+    var module = try lower(a, "const write = func (destination: ResizeArray U32) -> (input: U32) => return do:\n" ++
+        "  let seed = @array.fill 2 input\n" ++
+        "  let generated = @array.generate 2 (func (index: U32) => return @u32.add seed[index] index)\n" ++
+        "  @storage.push destination (@u32.add generated[0] generated[1])\n" ++
+        "entry const answer = func (input: U32) => return do:\n  let destination: ResizeArray U32 = #[]\n" ++
+        "  write destination input\n  write destination input\n  write destination input\n  write destination input\n" ++
+        "  write destination input\n  write destination input\n  write destination input\n  write destination input\n" ++
+        "  return @storage.length destination\n");
+    defer module.deinit(a);
+    try publishGeneratorModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishGeneratorModule, .{@as([]const core.Module, &.{module})});
+}
+test "scratch generator writer admission declines borrowed and owning row layouts" {
+    for ([_][]const u8{ "&source[0..1]", "#[input]" }) |element| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const write = func (destination: ResizeArray U32) -> (source: Array U32) -> (input: U32) => return do:\n  let generated = @array.generate 1 (func (_: U32) => return ");
+        try text.appendSlice(a, element);
+        try text.appendSlice(a, ")\n  @storage.push destination (@storage.length generated[0])\nentry const answer = func (input: U32) => return do:\n  let source = #[input]\n  let destination: ResizeArray U32 = #[]\n");
+        for (0..64) |_| try text.appendSlice(a, "  write destination source input\n");
+        try text.appendSlice(a, "  return @storage.length destination\n");
+        var module = try lower(a, text.items);
+        defer module.deinit(a);
+        var result = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 128 });
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic != null);
+        try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
+    }
+}
 test "loaded nominal fields keep semantic witnesses across cached generic contexts" {
     var module = try lowerWithCatalog(a, "type Maybe a is data = $Some a | $Nothing\n" ++
         "const ResizeArray.length = func (values: ResizeArray a): U32 => return @storage.length values\n" ++

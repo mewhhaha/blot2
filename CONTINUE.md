@@ -32,6 +32,15 @@ filtered writer-decline diagnostics are identifying the precise admission gate.
 Do not raise engine, source or storage caps to conceal this failure. Probe drivers
 live below ignored build/; tracked full-main/Pen runners remain authoritative.
 
+Writer planning now admits fixed scratch fill/generate with exact inline element
+layouts and checked callbacks. Runtime indices are typed U32, never literals;
+normal child ownership/region/ordered-effect validation remains authoritative.
+The128-expression law fails on the old compiler and passes with exhaustive OOM;
+borrowed/owning row negatives publish no bytes. Seven affected native laws pass,
+all2,700 compile, and guests are49passes/1known baseline. Executed callbacks cover
+ordered destination effects and implicit global reads after mutation. Astra
+review, lint/format pass; the full gate was attempted and remains registry-blocked.
+
 Planner closures now retain obligations from their defining module. Named and
 closure planning scope and restore active goals; factory arguments are planned
 in the caller first. A minimal imported nested-callback law reproduces the old

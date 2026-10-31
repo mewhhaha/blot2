@@ -1716,7 +1716,9 @@ const Generator = struct {
             },
             else => {},
         }
-        if (self.planning_writer and (n.tag == .array or n.tag == .call or n.tag == .apply)) {
+        if (self.planning_writer and (n.tag == .array or n.tag == .call or n.tag == .apply or
+            (n.tag == .array_op and (m.arrayOperation(id) == .fill or m.arrayOperation(id) == .generate))))
+        {
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
             const owner = try self.unit(actual.unit);
             const node = owner.types.node(actual.ty);
@@ -2008,12 +2010,26 @@ const Generator = struct {
             },
             .array_op => {
                 if (!readers) return false;
-                const op: @import("collection_ops.zig").Op = @fromBackingInt(@intCast(n.c));
+                const op = m.arrayOperation(id);
+                const arguments = m.children(id);
                 switch (op) {
                     .length, .get, .identity, .cursor, .cursor_has, .cursor_value, .cursor_advance => {},
+                    .fill, .generate => {
+                        if (!self.planning_writer or arguments.len != 2) return false;
+                        const actual = try self.resolveType(.{ .unit = m.unit, .ty = n.ty }, 0);
+                        const owner = try self.unit(actual.unit);
+                        const element = @import("storage_collections.zig").element(owner, actual.ty) orelse return false;
+                        if (!try self.selectedInlineType(.{ .unit = actual.unit, .ty = element, .environment = actual.environment }, remaining)) return false;
+                    },
                     else => return false,
                 }
-                for (m.children(id)) |child| if (!try self.numericExpression(m, child, remaining, active, used, readers, depth + 1)) return false;
+                for (arguments) |argument| if (!try self.numericExpression(m, argument, remaining, active, used, readers, depth + 1)) return false;
+                if (op == .generate) {
+                    const function = (try self.planValue(m, arguments[1], remaining, depth + 1)) orelse return false;
+                    // Runtime indices carry their checked type, never a literal.
+                    const index: Value = .{ .word = .{ .id = 0 }, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = T.u32_type }, .arguments = &.{} } };
+                    if (!try self.plannedCallback(function, index, remaining, active, used, depth + 1)) return false;
+                }
             },
             .loop => {
                 const loop = m.loopInfo(id);

@@ -1454,5 +1454,27 @@
       "/tmp/gdev-stage-update-inline-cost.log",
       "/tmp/gdev-stage-update-writer-declines.log"
     ]
+  },
+  "scratch_generator_writer_planning": {
+    "fix": "Writer-only fixed fill/generate scratch descriptors require exact selected inline elements; both operands and exact callback walked; typed U32 runtime index has no literal; ordinary child emission owns allocation/alias/trace/region checks",
+    "baseline": "OldHEAD backend with current regression fails128 source-expression limit; fixed passes same bound with8writercalls",
+    "native": "Newpositive PASS exhaustiveOOM; borrowed/owning element negative PASS zero bytes;7affectednative laws PASS fullOOM wherewrapped; all2700 inventory compile",
+    "executed": "New4tests PASS bothtiers syncasync: per-index captured destination effects and implicit mutable global reads afterlocalaliasmutation. Affectedbatch49PASS1recorded baseline associated latent-effect result layout failure",
+    "review": "Astra xhigh final22line review clear;2changedZiglint0; TS fmtchecks clean",
+    "full_gate": "Attempted before commit; locked Baba9.0.1 registry unsuccessful tunnel before tests",
+    "logs": [
+      "/tmp/blot-scratch-generators-baseline.log",
+      "/tmp/blot-scratch-generators-native.log",
+      "/tmp/blot-scratch-generators-regressions.log",
+      "/tmp/blot-scratch-generators-affected-guests.log",
+      "/tmp/blot-scratch-generators-full-gate.log"
+    ]
+  },
+  "simulation_boundary": {
+    "gdev_checkpoint": "e967967feb2ff0d2f1e26e19b33ecbf85c84fa83",
+    "projection": "150identically named aliases,149base owners/callbacks plus plainaudio; noFrameAccess165fieldchange",
+    "reason": "Filteredfirstdecline is unused frame.draws borrowedrow in callbackcapture; simulationprojection reaches numeric body admission",
+    "stage": "main-20e6e985a031fedf emits butroot15,274,086bytes stillinvalid,20KBsavingonly; no nativeframequalification",
+    "review": "Astra xhigh clear sourceboundary; late compiled-block outlining feasibility being measured"
   }
 }
