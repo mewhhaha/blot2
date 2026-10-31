@@ -54,12 +54,12 @@ entry const inferred = func () => return do:
   break 0
 ```
 
-`answer ()` returns 42. Closures capture immutable values, and pure local
-bindings generalize independently at each use. Higher-order functions propagate
-the inferred effect rows of callbacks. Creating an effectful closure is pure;
-calling it requires the corresponding provider. Demand parameters use `~` and
-are evaluated explicitly with `@demand`. See
-[effects and controlled IO](../compiler/effects-and-io.md).
+`answer ()` returns 42. Closures capture values; captured owner descriptors
+retain their mutable aliases. Pure local bindings generalize independently at
+each use. Higher-order functions propagate the inferred effect rows of
+callbacks. Creating an effectful closure is pure; calling it requires the
+corresponding provider. Demand parameters use `~` and are evaluated explicitly
+with `@demand`. See [effects and controlled IO](../compiler/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `break ()` is needed, and their last expression statement is discarded. A
@@ -433,23 +433,23 @@ bounds.
 ordinary tuple aliases: arithmetic, shifts, min/max, comparison masks and
 bitwise selection, literal shuffles, dot products, bit reinterpretation, an
 opt-in relaxed multiply-add, checked array load/store, and ordered or explicitly
-pairwise reductions. Each lane matches its scalar kernel bit for bit, and
-private values stay in v128 locals. Eligible independent numeric construction
-also vectorizes automatically. [SIMD semantics](../compiler/guide.md#simd)
-specify the exact arithmetic and admission limits.
+pairwise reductions. Lane, rounding and relaxed-multiply-add contracts follow
+the language guide; source spelling does not guarantee a particular optimizer
+representation. [SIMD semantics](../compiler/guide.md#simd) specify the exact
+arithmetic and admission limits.
 
-Ownership analysis removes eligible local allocations and permits safe storage
-reuse. Runtime reclamation additionally uses a tracing collector in Wasm linear
-memory; it is not an ownership-only lifetime system or the Wasm GC extension.
+Named owners and lexical lifetime checks govern the owned-storage profile.
+Aliases share writes; retained independent data requires an explicit copy. The
+profile uses planned data stacks without a tracing collector.
 
 ### Array library
 
 Arrays expose prelude members without importing `std/array`: `values.length`,
 `values.is_empty`, `values.get(index)`, and `values.set(index)(replacement)`.
 The checked operations return `Maybe`. `values[index]` reads with a bounds
-check; `values[index] := replacement` rebinds an existing local while preserving
-earlier aliases. `self` denotes the old element. Paths such as
-`world.rows[row][column] := self + 1` are supported.
+check. In the owned profile `values[index] := replacement` writes through the
+owner and its aliases; `self` denotes the old element. Nested writes require
+checked fixed rows or valid borrowed links, not arbitrary fresh child owners.
 
 Receiver members are ordinary receiver-first associated functions. For example,
 `values.get` is `Array.get values`, a function awaiting its index. Record fields
@@ -478,17 +478,17 @@ entry const answer = func () => return array.fold_left U32.add 0 values
 
 `fold_left`, `any`, and `all` propagate callback effects. Array construction
 through `generate`, `map`, `filter`, and `filter_map` requires pure callbacks.
-Array elements are homogeneous, including tuples, nested arrays, constructors
-and closures. Empty arrays infer their element type from use. Tuples use
-`(42, true)` and `(U32, Bool)` syntax; `@product.get pair 0` requires a
-statically known tuple shape.
+Array elements are homogeneous. The owned profile requires checked fixed inline
+rows and valid borrowed descriptors; arbitrary nested owning arrays and runtime
+closures are not promised. Empty arrays infer their element type from use.
+Tuples use `(42, true)` and `(U32, Bool)` syntax; `@product.get pair 0` requires
+a statically known tuple shape.
 
-Wasm stores arrays in contiguous lanes and preserves old aliases. Updates reuse
-locally owned storage when its last reference is consumed, including a single
-array carried through a loop. Direct `array.replace` calls and aliases preserve
-this reuse, as do wrappers that pass each parameter once to `@array.set`. Shared
-arrays and values whose ownership is unknown are copied. The source folds and
-predicates use loops.
+Owned-profile arrays use checked contiguous rows. Direct element writes mutate
+their owner; named grow/shrink operations follow the owner's capabilities.
+Source folds and predicates preserve iteration order and callback effects.
+Explicit copies and caller destinations express independent versions rather than
+depending on last-reference/COW optimization.
 
 The Zig const evaluator retains immutable collection values. Appending or
 prepending to the latest version uses unused buffer slots and grows the buffer

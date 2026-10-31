@@ -904,16 +904,13 @@ without changing lane order, bit reinterpretation or rounding contracts. Exact
 support for calls, stored aggregates and callbacks follows its checked layout
 rules; source spelling alone does not guarantee allocation-free execution.
 
-Eligible independent numeric array-construction kernels automatically use
-four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary
-function bodies, including private numeric locals and unconditional block
-returns; it does not recognize library names. Memory reads, effects, conditional
-branches and potentially trapping integer division remain scalar. Four checked
-F32 row fields multiplied by the same factor may share a vector product. Stores,
-calls and unproved control edges end that proof. F32 expression order and U32
-wrapping are preserved. No reduction is automatically regrouped: `f32_sum` adds
-left to right, while `f32_sum_pairwise` explicitly chooses `(a + b) + (c + d)`
-and can round differently.
+Optimizations preserve F32 expression order and U32 wrapping. No reduction may
+be silently regrouped: `f32_sum` adds left to right, while `f32_sum_pairwise`
+explicitly chooses `(a + b) + (c + d)` and can round differently. Earlier
+backend-specific automatic-vectorization admission and private-value optimizer
+measurements remain in
+[the historical guide](https://github.com/mewhhaha/blot2/blob/4b594a129df6683c900021f355dd771a3de4a311/compiler/guide.md#simd).
+They are not cost or representation guarantees for the owned-storage profile.
 
 ## Effects and host capabilities
 

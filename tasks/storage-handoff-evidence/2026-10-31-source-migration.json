@@ -76,7 +76,7 @@
   "owned_profile_guide_followup": {
     "date": "2026-10-31",
     "compiler_sha256": "9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929",
-    "guide_sha256": "5c4c94a1e17a976c3c7f0784aefab1c8ff1a3d5d75fb8233fed1508ca05ce333",
+    "guide_sha256": "c9cdbcef8bd1551f448bf57dcce4da5d2e137be512db8ecac7d820210723f3f2",
     "change": "Remove normative legacy implicit-snapshot/COW/refcount/collector optimizer prose; document named owners, aliases and explicit copies, preserving grammar, evaluation order, constant-evaluator and numeric contracts. Explicitly retain unfinished ABI3/task120 transition.",
     "astra_review": "Read-only cleanup plan approved; no claim of universal backend cutover.",
     "independent_blot_blocks": 42,
@@ -88,7 +88,8 @@
       "snapshot": 42,
       "snapshot_policy": "Explicit @storage.copy; original element1 retained while mutable copy becomes41."
     },
-    "qualification": "Guide code blocks only; full compiler/library qualification remains separate."
+    "qualification": "Guide code blocks only; full compiler/library qualification remains separate.",
+    "code_blocks_unchanged_after_prose_review": true
   },
   "documentation_cleanup_followup": {
     "date": "2026-10-31",

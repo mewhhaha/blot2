@@ -24,10 +24,10 @@ come from generator inputs, never manual output patches.
 
 ## Checked compiler fixes
 
-The installed development compiler is the reviewed contract-method candidate, SHA
-`9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929`. Older exact
-candidates remain local build artifacts; portable evidence qualifies its named
-candidate rather than every later revision.
+The installed development compiler is the reviewed contract-method candidate,
+SHA `52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004`. Older
+exact candidates remain local build artifacts; portable evidence qualifies its
+named candidate rather than every later revision.
 
 - [Imported opaque layouts](tasks/storage-handoff-evidence/2026-10-31-opaque-layouts.json)
   use exact closed producer metadata while preserving public opacity.
@@ -47,8 +47,8 @@ candidate rather than every later revision.
   failure. All 61 affected guest tests pass.
 
 [Contract methods](tasks/storage-handoff-evidence/2026-10-31-contract-methods.json)
-now select exact visible implementations with full signature/effect evidence
-and context-sensitive reusable calls. Original Gdev language tests and Ink
+now select exact visible implementations with full signature/effect evidence and
+context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main must be rechecked on this binary.
 
@@ -61,18 +61,19 @@ existing checker warnings and the broader 25-finding baseline remain visible.
 ## Remaining execution work
 
 Source checks are distinct from emitting original exports and running
-assertions. Ink's completed inventory reports 322 passes and three expected
-invalid fixtures; rerun after source changes. Gdev's 441-file inventory had
-three restore-family failures cleared by the callback fix and one icon-preview
-API migration. Refresh the final inventory after that tool/generator batch.
+assertions. The final52e Ink inventory passes all325 files:322 valid files and
+three intended semantic rejections, with matching end-of-run source digest.
+Gdev's complete990 inventory passes438 valid files plus3intended rejections; the
+final52e/current-source441-file refresh is running.
 
-Current execution frontiers include parser array-element layouts, actor
-presentation-reference qualification and the full affordance
-fixture. Original prepared-physics replay comparisons pass through the smaller
-batch counts; the 2,048-body case traps and needs diagnosis with unchanged
-limits. All nine original adapter entries now pass 71 cases per mode after
-restoring their required request-bitset owner. Preserve original workloads and
-assertions while resolving remaining issues.
+All68 original prepared-physics comparisons now pass on990, including all three
+modes at2,048fixed bodies, with named source/proxy owners and unchanged limits.
+Allnine adapter entries pass71cases per mode. On final52e, allsix Gdev
+language/Format entries, six restore entries, both restore traps and actor
+presentation's66checks pass. The parser's typed leaves execute, while its
+complete original module reaches the checked layout budget. Full affordance,
+salt-clicks and remaining original-export qualification stay open. Preserve
+original workloads and assertions while resolving those gaps.
 
 Ordinary legacy backend retirement is still unfinished (task 120). Some pure
 programs still emit ABI 3; do not fake ABI 8 with unused owners or claim that
