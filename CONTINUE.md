@@ -52,6 +52,16 @@ files; external libraries are read live. Rerun after shared dependencies settle.
 
 ## Current implementation and next work
 
+Imported closed opaque layouts now use exact validated producer metadata while
+preserving public opacity. The checked candidate and focused coverage are in
+[opaque layout evidence](tasks/storage-handoff-evidence/2026-10-31-opaque-layouts.json).
+New fixture execution exposed two further backend defects: initial `Nothing`
+refinements prune loop-carried `Some` branches, and traversing an empty typed
+row pool cannot materialize nested borrowed payloads. Preserve the original
+empty and tie assertions; do not seed dummy rows or weaken expectations. SIMD
+literal forwarding and custom Codec/Format emission also remain compiler
+frontiers.
+
 Read `AGENTS.md`, `tasks/STORAGE_REWRITE.md`, `compiler/guide.md` and
 `zig-native/CONTRACT.md`. The rewrite remains unfinished: retire the ordinary
 legacy backend and qualify remaining fixtures against named owners, preserving
