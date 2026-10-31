@@ -1118,6 +1118,41 @@
     "review": "Astraxhigh finalreviewclear",
     "lint": "2changedZigfileszerofindings;changedTypeScriptformatpasses",
     "full_gate": "attempted; lockedBabaregistryproxyunsuccessfultunnelbeforetests",
-    "main_attempt": "build/gdev-first-frame/main-213d2fc24abd7fc7 running"
+    "main_attempt": {
+      "evidence": "/workspace/blot2/build/gdev-first-frame/main-213d2fc24abd7fc7",
+      "identity": "48a6b2ec2f218b6106a9b5883ab60a1e3aa1bb0ad9404bfed7514675f8476994",
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/workspace/gdev/src/ui/station.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 19233,
+          "end": 19256,
+          "message": "Storage source expansion exceeded its expression budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    }
+  },
+  "one_million_emission_experiment": {
+    "status": "running",
+    "date": "2026-10-31",
+    "source_checkpoint": "66a2fc1113a6fb7d12ed3748082587c1b04f7c85",
+    "gdev_checkpoint": "5538a4c68c9caec93e15ebcbf7361641e4049ce3",
+    "change": "one-off native compiler build changes private WorkLimits default from500000 to1000000 expressions and adds diagnostic-only counters/phase markers; production source/default remain500000",
+    "review": "Astra xhigh conditionally recommended one bounded experiment after another finite500k root exhaustion; not automatic escalation or default approval",
+    "unchanged": "all source/ownership/layout/depth/key/guest capacities, realmain/pen.json imports and assets",
+    "compiler_sha256": "a613ed24b1e13e2373c4d94b7024157af96d744f4b1ae8e8e0f381dbba159e5c",
+    "artifact": "build/gdev-first-frame/main-29f12d755e093cf4",
+    "local_logs": [
+      "/tmp/gdev-backend-million-main.log",
+      "build/gdev-first-frame/main-29f12d755e093cf4/compiler-stderr.log"
+    ],
+    "initial_observation": "1m47s active,VmHWM861392kB; emission progressing normally",
+    "resource_caution": "prior3.70GB capture counter is cumulative volume, not peak resident memory; allowance is per function, not a global work bound",
+    "next": "use result: success=>actualguest/frame; semantic/storageerror=>fixboundary; exhaustion/resourcegrowth=>measure specificdominator, do notraiseagain"
   }
 }

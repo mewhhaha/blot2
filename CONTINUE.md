@@ -2,9 +2,17 @@
 
 ## Current cloud frontier
 
-Continue until one real Gdev frame runs in native Pen and inspect the PNG. The current main attempt is `main-213d2fc24abd7fc7`, running with pure getters
-admitted in scalar/inline mode. The preceding candidate still hit the500,000
-root emission cap, now in Ink ray/box math. No successful main Wasm or frame.
+Continue until one real Gdev frame runs in native Pen and inspect the PNG. The normal `main-213d2fc24abd7fc7` attempt advanced beyond ray/box math and
+hit the 500,000-expression root emission allowance in station UI code. No
+successful main Wasm or frame yet. The checked compiler is `66a2fc1`.
+
+Astra xhigh reviewed one bounded **1,000,000-expression experiment** after that
+result. It is running as `main-29f12d755e093cf4`; this is not a default change.
+The production default remains 500,000. ABI, ownership/source proofs, layout,
+depth, key and guest storage limits are unchanged. Keep the instrumented
+phase/work/resource evidence; choose the next action from this result. Do not
+raise it again automatically. On success, run the actual Pen guest and inspect
+the PNG; a new semantic/storage diagnostic takes priority over policy changes.
 
 A direct real `ray_box` probe found `abs` declined solely because the getter
 planner required reader mode. It now validates the receiver in its original
