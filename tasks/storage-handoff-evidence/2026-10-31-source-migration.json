@@ -126,5 +126,97 @@
     },
     "no_legacy_reader_fallback": true,
     "no_wire_or_authored_gameplay_change": true
+  },
+  "final_application_source_inventories": {
+    "date": "2026-10-31",
+    "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+    "selected_files": 766,
+    "passed": 760,
+    "expected_rejections": 6,
+    "unexpected_failures": 0,
+    "projects": {
+      "ink": {
+        "mode": "frontend-api-only",
+        "compilerIdentity": "1d459a2c4af48432ae5228af4a8ab44f26ddc34f35896aef8b71efe88d9fc259",
+        "sourceDigest": "332b6a4ca2f241680afb0a440e9b6289d5880eb8a73134e15d8c7340f1144050",
+        "selectedFiles": 325,
+        "complete": true,
+        "passed": 322,
+        "expectedRejections": 3,
+        "unexpectedFailures": 0,
+        "end_source_digest_matches": true,
+        "source_commit": "59b62fecf83ddf17aa5ef6eead45f4107d273f00",
+        "negative_expectations": {
+          "tests/rejected/app_update_of_the_wrong_type.blot": {
+            "code": "type_mismatch",
+            "reason": "A fixed update returns Unit, not elapsed seconds."
+          },
+          "tests/rejected/derived_effectful.blot": {
+            "code": "effect_mismatch",
+            "reason": "Derived compute callbacks must be pure; Foreign is not admitted."
+          },
+          "tests/rejected/handles_wrong_kind.blot": {
+            "code": "type_mismatch",
+            "reason": "Building and Pile handle kinds remain distinct."
+          }
+        },
+        "reproduce": "deno run --no-config --no-lock -A ../blot2/scripts/migration_audit.ts --project . --compiler ../blot2/zig-native/zig-out-contract-fix/bin/blotc --expectations tests/migration_expectations.json --report /tmp/ink-source-audit.json"
+      },
+      "gdev": {
+        "mode": "frontend-api-only",
+        "compilerIdentity": "8280d9b1c98fc54509907c3c29b5a8b020e944d8bce92cd6c79e2f57c530bf45",
+        "sourceDigest": "2c53243dfddcf2375dfef6405ae049426431895cb92bc6200db52c16326665c1",
+        "selectedFiles": 441,
+        "complete": true,
+        "passed": 438,
+        "expectedRejections": 3,
+        "unexpectedFailures": 0,
+        "end_source_digest_matches": true,
+        "source_commit": "8552031f6a6b2f98b50bd755d1d895115e659b16",
+        "negative_expectations": {
+          "tests/rejected/actor_and_home_ids.blot": {
+            "code": "type_mismatch",
+            "stage": "check-project",
+            "reason": "A rocket home requires HomeId; ActorId must remain a distinct type."
+          },
+          "tests/rejected/app_update_of_the_wrong_type.blot": {
+            "code": "type_mismatch",
+            "stage": "check-project",
+            "reason": "An update stage promises Unit and must reject an F32 result."
+          },
+          "tests/rejected/typed_service_answer.blot": {
+            "code": "type_mismatch",
+            "stage": "check-project",
+            "reason": "A pending U32 service response must not be consumed through a Bool method."
+          }
+        },
+        "reproduce": "deno run --no-config --no-lock -A ../blot2/scripts/migration_audit.ts --project . --compiler ../blot2/zig-native/zig-out-contract-fix/bin/blotc --expectations tests/migration_expectations.json --report /tmp/gdev-source-audit.json"
+      }
+    },
+    "scope": "Frontend/API checks including unused declarations. Original-export emission, runtime, full compiler/release and browser qualification are separate.",
+    "remaining_emission_examples": [
+      "Complete owned_devtools parser checked layout budget",
+      "Complete building-affordance fixture",
+      "Salt-clicks fixed inline layout",
+      "Icon atlas host projection form",
+      "Ordinary legacy backend retirement task120"
+    ]
+  },
+  "final_actor_qualification": {
+    "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+    "gdev_source_commit": "7029c1268dc6f12f1fd76d05fd3e25003a837aaf",
+    "entrypoints": 3,
+    "assertions": 66,
+    "original_assertions": 48,
+    "original_workload": "48 actors\u00d724 variants\u00d72 complete streams",
+    "additional_witnesses": "12 meaningful draw-toggle checks and6 shader flag/lane-boundary checks",
+    "reference_history": "Authored bounce policy already exists in pre-migration ab425424864bd17854d6f026c731c7cdf7f5ff28; update older frozen controlflow only at canonical scalar lighting boundary, product unchanged."
+  },
+  "final_gdev_runtime": {
+    "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+    "language_entries": 6,
+    "restore_entries": 6,
+    "restore_rejection_traps": 2,
+    "source_or_assertions_weakened": false
   }
 }

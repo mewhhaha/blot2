@@ -61,19 +61,21 @@ existing checker warnings and the broader 25-finding baseline remain visible.
 ## Remaining execution work
 
 Source checks are distinct from emitting original exports and running
-assertions. The final52e Ink inventory passes all325 files:322 valid files and
-three intended semantic rejections, with matching end-of-run source digest.
-Gdev's complete990 inventory passes438 valid files plus3intended rejections; the
-final52e/current-source441-file refresh is running.
+assertions. The `52e04df6` Ink inventory passes all 325 files: 322 valid files
+and three intended semantic rejections, with matching end-of-run source digest.
+Gdev's `52e04df6` inventory also passes all 441 current files:438 valid files
+and three intended rejections. Both complete audits have matching end-of-run
+source digests. Exact records and reproduction commands are in
+[the migration evidence](tasks/storage-handoff-evidence/2026-10-31-source-migration.json).
 
-All68 original prepared-physics comparisons now pass on990, including all three
-modes at2,048fixed bodies, with named source/proxy owners and unchanged limits.
-Allnine adapter entries pass71cases per mode. On final52e, allsix Gdev
-language/Format entries, six restore entries, both restore traps and actor
-presentation's66checks pass. The parser's typed leaves execute, while its
-complete original module reaches the checked layout budget. Full affordance,
-salt-clicks and remaining original-export qualification stay open. Preserve
-original workloads and assertions while resolving those gaps.
+All 68 original prepared-physics comparisons now pass on `9902355f`, including
+all three modes at2,048 fixed bodies, with named source/proxy owners and
+unchanged limits. All nine adapter entries pass 71 cases per mode. On
+`52e04df6`, all six Gdev language/Format entries, six restore entries, both
+restore traps and actor presentation's66 checks pass. The parser's typed leaves
+execute, while its complete original module reaches the checked layout budget.
+Full affordance, salt-clicks and remaining original-export qualification stay
+open. Preserve original workloads and assertions while resolving those gaps.
 
 Ordinary legacy backend retirement is still unfinished (task 120). Some pure
 programs still emit ABI 3; do not fake ABI 8 with unused owners or claim that
