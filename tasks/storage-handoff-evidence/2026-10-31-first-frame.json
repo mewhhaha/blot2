@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-31",
+  "milestone": "One actual Gdev main frame in native Pen, PNG visually inspected",
+  "success": true,
+  "attempt": "build/storage-integration/gdev-one-frame/attempt-eru2w98y",
+  "entry": "src/main.blot:main",
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiler_sha256": "e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd",
+  "configured_identity": "f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954",
+  "pen_sha256": "a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014",
+  "source_checkpoints": {
+    "gdev": "dbf45e8bcb8e98389a9e9ec2b9e2cee82542ec99",
+    "ink": "959119ddbef9a777537e595d6f37ebacb8690e97",
+    "pen": "7c03814ca050662ef320622fe037f4e8f9150868"
+  },
+  "wasm": {
+    "wasm_bytes": 45764043,
+    "defined_functions": 3961,
+    "code_body_bytes": 44567598,
+    "largest_function_body_bytes": 2245344,
+    "largest_declared_locals": 20174,
+    "largest_parameters_plus_locals": 20175,
+    "globals": 236431,
+    "sha256": "045ea901cce50e60ddc055735bfaca8db696d5243f7b429cbcd0e8ff23716414",
+    "V8_validate": true,
+    "Pen_Wasmtime49_validate": true
+  },
+  "png": {
+    "file": "2026-10-31-first-frame.png",
+    "sha256": "c1ff619ffe1e16093819fa6b5a9b158e6404f3ecabc1e13849e665aa80b0b15e",
+    "width": 640,
+    "height": 480,
+    "inspection": "Authored startup letter board is visible; this qualifies first-frame integration, not full gameplay or release performance."
+  },
+  "trace": "0 d3d3efbacc306317 685c42a4adac06bb",
+  "compiler_seconds": 2188.86,
+  "compiler_peak_sampled_rss_kib": 17388060,
+  "gpu": "llvmpipe LLVM19.1.7 Vulkan",
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "preserved": {
+    "guest_ABI": 8,
+    "session": 2,
+    "framing_schema": 26,
+    "frame_access_fields": 165,
+    "production_expression_limit": 500000,
+    "layout_limit": 100000,
+    "project_reply_bytes": 67108864
+  },
+  "pending": [
+    "Full compiler gate blocked before tests by locked Baba9.0.1 fetch through proxy",
+    "Broader library/game/host/browser/recovery qualification",
+    "Temporary compiler diagnostic removal and affected checks"
+  ]
+}
