@@ -6,11 +6,20 @@ const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
-fn publishPlainGetters(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
+}
+test "writer outlining leaves implicit global pool reads with their owning generator" {
+    var module = try lower(a, "const pool: Array U32 = #[5]\n" ++
+        "const implicit = func (destination: ResizeArray U32) => return @storage.push destination pool[0]\n" ++
+        "const explicit = func (destination: ResizeArray U32) -> (source: Array U32) => return @storage.push destination source[0]\n" ++
+        "entry const answer = func (input: U32) => return do:\n  let source = pool\n  source[0] := @u32.add input 7\n  let rows: ResizeArray U32 = #[input]\n  implicit rows\n  explicit rows source\n  return rows[1]\n");
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
 test "plain getters preserve exact dispatch through selected inline helpers" {
     var parts: [103][]const u8 = undefined;
@@ -27,8 +36,8 @@ test "plain getters preserve exact dispatch through selected inline helpers" {
     defer a.free(source);
     var module = try lowerWithCatalog(a, source, true);
     defer module.deinit(a);
-    try publishPlainGetters(a, &.{module});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPlainGetters, .{@as([]const core.Module, &.{module})});
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
 fn publishScratchWriter(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });

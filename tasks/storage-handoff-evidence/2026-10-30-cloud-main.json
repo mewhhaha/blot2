@@ -1185,6 +1185,13 @@
       "max_snapshot": 186,
       "hits": 75570,
       "misses": 1607
+    },
+    "retry_after_chart_regions": {
+      "artifact": "build/gdev-first-frame/main-8320eac6eff57b00",
+      "status": "running",
+      "blot_base": "8594c321b96efcc5b8ddf6bfae8b16301e4baa10",
+      "gdev_base": "92503ebb82d789075d623e88bdba6c7dafcd5fb5",
+      "note": "same1Mceiling; predatesimplicitglobaladmissionguard; productiondefaultstill500k"
     }
   },
   "writer_scratch_regions": {
@@ -1206,5 +1213,15 @@
     "broader": "output.blot missing_file atminor_support/owned beforeexecution; notqualified",
     "review": "Astraxhigh finalreviewclear",
     "contracts": "framing26,ABI8/session2,activecodecs/capacitiesunchanged"
+  },
+  "writer_implicit_global_admission": {
+    "reproduction": "validwriterreads globalArray aftermutation; beforeguard bothmodesfailedemit withchildmissingglobalcatalog",
+    "change": "afterexternalreferenceresolution, globalcollectionelementtype causescleanoptionaladmissiondecline; nochildglobalcatalogauthorityadded; ordinaryscopeusesthelivepool; explicitlypasseddescriptorsunaffected",
+    "native_inventory": 2689,
+    "native": "newlow512lawPASSwithfullexhaustiveOOM",
+    "executed": "bothmodes sync/async repeatedmutations passimplicitandexplicitwriters; affectedbatch29PASS1confirmedbaselineassociatedfailure; nestedMaybePASS",
+    "lint": "2changedZigfiles0findings;TSformatpasses",
+    "full_gate": "attempted; lockedBabaregistryproxyunsuccessfultunnel",
+    "review": "Astraxhighconfirmed exactemittercondition anddeclineboundary"
   }
 }

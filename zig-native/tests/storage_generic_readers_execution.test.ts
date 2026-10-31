@@ -5,6 +5,18 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const longField = "x".repeat(7000);
 const source = `import * as array from "std/array"
 const keeper: Array U32 = #[123]
+const implicit_pool: Array U32 = #[5]
+const implicit_writer = func (destination: ResizeArray U32) => return do:
+  destination.push implicit_pool[0]
+const explicit_writer = func (destination: ResizeArray U32) -> (pool: Array U32) => return do:
+  destination.push pool[0]
+entry const global_writer = func (input: U32) => return do:
+  let pool = implicit_pool
+  pool[0] := @u32.add input 7
+  let destination: ResizeArray U32 = #[input]
+  implicit_writer destination
+  explicit_writer destination pool
+  return #[destination[0], destination[1], destination[2]]
 const region_writer = func (destination: ResizeArray U32) -> (input: U32) => return do:
   let first: GrowArray U32 = #[input]
   let second: ResizeArray U32 = #[@u32.add input 1]
@@ -170,6 +182,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
             );
           }
           for (const input of [0, 1, 100]) {
+            assert.deepEqual(
+              await call("global_writer", input),
+              new Uint32Array([input, input + 7, input + 7]),
+            );
             assert.deepEqual(
               await call("region_reuse", input),
               new Uint32Array([

@@ -5,8 +5,8 @@
 Continue until one real Gdev frame runs in native Pen and inspect the PNG. The first bounded 1,000,000-expression experiment (`main-29f12d755e093cf4`)
 passed the former root cap and stopped at504,593 with an unresolved element
 layout in output_chart. The production default is still500,000; this is not a
-policy qualification or a successful main Wasm/frame. Next rebuild the same
-1M experiment with the checked writer-region and chart fixes below, then follow
+policy qualification or a successful main Wasm/frame. The same1M retry `main-8320eac6eff57b00` is running with the writer-region and
+chart fixes, preceding the implicit-global admission guard. Follow
 the actual main to a real Pen PNG. No further automatic cap increase.
 
 A persistent-pool witness exposed scratch Grow/Resize regions overlapping a
@@ -20,6 +20,13 @@ scope exit. Three affected native laws pass, including exhaustive OOM; all2,688
 compile. The broad guest batch remains29passes/1known baseline failure. Astra
 xhigh reviewed the fix; lint/format pass and the required full gate was attempted
 but is registry blocked.
+
+Optional writer admission now declines implicit references to global collections,
+which belong to the caller's named-pool catalog. Ordinary scoped emission reads
+the live pool; explicit descriptor arguments remain eligible. A mutated-global
+regression passes with both implicit and explicit writers in both tiers and
+sync/async, plus exhaustive native OOM. The affected guest batch remains29/1
+with the recorded baseline failure. All2,689 native tests compile.
 
 Chart interpolation uses the existing F32.lerp family explicitly. advance_into
 now takes the named row owner, rates owner and plain Layout, creates its old-row

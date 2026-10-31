@@ -1854,6 +1854,9 @@ const Generator = struct {
                 const source = try self.unit(ref.unit);
                 const kind = source.binding(ref.binding).kind;
                 if (kind != .local and kind != .parameter) {
+                    // Children receive pool descriptors explicitly; they do
+                    // not own the caller's persistent-global catalog.
+                    if (kind == .global and @import("storage_collections.zig").element(source, source.binding(ref.binding).ty) != null) return false;
                     const body = source.body(ref.binding) orelse return false;
                     if (body.is_function) {
                         if (!readers) return false;
