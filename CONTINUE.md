@@ -17,11 +17,13 @@ mutation pass in both tiers and sync/async. Its full retry
 
 Use compile-only probes of the real `game.played.update` and `.render` with
 `world.with_owners`, `host.with_frame` and canonical FrameAccess to isolate late
-failures cheaply. They do not qualify initialization, events, packet encoding,
-total-main work or a frame. Update now passes jetpack and ReturningHome and
-reaches an unresolved layout in salt_simulation. Render passes the callback
-planner crash, brush edges and kite lightning, then reaches unresolved add
-dispatch. Gdev85c80ee checkpoints scalar interpolation and lightning ownership.
+failures cheaply. Update now passes ReturningHome, salt simulation and arena
+interpolation, then stops at `locale.keys`; render passes nominal field dispatch
+and menu construction, then stops at `title.title_colors`. Both are implicit
+global collection references under investigation. Salt's lower result is
+explicit Maybe F32; arena uses its scalar F32.lerp and passes endpoint/clamping
+checks in both tiers/sync-async. Ink menu now builds sprites into GrowArray and
+freezes once; all three menu laws, including left/right highlight order, pass.
 Current local probe drivers are below ignored `build/`; the tracked full-main
 and Pen runners remain the integration authority.
 
@@ -43,6 +45,14 @@ exhaustive OOM; recursion rejection passes and all2,697 tests compile. The guest
 batch is 37passes/1recorded baseline failure. Astra xhigh reviewed the one-line
 fix; lint/format pass and the required full gate was attempted (registry
 blocked).
+
+Loaded user nominal fields now retain checked semantic witnesses. Closed
+cached layouts carry empty-context evidence; open generic layouts capture the
+selected substitutions. Imported Vector/Pose readers reproduce the old add
+dispatch failure and execute in both tiers/sync-async with retained values,
+owner mutation and signed zero. The native law passes exhaustive OOM; all2,698
+native tests compile and the affected guest batch is39passes/1known baseline
+associated-result layout failure. Astra xhigh review and changed-file lint pass.
 
 Late scoped-only local compaction is retained (`d2a09a2`): single-definition i32
 locals confined to one straight-line segment reuse dead slots after ownership

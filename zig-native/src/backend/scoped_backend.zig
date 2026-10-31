@@ -354,16 +354,25 @@ const Generator = struct {
         if (self.plain_layouts.get(key)) |template| return self.cloneLayout(template);
         self.layout_steps += 1;
         if (self.layout_steps > 100_000) return self.fail(m, id, .storage_unsupported, "Storage layout exceeded its checked node budget");
-        const value = try self.shapeUncached(m, id, ty, depth);
+        var value = try self.shapeUncached(m, id, ty, depth);
         // A concrete shape reached through a generic substitution is not a
         // declaration-wide fact. Only independently closed immutable types may
         // use this key; owning/borrowed descriptors retain full live evidence.
+        var closed = false;
         if (plainShape(value)) {
             var remaining = 100_000 - self.layout_steps;
-            const closed = call_plan.inlineType(m, ty, &remaining, 0);
+            closed = call_plan.inlineType(m, ty, &remaining, 0);
             self.layout_steps = 100_000 - remaining;
-            if (closed) try self.plain_layouts.put(self.allocator, key, try self.cloneLayout(value));
         }
+        // Loaded user nominal fields retain their checked semantic type even
+        // when a generic projection has not resolved its own result variable.
+        // Constructor-local mappings have unwound here. Closed cache entries
+        // must not retain unrelated caller substitutions.
+        if (value.type_evidence == null and value.nominal != null and m.types.node(ty).tag == .nominal) value.type_evidence = .{
+            .root = .{ .unit = m.unit, .ty = ty },
+            .arguments = if (closed) &.{} else try self.captureTypes(),
+        };
+        if (closed) try self.plain_layouts.put(self.allocator, key, try self.cloneLayout(value));
         return value;
     }
     fn cloneLayout(self: *Generator, template: Value) Error!Value {

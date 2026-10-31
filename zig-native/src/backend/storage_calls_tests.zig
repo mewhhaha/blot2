@@ -12,6 +12,25 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+test "loaded nominal fields keep semantic witnesses across cached generic contexts" {
+    var module = try lowerWithCatalog(a, "type Maybe a is data = $Some a | $Nothing\n" ++
+        "const ResizeArray.length = func (values: ResizeArray a): U32 => return @storage.length values\n" ++
+        "const View.at = func (values: View a) -> (index: U32) => return @storage.read values index\n" ++
+        "type Vector is data = $Vector {x: F32}\ntype Pose is data = $Pose {position: Vector}\n" ++
+        "const vector = func (x: F32) => return $Vector {x}\n" ++
+        "const Vector.add = func (left: Vector) -> (right: Vector) => return vector (@f32.add left.x right.x)\n" ++
+        "const rows = func (pool: ResizeArray (Maybe a)): &[Maybe a] => return &pool[0..pool.length]\n" ++
+        "const shifted = func access -> tag => return do:\n  let poses = rows access.pool\n  let $Some pose = poses.at 0 else:\n    return (tag, vector 0.0)\n  return (tag, @type.call \"add\" pose.position (vector 1.0))\n" ++
+        "entry const answer = func (input: F32) => return do:\n" ++
+        "  let pool: ResizeArray (Maybe Pose) = #[$Some $Pose {position: vector input}]\n" ++
+        "  let (integer, first) = shifted {pool} 7\n" ++
+        "  pool[0] := $Some $Pose {position: vector (@f32.add input 10.0)}\n" ++
+        "  let (floating, second) = shifted {pool} input\n" ++
+        "  return #[@u32.to_f32 integer, first.x, floating, second.x]\n", true);
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
 test "inline generic result witnesses preserve distinct same layout nominal instances" {
     var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
         "type Actor is data = $Actor U32\ntype Pose is data = $Pose U32\n" ++

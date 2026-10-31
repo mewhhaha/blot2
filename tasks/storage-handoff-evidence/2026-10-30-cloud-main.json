@@ -1366,5 +1366,43 @@
     "jetpack": "3existing scalar F32.lerp selections, preserving formulas/operand order; thrust start/full/rebound runtimePASS both tiers/sync-async; Falling x/z compile coverage from real update probe",
     "lightning": "GrowArrayDraw push/freeze preserves4main and3branch ordering;7strokes91points parameters/endpoints and older borrows afterappend92 runtimePASS both tiers/sync-async",
     "review": "Astra xhigh final review passes; no formats/ABI/capacities changed"
+  },
+  "nominal_field_semantic_witnesses": {
+    "bug": "Loaded user nominal fields lost semantic evidence; physical Pose/Vector fields could not resolve associated add after a generic view projection",
+    "fix": "Attach checked nominal root after constructor mappings unwind; independently closed templates use empty substitutions, open layouts capture selected substitutions; descriptor nominal branches excluded",
+    "native": "New law PASS exhaustiveOOM1.63s; four affected laws PASS; all2698 native inventory compiles",
+    "executed": "Imported Vector/Pose/row readers with U32/F32 generic contexts, retained values, owner mutation and signedzero; baselineFAIL bothtiers; fixedPASS bothtiers sync/async; affectedbatch39PASS1known baseline associated-effect result layout failure",
+    "review": "Astra xhigh final code/regression review clear; changed Zig lint0, TS no-config format clean",
+    "full_gate": "Attempted before commit; locked Baba9.0.1 registry proxy unsuccessful tunnel before tests",
+    "logs": [
+      "/tmp/blot-nominal-fields-full-gate.log",
+      "/tmp/blot-nominal-fields-regressions.log"
+    ]
+  },
+  "menu_and_arena_source": {
+    "ink_menu": "GrowArray Sprite push/freeze preserving optional highlight/arrowglyph order; three tests/nine checks PASS bothtiers sync/async; old overlay reproduces loop storage_escape; Astra review clear",
+    "gdev_salt": "Exact Maybe F32 lower result annotation; trace Nothing span8063..8071; actual update advances beyond salt",
+    "gdev_arena": "Select scalar F32.lerp; standalone old baseline layout0 and only-call-selection overlay5085B; real expanding5/starter samples[-1,0,.5,1,2] yield extents[13,13,21,29,29] and reveal[0,0,.5,1,1] bothtiers sync/async",
+    "update_frontier": {
+      "artifact": "main-28e4e83cb629baff",
+      "file": "src/platform/locale.blot",
+      "span": [
+        11261,
+        11265
+      ],
+      "reference": "keys",
+      "log": "/tmp/gdev-stage-update-arena.log"
+    },
+    "render_frontier": {
+      "artifact": "main-42e51693d14b3e46",
+      "file": "src/ui/title.blot",
+      "span": [
+        6840,
+        6852
+      ],
+      "reference": "title_colors",
+      "log": "/tmp/gdev-stage-render-menu.log"
+    },
+    "qualification": "Focused compile-only stages; no actual main or Pen frame success; ABI8/session2/framing26/capacities unchanged"
   }
 }
