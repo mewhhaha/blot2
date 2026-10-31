@@ -78,7 +78,7 @@ fn Builder(comptime Module: type) type {
             if (source == 0 or source >= self.module.nodes.len) return error.Unavailable;
             return self.module.nodes[source];
         }
-        fn namedFunction(self: *Self, original: @import("core.zig").BindingRef, actual: u32, depth: usize) Error!?terms.Id {
+        fn namedFunction(self: *Self, original: @import("core.zig").BindingRef, actual: u32, use: enum { value, invocation }, depth: usize) Error!?terms.Id {
             var target = original;
             var producer: *const @typeInfo(Module).pointer.child = self.module;
             for (0..128) |_| {
@@ -104,6 +104,10 @@ fn Builder(comptime Module: type) type {
                 if (binding.kind != .global or binding.body_id == 0 or binding.body_id >= producer.bodies.len or binding.scheme.generative.len != 0) return null;
                 const body = producer.bodies[binding.body_id];
                 if (!body.is_function) return null;
+                // Source callback values publish recipes only for these two
+                // roles. Reading an ordinary closed global does not invoke it
+                // or claim that its future arguments cannot be stored.
+                if (use == .value and binding.capability_flow != .identity and binding.capability_flow != .input_shape) return null;
                 const relocation = @import("generative_relocation.zig").Relocation.init(producer, self.module, binding.scheme, actual, actual, 0, 0) catch return error.Unavailable;
                 const work = 65_536 - relocation.remaining;
                 if (work > self.remaining) return error.CapabilityAnalysisLimit;
@@ -145,7 +149,7 @@ fn Builder(comptime Module: type) type {
                     if (binding.kind == .parameter) return 0;
                 }
             }
-            if (self.input_globals) if (try self.namedFunction(value, actual, depth + 1)) |function| return function;
+            if (self.input_globals) if (try self.namedFunction(value, actual, .value, depth + 1)) |function| return function;
             if (self.input_globals) {
                 if (value.unit != 0 and value.unit != self.module.unit) return 0;
                 if (value.binding < self.module.bindings.len and self.module.bindings[value.binding].kind == .global) return 0;
@@ -178,7 +182,7 @@ fn Builder(comptime Module: type) type {
                         return self.expression(call.body, &nested, depth + 1);
                     }
                     if (self.input_globals) if (flow.coreCall(self.module, source)) |call| {
-                        const function = (try self.namedFunction(call.target, call.signature, depth + 1)) orelse return error.Unavailable;
+                        const function = (try self.namedFunction(call.target, call.signature, .invocation, depth + 1)) orelse return error.Unavailable;
                         var arguments: [16]terms.Id = undefined;
                         for (call.arguments[0..call.len], 0..) |argument, index| arguments[index] = try self.expression(argument, environment, depth + 1);
                         return self.store.invoke(self.allocator, function, arguments[0..call.len]);

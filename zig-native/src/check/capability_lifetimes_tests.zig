@@ -1155,3 +1155,76 @@ test "discarded canonical Unit statements preserve exact immutable no-store cont
     try discardedUnitContractLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, discardedUnitContractLaw, .{});
 }
+
+const ordinary_callback_values_source =
+    \\const encode = func (value: F32) => return #[value]
+    \\const decode = func (values: Array F32) => return values[0]
+    \\const store_callback = func (callback: Unit -> U32) => return #[callback]
+    \\const identity = func (value: U32) => return value
+    \\const wrap = func (value: U32) => return {value}
+    \\const metadata = func (key: U32) => return {key, encode, decode, store_callback, identity, wrap}
+;
+
+fn ordinaryCallbackValuesLaw(allocator: std.mem.Allocator) !void {
+    var module = try lower(allocator, ordinary_callback_values_source);
+    defer module.deinit(allocator);
+    var factory: ?C.Body = null;
+    var encode: C.BindingId = 0;
+    var stored_callback: C.BindingId = 0;
+    for (module.bodies) |body| {
+        if (std.mem.eql(u8, module.name(body.declaration_name), "metadata")) factory = body;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "encode")) encode = body.binding;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "store_callback")) stored_callback = body.binding;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "identity")) module.bindings[body.binding].capability_flow = .identity;
+        if (std.mem.eql(u8, module.name(body.declaration_name), "wrap")) {
+            module.bindings[body.binding].capability_flow = .input_shape;
+            module.bindings[body.binding].capability_parameters = .init(1, 1);
+        }
+    }
+    try std.testing.expect(factory != null and encode != 0 and stored_callback != 0);
+    // An ordinary syntactic product summary is not an advertised no-store
+    // callable recipe. Frozen import contexts can retain these summaries.
+    for ([_]C.BindingId{ encode, stored_callback }) |binding| {
+        try std.testing.expectEqual(.unknown, module.bindings[binding].capability_flow);
+        module.bindings[binding].capability_parameters = .init(1, 1);
+    }
+    const body = factory.?;
+    // Install exact frozen claims independently of whether this small module
+    // needs a public capability catalog. The immutable reader proves them.
+    module.bindings[body.binding].capability_flow = .input_shape;
+    module.bindings[body.binding].capability_parameters = .init(1, 1);
+    const binding = module.bindings[body.binding];
+    try std.testing.expectEqual(.input_shape, binding.capability_flow);
+    try std.testing.expectEqual(@as(u16, 1), binding.capability_parameters.result());
+    const reader = @import("capability_contract_core.zig");
+    var graph: @import("capability_contracts.zig").Store = .{};
+    defer graph.deinit(allocator);
+    const root = (try reader.derive(allocator, &graph, &module, body, binding.capability_parameters)).?;
+    try std.testing.expectEqual(@as(u16, 1), try graph.view().parameterMask(root));
+    var checked_fields: usize = 0;
+    for (module.field_names) |field| {
+        const spelling = module.name(field.spelling);
+        if (!std.mem.eql(u8, spelling, "encode") and !std.mem.eql(u8, spelling, "store_callback") and !std.mem.eql(u8, spelling, "identity") and !std.mem.eql(u8, spelling, "wrap")) continue;
+        const selected = try graph.project(allocator, root, field.symbol, .field);
+        const expected: @import("capability_contracts.zig").Tag = if (std.mem.eql(u8, spelling, "encode") or std.mem.eql(u8, spelling, "store_callback")) .empty else .callable;
+        try std.testing.expectEqual(expected, graph.nodes.items[selected].tag);
+        checked_fields += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 4), checked_fields);
+    try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
+    for ([_]C.BindingId{ encode, stored_callback }) |target| {
+        // A forged marker must still force independent body reconstruction,
+        // including when the callback is reached only as a returned field.
+        module.bindings[target].capability_flow = .input_shape;
+        try std.testing.expect(!reader.inputBody(&module, body, binding.capability_parameters));
+        try derivedAbsent(allocator, &module, body);
+        try std.testing.expectError(error.InvalidArtifact, @import("frozen_core_validation.zig").validate(allocator, &module, .{}));
+        module.bindings[target].capability_flow = .unknown;
+    }
+    try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
+}
+
+test "ordinary closed callback values retain footprints without gaining no-store recipes through OOM" {
+    try ordinaryCallbackValuesLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, ordinaryCallbackValuesLaw, .{});
+}

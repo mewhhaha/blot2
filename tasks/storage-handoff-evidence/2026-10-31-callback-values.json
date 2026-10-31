@@ -1,0 +1,59 @@
+{
+  "change": "Immutable Core now classifies ordinary named callback VALUE references exactly as the Source producer: only identity/input_shape declarations advertise callable no-store recipes. The exact owning global is resolved before classification. Direct INVOCATION remains on the existing independently reconstructed recipe path; inputStore, ownership and capability authority checks are unchanged.",
+  "source_paths": [
+    "zig-native/src/check/capability_contract_core.zig",
+    "zig-native/src/check/capability_lifetimes_tests.zig",
+    "zig-native/tests/scoped_callback_value_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-callback-fix/bin/blotc",
+    "sha256": "9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "native": {
+    "path": "zig-native/zig-out-callback-native-dev/bin/blot-tests",
+    "sha256": "ccb53af2ab3333ed676668f35939768809244d8391d1487595afc5f820a41830",
+    "compiled_inventory": 2728,
+    "selected": 396,
+    "passed": 395,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "focused_passed": 1,
+    "focused_coverage": [
+      "full allocation-failure sweep through Source lowering and independent Core recipe derivation/validation",
+      "factory caller-input mask remains1",
+      "ordinary scalar encoder and callable-storer fields retain closed footprints without callable recipes",
+      "genuine identity and input_shape wrapper fields retain callable recipes",
+      "forged input_shape marker on either ordinary storer rejects independent returned-field reconstruction and frozen validation"
+    ]
+  },
+  "guest": {
+    "passed": 59,
+    "failed": 0,
+    "coverage": "Prior57 guest laws plus2 new imported callback-factory laws, both tiers and sync/JSPI. New laws cover ordinary encode/decode, genuine identity/wrap invocation, reexport alias, fresh and retained builds, failed producer type edit and byte-identical recovery. No backend checkpoint or persisted artifact reload support inferred."
+  },
+  "integration": {
+    "original_restore": {
+      "passed": 6
+    },
+    "original_restore_traps": {
+      "passed": 2
+    },
+    "original_versions_helper": {
+      "frontend": "passed"
+    },
+    "source_edits": false,
+    "root_cause": "versions.metadata_codec returns closed ordinary encoder/decoder globals; Core eagerly reconstructed encoder(value:F32)=>#[value] when reading the callback VALUE and incorrectly applied no-store argument checks. Source did not advertise that callback recipe. Old frozen validation rejected at catalogs deriveWithOwners root null."
+  },
+  "review": "Astra xhigh approved the exact final implementation, strict invocation/no-store boundaries, forged-marker rejection and regression coverage.",
+  "lint": "Both changed Zig files zero analyzer findings; Zig formatting, TS deno fmt --no-config and git diff whitespace pass.",
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 npm.jsr.io dependency fetch blocked before tests by Operation not permitted; no manifest/dependency/TLS changes"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy owners, casts, opacity fallback, source workaround, Gdev/Ink/Pen edits, main/GPU build, broad exception catching, weakened inputStore or advertised no-store proof. All temporary restore diagnostic prints reverted.",
+  "date": "2026-10-31"
+}
