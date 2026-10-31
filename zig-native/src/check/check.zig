@@ -921,6 +921,11 @@ const Engine = struct {
     expr_types: []T.Id,
     resolved: []BindingId,
     bindings: std.ArrayList(Binding) = .empty,
+    /// Header lookup never admits a producer graph. These borrowed interfaces
+    /// live only for this check; only demanded imports become typed bindings.
+    imported_values: std.AutoHashMapUnmanaged(ExternalTarget, ImportedBinding) = .empty,
+    imported_globals: std.AutoHashMapUnmanaged(symbols.Symbol, ExternalTarget) = .empty,
+    imported_qualified: std.AutoHashMapUnmanaged(Qualified, ExternalTarget) = .empty,
     merges: std.ArrayList(Merge) = .empty,
     obligations: std.ArrayList(T.Obligation) = .empty,
     pending: std.ArrayList(PendingObligation) = .empty,
@@ -1086,7 +1091,7 @@ const Engine = struct {
                 continue;
             }
             const declaration = tree.valueDecl(id);
-            if (self.catalogs.globals.contains(declaration.name)) {
+            if (self.hasGlobal(declaration.name)) {
                 try self.diagnostic(.duplicate_name, id);
                 continue;
             }
@@ -1149,14 +1154,14 @@ const Engine = struct {
         try self.indexAssociated();
         for (inherited_fixities) |fixity| {
             if (local_fixities.contains(fixity.operator)) continue;
-            const binding = if (fixity.external) |external| self.catalogs.external_targets.get(external) else try self.catalogBinding(fixity.target);
-            if (binding == null) try self.diagnostic(.unknown_name, fixity.origin);
+            const present = if (fixity.external) |external| self.catalogs.external_targets.contains(external) or self.imported_values.contains(external) else self.hasCatalogBinding(fixity.target);
+            if (!present) try self.diagnostic(.unknown_name, fixity.origin);
         }
         // A source declaration named namespace.member cannot silently hide an
         // imported declaration whose identity is the same numeric pair.
         for (tree.roots.items) |id| if (tree.node(id).tag == .value_decl) {
             if (self.qualifiedKey(tree.valueDecl(id).name)) |key|
-                if (self.catalogs.qualified.contains(key)) try self.diagnostic(.duplicate_name, id);
+                if (self.hasQualified(key)) try self.diagnostic(.duplicate_name, id);
         };
     }
     fn validateModuleBodies(self: *Engine) T.Error!void {
@@ -1275,14 +1280,14 @@ const Engine = struct {
         const separator = std.mem.findScalar(u8, text, '.') orelse return null;
         return .{ .namespace = self.pool.lookup(text[0..separator]) orelse return null, .member = self.pool.lookup(text[separator + 1 ..]) orelse return null };
     }
-    fn qualifiedBinding(self: *Engine, name: symbols.Symbol) Allocator.Error!?BindingId {
+    fn qualifiedBinding(self: *Engine, name: symbols.Symbol) T.Error!?BindingId {
         if (self.catalogs.qualified_symbols.get(name)) |found| return found.binding;
         const key = self.qualifiedKey(name) orelse return null;
-        const binding = self.catalogs.qualified.get(key) orelse return null;
+        const binding = try self.qualifiedImportBinding(key) orelse return null;
         try self.catalogs.qualified_symbols.put(self.allocator, name, .{ .namespace = key.namespace, .binding = binding });
         return binding;
     }
-    fn globalBinding(self: *Engine, name: symbols.Symbol) Allocator.Error!?BindingId {
+    fn globalBinding(self: *Engine, name: symbols.Symbol) T.Error!?BindingId {
         // Resolve source value paths through the lexical root first. Fixity
         // declarations use the separate immutable global catalog below.
         const text = self.pool.get(name);
@@ -1292,8 +1297,9 @@ const Engine = struct {
         }
         return self.catalogBinding(name);
     }
-    fn catalogBinding(self: *Engine, name: symbols.Symbol) Allocator.Error!?BindingId {
+    fn catalogBinding(self: *Engine, name: symbols.Symbol) T.Error!?BindingId {
         if (self.catalogs.globals.get(name)) |binding| return binding;
+        if (self.imported_globals.get(name)) |target| return self.importedBinding(target);
         return self.qualifiedBinding(name);
     }
     pub fn sourceDuplicateName(self: *const Engine) ?ast.Id {
@@ -1305,12 +1311,14 @@ const Engine = struct {
                     const declaration = self.bindings.items[binding].declaration;
                     return if (self.tree.span(declaration).start < self.tree.span(constructor.identity.decl).start) declaration else constructor.identity.decl;
                 }
+                if (self.imported_globals.get(constructor.name)) |target| return self.imported_values.get(target).?.origin;
             };
         }
         const diagnostics = if (self.source_validation) self.source_header_diagnostics else self.diagnostics.items;
         for (diagnostics) |issue| if (issue.code == .duplicate_name and self.tree.node(issue.node).tag == .value_decl) {
             const name = self.tree.valueDecl(issue.node).name;
             if (self.catalogs.globals.get(name)) |binding| return self.bindings.items[binding].declaration;
+            if (self.imported_globals.get(name)) |target| return self.imported_values.get(target).?.origin;
         };
         return null;
     }
@@ -1324,7 +1332,7 @@ const Engine = struct {
     }
     pub fn sourceNonCallableEffect(self: *const Engine, symbol: symbols.Symbol) bool {
         if (self.catalogs.effect_family_names.get(self.catalogKey(symbol))) |family| return !self.effect_families.items[family].callable;
-        if (self.catalogs.globals.contains(symbol) or self.catalogs.qualified.contains(self.catalogKey(symbol)) or self.catalogOperationTemplate(symbol) != null) return false;
+        if (self.hasGlobal(symbol) or self.hasQualified(self.catalogKey(symbol)) or self.catalogOperationTemplate(symbol) != null) return false;
         const text = self.pool.get(symbol);
         var prefix_end = text.len;
         while (std.mem.findScalarLast(u8, text[0..prefix_end], '.')) |separator| {
@@ -1397,7 +1405,7 @@ const Engine = struct {
             if (definition.declared_record or (self.nominals.items[definition.nominal].is_opaque and self.types.node(definition.payload).tag == .record)) return .record;
             return .other;
         }
-        const value = try self.catalogBinding(symbol) != null or self.catalogOperationTemplate(symbol) != null or self.catalogs.effect_family_names.contains(self.catalogKey(symbol));
+        const value = self.hasCatalogBinding(symbol) or self.catalogOperationTemplate(symbol) != null or self.catalogs.effect_family_names.contains(self.catalogKey(symbol));
         return if (value) .other else .missing;
     }
     pub fn sourceMissingRecordField(self: *const Engine, symbol: symbols.Symbol, fields: []const ast.Id) ?symbols.Symbol {
@@ -1431,13 +1439,13 @@ const Engine = struct {
         return !fixity.named;
     }
     pub fn sourceOperatorTargetExists(self: *Engine, name: symbols.Symbol) Allocator.Error!bool {
-        if (try self.catalogBinding(name) != null) return true;
+        if (self.hasCatalogBinding(name)) return true;
         const key = self.catalogKey(name);
         return self.catalogs.constructor_names.contains(key) or self.catalogOperationTemplate(name) != null;
     }
     pub fn sourceQualifiedExists(self: *const Engine, namespace: symbols.Symbol, member: symbols.Symbol) bool {
         const key: Qualified = .{ .namespace = namespace, .member = member };
-        return self.catalogs.qualified.contains(key) or self.catalogs.nominal_names.contains(key) or self.catalogs.effect_family_names.contains(key) or self.catalogs.effect_operation_names.contains(key);
+        return self.hasQualified(key) or self.catalogs.nominal_names.contains(key) or self.catalogs.effect_family_names.contains(key) or self.catalogs.effect_operation_names.contains(key);
     }
     pub fn sourceValueExists(self: *Engine, name: symbols.Symbol) Allocator.Error!bool {
         if (try self.sourceOperatorTargetExists(name)) return true;
@@ -1449,7 +1457,7 @@ const Engine = struct {
             const suffix = text[self.pool.get(root).len + 1 ..];
             const end = std.mem.findScalar(u8, suffix, '.') orelse suffix.len;
             if (self.pool.lookup(suffix[0..end])) |member|
-                if (self.catalogs.qualified.contains(.{ .namespace = root, .member = member })) return true;
+                if (self.hasQualified(.{ .namespace = root, .member = member })) return true;
         }
         if (root != name and try self.sourceOperatorTargetExists(root)) return true;
         if (self.catalogs.nominal_names.contains(.{ .namespace = 0, .member = root }) or self.catalogs.effect_family_names.contains(.{ .namespace = 0, .member = root })) return true;
@@ -1577,7 +1585,7 @@ const Engine = struct {
     fn importHeader(self: *Engine, imported: SourceHeader) T.Error!void {
         std.debug.assert(self.source_validation);
         const key: Qualified = .{ .namespace = imported.namespace, .member = imported.member };
-        if (imported.expose and ((imported.namespace == 0 and self.catalogs.globals.contains(imported.name)) or (imported.namespace != 0 and self.catalogs.qualified.contains(key)))) {
+        if (imported.expose and ((imported.namespace == 0 and self.hasGlobal(imported.name)) or (imported.namespace != 0 and self.hasQualified(key)))) {
             try self.diagnostic(.duplicate_name, imported.origin);
             return;
         }
@@ -1589,21 +1597,41 @@ const Engine = struct {
         if (!imported.expose) return;
         if (imported.namespace == 0) try self.catalogs.globals.put(self.allocator, imported.name, binding) else try self.catalogs.qualified.put(self.allocator, key, binding);
     }
+    fn hasGlobal(self: *const Engine, name: symbols.Symbol) bool {
+        return self.catalogs.globals.contains(name) or self.imported_globals.contains(name);
+    }
+    fn hasQualified(self: *const Engine, key: Qualified) bool {
+        return self.catalogs.qualified.contains(key) or self.imported_qualified.contains(key);
+    }
+    fn hasCatalogBinding(self: *const Engine, name: symbols.Symbol) bool {
+        if (self.hasGlobal(name)) return true;
+        return self.hasQualified(self.catalogKey(name));
+    }
+    fn importedBinding(self: *Engine, target: ExternalTarget) T.Error!?BindingId {
+        if (self.catalogs.external_targets.get(target)) |binding| return binding;
+        const imported = self.imported_values.get(target) orelse return null;
+        return self.importScheme(imported.interface, target, if (imported.namespace == 0) imported.name else imported.member, imported.origin, 0);
+    }
+    fn qualifiedImportBinding(self: *Engine, key: Qualified) T.Error!?BindingId {
+        if (self.catalogs.qualified.get(key)) |binding| return binding;
+        const target = self.imported_qualified.get(key) orelse return null;
+        return self.importedBinding(target);
+    }
     fn importBinding(self: *Engine, imported: ImportedBinding) T.Error!void {
         const key: Qualified = .{ .namespace = imported.namespace, .member = imported.member };
-        if (imported.expose and ((imported.namespace == 0 and self.catalogs.globals.contains(imported.name)) or
-            (imported.namespace != 0 and self.catalogs.qualified.contains(key))))
+        if (imported.expose and ((imported.namespace == 0 and self.hasGlobal(imported.name)) or
+            (imported.namespace != 0 and self.hasQualified(key))))
         {
             try self.diagnostic(.duplicate_name, imported.origin);
             return;
         }
-        var binding = self.catalogs.external_targets.get(imported.target);
-        if (binding == null) {
-            binding = try self.importScheme(imported.interface, imported.target, if (imported.namespace == 0) imported.name else imported.member, imported.origin, 0);
-            if (binding == null) return;
-        }
+        self.frontend_work.import_requests += 1;
+        if (imported.interface.capability_flow == .scope_task) self.has_tasks = true;
+        if (imported.interface.capability_parameters.inputInvokes()) self.has_input_invocations = true;
+        const entry = try self.imported_values.getOrPut(self.allocator, imported.target);
+        if (!entry.found_existing) entry.value_ptr.* = imported;
         if (!imported.expose) return;
-        if (imported.namespace == 0) try self.catalogs.globals.put(self.allocator, imported.name, binding.?) else try self.catalogs.qualified.put(self.allocator, key, binding.?);
+        if (imported.namespace == 0) try self.imported_globals.put(self.allocator, imported.name, imported.target) else try self.imported_qualified.put(self.allocator, key, imported.target);
     }
     /// Copies one producer scheme. Schemes it shares are imported first, as
     /// bindings of their own, so shared uses keep pointing at shared schemes.
@@ -2035,6 +2063,16 @@ const Engine = struct {
         return T.receiverIdentity(self.types.node(self.types.head(ty, 0)));
     }
     fn indexAssociated(self: *Engine) T.Error!void {
+        var imported = self.imported_globals.iterator();
+        while (imported.next()) |entry| {
+            const text = self.pool.get(entry.key_ptr.*);
+            const dot = std.mem.findScalarLast(u8, text, '.') orelse continue;
+            const head = text[0..dot];
+            const name = self.pool.lookup(head) orelse continue;
+            if (self.builtin_catalog or self.catalogs.nominal_names.contains(.{ .namespace = 0, .member = name })) {
+                if (try self.importedBinding(entry.value_ptr.*)) |binding| try self.catalogs.globals.put(self.allocator, entry.key_ptr.*, binding);
+            }
+        }
         var globals = self.catalogs.globals.iterator();
         while (globals.next()) |entry| {
             const text = self.pool.get(entry.key_ptr.*);
@@ -2497,7 +2535,7 @@ const Engine = struct {
                     }
                     try self.importBinding(.{ .target = target, .interface = interface, .origin = imported.origin, .expose = false });
                 }
-                const binding = self.catalogs.external_targets.get(target).?;
+                const binding = (try self.importedBinding(target)).?;
                 var present = false;
                 for (self.associated.items) |prior| if (prior.identity.unit == method.identity.unit and prior.identity.decl == method.identity.decl and prior.member == method.member and prior.binding == binding) {
                     present = true;
@@ -2778,7 +2816,7 @@ const Engine = struct {
                 return;
             }
             const syntax = self.tree.implementation(id);
-            var duplicate = self.catalogs.globals.contains(syntax.name) or self.catalogs.nominal_names.contains(.{ .namespace = 0, .member = syntax.name }) or self.catalogs.contract_names.contains(.{ .namespace = 0, .member = syntax.name }) or self.catalogs.implementation_names.contains(.{ .namespace = 0, .member = syntax.name });
+            var duplicate = self.hasGlobal(syntax.name) or self.catalogs.nominal_names.contains(.{ .namespace = 0, .member = syntax.name }) or self.catalogs.contract_names.contains(.{ .namespace = 0, .member = syntax.name }) or self.catalogs.implementation_names.contains(.{ .namespace = 0, .member = syntax.name });
             for (self.implementations.items) |prior| {
                 if (prior.identity.unit == self.unit and prior.name == syntax.name) duplicate = true;
             }
@@ -3851,7 +3889,7 @@ const Engine = struct {
                     error.OutOfMemory => return error.OutOfMemory,
                     error.SymbolLimit => return error.TypeLimit,
                 };
-                if (self.catalogs.globals.contains(name)) continue;
+                if (self.hasGlobal(name)) continue;
                 const start: u32 = @intCast(self.obligations.items.len);
                 for (self.contract_predicates.items[contract.predicates.start..][0..contract.predicates.len]) |predicate| try self.obligations.append(self.allocator, predicate);
                 const source = self.member_sources.get(self.memberIndex(contract, member.name).?) orelse 0;
@@ -4763,7 +4801,7 @@ const Engine = struct {
                 continue;
             }
             const key = self.catalogKey(n.a);
-            if (self.catalogs.effect_family_names.contains(key) or self.catalogs.nominal_names.contains(key) or self.catalogs.globals.contains(n.a)) {
+            if (self.catalogs.effect_family_names.contains(key) or self.catalogs.nominal_names.contains(key) or self.hasGlobal(n.a)) {
                 try self.diagnostic(.duplicate_name, id);
                 continue;
             }
@@ -4843,7 +4881,7 @@ const Engine = struct {
         if (self.lookup(name) != null or try self.globalBinding(name) != null) return null;
         const text = self.pool.get(name);
         const root_end = std.mem.findScalar(u8, text, '.') orelse text.len;
-        if (self.pool.lookup(text[0..root_end])) |root| if (self.lookup(root) != null or self.catalogs.globals.contains(root)) return null;
+        if (self.pool.lookup(text[0..root_end])) |root| if (self.lookup(root) != null or self.hasGlobal(root)) return null;
         return self.catalogOperationTemplate(name);
     }
     fn catalogOperationTemplate(self: *const Engine, name: symbols.Symbol) ?u32 {
@@ -5288,7 +5326,7 @@ const Engine = struct {
             const argument = self.tree.node(left);
             var binding: ?BindingId = null;
             if (argument.tag == .name and self.lookup(argument.a) == null) binding = try self.globalBinding(argument.a);
-            if (argument.tag == .field_access and self.tree.node(argument.a).tag == .name and self.lookup(self.tree.node(argument.a).a) == null) binding = self.catalogs.qualified.get(.{ .namespace = self.tree.node(argument.a).a, .member = argument.b });
+            if (argument.tag == .field_access and self.tree.node(argument.a).tag == .name and self.lookup(self.tree.node(argument.a).a) == null) binding = try self.qualifiedImportBinding(.{ .namespace = self.tree.node(argument.a).a, .member = argument.b });
             const selected = binding orelse {
                 try self.diagnostic(.function_target, left);
                 return try self.types.fresh();
@@ -6589,6 +6627,12 @@ const Engine = struct {
         if (node.tag != .name) return null;
         var binding = self.resolved[source];
         if (binding == 0) {
+            const deferred_target = self.imported_globals.get(node.a) orelse self.imported_qualified.get(self.catalogKey(node.a));
+            if (deferred_target) |target| {
+                const contract = self.imported_values.get(target).?.interface.capability_parameters;
+                if (!contract.valid() or !contract.invokes()) return null;
+                return contract;
+            }
             if (self.catalogs.globals.get(node.a)) |global| binding = global else {
                 const name = self.pool.get(node.a);
                 const separator = std.mem.findScalar(u8, name, '.') orelse return null;
@@ -7970,12 +8014,12 @@ const Engine = struct {
         const first = parts.next().?;
         if (parts.peek() == null) return null;
         const root = self.pool.lookup(first) orelse return null;
-        var binding = self.lookup(root) orelse self.catalogs.globals.get(root);
+        var binding = self.lookup(root) orelse try self.globalBinding(root);
         if (binding == null) {
             const member = parts.next().?;
             if (self.editorAt(id) and parts.peek() == null and self.isNamespace(root))
                 return try self.captureEditor(id, 0, root);
-            if (self.pool.lookup(member)) |symbol| binding = self.catalogs.qualified.get(.{ .namespace = root, .member = symbol });
+            if (self.pool.lookup(member)) |symbol| binding = try self.qualifiedImportBinding(.{ .namespace = root, .member = symbol });
         }
         const target = binding orelse return null;
         var ty = if (self.bindings.items[target].kind == .global or self.bindings.items[target].kind == .external) try self.globalReference(target, id) else try self.instantiate(target, id);
@@ -11425,7 +11469,7 @@ const Engine = struct {
         var selected: ?BindingId = null;
         switch (kind) {
             .name => if (!self.discoveryShadowed(locals, name)) {
-                selected = try self.catalogBinding(name);
+                selected = self.catalogs.globals.get(name);
                 if (selected == null) {
                     const text = self.pool.get(name);
                     if (std.mem.findScalar(u8, text, '.')) |dot| {
@@ -11443,8 +11487,8 @@ const Engine = struct {
                 const target = if (declared) |override| override.target else name;
                 if ((!named or !self.discoveryShadowed(locals, target)) and (declared != null or named)) {
                     if (declared) |override| {
-                        if (override.external) |external| selected = self.catalogs.external_targets.get(external) else selected = try self.catalogBinding(target);
-                    } else selected = try self.catalogBinding(target);
+                        if (override.external) |external| selected = self.catalogs.external_targets.get(external) else selected = self.catalogs.globals.get(target);
+                    } else selected = self.catalogs.globals.get(target);
                 }
             },
         }
@@ -12178,7 +12222,7 @@ const Engine = struct {
         while (self.tree.node(parent).tag == .group) parent = self.tree.node(parent).a;
         const base = self.tree.node(parent);
         if (base.tag == .name and self.lookup(base.a) == null) {
-            if (self.catalogs.qualified.get(.{ .namespace = base.a, .member = node.b })) |binding|
+            if (try self.qualifiedImportBinding(.{ .namespace = base.a, .member = node.b })) |binding|
                 return try self.globalReference(binding, id);
             if (try self.typeConstructorValue(.{ .namespace = base.a, .member = node.b })) |ty| return ty;
         }
@@ -13024,7 +13068,7 @@ const Engine = struct {
                 } else if (try self.globalBinding(target)) |binding|
                     function_ty = try self.globalReference(binding, id);
             } else if (declared.?.external) |external| {
-                if (self.catalogs.external_targets.get(external)) |binding| function_ty = try self.globalReference(binding, id);
+                if (try self.importedBinding(external)) |binding| function_ty = try self.globalReference(binding, id);
             } else if (try self.catalogBinding(target)) |binding|
                 function_ty = try self.globalReference(binding, id);
             if (function_ty) |ty| {
@@ -14897,6 +14941,8 @@ const Engine = struct {
         return span.start <= marker.span.start and span.end == marker.span.end;
     }
     fn isNamespace(self: *const Engine, name: symbols.Symbol) bool {
+        var imported = self.imported_qualified.keyIterator();
+        while (imported.next()) |key| if (key.namespace == name) return true;
         inline for (.{ "qualified", "nominal_names", "constructor_names", "contract_names", "implementation_names", "effect_family_names", "effect_operation_names" }) |map| {
             var keys = @field(self.catalogs, map).keyIterator();
             while (keys.next()) |key| if (key.namespace == name) return true;
@@ -14968,11 +15014,30 @@ const Engine = struct {
         }
         return self.types.saveList(scope[0..count]);
     }
+    fn prepareCompletionImports(self: *Engine, capture: *const EditorCapture) T.Error!void {
+        if (capture.kind == .type_ or capture.kind == .constructor or capture.kind == .intrinsic) return;
+        const prefix = self.editor_marker.?.prefix;
+        if (capture.namespace == 0) {
+            if (capture.receiver != 0) return;
+            var names = self.imported_globals.iterator();
+            while (names.next()) |entry| {
+                if (!std.mem.startsWith(u8, self.pool.get(entry.key_ptr.*), prefix)) continue;
+                if (try self.importedBinding(entry.value_ptr.*)) |binding| try self.catalogs.globals.put(self.allocator, entry.key_ptr.*, binding);
+            }
+        } else {
+            var names = self.imported_qualified.iterator();
+            while (names.next()) |entry| {
+                if (entry.key_ptr.namespace != capture.namespace or !std.mem.startsWith(u8, self.pool.get(entry.key_ptr.member), prefix)) continue;
+                if (try self.importedBinding(entry.value_ptr.*)) |binding| try self.catalogs.qualified.put(self.allocator, entry.key_ptr.*, binding);
+            }
+        }
+    }
     fn finishHoles(self: *Engine) T.Error!void {
         const display = @import("../reuse/type_display.zig");
         for (self.holes.items) |hole| {
             if (self.editor_capture) |*capture| if (capture.node == hole.node) {
                 if (capture.context != null) continue;
+                try self.prepareCompletionImports(capture);
                 capture.names = try @import("../reuse/completion_names.zig").capture(self, capture, self.identityOf(capture.receiver));
                 capture.context = try @import("../reuse/hole_diagnostics.zig").buildNamed(self, hole.node, hole.scope, hole.owner, self.types.list(capture.scope_names));
                 continue;
@@ -15704,6 +15769,9 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         engine.diagnostics.deinit(allocator);
     }
     engine.bindings.deinit(allocator);
+    engine.imported_values.deinit(allocator);
+    engine.imported_globals.deinit(allocator);
+    engine.imported_qualified.deinit(allocator);
     engine.computed_rows.deinit(allocator);
     engine.computed_variables.deinit(allocator);
     engine.predicate_origins.deinit(allocator);

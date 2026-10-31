@@ -6,28 +6,37 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. The diagnostic runner defaults to
 a five-second build deadline and kills the compiler on timeout.
 
-Concrete anonymous field instances now share completed body admission and
-executable definitions throughout one compilation. Field recipes retain source
-declarations; every use resolves their types under its current receiver
-environment. Record keys and inline words use the same canonical field order.
-Nominal witnesses, callbacks and descriptors retain the ordinary scoped paths;
-field-associated ambient rows remain unchanged and do not establish purity.
+Nested descriptor readers and stable writers now emit shared function calls. The
+first slice accepts plain stored rows, scalar reader results and Unit writers;
+callback keys include their checked semantic frontier. Unsupported witnesses and
+aggregate results retain ordinary scoped emission. Nested calls replay
+read/write facts and transitive scratch-region requirements. Completed admission
+is shared too, so the initial call graph no longer expands repeatedly.
 
-Five alternating Safe/noLLVM pairs on a 64-field, depth-five graph improve
-median build time from **511.30 ms to 181.76 ms**, admission nodes from **69,546
-to 701**, emission expressions from **5,494 to 579**, and Wasm from **46,959 to
-12,452 bytes**. The paired scalar control remains about **91 ms**.
-[Pinned evidence](zig-native/measurements/concrete-fields-2026-10-31.json) keeps
-these synthetic results separate from Gdev: its original language fixture
-compiles in about **507 ms** and passes all six entries/11 assertions in sync
-and JSPI. Actor presentation and main still exceed the five-second cutoff. The
-whole-game target remains open. Next sample the bounded real build's admission
-declines and substitution/captured-environment work before extending sharing to
-descriptors. The field refinement fixed-point solver still runs.
+Five alternating Safe/noLLVM pairs on depth-ten storage graphs improve writer
+build time from **247.06 ms to 88.61 ms**, Wasm from **195,293 to 8,794 bytes**,
+and emission expressions from **19,565 to 218**. Reader builds improve from
+**188.07 ms to 78.78 ms**, Wasm from **57,599 to 4,930 bytes**, and admission
+nodes from **81,893 to 165**.
+[Pinned evidence](zig-native/measurements/storage-call-graph-2026-11-01.json)
+keeps these synthetic results separate from Gdev: its original language fixture
+compiles in about **469 ms** and passes six entries/11 assertions in sync and
+JSPI. Actor presentation and main still exceed the five-second cutoff. Roughly
+**1 MB of Wasm** is the owner's working expectation; the old successful main
+produced 47.4 MB, mostly code. No current whole-game size is established.
 
-The
-[previous scalar batch](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
-improved its separately pinned depth-12 graph from 676.75 ms to 88.53 ms.
+Imported names now register without copying their type graphs. First typed use
+materializes the exact producer scheme; unused imports publish no binding or
+certificate. Producer checking and associated declaration catalogs remain
+complete. Next identify the bounded real build's remaining frontend work and
+unsupported storage helpers before extending the call ABI. The field-refinement
+fixed-point solver remains.
+
+Earlier
+[scalar sharing](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
+and
+[concrete-field sharing](zig-native/measurements/concrete-fields-2026-10-31.json)
+retain their separately pinned measurements.
 
 This is a greenfield project. Breaking changes are welcome; remove superseded
 APIs and implementations. Preserve useful behavior, assertions, deterministic
@@ -83,17 +92,21 @@ context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
-Astra xhigh reviewed the semantic fixes and both performance batches. Earlier
-gate attempts on the frame candidate were blocked fetching locked Baba 9.0.1.
-This host reaches protocol preflight and fails on existing operand-span ends,
+Astra xhigh reviewed the semantic fixes and performance batches. Earlier gate
+attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
+host reaches protocol preflight and fails on existing operand-span ends,
 independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The concrete-field batch compiles all 2,736
-native tests; its affected family passes 106/107 laws with the recorded
-associated-partial baseline failure. All three new laws pass, including an
-exhaustive allocation-failure sweep for concrete-field sharing. Affected guests
-pass 60/61 with the independently reproduced associated-latent baseline; all
-four new guests pass. Full Zig lint reports zero findings across 566 source
-files. Current performance binaries have not qualified a real Gdev frame.
+qualification remains pending. The descriptor/import batch compiles all 2,742
+native tests; its storage family passes 108/109 with the recorded
+associated-partial baseline failure. The broader 305-law run passed 303; one
+obsolete import-count expectation was corrected and independently passed, while
+the same associated-partial failure remains. All six new laws pass, including
+two exhaustive allocation-failure sweeps. Affected storage guests pass 66/67
+with the independently reproduced associated-latent baseline, plus both new
+scratch-region guests. Full Zig lint reports zero findings across 567 source
+files. An additional reuse suite hits the same 16 body-cache work assertions on
+both the baseline and candidate; it does not pass. Current performance binaries
+have not qualified a real Gdev frame.
 
 ## Remaining execution work
 

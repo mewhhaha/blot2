@@ -2026,3 +2026,124 @@ test "principal row substitution preserves Foreign callback authority and prefix
         try std.testing.expect(std.mem.findScalar(T.Effects.Label, destination.rowLabels(still_effectful.c), T.foreign_operation) != null);
     }
 }
+
+// An unused interface may be much wider than the consumer's entire solver.
+// Its closed-row certificate must not become a fabricated external binding.
+test "unused wide imported schemes admit no type graph or Core certificate" {
+    const text = "entry const answer = 42\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    const wide_name = try pool.intern(a, "wide");
+    var tokens = try lexer.lex(a, text);
+    defer tokens.deinit(a);
+    var tree = try parser.parse(a, text, tokens.tokens.items, &pool);
+    defer tree.deinit(a);
+    var producer = try T.Store.init(a);
+    defer producer.deinit();
+    var variables: [128]T.Id = undefined;
+    for (&variables) |*variable| variable.* = try producer.fresh();
+    const payload = try producer.product(&variables);
+    const latent = try producer.freshEffects();
+    const arrow = try producer.functionWithEffects(payload, payload, latent);
+    const certified = try producer.closeCovariantCertified(arrow, &.{producer.row(latent).tail.variable}, &.{});
+    var baseline = try check.checkWithImports(a, &tree, &pool, &.{});
+    defer baseline.deinit(a);
+    var consumer = try check.checkWithImports(a, &tree, &pool, &.{.{ .name = wide_name, .target = .{ .unit = 2, .binding = 1 }, .origin = 0, .interface = .{ .types = .{ .store = &producer }, .scheme = .{ .root = certified.root, .variables = try producer.saveList(&variables), .closed_rows = certified.closed_rows }, .obligations = &.{} } }});
+    defer consumer.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), consumer.diagnostics.len);
+    try std.testing.expectEqual(@as(usize, 0), consumer.imported_schemes);
+    try std.testing.expectEqual(baseline.bindings.len, consumer.bindings.len);
+    try std.testing.expectEqual(baseline.types.nodes.items.len, consumer.types.nodes.items.len);
+    try std.testing.expectEqual(baseline.types.effects.variables.items.len, consumer.types.effects.variables.items.len);
+    var ir = try @import("core.zig").lower(a, &tree, &pool, &consumer);
+    defer ir.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), ir.diagnostics.len);
+    for (ir.bindings) |binding| try std.testing.expect(binding.kind != .external);
+    try @import("package_core.zig").executable(&ir, .{ .units = &.{&ir} });
+}
+
+fn lazyImportedAliases(allocator: std.mem.Allocator) !void {
+    const text = "entry const integer = identity 42\nentry const floating = Lib.identity 1.25\n";
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    const namespace = try pool.intern(allocator, "Lib");
+    const name = try pool.intern(allocator, "identity");
+    var tokens = try lexer.lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var tree = try parser.parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    var producer = try T.Store.init(allocator);
+    defer producer.deinit();
+    const variable = try producer.fresh();
+    const row = try producer.freshEffects();
+    const interface: check.SchemeInterface = .{ .types = .{ .store = &producer }, .scheme = .{ .root = try producer.functionWithEffects(variable, variable, row), .variables = try producer.saveList(&.{variable}), .row_variables = try producer.saveList(&.{producer.row(row).tail.variable}) }, .obligations = &.{} };
+    const target: check.ExternalTarget = .{ .unit = 2, .binding = 1 };
+    var consumer = try check.checkWithImports(allocator, &tree, &pool, &.{
+        .{ .name = name, .target = target, .origin = 0, .interface = interface },
+        .{ .namespace = namespace, .member = name, .target = target, .origin = 0, .interface = interface },
+    });
+    defer consumer.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), consumer.diagnostics.len);
+    try std.testing.expectEqual(@as(usize, 1), consumer.imported_schemes);
+    var external_count: usize = 0;
+    for (consumer.bindings) |binding| {
+        if (binding.kind == .external) {
+            external_count += 1;
+            try std.testing.expectEqual(target, binding.external.?);
+            try std.testing.expectEqual(@as(u32, 1), binding.scheme.row_variables.len);
+        }
+        if (binding.name == pool.lookup("integer").?) try std.testing.expectEqual(T.u32_type, binding.ty);
+        if (binding.name == pool.lookup("floating").?) try std.testing.expectEqual(T.f32_type, binding.ty);
+    }
+    try std.testing.expectEqual(@as(usize, 1), external_count);
+    try std.testing.expectEqual(@as(usize, 0), producer.versions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), producer.effects.versions.items.len);
+}
+
+test "lazy qualified and unqualified imports share one scheme and independent instantiations through OOM" {
+    try lazyImportedAliases(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lazyImportedAliases, .{});
+}
+
+fn lazyImportedSharedCallees(allocator: std.mem.Allocator) !void {
+    const producer_text =
+        \\const leaf: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
+        \\const outer = func value => return leaf value
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var producer_tokens = try lexer.lex(allocator, producer_text);
+    defer producer_tokens.deinit(allocator);
+    var producer_tree = try parser.parse(allocator, producer_text, producer_tokens.tokens.items, &pool);
+    defer producer_tree.deinit(allocator);
+    var producer = try check.checkModule(allocator, &producer_tree, &pool, &.{}, &.{}, 2);
+    defer producer.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), producer.diagnostics.len);
+    var outer: check.BindingId = 0;
+    for (producer.bindings, 0..) |binding, index| if (binding.name == pool.lookup("outer").?) {
+        outer = @intCast(index);
+    };
+    const principal = producer.bindings[outer].scheme;
+    var shared = false;
+    for (producer.obligations[principal.obligations.start..][0..principal.obligations.len]) |predicate| shared = shared or predicate.kind == .callee_use;
+    try std.testing.expect(shared);
+    const text = "entry const result: U32 = outer 21\n";
+    var tokens = try lexer.lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var tree = try parser.parse(allocator, text, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    const catalog: check.ImportedCatalog = .{ .producer = &producer, .kind = .catalog, .index = 0, .origin = 0 };
+    var consumer = try check.checkWithImports(allocator, &tree, &pool, &.{.{ .name = pool.lookup("outer").?, .target = .{ .unit = 2, .binding = outer }, .origin = 0, .interface = catalog.interface(outer) }});
+    defer consumer.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), consumer.diagnostics.len);
+    try std.testing.expectEqual(@as(usize, 2), consumer.imported_schemes);
+    for (consumer.obligations) |predicate| if (predicate.kind == .callee_use) {
+        try std.testing.expectEqual(consumer.unit, predicate.identity.unit);
+        try std.testing.expectEqual(check.Kind.external, consumer.bindings[predicate.identity.decl].kind);
+        try std.testing.expect(consumer.bindings[predicate.identity.decl].scheme.root != 0);
+    };
+}
+
+test "lazy imported shared callees retain relocated predicate evidence" {
+    try lazyImportedSharedCallees(a);
+}

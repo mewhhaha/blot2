@@ -124,8 +124,9 @@ test "diamond modules publish one principal body and independently copy imported
     try requireValid(&checked);
     try std.testing.expectEqual(@as(usize, 4), checked.modules.len);
     try std.testing.expectEqual(@as(usize, 8), checked.body_elaborations);
-    // The private arithmetic producer is copied with its shared scheme.
-    try std.testing.expectEqual(@as(usize, 11), checked.imported_schemes);
+    // Each consumer still owns twice's scheme and its private arithmetic
+    // producer. Main omits the unused common.identity and right.floating.
+    try std.testing.expectEqual(@as(usize, 9), checked.imported_schemes);
     try std.testing.expectEqual(syntax_nodes, fixture.source.unit(1).tree.nodes.items.len);
     try std.testing.expectEqual(symbols_count, fixture.source.symbols.entries.items.len);
     const shared = fixture.source.unitImports(2)[0].target;
@@ -135,9 +136,15 @@ test "diamond modules publish one principal body and independently copy imported
     try std.testing.expectEqual(@as(u32, 1), principal.scheme.obligations.len);
     try std.testing.expectEqual(@as(usize, 3), checked.module(shared).checked.body_elaborations);
     const main = &checked.module(1).checked;
-    try std.testing.expectEqual(@as(usize, 5), main.imported_schemes);
+    try std.testing.expectEqual(@as(usize, 3), main.imported_schemes);
+    const right = fixture.source.unitImports(1)[1].target;
+    const unused_targets = [_]check.ExternalTarget{
+        try exported(&checked, &fixture.source, shared, "identity"),
+        try exported(&checked, &fixture.source, right, "floating"),
+    };
     var matching: usize = 0;
     for (main.bindings) |binding| if (binding.external) |target| {
+        for (unused_targets) |unused| try std.testing.expect(!std.meta.eql(target, unused));
         if (std.meta.eql(target, twice)) {
             matching += 1;
             const root = main.types.node(binding.scheme.root);
@@ -814,4 +821,42 @@ test "module abstraction public contracts cannot name private predicates" {
     var checked = try project_check.checkProject(a, &fixture.source);
     defer checked.deinit(a);
     try std.testing.expect(hasDiagnostic(&checked, "private_identity_escape", 1));
+}
+
+test "unused imported values stay absent while forwarded associated catalogs retain exact schemes" {
+    var fixture = try Fixture.init(&.{
+        .{ .name = "main.blot", .text =
+        \\import { identity, Point } from "./facade"
+        \\entry const integer: U32 = identity 42
+        \\entry const combined = @type.call "add" ($Point {x:20}) ($Point {x:22})
+        },
+        .{ .name = "facade.blot", .text =
+        \\import { identity as unused, Point as LocalPoint } from "./library"
+        \\export { identity, Point } from "./library"
+        \\const marker = 0
+        },
+        .{ .name = "library.blot", .text =
+        \\const identity = func value => return value
+        \\type Point is data = $Point {x:U32}
+        \\const Point.add = func left => return func right => return $Point {x:@u32.add left.x right.x}
+        },
+    });
+    defer fixture.deinit();
+    var checked = try project_check.checkProject(a, &fixture.source);
+    defer checked.deinit(a);
+    try requireValid(&checked);
+    const facade_id = fixture.source.unitImports(1)[0].target;
+    const facade = &checked.module(facade_id).checked;
+    // The method escapes with LocalPoint's declaration catalog. The unrelated
+    // imported identity has no binding or copied certificate in the facade.
+    try std.testing.expectEqual(@as(usize, 1), facade.imported_schemes);
+    try std.testing.expectEqual(@as(usize, 1), facade.associated.len);
+    try std.testing.expect(facade.bindings[facade.associated[0].binding].scheme.root != 0);
+    for (facade.bindings) |binding| if (binding.kind == .external) try std.testing.expect(binding.name != fixture.source.symbols.lookup("unused").?);
+    const main = &checked.module(1).checked;
+    try std.testing.expectEqual(@as(usize, 2), main.imported_schemes);
+    const integer = try exported(&checked, &fixture.source, 1, "integer");
+    try std.testing.expectEqual(types.u32_type, main.bindings[integer.binding].ty);
+    try std.testing.expectEqual(@as(usize, 1), main.associated.len);
+    try std.testing.expectEqual(facade.bindings[facade.associated[0].binding].external.?, main.bindings[main.associated[0].binding].external.?);
 }

@@ -67,6 +67,8 @@ export const devCheckAreas = {
       "backend.storage_calls_tests.test.concrete anonymous field instances share body plans through allocation failures",
       "backend.storage_calls_tests.test.concrete field recipes retain declaration types order absence and capacity fallback",
       "backend.storage_calls.test.completed call admission owns exact contextual keys and conservative heights",
+      "backend.storage_call_graph_tests.test.storage descriptor DAGs share nested reader and writer definitions",
+      "backend.storage_call_graph_tests.test.storage descriptor DAG publication survives allocation failures",
       "check.package_contracts_tests.test.callback field selection preserves latent effects and invocation cannot erase them",
       "check.package_contracts_tests.test.source collection prerequisites admit owned readers but reject Ref and Link",
       "check.package_contracts_tests.test.source nominal fields instantiate only the constructor owned binders",
@@ -162,6 +164,7 @@ export const devCheckAreas = {
       "zig-native/tests/storage_project_execution.test.ts",
       "zig-native/tests/data_stacks_execution.test.ts",
       "zig-native/tests/storage_calls_execution.test.ts",
+      "zig-native/tests/storage_call_graph_execution.test.ts",
       "zig-native/tests/concrete_fields_execution.test.ts",
       "zig-native/tests/storage_record_merge_execution.test.ts",
       "zig-native/tests/scoped_contract_methods_execution.test.ts",
@@ -471,6 +474,10 @@ export const devCheckAreas = {
     "description":
       "Retained body reuse, interface invalidation, relocation and failed-revision recovery.",
     "native": [
+      "check.check_effect_tests.test.unused wide imported schemes admit no type graph or Core certificate",
+      "check.check_effect_tests.test.lazy qualified and unqualified imports share one scheme and independent instantiations through OOM",
+      "check.check_effect_tests.test.lazy imported shared callees retain relocated predicate evidence",
+      "reuse.project_check_tests.test.unused imported values stay absent while forwarded associated catalogs retain exact schemes",
       "check.check_shared_scheme_tests.test.predicate-free schemes preserve independent types and callback rows without sharing summaries through OOM",
       "check.check_shared_scheme_tests.test.recursive frontend scheduling keeps forward chains independent of native and syntax depth",
       "check.check_shared_scheme_tests.test.recursive frontend dependency discovery preserves local and pattern shadowing",

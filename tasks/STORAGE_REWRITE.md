@@ -1,9 +1,9 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration. The
-scalar and concrete-field call-sharing batches have measured synthetic gains;
-whole-game compilation exceeds the five-second diagnostic cutoff. See
-[the latest pinned evidence](../zig-native/measurements/concrete-fields-2026-10-31.json)
+scalar, concrete-field and descriptor-call batches have measured synthetic
+gains; whole-game compilation exceeds the five-second diagnostic cutoff. See
+[the latest pinned evidence](../zig-native/measurements/storage-call-graph-2026-11-01.json)
 and [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact

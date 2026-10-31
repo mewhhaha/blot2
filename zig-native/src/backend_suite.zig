@@ -3,6 +3,7 @@ comptime {
     _ = @import("backend/scoped_backend_tests.zig");
     _ = @import("backend/storage_plan_tests.zig");
     _ = @import("backend/storage_calls_tests.zig");
+    _ = @import("backend/storage_call_graph_tests.zig");
     _ = @import("backend/storage_type_key_tests.zig");
     _ = @import("backend/private_append_region_tests.zig");
     _ = @import("backend/storage_data_tests.zig");

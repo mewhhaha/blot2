@@ -29,6 +29,20 @@ includes five alternating pairs and an unchanged scalar control. A 64-field
 depth-six probe reaches the existing source-validation budget; it is a rejected
 workload, not a timing result. Do not raise compiler limits for the benchmark.
 
+For nested storage readers and Unit writers:
+
+```sh
+deno run --no-config --no-lock -A scripts/bench/storage_calls.ts --blotc zig-native/zig-out-native-dev/bin/blotc --sizes 1,4,8 --depth 10
+```
+
+Both graphs call their predecessor twice per level. Each build executes seven
+inputs, including wraparound and repeated invocations, against independent
+results. Reports include Wasm bytes/functions, emission and admission counters,
+source/compiler hashes and a five-second deadline. The
+[descriptor-call record](../../zig-native/measurements/storage-call-graph-2026-11-01.json)
+contains five alternating pairs at four calls. The real-game 1 MB expectation
+and subsecond compilation target remain open.
+
 Run measurements on an otherwise idle host, using a preserved release binary for
 each variant. Keep the frozen workload manifest, output hashes, commands and raw
 samples with the report. Safe/noLLVM builds qualify development behavior; they

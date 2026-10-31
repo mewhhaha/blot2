@@ -1,0 +1,543 @@
+{
+  "date": "2026-10-31T23:32:24.786458+00:00",
+  "goal": {
+    "compile_ms": 1000,
+    "whole_gdev_wasm_bytes_working_expectation": 1000000,
+    "achieved": false,
+    "note": "The one-megabyte expectation is the owner's approximate target, not a qualified final measurement. Actual main/actor builds still exceed five seconds."
+  },
+  "scope": "Lazy imported scheme materialization plus nested shared descriptor call definitions and completed admission. Development Safe/noLLVM evidence; no ABI8/session2 change.",
+  "source": {
+    "baseline_commit": "360268b32564de97c1adaa176147e7edc04c2095",
+    "candidate_base_commit": "360268b32564de97c1adaa176147e7edc04c2095",
+    "changed_production_sha256": {
+      "zig-native/src/backend/scoped_backend.zig": "a5d09d969d6ebd7e3cfd6e5c8b11f5f11840e770f671b04f1e4754970894d344",
+      "zig-native/src/check/check.zig": "d17250630d3ed520379114b0d9de29f3b50c4e155d12332ce50332be31018a04",
+      "zig-native/src/work_counters.zig": "962d52b9d6ec0269a4a618fc416a4763e05e76802c0968e8b2d2ed2c0cb5a0d8"
+    },
+    "fixture_and_harness_sha256": {
+      "scripts/bench/storage_calls.ts": "c172270d01b9fb4852c14a303a66e982b34a9ee20773fbb465fb3850f853d391",
+      "scripts/dev_check_areas.ts": "bb9fccc943e6b7a36547ddcc8809978e501247e3d9c91cf65b80903da62d95db",
+      "zig-native/tests/storage_call_graph_execution.test.ts": "01f8cd9ae7db73b1a1eeff09e583da8aeadce87978a7a8d2132931652ffd3092",
+      "zig-native/src/backend/storage_call_graph_tests.zig": "4c532225161ab3e11fd5938295e5e4cf44e0503f10b0eee559d44ea4e75103ad",
+      "zig-native/src/check/check_effect_tests.zig": "b667baa8d423b9a78c34cfda51b2c5def5191759f8c6840f60acdb8fd3a8b4e7",
+      "zig-native/src/reuse/project_check_tests.zig": "5896251b54d9257820192471a683ea9e36341056436b45ef02bb4341a23343d9",
+      "zig-native/src/backend_suite.zig": "b8a0eac794932e9f28575393a9692ca8d4c013e3320628f063c1314ca5c71343"
+    },
+    "std_tree": "3076b1172f56836f3233f47f2a1c811d31aedab4",
+    "prelude_sha256": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "gdev_commit": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+    "pen_commit": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf"
+  },
+  "environment": {
+    "zig": "0.17.0",
+    "deno": "2.9.8",
+    "optimize": "safe",
+    "llvm": false,
+    "os": "Linux-7.3.0-4-cachyos-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "method": "Sequential alternating pairs on an otherwise idle host; unpinned affinity. Fresh compiler sessions with disk cache disabled. Build latency excludes startup, guest instantiation and checks; latency_ms includes them. No profiler enabled during throughput pairs."
+  },
+  "implementation": [
+    "Engine retains lazy import names/targets privately and materializes a real binding/scheme at first typed use. No fake type or placeholder certificate reaches Checked/Core. Producer checking, coherence and associated catalog metadata remain complete.",
+    "Shared physical reader definitions take descriptor words and capture values as parameters. This slice shares scalar results; aggregate/descriptor result templates stay generator-local.",
+    "Shared Unit writers normalize formal owner roles and alias relationships. This slice requires plain stored rows without variants; unsupported cases keep ordinary scoped emission.",
+    "Shared keys require fully encoded semantic types, body/binding/public type frontiers, source row identities, invocation context and selected callback evidence. Qualified/captured-goal closures, generative schemes and unsupported opaque key forms decline sharing.",
+    "Writer summaries own only physical shapes in the compilation arena, with type environments removed. Nested access effects and transitive scratch regions replay on hits and misses. Pending array destinations cannot be consumed by ABI scratch buffers.",
+    "Stable variant-free input shapes permit idempotent per-owner read/write summaries. Completed admission memo separates reader/writer modes, retains relative depth bounds and never skips the first executable body root walk."
+  ],
+  "benchmarks": [
+    {
+      "workload": "storage_reader_dag",
+      "depth": 10,
+      "repeats": 4,
+      "pairs": 5,
+      "source_sha256": "5b6002c2f733c344ed53871e1c42c476a715a355e37b8814e47937292c33f0bf",
+      "baseline": {
+        "compiler_sha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+        "build_ms_samples": [
+          187.490951,
+          190.60158900000002,
+          187.44818800000002,
+          188.06703599999997,
+          188.72129
+        ],
+        "median_build_ms": 188.06703599999997,
+        "latency_ms_samples": [
+          206.880242,
+          212.57576999999998,
+          207.226271,
+          202.78832600000004,
+          211.11589099999998
+        ],
+        "wasm_bytes": 57599,
+        "code_functions": 27,
+        "nonzero_work_counters": {
+          "scoped_emission_expressions": 10355,
+          "scoped_call_admission_nodes": 81893,
+          "scoped_field_refinements": 18424,
+          "max_scoped_emission_body_steps": 10233,
+          "max_scoped_emission_limit": 500000
+        }
+      },
+      "candidate": {
+        "compiler_sha256": "8d74dc0293596e4c52888db7368fc1b8b04040e3ac9dbe9989cb113c35cc84f7",
+        "build_ms_samples": [
+          96.74865500000001,
+          105.01705700000002,
+          78.780847,
+          77.36720700000001,
+          76.93890199999998
+        ],
+        "median_build_ms": 78.780847,
+        "latency_ms_samples": [
+          116.02919899999998,
+          119.01203500000003,
+          98.13391000000001,
+          92.89072400000003,
+          90.41371000000001
+        ],
+        "wasm_bytes": 4930,
+        "code_functions": 37,
+        "nonzero_work_counters": {
+          "scoped_emission_expressions": 195,
+          "scoped_call_admission_nodes": 165,
+          "scoped_reader_definitions": 11,
+          "scoped_reader_cache_hits": 17,
+          "scoped_descriptor_admissions": 10,
+          "scoped_descriptor_admission_hits": 28,
+          "scoped_field_refinements": 78,
+          "max_scoped_emission_body_steps": 122,
+          "max_scoped_emission_limit": 500000
+        }
+      },
+      "median_speedup": 2.3872177459579738
+    },
+    {
+      "workload": "storage_writer_dag",
+      "depth": 10,
+      "repeats": 4,
+      "pairs": 5,
+      "source_sha256": "89a428dd1be6807cecd36b0bfb7207d54ec6b49bdd2ff4237e4a6296733e21b8",
+      "baseline": {
+        "compiler_sha256": "32befd26ac6f97b90ac984068ab7c77a0ea667322619300eb296a6fe9bdccaae",
+        "build_ms_samples": [
+          246.136076,
+          248.93778600000007,
+          246.150032,
+          248.09945999999997,
+          247.06019300000003
+        ],
+        "median_build_ms": 247.06019300000003,
+        "latency_ms_samples": [
+          269.5367590000001,
+          268.910909,
+          270.13579899999996,
+          270.86185,
+          283.45945000000006
+        ],
+        "wasm_bytes": 195293,
+        "code_functions": 27,
+        "nonzero_work_counters": {
+          "scoped_emission_expressions": 19565,
+          "scoped_call_admission_nodes": 147757,
+          "scoped_field_refinements": 18504,
+          "max_scoped_emission_body_steps": 19447,
+          "max_scoped_emission_limit": 500000
+        }
+      },
+      "candidate": {
+        "compiler_sha256": "8d74dc0293596e4c52888db7368fc1b8b04040e3ac9dbe9989cb113c35cc84f7",
+        "build_ms_samples": [
+          88.61336600000004,
+          88.961588,
+          88.32568800000001,
+          88.51822499999997,
+          89.947404
+        ],
+        "median_build_ms": 88.61336600000004,
+        "latency_ms_samples": [
+          118.31881699999997,
+          139.96399100000002,
+          139.71196099999997,
+          138.86805600000002,
+          142.11715600000002
+        ],
+        "wasm_bytes": 8794,
+        "code_functions": 37,
+        "nonzero_work_counters": {
+          "scoped_emission_expressions": 218,
+          "scoped_call_admission_nodes": 982,
+          "scoped_writer_definitions": 11,
+          "scoped_writer_cache_hits": 17,
+          "scoped_descriptor_admissions": 10,
+          "scoped_descriptor_admission_hits": 28,
+          "scoped_field_refinements": 248,
+          "max_scoped_emission_body_steps": 118,
+          "max_scoped_emission_limit": 500000
+        }
+      },
+      "median_speedup": 2.788069161033787
+    }
+  ],
+  "sample_order": [
+    {
+      "pair": 0,
+      "variant": "baseline",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 0,
+      "variant": "baseline",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 0,
+      "variant": "candidate",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 0,
+      "variant": "candidate",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 1,
+      "variant": "candidate",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 1,
+      "variant": "candidate",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 1,
+      "variant": "baseline",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 1,
+      "variant": "baseline",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 2,
+      "variant": "baseline",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 2,
+      "variant": "baseline",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 2,
+      "variant": "candidate",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 2,
+      "variant": "candidate",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 3,
+      "variant": "candidate",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 3,
+      "variant": "candidate",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 3,
+      "variant": "baseline",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 3,
+      "variant": "baseline",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 4,
+      "variant": "baseline",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 4,
+      "variant": "baseline",
+      "workload": "storage_writer_dag"
+    },
+    {
+      "pair": 4,
+      "variant": "candidate",
+      "workload": "storage_reader_dag"
+    },
+    {
+      "pair": 4,
+      "variant": "candidate",
+      "workload": "storage_writer_dag"
+    }
+  ],
+  "reproduction": {
+    "build": "zig version && cd zig-native && zig build install compiler-identity test-compile -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev -j2",
+    "benchmark": "deno run --no-config --no-lock -A scripts/bench/storage_calls.ts --blotc COMPILER --sizes 4 --depth 10",
+    "scaling": "deno run --no-config --no-lock -A scripts/bench/storage_calls.ts --blotc COMPILER --sizes 1,4,8 --depth 10",
+    "semantics": "Every synthetic build checks seven dynamic inputs (0,1,7,41,4294967293,3,0), including wrapping and repeated invocation, against independent closed-form graph multiplicities."
+  },
+  "gdev_bounded_builds": [
+    {
+      "entry": "tests/language_compatibility.blot",
+      "compilerSha256": "8d74dc0293596e4c52888db7368fc1b8b04040e3ac9dbe9989cb113c35cc84f7",
+      "sourceCheckpoint": {
+        "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 468.89254300000005,
+      "success": true,
+      "compiled": true,
+      "wasmBytes": 25489
+    },
+    {
+      "entry": "tests/actor_presentation.blot",
+      "compilerSha256": "8d74dc0293596e4c52888db7368fc1b8b04040e3ac9dbe9989cb113c35cc84f7",
+      "sourceCheckpoint": {
+        "entrySha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5002.68563,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete"
+    },
+    {
+      "entry": "src/main.blot",
+      "compilerSha256": "8d74dc0293596e4c52888db7368fc1b8b04040e3ac9dbe9989cb113c35cc84f7",
+      "sourceCheckpoint": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5003.312193000001,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete"
+    }
+  ],
+  "gdev_language_execution": {
+    "entries": 6,
+    "assertions_per_mode": 11,
+    "modes": [
+      "sync",
+      "JSPI"
+    ],
+    "passed": true
+  },
+  "historical_whole_game": {
+    "record": "tasks/storage-handoff-evidence/2026-10-31-migrated-frame.json",
+    "compiler_sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+    "compile_seconds": 2188.17,
+    "wasm_bytes": 47432547,
+    "code_body_bytes": 46222641,
+    "defined_functions": 8644,
+    "globals": 237015,
+    "largest_function_body_bytes": 2267273,
+    "note": "Historical frame-qualified artifact. Its size is not a current-candidate measurement."
+  },
+  "verification": {
+    "compiled_native_inventory": 2742,
+    "native_binary_sha256": "2494afadec0309183973d833b64ba27a55230487ccfaa793f8afd17374f77af8",
+    "scoped_storage_development": {
+      "selected": 109,
+      "passed": 108,
+      "failed": 1,
+      "fault_mode": "sampled",
+      "leaks": 0,
+      "wall_seconds": 9.807117056000001,
+      "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+      "success": false
+    },
+    "broader_native": {
+      "selected": 305,
+      "passed_on_first_run": 303,
+      "failures_on_first_run": [
+        "reuse.project_check_tests.test.diamond modules publish one principal body and independently copy imported schemes",
+        "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers"
+      ],
+      "resolution": "Diamond law now expects exactly two unused imports to be absent (9 materialized schemes rather than11); semantic/ownership assertions retained. Corrected law independently passed; the associated-partial baseline failure remains. No whole-suite pass claimed.",
+      "fault_mode": "sampled",
+      "leaks": 0
+    },
+    "new_and_corrected_native_full_fault_mode": [
+      {
+        "name": "reuse.project_check_tests.test.diamond modules publish one principal body and independently copy imported schemes",
+        "duration_ns": 4967562,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "reuse.project_check_tests.test.unused imported values stay absent while forwarded associated catalogs retain exact schemes",
+        "duration_ns": 2286852,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_call_graph_tests.test.storage descriptor DAGs share nested reader and writer definitions",
+        "duration_ns": 45053862,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_call_graph_tests.test.storage descriptor DAG publication survives allocation failures",
+        "duration_ns": 5689271260,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_effect_tests.test.unused wide imported schemes admit no type graph or Core certificate",
+        "duration_ns": 904842,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_effect_tests.test.lazy qualified and unqualified imports share one scheme and independent instantiations through OOM",
+        "duration_ns": 13864720,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.check_effect_tests.test.lazy imported shared callees retain relocated predicate evidence",
+        "duration_ns": 1175245,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "affected_storage_guests": {
+      "passed": 66,
+      "failed": 1,
+      "additional_scratch_guests_passed": 2,
+      "baseline_failure": "associated function results retain selected latent effect rows",
+      "new_storage_graph_guests_passed": 8,
+      "coverage": "Development/optimized, sync/JSPI, independent owners, aliases, Ref/Link/view offsets, static captured callbacks, loops/read-after-write, U32 wraparound and transitive scratch-region collisions."
+    },
+    "import_reuse_guests": {
+      "candidate_passed": 25,
+      "candidate_failed": 16,
+      "baseline_passed": 17,
+      "baseline_failed": 16,
+      "difference_in_test_count": "Candidate run also included the eight new storage graph tests.",
+      "same_failure_names": [
+        "body checker reuse relocates and follows executable edits through rejected revisions",
+        "body checker reuse relocates shaped records with owning payloads and reversed spelling order",
+        "body checker reuse relocates shared producer schemes through source and compiled imports",
+        "body checker reuse preserves portable qualified producer origins after earlier body edits",
+        "body checker reuse restores chained dotted nominal paths from source and compiled producers",
+        "body checker reuse revokes local principals for source and compiled selected effects",
+        "body checker reuse owns result directed local principals",
+        "body checker reuse preserves selected Foreign traces in inferred local principals",
+        "body checker reuse relocates written local association and representation origins",
+        "body checker reuse preserves exported local qualification origins in source and compiled producers",
+        "body checker reuse relocates producer units and bindings through source and compiled origins",
+        "body checker reuse resolves imported annotation heads with exact source and compiled recipes",
+        "body checker reuse owns shared local relays through source and compiled changes",
+        "body checker reuse owns Foreign arrows through source compiled changes and rejection",
+        "body checker reuse owns array selectors through source compiled changes and rejection",
+        "body checker reuse owns if let joins captures and effect traces through compiled changes"
+      ],
+      "failure_class": "Existing body-cache work/reuse assertions fail in both binaries; this is missing qualification, not a pass."
+    },
+    "full_gate": {
+      "command": "deno task test:compiler",
+      "passed": false,
+      "stage": "preflight-regressions",
+      "failure": "Existing wire protocol operand-span ends42/47 vs expected43/48; independently reproduced on preserved baseline in prior batch. Later stages not reached."
+    },
+    "lint": {
+      "source_files": 567,
+      "findings": 0,
+      "fixture_files": 1,
+      "fixture_findings": 0
+    },
+    "typescript_check": true,
+    "format_check": true,
+    "diff_check": true,
+    "review": "Astra xhigh reviewed lazy imports, exact key gates, nested effect replay, global metadata lifetime, admission memo and scratch-region propagation; requested fixes and scratch witness are included."
+  },
+  "rejected_experiments": [
+    {
+      "idea": "Broaden ground-data local generalization shortcut",
+      "status": "Not implemented; no material cost demonstrated on representative session probes.",
+      "evidence": "15 producer-wrapper builds and45 runtime checks pass, but free-variable work remains flat (two queries/six visits) across all sizes/shapes in this source-interface path. Do not claim a quadratic-generalization win from those probes."
+    }
+  ],
+  "limits": [
+    "Whole Gdev main/actor builds were cancelled at five seconds; no current final Wasm size or fresh frame qualification.",
+    "Wide FrameAccess arguments can still decline descriptor sharing when any stored row is not plain, including unused fields. Demand slicing and a broader ownership/result ABI remain open.",
+    "The late outliner and field-refinement fixed-point solver remain; this is the first descriptor graph slice, not a complete backend replacement.",
+    "No LLVM release, whole native exhaustive, browser/GPU or full compiler qualification.",
+    "No Gdev/Ink/Pen source/assets changed; no compiler work limit raised."
+  ],
+  "raw_evidence_local": "build/bench/storage-call-graph (ignored); portable record preserves all paired samples, source/compiler identities, counters, commands and qualification limits."
+}
