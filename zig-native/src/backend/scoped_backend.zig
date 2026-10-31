@@ -13,6 +13,7 @@ const Local = @import("runtime_code.zig").Local;
 const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
 const scope_outline = @import("wasm_scope_outline.zig");
+const type_arguments_index = @import("storage_type_arguments.zig");
 const selected_types = @import("storage_type_key.zig");
 const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
@@ -159,6 +160,7 @@ const Generator = struct {
     stacks: std.ArrayList(bool) = .empty,
     globals: std.ArrayList(Global) = .empty,
     type_arguments: std.ArrayList(TypeArgument) = .empty,
+    refinement_index: ?*type_arguments_index.Index = null,
     max_stacks: u32 = 0,
     roots: std.ArrayList(Root) = .empty,
     bindings: std.ArrayList(Binding) = .empty,
@@ -1294,6 +1296,11 @@ const Generator = struct {
     fn resolveType(self: *Generator, input: TypeRef, depth: usize) Error!TypeRef {
         if (depth > 128) return error.Declined;
         if (input.environment) |environment| return self.resolveActual(.{ .unit = input.unit, .ty = input.ty }, environment, depth + 1);
+        if (self.refinement_index) |index| {
+            const position = try index.find(self.type_arguments.items, input.unit, input.ty) orelse return input;
+            const argument = self.type_arguments.items[position];
+            return self.resolveType(.{ .unit = argument.argument_unit, .ty = argument.argument, .environment = argument.environment }, depth + 1);
+        }
         var i = self.type_arguments.items.len;
         while (i != 0) {
             i -= 1;
@@ -1397,6 +1404,19 @@ const Generator = struct {
     /// The checked receiver and its actual catalog declaration establish the
     /// result; the spelling of a member never implies a collection element type.
     fn refineFields(self: *Generator, m: *const core.Module, goals: []const core.Obligation) Error!void {
+        // This call graph only reads or appends substitutions. Other emission
+        // scopes may restore/shrink/swap them and must keep ordinary resolution.
+        var binding_index: type_arguments_index.Index = .{ .allocator = self.allocator };
+        const previous = self.refinement_index;
+        self.refinement_index = &binding_index;
+        defer {
+            self.refinement_index = previous;
+            self.emission_work.scoped_refinement_lookups +|= binding_index.stats.lookups;
+            self.emission_work.scoped_refinement_indexed_bindings +|= binding_index.stats.synchronized;
+            self.emission_work.scoped_refinement_linear_bindings +|= binding_index.stats.linear;
+            self.emission_work.scoped_refinement_index_declines +|= binding_index.stats.declines;
+            binding_index.deinit();
+        }
         var passes: usize = 0;
         while (passes <= goals.len) : (passes += 1) {
             const before = self.type_arguments.items.len;

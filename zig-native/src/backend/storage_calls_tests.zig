@@ -12,6 +12,34 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_refinement_indexed_bindings > 0);
+}
+test "wide field refinement restores scoped indexes through allocation failures" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a, "const read = func row => return {");
+    for (0..72) |index| {
+        const field = try a.print("f{d}: row.f{d},", .{ index, index });
+        defer a.free(field);
+        try source.appendSlice(a, field);
+    }
+    try source.appendSlice(a, "}\nentry const answer = func (input: U32) => return do:\n  let values: Array U32 = #[input]\n  values[0] := input\n  let selected = read {");
+    for (0..72) |index| {
+        const field = try a.print("f{d}: values[0],", .{index});
+        defer a.free(field);
+        try source.appendSlice(a, field);
+    }
+    try source.appendSlice(a, "}\n  return @u32.add selected.f0 selected.f71\n");
+    var module = try lower(a, source.items);
+    defer module.deinit(a);
+    try publishRefinedModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishRefinedModule, .{@as([]const core.Module, &.{module})});
+}
 test "context free inline layouts substitute constructor variables and reject open phantom arguments" {
     var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
         "type Pair [a, b] is data = $Pair (a, b)\n" ++

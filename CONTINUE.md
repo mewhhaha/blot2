@@ -54,6 +54,27 @@ infinity and NaN across repeated invocations (four tests pass). Changed Zig file
 required full gate was attempted before checkpointing and remains blocked by
 the locked Baba9.0.1 registry proxy fetch. No dependency or lockfile changed.
 
+A sampled late-main bottleneck is repeated type-binding scans in `refineFields`.
+The old attempt reached 112,773 active bindings and pass 297 of 335; two bounded
+read-only stack samples identify `resolveType` in that refinement path. A checked
+candidate now indexes only this append-only lexical scope, preserving the last
+nonidentity binding and exact captured environments/depth rules. Index positions
+survive reallocation; saturation or shrink uses the original reverse scan.
+The optional index never escapes into scopes that restore or swap substitutions.
+Three index laws and the 72-field integration law pass, including exhaustive
+allocation failures; all 2,716 native tests compile. Captured-context guests and
+the wide execution witness pass. The real update probe `main-d5ae919c258a9a26`
+emits byte-identical validated Wasm, with 469,259 lookups, 346,623 synchronized
+bindings and zero index declines (180.3s, 2,681,820 KiB peak RSS). No compiler,
+engine or storage limit changed. Candidate prefix: `zig-out-refinement-index`.
+The full gate was attempted and remains registry-blocked.
+
+The old Pen attempt has one final five-minute grace period while this checked
+candidate is checkpointed. If no main module arrives, preserve its cancellation
+evidence and replace it with the indexed compiler; do not wait indefinitely or
+run two native attempts together. The local deadline is in
+`/tmp/blot-index-swap-deadline.json`.
+
 The actual native Pen attempt is running at
 `build/storage-integration/gdev-one-frame/attempt-5442nr03`, using the matching
 default compiler. The prior `attempt-s1i49tls` hit Pen's default 300-second

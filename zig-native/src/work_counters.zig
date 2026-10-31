@@ -82,6 +82,10 @@ pub const Counters = struct {
     scoped_outline_key_declines: u64 = 0,
     scoped_outlined_regions: u64 = 0,
     scoped_outlined_globals: u64 = 0,
+    scoped_refinement_lookups: u64 = 0,
+    scoped_refinement_indexed_bindings: u64 = 0,
+    scoped_refinement_linear_bindings: u64 = 0,
+    scoped_refinement_index_declines: u64 = 0,
     max_scoped_emission_body_steps: u64 = 0,
     max_scoped_emission_limit: u64 = 0,
     /// Region solver work only; frontend type stores are counted separately.

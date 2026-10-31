@@ -1570,5 +1570,41 @@
     "stopped_attempt": "attempt-5rjaql86 intentionalpackagingchange, notcompilerfailure",
     "checks": "4entryfilesparsePASS; allsourcefunctionbodiesbyteexact; normalPenfallbacktomainverified; explicittracefixturepreservesbothnames",
     "scope": "No gameplay, assets, ABI, session, storage, engineorcompilerbudgetchanges; performanceconsumer migrationdeferredandlocationsdocumented"
+  },
+  "scoped_refinement_index": {
+    "measured_hotspot": "Two boundedread-only liveworkerstack samples: resolveType/refineFields; worker detachedeachsample. VerifiedoldbinarySHA55f1f041068953110620f184f313e219c5134f9cea52e1baf22cf7d36d954d34.",
+    "live_counts": {
+      "type_arguments": 112773,
+      "refinement_type_arguments": 112773,
+      "goals": 335,
+      "pass": 297,
+      "goal_ordinal": 23
+    },
+    "fix": "Append-only lexicalindex ONLYinside refineFields; lastnonidentity(unit,param)->position; rereadfullarg; environments/depthunchanged; cap262144 optionalmetadata thenordinaryreversefallback; deferredrestore/deinit",
+    "native": "3indexlaws+widefieldintegration+3affectedlawsPASS, wrappedexhaustiveOOM; all2716compile",
+    "guests": "61PASS1recordedbaseline (associatedlatent-effectresultlayout); wide2testsPASS both tiers/syncasync actualindexasserted",
+    "stage": {
+      "artifact": "main-d5ae919c258a9a26",
+      "module_bytes": 13994810,
+      "bytes": "Exactlyidentical to preindexV8+Wasmtime49validatedupdate",
+      "lookups": 469259,
+      "synchronized_bindings": 346623,
+      "small_fallback_visits": 6064772,
+      "index_declines": 0,
+      "wall_seconds": 180.32298503599304,
+      "peak_rss_kib": 2681820
+    },
+    "review": "Astra xhigh finalsemanticreviewclear; unchangedfullscopeappendonlycallgraphverified",
+    "full_gate": "Attemptedbeforecheckpoint; lockedBaba9.0.1 proxytunnelfailurebeforetests",
+    "active_old_attempt": "attempt-5442nr03 hasonebounded5minutegraceperiodduringcheckpoint/push; thenswapunlessmodulecomplete",
+    "logs": [
+      "/tmp/blot-refinement-index-native.log",
+      "/tmp/blot-refinement-index-native-regressions.log",
+      "/tmp/blot-refinement-index-affected-guests.log",
+      "/tmp/gdev-update-refinement-index.log",
+      "/tmp/blot-live-stack.log",
+      "/tmp/blot-live-stack-2.log",
+      "/tmp/blot-live-refinement-counts.json"
+    ]
   }
 }
