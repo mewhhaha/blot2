@@ -19,6 +19,7 @@ const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const source_proof = @import("../check/package_core.zig");
+const evaluation = @import("../eval/core_eval.zig");
 const Error = std.mem.Allocator.Error || error{Declined};
 /// Compiler work policy, independent of guest storage capacities and proofs.
 /// Each export and reusable child retains its own finite expansion allowance.
@@ -138,11 +139,30 @@ fn borrows(value: Value, owner: Value) bool {
 }
 const DispatchKey = struct { unit: u32, identity: T.NominalIdentity, member: u32, operator: T.Operator, field: bool = false };
 const Dispatches = std.AutoHashMapUnmanaged(DispatchKey, ?core.BindingRef);
+const MethodSelector = struct {
+    allocator: std.mem.Allocator,
+    units: []const core.Module,
+    entry: u32,
+    session: ?evaluation.Session = null,
+    fn deinit(self: *MethodSelector) void {
+        if (self.session) |*session| session.deinit();
+    }
+    fn get(self: *MethodSelector) std.mem.Allocator.Error!*evaluation.Session {
+        if (self.session == null) {
+            self.session = try evaluation.Session.init(self.allocator, self.units);
+            self.session.?.diagnostic_context.entry = self.entry;
+        }
+        return &self.session.?;
+    }
+};
 const Generator = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
     uses: []const u32 = &.{},
     active_goals: []const core.Obligation = &.{},
+    entry_unit: u32,
+    specialization_origin: ?evaluation.SourceLocation = null,
+    methods: *MethodSelector,
     calls: call_plan.Cache,
     active_calls: *call_plan.ActiveCalls,
     specialize: bool = true,
@@ -2276,7 +2296,7 @@ const Generator = struct {
             try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         }
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const parameter_count = std.math.add(usize, arguments.len, if (owned_result) 3 else 0) catch return self.unsupported(m, body.root);
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
@@ -2302,6 +2322,9 @@ const Generator = struct {
                 .dispatches = self.dispatches,
                 .capacity_requests = self.capacity_requests,
                 .validation_budget = self.validation_budget,
+                .entry_unit = self.entry_unit,
+                .specialization_origin = self.specialization_origin,
+                .methods = self.methods,
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
@@ -2410,7 +2433,7 @@ const Generator = struct {
         for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
             defer self.allocator.free(signature);
@@ -2435,6 +2458,9 @@ const Generator = struct {
                 .dispatches = self.dispatches,
                 .capacity_requests = self.capacity_requests,
                 .validation_budget = self.validation_budget,
+                .entry_unit = self.entry_unit,
+                .specialization_origin = self.specialization_origin,
+                .methods = self.methods,
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
@@ -2813,7 +2839,7 @@ const Generator = struct {
         if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
         // Successful readers preserve their caller-loop read facts on hits too.
         for (arguments) |argument| try self.readerReads(argument);
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
             defer self.allocator.free(signature);
@@ -2838,6 +2864,9 @@ const Generator = struct {
                 .dispatches = self.dispatches,
                 .capacity_requests = self.capacity_requests,
                 .validation_budget = self.validation_budget,
+                .entry_unit = self.entry_unit,
+                .specialization_origin = self.specialization_origin,
+                .methods = self.methods,
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
@@ -2896,7 +2925,7 @@ const Generator = struct {
     }
     fn writerCacheEntry(self: *Generator, m: *const core.Module, id: core.Id, key: call_plan.Key) Error!?usize {
         for (self.calls.entries.items, 0..) |entry, index| {
-            if (entry.key.unit != key.unit or entry.key.binding != key.binding or !std.mem.eql(u32, entry.key.evidence, key.evidence)) continue;
+            if (!entry.key.eql(key)) continue;
             if (entry.building) return index;
             const regions = self.writer_regions.get(entry.function) orelse return self.unsupported(m, id);
             var available = true;
@@ -2970,7 +2999,7 @@ const Generator = struct {
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
         if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         const index = if (try self.writerCacheEntry(m, body.root, key)) |found| found else blk: {
             const function = self.module.addTypedFunction(&.{.i32}, .i32, .scalar) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
@@ -2994,6 +3023,9 @@ const Generator = struct {
                 .dispatches = self.dispatches,
                 .capacity_requests = self.capacity_requests,
                 .validation_budget = self.validation_budget,
+                .entry_unit = self.entry_unit,
+                .specialization_origin = self.specialization_origin,
+                .methods = self.methods,
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
@@ -3182,11 +3214,23 @@ const Generator = struct {
         }
         return keys.complete(reference, descriptor.items, height);
     }
+    fn invocationContext(self: *const Generator) u32 {
+        return if (self.specialization_origin) |origin| origin.unit else 0;
+    }
+    fn invocationOrigin(self: *const Generator, m: *const core.Module, id: core.Id) ?evaluation.SourceLocation {
+        return evaluation.sourceInvocationOrigin(self.specialization_origin, self.entry_unit, m.unit, m.span(id), evaluation.callerDependentUse(m, id));
+    }
+    fn invokeAt(self: *Generator, m: *const core.Module, id: core.Id, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
+        const previous = self.specialization_origin;
+        self.specialization_origin = self.invocationOrigin(m, id);
+        defer self.specialization_origin = previous;
+        return self.invoke(target, arguments, depth);
+    }
     fn invoke(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
         const m = try self.unit(target.unit);
         const body = m.body(target.binding) orelse return error.Declined;
         const parameters = m.bodyParameters(body);
-        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = m.unit, .id = target.binding, .kind = .named };
+        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = m.unit, .id = target.binding, .kind = .named, .context = self.invocationContext() };
         var selected: std.ArrayList(u32) = .empty;
         defer selected.deinit(self.allocator);
         var origin: ?@import("../check/scheme_equations.zig").SourceFailure = null;
@@ -3317,7 +3361,7 @@ const Generator = struct {
         try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &evidence, &type_key, 0);
         try self.selectedType(m, id, .{ .unit = owner.unit, .ty = result_type }, &evidence, &type_key, 0);
         try self.finishSelectedTypes(m, id, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = owner.unit, .binding = 0, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = owner.unit, .binding = 0, .context = self.invocationContext(), .evidence = evidence.items };
         const index = if (self.calls.find(key)) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, words);
             defer self.allocator.free(signature);
@@ -3342,6 +3386,9 @@ const Generator = struct {
                 .dispatches = self.dispatches,
                 .capacity_requests = self.capacity_requests,
                 .validation_budget = self.validation_budget,
+                .entry_unit = self.entry_unit,
+                .specialization_origin = self.specialization_origin,
+                .methods = self.methods,
                 .module = self.module,
                 .runtime = self.runtime,
                 .fixed_region = self.fixed_region,
@@ -3414,7 +3461,7 @@ const Generator = struct {
             const args = try self.arena.allocator().alloc(Value, function.fields.len + 1);
             @memcpy(args[0..function.fields.len], function.fields);
             args[function.fields.len] = argument;
-            return self.invoke(.{ .unit = callable.unit, .binding = callable.target }, args, depth + 1);
+            return self.invokeAt(m, id, .{ .unit = callable.unit, .binding = callable.target }, args, depth + 1);
         }
         const owner = try self.unit(callable.unit);
         const closure = if (function.demand != null) owner.suspension(callable.node) else owner.closure(callable.node);
@@ -3435,7 +3482,7 @@ const Generator = struct {
                 try self.mapTypesUnder(formal, signature, capture.callable.?.types, 0);
             } else try self.mapValueTypes(formal, capture, 0);
         }
-        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = callable.unit, .id = callable.node, .kind = .closure };
+        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = callable.unit, .id = callable.node, .kind = .closure, .context = self.invocationContext() };
         var selected: std.ArrayList(u32) = .empty;
         defer selected.deinit(self.allocator);
         try self.selectedArguments(m, id, function.fields, &.{argument}, &selected);
@@ -3884,7 +3931,50 @@ const Generator = struct {
         };
         if (!matches) return self.unsupported(m, id);
         try self.mapTypes(.{ .unit = owner.unit, .ty = result }, output, 0);
-        return try self.invoke(target, arguments, depth + 1);
+        return try self.invokeAt(m, id, target, arguments, depth + 1);
+    }
+
+    fn contractMethod(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
+        const node = m.node(id);
+        const template = m.member_templates[node.a];
+        const before = self.type_arguments.items.len;
+        defer self.type_arguments.shrinkRetainingCapacity(before);
+        const protected_before = self.protected.items.len;
+        defer self.protected.shrinkRetainingCapacity(protected_before);
+        const children = m.children(id);
+        const arguments = try self.arena.allocator().alloc(Value, children.len);
+        const inputs = try self.arena.allocator().alloc(TypeRef, children.len);
+        for (children, arguments, inputs) |child, *argument, *input| {
+            argument.* = try self.expression(m, child, depth + 1);
+            if (argument.terminated) return argument.*;
+            try self.protected.append(self.allocator, argument.*);
+            input.* = try self.operandType(.{ .unit = m.unit, .ty = m.typeOf(child) }, argument.*);
+        }
+        const session = try self.methods.get();
+        var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
+        defer mappings.deinit(self.allocator);
+        for (m.types.list(template.arguments)) |argument_type| try mappings.append(self.allocator, .{
+            .variable = argument_type,
+            .evidence = try self.dispatchEvidence(&session.storage.evidence, .{ .unit = m.unit, .ty = argument_type }, 0),
+        });
+        // A chosen target and compatible data layouts cannot establish its
+        // latent effects. Compare the complete checked declaration-proxy arrow
+        // with the independently selected closed semantic signature.
+        const expected = try self.dispatchEvidence(&session.storage.evidence, .{ .unit = m.unit, .ty = m.binding(template.binding).ty }, 0);
+        const selected = selection: {
+            session.associated_remaining = @min(session.associated_remaining, self.validation_budget.*);
+            const remaining_before = session.associated_remaining;
+            defer self.validation_budget.* -|= remaining_before -| session.associated_remaining;
+            const previous_origin = session.specialization_origin;
+            session.specialization_origin = self.specialization_origin;
+            defer session.specialization_origin = previous_origin;
+            break :selection session.implementationMethod(m.unit - 1, id, template, mappings.items, &.{}) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                return self.unsupported(m, id);
+            };
+        };
+        if (expected != selected.signature) return self.unsupported(m, id);
+        return (try self.dispatchCandidate(m, id, selected.target, inputs, .{ .unit = m.unit, .ty = node.ty }, arguments, depth + 1)) orelse self.unsupported(m, id);
     }
     fn operandType(self: *Generator, input: TypeRef, value: Value) Error!TypeRef {
         const resolved = try self.resolveType(input, 0);
@@ -4124,7 +4214,7 @@ const Generator = struct {
         if (signature.tag != .function) return self.unsupported(m, id);
         try self.mapTypes(.{ .unit = owner.unit, .ty = signature.a }, receiver, 0);
         try self.mapTypes(.{ .unit = owner.unit, .ty = signature.b }, .{ .unit = m.unit, .ty = projection.result_type }, 0);
-        return self.invoke(target, &.{value}, depth + 1);
+        return self.invokeAt(m, id, target, &.{value}, depth + 1);
     }
     fn namedPlace(self: *Generator, m: *const core.Module, id: core.Id, value: *Value, name: u32) Error!*Value {
         const spelling = m.fieldSpelling(name) orelse return self.unsupported(m, id);
@@ -4580,7 +4670,6 @@ const Generator = struct {
                 return result;
             },
             .staging => {
-                const evaluation = @import("../eval/core_eval.zig");
                 var session = try evaluation.Session.init(self.allocator, self.units);
                 defer session.deinit();
                 const values: std.AutoHashMapUnmanaged(core.BindingId, evaluation.ValueId) = .empty;
@@ -4731,6 +4820,7 @@ const Generator = struct {
                 for (merges, merged) |merge, value| if (value) |normal| try self.bind(m, merge.result, normal);
                 return result orelse try self.terminated();
             },
+            .contract_method => return self.contractMethod(m, id, depth),
             .call => {
                 const call = m.call(id);
                 var values: std.ArrayList(Value) = .empty;
@@ -4745,6 +4835,9 @@ const Generator = struct {
                 }
                 var target = call.target;
                 if (target.unit == 0) target.unit = m.unit;
+                const previous_origin = self.specialization_origin;
+                self.specialization_origin = self.invocationOrigin(m, id);
+                defer self.specialization_origin = previous_origin;
                 return self.instantiate(target, .{ .unit = m.unit, .ty = call.callee_type }, values.items, depth + 1);
             },
             else => return self.unsupported(m, id),
@@ -4809,6 +4902,7 @@ const Generator = struct {
             self.type_arguments.clearRetainingCapacity();
             self.invalid_literals.clearRetainingCapacity();
             self.active_goals = &.{};
+            self.specialization_origin = .{ .unit = m.unit, .span = body.span };
             self.roots.clearRetainingCapacity();
             self.bindings.clearRetainingCapacity();
             self.stacks.clearRetainingCapacity();
@@ -4913,7 +5007,9 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
-    var g: Generator = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry };
+    defer methods.deinit();
+    var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
     g.emit(entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,

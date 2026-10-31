@@ -5,15 +5,20 @@ const T = @import("../check/types.zig");
 pub const Key = struct {
     unit: u32,
     binding: core.BindingId,
+    /// Caller-visible implementations are part of semantic specialization.
+    context: u32 = 0,
     /// Complete checked type substitution, callback identity, and static region
     /// mapping are serialized here. Equality compares all bytes, not a hash.
     evidence: []const u32,
+    pub fn eql(self: Key, other: Key) bool {
+        return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
+    }
 };
 pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true };
 /// Selected source calls, not source references or partial applications. Keys
 /// contain only bounded static callback choices; runtime data is never a key.
 pub const ActiveCalls = struct {
-    pub const Target = struct { unit: u32, id: u32, kind: enum { named, closure } };
+    pub const Target = struct { unit: u32, id: u32, kind: enum { named, closure }, context: u32 = 0 };
     const Frame = struct { target: Target, start: usize, length: usize };
     allocator: std.mem.Allocator,
     frames: std.ArrayList(Frame) = .empty,
@@ -51,8 +56,7 @@ pub const Cache = struct {
     }
     pub fn find(self: *const Cache, key: Key) ?usize {
         for (self.entries.items, 0..) |entry, index| {
-            if (entry.key.unit == key.unit and entry.key.binding == key.binding and
-                std.mem.eql(u32, entry.key.evidence, key.evidence)) return index;
+            if (entry.key.eql(key)) return index;
         }
         return null;
     }

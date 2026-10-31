@@ -24,7 +24,7 @@ come from generator inputs, never manual output patches.
 
 ## Checked compiler fixes
 
-The installed development compiler is the reviewed callback-value candidate, SHA
+The installed development compiler is the reviewed contract-method candidate, SHA
 `9902355fc8b3735371e38495d741c84122e7eae9fa583d1fd650d343ded09929`. Older exact
 candidates remain local build artifacts; portable evidence qualifies its named
 candidate rather than every later revision.
@@ -42,9 +42,15 @@ candidate rather than every later revision.
 - [Callback values](tasks/storage-handoff-evidence/2026-10-31-callback-values.json)
   align source/Core recipe classification while keeping invocation and no-store
   checks strict. All six original Gdev restore tests and both rejection tests
-  pass. The latest native inventory compiles 2,728 tests; 395/396 affected laws
+  pass. The latest native inventory compiles 2,730 tests; 435/436 affected laws
   pass with the same independently reproduced associated-partial baseline
-  failure. All 59 affected guest tests pass.
+  failure. All 61 affected guest tests pass.
+
+[Contract methods](tasks/storage-handoff-evidence/2026-10-31-contract-methods.json)
+now select exact visible implementations with full signature/effect evidence
+and context-sensitive reusable calls. Original Gdev language tests and Ink
+custom-codec persistence, including all 260 truncated inputs, pass on the final
+candidate. Actual main must be rechecked on this binary.
 
 Astra xhigh reviewed the semantic fixes. The required full compiler gate was
 attempted for each batch but stops before tests because the configured proxy
@@ -60,8 +66,8 @@ invalid fixtures; rerun after source changes. Gdev's 441-file inventory had
 three restore-family failures cleared by the callback fix and one icon-preview
 API migration. Refresh the final inventory after that tool/generator batch.
 
-Current execution frontiers include generic Format/custom Codec method lowering,
-parser array-element layouts, actor frame evidence and the full affordance
+Current execution frontiers include parser array-element layouts, actor
+presentation-reference qualification and the full affordance
 fixture. Original prepared-physics replay comparisons pass through the smaller
 batch counts; the 2,048-body case traps and needs diagnosis with unchanged
 limits. All nine original adapter entries now pass 71 cases per mode after

@@ -22,6 +22,36 @@ fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Modu
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expect(result.counters.scoped_refinement_indexed_bindings > 0);
 }
+test "scoped contract methods select checked scalar witnesses through allocation failures" {
+    var module = try lower(a,
+        \\type Render a is contract = {const render: a -> U32}
+        \\impl Number : Render U32 = {const render = func value => return @u32.add value 7}
+        \\entry const answer = func (count: U32): Array U32 => return do:
+        \\  let output: GrowArray U32 = #[]
+        \\  for index in 0 .. count:
+        \\    @storage.push output (Render.render index)
+        \\  return @storage.freeze output
+    );
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
+}
+test "reusable scalar and writer key equality retains distinct implementation contexts" {
+    const calls = @import("storage_calls.zig");
+    var cache: calls.Cache = .{ .allocator = a };
+    defer cache.deinit();
+    const left: calls.Key = .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{ 7, 11, 13 } };
+    var right = left;
+    right.context = 4;
+    try std.testing.expect(!left.eql(right));
+    const first = try cache.insert(left, 31, false);
+    try std.testing.expect(cache.find(right) == null);
+    const second = try cache.insert(right, 32, false);
+    try std.testing.expectEqual(first, cache.find(left).?);
+    try std.testing.expectEqual(second, cache.find(right).?);
+    try std.testing.expectEqual(@as(u32, 31), cache.entries.items[cache.find(left).?].function);
+    try std.testing.expectEqual(@as(u32, 32), cache.entries.items[cache.find(right).?].function);
+}
 test "loop header inline variants publish across entry backedge and continue allocation failures" {
     var module = try lower(a, "type Maybe a is data = $Some a | $Nothing\n" ++
         "entry const trace = func (count: U32): Array U32 => return do:\n" ++

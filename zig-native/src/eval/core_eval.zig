@@ -130,6 +130,14 @@ pub const DispatchRecord = struct {
 };
 pub const SourceLocation = @import("../check/staging_origins.zig").Location;
 
+/// The checked caller context follows dependent uses across generic helpers.
+/// Concrete library calls establish their own implementation visibility.
+pub fn sourceInvocationOrigin(previous: ?SourceLocation, entry: u32, caller: u32, span: core.Span, dependent: bool) ?SourceLocation {
+    if (caller == entry) return previous orelse .{ .unit = caller, .span = span };
+    if (dependent) return previous;
+    return .{ .unit = caller, .span = span };
+}
+
 /// Source variables are the only positions a caller can substitute.
 pub fn callerDependent(source: *const core.Types, ty: types.Id, depth: usize) bool {
     if (ty == 0 or depth >= 256) return false;
@@ -3119,12 +3127,7 @@ pub const Session = struct {
         issue.span = use.span;
     }
     fn invocationOrigin(self: *Session, owner: usize, source: core.Id, dependent: bool) ?SourceLocation {
-        if (self.unitId(owner) == self.diagnostic_context.entry) {
-            if (self.specialization_origin) |origin| return origin;
-            return .{ .unit = self.unitId(owner), .span = self.units[owner].span(source) };
-        }
-        if (dependent) return self.specialization_origin;
-        return .{ .unit = self.unitId(owner), .span = self.units[owner].span(source) };
+        return sourceInvocationOrigin(self.specialization_origin, self.diagnostic_context.entry, self.unitId(owner), self.units[owner].span(source), dependent);
     }
     fn failDispatch(self: *Session, owner: usize, id: core.Id, code: Code, record: DispatchRecord) Error {
         const fresh = self.diagnostic == null;

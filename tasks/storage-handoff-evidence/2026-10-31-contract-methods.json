@@ -1,0 +1,72 @@
+{
+  "change": "Scoped storage lowers checked contract method proxies through the existing semantic implementation selector. Fully closed checked type arguments select exact coherent visible implementations and prerequisites; the complete instantiated proxy arrow must equal the selected semantic signature, including all latent effects. The selected body uses ordinary scoped source-proof, shape, ownership and borrowed-root admission.",
+  "source_paths": [
+    "zig-native/src/backend/scoped_backend.zig",
+    "zig-native/src/backend/storage_calls.zig",
+    "zig-native/src/backend/storage_calls_tests.zig",
+    "zig-native/src/eval/core_eval.zig",
+    "zig-native/tests/scoped_contract_methods_execution.test.ts"
+  ],
+  "compiler": {
+    "path": "zig-native/zig-out-contract-fix/bin/blotc",
+    "sha256": "52e04df6262c1572f07e9f16d474019a77dbdfbfd5fc1c042ea8fa3cb3242004",
+    "zig": "0.17.0",
+    "llvm": false,
+    "frozen": true
+  },
+  "native": {
+    "path": "zig-native/zig-out-contract-native-dev/bin/blot-tests",
+    "sha256": "92d5a22c1f543ca3f05c2c5989e5cd39d490496ef3ae35a910ff24a44fb9d000",
+    "compiled_inventory": 2730,
+    "selected": 436,
+    "passed": 435,
+    "failed": 1,
+    "baseline_failure": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+    "baseline_reproduced": true,
+    "focused_passed": 2,
+    "focused_coverage": [
+      "scoped contract selection publishes across every allocation failure",
+      "identical target/full evidence under distinct implementation contexts retains distinct reusable definitions",
+      "same Key.eql is used by scalar and writer cache lookup"
+    ]
+  },
+  "guest": {
+    "passed": 61,
+    "failed": 0,
+    "coverage": "Prior59 guest laws plus2 focused contract laws, both tiers and sync/JSPI: caller-owned private same-shape nominal witnesses through an imported generic forwarder, caller-only custom std/text.Format, standard Bool Format, generic Array Show prerequisites, private witness/missing-prerequisite rejection, incompatible method result rejection and byte-identical failed-revision recovery."
+  },
+  "context_and_work": "The existing evaluator invocation-origin rule is extracted unchanged and reused by scoped named invocation boundaries. All five child generators retain context, and all reusable keys plus active selections include caller context. The selector Session is lazy and shared only within one immutable compile; its cumulative associated work is capped/debited against the existing shared scoped validation budget on success and failure. No planner admits new cached forms, no legacy evaluator body execution or machine-layout inference.",
+  "integration": {
+    "format_original_report": {
+      "passed_assertions": 3,
+      "compiler": "25917a27 predecessor before final writer-key equality fix; final focused standard Bool Format law passes on52e"
+    },
+    "ink_original_word_persist": {
+      "emitted_bytes": 1016563,
+      "positive_corpora": "Final immutable52e actual native original corpus PASS: count0/1/3/256/1024 roundtrip/bridge/byte identity, scene restore/migration; all260prefix truncations0..259, tail/header/duplicate/componentbounds traps. Root-approved sparse-pool native law uses invalid extent alive+1 plus positive partial extent2; no Blot fixture/SDK/generator workaround.",
+      "guard_classification": "Current sparse component pool extent2 is valid under alive extent3. Worker preserves positive padding law and invalid extent4/overflow/directory/prefix traps; source/generator decoder policy unchanged.",
+      "wasm_sha256": "bb0c1c844fb14bce1dfe6caeee87bccdcb0eddc354b3a193d85cd2b79bad19b5"
+    },
+    "actual_main": "Not qualified by this handoff. Root must build and execute actual main against exact final52e artifact because context-aware reuse can change code/function counts. Earlier990 main trial is separate.",
+    "affordance_exploratory_overlay": "Intentionally interrupted olda95 four-export overlay after55:05 and11646680KiB RSS at parent direction to avoid memory contention. No pass/failure claim. Exact inputs/process metrics were retained locally.",
+    "gdev_original_language_compatibility": {
+      "passed_entrypoints": 6,
+      "compiler": "final52e exactSHA verified",
+      "source_or_assertion_edits": false,
+      "coverage": "All original language-control, Unicode/scalar, demand, dollar-callback, independent-copy/update, Format, and block/loop exit assertions."
+    }
+  },
+  "review": "Astra approved exact final implementation including writerCacheEntry correction through shared Key.eql, full-arrow equality, checked caller-context propagation, all five key/child paths, cumulative selector budget and focused laws. Lawful source witnesses use distinct owning nominal families because orphan/coherence rules forbid invented dual instances.",
+  "lint": {
+    "findings": 0,
+    "zig_files": 4,
+    "format": "Zig formatting, TS deno fmt --no-config and git diff whitespace pass"
+  },
+  "full_gate": {
+    "attempted": true,
+    "completed": false,
+    "blocker": "Locked Baba9.0.1 npm.jsr.io dependency fetch blocked before tests by Operation not permitted; no manifest/dependency/TLS changes"
+  },
+  "frozen_contracts": "ABI8/session2/storage/work/engine capacities unchanged. No dummy owners, casts, opaque fallback, custom-codec generator workaround, Gdev/Ink/Pen source edits, main/GPU build, or authority relaxation. Root docs/tasks changes are excluded from this manifest.",
+  "date": "2026-10-31"
+}
