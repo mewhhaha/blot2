@@ -78,16 +78,25 @@ fix passes all 26 lanes, full U32 IDs, order boundaries, Some/Nothing parameters
 signed zero, rejection of extras/oversized order, and recovery after traps.
 Both tiers and sync/async pass (48 checks). Guards and conversion are unchanged.
 
-The latest real Pen attempt,
-`build/storage-integration/gdev-one-frame/attempt-gf78rbfc`, used the installed
-indexed compiler (SHA-256 `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`)
-and the typed instance adapter. Its configured hello identity was
+The active real Pen attempt is
+`build/storage-integration/gdev-one-frame/attempt-s7g8la7z`, using indexed
+compiler SHA-256 `e6ccd2d4a2403ac26be09ad0997a50174dab5949cfffed54280b7a8cd7c1eadd`
+and configured identity
 `f4ef9bcd34c5a0dec9859b30778cc352bf0611b1d81e4688f70caaa7cc693954`.
-It finished after about34minutes at the generic result-selected `from` in
-`std/prelude.blot:48`; peak sampled RSS was16,413,984KiB. No module or PNG
-completed. Pen's remaining generated U32 schema/count/tag/integer conversions
-now use explicit `U32.to_f32`; generator tests, formatting and freshness pass.
-Complete the focused current-owner encoder witness before the next native run.
+Native Pen SHA-256 is
+`a04abe247d01f56dac6b44c8cffef8563f499afa90641548a76028be606b9014`.
+Resume this attempt before starting another full compile. No PNG has completed.
+
+The previous attempt finished after about34minutes at result-selected `from`
+in `std/prelude.blot:48`, before emitting a module. Pen's remaining generated
+U32 schema/count/tag/integer conversions now use explicit `U32.to_f32`.
+All ten generator tests, Rust formatting, regeneration and native freshness pass;
+Rust packet output is unchanged. The real `host.with_frame`/`host.encode_frame`
+fixture passes both tiers and sync/async: runtime-empty packets, nested draws,
+solids/insets, changed preferences, fields, borrowed UI text, full-width retained
+IDs/removals and extensions. The final fixture adds count-header assertions and
+a prefilled destination. Astra xhigh review found no blocker; no Ink host change
+was needed. Detailed results stay in the tracked evidence.
 
 Earlier operational fixes remain: Gdev's plugin deadline is 7,200 seconds for
 the bounded cold build; production main has one unchanged gameplay export;
