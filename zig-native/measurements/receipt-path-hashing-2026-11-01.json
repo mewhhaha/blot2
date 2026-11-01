@@ -1,0 +1,1050 @@
+{
+  "date": "2026-11-01",
+  "scope": "Exact certificate hashing work reduction; Safe/noLLVM instrumented development compiler. No whole-game compilation or size claim.",
+  "parent_commit": "615ef4618fefa525a3f90d37af1e2c30e40b7dbb",
+  "compiler_baseline_sha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+  "compiler_candidate_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+  "toolchain": {
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false,
+    "deno": "2.9.8"
+  },
+  "implementation": "Store path roles in fixed scratch; materialize digest prefixes only when a matching closed row is reached. Invalidate at every changed edge. Preserve exact certificate bytes, multiplicity, sorting, visit/depth budgets and failure behavior. No heap allocation added.",
+  "native_hash_operations": {
+    "format": "lazy/eager",
+    "sparse": [
+      2,
+      1026
+    ],
+    "dense": [
+      190,
+      318
+    ],
+    "absent": [
+      0,
+      510
+    ],
+    "note": "Measured test-only counters; every source graph visit still occurs and consumes identical work. These are operation counts, not latency predictions."
+  },
+  "focused_native": [
+    {
+      "name": "reuse.body_check_cache.test.lazy closed row paths preserve sparse dense and shared certificate bytes without allocations",
+      "duration_ns": 41432405,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 0,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    },
+    {
+      "name": "reuse.body_check_cache.test.lazy closed row paths retain every role and certificate sorting across live and frozen sources",
+      "duration_ns": 14307011,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 0,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    },
+    {
+      "name": "reuse.body_check_cache.test.lazy closed row paths preserve work depth path capacity and missing-field rejection boundaries",
+      "duration_ns": 52152539,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 0,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    }
+  ],
+  "real_producer": {
+    "description": "Unmodified pen/protocol_render is imported and all producer bodies checked; only a tiny identity entry is emitted. Native Gdev asset settings retained. This is not an executed renderer or whole Gdev.",
+    "entry_source": "import * as render from \"pen/protocol_render\"\nentry const answer = func (input: U32): U32 => return do:\n  let marker: GrowArray U32 = #[input]\n  return marker[0]\n",
+    "runtime_inputs": [
+      0,
+      1,
+      41,
+      4294967295,
+      0
+    ],
+    "deadline_ms": 5000,
+    "samples": [
+      {
+        "variant": "baseline",
+        "median_build_ms": 891.570941,
+        "median_check_us": 502320,
+        "samples": [
+          {
+            "pair": 0,
+            "build_ms": 1122.346466,
+            "pins": {
+              "compiler_sha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1916,
+              "assets": 288305,
+              "inputs": 1424,
+              "load": 1964,
+              "lex": 24182,
+              "parse": 14371,
+              "check": 695076,
+              "lower": 23989,
+              "freeze": 10062,
+              "validation": 25965,
+              "backend": 30210
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          },
+          {
+            "pair": 1,
+            "build_ms": 891.570941,
+            "pins": {
+              "compiler_sha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1597,
+              "assets": 286832,
+              "inputs": 1016,
+              "load": 1336,
+              "lex": 16940,
+              "parse": 10414,
+              "check": 502320,
+              "lower": 17281,
+              "freeze": 7726,
+              "validation": 19093,
+              "backend": 22383
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          },
+          {
+            "pair": 2,
+            "build_ms": 852.3391870000002,
+            "pins": {
+              "compiler_sha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1458,
+              "assets": 256382,
+              "inputs": 992,
+              "load": 1348,
+              "lex": 16776,
+              "parse": 10214,
+              "check": 492408,
+              "lower": 17981,
+              "freeze": 8001,
+              "validation": 19591,
+              "backend": 22667
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          }
+        ]
+      },
+      {
+        "variant": "candidate",
+        "median_build_ms": 852.3710979999998,
+        "median_check_us": 493393,
+        "samples": [
+          {
+            "pair": 0,
+            "build_ms": 863.800326,
+            "pins": {
+              "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1534,
+              "assets": 261363,
+              "inputs": 1017,
+              "load": 1392,
+              "lex": 16769,
+              "parse": 10296,
+              "check": 498792,
+              "lower": 17689,
+              "freeze": 7900,
+              "validation": 19663,
+              "backend": 22775
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          },
+          {
+            "pair": 1,
+            "build_ms": 852.3710979999998,
+            "pins": {
+              "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1503,
+              "assets": 256982,
+              "inputs": 998,
+              "load": 1309,
+              "lex": 16633,
+              "parse": 10162,
+              "check": 493393,
+              "lower": 17314,
+              "freeze": 7750,
+              "validation": 19184,
+              "backend": 22516
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          },
+          {
+            "pair": 2,
+            "build_ms": 849.156555,
+            "pins": {
+              "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+              "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+              "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "wasm_bytes": 2935,
+            "phases_us": {
+              "other": 1645,
+              "assets": 256215,
+              "inputs": 1012,
+              "load": 1347,
+              "lex": 16631,
+              "parse": 10233,
+              "check": 491220,
+              "lower": 17276,
+              "freeze": 7697,
+              "validation": 19047,
+              "backend": 22386
+            },
+            "checking": {
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "type_nodes": 29353
+            },
+            "normalization": {
+              "free_type_queries": 4534,
+              "free_type_visits": 16105,
+              "free_row_queries": 71109,
+              "free_row_visits": 96644
+            }
+          }
+        ]
+      }
+    ],
+    "note": "Three alternating instrumented pairs. Small wall-time change and an outlier; no broad end-to-end speedup inferred."
+  },
+  "real_language_control": {
+    "samples": [
+      {
+        "variant": "baseline",
+        "median_build_ms": 484.89842799999997,
+        "samples": [
+          {
+            "pair": 0,
+            "compilerSha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 519.535558,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 1156,
+              "assets": 297103,
+              "inputs": 992,
+              "load": 938,
+              "lex": 7402,
+              "parse": 4136,
+              "check": 87252,
+              "lower": 8601,
+              "freeze": 4498,
+              "validation": 12475,
+              "backend": 90822
+            }
+          },
+          {
+            "pair": 1,
+            "compilerSha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 484.89842799999997,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 1333,
+              "assets": 261658,
+              "inputs": 1018,
+              "load": 756,
+              "lex": 7369,
+              "parse": 4177,
+              "check": 86659,
+              "lower": 8550,
+              "freeze": 4466,
+              "validation": 12479,
+              "backend": 92281
+            }
+          },
+          {
+            "pair": 2,
+            "compilerSha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 480.969381,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 982,
+              "assets": 258981,
+              "inputs": 996,
+              "load": 749,
+              "lex": 7190,
+              "parse": 4118,
+              "check": 87708,
+              "lower": 8465,
+              "freeze": 4436,
+              "validation": 12423,
+              "backend": 90704
+            }
+          }
+        ]
+      },
+      {
+        "variant": "candidate",
+        "median_build_ms": 484.310109,
+        "samples": [
+          {
+            "pair": 0,
+            "compilerSha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 484.310109,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 1110,
+              "assets": 262197,
+              "inputs": 995,
+              "load": 758,
+              "lex": 7191,
+              "parse": 4092,
+              "check": 86258,
+              "lower": 8567,
+              "freeze": 4447,
+              "validation": 12407,
+              "backend": 93211
+            }
+          },
+          {
+            "pair": 1,
+            "compilerSha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 484.08306799999997,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 971,
+              "assets": 261712,
+              "inputs": 1024,
+              "load": 784,
+              "lex": 7249,
+              "parse": 4119,
+              "check": 86443,
+              "lower": 8501,
+              "freeze": 4467,
+              "validation": 12615,
+              "backend": 91940
+            }
+          },
+          {
+            "pair": 2,
+            "compilerSha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "sourceCheckpoint": {
+              "entrySha256": "fdcbab798f0e34e403f6902418004e6e955bd4a928b94d9191046bbdd22e9a32",
+              "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+            },
+            "deadlineMs": 5000,
+            "buildMs": 532.072776,
+            "success": true,
+            "compiled": true,
+            "wasmBytes": 25489,
+            "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+            "phases_us": {
+              "other": 1321,
+              "assets": 290953,
+              "inputs": 1023,
+              "load": 757,
+              "lex": 7235,
+              "parse": 4100,
+              "check": 104786,
+              "lower": 8469,
+              "freeze": 4436,
+              "validation": 12447,
+              "backend": 92113
+            }
+          }
+        ]
+      }
+    ],
+    "execution_note": "Current6af6 candidate executes the original fixture:6entries/11assertions per sync/JSPI mode. Baseline/candidate Wasm SHA values also match.",
+    "conclusion": "Median484.90ms baseline versus484.31ms candidate: effectively unchanged.",
+    "execution": {
+      "variant": "final",
+      "entries": 6,
+      "assertions": 11,
+      "modes": [
+        "sync",
+        "JSPI"
+      ],
+      "passed": true
+    }
+  },
+  "bounded_game": {
+    "compilerSha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+    "sourceCheckpoint": {
+      "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "deadlineMs": 5000,
+    "buildMs": 5002.423643,
+    "success": false,
+    "compiled": false,
+    "status": "timeout_incomplete",
+    "error": "Zig project build aborted"
+  },
+  "same_imports_entry_ablation": {
+    "result": {
+      "compilerSha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+      "sourceCheckpoint": {
+        "entrySha256": "0f8992c4429264b64c9f1659cdcebd523c3d9c803fbc86d7a716c29cf37c36a6",
+        "originalEntrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "entryBodyAblated": true,
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5002.013255999999,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete",
+      "error": "Zig project build aborted"
+    },
+    "description": "Keep original main imports/assets, replace only entry body with tiny GrowArray identity. Still exceeds5s; producer frontend alone exceeds the diagnostic window. This synthetic entry is not game runtime evidence."
+  },
+  "worker16_probe": {
+    "result": {
+      "compilerSha256": "651ec7e9de5dc56407400bbb356f92f99a2b56b02898f786f6160de61d377040",
+      "sourceCheckpoint": {
+        "entrySha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5003.060353000001,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete",
+      "error": "Zig project build aborted",
+      "frontendWorkers": 16
+    },
+    "note": "Earlier651ec7e9 baseline; actor presentation still hit5s with16 frontend workers. Default remains4."
+  },
+  "static_source_inventory": {
+    "prelude": "std/prelude.blot (resolved by runner to /home/jacobt/src/blot2/std/prelude.blot)",
+    "entries": {
+      "src/main.blot": {
+        "source_import_graph": {
+          "source_modules": 206,
+          "source_lines": 44914,
+          "top_level_function_declarations_approx": 3302,
+          "non_blot_files": 55,
+          "non_blot_lines": 12835,
+          "largest_source_modules": [
+            {
+              "path": "gdev/src/actors/robots.blot",
+              "lines": 2301,
+              "functions_approx": 159
+            },
+            {
+              "path": "gdev/src/world/salt.blot",
+              "lines": 1735,
+              "functions_approx": 156
+            },
+            {
+              "path": "gdev/src/ui/station.blot",
+              "lines": 1524,
+              "functions_approx": 143
+            },
+            {
+              "path": "gdev/pen/protocol.blot",
+              "lines": 1271,
+              "functions_approx": 2
+            },
+            {
+              "path": "gdev/src/world_storage.blot",
+              "lines": 1176,
+              "functions_approx": 30
+            },
+            {
+              "path": "ink/lib/shapes.blot",
+              "lines": 1130,
+              "functions_approx": 52
+            },
+            {
+              "path": "ink/lib/editor.blot",
+              "lines": 1126,
+              "functions_approx": 94
+            },
+            {
+              "path": "gdev/pen/protocol_render.blot",
+              "lines": 1079,
+              "functions_approx": 22
+            },
+            {
+              "path": "gdev/src/buildings/buildings.blot",
+              "lines": 904,
+              "functions_approx": 98
+            },
+            {
+              "path": "gdev/src/text.blot",
+              "lines": 852,
+              "functions_approx": 23
+            },
+            {
+              "path": "gdev/src/world/trails.blot",
+              "lines": 804,
+              "functions_approx": 79
+            },
+            {
+              "path": "gdev/src/progression/tutorial.blot",
+              "lines": 770,
+              "functions_approx": 62
+            }
+          ]
+        },
+        "source_import_longest_chain": [
+          "gdev/src/main.blot",
+          "gdev/src/game.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/ui/output_chart.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/progression/purchases.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/robot_wakes.blot",
+          "gdev/src/actors/actor_state.blot",
+          "gdev/src/actors/jetpack.blot",
+          "gdev/src/buildings/buildings.blot",
+          "gdev/src/effects/impact.blot",
+          "gdev/src/world/rock.blot",
+          "gdev/src/effects/stage_lights.blot",
+          "gdev/src/world/cycle.blot",
+          "gdev/src/library.blot",
+          "ink/lib/orbit.blot",
+          "ink/lib/view.blot",
+          "ink/lib/render.blot",
+          "ink/lib/app.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/math.blot",
+          "std/vector.blot"
+        ],
+        "with_explicit_session_prelude": {
+          "source_modules": 207,
+          "source_lines": 45239,
+          "top_level_function_declarations_approx": 3449,
+          "non_blot_files": 55,
+          "non_blot_lines": 12835,
+          "largest_source_modules": [
+            {
+              "path": "gdev/src/actors/robots.blot",
+              "lines": 2301,
+              "functions_approx": 159
+            },
+            {
+              "path": "gdev/src/world/salt.blot",
+              "lines": 1735,
+              "functions_approx": 156
+            },
+            {
+              "path": "gdev/src/ui/station.blot",
+              "lines": 1524,
+              "functions_approx": 143
+            },
+            {
+              "path": "gdev/pen/protocol.blot",
+              "lines": 1271,
+              "functions_approx": 2
+            },
+            {
+              "path": "gdev/src/world_storage.blot",
+              "lines": 1176,
+              "functions_approx": 30
+            },
+            {
+              "path": "ink/lib/shapes.blot",
+              "lines": 1130,
+              "functions_approx": 52
+            },
+            {
+              "path": "ink/lib/editor.blot",
+              "lines": 1126,
+              "functions_approx": 94
+            },
+            {
+              "path": "gdev/pen/protocol_render.blot",
+              "lines": 1079,
+              "functions_approx": 22
+            },
+            {
+              "path": "gdev/src/buildings/buildings.blot",
+              "lines": 904,
+              "functions_approx": 98
+            },
+            {
+              "path": "gdev/src/text.blot",
+              "lines": 852,
+              "functions_approx": 23
+            },
+            {
+              "path": "gdev/src/world/trails.blot",
+              "lines": 804,
+              "functions_approx": 79
+            },
+            {
+              "path": "gdev/src/progression/tutorial.blot",
+              "lines": 770,
+              "functions_approx": 62
+            }
+          ]
+        },
+        "prelude_closure": {
+          "source_modules": 1,
+          "source_lines": 325,
+          "top_level_function_declarations_approx": 147,
+          "non_blot_files": 0,
+          "non_blot_lines": 0,
+          "largest_source_modules": [
+            {
+              "path": "std/prelude.blot",
+              "lines": 325,
+              "functions_approx": 147
+            }
+          ]
+        },
+        "prelude_overlap": {
+          "already_in_source_import_graph": false,
+          "additional_source_modules": 1,
+          "additional_source_lines": 325,
+          "additional_module_paths": [
+            "std/prelude.blot"
+          ]
+        },
+        "unresolved_imports": []
+      },
+      "tests/actor_presentation.blot": {
+        "source_import_graph": {
+          "source_modules": 209,
+          "source_lines": 45192,
+          "top_level_function_declarations_approx": 3314,
+          "non_blot_files": 55,
+          "non_blot_lines": 12835,
+          "largest_source_modules": [
+            {
+              "path": "gdev/src/actors/robots.blot",
+              "lines": 2301,
+              "functions_approx": 159
+            },
+            {
+              "path": "gdev/src/world/salt.blot",
+              "lines": 1735,
+              "functions_approx": 156
+            },
+            {
+              "path": "gdev/src/ui/station.blot",
+              "lines": 1524,
+              "functions_approx": 143
+            },
+            {
+              "path": "gdev/pen/protocol.blot",
+              "lines": 1271,
+              "functions_approx": 2
+            },
+            {
+              "path": "gdev/src/world_storage.blot",
+              "lines": 1176,
+              "functions_approx": 30
+            },
+            {
+              "path": "ink/lib/shapes.blot",
+              "lines": 1130,
+              "functions_approx": 52
+            },
+            {
+              "path": "ink/lib/editor.blot",
+              "lines": 1126,
+              "functions_approx": 94
+            },
+            {
+              "path": "gdev/pen/protocol_render.blot",
+              "lines": 1079,
+              "functions_approx": 22
+            },
+            {
+              "path": "gdev/src/buildings/buildings.blot",
+              "lines": 904,
+              "functions_approx": 98
+            },
+            {
+              "path": "gdev/src/text.blot",
+              "lines": 852,
+              "functions_approx": 23
+            },
+            {
+              "path": "gdev/src/world/trails.blot",
+              "lines": 804,
+              "functions_approx": 79
+            },
+            {
+              "path": "gdev/src/progression/tutorial.blot",
+              "lines": 770,
+              "functions_approx": 62
+            }
+          ]
+        },
+        "source_import_longest_chain": [
+          "gdev/tests/actor_presentation.blot",
+          "gdev/test_support/actor_presentation.blot",
+          "gdev/src/game.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/ui/output_chart.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/progression/purchases.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/robot_wakes.blot",
+          "gdev/src/actors/actor_state.blot",
+          "gdev/src/actors/jetpack.blot",
+          "gdev/src/buildings/buildings.blot",
+          "gdev/src/effects/impact.blot",
+          "gdev/src/world/rock.blot",
+          "gdev/src/effects/stage_lights.blot",
+          "gdev/src/world/cycle.blot",
+          "gdev/src/library.blot",
+          "ink/lib/orbit.blot",
+          "ink/lib/view.blot",
+          "ink/lib/render.blot",
+          "ink/lib/app.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/math.blot",
+          "std/vector.blot"
+        ],
+        "with_explicit_session_prelude": {
+          "source_modules": 210,
+          "source_lines": 45517,
+          "top_level_function_declarations_approx": 3461,
+          "non_blot_files": 55,
+          "non_blot_lines": 12835,
+          "largest_source_modules": [
+            {
+              "path": "gdev/src/actors/robots.blot",
+              "lines": 2301,
+              "functions_approx": 159
+            },
+            {
+              "path": "gdev/src/world/salt.blot",
+              "lines": 1735,
+              "functions_approx": 156
+            },
+            {
+              "path": "gdev/src/ui/station.blot",
+              "lines": 1524,
+              "functions_approx": 143
+            },
+            {
+              "path": "gdev/pen/protocol.blot",
+              "lines": 1271,
+              "functions_approx": 2
+            },
+            {
+              "path": "gdev/src/world_storage.blot",
+              "lines": 1176,
+              "functions_approx": 30
+            },
+            {
+              "path": "ink/lib/shapes.blot",
+              "lines": 1130,
+              "functions_approx": 52
+            },
+            {
+              "path": "ink/lib/editor.blot",
+              "lines": 1126,
+              "functions_approx": 94
+            },
+            {
+              "path": "gdev/pen/protocol_render.blot",
+              "lines": 1079,
+              "functions_approx": 22
+            },
+            {
+              "path": "gdev/src/buildings/buildings.blot",
+              "lines": 904,
+              "functions_approx": 98
+            },
+            {
+              "path": "gdev/src/text.blot",
+              "lines": 852,
+              "functions_approx": 23
+            },
+            {
+              "path": "gdev/src/world/trails.blot",
+              "lines": 804,
+              "functions_approx": 79
+            },
+            {
+              "path": "gdev/src/progression/tutorial.blot",
+              "lines": 770,
+              "functions_approx": 62
+            }
+          ]
+        },
+        "prelude_closure": {
+          "source_modules": 1,
+          "source_lines": 325,
+          "top_level_function_declarations_approx": 147,
+          "non_blot_files": 0,
+          "non_blot_lines": 0,
+          "largest_source_modules": [
+            {
+              "path": "std/prelude.blot",
+              "lines": 325,
+              "functions_approx": 147
+            }
+          ]
+        },
+        "prelude_overlap": {
+          "already_in_source_import_graph": false,
+          "additional_source_modules": 1,
+          "additional_source_lines": 325,
+          "additional_module_paths": [
+            "std/prelude.blot"
+          ]
+        },
+        "unresolved_imports": []
+      }
+    },
+    "lexical_count_note": "Function counts are approximate top-level function-valued declaration counts, not semantic body-check counts."
+  },
+  "profile": {
+    "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+    "samples": 35,
+    "window_ms": 5000,
+    "frame_limit": 96,
+    "sampled_thread_cpu_ms": 9323.533878,
+    "note": "Overlapping worker CPU samples with truncated stacks. Source hashes can match copied files; encode_render_views source is gdev/pen/protocol_render.blot with SHA987e1f0e. ClosedPath drops out of the top sampled frames; no comparable complete build clock is available.",
+    "sample_file_sha256": "2a3974275d015c26dbfdcc161310347ad2e23e791e8cf18a3403b50dd11ccd6e"
+  },
+  "verification": {
+    "native_inventory": 2754,
+    "broader_native": {
+      "selected": 351,
+      "passed": 350,
+      "failed": [
+        "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers"
+      ],
+      "leaks": 0,
+      "logged_errors": 0,
+      "fault_mode": "sampled"
+    },
+    "reuse_guests": {
+      "baseline": {
+        "passed": 17,
+        "failed": 16,
+        "failure_names": [
+          "body checker reuse owns Foreign arrows through source compiled changes and rejection",
+          "body checker reuse owns array selectors through source compiled changes and rejection",
+          "body checker reuse owns if let joins captures and effect traces through compiled changes",
+          "body checker reuse owns result directed local principals",
+          "body checker reuse owns shared local relays through source and compiled changes",
+          "body checker reuse preserves exported local qualification origins in source and compiled producers",
+          "body checker reuse preserves portable qualified producer origins after earlier body edits",
+          "body checker reuse preserves selected Foreign traces in inferred local principals",
+          "body checker reuse relocates and follows executable edits through rejected revisions",
+          "body checker reuse relocates producer units and bindings through source and compiled origins",
+          "body checker reuse relocates shaped records with owning payloads and reversed spelling order",
+          "body checker reuse relocates shared producer schemes through source and compiled imports",
+          "body checker reuse relocates written local association and representation origins",
+          "body checker reuse resolves imported annotation heads with exact source and compiled recipes",
+          "body checker reuse restores chained dotted nominal paths from source and compiled producers",
+          "body checker reuse revokes local principals for source and compiled selected effects"
+        ],
+        "log_sha256": "ca79d90aedbba9098fcde33c2d2c6caa867b96cd14cabf4375ed9fa841a02d17"
+      },
+      "candidate": {
+        "passed": 17,
+        "failed": 16,
+        "failure_names": [
+          "body checker reuse owns Foreign arrows through source compiled changes and rejection",
+          "body checker reuse owns array selectors through source compiled changes and rejection",
+          "body checker reuse owns if let joins captures and effect traces through compiled changes",
+          "body checker reuse owns result directed local principals",
+          "body checker reuse owns shared local relays through source and compiled changes",
+          "body checker reuse preserves exported local qualification origins in source and compiled producers",
+          "body checker reuse preserves portable qualified producer origins after earlier body edits",
+          "body checker reuse preserves selected Foreign traces in inferred local principals",
+          "body checker reuse relocates and follows executable edits through rejected revisions",
+          "body checker reuse relocates producer units and bindings through source and compiled origins",
+          "body checker reuse relocates shaped records with owning payloads and reversed spelling order",
+          "body checker reuse relocates shared producer schemes through source and compiled imports",
+          "body checker reuse relocates written local association and representation origins",
+          "body checker reuse resolves imported annotation heads with exact source and compiled recipes",
+          "body checker reuse restores chained dotted nominal paths from source and compiled producers",
+          "body checker reuse revokes local principals for source and compiled selected effects"
+        ],
+        "log_sha256": "064e7c4d9087ae8030153473ae66235cd9a6ca7eb0f7339ceec939b702631990"
+      },
+      "note": "Same16 existing work/reuse assertion failures. This suite does not pass and later revisions after those assertions remain unqualified."
+    },
+    "zig_lint": {
+      "source_files": 567,
+      "source_findings": 0,
+      "fixture_files": 1,
+      "fixture_findings": 0
+    },
+    "full_gate": {
+      "attempted": true,
+      "passed": false,
+      "reason": "Same existing protocol operand-span preflight failure42/47 versus43/48. Full release qualification remains pending."
+    }
+  },
+  "next_frontier": {
+    "source": "gdev/pen/protocol_render.blot",
+    "instrumented_prefix_locals": 667,
+    "completed_function_inventory": false,
+    "already_fast_u32": 81,
+    "unresolved_variables": 91,
+    "function_values": 4,
+    "closed_arrays": 3,
+    "closed_nominals": 488,
+    "closed_resize_f32_rebindings": 476,
+    "strict_no_pending_guard_hits": 0,
+    "ordinary_field_predicates_observed": true,
+    "contract_method_explicit_qualification_generative_blockers_observed": 0,
+    "proposal": "Skip local generalization only for certified closed Array/Grow/Resize values, with exact candidate-retention guards; keep contracts/method/explicit/generative cases on their existing path. No language change required."
+  },
+  "reproduction": {
+    "build": "zig version && cd zig-native && zig build install compiler-identity test-compile -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev -j2",
+    "game": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler COMPILER --timeout-ms 5000 --profile",
+    "producer": "Use the recorded tiny entry under the original Gdev compiler settings, same as scripts/storage_handoff/build_gdev.ts; cacheDirectoryfalse, profileBackendtrue, startup/build deadline5000ms."
+  }
+}

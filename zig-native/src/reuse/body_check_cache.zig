@@ -1159,15 +1159,16 @@ pub fn closedRowsDigest(source: F.Source, raw: T.Id, principal: T.Scheme, pool: 
         }
         hashWord(&certificate, 1);
         var paths: [128]Digest = undefined;
+        var path: ClosedPath = .{};
         var count: usize = 0;
-        if (!closedPaths(source, raw, variable, pool, @splat(0), &paths, &count, &budget, 0) or count == 0) return null;
+        if (!closedPaths(source, raw, variable, pool, &path, &paths, &count, &budget, 0) or count == 0) return null;
         std.mem.sortUnstable(Digest, paths[0..count], {}, struct {
             fn less(_: void, left: Digest, right: Digest) bool {
                 return std.mem.order(u8, &left, &right) == .lt;
             }
         }.less);
         hashWord(&certificate, @intCast(count));
-        for (paths[0..count]) |path| certificate.update(&path);
+        for (paths[0..count]) |digest| certificate.update(&digest);
         certificate.final(&certificates[index]);
     }
     std.mem.sortUnstable(Digest, certificates[0..principal.closed_rows.len], {}, struct {
@@ -1180,7 +1181,9 @@ pub fn closedRowsDigest(source: F.Source, raw: T.Id, principal: T.Scheme, pool: 
     hash.final(&digest);
     return digest;
 }
+threadlocal var closed_path_test_hashes: usize = 0;
 fn closedPath(parent: Digest, tag: T.Tag, slot: u32, name: []const u8) Digest {
+    if (@import("builtin").is_test) closed_path_test_hashes += 1;
     var hash: std.crypto.hash.Blake3 = .init(.{});
     hash.update(&parent);
     hashWord(&hash, @backingInt(tag));
@@ -1191,7 +1194,28 @@ fn closedPath(parent: Digest, tag: T.Tag, slot: u32, name: []const u8) Digest {
     hash.final(&path);
     return path;
 }
-fn closedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Pool, path: Digest, paths: *[128]Digest, count: *usize, budget: *usize, depth: usize) bool {
+const ClosedPath = struct {
+    const Role = struct { tag: T.Tag, slot: u32, name: []const u8 };
+    roles: [128]Role = undefined,
+    prefixes: [128]Digest = undefined,
+    ready: usize = 0,
+
+    fn edge(self: *ClosedPath, depth: usize, tag: T.Tag, slot: u32, name: []const u8) void {
+        self.roles[depth] = .{ .tag = tag, .slot = slot, .name = name };
+        self.ready = @min(self.ready, depth);
+    }
+    fn row(self: *ClosedPath, depth: usize, tag: T.Tag) Digest {
+        var prefix: Digest = @splat(0);
+        if (self.ready != 0) prefix = self.prefixes[self.ready - 1];
+        while (self.ready < depth) : (self.ready += 1) {
+            const role = self.roles[self.ready];
+            prefix = closedPath(prefix, role.tag, role.slot, role.name);
+            self.prefixes[self.ready] = prefix;
+        }
+        return closedPath(prefix, tag, 2, "");
+    }
+};
+fn closedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Pool, path: *ClosedPath, paths: *[128]Digest, count: *usize, budget: *usize, depth: usize) bool {
     if (depth >= 128 or budget.* == 0) return false;
     budget.* -= 1;
     const node = source.node(source.head(ty, 0));
@@ -1200,39 +1224,56 @@ fn closedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Poo
             const tail = source.row(node.c).tail;
             if (tail == .variable and tail.variable == target) {
                 if (count.* == paths.len) return false;
-                paths[count.*] = closedPath(path, node.tag, 2, "");
+                paths[count.*] = path.row(depth, node.tag);
                 count.* += 1;
             }
-            if (!closedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
-            if (node.tag == .function) return closedPaths(source, node.b, target, pool, closedPath(path, node.tag, 1, ""), paths, count, budget, depth + 1);
+            path.edge(depth, node.tag, 0, "");
+            if (!closedPaths(source, node.a, target, pool, path, paths, count, budget, depth + 1)) return false;
+            if (node.tag == .function) {
+                path.edge(depth, node.tag, 1, "");
+                return closedPaths(source, node.b, target, pool, path, paths, count, budget, depth + 1);
+            }
         },
         .product => for (source.list(.{ .start = node.a, .len = node.b }), 0..) |child, index| {
-            if (!closedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+            path.edge(depth, node.tag, @intCast(index), "");
+            if (!closedPaths(source, child, target, pool, path, paths, count, budget, depth + 1)) return false;
         },
         .nominal, .projection, .instance_selection => for (source.nominalArguments(node), 0..) |child, index| {
-            if (!closedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+            path.edge(depth, node.tag, @intCast(index), "");
+            if (!closedPaths(source, child, target, pool, path, paths, count, budget, depth + 1)) return false;
         },
         .record => for (0..node.b) |index| {
             const field = source.recordField(node, index);
             if (field.name == 0) return false;
-            if (!closedPaths(source, field.ty, target, pool, closedPath(path, node.tag, 0, pool.get(field.name)), paths, count, budget, depth + 1)) return false;
+            path.edge(depth, node.tag, 0, pool.get(field.name));
+            if (!closedPaths(source, field.ty, target, pool, path, paths, count, budget, depth + 1)) return false;
         },
         .usage, .scoped => {
-            if (!closedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
-            if ((node.tag == .usage and node.c != 0) or (node.tag == .scoped and node.b == 0)) return closedPaths(source, node.c, target, pool, closedPath(path, node.tag, 1, ""), paths, count, budget, depth + 1);
+            path.edge(depth, node.tag, 0, "");
+            if (!closedPaths(source, node.a, target, pool, path, paths, count, budget, depth + 1)) return false;
+            if ((node.tag == .usage and node.c != 0) or (node.tag == .scoped and node.b == 0)) {
+                path.edge(depth, node.tag, 1, "");
+                return closedPaths(source, node.c, target, pool, path, paths, count, budget, depth + 1);
+            }
         },
         .forall, .existential => {
-            if (!closedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
+            path.edge(depth, node.tag, 0, "");
+            if (!closedPaths(source, node.a, target, pool, path, paths, count, budget, depth + 1)) return false;
             for (source.quantifierGoals(source.head(ty, 0)), 0..) |goal, index| {
                 for ([_]T.Id{ goal.ty, goal.other, goal.result, goal.signature }, 0..) |root, part| {
-                    if (!closedPaths(source, root, target, pool, closedPath(path, node.tag, @intCast(1 + index * 4 + part), ""), paths, count, budget, depth + 1)) return false;
+                    path.edge(depth, node.tag, @intCast(1 + index * 4 + part), "");
+                    if (!closedPaths(source, root, target, pool, path, paths, count, budget, depth + 1)) return false;
                 }
             }
         },
         .state_provider => for ([_]T.Id{ node.a, node.b, node.c }, 0..) |child, index| {
-            if (!closedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+            path.edge(depth, node.tag, @intCast(index), "");
+            if (!closedPaths(source, child, target, pool, path, paths, count, budget, depth + 1)) return false;
         },
-        .array, .list, .cursor, .resolver => return closedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1),
+        .array, .list, .cursor, .resolver => {
+            path.edge(depth, node.tag, 0, "");
+            return closedPaths(source, node.a, target, pool, path, paths, count, budget, depth + 1);
+        },
         .absent, .unit, .boolean, .u32, .f32, .never, .variable, .bound, .rigid, .instance_version, .erased_proof, .type_constructor => {},
     }
     return true;
@@ -3326,4 +3367,238 @@ test "body check cache forwarded shared principals require an exact bounded tran
     obligations[1].identity.decl = 4;
     try std.testing.expect(!forwardsShared(checked, 1, .{ .unit = 1, .decl = 3 }));
     try std.testing.expect(forwardsShared(checked, 1, .{ .unit = 1, .decl = 4 }));
+}
+
+// Test-only oracle: the original eager path hashing algorithm.
+fn eagerClosedRowsDigest(source: F.Source, raw: T.Id, principal: T.Scheme, pool: *const symbols.Pool) ?Digest {
+    var hash: std.crypto.hash.Blake3 = .init(.{});
+    hashWord(&hash, principal.closed_rows.len);
+    var budget: usize = 4096;
+    var certificates: [128]Digest = undefined;
+    if (principal.closed_rows.len > certificates.len) return null;
+    for (source.list(principal.closed_rows), 0..) |variable, index| {
+        var certificate: std.crypto.hash.Blake3 = .init(.{});
+        if (std.mem.findScalar(u32, source.list(principal.row_variables), variable)) |position_| {
+            hashWord(&certificate, 0);
+            hashWord(&certificate, @intCast(position_));
+            certificate.final(&certificates[index]);
+            continue;
+        }
+        hashWord(&certificate, 1);
+        var paths: [128]Digest = undefined;
+        var count: usize = 0;
+        if (!eagerClosedPaths(source, raw, variable, pool, @splat(0), &paths, &count, &budget, 0) or count == 0) return null;
+        std.mem.sortUnstable(Digest, paths[0..count], {}, struct {
+            fn less(_: void, left: Digest, right: Digest) bool {
+                return std.mem.order(u8, &left, &right) == .lt;
+            }
+        }.less);
+        hashWord(&certificate, @intCast(count));
+        for (paths[0..count]) |path| certificate.update(&path);
+        certificate.final(&certificates[index]);
+    }
+    std.mem.sortUnstable(Digest, certificates[0..principal.closed_rows.len], {}, struct {
+        fn less(_: void, left: Digest, right: Digest) bool {
+            return std.mem.order(u8, &left, &right) == .lt;
+        }
+    }.less);
+    for (certificates[0..principal.closed_rows.len]) |certificate| hash.update(&certificate);
+    var digest: Digest = undefined;
+    hash.final(&digest);
+    return digest;
+}
+fn eagerClosedPaths(source: F.Source, ty: T.Id, target: u32, pool: *const symbols.Pool, path: Digest, paths: *[128]Digest, count: *usize, budget: *usize, depth: usize) bool {
+    if (depth >= 128 or budget.* == 0) return false;
+    budget.* -= 1;
+    const node = source.node(source.head(ty, 0));
+    switch (node.tag) {
+        .function, .demand, .provider => {
+            const tail = source.row(node.c).tail;
+            if (tail == .variable and tail.variable == target) {
+                if (count.* == paths.len) return false;
+                paths[count.*] = closedPath(path, node.tag, 2, "");
+                count.* += 1;
+            }
+            if (!eagerClosedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
+            if (node.tag == .function) return eagerClosedPaths(source, node.b, target, pool, closedPath(path, node.tag, 1, ""), paths, count, budget, depth + 1);
+        },
+        .product => for (source.list(.{ .start = node.a, .len = node.b }), 0..) |child, index| {
+            if (!eagerClosedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+        },
+        .nominal, .projection, .instance_selection => for (source.nominalArguments(node), 0..) |child, index| {
+            if (!eagerClosedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+        },
+        .record => for (0..node.b) |index| {
+            const field = source.recordField(node, index);
+            if (field.name == 0) return false;
+            if (!eagerClosedPaths(source, field.ty, target, pool, closedPath(path, node.tag, 0, pool.get(field.name)), paths, count, budget, depth + 1)) return false;
+        },
+        .usage, .scoped => {
+            if (!eagerClosedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
+            if ((node.tag == .usage and node.c != 0) or (node.tag == .scoped and node.b == 0)) return eagerClosedPaths(source, node.c, target, pool, closedPath(path, node.tag, 1, ""), paths, count, budget, depth + 1);
+        },
+        .forall, .existential => {
+            if (!eagerClosedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1)) return false;
+            for (source.quantifierGoals(source.head(ty, 0)), 0..) |goal, index| {
+                for ([_]T.Id{ goal.ty, goal.other, goal.result, goal.signature }, 0..) |root, part| {
+                    if (!eagerClosedPaths(source, root, target, pool, closedPath(path, node.tag, @intCast(1 + index * 4 + part), ""), paths, count, budget, depth + 1)) return false;
+                }
+            }
+        },
+        .state_provider => for ([_]T.Id{ node.a, node.b, node.c }, 0..) |child, index| {
+            if (!eagerClosedPaths(source, child, target, pool, closedPath(path, node.tag, @intCast(index), ""), paths, count, budget, depth + 1)) return false;
+        },
+        .array, .list, .cursor, .resolver => return eagerClosedPaths(source, node.a, target, pool, closedPath(path, node.tag, 0, ""), paths, count, budget, depth + 1),
+        .absent, .unit, .boolean, .u32, .f32, .never, .variable, .bound, .rigid, .instance_version, .erased_proof, .type_constructor => {},
+    }
+    return true;
+}
+
+const PathMeasurement = struct { accepted: bool, count: usize, remaining: usize, eager_hashes: usize, lazy_hashes: usize };
+fn compareClosedPaths(source: F.Source, root: T.Id, target: u32, pool: *const symbols.Pool, work: usize) !PathMeasurement {
+    var eager: [128]Digest = undefined;
+    var lazy: [128]Digest = undefined;
+    var eager_count: usize = 0;
+    var lazy_count: usize = 0;
+    var eager_budget = work;
+    var lazy_budget = work;
+    closed_path_test_hashes = 0;
+    const accepted = eagerClosedPaths(source, root, target, pool, @splat(0), &eager, &eager_count, &eager_budget, 0);
+    const eager_hashes = closed_path_test_hashes;
+    var path: ClosedPath = .{};
+    closed_path_test_hashes = 0;
+    try std.testing.expectEqual(accepted, closedPaths(source, root, target, pool, &path, &lazy, &lazy_count, &lazy_budget, 0));
+    const lazy_hashes = closed_path_test_hashes;
+    try std.testing.expectEqual(eager_count, lazy_count);
+    try std.testing.expectEqual(eager_budget, lazy_budget);
+    try std.testing.expectEqualSlices(Digest, eager[0..eager_count], lazy[0..lazy_count]);
+    try std.testing.expect(lazy_hashes <= eager_hashes);
+    return .{ .accepted = accepted, .count = lazy_count, .remaining = lazy_budget, .eager_hashes = eager_hashes, .lazy_hashes = lazy_hashes };
+}
+
+test "lazy closed row paths preserve sparse dense and shared certificate bytes without allocations" {
+    const a = std.testing.allocator;
+    var failing = std.testing.FailingAllocator.init(a, .{});
+    const allocator = failing.allocator();
+    var types = try T.Store.init(allocator);
+    defer types.deinit();
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    const row = try types.freshEffects();
+    const target = types.row(row).tail.variable;
+    const callback = try types.functionWithEffects(T.unit, T.u32_type, row);
+    var data = T.u32_type;
+    for (0..8) |_| data = try types.product(&.{ data, data });
+    const sparse = try types.product(&.{ data, callback, data });
+    var dense = callback;
+    for (0..6) |_| dense = try types.product(&.{ dense, dense });
+    const raw = try types.product(&.{ sparse, dense });
+    const rows = try types.saveList(&.{target});
+    const principal: T.Scheme = .{ .root = raw, .closed_rows = rows };
+    // Neither walker nor digest publication may acquire heap storage.
+    failing.fail_index = failing.alloc_index;
+    failing.resize_fail_index = failing.resize_index;
+    const absent = try compareClosedPaths(.{ .store = &types }, data, target, &pool, 4096);
+    const sparse_work = try compareClosedPaths(.{ .store = &types }, sparse, target, &pool, 4096);
+    const dense_work = try compareClosedPaths(.{ .store = &types }, dense, target, &pool, 4096);
+    try std.testing.expectEqual(@as(usize, 0), absent.lazy_hashes);
+    try std.testing.expectEqual(@as(usize, 1), sparse_work.count);
+    try std.testing.expectEqual(@as(usize, 2), sparse_work.lazy_hashes);
+    try std.testing.expectEqual(@as(usize, 64), dense_work.count);
+    try std.testing.expect(dense_work.lazy_hashes < dense_work.eager_hashes);
+    try std.testing.expectEqual(eagerClosedRowsDigest(.{ .store = &types }, raw, principal, &pool), closedRowsDigest(.{ .store = &types }, raw, principal, &pool));
+    try std.testing.expect(!failing.has_induced_failure);
+    std.debug.print("BLOT_CLOSED_PATH_HASHES sparse={d}/{d} dense={d}/{d} absent={d}/{d} (lazy/eager)\n", .{ sparse_work.lazy_hashes, sparse_work.eager_hashes, dense_work.lazy_hashes, dense_work.eager_hashes, absent.lazy_hashes, absent.eager_hashes });
+}
+
+test "lazy closed row paths retain every role and certificate sorting across live and frozen sources" {
+    const a = std.testing.allocator;
+    var types = try T.Store.init(a);
+    defer types.deinit();
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    const left = try pool.intern(a, "left");
+    const right = try pool.intern(a, "right");
+    const first = try types.freshEffects();
+    const second = try types.freshEffects();
+    const targets = [_]u32{ types.row(first).tail.variable, types.row(second).tail.variable };
+    const callback = try types.functionWithEffects(T.unit, T.u32_type, first);
+    const alternate = try types.provider(callback, second);
+    const scoped = try types.scoped(callback, .{ .unit = 1, .decl = 9 });
+    const parameter = try types.capabilityParameter(alternate);
+    const region = try types.freshRegion();
+    const binder = try types.boundType(0, 0);
+    const goals = [_]T.Obligation{.{ .kind = .field, .ty = callback, .other = alternate, .result = scoped, .signature = parameter, .source = 0 }};
+    const forms = [_]T.Id{
+        try types.demandWithEffects(alternate, first),
+        try types.nominal(.{ .unit = 1, .decl = 7 }, &.{ callback, alternate }),
+        try types.projection(.{ .unit = 1, .decl = 8 }, left, &.{ callback, alternate }),
+        try types.instanceSelection(.{ .unit = 1, .decl = 3 }, &.{ scoped, parameter }),
+        try types.usage(callback, .borrow, region),
+        try types.quantifiedWithGoals(.forall, callback, &.{binder}, &goals),
+        try types.quantifiedWithGoals(.existential, alternate, &.{binder}, &goals),
+        try types.stateProvider(callback, alternate, callback),
+        try types.array(callback),
+        try types.sequence(.list, callback),
+        try types.sequence(.cursor, alternate),
+        try types.resolver(callback),
+    };
+    const raw = try types.record(&.{ .{ .name = right, .ty = try types.product(&forms) }, .{ .name = left, .ty = callback } });
+    const reversed = try types.record(&.{ .{ .name = left, .ty = callback }, .{ .name = right, .ty = try types.product(&forms) } });
+    const closed = try types.saveList(&.{ targets[1], targets[0], targets[0] });
+    const public = try types.saveList(targets[0..1]);
+    const graph: F.Graph = .{ .nodes = types.nodes.items, .extra = types.extra.items, .rows = types.effects.rows.items, .labels = types.effects.labels.items, .operations = types.operations.items, .row_variable_count = @intCast(types.effects.variables.items.len), .quantifier_goals = types.quantifier_goals.items, .quantifier_obligations = types.quantifier_obligations.items };
+    for ([_]F.Source{ .{ .store = &types }, .{ .frozen = &graph } }) |source| {
+        for (targets) |target| _ = try compareClosedPaths(source, raw, target, &pool, 4096);
+        for ([_]T.List{ .{}, public }) |binders| {
+            const principal: T.Scheme = .{ .root = raw, .row_variables = binders, .closed_rows = closed };
+            const eager = eagerClosedRowsDigest(source, raw, principal, &pool);
+            try std.testing.expect(eager != null);
+            try std.testing.expectEqual(eager, closedRowsDigest(source, raw, principal, &pool));
+            try std.testing.expectEqual(eager, closedRowsDigest(source, reversed, principal, &pool));
+        }
+    }
+}
+
+test "lazy closed row paths preserve work depth path capacity and missing-field rejection boundaries" {
+    const a = std.testing.allocator;
+    var types = try T.Store.init(a);
+    defer types.deinit();
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    const row = try types.freshEffects();
+    const target = types.row(row).tail.variable;
+    const callback = try types.functionWithEffects(T.unit, T.u32_type, row);
+    for (0..5) |work| {
+        const actual = try compareClosedPaths(.{ .store = &types }, callback, target, &pool, work);
+        try std.testing.expectEqual(work >= 3, actual.accepted);
+    }
+    var deep = callback;
+    for (0..126) |_| deep = try types.array(deep);
+    try std.testing.expect((try compareClosedPaths(.{ .store = &types }, deep, target, &pool, 4096)).accepted);
+    deep = try types.array(deep);
+    try std.testing.expect(!(try compareClosedPaths(.{ .store = &types }, deep, target, &pool, 4096)).accepted);
+    var data = T.u32_type;
+    for (0..11) |_| data = try types.product(&.{ data, data });
+    for ([_]usize{ 4094, 4095, 4096 }) |work| {
+        const actual = try compareClosedPaths(.{ .store = &types }, data, target, &pool, work);
+        try std.testing.expectEqual(work >= 4095, actual.accepted);
+    }
+    const repeated: [129]T.Id = @splat(callback);
+    const fits = try types.product(repeated[0..128]);
+    const overflow = try types.product(&repeated);
+    try std.testing.expect((try compareClosedPaths(.{ .store = &types }, fits, target, &pool, 4096)).accepted);
+    const too_many = try compareClosedPaths(.{ .store = &types }, overflow, target, &pool, 4096);
+    try std.testing.expect(!too_many.accepted);
+    try std.testing.expectEqual(@as(usize, 128), too_many.count);
+    const nameless = try types.record(&.{.{ .name = 0, .ty = callback }});
+    try std.testing.expect(!(try compareClosedPaths(.{ .store = &types }, nameless, target, &pool, 4096)).accepted);
+    const rows: [129]u32 = @splat(target);
+    const public = try types.saveList(&.{target});
+    for ([_]usize{ 128, 129 }) |count| {
+        const principal: T.Scheme = .{ .root = callback, .row_variables = public, .closed_rows = try types.saveList(rows[0..count]) };
+        const eager = eagerClosedRowsDigest(.{ .store = &types }, callback, principal, &pool);
+        try std.testing.expectEqual(count == 128, eager != null);
+        try std.testing.expectEqual(eager, closedRowsDigest(.{ .store = &types }, callback, principal, &pool));
+    }
 }

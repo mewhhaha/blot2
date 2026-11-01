@@ -29,13 +29,20 @@ whole-game size or fresh frame. Roughly **1 MB** remains the owner's
 expectation. The historical frame-qualified main took 2,188 seconds and produced
 47.4 MB, mostly code. Release builds and release performance remain pending.
 
-A fresh bounded profile still spends substantial frontend work capturing body
-reuse receipts: closed-row certificate paths, repeated type eligibility hashes
-and syntax hashes. Next make receipt capture proportional to the retained graph,
-starting with exact lazy path hashing. Preserve certificate bytes, multiplicity,
-work limits and retained-edit behavior. Do not revive a synthetic-only speedup:
-recursive normalization caching alone regressed the source probe until
-covariance copying was fixed too.
+Closed-row certificate paths now hash lazily, preserving exact receipt bytes,
+multiplicity and work limits. Native sparse paths require **2 hashes rather than
+1,026**, and target-free paths require none. Real producer checking improves
+modestly; the smaller language fixture is effectively unchanged. See the
+[receipt evidence](zig-native/measurements/receipt-path-hashing-2026-11-01.json).
+
+The next measured frontend target is local array generalization. A bounded
+observer finds hundreds of closed `ResizeArray F32` rebindings in the real
+`encode_render_views` producer, each surrounded by unrelated generic field
+requirements. Skip generalization only when its quantifiers and retained
+predicates are provably empty; preserve contract, method, explicit and
+generative paths. The same-imports/tiny-entry ablation still exceeds five
+seconds, so producer checking alone needs improvement. The game imports about
+45,000 source lines across 207 modules, including the prelude.
 
 Earlier descriptor, nominal and scalar call-sharing results remain in their
 linked records under `zig-native/measurements/`. Those changes reduce synthetic
@@ -99,16 +106,16 @@ Astra xhigh reviewed the semantic fixes and performance batches. Earlier gate
 attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
 host reaches protocol preflight and fails on existing operand-span ends,
 independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The current batch compiles all **2,751 native
-tests**. Its broader sampled selection passes **345/346**, with the same
-independently reproduced associated-partial baseline failure. Seven focused laws
-pass in full allocation-failure mode, including four exhaustive sweeps. All 28
-focused guest tests pass across development/optimized tiers and sync/JSPI, and
-the original Gdev language fixture passes its six entries/11 assertions per
-mode. Full Zig lint reports zero findings across 567 source files. The required
-full gate still stops at the existing protocol operand-span preflight failure.
-The older reuse-suite work assertions and broader integration/release coverage
-remain pending, as recorded in the earlier evidence.
+qualification remains pending. The graph-sharing batch's seven focused laws and
+28 guests pass on its pinned candidate. The receipt batch compiles **2,754
+native tests**, passes **350/351** broader sampled laws with the same
+associated-partial baseline failure, and passes all three exact eager-oracle
+laws without heap allocation. The original Gdev language fixture passes six
+entries/11 assertions per sync/JSPI mode. The body-reuse suite remains **17
+passed/16 failed** on both baseline and candidate; those existing work
+assertions are not a pass. Full Zig lint reports zero findings across 567 source
+files. The required full gate still stops at the existing protocol operand-span
+preflight failure. Broader integration and release coverage remain open.
 
 ## Remaining execution work
 
