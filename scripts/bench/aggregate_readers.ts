@@ -7,11 +7,20 @@ const repo = resolve(new URL("../../", import.meta.url).pathname);
 const out = resolve(repo, "build/bench/aggregate-producer");
 await Deno.mkdir(out, { recursive: true });
 let executable = resolve(repo, "zig-native/zig-out-native-dev/bin/blotc");
-if (Deno.args.length !== 0) {
-  if (Deno.args.length !== 2 || Deno.args[0] !== "--compiler") {
-    throw new Error("Expected --compiler PATH");
-  }
-  executable = resolve(repo, Deno.args[1]);
+let codegenTier: "development" | "optimized" = "optimized";
+let codegenWorkers = 1;
+for (let at = 0; at < Deno.args.length; at += 2) {
+  const flag = Deno.args[at];
+  const value = Deno.args[at + 1];
+  if (value === undefined) throw new Error(`Missing value for ${flag}`);
+  if (flag === "--compiler") executable = resolve(repo, value);
+  else if (
+    flag === "--tier" && (value === "development" || value === "optimized")
+  ) {
+    codegenTier = value;
+  } else if (flag === "--workers" && /^(?:[1-9]|1[0-6])$/.test(value)) {
+    codegenWorkers = Number(value);
+  } else throw new Error(`Unsupported option: ${flag} ${value}`);
 }
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) =>
@@ -85,6 +94,8 @@ for (const kind of ["matrix", "settings"]) {
         prelude: `${repo}/std/prelude.blot`,
         imports: { "ink/": resolve(repo, "../ink/lib") },
         cacheDirectory: false,
+        codegenTier,
+        codegenWorkers,
         profileBackend: true,
         startupTimeoutMs: 5000,
       });
@@ -138,6 +149,8 @@ for (const kind of ["matrix", "settings"]) {
       kind,
       size,
       compiler_sha256,
+      codegen_tier: codegenTier,
+      codegen_workers: codegenWorkers,
       source_files,
       source_sha256: await hash(new TextEncoder().encode(source)),
       deadline_ms: 5000,

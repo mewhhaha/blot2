@@ -118,6 +118,12 @@ old leaf before the RHS, retain extent protection and reacquire the address
 afterward. Getter fallback releases temporary view protection before calling the
 getter; rows with variants or borrows retain whole-value loading.
 
+Owned assembly honors the selected tier, worker count, IO, profiling and physical
+machine-code sharing. Defaults remain optimized, serial and unshared. Returned
+optimizer counters describe actual assembly; unchanged-output replay can report
+zero fresh work. Emitted-function counts exclude physically shared functions.
+The complete execution policy remains part of retained whole-output identity.
+
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
 Recursive normalization receipts retain the cursor, depth and exact type/row

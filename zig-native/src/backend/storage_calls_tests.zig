@@ -9,9 +9,10 @@ const a = std.testing.allocator;
 test {
     _ = @import("scoped_opaque_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
+    _ = @import("storage_assembly_options_tests.zig");
 }
 fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
-    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
@@ -402,7 +403,7 @@ test "closed generic row templates keep repeated copies within the fixed layout 
     try std.testing.expect(result.bytes.len > 8);
 }
 fn publishGeneratorModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
-    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 128 });
+    var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 128 } });
     defer result.deinit(allocator);
     if (result.diagnostic) |diagnostic| std.debug.print("GENERATOR_EMIT {any}\n", .{diagnostic});
     try std.testing.expect(result.diagnostic == null);
@@ -432,7 +433,7 @@ test "scratch generator writer admission declines borrowed and owning row layout
         try text.appendSlice(a, "  return @storage.length destination\n");
         var module = try lower(a, text.items);
         defer module.deinit(a);
-        var result = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 128 });
+        var result = try scoped.compileWithOptions(a, &.{module}, 1, .{ .work_limits = .{ .expressions = 128 } });
         defer result.deinit(a);
         try std.testing.expect(result.diagnostic != null);
         try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
@@ -499,7 +500,7 @@ test "plain getters preserve exact dispatch through selected inline helpers" {
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
 fn publishScratchWriter(allocator: std.mem.Allocator, modules: []const core.Module) !void {
-    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
@@ -538,7 +539,7 @@ test "Unit writer helpers admit plain local scratch arrays with checked cleanup"
 }
 
 fn publishSelectedReader(allocator: std.mem.Allocator, modules: []const core.Module) !void {
-    var result = try scoped.compileWithWorkLimits(allocator, modules, 1, .{}, .{ .expressions = 512 });
+    var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
@@ -587,7 +588,7 @@ test "selected parameterized readers outline exact descriptor payloads across ow
     defer a.free(source);
     var module = try lower(a, source);
     defer module.deinit(a);
-    var result = try scoped.compileWithWorkLimits(a, &.{module}, 1, .{}, .{ .expressions = 512 });
+    var result = try scoped.compileWithOptions(a, &.{module}, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer result.deinit(a);
     if (result.diagnostic) |diagnostic| std.debug.print("generic reader: {s}\n", .{diagnostic.message()});
     try std.testing.expect(result.diagnostic == null);
@@ -599,7 +600,7 @@ test "selected parameterized readers outline exact descriptor payloads across ow
     defer a.free(callable_source);
     var callable_module = try lower(a, callable_source);
     defer callable_module.deinit(a);
-    var declined = try scoped.compileWithWorkLimits(a, &.{callable_module}, 1, .{}, .{ .expressions = 512 });
+    var declined = try scoped.compileWithOptions(a, &.{callable_module}, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer declined.deinit(a);
     try std.testing.expect(declined.diagnostic != null);
     try std.testing.expectEqualStrings("Storage source expansion exceeded its expression budget", declined.diagnostic.?.message());

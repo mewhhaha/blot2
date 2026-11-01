@@ -9,8 +9,17 @@ const { values, positionals } = parseArgs({
     entry: { type: "string" },
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
+    tier: { type: "string", default: "optimized" },
+    workers: { type: "string", default: "1" },
   },
 });
+if (values.tier !== "development" && values.tier !== "optimized") {
+  throw new Error("--tier must be development or optimized");
+}
+const workers = Number(values.workers);
+if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
+  throw new Error("--workers must be an integer from 1 to 16");
+}
 const parentArg = positionals[0] ?? "build/gdev-first-frame";
 if (positionals.length > 1) {
   throw new Error("Expected at most one output directory");
@@ -68,6 +77,8 @@ try {
     cacheDirectory: false,
     startupTimeoutMs: timeoutMs,
     profileBackend: values.profile,
+    codegenTier: values.tier,
+    codegenWorkers: workers,
   });
   buildStarted = performance.now();
   const result = await compiler.build({
@@ -122,6 +133,8 @@ const output = {
     penJsonSha256: await sha256(penBytes),
   },
   deadlineMs: timeoutMs,
+  codegenTier: values.tier,
+  codegenWorkers: workers,
   buildMs,
   profileBackend: values.profile,
   ...report!,

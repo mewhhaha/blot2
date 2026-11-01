@@ -2368,7 +2368,14 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 }
 
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
-    if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithConfig(allocator, units, entry, options.storage orelse options.policy.storage.config());
+    if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithOptions(allocator, units, entry, .{
+        .storage = options.storage orelse options.policy.storage.config(),
+        .tier = options.policy.codegen_tier,
+        .workers = options.policy.codegen_workers,
+        .share_machine_code = options.policy.share_machine_code,
+        .io = options.io,
+        .profile = options.profile_backend,
+    });
     return compileLocals(allocator, units, entry, options, true) catch |err| {
         if (err != error.SpeculativeLocalRetry) return @errorCast(err);
         // A promoted generalized local could not serve one of its uses, or

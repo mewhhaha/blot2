@@ -5611,12 +5611,20 @@ fn callbackAbi(m: *const core.Module, ty: T.Id) ?wasm.Callback {
     return .{ .parameter = valueAbi(m, node.a) orelse return null, .result = valueAbi(m, node.b) orelse return null };
 }
 pub fn compile(allocator: std.mem.Allocator, units: []const core.Module, entry: u32) std.mem.Allocator.Error!backend.Result {
-    return compileWithConfig(allocator, units, entry, .{});
+    return compileWithOptions(allocator, units, entry, .{});
 }
-pub fn compileWithConfig(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, config: storage_plan.Config) std.mem.Allocator.Error!backend.Result {
-    return compileWithWorkLimits(allocator, units, entry, config, .{});
-}
-pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, config: storage_plan.Config, limits: WorkLimits) std.mem.Allocator.Error!backend.Result {
+pub const CompileOptions = struct {
+    storage: storage_plan.Config = .{},
+    work_limits: WorkLimits = .{},
+    tier: @import("../compilation_tier.zig").Tier = .optimized,
+    workers: u8 = 1,
+    share_machine_code: bool = false,
+    io: ?std.Io = null,
+    profile: bool = false,
+};
+pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, options: CompileOptions) std.mem.Allocator.Error!backend.Result {
+    const config = options.storage;
+    const limits = options.work_limits;
     if (limits.expressions == 0) return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped emission requires a positive expression allowance" } };
     const views = try allocator.alloc(*const core.Module, units.len);
     defer allocator.free(views);
@@ -5696,9 +5704,17 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     };
     emission_work.scoped_outlined_regions = outlined.regions;
     emission_work.scoped_outlined_globals = outlined.globals;
-    const bytes = module.assembleWithOptions(.{}) catch |err| switch (err) {
+    var runtime_optimization: @import("optimized_bodies.zig").Stats = .{ .tier = options.tier };
+    const bytes = module.assembleWithOptions(.{
+        .tier = options.tier,
+        .workers = options.workers,
+        .share_machine_code = options.share_machine_code,
+        .io = options.io,
+        .profile = options.profile,
+        .stats = &runtime_optimization,
+    }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
+        else => return .{ .runtime_optimization = runtime_optimization, .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
     };
-    return .{ .bytes = bytes, .emitted_functions = module.functions.items.len, .whole_module_only = true, .counters = emission_work };
+    return .{ .runtime_optimization = runtime_optimization, .bytes = bytes, .emitted_functions = module.functions.items.len - runtime_optimization.shared, .whole_module_only = true, .counters = emission_work };
 }

@@ -23,9 +23,9 @@ keeps intermediate failures, matched pairs, real-workload controls and compiler
 identities separate. A smaller Gdev fixture still has a modest latency
 regression; the final invariant-leaf shortcut reduces that overhead.
 
-Whole Gdev remains unfinished. The current aggregate-reader candidate exceeds a
-ten-second main diagnostic and a five-second actor diagnostic; there is no
-current whole-game size or fresh frame. Roughly **1 MB** remains the owner's
+Whole Gdev remains unfinished. The current candidate exceeds five-second main
+diagnostics in both optimized and development modes with four optimizer workers;
+there is no current whole-game size or fresh frame. Roughly **1 MB** remains the owner's
 expectation. The historical frame-qualified main took 2,188 seconds and produced
 47.4 MB, mostly code. Release builds and release performance remain pending.
 
@@ -58,14 +58,23 @@ remain intact. Matrix control outputs are byte-identical; overall compilation
 latency is roughly flat. See
 [selected-field evidence](zig-native/measurements/selected-field-loads-2026-11-01.json).
 
-The next confirmed issue is owned-backend option forwarding. Its dispatcher
-passes storage settings alone and assembly uses defaults, ignoring requested
-development tier, optimizer workers, IO and profiling. Actual optimized passes
-run, but runtime-optimization stats stay zero because their result is omitted.
-Forward existing policy/IO/profile controls and return real stats before drawing
-conclusions from that zero counter. Tier and workers already belong to retained
-output identity. Do not reorder optimization around machine outlining without
-separate evidence; unused whole-row loads had no general DCE pass to remove them.
+Owned assembly now honors development/optimized tiers, optimizer workers, IO,
+profiling and physical machine-code sharing. Its omitted stats previously
+reported zero functions even though optimized passes ran. All six Ink controls
+remain byte-identical across the old default and all four tier/worker pairs;
+three rotated repetitions show roughly flat latency with variance. The matrix
+control reports 58 functions and 58 parallel jobs with four workers. Defaults
+stay optimized/serial/unshared; complete execution policy already belongs to
+retained output identity. See
+[owned assembly evidence](zig-native/measurements/owned-assembly-options-2026-11-01.json).
+
+Next investigate source-call expansion involving variant-bearing rows. Current
+aggregate helper admission requires variant-free physical schemas. First find a
+repeated, reachable Gdev call and a bounded original producer discriminator;
+synthetic variant gains alone would not rank its whole-game impact. Outline bank
+slot reuse is secondary: historical global counts are huge, but code bodies
+account for most of the 47.4 MB. Do not repeat unchanged main diagnostics or
+reorder optimization around outlining without new evidence.
 
 A conservative declaration-demand prepass is measured but **not integrated**.
 It omits 680 of 5,957 declarations on main, but still retains 84% of original
@@ -135,14 +144,14 @@ custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `839721a3` compiles **2,767 native tests**. Both focused selected-field
-laws pass in full fault mode; **369/370** broader sampled laws
-pass with the independently reproduced associated-partial baseline failure.
-All 25 affected guests and both new selected-field tests pass, including
-sync/JSPI, mutation ordering, relocation, joined owners, temporary-view getter
-mutation and traps before effects. Both tier requests are tested; actual owned
-assembly still uses optimized defaults until the forwarding fix above. Original
-Gdev language entries pass six entries/11 assertions per sync/JSPI mode. Zig lint reports zero findings across 570 source files.
+compiler `5f12251f` compiles **2,770 native tests**. All three focused assembly
+option laws pass; **379/380** broader sampled laws pass with the independently
+reproduced associated-partial baseline failure. All **31 affected guests** pass,
+including actual development/optimized aggregate-reader and selected-field
+execution, serial/parallel byte equality, profiling, physical sharing and
+sync/JSPI. Original Gdev language entries pass six entries/11 assertions per
+sync/JSPI mode in both tiers with four workers. Zig lint reports zero findings
+across 571 source files.
 
 Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
 `HOME`, enabling disk-cache contamination between retained and supposedly fresh
@@ -150,8 +159,7 @@ clients. The body-reuse harness now explicitly disables persistence. Those old
 figures were not compiler semantic regressions. The stale five-character `true`
 span assertion is also corrected; all 42 protocol tests pass.
 
-The required full gate passes 31 body preflight tests, then reaches **47 passed,
-one failed** in smoke. The remaining list/chunk loop owner-escape failure is
+The required full gate currently stops at **47 passed, one failed** in smoke. The remaining list/chunk loop owner-escape failure is
 independently reproduced on preserved `0faa0cbb`; it is not a passing gate.
 Release, full-native and broader integration qualification remain pending.
 
