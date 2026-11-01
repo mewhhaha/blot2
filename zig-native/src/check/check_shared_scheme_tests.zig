@@ -728,3 +728,160 @@ test "unused generic pair helpers keep checker type graphs bounded" {
         smaller_nodes = nodes;
     }
 }
+
+const ArrayLocalWitness = struct { implicit_receivers: usize = 0, generations: usize = 0 };
+fn closedArrayLocalParity(allocator: std.mem.Allocator, source: []const u8, valid: bool, admits: bool) !void {
+    return closedArrayLocalWitness(allocator, source, valid, admits, null);
+}
+fn closedArrayLocalWitness(allocator: std.mem.Allocator, source: []const u8, valid: bool, admits: bool, witness: ?*ArrayLocalWitness) !void {
+    var tokens = try lexer.lex(allocator, source);
+    defer tokens.deinit(allocator);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var ordinary_work: @import("../work_counters.zig").Frontend = .{};
+    var shortcut_work: @import("../work_counters.zig").Frontend = .{};
+    var ordinary = ordinary: {
+        const capture = @import("../phase_profile.zig").captureChecking(&ordinary_work);
+        defer capture.restore();
+        break :ordinary try check.checkPrivateExecution(allocator, &tree, &pool, .{ .closed_array_locals = false });
+    };
+    defer ordinary.deinit(allocator);
+    var shortcut = shortcut: {
+        const capture = @import("../phase_profile.zig").captureChecking(&shortcut_work);
+        defer capture.restore();
+        break :shortcut try check.checkPrivateExecution(allocator, &tree, &pool, .{});
+    };
+    defer shortcut.deinit(allocator);
+    try std.testing.expectEqual(valid, ordinary.diagnostics.len == 0);
+    try std.testing.expectEqual(ordinary.diagnostics.len, shortcut.diagnostics.len);
+    for (ordinary.diagnostics, shortcut.diagnostics) |old, new| {
+        try std.testing.expectEqual(old.code, new.code);
+        try std.testing.expectEqualDeep(old.span, new.span);
+    }
+    try std.testing.expectEqual(@as(u64, 0), ordinary_work.closed_array_locals);
+    try std.testing.expectEqual(admits, shortcut_work.closed_array_locals > 0);
+    if (admits) try std.testing.expect(shortcut_work.scheme_calls < ordinary_work.scheme_calls);
+    if (witness) |observed| {
+        observed.generations = ordinary.generative_bindings.len;
+        for (ordinary.obligations) |obligation| {
+            if (obligation.kind == .receiver and !obligation.explicit) observed.implicit_receivers += 1;
+        }
+    }
+    try std.testing.expectEqual(ordinary.bindings.len, shortcut.bindings.len);
+    for (ordinary.bindings, shortcut.bindings) |old, new| {
+        try std.testing.expectEqual(old.kind, new.kind);
+        try std.testing.expectEqual(old.name, new.name);
+        try std.testing.expectEqual(old.scheme.variables.len, new.scheme.variables.len);
+        try std.testing.expectEqual(old.scheme.row_variables.len, new.scheme.row_variables.len);
+        try std.testing.expectEqual(old.scheme.closed_rows.len, new.scheme.closed_rows.len);
+        try std.testing.expectEqual(old.scheme.obligations.len, new.scheme.obligations.len);
+        try std.testing.expectEqual(old.scheme.generative.len, new.scheme.generative.len);
+        if (valid and old.ty != 0) {
+            const raw_old = ordinary.types.node(old.ty);
+            const raw_new = shortcut.types.node(new.ty);
+            try std.testing.expectEqual(raw_old.tag, raw_new.tag);
+            if (raw_old.tag == .variable) try std.testing.expectEqual(raw_old.b, raw_new.b);
+            try std.testing.expect(try @import("../reuse/principal_type_graph.zig").matchesOpen(allocator, &ordinary.types, old.ty, &shortcut.types, new.ty, 128, 4096));
+            try std.testing.expect(try @import("../reuse/principal_type_graph.zig").matchesOpen(allocator, &shortcut.types, new.ty, &ordinary.types, old.ty, 128, 4096));
+        }
+        if (!valid or old.scheme.root == 0) continue;
+        try std.testing.expect(try @import("../reuse/principal_type_graph.zig").matchesOpen(allocator, &ordinary.types, old.scheme.root, &shortcut.types, new.scheme.root, 128, 4096));
+        try std.testing.expect(try @import("../reuse/principal_type_graph.zig").matchesOpen(allocator, &shortcut.types, new.scheme.root, &ordinary.types, old.scheme.root, 128, 4096));
+    }
+}
+
+const closed_array_local_source =
+    \\const render = func context -> (input: F32) => return do:
+    \\  let selected = context.value
+    \\  let rows: ResizeArray F32 = #[input]
+    \\  rows[0] := @f32.add rows[0] 1.0
+    \\  rows[0] := @f32.add rows[0] 2.0
+    \\  return (selected, rows)
+    \\entry const answer = func (input: U32) => return render {value: input} 3.5
+;
+
+fn closedArrayLocalAllocationLaw(allocator: std.mem.Allocator) !void {
+    try closedArrayLocalParity(allocator, closed_array_local_source, true, true);
+}
+
+test "closed array locals bypass unrelated field generalization with old-path parity through OOM" {
+    try closedArrayLocalAllocationLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, closedArrayLocalAllocationLaw, .{});
+}
+
+test "closed array locals admit all array modes and closed callbacks while open elements retain generalization" {
+    // The expression checker normalizes these array results before local
+    // generalization; this fixture does not claim a variable-backed history.
+    try closedArrayLocalParity(a,
+        \\const make = func value => return value
+        \\entry const answer = func (input: U32) => return do:
+        \\  let original: Array U32 = #[input]
+        \\  let rows = make original
+        \\  rows[0] := @u32.add rows[0] 1
+        \\  return rows
+    , true, true);
+    for ([_][]const u8{ "Array", "GrowArray", "ResizeArray" }) |mode| {
+        const source = try a.print("entry const answer = func (input: U32) => return do:\n  let rows: {s} U32 = #[input]\n  rows[0] := @u32.add rows[0] 1\n  return rows\n", .{mode});
+        defer a.free(source);
+        try closedArrayLocalParity(a, source, true, true);
+    }
+    try closedArrayLocalParity(a,
+        \\entry const answer = func () => return do:
+        \\  let rows: Array (U32 -> U32 ! {}) = #[(func (value: U32): U32 ! {} => return value)]
+        \\  return rows
+    , true, true);
+    for ([_][]const u8{
+        \\entry const answer = func input => return do:
+        \\  let rows = #[input]
+        \\  return rows
+        ,
+        \\entry const answer = func (callback: U32 -> U32 ! {| e}) => return do:
+        \\  let rows = #[callback]
+        \\  return rows
+        ,
+        \\entry const answer = func (rows: ResizeArray U32) => return do:
+        \\  let borrowed = &rows[0..1]
+        \\  let place = @storage.at rows 0
+        \\  return (@storage.read borrowed 0, @storage.load place)
+        ,
+    }) |source| try closedArrayLocalParity(a, source, true, false);
+}
+
+test "closed array locals retain explicit clauses and implicit contract selection or rejection" {
+    var receiver: ArrayLocalWitness = .{};
+    try closedArrayLocalWitness(a,
+        \\type Number is data = $Number U32
+        \\const Number.current = func (value: Number): U32 => return do:
+        \\  let pending = value.current
+        \\  let rows: Array U32 = #[1]
+        \\  return rows[0]
+        \\entry const answer = 42
+    , true, false, &receiver);
+    try std.testing.expect(receiver.implicit_receivers > 0);
+    var generation: ArrayLocalWitness = .{};
+    try closedArrayLocalWitness(a,
+        \\type State a is effect = {get: Unit -> a, set: a -> Unit}
+        \\const choose = func (flag: Bool) -> (left: State U32) -> (right: State U32) => return do:
+        \\  let selected = if flag then left else right
+        \\  let rows: Array U32 = #[1]
+        \\  return (selected, rows)
+        \\entry const answer = 42
+    , true, false, &generation);
+    try std.testing.expect(generation.generations > 0);
+    try closedArrayLocalParity(a,
+        \\entry const answer = func (input: U32) => return do:
+        \\  let rows: Array U32 where { type_rep (Array U32) } = #[input]
+        \\  return rows
+    , true, false);
+    const contract = "type Build a is contract = { const build: a -> Array U32 }\n";
+    const entry = "entry const answer = func (input: U32) => return do:\n  let rows = Build.build input\n  return rows\n";
+    const selected = try std.mem.concat(a, u8, &.{ contract, "impl BuildNumber : Build U32 = { const build = func value => return #[value] }\n", entry });
+    defer a.free(selected);
+    try closedArrayLocalParity(a, selected, true, false);
+    const missing = try std.mem.concat(a, u8, &.{ contract, entry });
+    defer a.free(missing);
+    try closedArrayLocalParity(a, missing, false, false);
+}

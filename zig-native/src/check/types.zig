@@ -290,6 +290,9 @@ pub const Store = struct {
         const n = self.node(id);
         return if (n.closed_generation == self.closed_generation) n.closed_height else 0;
     }
+    pub fn knownClosed(self: *const Store, id: Id) bool {
+        return self.closedHeight(id) != 0;
+    }
     fn closedRow(self: *const Store, id: Effects.Id) ?ClosedRow {
         // The shared physical-epoch guard is the same as closedHeight.
         // Both synchronizeClosedGraphs and rollback advance the generation
@@ -3386,4 +3389,40 @@ fn recursiveResolutionHistoryLaw(allocator: std.mem.Allocator) !void {
 test "recursive resolution preserves open histories depth rollback recycled IDs and saturation through OOM" {
     try recursiveResolutionHistoryLaw(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, recursiveResolutionHistoryLaw, .{});
+}
+
+fn knownClosedLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    const raw = try store.array(u32_type);
+    try std.testing.expect(store.knownClosed(raw));
+    const point = store.mark();
+    _ = try store.fresh();
+    store.rollback(point);
+    try std.testing.expect(!store.knownClosed(raw));
+    try std.testing.expect(store.knownClosed(try store.resolve(raw, 0)));
+    const row_point = store.effects.mark();
+    _ = try store.freshEffects();
+    store.effects.rollback(row_point);
+    try std.testing.expect(!store.knownClosed(raw));
+    try std.testing.expect(store.knownClosed(try store.resolve(raw, 0)));
+    const variable = try store.fresh();
+    const open = try store.array(variable);
+    try std.testing.expect(!store.knownClosed(open));
+    try store.appendVersion(variable, f32_type);
+    try std.testing.expect(!store.knownClosed(open));
+    try std.testing.expect(store.knownClosed(try store.resolve(open, 0)));
+    store.closed_generation = std.math.maxInt(u16);
+    try std.testing.expect(!store.knownClosed(raw));
+    var physical = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer physical.deinit();
+    const other = try physical.array(u32_type);
+    try std.testing.expect(physical.knownClosed(other));
+    physical.effects.physical_epoch = std.math.maxInt(u64);
+    try std.testing.expect(!physical.knownClosed(other));
+}
+
+test "known closed evidence declines revoked open and saturated certificates through OOM" {
+    try knownClosedLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, knownClosedLaw, .{});
 }

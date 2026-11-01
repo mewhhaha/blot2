@@ -35,14 +35,21 @@ multiplicity and work limits. Native sparse paths require **2 hashes rather than
 modestly; the smaller language fixture is effectively unchanged. See the
 [receipt evidence](zig-native/measurements/receipt-path-hashing-2026-11-01.json).
 
-The next measured frontend target is local array generalization. A bounded
-observer finds hundreds of closed `ResizeArray F32` rebindings in the real
-`encode_render_views` producer, each surrounded by unrelated generic field
-requirements. Skip generalization only when its quantifiers and retained
-predicates are provably empty; preserve contract, method, explicit and
-generative paths. The same-imports/tiny-entry ablation still exceeds five
-seconds, so producer checking alone needs improvement. The game imports about
-45,000 source lines across 207 modules, including the prelude.
+Closed array locals now omit provably empty generalization, preserving contract,
+method, explicit and generative paths. In the actual render-producer probe this
+removes 659 generalizations and reduces candidate scans from 359,768 to 50,653.
+Three matched pairs improve **882 to 642 ms**, with checking **509 to 258 ms**
+and identical tiny-entry output. This is producer checking, not whole-game
+emission. See the [array-local evidence](zig-native/measurements/closed-array-locals-2026-11-01.json).
+
+Main, actor presentation and the same-imports/tiny-entry ablation still exceed
+five seconds. The next major lever is declaration demand: executable builds
+should check reached bodies while explicit checks remain exhaustive. Keep
+headers and implementation coherence eager; use the existing lexical reference
+walker and a conservative authority frontier first. Unchecked names must never
+be published as completed typed interfaces. Count selected declarations on real
+Gdev before expanding this change. The game imports about 45,000 source lines
+across 207 modules, including the prelude.
 
 Earlier descriptor, nominal and scalar call-sharing results remain in their
 linked records under `zig-native/measurements/`. Those changes reduce synthetic
@@ -116,6 +123,14 @@ passed/16 failed** on both baseline and candidate; those existing work
 assertions are not a pass. Full Zig lint reports zero findings across 567 source
 files. The required full gate still stops at the existing protocol operand-span
 preflight failure. Broader integration and release coverage remain open.
+
+The array-local candidate compiles **2,758 native tests**, passes all four
+focused laws in full fault mode and **354/355** broader sampled laws with that
+same baseline failure. All 27 selected executed-Wasm tests and original Gdev
+language entries pass; body-reuse/text tests retain the same 17/16 result.
+Full Zig lint remains clean; the required full gate retains its protocol-span
+blocker. The production compiler is `0faa0cbb`; exact pins are in the array-local
+record.
 
 ## Remaining execution work
 

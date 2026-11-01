@@ -12,6 +12,7 @@ pub const Frontend = struct {
     parallel_retries: u64 = 0,
     modules: u64 = 0,
     scheme_calls: u64 = 0,
+    closed_array_locals: u64 = 0,
     candidate_scans: u64 = 0,
     candidates: u64 = 0,
     candidate_parts: u64 = 0,

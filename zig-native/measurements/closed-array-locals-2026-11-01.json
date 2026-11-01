@@ -1,0 +1,1135 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "75052bd8b63c460bcdbfc1d84f0cee033e1634b5",
+  "scope": "Closed array local generalization in actual Gdev render producer; instrumented Safe/noLLVM compiler. No whole-game size result.",
+  "toolchain": {
+    "zig": "0.17.0",
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)",
+    "llvm": false,
+    "optimize": "safe"
+  },
+  "implementation": "Certified closed Array/GrowArray/ResizeArray locals omit generalization when unqualified, no generative bindings exist and ordinary pending predicates cannot be retained. Contract selection is guarded before inherited-explicit exclusion. Preserve raw binding type and resolved principal. Open rows/elements, retained methods/explicit predicates and revoked certificates take ordinary path.",
+  "compiler_baseline_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+  "compiler_candidate_sha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+  "real_producer": {
+    "runner": "scripts/bench/render_producer.ts",
+    "description": "Imports unmodified pen/protocol_render and checks all producer bodies; only a tiny identity is emitted/executed. Native Gdev asset settings retained. Not renderer execution or whole-game code size.",
+    "deadline_ms": 5000,
+    "baseline": {
+      "median_build_ms": 881.514021,
+      "median_check_us": 508863,
+      "samples": [
+        {
+          "build_ms": 869.657134,
+          "pins": {
+            "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 866696,
+            "peak_rss_kib": 51852,
+            "phases": {
+              "other": {
+                "us": 1800,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 192
+              },
+              "assets": {
+                "us": 264142,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 7552
+              },
+              "inputs": {
+                "us": 1050,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1408,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 16947,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 5796
+              },
+              "parse": {
+                "us": 10376,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 332
+              },
+              "check": {
+                "us": 501190,
+                "requested_bytes": 29410030,
+                "allocations": 76031,
+                "rss_growth_kib": 21932
+              },
+              "lower": {
+                "us": 18085,
+                "requested_bytes": 4195933,
+                "allocations": 3161,
+                "rss_growth_kib": 3080
+              },
+              "freeze": {
+                "us": 8012,
+                "requested_bytes": 1557237,
+                "allocations": 4955,
+                "rss_growth_kib": 272
+              },
+              "validation": {
+                "us": 19521,
+                "requested_bytes": 590475,
+                "allocations": 63,
+                "rss_growth_kib": 2196
+              },
+              "backend": {
+                "us": 24161,
+                "requested_bytes": 517359,
+                "allocations": 186,
+                "rss_growth_kib": 1068
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "candidates": 102475,
+              "candidate_parts": 307390,
+              "candidate_variables": 187526,
+              "candidate_rows": 39899,
+              "dependency_hits": 101828,
+              "dependency_recomputations": 647,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 29353,
+              "normalization": {
+                "row_requests": 32758,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 31241,
+                "composite_hits": 8,
+                "composite_collisions": 4286,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 98,
+                "free_type_queries": 4534,
+                "free_type_visits": 16105,
+                "free_row_queries": 71109,
+                "free_row_visits": 96644,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        },
+        {
+          "build_ms": 881.514021,
+          "pins": {
+            "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 877311,
+            "peak_rss_kib": 53212,
+            "phases": {
+              "other": {
+                "us": 1538,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 220
+              },
+              "assets": {
+                "us": 268159,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 7500
+              },
+              "inputs": {
+                "us": 1050,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1389,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 17125,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 5720
+              },
+              "parse": {
+                "us": 10475,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 364
+              },
+              "check": {
+                "us": 508863,
+                "requested_bytes": 29410030,
+                "allocations": 76031,
+                "rss_growth_kib": 23820
+              },
+              "lower": {
+                "us": 17949,
+                "requested_bytes": 4195933,
+                "allocations": 3161,
+                "rss_growth_kib": 3012
+              },
+              "freeze": {
+                "us": 8038,
+                "requested_bytes": 1557237,
+                "allocations": 4955,
+                "rss_growth_kib": 272
+              },
+              "validation": {
+                "us": 19714,
+                "requested_bytes": 590475,
+                "allocations": 63,
+                "rss_growth_kib": 2224
+              },
+              "backend": {
+                "us": 23008,
+                "requested_bytes": 517359,
+                "allocations": 186,
+                "rss_growth_kib": 648
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "candidates": 102475,
+              "candidate_parts": 307390,
+              "candidate_variables": 187526,
+              "candidate_rows": 39899,
+              "dependency_hits": 101828,
+              "dependency_recomputations": 647,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 29353,
+              "normalization": {
+                "row_requests": 32758,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 31241,
+                "composite_hits": 8,
+                "composite_collisions": 4286,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 98,
+                "free_type_queries": 4534,
+                "free_type_visits": 16105,
+                "free_row_queries": 71109,
+                "free_row_visits": 96644,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        },
+        {
+          "build_ms": 885.828462,
+          "pins": {
+            "compiler_sha256": "6af6a10a02ab7a8062a53f00d5cc4b662e70228516ce58369c9c17de179ffa43",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 881462,
+            "peak_rss_kib": 54676,
+            "phases": {
+              "other": {
+                "us": 1307,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 312
+              },
+              "assets": {
+                "us": 268684,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 7492
+              },
+              "inputs": {
+                "us": 1038,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1378,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 17200,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 3572
+              },
+              "parse": {
+                "us": 10543,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 356
+              },
+              "check": {
+                "us": 511068,
+                "requested_bytes": 29410030,
+                "allocations": 76031,
+                "rss_growth_kib": 23552
+              },
+              "lower": {
+                "us": 18224,
+                "requested_bytes": 4195933,
+                "allocations": 3161,
+                "rss_growth_kib": 2956
+              },
+              "freeze": {
+                "us": 8152,
+                "requested_bytes": 1557237,
+                "allocations": 4955,
+                "rss_growth_kib": 272
+              },
+              "validation": {
+                "us": 20293,
+                "requested_bytes": 590475,
+                "allocations": 63,
+                "rss_growth_kib": 4296
+              },
+              "backend": {
+                "us": 23571,
+                "requested_bytes": 517359,
+                "allocations": 186,
+                "rss_growth_kib": 404
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1676,
+              "candidate_scans": 359768,
+              "candidates": 102475,
+              "candidate_parts": 307390,
+              "candidate_variables": 187526,
+              "candidate_rows": 39899,
+              "dependency_hits": 101828,
+              "dependency_recomputations": 647,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 29353,
+              "normalization": {
+                "row_requests": 32758,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 31241,
+                "composite_hits": 8,
+                "composite_collisions": 4286,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 98,
+                "free_type_queries": 4534,
+                "free_type_visits": 16105,
+                "free_row_queries": 71109,
+                "free_row_visits": 96644,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "median_build_ms": 641.5572380000001,
+      "median_check_us": 257557,
+      "samples": [
+        {
+          "build_ms": 671.663051,
+          "pins": {
+            "compiler_sha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 667436,
+            "peak_rss_kib": 49312,
+            "phases": {
+              "other": {
+                "us": 1579,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 68
+              },
+              "assets": {
+                "us": 305535,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 6612
+              },
+              "inputs": {
+                "us": 1076,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1395,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 17273,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 5640
+              },
+              "parse": {
+                "us": 10678,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 468
+              },
+              "check": {
+                "us": 259442,
+                "requested_bytes": 18392482,
+                "allocations": 50887,
+                "rss_growth_kib": 21608
+              },
+              "lower": {
+                "us": 18746,
+                "requested_bytes": 4188701,
+                "allocations": 3161,
+                "rss_growth_kib": 2236
+              },
+              "freeze": {
+                "us": 8175,
+                "requested_bytes": 1550021,
+                "allocations": 4955,
+                "rss_growth_kib": 340
+              },
+              "validation": {
+                "us": 20013,
+                "requested_bytes": 590543,
+                "allocations": 63,
+                "rss_growth_kib": 2208
+              },
+              "backend": {
+                "us": 23519,
+                "requested_bytes": 517393,
+                "allocations": 186,
+                "rss_growth_kib": 464
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1017,
+              "closed_array_locals": 659,
+              "candidate_scans": 50653,
+              "candidates": 19855,
+              "candidate_parts": 59530,
+              "candidate_variables": 36064,
+              "candidate_rows": 7850,
+              "dependency_hits": 19298,
+              "dependency_recomputations": 557,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 27544,
+              "normalization": {
+                "row_requests": 30744,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 28946,
+                "composite_hits": 6,
+                "composite_collisions": 4135,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 100,
+                "free_type_queries": 2190,
+                "free_type_visits": 8688,
+                "free_row_queries": 18529,
+                "free_row_visits": 38991,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        },
+        {
+          "build_ms": 616.7762359999999,
+          "pins": {
+            "compiler_sha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 612528,
+            "peak_rss_kib": 52572,
+            "phases": {
+              "other": {
+                "us": 1330,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 56
+              },
+              "assets": {
+                "us": 261766,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 8640
+              },
+              "inputs": {
+                "us": 1022,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1338,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 16961,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 3504
+              },
+              "parse": {
+                "us": 10457,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 456
+              },
+              "check": {
+                "us": 251060,
+                "requested_bytes": 18392482,
+                "allocations": 50887,
+                "rss_growth_kib": 23244
+              },
+              "lower": {
+                "us": 18051,
+                "requested_bytes": 4188701,
+                "allocations": 3161,
+                "rss_growth_kib": 2224
+              },
+              "freeze": {
+                "us": 7932,
+                "requested_bytes": 1550021,
+                "allocations": 4955,
+                "rss_growth_kib": 272
+              },
+              "validation": {
+                "us": 19620,
+                "requested_bytes": 590543,
+                "allocations": 63,
+                "rss_growth_kib": 4300
+              },
+              "backend": {
+                "us": 22986,
+                "requested_bytes": 517393,
+                "allocations": 186,
+                "rss_growth_kib": 208
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1017,
+              "closed_array_locals": 659,
+              "candidate_scans": 50653,
+              "candidates": 19855,
+              "candidate_parts": 59530,
+              "candidate_variables": 36064,
+              "candidate_rows": 7850,
+              "dependency_hits": 19298,
+              "dependency_recomputations": 557,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 27544,
+              "normalization": {
+                "row_requests": 30744,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 28946,
+                "composite_hits": 6,
+                "composite_collisions": 4135,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 100,
+                "free_type_queries": 2190,
+                "free_type_visits": 8688,
+                "free_row_queries": 18529,
+                "free_row_visits": 38991,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        },
+        {
+          "build_ms": 641.5572380000001,
+          "pins": {
+            "compiler_sha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+            "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+            "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+            "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+            "source_files": {
+              "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+              "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+              "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+              "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+              "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+              "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+            }
+          },
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "executed_inputs": [
+            0,
+            1,
+            41,
+            4294967295,
+            0
+          ],
+          "phase_profile": {
+            "total_us": 638243,
+            "peak_rss_kib": 49324,
+            "phases": {
+              "other": {
+                "us": 1924,
+                "requested_bytes": 94529,
+                "allocations": 40,
+                "rss_growth_kib": 68
+              },
+              "assets": {
+                "us": 266475,
+                "requested_bytes": 28714413,
+                "allocations": 517,
+                "rss_growth_kib": 6496
+              },
+              "inputs": {
+                "us": 1053,
+                "requested_bytes": 206649,
+                "allocations": 450,
+                "rss_growth_kib": 0
+              },
+              "load": {
+                "us": 1720,
+                "requested_bytes": 607059,
+                "allocations": 225,
+                "rss_growth_kib": 0
+              },
+              "lex": {
+                "us": 17398,
+                "requested_bytes": 1109384,
+                "allocations": 151,
+                "rss_growth_kib": 5756
+              },
+              "parse": {
+                "us": 10793,
+                "requested_bytes": 1995788,
+                "allocations": 5396,
+                "rss_growth_kib": 468
+              },
+              "check": {
+                "us": 257557,
+                "requested_bytes": 18392482,
+                "allocations": 50887,
+                "rss_growth_kib": 21452
+              },
+              "lower": {
+                "us": 19347,
+                "requested_bytes": 4188701,
+                "allocations": 3161,
+                "rss_growth_kib": 2416
+              },
+              "freeze": {
+                "us": 8265,
+                "requested_bytes": 1550021,
+                "allocations": 4955,
+                "rss_growth_kib": 396
+              },
+              "validation": {
+                "us": 20752,
+                "requested_bytes": 590543,
+                "allocations": 63,
+                "rss_growth_kib": 2124
+              },
+              "backend": {
+                "us": 32953,
+                "requested_bytes": 517393,
+                "allocations": 186,
+                "rss_growth_kib": 480
+              }
+            },
+            "checking": {
+              "parallel_batches": 5,
+              "parallel_jobs": 6,
+              "parallel_retries": 0,
+              "modules": 7,
+              "scheme_calls": 1017,
+              "closed_array_locals": 659,
+              "candidate_scans": 50653,
+              "candidates": 19855,
+              "candidate_parts": 59530,
+              "candidate_variables": 36064,
+              "candidate_rows": 7850,
+              "dependency_hits": 19298,
+              "dependency_recomputations": 557,
+              "import_requests": 4029,
+              "imported_schemes": 688,
+              "imported_summary_reuses": 36,
+              "imported_read": 63,
+              "type_nodes": 27544,
+              "normalization": {
+                "row_requests": 30744,
+                "closed_row_hits": 0,
+                "epoch_row_hits": 0,
+                "epoch_row_probes": 0,
+                "epoch_row_collisions": 0,
+                "epoch_row_stale": 0,
+                "epoch_row_context_misses": 0,
+                "epoch_row_publications": 0,
+                "composite_probes": 28946,
+                "composite_hits": 6,
+                "composite_collisions": 4135,
+                "composite_stale_dependencies": 2,
+                "composite_future_clock_misses": 0,
+                "composite_frontier_declines": 0,
+                "composite_publications": 100,
+                "free_type_queries": 2190,
+                "free_type_visits": 8688,
+                "free_row_queries": 18529,
+                "free_row_visits": 38991,
+                "argument_rows": 0,
+                "labels": 0,
+                "arguments": 0,
+                "changed_rows": 0,
+                "closed_row_evictions": 0,
+                "interner_requests": 0,
+                "interner_candidates": 0,
+                "interner_arguments": 0,
+                "interner_linked": 0,
+                "interner_rebuilds": 0,
+                "closed_operation_hits": 0,
+                "argument_height_checks": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fraction_build_time_removed": 0.2722098313623986,
+    "note": "Three final alternating pairs; first pair overlaps short lint/preflight checks. An earlier independent three-pair set measured889.54\u2192624.18ms. All final outputs byte-identical."
+  },
+  "focused_native": [
+    {
+      "name": "check.types.test.known closed evidence declines revoked open and saturated certificates through OOM",
+      "duration_ns": 56698468,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 1,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    },
+    {
+      "name": "check.check_shared_scheme_tests.test.closed array locals bypass unrelated field generalization with old-path parity through OOM",
+      "duration_ns": 896459897,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 1,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    },
+    {
+      "name": "check.check_shared_scheme_tests.test.closed array locals admit all array modes and closed callbacks while open elements retain generalization",
+      "duration_ns": 7215645,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 0,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    },
+    {
+      "name": "check.check_shared_scheme_tests.test.closed array locals retain explicit clauses and implicit contract selection or rejection",
+      "duration_ns": 10543270,
+      "status": "passed",
+      "leaks": 0,
+      "logged_errors": 0,
+      "allocation_failures": "full",
+      "sweeps": {
+        "full_sweeps": 0,
+        "sampled_sweeps": 0,
+        "discovered_allocations": 0,
+        "fault_runs": 0
+      }
+    }
+  ],
+  "compiled_native_tests": 2758,
+  "broader_native": {
+    "selected": 355,
+    "passed": 354,
+    "failed": [
+      {
+        "name": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+        "duration_ns": 11096331,
+        "status": "failed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "sampled",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "allocation_failures": "sampled",
+    "note": "Run before final test-only strengthening; production compiler hash unchanged. Four strengthened laws subsequently pass in full fault mode."
+  },
+  "guests": {
+    "selected_executed_wasm": {
+      "passed": 27,
+      "failed": 0,
+      "files": [
+        "scoped_storage_execution.test.ts",
+        "scoped_indexed_field_execution.test.ts",
+        "scoped_contract_methods_execution.test.ts",
+        "source_proof_dag_execution.test.ts"
+      ]
+    },
+    "body_reuse_and_text": {
+      "passed": 17,
+      "failed": 16,
+      "note": "Same totals as preserved baseline; existing work/reuse assertion failures. Not a passing suite.",
+      "failure_names_identical_to_baseline": true,
+      "failure_names": [
+        "body checker reuse owns Foreign arrows through source compiled changes and rejection",
+        "body checker reuse owns array selectors through source compiled changes and rejection",
+        "body checker reuse owns if let joins captures and effect traces through compiled changes",
+        "body checker reuse owns result directed local principals",
+        "body checker reuse owns shared local relays through source and compiled changes",
+        "body checker reuse preserves exported local qualification origins in source and compiled producers",
+        "body checker reuse preserves portable qualified producer origins after earlier body edits",
+        "body checker reuse preserves selected Foreign traces in inferred local principals",
+        "body checker reuse relocates and follows executable edits through rejected revisions",
+        "body checker reuse relocates producer units and bindings through source and compiled origins",
+        "body checker reuse relocates shaped records with owning payloads and reversed spelling order",
+        "body checker reuse relocates shared producer schemes through source and compiled imports",
+        "body checker reuse relocates written local association and representation origins",
+        "body checker reuse resolves imported annotation heads with exact source and compiled recipes",
+        "body checker reuse restores chained dotted nominal paths from source and compiled producers",
+        "body checker reuse revokes local principals for source and compiled selected effects"
+      ]
+    },
+    "gdev_language": {
+      "entries": 6,
+      "assertions": 11,
+      "modes": [
+        "sync",
+        "JSPI"
+      ],
+      "passed": true,
+      "build_ms": 483.268005,
+      "wasm_bytes": 25489,
+      "wasm_sha256": "8065842beee10397717ce1f835696ee6881d0a1272ff05024cc24626c07441b2",
+      "baseline_bytes_identical": true
+    }
+  },
+  "bounded_integration": {
+    "main": {
+      "evidence": "/home/jacobt/src/blot2/build/bench/closed-array-locals/main/main-997144057f44f15",
+      "identity": "061ee0b244312a1103ac79bab59d01b94897bbea434fdbcbd59359f84cae85ed",
+      "compiler": "/home/jacobt/src/blot2/zig-native/zig-out-native-dev/bin/blotc",
+      "compilerSha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "sourceCheckpoint": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5001.921188,
+      "profileBackend": true,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete",
+      "error": "Zig project build aborted"
+    },
+    "actor": {
+      "evidence": "/home/jacobt/src/blot2/build/bench/closed-array-locals/actor/main-e68c446684d32515",
+      "identity": "061ee0b244312a1103ac79bab59d01b94897bbea434fdbcbd59359f84cae85ed",
+      "compiler": "/home/jacobt/src/blot2/zig-native/zig-out-native-dev/bin/blotc",
+      "compilerSha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+      "entry": "/home/jacobt/src/gdev/tests/actor_presentation.blot",
+      "sourceCheckpoint": {
+        "entrySha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5001.821988000001,
+      "profileBackend": true,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete",
+      "error": "Zig project build aborted"
+    },
+    "same_imports_tiny_entry": {
+      "evidence": "/home/jacobt/src/blot2/build/bench/closed-array-locals/ablation/main-b0207414890165d1",
+      "identity": "061ee0b244312a1103ac79bab59d01b94897bbea434fdbcbd59359f84cae85ed",
+      "compiler": "/home/jacobt/src/blot2/zig-native/zig-out-native-dev/bin/blotc",
+      "compilerSha256": "0faa0cbb3ed540dc23285b9b4cf14d64547dc814f1ba353f93bf80ee6516a95f",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "sourceCheckpoint": {
+        "entrySha256": "0f8992c4429264b64c9f1659cdcebd523c3d9c803fbc86d7a716c29cf37c36a6",
+        "originalEntrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "entryBodyAblated": true,
+        "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "deadlineMs": 5000,
+      "buildMs": 5002.253779,
+      "profileBackend": true,
+      "success": false,
+      "compiled": false,
+      "status": "timeout_incomplete",
+      "error": "Zig project build aborted"
+    }
+  },
+  "verification": {
+    "zig_lint": "567 source files and1 fixture, zero findings",
+    "dev_runner_tests": "5passed",
+    "full_gate": "Required deno task test:compiler attempted again; existing protocol operand-span ends42/47 expected43/48 fail before release build/full native execution. Full qualification pending."
+  },
+  "coverage_limits": [
+    "No current whole-game artifact or measured size; roughly1MB is expectation only.",
+    "No release compiler/performance result or fresh Gdev frame.",
+    "Source array results normalize before local; raw variable-backed array historical trigger was not observed. Raw binding.ty parity is checked, and existing type-store history laws cover certificate revocation."
+  ],
+  "review": "Astra xhigh: no production blockers; requested method/generative and raw-type parity cases added."
+}

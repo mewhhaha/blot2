@@ -97,6 +97,13 @@ candidate, and publication retains no temporary span. Schemes without residual
 predicates keep their ordinary quantified types and rows; they omit only
 metadata for shared-predicate instantiation, which they cannot request.
 
+Unqualified Array, GrowArray and ResizeArray locals may omit generalization
+when a current closed-graph certificate proves both quantifier sets empty.
+The shortcut requires no generative bindings and declines pending contracts
+before the inherited-explicit exclusion, then declines retained methods or
+explicit predicates. It preserves the binding's raw type and resolved root.
+Open elements, open callback rows and revoked certificates use generalization.
+
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
 Recursive normalization receipts retain the cursor, depth and exact type/row

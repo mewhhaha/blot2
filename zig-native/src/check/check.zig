@@ -100,6 +100,7 @@ pub const PrivateExecution = struct {
     parallel_min_nodes: usize = 4096,
     scheme_dependency_reuse: bool = true,
     indexed_scheme_membership: bool = true,
+    closed_array_locals: bool = true,
     eager_scheme_summaries: bool = false,
     imported_summary_reuse: bool = true,
     alias_globals: bool = false,
@@ -13130,6 +13131,19 @@ const Engine = struct {
         }
         return free.toOwnedSlice(self.allocator);
     }
+    fn closedArrayLocal(self: *const Engine, resolved: T.Id) bool {
+        if (!self.execution.closed_array_locals or self.generative_bindings.items.len != 0) return false;
+        if (@import("storage_types.zig").arrayElement(&self.types, resolved) == null or !self.types.knownClosed(resolved)) return false;
+        for (self.pending.items, 0..) |pending, index| {
+            if (pending.solved or pending.covered or pending.local_scheme or pending.owner != self.current or (pending.declared and pending.scope != self.local_qualification_scope)) continue;
+            // Contract selection can solve or diagnose even a ground request.
+            if (pending.value.kind == .contract) return false;
+            const explicit = self.explicitRequirement(pending.value);
+            if (explicit and index < self.local_requirements_start) continue;
+            if (pending.method_member or explicit) return false;
+        }
+        return true;
+    }
     fn local(self: *Engine, name: symbols.Symbol, value: T.Id, declaration: ast.Id) T.Error!BindingId {
         try self.solveFields();
         const resolved = try self.types.resolve(value, 0);
@@ -13144,6 +13158,14 @@ const Engine = struct {
             // every earlier lexical binding here makes N scalar lets quadratic.
             const binding = try self.addBinding(.{ .name = name, .declaration = declaration, .owner = self.owner, .kind = .local, .ty = resolved, .scheme = .{ .root = resolved } });
             try self.env.append(self.allocator, .{ .name = name, .binding = binding });
+            return binding;
+        }
+        if (!qualified and self.closedArrayLocal(resolved)) {
+            // A certified array has no type or row quantifiers to retain the
+            // remaining ordinary predicates. Preserve its raw historical type.
+            const binding = try self.addBinding(.{ .name = name, .declaration = declaration, .owner = self.owner, .kind = .local, .ty = value, .scheme = .{ .root = resolved } });
+            try self.env.append(self.allocator, .{ .name = name, .binding = binding });
+            self.frontend_work.closed_array_locals += 1;
             return binding;
         }
         const excluded = try self.environmentFree();

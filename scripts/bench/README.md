@@ -199,6 +199,12 @@ separate from unprofiled process CPU and end-to-end latency. See the
 [frontend architecture review](https://github.com/mewhhaha/blot2/blob/e2fbe95b4ece3e2d4fd442d95274bb6156815705/COMPILER_FRONTEND_REVIEW.md)
 for the CT114 findings and remaining representation changes.
 
+`deno run -A scripts/bench/render_producer.ts --compiler PATH` checks the actual
+Gdev `pen/protocol_render` import with its native-asset settings and a five-second
+deadline. It emits and executes only a tiny identity entry. Compare alternating
+compiler runs using `phaseProfile.checking`; the emitted size does not measure
+the renderer or whole game.
+
 ## Idiomatic Blot/Rust programs
 
 `deno task bench:idiomatic` measures eighteen public source pairs with fresh

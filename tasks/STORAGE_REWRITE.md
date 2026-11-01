@@ -8,6 +8,7 @@ diagnostics. See
 [the graph-sharing evidence](../zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
 and
 [exact receipt hashing](../zig-native/measurements/receipt-path-hashing-2026-11-01.json)
+and [closed array locals](../zig-native/measurements/closed-array-locals-2026-11-01.json)
 and [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
