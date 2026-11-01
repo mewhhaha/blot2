@@ -25,16 +25,19 @@ pub const Workspace = struct {
     admission: ?*Admission = null,
     modules: [128]*const core.Module = undefined,
     module_count: usize = 0,
-    bounds_units: [128]*const core.Module = undefined,
-    bounds_unit_count: ?usize = null,
-    bounds_receipts: [128]BoundsReceipt = undefined,
-    bounds_count: usize = 0,
+    bounds_units: ?[]const *const core.Module = null,
+    bounds_receipts: std.ArrayList(BoundsReceipt) = .empty,
     const BoundsReceipt = struct {
         module: *const core.Module,
         symbol_count: ?usize,
         source_length: ?u32,
         forbidden_owner: ?u32,
     };
+    pub fn deinit(self: *Workspace) void {
+        if (self.bounds_units) |units| self.allocator.free(units);
+        self.bounds_receipts.deinit(self.allocator);
+        self.* = undefined;
+    }
     pub fn proved(self: *const Workspace, module: *const core.Module) bool {
         for (self.modules[0..self.module_count]) |candidate| if (candidate == module) return true;
         return false;
@@ -334,20 +337,25 @@ pub fn bounds(workspace: ?*Workspace, module: *const core.Module, context: @impo
         if (@typeInfo(@TypeOf(context)).@"struct".field_names.len != 4) @compileError("register every bounds Context field in the receipt");
     }
     const owner = workspace orelse return @import("frozen_core_validation.zig").validateBounds(module, context);
-    var same_context = context.units.len <= owner.bounds_units.len;
-    if (same_context) {
-        if (owner.bounds_unit_count) |count| {
-            same_context = std.mem.eql(*const core.Module, owner.bounds_units[0..count], context.units);
-        } else {
-            @memcpy(owner.bounds_units[0..context.units.len], context.units);
-            owner.bounds_unit_count = context.units.len;
-        }
-    }
-    if (same_context) for (owner.bounds_receipts[0..owner.bounds_count]) |receipt| {
+    var same_context = true;
+    if (owner.bounds_units) |units| same_context = std.mem.eql(*const core.Module, units, context.units);
+    if (same_context) for (owner.bounds_receipts.items) |receipt| {
         if (receipt.module == module and receipt.symbol_count == context.symbol_count and receipt.source_length == context.source_length and receipt.forbidden_owner == context.forbidden_owner) return;
     };
     try @import("frozen_core_validation.zig").validateBounds(module, context);
-    if (!same_context or owner.bounds_count == owner.bounds_receipts.len) return;
-    owner.bounds_receipts[owner.bounds_count] = .{ .module = module, .symbol_count = context.symbol_count, .source_length = context.source_length, .forbidden_owner = context.forbidden_owner };
-    owner.bounds_count += 1;
+    if (!same_context) return;
+    // Own the ordered immutable context; a caller can reuse its pointer-array
+    // storage for another environment. Allocate all metadata before publication.
+    var captured: ?[]const *const core.Module = null;
+    errdefer if (captured) |units| owner.allocator.free(units);
+    if (owner.bounds_units == null) captured = owner.allocator.dupe(*const core.Module, context.units) catch {
+        owner.oom = true;
+        return error.InvalidArtifact;
+    };
+    owner.bounds_receipts.ensureUnusedCapacity(owner.allocator, 1) catch {
+        owner.oom = true;
+        return error.InvalidArtifact;
+    };
+    if (captured) |units| owner.bounds_units = units;
+    owner.bounds_receipts.appendAssumeCapacity(.{ .module = module, .symbol_count = context.symbol_count, .source_length = context.source_length, .forbidden_owner = context.forbidden_owner });
 }

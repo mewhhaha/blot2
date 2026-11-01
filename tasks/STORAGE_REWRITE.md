@@ -1,18 +1,23 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Actual-main CPU sampling](../zig-native/measurements/bounds-and-source-proof-2026-11-01.json)
+finds and removes the 128-module bounds-cache cutoff and avoids large witness
+initialization for unrelated goal headers. Actual main still exceeds 30 seconds;
+source-body proof reconstruction is the next measured target. No current full
+game output or five-second qualification is established.
 [Full-game timing](../zig-native/measurements/full-gdev-timing-2026-11-01.json)
 now establishes **main exceeds five minutes**: an unprofiled run stopped at
 300.07 seconds without an artifact. A separate trace completes frontend work
 around 9.02 seconds and remains in synchronous `owned.emit` at 30 seconds.
-Investigate full-game backend expansion/admission/outlining; producer timings
-do not establish whole-game latency. Exact completion time remains unknown.
+Investigate full-game backend expansion/admission/outlining; producer timings do
+not establish whole-game latency. Exact completion time remains unknown.
 [Measured worker scaling and largest-first dispatch](../zig-native/measurements/concurrency-and-total-time-2026-11-01.json)
-improve matched unprofiled four-worker producer compilation 7.46 to 7.15 seconds;
-the eight-worker candidate takes 6.89 seconds in separate pairs. Retained entry
-edits take about 0.50 seconds. Heap contention is small; no allocator caches were
-added. Actual Gdev main remains incomplete after the five-minute measurement, with whole-game
-total/size/frame qualification pending.
+improve matched unprofiled four-worker producer compilation 7.46 to 7.15
+seconds; the eight-worker candidate takes 6.89 seconds in separate pairs.
+Retained entry edits take about 0.50 seconds. Heap contention is small; no
+allocator caches were added. Actual Gdev main remains incomplete after the
+five-minute measurement, with whole-game total/size/frame qualification pending.
 [Scoped validation batches and list-copy deletion](../zig-native/measurements/checker-validation-reduction-2026-11-01.json)
 improve matched fresh World-producer validation 883 to 693 ms and total 7.69 to
 7.41 seconds. Checking improves only 1.5%; the ineffective nominal memo and

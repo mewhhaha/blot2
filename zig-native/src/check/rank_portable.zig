@@ -19,6 +19,7 @@ pub fn executable(module: *const core.Module, context: anytype) Error!void {
 
 pub fn executableAllocated(allocator: @import("std").mem.Allocator, module: *const core.Module, context: anytype) error{ InvalidArtifact, OutOfMemory }!void {
     var workspace: @import("scheme_equations.zig").Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     return executableWorkspace(module, context, &workspace);
 }
 pub fn executableWorkspace(module: *const core.Module, context: anytype, workspace: *@import("scheme_equations.zig").Workspace) error{ InvalidArtifact, OutOfMemory }!void {

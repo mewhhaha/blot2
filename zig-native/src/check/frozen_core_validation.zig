@@ -2101,6 +2101,7 @@ fn validateBatchWithBudget(allocator: std.mem.Allocator, module: *const core.Mod
     try listRoles(module, colors[start..][0..module.types.extra.len], colors[start + module.types.extra.len ..][0..module.extra.len]);
     try cycles(graph, .{ .colors = colors, .path = path });
     var equations: @import("scheme_equations.zig").Workspace = .{ .allocator = allocator };
+    defer equations.deinit();
     const tasks = @import("task_core.zig");
     var task_result: Error!void = undefined;
     if (batch) |value| {

@@ -2237,6 +2237,7 @@ test "named ordinary owners retain value witnesses empty arms and exiting fallba
 fn packageWorkspace(allocator: std.mem.Allocator, module: *const core.Module) !void {
     var remaining: usize = 1_000_000;
     var workspace: @import("scheme_equations.zig").Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     @import("package_core.zig").executableWorkspace(module, .{ .units = &[_]*const core.Module{module} }, &remaining, &workspace) catch |err| {
         if (workspace.oom) return error.OutOfMemory;
         return err;
@@ -2355,13 +2356,14 @@ test "validation bounds receipts retain exact context and never publish failed c
     defer module.deinit(std.testing.allocator);
     const equations = @import("scheme_equations.zig");
     var workspace: equations.Workspace = .{ .allocator = std.testing.allocator };
+    defer workspace.deinit();
     const units = [_]*const core.Module{&module};
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &units, .source_length = 0 }));
-    try std.testing.expectEqual(@as(usize, 0), workspace.bounds_count);
+    try std.testing.expectEqual(@as(usize, 0), workspace.bounds_receipts.items.len);
     try equations.bounds(&workspace, &module, .{ .units = &units });
-    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_count);
+    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
     try equations.bounds(&workspace, &module, .{ .units = &units });
-    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_count);
+    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &units, .source_length = 0 }));
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &units, .symbol_count = 1 }));
     const duplicates = [_]*const core.Module{ &module, &module };
@@ -2370,14 +2372,66 @@ test "validation bounds receipts retain exact context and never publish failed c
     sibling.unit += 1;
     const pair = [_]*const core.Module{ &module, &sibling };
     try equations.bounds(&workspace, &module, .{ .units = &pair });
-    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_count);
+    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &duplicates }));
     var invalid = module;
     invalid.unit = 0;
     const invalid_units = [_]*const core.Module{&invalid};
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, .{ .units = &invalid_units }));
-    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_count);
+    try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
     try std.testing.expect(!workspace.proved(&module));
+}
+
+fn largeBoundsReceipts(allocator: std.mem.Allocator, source: *const core.Module) !void {
+    const equations = @import("scheme_equations.zig");
+    var modules: [245]core.Module = undefined;
+    var units: [modules.len]*const core.Module = undefined;
+    for (&modules, &units, 0..) |*module, *unit, index| {
+        module.* = source.*;
+        module.unit = @intCast(index + 1);
+        unit.* = module;
+    }
+    var workspace: equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, units[0], .{ .units = &units, .source_length = 0 }));
+    try std.testing.expect(workspace.bounds_units == null);
+    try std.testing.expectEqual(@as(usize, 0), workspace.bounds_receipts.items.len);
+    for (units, 0..) |module, index| {
+        equations.bounds(&workspace, module, .{ .units = &units }) catch |err| {
+            try std.testing.expectEqual(index, workspace.bounds_receipts.items.len);
+            if (index == 0) try std.testing.expect(workspace.bounds_units == null);
+            if (workspace.oom) return error.OutOfMemory;
+            return err;
+        };
+    }
+    try std.testing.expectEqual(units.len, workspace.bounds_units.?.len);
+    try std.testing.expectEqual(units.len, workspace.bounds_receipts.items.len);
+    for (units) |module| try equations.bounds(&workspace, module, .{ .units = &units });
+    try std.testing.expectEqual(units.len, workspace.bounds_receipts.items.len);
+    // Reusing the caller's pointer array must not rewrite the captured mapping.
+    const saved = units[200];
+    units[200] = units[201];
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, units[0], .{ .units = &units }));
+    units[200] = saved;
+    try equations.bounds(&workspace, units[200], .{ .units = &units });
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, units[200], .{ .units = &units, .forbidden_owner = units[200].unit }));
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, units[200], .{ .units = &units, .source_length = 0 }));
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, units[200], .{ .units = &units, .symbol_count = 1 }));
+    try std.testing.expectEqual(units.len, workspace.bounds_receipts.items.len);
+    try std.testing.expect(!workspace.proved(units[200]));
+}
+
+test "validation bounds receipts scale past 128 owners and retain exact contexts through OOM" {
+    const allocator = std.testing.allocator;
+    var module = try lowerSource(allocator, "const answer = {value: 42}\n");
+    defer module.deinit(allocator);
+    // These record-only copies have local targets, with no nominal or foreign
+    // references. Each retains its own immutable module identity in the context.
+    for (module.bindings) |*binding| if (binding.target.unit == module.unit) {
+        binding.target.unit = 0;
+    };
+    try largeBoundsReceipts(allocator, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, largeBoundsReceipts, .{&module});
 }
 
 test "callback field selection preserves latent effects and invocation cannot erase them" {

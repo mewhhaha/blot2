@@ -6,6 +6,22 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+Actual-main emission sampling found a **128-module bounds-cache cliff**: large
+contexts repeatedly validated entire catalogs during source proofs. Bounds
+receipts now own a scalable exact context and retain more than 128 results.
+Unrelated goal headers are rejected before initializing/copying large witness
+arrays, with the same proof-budget and proxy-validation behavior. The next
+sample removes repeated bounds validation from the hot list and places 58% of
+sampled emission CPU in source-body proofs. Both fixes still time out on actual
+main at 30 seconds; no five-second or whole-game output claim is established.
+The checked checkpoint passes 27 selected native laws, 28 full-fault laws, 11
+guests, zero Zig lint findings and seven unchanged real kite streams. The full
+gate retains the known 48-pass/one List/chunk failure. See
+[bounds and source-proof evidence](zig-native/measurements/bounds-and-source-proof-2026-11-01.json).
+Next: a private successful source-check/lowerer receipt may replace duplicate
+body reconstruction. The existing Core-validation receipt alone grants no such
+authority; arbitrary/mixed/decoded Core must retain reconstruction.
+
 An owner-requested full timing run now establishes **Gdev main exceeds five
 minutes**, not seven seconds. The unprofiled `9361e10` build was aborted at
 300.07 seconds, with about 2.25 GiB sampled resident memory and roughly one CPU
@@ -16,7 +32,8 @@ That window is synchronous emission, including call admission/refinement,
 expansion and inline outlining; codegen workers apply only to later assembly.
 The long unprofiled run has no internal phase trace after that boundary. Target
 full-game backend work before extrapolating tiny-export producer improvements.
-See [the full-game timing evidence](zig-native/measurements/full-gdev-timing-2026-11-01.json).
+See
+[the full-game timing evidence](zig-native/measurements/full-gdev-timing-2026-11-01.json).
 
 Ready checker jobs now start largest syntax units first, while preparation,
 budgets, diagnostics and publication keep their original order. Three matched
@@ -41,8 +58,8 @@ selected native laws**, all with full allocation-failure mode, **11 guests** and
 zero Zig lint findings. Seven original kite scenarios retain identical complete
 streams and Wasm bytes. The required full gate remains **48 passed/one baseline
 List/chunk storage_escape** at bytes 312..345. Actual unprofiled Gdev main now
-exceeds the explicit **five-minute measurement**; total completion time, size, frame
-and release qualification remain unknown/pending. See
+exceeds the explicit **five-minute measurement**; total completion time, size,
+frame and release qualification remain unknown/pending. See
 [the concurrency and total-time evidence](zig-native/measurements/concurrency-and-total-time-2026-11-01.json).
 
 Closure validation now computes whole-context spawn-contract presence once per
@@ -54,7 +71,8 @@ the identical **2,935-byte** identity export. This checks all 240 producer
 modules, not actual world initialization or whole-main performance. Shared
 nominal preparation and application-normalization guards showed no meaningful
 checker gain and were removed; their patch and executed witnesses are archived.
-See [the matched controls and rejected work](zig-native/measurements/checker-validation-reduction-2026-11-01.json).
+See
+[the matched controls and rejected work](zig-native/measurements/checker-validation-reduction-2026-11-01.json).
 
 The cursor-view adapter is **rejected and removed**. Fused covariance opening
 and view-aware application/pending-use reads eliminate **28.4%** of
@@ -84,15 +102,14 @@ per-module completed clocks; source ordinals must never be attributed using Core
 names.
 
 The previous `4c9635bb` checkpoint compiles 2,785 native laws. Its type-effects
-cycle passes 17
-selected native laws, nine guests and zero Zig lint findings in 22.13 seconds;
-the same 17 native laws pass full allocation-failure mode in 3.07 seconds. Seven
-original kite draw-stream scenarios pass, with both producer Wasm binaries and
-complete streams byte-identical to their pinned reference. The required full
-gate stops after 3.10 seconds at **48 passed/one baseline List/chunk
-storage_escape** at bytes 312..345, reproduced with the preserved baseline
-compiler. Full qualification, whole-main/frame and release measurements remain
-pending.
+cycle passes 17 selected native laws, nine guests and zero Zig lint findings in
+22.13 seconds; the same 17 native laws pass full allocation-failure mode in 3.07
+seconds. Seven original kite draw-stream scenarios pass, with both producer Wasm
+binaries and complete streams byte-identical to their pinned reference. The
+required full gate stops after 3.10 seconds at **48 passed/one baseline
+List/chunk storage_escape** at bytes 312..345, reproduced with the preserved
+baseline compiler. Full qualification, whole-main/frame and release measurements
+remain pending.
 
 The broader automatic copy/append planner is also **rejected and removed**.
 Original owned copies at eight sites shrink 26.5%, while production-scale plain
@@ -474,10 +491,9 @@ Use `--entry tests/language_compatibility.blot` for the small real fixture and
 `--profile` for completed-build phase attribution. The diagnostic accepts at
 most 30 seconds. Only an explicitly requested full timing measurement may use
 `--measure-total --timeout-ms 300000`; the default remains five seconds, and
-timeouts remain incomplete. Do not use this long allowance for iteration.
-Defer the Pen frame driver's
-regular application pipeline until bounded compilation is fast enough. The older
-PNG does not qualify a later compiler.
+timeouts remain incomplete. Do not use this long allowance for iteration. Defer
+the Pen frame driver's regular application pipeline until bounded compilation is
+fast enough. The older PNG does not qualify a later compiler.
 
 The reusable frontend inventory checks unused declarations through overlays:
 

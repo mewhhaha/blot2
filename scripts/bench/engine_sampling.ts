@@ -40,6 +40,9 @@ export async function createSampledCompiler(
   await Deno.writeTextFile(`${output}/samples.jsonl`, "");
   await Deno.writeTextFile(`${output}/builds.jsonl`, "");
   await Deno.writeTextFile(`${output}/gdb.log`, "");
+  await Deno.remove(`${output}/sampling-window.json`).catch((error) => {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  });
   const wrapper = `${output}/blotc-ptracer`;
   await Deno.writeTextFile(
     wrapper,
@@ -146,11 +149,13 @@ os.execv(${JSON.stringify(binary)}, [${JSON.stringify(binary)}] + sys.argv[1:])
           const after = await ticks().catch(() => null);
           let cpuMs: number | null = null;
           if (after !== null) cpuMs = (after - before) * 1000 / hz;
+          let label = "world-producer";
+          if (focus === "emission") label = "gdev-main";
           await Deno.writeTextFile(
             `${output}/builds.jsonl`,
             JSON.stringify({
               run: 0,
-              label: "world-producer",
+              label,
               sampled: true,
               diagnostic: "sampling is diagnostic, not release timing",
               started_ms: started,

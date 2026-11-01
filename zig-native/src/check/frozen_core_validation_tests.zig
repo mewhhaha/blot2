@@ -72,6 +72,7 @@ test "forbidden Core owner restricts bounds, captured contexts and equation work
     try V.validateBounds(&module, ordinary);
     try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&module, restricted));
     var workspace: equations.Workspace = .{ .allocator = a };
+    defer workspace.deinit();
     try equations.bounds(&workspace, &module, ordinary);
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, restricted));
 }

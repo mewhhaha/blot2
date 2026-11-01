@@ -1,0 +1,117 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "d8fe5c97c902dcd5f87b0f26e5280937bc547d37",
+  "scope": "Actual-main emission CPU attribution and two proof-work reductions. Full-game under-five-second target remains unmet; no completed current main artifact.",
+  "compiler": {
+    "baseline_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+    "candidate_sha256": "dd3bc14365ad1d336edaf67de9013248354dafe816bc6db919031d8e8d8477d8",
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false
+  },
+  "workload": {
+    "gdev": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "entry": "../gdev/src/main.blot",
+    "cache": false,
+    "frontend_workers": 4,
+    "codegen_workers": 4
+  },
+  "changes": [
+    "Remove the 128-module/128-receipt bounds-cache cutoff; own the ordered exact context and publish only successful complete checks.",
+    "Reject unrelated source-goal headers before initializing or copying large Principal witness arrays, preserving proof budget, proxy canonicalization and row authority."
+  ],
+  "cpu_diagnostics": {
+    "baseline_directory": "build/bench/gdev-emission/main-ec8310703d8fe7d5",
+    "after_dynamic_receipts_directory": "build/bench/gdev-bounds-emission/main-89f23be6ca188b68",
+    "baseline_sampling_window_cpu_ms": 6100.0,
+    "baseline_covered_cpu_ms": 6022.959954,
+    "baseline_coverage_ratio": 0.9873704842622951,
+    "candidate_sampling_window_cpu_ms": 6220.0,
+    "candidate_covered_cpu_ms": 6125.019828,
+    "candidate_coverage_ratio": 0.9847298758842444,
+    "baseline_late_input_body_cpu_percent": 45.1,
+    "after_dynamic_receipts_source_prove_body_inclusive_cpu_percent": 58.3,
+    "after_dynamic_receipts_goal_given_mode_compiler_owner_cpu_percent": 12.174094499927225,
+    "limits": "Separate endpoint-weighted emission windows; inclusive categories overlap. Share changes do not establish total-time speedup. Header-preflight candidate not sampled separately."
+  },
+  "actual_main": {
+    "dynamic_receipts": "build/bench/gdev-bounds-dynamic/main-31082f299598a2c/result.json",
+    "both_changes": "build/bench/gdev-bounds-preflight/main-c8f04959a953022c/result.json",
+    "status": "timeout_incomplete",
+    "deadline_ms": 30000,
+    "compiled": false,
+    "total_time_and_size": "unknown"
+  },
+  "checks": {
+    "development_report": "build/bench/bounds-preflight-check-dev-final/run-17f6fb21765cfeca/results.json",
+    "development_seconds": 7.671900768,
+    "native_inventory": 2791,
+    "selected_native_laws": 27,
+    "guests_passed": 11,
+    "zig_lint_findings": 0,
+    "full_fault_selected_native_laws": 28,
+    "full_fault_seconds": 3.419055935999495,
+    "full_fault_log": "build/bench/bounds-preflight-check-dev-final/full-faults.log",
+    "full_gate": "build/bench/bounds-preflight-full-gate/run-1c39d4f58515c661",
+    "full_gate_status": "48 passed; one known baseline List/chunk storage_escape failure at bytes 312..345; full qualification pending"
+  },
+  "real_kites": {
+    "evidence": "build/bench/bounds-preflight-kites-10s/pair-ed87c56c749df22f/result.json",
+    "status": "complete",
+    "seven_scenarios": [
+      {
+        "scenario": 0,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 1,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 2,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 4,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 8,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 16,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 31,
+        "equal": true,
+        "first_difference": -1
+      }
+    ],
+    "prior_compiler_control": "build/bench/concurrency/kites-stream/pair-58fe7bd6c65c29c9/result.json",
+    "parity": [
+      {
+        "producer": "baseline",
+        "streams_equal": true,
+        "wasm_equal": true,
+        "current_build_ms": 5084.134587
+      },
+      {
+        "producer": "candidate",
+        "streams_equal": true,
+        "wasm_equal": true,
+        "current_build_ms": 5086.315103
+      }
+    ],
+    "latency_limit": "Five-second attempts incomplete; ten-second cap completes. No matched latency claim across separate controls/worker settings."
+  },
+  "next": "Replace repeated source-body reconstruction only with authority minted by a closed successful checker/lowerer factory. Existing Core-validation receipt is insufficient; standalone/mixed/decoded paths stay checked."
+}

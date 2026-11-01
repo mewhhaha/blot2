@@ -387,6 +387,7 @@ test "source goal header rejection preserves epochs while failed type proofs sti
     solver.refresh();
     scopes.solver = &solver;
     var workspace: Equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
     var walker: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission };
     const warm_variable = try solver.store.fresh();
@@ -407,8 +408,13 @@ test "source goal header rejection preserves epochs while failed type proofs sti
         const type_epoch = solver.store.mutation_epoch;
         const effect_epoch = solver.store.effects.mutation_epoch;
         const physical_epoch = solver.store.effects.physical_epoch;
+        const before_preflight = remaining;
+        try std.testing.expect(!try walker.goalHeaderCandidate(wanted, given));
+        try std.testing.expectEqual(before_preflight - 1, remaining);
         var proof: contracts.Principal = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes, .foreign_views = true };
+        const before_match = remaining;
         try std.testing.expect(!try walker.goalMatches(&proof, wanted, given, false));
+        try std.testing.expectEqual(before_match - 1, remaining);
         try std.testing.expectEqual(type_epoch, solver.store.mutation_epoch);
         try std.testing.expectEqual(effect_epoch, solver.store.effects.mutation_epoch);
         try std.testing.expectEqual(physical_epoch, solver.store.effects.physical_epoch);
@@ -418,6 +424,25 @@ test "source goal header rejection preserves epochs while failed type proofs sti
     }
     var different_type = wanted;
     different_type.ty = T.f32_type;
+    const before_candidate = remaining;
+    try std.testing.expect(try walker.goalHeaderCandidate(wanted, different_type));
+    try std.testing.expectEqual(before_candidate, remaining);
+    // Source callee proxies must still validate their target chains before a
+    // different name/operator can reject them. These missing targets are invalid.
+    var first_proxy = wanted;
+    first_proxy.kind = .callee_use;
+    first_proxy.identity = .{ .unit = 1, .decl = 1 };
+    var second_proxy = first_proxy;
+    second_proxy.identity.unit = 2;
+    second_proxy.name += 1;
+    try std.testing.expect(try walker.goalHeaderCandidate(first_proxy, second_proxy));
+    try std.testing.expectEqual(before_candidate, remaining);
+    var proxy_proof: contracts.Principal = .{ .left = &module.types, .right = &module.types, .remaining = &remaining, .views = &scopes };
+    try std.testing.expectError(error.InvalidArtifact, walker.goalMatches(&proxy_proof, first_proxy, second_proxy, false));
+    const saved_remaining = remaining;
+    remaining = 0;
+    try std.testing.expectError(error.InvalidArtifact, walker.goalHeaderCandidate(wanted, mismatches[0]));
+    remaining = saved_remaining;
     const unchanged_mark = solver.store.mark();
     const unchanged_type_epoch = solver.store.mutation_epoch;
     const unchanged_effect_epoch = solver.store.effects.mutation_epoch;
@@ -526,6 +551,7 @@ fn sourceRowIndexScenario(allocator: std.mem.Allocator) !void {
     };
     var remaining: usize = 1_000_000;
     var workspace: Equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
     defer {
         for (admission.source_rows.items) |index| allocator.free(index.rows);
@@ -612,6 +638,7 @@ pub fn checkedInterfaceBodyOrigin(module: *const core.Module, binding: core.Bind
         cache.exhausted_unit = null;
     }
     var workspace: Equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     var admission: Admission = .{ .remaining = remaining, .workspace = &workspace, .source_bodies = true, .source_failure = failure };
     defer admission.bodies.deinit(allocator);
     defer {
@@ -1447,6 +1474,15 @@ const Walker = struct {
             forwards += 1;
         }
     }
+    /// Reject immutable headers before initializing/copying Principal's witness
+    /// arrays. Rejection consumes the original comparison step; candidates leave
+    /// all work and authority to goalMatches, including source proxy admission.
+    fn goalHeaderCandidate(self: *Self, wanted: anytype, given: anytype) Error!bool {
+        if (self.admission.source_bodies and wanted.kind == .callee_use and given.kind == .callee_use and !std.meta.eql(wanted.identity, given.identity)) return true;
+        if (wanted.kind == given.kind and wanted.name == given.name and wanted.operator == given.operator and std.meta.eql(wanted.identity, given.identity)) return true;
+        try self.step(0);
+        return false;
+    }
     fn goalMatches(self: *Self, proof: *contracts.Principal, wanted_: anytype, given_: anytype, covariant_signature: bool) Error!bool {
         try self.step(0);
         var wanted = wanted_;
@@ -1766,6 +1802,7 @@ const Walker = struct {
                     if (try self.sharedGoal(wanted, given, depth + 1)) return true;
                     continue;
                 }
+                if (!try self.goalHeaderCandidate(given, wanted)) continue;
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
                 if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, self.goalArity(given.kind, given.signature), depth + 1);
@@ -1774,6 +1811,7 @@ const Walker = struct {
         }
         for (self.scopes.formals[0..self.scopes.formal_count]) |owner| {
             for (self.module.types.quantifierGoals(owner)) |given| {
+                if (!try self.goalHeaderCandidate(given, wanted)) continue;
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes };
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
                 if (given.kind != .task_receive and given.signature != 0) try self.goalRows(given.signature, self.goalArity(given.kind, given.signature), depth + 1);
@@ -1783,6 +1821,7 @@ const Walker = struct {
         for (self.scopes.openings[0..self.scopes.opening_count]) |opening| {
             const owner = self.module.types.node(opening.quantifier);
             for (self.module.types.quantifierGoals(opening.quantifier)) |given| {
+                if (!try self.goalHeaderCandidate(given, wanted)) continue;
                 var proof: contracts.Principal = .{ .left = &self.module.types, .right = &self.module.types, .remaining = self.scopes.remaining, .views = self.scopes, .instance = .{ .start = owner.b, .len = owner.c } };
                 @memcpy(proof.witnesses[0..opening.binders.len], self.module.types.list(opening.binders));
                 if (!try self.goalMatches(&proof, given, wanted, true)) continue;
@@ -1866,6 +1905,7 @@ const Walker = struct {
                 var found = false;
                 for (self.scopes.schemes[0..self.scopes.scheme_count]) |owner| {
                     for (try self.scopes.schemeGoals(owner)) |given| {
+                        if (!try self.goalHeaderCandidate(goal, given)) continue;
                         var proof = direct;
                         if (!try self.goalMatches(&proof, goal, given, false)) continue;
                         direct = proof;
@@ -1876,6 +1916,7 @@ const Walker = struct {
                 }
                 if (!found) for (self.scopes.formals[0..self.scopes.formal_count]) |owner| {
                     for (self.module.types.quantifierGoals(owner)) |given| {
+                        if (!try self.goalHeaderCandidate(goal, given)) continue;
                         var proof = direct;
                         if (!try self.goalMatches(&proof, goal, given, false)) continue;
                         direct = proof;
@@ -1899,6 +1940,7 @@ const Walker = struct {
             var found = false;
             for (self.scopes.schemes[0..self.scopes.scheme_count]) |frame| {
                 for (try self.scopes.schemeGoals(frame)) |given| {
+                    if (!try self.goalHeaderCandidate(goal, given)) continue;
                     var proof = mapping.*;
                     if (!try self.goalMatches(&proof, goal, given, false)) continue;
                     found = true;
@@ -1908,6 +1950,7 @@ const Walker = struct {
             }
             if (!found) for (self.scopes.formals[0..self.scopes.formal_count]) |owner| {
                 for (self.module.types.quantifierGoals(owner)) |given| {
+                    if (!try self.goalHeaderCandidate(goal, given)) continue;
                     var proof = mapping.*;
                     if (!try self.goalMatches(&proof, goal, given, false)) continue;
                     found = true;
@@ -4179,6 +4222,7 @@ fn sharedGoalReceiptScenario(allocator: std.mem.Allocator) !void {
     solver.refresh();
     scopes.solver = &solver;
     var workspace: Equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
     var walker: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission, .call_owner = 84, .goal_depth = 1 };
     const goal: core.Obligation = .{ .kind = .callee_use, .ty = public_pack, .identity = .{ .unit = 1, .decl = 1 }, .span = .{ .start = 0, .end = 0 } };
@@ -4243,6 +4287,7 @@ fn sharedGoalFailureScenario(allocator: std.mem.Allocator, producer: *const core
     scopes.types = &temporary.types;
     scopes.solver = &solver;
     var workspace: Equations.Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
     var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
     defer admission.bodies.deinit(allocator);
     defer {

@@ -77,10 +77,19 @@ for row in rows:
 missing_cpu = sum(b.get('cpu_ms') is None for b in windows)
 process_ms = None
 if not missing_cpu: process_ms = sum(b['cpu_ms'] for b in windows)
+build_process_ms = process_ms
+cpu_scope = 'whole measured build'
+focus_path = root / 'sampling-window.json'
+if len(windows) == 1 and focus_path.exists():
+    focus = json.loads(focus_path.read_text())
+    if focus.get('focus') == 'emission' and focus.get('focus_reached') and focus.get('process_cpu_ms') is not None:
+        process_ms = focus['process_cpu_ms']
+        cpu_scope = 'owned.emit sampling window'
 def ranked(counter):
     return [{'name': name, 'cpu_ms': ns / 1e6, 'sampled_cpu_percent': 100 * ns / covered} for name, ns in counter.most_common(40)]
 report = {'scope': __doc__.split('\n')[0], 'builds': len(windows), 'complete_intervals': intervals,
           'discarded_boundary_intervals': discarded, 'sampled_process_cpu_ms': process_ms,
+          'process_cpu_scope': cpu_scope, 'whole_build_process_cpu_ms': build_process_ms,
           'covered_cpu_ms': covered / 1e6, 'coverage_ratio': covered / 1e6 / process_ms if process_ms else None,
           'missing_process_cpu_builds': missing_cpu,
           'uncovered_cpu_ms': max(0, process_ms - covered / 1e6) if process_ms is not None else None, 'missing_stack_cpu_ms': unknown / 1e6,
