@@ -1,0 +1,657 @@
+{
+  "scope": "Diagnostic AST declaration inventory only; exhaustive compiler checking unchanged. One bounded pair per workload, not a latency distribution.",
+  "zig_version": "0.17.0",
+  "binaries": {
+    "baseline": {
+      "path": "/home/jacobt/src/blot2/build/bench/declaration-demand-roots/baseline/bin/blot-demand-inventory",
+      "sha256": "194c2683f05347fb4359e71572eac8908b8e6c0913f066df40ea0a034c28ba6c"
+    },
+    "candidate": {
+      "path": "/home/jacobt/src/blot2/zig-native/zig-out-demand-root-candidate/bin/blot-demand-inventory",
+      "sha256": "2e67678803e798cda71ad9c2e65d07dbe8c13f230498f68e8dfdcbe70cd5342f"
+    }
+  },
+  "sources": {
+    "zig-native/src/reuse/declaration_demand.zig": "a861e767b5b5d2670852a534adf721287c3f1bd6f2d6f4c8e98b03e0f7fa7b9a",
+    "zig-native/src/bench_declaration_demand.zig": "d112f1d1803ace634e9b546b66a6630c6692ffe33c78e728b641c47112a668c0",
+    "zig-native/src/reuse/global_references.zig": "69ba9c97b2736cad6a3a10d5850d8a85b5e2c9107580175bf5428a18fec0c722"
+  },
+  "results": {
+    "main": {
+      "baseline": {
+        "command": [
+          "/home/jacobt/src/blot2/build/bench/declaration-demand-roots/baseline/bin/blot-demand-inventory",
+          "../gdev",
+          "src/main.blot"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1326.033,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/src/main.blot",
+          "ablated": false,
+          "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "effective_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 264,
+          "import_count": 2019,
+          "source_bytes": 2537356,
+          "asset_us": 282729,
+          "load_us": 690643,
+          "plan_us": 171223,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5957,
+            "reached": 5277,
+            "fallback_units": 0,
+            "transitions": 356826
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3321,
+                "selected": 2643,
+                "source_bytes": 1707052,
+                "selected_source_bytes": 1428857
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 2380,
+                "source_bytes": 340046,
+                "selected_source_bytes": 340046
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 254,
+                "source_bytes": 29995,
+                "selected_source_bytes": 29995
+              }
+            }
+          }
+        },
+        "module_source_sha256": "8034eec5a75c980b3696b00d5280b4dbcc61511cbb9770469e9820ebdf4f3139"
+      },
+      "candidate": {
+        "command": [
+          "/home/jacobt/src/blot2/zig-native/zig-out-demand-root-candidate/bin/blot-demand-inventory",
+          "../gdev",
+          "src/main.blot"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1300.659,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/src/main.blot",
+          "ablated": false,
+          "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "effective_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 264,
+          "import_count": 2019,
+          "source_bytes": 2537356,
+          "asset_us": 260978,
+          "load_us": 678422,
+          "plan_us": 164710,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5957,
+            "reached": 4241,
+            "fallback_units": 0,
+            "transitions": 348231
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3321,
+                "selected": 2595,
+                "source_bytes": 1707052,
+                "selected_source_bytes": 1409748
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 1512,
+                "source_bytes": 340046,
+                "selected_source_bytes": 331967
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 134,
+                "source_bytes": 29995,
+                "selected_source_bytes": 12123
+              }
+            }
+          }
+        },
+        "module_source_sha256": "8034eec5a75c980b3696b00d5280b4dbcc61511cbb9770469e9820ebdf4f3139"
+      }
+    },
+    "tiny": {
+      "baseline": {
+        "command": [
+          "/home/jacobt/src/blot2/build/bench/declaration-demand-roots/baseline/bin/blot-demand-inventory",
+          "../gdev",
+          "src/main.blot",
+          "--tiny-entry"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1321.655,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/src/main.blot",
+          "ablated": true,
+          "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "effective_entry_sha256": "c9a49f7930a669770146ae7b9d744d08f754d16d0d6c53ae1a168b87c9178259",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 264,
+          "import_count": 2019,
+          "source_bytes": 2537063,
+          "asset_us": 261897,
+          "load_us": 707817,
+          "plan_us": 161634,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5957,
+            "reached": 5139,
+            "fallback_units": 0,
+            "transitions": 338526
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3321,
+                "selected": 2505,
+                "source_bytes": 1706912,
+                "selected_source_bytes": 1317906
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 2380,
+                "source_bytes": 340046,
+                "selected_source_bytes": 340046
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 254,
+                "source_bytes": 29995,
+                "selected_source_bytes": 29995
+              }
+            }
+          }
+        },
+        "module_source_sha256": "8f57ec6a8b34f77b33ef2d288090c6d6d39682bcfec3ced7fc29db084fbb44ec"
+      },
+      "candidate": {
+        "command": [
+          "/home/jacobt/src/blot2/zig-native/zig-out-demand-root-candidate/bin/blot-demand-inventory",
+          "../gdev",
+          "src/main.blot",
+          "--tiny-entry"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1171.334,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/src/main.blot",
+          "ablated": true,
+          "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+          "effective_entry_sha256": "c9a49f7930a669770146ae7b9d744d08f754d16d0d6c53ae1a168b87c9178259",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 264,
+          "import_count": 2019,
+          "source_bytes": 2537063,
+          "asset_us": 267178,
+          "load_us": 678528,
+          "plan_us": 24730,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5957,
+            "reached": 279,
+            "fallback_units": 0,
+            "transitions": 8055
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3321,
+                "selected": 266,
+                "source_bytes": 1706912,
+                "selected_source_bytes": 36118
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 13,
+                "source_bytes": 340046,
+                "selected_source_bytes": 364
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 0,
+                "source_bytes": 29995,
+                "selected_source_bytes": 0
+              }
+            }
+          }
+        },
+        "module_source_sha256": "8f57ec6a8b34f77b33ef2d288090c6d6d39682bcfec3ced7fc29db084fbb44ec"
+      }
+    },
+    "actor": {
+      "baseline": {
+        "command": [
+          "/home/jacobt/src/blot2/build/bench/declaration-demand-roots/baseline/bin/blot-demand-inventory",
+          "../gdev",
+          "tests/actor_presentation.blot"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1299.148,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/tests/actor_presentation.blot",
+          "ablated": false,
+          "original_entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+          "effective_entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 268,
+          "import_count": 2072,
+          "source_bytes": 2558371,
+          "asset_us": 262467,
+          "load_us": 689789,
+          "plan_us": 164742,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5978,
+            "reached": 5217,
+            "fallback_units": 0,
+            "transitions": 349158
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3342,
+                "selected": 2583,
+                "source_bytes": 1723712,
+                "selected_source_bytes": 1380908
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 2380,
+                "source_bytes": 340046,
+                "selected_source_bytes": 340046
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 254,
+                "source_bytes": 29995,
+                "selected_source_bytes": 29995
+              }
+            }
+          }
+        },
+        "module_source_sha256": "35fc3091647df5ca4babe12ca0e4d6cb977aa1cb5d142406eed9cf6bf41f97f1"
+      },
+      "candidate": {
+        "command": [
+          "/home/jacobt/src/blot2/zig-native/zig-out-demand-root-candidate/bin/blot-demand-inventory",
+          "../gdev",
+          "tests/actor_presentation.blot"
+        ],
+        "deadline_ms": 5000,
+        "wall_ms": 1180.481,
+        "exit_code": 0,
+        "inventory": {
+          "kind": "declaration-demand-inventory-v1",
+          "entry": "/home/jacobt/src/gdev/tests/actor_presentation.blot",
+          "ablated": false,
+          "original_entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+          "effective_entry_sha256": "41bcc35fb6dff64be1765295d755d5772a9563ade7946ada757e635b76d26239",
+          "semantic_check": false,
+          "lowering": false,
+          "compilation": false,
+          "module_count": 268,
+          "import_count": 2072,
+          "source_bytes": 2558371,
+          "asset_us": 262109,
+          "load_us": 687943,
+          "plan_us": 47143,
+          "assets": {
+            "parsed": 72,
+            "reused": 0,
+            "input_bytes": 758288,
+            "generated_bytes": 168093
+          },
+          "plan": {
+            "total": 5978,
+            "reached": 797,
+            "fallback_units": 0,
+            "transitions": 44544
+          },
+          "body_weights": {
+            "scope": "top_level_and_implementation_members",
+            "original_modules": {
+              "lambda": {
+                "declarations": 3342,
+                "selected": 543,
+                "source_bytes": 1723712,
+                "selected_source_bytes": 168861
+              },
+              "non_lambda": {
+                "declarations": 2380,
+                "selected": 238,
+                "source_bytes": 340046,
+                "selected_source_bytes": 56206
+              }
+            },
+            "generated_asset_modules": {
+              "lambda": {
+                "declarations": 2,
+                "selected": 0,
+                "source_bytes": 197,
+                "selected_source_bytes": 0
+              },
+              "non_lambda": {
+                "declarations": 254,
+                "selected": 16,
+                "source_bytes": 29995,
+                "selected_source_bytes": 10154
+              }
+            }
+          }
+        },
+        "module_source_sha256": "35fc3091647df5ca4babe12ca0e4d6cb977aa1cb5d142406eed9cf6bf41f97f1"
+      }
+    }
+  },
+  "date": "2026-11-01",
+  "parent_commit": "cd6b91f9b321252f2dc5731a9e7aba022f6620ef",
+  "production_compiler_sha256": "5f12251f3b7b62c7efcae451e5e54d5e7517520970c9dfa68528943d973484d3",
+  "production_compiler_changed": false,
+  "root_policy": "Entry exports, associated names, implementation members and fixity targets seed demand. Unreachable const/let/tagged initializers and attributed functions do not seed it. Reached declarations still pull their dependencies and taggers. This is a diagnostic manifest, never typed authority.",
+  "review": "Astra xhigh reviewed policy, law and paired evidence; no blockers.",
+  "source_checkpoints": {
+    "gdev": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "pen": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf"
+  },
+  "summary": [
+    {
+      "workload": "main",
+      "baseline": {
+        "reached_declarations": 5277,
+        "total_declarations": 5957,
+        "original_lambda_bytes": 1707052,
+        "reached_original_lambda_bytes": 1428857,
+        "retained_original_lambda_fraction": 0.8370319123260451,
+        "reached_all_body_bytes": 1798898,
+        "plan_us": 171223
+      },
+      "candidate": {
+        "reached_declarations": 4241,
+        "total_declarations": 5957,
+        "original_lambda_bytes": 1707052,
+        "reached_original_lambda_bytes": 1409748,
+        "retained_original_lambda_fraction": 0.8258377600682346,
+        "reached_all_body_bytes": 1753838,
+        "plan_us": 164710
+      }
+    },
+    {
+      "workload": "tiny",
+      "baseline": {
+        "reached_declarations": 5139,
+        "total_declarations": 5957,
+        "original_lambda_bytes": 1706912,
+        "reached_original_lambda_bytes": 1317906,
+        "retained_original_lambda_fraction": 0.7720995575636003,
+        "reached_all_body_bytes": 1687947,
+        "plan_us": 161634
+      },
+      "candidate": {
+        "reached_declarations": 279,
+        "total_declarations": 5957,
+        "original_lambda_bytes": 1706912,
+        "reached_original_lambda_bytes": 36118,
+        "retained_original_lambda_fraction": 0.021159848896721095,
+        "reached_all_body_bytes": 36482,
+        "plan_us": 24730
+      }
+    },
+    {
+      "workload": "actor",
+      "baseline": {
+        "reached_declarations": 5217,
+        "total_declarations": 5978,
+        "original_lambda_bytes": 1723712,
+        "reached_original_lambda_bytes": 1380908,
+        "retained_original_lambda_fraction": 0.8011245498087848,
+        "reached_all_body_bytes": 1750949,
+        "plan_us": 164742
+      },
+      "candidate": {
+        "reached_declarations": 797,
+        "total_declarations": 5978,
+        "original_lambda_bytes": 1723712,
+        "reached_original_lambda_bytes": 168861,
+        "retained_original_lambda_fraction": 0.09796358092303123,
+        "reached_all_body_bytes": 235221,
+        "plan_us": 47143
+      }
+    }
+  ],
+  "qualification": {
+    "complete_native_inventory_compiled": 2771,
+    "focused_native": [
+      {
+        "name": "reuse.declaration_demand.test.declaration demand follows namespace named reexports and ordinary helpers through allocation failures",
+        "duration_ns": 80884772,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "reuse.declaration_demand.test.declaration demand preserves named aliases prelude producers and lexical shadowing",
+        "duration_ns": 814982,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "reuse.declaration_demand.test.declaration demand retains operator associated and implementation roots",
+        "duration_ns": 481957,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "reuse.declaration_demand.test.declaration demand omits unreachable const let and tagged initializers",
+        "duration_ns": 680936,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "reuse.declaration_demand.test.declaration demand falls back for escaped namespace authority and declines compiled owners",
+        "duration_ns": 402876,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_assembly_options_tests.test.owned public compilation forwards tiers workers and profiling",
+        "duration_ns": 371701359,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_assembly_options_tests.test.owned public compilation keeps tiny worker requests serial",
+        "duration_ns": 2531108,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_assembly_options_tests.test.owned public compilation forwards physical machine code sharing",
+        "duration_ns": 3448595,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "zig_lint": "571 source files + 1 fixture, zero findings",
+    "development_runner": "5 passed; Deno check and format passed",
+    "production_coverage": "Production compiler bytes are unchanged, retaining the exact 5f12251f pin of 31 affected guests and previous 379/380 sampled native evidence. Diagnostic changes are qualified by the five declaration-demand laws here.",
+    "required_full_gate": {
+      "command": "deno task test:compiler --budget-seconds 45 --phase-seconds 30 --timings-dir build/bench/declaration-demand-roots/full-gate",
+      "smoke_passed": 47,
+      "smoke_failed": 1,
+      "failure": "Existing List/chunk storage_escape; independently reproduced on preserved baseline. Not a passing full gate."
+    }
+  },
+  "limits": [
+    "This inventories AST body demand only. Exhaustive checking, lowering, source diagnostics, coherence and compiler interface authority are unchanged. No compile-speed or emitted-Wasm improvement is claimed.",
+    "One bounded pair per workload, not a latency distribution. Module-source digests match in each pair; no conservative fallback was needed.",
+    "Removing excess roots exposes large unused-heavy actor/tiny demand reductions, but main retains 98.5% of previously selected original body bytes. This does not explain main compilation latency or the historical code-size explosion.",
+    "Do not treat unchecked omitted declarations as completed typed interfaces. Whole-game subsecond compilation, 1 MB size, fresh frame and complete qualification remain pending."
+  ]
+}

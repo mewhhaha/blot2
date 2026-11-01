@@ -16,8 +16,9 @@ Owned assembly now honors tier, worker and sharing controls and reports
 [actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
 A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
 observes source type instantiation before assembly; it is not a completed build.
-The [declaration-demand inventory](../zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
-is diagnostic only; source checking remains exhaustive. Read
+The [corrected lazy demand inventory](../zig-native/measurements/lazy-declaration-demand-2026-11-01.json)
+is diagnostic only; source checking remains exhaustive. Unused-heavy entry
+points expose large body-demand reductions; main still retains most body bytes. Read
 [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact

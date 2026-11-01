@@ -85,14 +85,20 @@ slot reuse is secondary: historical globals are huge, but code bodies account
 for most of the 47.4 MB. Do not repeat unchanged main diagnostics or reorder
 optimization around outlining without new evidence.
 
-A conservative declaration-demand prepass is measured but **not integrated**.
-It omits 680 of 5,957 declarations on main, but still retains 84% of original
-lambda body bytes; even the tiny-entry ablation retains 77%. Planning costs
-about 0.16 seconds. This coarse associated/initializer frontier alone is not the
-massive lever. See [the AST inventory](zig-native/measurements/declaration-demand-inventory-2026-11-01.json).
-It includes generated assets: 264 loaded modules versus the original static
-source graph's 207. Unchecked source names must never become completed typed
-interfaces; exhaustive source checks remain unchanged.
+The declaration-demand manifest is **diagnostic only**, with exhaustive source
+checking unchanged. It now follows existing lazy initializer semantics instead
+of seeding every non-function and attributed declaration. On identical sources,
+main demand falls **5,277 to 4,241 of 5,957 declarations**, but retains **82.6%**
+of original function-body bytes. Tiny-entry retention falls **77.2% to 2.1%**;
+actor falls **80.1% to 9.8%**. All three inventory pairs have zero fallbacks and
+matching module-source digests. Planning takes about 165/25/47 ms respectively
+in these single pairs, not compile-speed measurements. See
+[the corrected demand inventory](zig-native/measurements/lazy-declaration-demand-2026-11-01.json).
+The earlier [over-rooted inventory](zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
+remains pinned historical evidence. Main still retains 98.5% of its previously
+selected original body bytes; blanket initializer roots do not explain its
+latency. Generated assets are included: 264 loaded modules on main. Unchecked
+source names must never become completed typed interfaces.
 
 Earlier descriptor, nominal and scalar call-sharing results remain in their
 linked records under `zig-native/measurements/`. Those changes reduce synthetic
@@ -153,9 +159,10 @@ custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `5f12251f` compiles **2,770 native tests**. All three focused assembly
-option laws pass; **379/380** broader sampled laws pass with the independently
-reproduced associated-partial baseline failure. All **31 affected guests** pass,
+compiler `5f12251f` is unchanged by the diagnostic-only batch. The native
+inventory now compiles **2,771 tests**; all five demand and three assembly-option
+laws pass in full fault mode. The earlier **379/380** broader sampled laws pass
+with the independently reproduced associated-partial baseline failure. All **31 affected guests** pass,
 including actual development/optimized aggregate-reader and selected-field
 execution, serial/parallel byte equality, profiling, physical sharing and
 sync/JSPI. Original Gdev language entries pass six entries/11 assertions per

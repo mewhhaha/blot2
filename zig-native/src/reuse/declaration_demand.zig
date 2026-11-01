@@ -138,11 +138,9 @@ const Builder = struct {
         const tree = &self.source.unit(unit).tree;
         const value_ = tree.valueDecl(root);
         const associated = std.mem.findScalar(u8, self.source.symbols.get(value_.name), '.') != null;
-        var body = value_.body;
-        while (tree.node(body).tag == .group) body = tree.node(body).a;
         var owner = root;
         if (method != 0) owner = method;
-        try self.declarations.append(self.allocator, .{ .unit = unit, .node = root, .owner = owner, .seed = method != 0 or associated or value_.exported or value_.attributes.len != 0 or tree.node(body).tag != .lambda });
+        try self.declarations.append(self.allocator, .{ .unit = unit, .node = root, .owner = owner, .seed = method != 0 or associated or value_.exported });
         if (method == 0) try self.put(.{ .unit = unit, .name = value_.name }, .{ .value = @intCast(self.declarations.items.len), .public = !std.mem.eql(u8, self.source.symbols.get(value_.modifier), "private") and !tree.declarationTraits(root).private });
     }
     fn collect(self: *Builder) A.Error!void {
@@ -395,7 +393,7 @@ test "declaration demand preserves named aliases prelude producers and lexical s
     try std.testing.expectEqual(@as(usize, 0), plan.stats.fallback_units);
 }
 
-test "declaration demand retains operator associated implementation attributed and eager roots" {
+test "declaration demand retains operator associated and implementation roots" {
     var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text =
         \\infixl 60 (+) = plus
         \\const op_helper = func value => return value
@@ -406,20 +404,41 @@ test "declaration demand retains operator associated implementation attributed a
         \\type Show a is contract = { const show: a -> U32 }
         \\impl NumberShow : Show U32 = { const show = func value => return impl_helper value }
         \\const impl_helper = func value => return value
-        \\const init_helper = func () => return 1
-        \\const eager = init_helper ()
-        \\const attr_helper = func value => return value
-        \\@[attr_helper 1]
-        \\const attributed = func value => return value
         \\const unused = func value => return value
         \\entry const answer = func value => return value
     }}, null);
     defer fixture.deinit();
     var plan = (try Plan.prepare(std.testing.allocator, &fixture.loaded)).?;
     defer plan.deinit();
-    for ([_][]const u8{ "plus", "op_helper", "Item.measure", "method_helper", "show", "impl_helper", "init_helper", "eager", "attr_helper", "attributed", "answer" }) |name| try std.testing.expect(fixture.wants(&plan, "main.blot", name));
+    for ([_][]const u8{ "plus", "op_helper", "Item.measure", "method_helper", "show", "impl_helper", "answer" }) |name| try std.testing.expect(fixture.wants(&plan, "main.blot", name));
     try std.testing.expect(!fixture.wants(&plan, "main.blot", "unused"));
     try std.testing.expectEqual(@as(usize, 0), plan.stats.fallback_units);
+}
+
+test "declaration demand omits unreachable const let and tagged initializers" {
+    const declarations =
+        \\const unused_const = @panic "unused constant"
+        \\let unused_let = @panic "unused startup"
+        \\const tagger = func value => return @panic "unused tag"
+        \\@[tagger]
+        \\const unused_tagged = 41
+        \\@[tagger]
+        \\const unused_function = func value => return value
+        \\
+    ;
+    for ([_]bool{ false, true }) |reached| {
+        var entry: []const u8 = "entry const answer = func () => return 0\n";
+        if (reached) entry = "entry const answer = func () => return unused_function (@u32.add unused_const (@u32.add unused_let unused_tagged))\n";
+        const source = try std.mem.concat(std.testing.allocator, u8, &.{ declarations, entry });
+        defer std.testing.allocator.free(source);
+        var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = source }}, null);
+        defer fixture.deinit();
+        var plan = (try Plan.prepare(std.testing.allocator, &fixture.loaded)).?;
+        defer plan.deinit();
+        for ([_][]const u8{ "unused_const", "unused_let", "unused_tagged", "unused_function", "tagger" }) |name| try std.testing.expectEqual(reached, fixture.wants(&plan, "main.blot", name));
+        try std.testing.expect(fixture.wants(&plan, "main.blot", "answer"));
+        try std.testing.expectEqual(@as(usize, 0), plan.stats.fallback_units);
+    }
 }
 
 test "declaration demand falls back for escaped namespace authority and declines compiled owners" {

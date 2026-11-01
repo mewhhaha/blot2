@@ -274,7 +274,8 @@ export const devCheckAreas = {
     native: [
       "reuse.declaration_demand.test.declaration demand follows namespace named reexports and ordinary helpers through allocation failures",
       "reuse.declaration_demand.test.declaration demand preserves named aliases prelude producers and lexical shadowing",
-      "reuse.declaration_demand.test.declaration demand retains operator associated implementation attributed and eager roots",
+      "reuse.declaration_demand.test.declaration demand retains operator associated and implementation roots",
+      "reuse.declaration_demand.test.declaration demand omits unreachable const let and tagged initializers",
       "reuse.declaration_demand.test.declaration demand falls back for escaped namespace authority and declines compiled owners",
       "backend.storage_calls_tests.test.shared aggregate readers retain nominal physical schemas across independent owners",
       "backend.storage_calls_tests.test.shared aggregate reader diamonds keep emission growth bounded",
