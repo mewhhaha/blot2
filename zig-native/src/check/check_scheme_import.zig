@@ -208,6 +208,11 @@ pub const Copier = struct {
         return try self.destination.nominal(identity, args.items);
     }
     pub fn copy(self: *Copier, source_id: T.Id, depth: usize) T.Error!T.Id {
+        self.destination.normalization.import_depth_entries +|= 1;
+        const attribution_start = self.destination.nodes.items.len;
+        defer if (depth == 0) {
+            self.destination.normalization.import_nodes_added +|= @intCast(self.destination.nodes.items.len -| attribution_start);
+        };
         if (depth >= 1024) return error.TypeLimit;
         const id = self.source.head(source_id, 0);
         if (self.mapping.get(id)) |known| return known;

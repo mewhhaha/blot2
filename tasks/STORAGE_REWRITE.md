@@ -16,6 +16,9 @@ Owned assembly now honors tier, worker and sharing controls and reports
 [actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
 A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
 observes source type instantiation before assembly; it is not a completed build.
+The [type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
+rejects ineffective substitution copying changes and attributes actual producer
+work. The new counters do not establish a frontend speedup.
 The [corrected lazy demand inventory](../zig-native/measurements/lazy-declaration-demand-2026-11-01.json)
 is diagnostic only; source checking remains exhaustive. Unused-heavy entry
 points expose large body-demand reductions; main still retains most body bytes. Read

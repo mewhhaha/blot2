@@ -1,0 +1,716 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "f5b23ba22ba18bd8ecfb557c6d776391edddea6a",
+  "scope": "Type-structure architecture experiment and operation attribution. Copy-on-change prototype rejected for negligible real-source work reduction. No frontend compilation speedup claimed.",
+  "toolchain": {
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false,
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)"
+  },
+  "baseline_compiler_sha256": "5f12251f3b7b62c7efcae451e5e54d5e7517520970c9dfa68528943d973484d3",
+  "rejected_compiler_sha256": "6395f679b896d66c7337cdc759a7f73d8bb8c47d39db3c96e51bff78af733e1c",
+  "diagnostic_compiler_sha256": "b66a2a3eb68f5c4bbcb168f79ee78e00d2b31cc5551e57e7f8dbb63b186df632",
+  "rejected_patch": "zig-native/measurements/rejected-substitution-copying-2026-11-01.patch",
+  "rejected_patch_sha256": "f96ed2030bc43fbca7af82f146c69c35a35854912ebe20a294235a5eee118066",
+  "implementation_retained": [
+    "Fourteen private normalization work counters attribute inclusive root-operation node growth and recursive depth entries to import, substitute, resolve, covariance opening/closing; plus memo/unchanged counts and variable-view/binder creation.",
+    "No semantic authority, new map, source omission, type cache or representation change. Counters are cumulative work including rolled-back work.",
+    "Keep the generic wide-record/nominal/effects executed guest as a semantic law; remove optimization-only native assertions and the rejected production implementation."
+  ],
+  "rejected_implementation": [
+    "Reuse unchanged nodes during nonempty substitution only after complete child/row traversal and exact constructor checks. Allocate changed product/record/nominal output buffers lazily, retain per-use fresh rows/history and projection limits.",
+    "Prototype passed four focused native laws including full OOM and both guest tiers with sync/JSPI and retained1\u21929\u21921 edits; baseline guests also passed.",
+    "Reject: actual matrix/settings/render producer type-node reductions are below0.25%; checking time remains flat and matrix total regresses in these pairs. The118-line production expansion is not justified by this result."
+  ],
+  "review": "Astra xhigh: no prototype correctness blockers; reject it on real-source measurements. Zero extra views also rules out the proposed historical-view canonicalization on these workloads.",
+  "method": "Three sequential alternating instrumented pairs; fresh sessions, cacheDirectory:false, five seconds per compile. All cells execute their independently expected inputs. Constructor attribution is one additional diagnostic sample per workload, not a latency distribution.",
+  "source_pins": {
+    "compiler_sha256": "5f12251f3b7b62c7efcae451e5e54d5e7517520970c9dfa68528943d973484d3",
+    "entry_sha256": "6bae44edba13ca7a4804f2bd7366464cbb89480a2dbb2a06c5ec566fac90a96b",
+    "producer_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+    "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+    "source_files": {
+      "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+      "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+      "/home/jacobt/src/gdev/pen/protocol_render.blot": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+      "/home/jacobt/src/gdev/pen/protocol.blot": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+      "/home/jacobt/src/gdev/pen/lanes.blot": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+      "/home/jacobt/src/gdev/pen/types.blot": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47"
+    }
+  },
+  "ink_source_files": {
+    "/home/jacobt/src/ink/lib/transform.blot": "cff7eb49e30159bece898b84ca6033e23b0f6eb03496bf542ac844aa8daf93a6",
+    "/home/jacobt/src/ink/lib/math.blot": "77718d79d615e2b49b9ed077f69bd26bbcf20162b895f6420a733c94b626b18d",
+    "/home/jacobt/src/ink/lib/render.blot": "938b52c18d078f52920596d48986e53b12a4f76f2b0d5f2bdf2b9bfaa05aea93",
+    "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1"
+  },
+  "summary": [
+    {
+      "kind": "matrix",
+      "size": 2,
+      "baseline": {
+        "build_ms": [
+          396.53775599999994,
+          376.91274799999997,
+          378.31732999999997
+        ],
+        "median_build_ms": 378.31732999999997,
+        "median_phase_us": {
+          "other": 1585,
+          "assets": 0,
+          "inputs": 69,
+          "load": 1081,
+          "lex": 14386,
+          "parse": 8449,
+          "check": 224124,
+          "lower": 15537,
+          "freeze": 7226,
+          "validation": 20617,
+          "backend": 80963
+        },
+        "type_nodes": 41801,
+        "check_requested_bytes": 16511329,
+        "check_allocations": 49216,
+        "wasm_bytes": 9910,
+        "wasm_sha256": "2d1fe81841580dfabf91c62b8110c53ae9d8746b54eddcefb3adfb845182fde5"
+      },
+      "candidate": {
+        "build_ms": [
+          362.718756,
+          370.01009600000003,
+          376.49974899999995
+        ],
+        "median_build_ms": 370.01009600000003,
+        "median_phase_us": {
+          "other": 1431,
+          "assets": 0,
+          "inputs": 65,
+          "load": 1073,
+          "lex": 14380,
+          "parse": 8471,
+          "check": 220111,
+          "lower": 15380,
+          "freeze": 7268,
+          "validation": 20553,
+          "backend": 80104
+        },
+        "type_nodes": 41759,
+        "check_requested_bytes": 16478713,
+        "check_allocations": 48786,
+        "wasm_bytes": 9910,
+        "wasm_sha256": "2d1fe81841580dfabf91c62b8110c53ae9d8746b54eddcefb3adfb845182fde5"
+      }
+    },
+    {
+      "kind": "matrix",
+      "size": 4,
+      "baseline": {
+        "build_ms": [
+          393.904979,
+          384.277966,
+          381.89492300000006
+        ],
+        "median_build_ms": 384.277966,
+        "median_phase_us": {
+          "other": 1826,
+          "assets": 0,
+          "inputs": 118,
+          "load": 1102,
+          "lex": 14886,
+          "parse": 8701,
+          "check": 225441,
+          "lower": 15756,
+          "freeze": 7200,
+          "validation": 20556,
+          "backend": 86007
+        },
+        "type_nodes": 42345,
+        "check_requested_bytes": 16687361,
+        "check_allocations": 49742,
+        "wasm_bytes": 12088,
+        "wasm_sha256": "42134c5f4e3b9134677f17383042c3b406d0b1d73e8fb39ec37bfe7b08c301ea"
+      },
+      "candidate": {
+        "build_ms": [
+          411.04568199999994,
+          385.279949,
+          389.471271
+        ],
+        "median_build_ms": 389.471271,
+        "median_phase_us": {
+          "other": 1901,
+          "assets": 0,
+          "inputs": 122,
+          "load": 1394,
+          "lex": 22291,
+          "parse": 11540,
+          "check": 227740,
+          "lower": 15644,
+          "freeze": 7254,
+          "validation": 20599,
+          "backend": 85761
+        },
+        "type_nodes": 42303,
+        "check_requested_bytes": 16654745,
+        "check_allocations": 49312,
+        "wasm_bytes": 12088,
+        "wasm_sha256": "42134c5f4e3b9134677f17383042c3b406d0b1d73e8fb39ec37bfe7b08c301ea"
+      }
+    },
+    {
+      "kind": "matrix",
+      "size": 6,
+      "baseline": {
+        "build_ms": [
+          385.10800300000005,
+          386.8567539999999,
+          396.27163900000005
+        ],
+        "median_build_ms": 386.8567539999999,
+        "median_phase_us": {
+          "other": 1597,
+          "assets": 0,
+          "inputs": 68,
+          "load": 1118,
+          "lex": 15516,
+          "parse": 9017,
+          "check": 223217,
+          "lower": 15966,
+          "freeze": 7206,
+          "validation": 20611,
+          "backend": 91098
+        },
+        "type_nodes": 42889,
+        "check_requested_bytes": 16887621,
+        "check_allocations": 50267,
+        "wasm_bytes": 14266,
+        "wasm_sha256": "33bf79a626f1b5eb745756f964a8155ac95cf3f47aaeec8193047311a1d3cced"
+      },
+      "candidate": {
+        "build_ms": [
+          413.362613,
+          388.0107609999999,
+          412.56318499999986
+        ],
+        "median_build_ms": 412.56318499999986,
+        "median_phase_us": {
+          "other": 1930,
+          "assets": 0,
+          "inputs": 134,
+          "load": 1752,
+          "lex": 27260,
+          "parse": 15894,
+          "check": 228551,
+          "lower": 15634,
+          "freeze": 7149,
+          "validation": 20252,
+          "backend": 89543
+        },
+        "type_nodes": 42847,
+        "check_requested_bytes": 16855005,
+        "check_allocations": 49837,
+        "wasm_bytes": 14266,
+        "wasm_sha256": "33bf79a626f1b5eb745756f964a8155ac95cf3f47aaeec8193047311a1d3cced"
+      }
+    },
+    {
+      "kind": "settings",
+      "size": 1,
+      "baseline": {
+        "build_ms": [
+          408.191965,
+          416.975823,
+          463.1142870000001
+        ],
+        "median_build_ms": 416.975823,
+        "median_phase_us": {
+          "other": 1672,
+          "assets": 0,
+          "inputs": 69,
+          "load": 1645,
+          "lex": 18770,
+          "parse": 10873,
+          "check": 283276,
+          "lower": 23603,
+          "freeze": 11648,
+          "validation": 27912,
+          "backend": 37023
+        },
+        "type_nodes": 55093,
+        "check_requested_bytes": 23109281,
+        "check_allocations": 64276,
+        "wasm_bytes": 6508,
+        "wasm_sha256": "b82713f78617863e3d8bb25f44e0b52ca5e86832177dc6348b82fc4552f5ccc8"
+      },
+      "candidate": {
+        "build_ms": [
+          423.48208999999997,
+          458.9681760000001,
+          405.160789
+        ],
+        "median_build_ms": 423.48208999999997,
+        "median_phase_us": {
+          "other": 1875,
+          "assets": 0,
+          "inputs": 72,
+          "load": 1650,
+          "lex": 18941,
+          "parse": 10981,
+          "check": 288047,
+          "lower": 23482,
+          "freeze": 11677,
+          "validation": 27997,
+          "backend": 37557
+        },
+        "type_nodes": 54961,
+        "check_requested_bytes": 23065137,
+        "check_allocations": 63671,
+        "wasm_bytes": 6508,
+        "wasm_sha256": "b82713f78617863e3d8bb25f44e0b52ca5e86832177dc6348b82fc4552f5ccc8"
+      }
+    },
+    {
+      "kind": "settings",
+      "size": 4,
+      "baseline": {
+        "build_ms": [
+          429.4211500000001,
+          417.6879319999998,
+          402.60363400000006
+        ],
+        "median_build_ms": 417.6879319999998,
+        "median_phase_us": {
+          "other": 1761,
+          "assets": 0,
+          "inputs": 86,
+          "load": 1618,
+          "lex": 18843,
+          "parse": 10854,
+          "check": 279193,
+          "lower": 23771,
+          "freeze": 11739,
+          "validation": 28084,
+          "backend": 37864
+        },
+        "type_nodes": 55138,
+        "check_requested_bytes": 23125744,
+        "check_allocations": 64317,
+        "wasm_bytes": 6775,
+        "wasm_sha256": "49fc747e881994ed12750dbf804e30357c175d2cfd1e8ff0a7bd9a4af8bbc5ef"
+      },
+      "candidate": {
+        "build_ms": [
+          466.60218899999995,
+          439.15049899999985,
+          440.40923999999995
+        ],
+        "median_build_ms": 440.40923999999995,
+        "median_phase_us": {
+          "other": 1838,
+          "assets": 0,
+          "inputs": 116,
+          "load": 2602,
+          "lex": 35903,
+          "parse": 20154,
+          "check": 303467,
+          "lower": 23480,
+          "freeze": 11661,
+          "validation": 27863,
+          "backend": 37475
+        },
+        "type_nodes": 55006,
+        "check_requested_bytes": 23081600,
+        "check_allocations": 63712,
+        "wasm_bytes": 6775,
+        "wasm_sha256": "49fc747e881994ed12750dbf804e30357c175d2cfd1e8ff0a7bd9a4af8bbc5ef"
+      }
+    },
+    {
+      "kind": "settings",
+      "size": 8,
+      "baseline": {
+        "build_ms": [
+          399.9319209999999,
+          439.4135759999999,
+          454.2506450000001
+        ],
+        "median_build_ms": 439.4135759999999,
+        "median_phase_us": {
+          "other": 1726,
+          "assets": 0,
+          "inputs": 66,
+          "load": 1668,
+          "lex": 19210,
+          "parse": 11094,
+          "check": 294891,
+          "lower": 23655,
+          "freeze": 11673,
+          "validation": 27808,
+          "backend": 38056
+        },
+        "type_nodes": 55198,
+        "check_requested_bytes": 23142992,
+        "check_allocations": 64363,
+        "wasm_bytes": 7131,
+        "wasm_sha256": "3503dc0f7b6a23d88090dd33c059e49deb2023731495b08279e1eb16adf508d0"
+      },
+      "candidate": {
+        "build_ms": [
+          424.51859000000013,
+          441.5418129999998,
+          429.5156400000001
+        ],
+        "median_build_ms": 429.5156400000001,
+        "median_phase_us": {
+          "other": 1767,
+          "assets": 0,
+          "inputs": 65,
+          "load": 1627,
+          "lex": 19067,
+          "parse": 11113,
+          "check": 293093,
+          "lower": 23474,
+          "freeze": 11664,
+          "validation": 27953,
+          "backend": 38385
+        },
+        "type_nodes": 55066,
+        "check_requested_bytes": 23098848,
+        "check_allocations": 63758,
+        "wasm_bytes": 7131,
+        "wasm_sha256": "3503dc0f7b6a23d88090dd33c059e49deb2023731495b08279e1eb16adf508d0"
+      }
+    },
+    {
+      "kind": "producer",
+      "size": 0,
+      "baseline": {
+        "build_ms": [
+          622.690332,
+          603.0485219999999,
+          620.6331909999999
+        ],
+        "median_build_ms": 620.6331909999999,
+        "median_phase_us": {
+          "other": 1358,
+          "assets": 277269,
+          "inputs": 1009,
+          "load": 1302,
+          "lex": 16360,
+          "parse": 10225,
+          "check": 243442,
+          "lower": 17734,
+          "freeze": 7673,
+          "validation": 19149,
+          "backend": 22565
+        },
+        "type_nodes": 27544,
+        "check_requested_bytes": 18392482,
+        "check_allocations": 50887,
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+      },
+      "candidate": {
+        "build_ms": [
+          607.62916,
+          597.5253839999999,
+          607.3776270000001
+        ],
+        "median_build_ms": 607.3776270000001,
+        "median_phase_us": {
+          "other": 1468,
+          "assets": 257204,
+          "inputs": 1023,
+          "load": 1331,
+          "lex": 16614,
+          "parse": 10309,
+          "check": 246142,
+          "lower": 17232,
+          "freeze": 7660,
+          "validation": 19078,
+          "backend": 22307
+        },
+        "type_nodes": 27542,
+        "check_requested_bytes": 18358926,
+        "check_allocations": 50444,
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+      }
+    }
+  ],
+  "operation_attribution": [
+    {
+      "kind": "producer",
+      "size": 0,
+      "type_nodes": 27544,
+      "counts": {
+        "substitute_nodes_added": 1757,
+        "substitute_depth_entries": 4330,
+        "substitute_memo_hits": 0,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 9427,
+        "resolve_depth_entries": 85111,
+        "open_nodes_added": 1300,
+        "open_depth_entries": 10894,
+        "close_nodes_added": 580,
+        "close_depth_entries": 1964,
+        "import_nodes_added": 2546,
+        "import_depth_entries": 6148,
+        "variable_views_created": 6440,
+        "type_binders_created": 6440
+      },
+      "wasm_bytes": 2935,
+      "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+    },
+    {
+      "kind": "matrix",
+      "size": 2,
+      "type_nodes": 41801,
+      "counts": {
+        "substitute_nodes_added": 2651,
+        "substitute_depth_entries": 6716,
+        "substitute_memo_hits": 0,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 15676,
+        "resolve_depth_entries": 117922,
+        "open_nodes_added": 2230,
+        "open_depth_entries": 12020,
+        "close_nodes_added": 1375,
+        "close_depth_entries": 2678,
+        "import_nodes_added": 3538,
+        "import_depth_entries": 7309,
+        "variable_views_created": 8620,
+        "type_binders_created": 8620
+      },
+      "wasm_bytes": 9910,
+      "wasm_sha256": "2d1fe81841580dfabf91c62b8110c53ae9d8746b54eddcefb3adfb845182fde5"
+    },
+    {
+      "kind": "matrix",
+      "size": 4,
+      "type_nodes": 42345,
+      "counts": {
+        "substitute_nodes_added": 2651,
+        "substitute_depth_entries": 6716,
+        "substitute_memo_hits": 0,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 15848,
+        "resolve_depth_entries": 119816,
+        "open_nodes_added": 2302,
+        "open_depth_entries": 12380,
+        "close_nodes_added": 1383,
+        "close_depth_entries": 2696,
+        "import_nodes_added": 3538,
+        "import_depth_entries": 7309,
+        "variable_views_created": 8702,
+        "type_binders_created": 8702
+      },
+      "wasm_bytes": 12088,
+      "wasm_sha256": "42134c5f4e3b9134677f17383042c3b406d0b1d73e8fb39ec37bfe7b08c301ea"
+    },
+    {
+      "kind": "matrix",
+      "size": 6,
+      "type_nodes": 42889,
+      "counts": {
+        "substitute_nodes_added": 2651,
+        "substitute_depth_entries": 6716,
+        "substitute_memo_hits": 0,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 16020,
+        "resolve_depth_entries": 121710,
+        "open_nodes_added": 2374,
+        "open_depth_entries": 12740,
+        "close_nodes_added": 1391,
+        "close_depth_entries": 2714,
+        "import_nodes_added": 3538,
+        "import_depth_entries": 7309,
+        "variable_views_created": 8784,
+        "type_binders_created": 8784
+      },
+      "wasm_bytes": 14266,
+      "wasm_sha256": "33bf79a626f1b5eb745756f964a8155ac95cf3f47aaeec8193047311a1d3cced"
+    },
+    {
+      "kind": "settings",
+      "size": 1,
+      "type_nodes": 55093,
+      "counts": {
+        "substitute_nodes_added": 3525,
+        "substitute_depth_entries": 8888,
+        "substitute_memo_hits": 3,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 19526,
+        "resolve_depth_entries": 150477,
+        "open_nodes_added": 2797,
+        "open_depth_entries": 14452,
+        "close_nodes_added": 1717,
+        "close_depth_entries": 3332,
+        "import_nodes_added": 6824,
+        "import_depth_entries": 14262,
+        "variable_views_created": 10973,
+        "type_binders_created": 10973
+      },
+      "wasm_bytes": 6508,
+      "wasm_sha256": "b82713f78617863e3d8bb25f44e0b52ca5e86832177dc6348b82fc4552f5ccc8"
+    },
+    {
+      "kind": "settings",
+      "size": 4,
+      "type_nodes": 55138,
+      "counts": {
+        "substitute_nodes_added": 3525,
+        "substitute_depth_entries": 8888,
+        "substitute_memo_hits": 3,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 19538,
+        "resolve_depth_entries": 150636,
+        "open_nodes_added": 2803,
+        "open_depth_entries": 14485,
+        "close_nodes_added": 1717,
+        "close_depth_entries": 3332,
+        "import_nodes_added": 6824,
+        "import_depth_entries": 14262,
+        "variable_views_created": 10982,
+        "type_binders_created": 10982
+      },
+      "wasm_bytes": 6775,
+      "wasm_sha256": "49fc747e881994ed12750dbf804e30357c175d2cfd1e8ff0a7bd9a4af8bbc5ef"
+    },
+    {
+      "kind": "settings",
+      "size": 8,
+      "type_nodes": 55198,
+      "counts": {
+        "substitute_nodes_added": 3525,
+        "substitute_depth_entries": 8888,
+        "substitute_memo_hits": 3,
+        "substitute_unchanged": 0,
+        "resolve_nodes_added": 19554,
+        "resolve_depth_entries": 150848,
+        "open_nodes_added": 2811,
+        "open_depth_entries": 14529,
+        "close_nodes_added": 1717,
+        "close_depth_entries": 3332,
+        "import_nodes_added": 6824,
+        "import_depth_entries": 14262,
+        "variable_views_created": 10994,
+        "type_binders_created": 10994
+      },
+      "wasm_bytes": 7131,
+      "wasm_sha256": "3503dc0f7b6a23d88090dd33c059e49deb2023731495b08279e1eb16adf508d0"
+    }
+  ],
+  "interpretation": [
+    "Resolve accounts for9,427net new nodes and85,111depth entries in the render producer, versus1,757nodes/4,330entries under substitution. These are inclusive counts, not exclusive CPU times or proof that required copies are redundant.",
+    "Every counted variable view in render/matrix/settings is a new binder. No extra chronological views were created, so suffix-view canonicalization has no demonstrated opportunity here.",
+    "A deeper frontend representation change needs attribution to the child or effect-row changes forcing normalization materialization. Do not infer main speed or emitted size from these completed slices."
+  ],
+  "qualification": {
+    "complete_native_inventory_compiled": 2771,
+    "prototype_native": [
+      {
+        "name": "check.types_substitution_structure_tests.test.nonempty substitution retains unchanged constructors without allocating wide records",
+        "duration_ns": 15836037,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.types_substitution_structure_tests.test.substitution copies only changed DAG frontiers through allocation failures",
+        "duration_ns": 45509465,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.types_substitution_structure_tests.test.unchanged substitution preserves historical cursors fresh rows and quantified ownership",
+        "duration_ns": 373057,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "check.types_substitution_structure_tests.test.unchanged substitution rechecks kind history affine payloads and projection budgets",
+        "duration_ns": 1231342,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "prototype_guests": {
+      "baseline_passed": 2,
+      "candidate_passed": 2
+    },
+    "diagnostic_native": {
+      "selected": 428,
+      "passed": 427,
+      "failed": [
+        {
+          "name": "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
+          "duration_ns": 10784651,
+          "status": "failed",
+          "leaks": 0,
+          "logged_errors": 0,
+          "allocation_failures": "sampled",
+          "sweeps": {
+            "full_sweeps": 0,
+            "sampled_sweeps": 0,
+            "discovered_allocations": 0,
+            "fault_runs": 0
+          }
+        }
+      ],
+      "allocation_failures": "sampled",
+      "leaks": 0,
+      "logged_errors": 0,
+      "known_baseline_failure": "selected primitive associated partials, independently reproduced previously"
+    },
+    "diagnostic_guests": {
+      "passed": 42,
+      "failed": 0,
+      "coverage": "New generic-structure guest +31bodyreuse +2text +3assembly +2aggregate +2selected-field; both tiers and sync/JSPI where specified."
+    },
+    "lint": "571sourcefiles+1fixture,zerofindings",
+    "development_runner": "5passed",
+    "required_full_gate": {
+      "command": "deno task test:compiler --budget-seconds 45 --phase-seconds 30 --timings-dir build/bench/type-sharing/full-gate",
+      "smoke_passed": 47,
+      "smoke_failed": 1,
+      "failure": "ExistingList/chunkstorage_escape;independentlyreproducedonpreservedbaseline;fullqualificationpending."
+    }
+  },
+  "limits": [
+    "No current whole-game size, subsecond build,1MBverification or fresh frame.",
+    "Safe/noLLVM development measurements; final release/performance qualification remains pending."
+  ]
+}

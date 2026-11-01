@@ -1,0 +1,482 @@
+diff --git a/zig-native/src/check/types.zig b/zig-native/src/check/types.zig
+index 26473d57..d66c5f46 100644
+--- a/zig-native/src/check/types.zig
++++ b/zig-native/src/check/types.zig
+@@ -592,14 +592,17 @@ pub const Store = struct {
+     /// A kind marker only. Exact propositions belong to the checked body's
+     /// value owner; matching this marker never establishes a witness.
+     pub fn usage(self: *Store, payload: Id, kind: UsageKind, region: Id) Error!Id {
++        try self.usageKind(payload, kind, region);
++        self.has_usage_types = true;
++        return self.add(.{ .tag = .usage, .a = payload, .b = @backingInt(kind), .c = region });
++    }
++    fn usageKind(self: *Store, payload: Id, kind: UsageKind, region: Id) Error!void {
+         if (payload == absent or payload >= self.nodes.items.len) return error.TypeMismatch;
+         if (self.node(self.head(payload, 0)).tag == .erased_proof) return error.TypeMismatch;
+         if (kind == .shared and try @import("usage_check.zig").affine(self, payload)) return error.TypeMismatch;
+         const loan = kind == .borrow or kind == .borrow_mut;
+         if (loan != (region != 0)) return error.TypeMismatch;
+         if (loan and !self.regionIdentity(region)) return error.TypeMismatch;
+-        self.has_usage_types = true;
+-        return self.add(.{ .tag = .usage, .a = payload, .b = @backingInt(kind), .c = region });
+     }
+     pub fn proofKind(self: *Store) Error!Id {
+         const marker = try self.add(.{ .tag = .erased_proof });
+@@ -2648,8 +2651,6 @@ pub const Store = struct {
+         const value = self.node(root);
+         switch (value.tag) {
+             .forall, .existential => {
+-                const binders = try self.allocator.dupe(Id, self.list(.{ .start = value.b, .len = value.c }));
+-                defer self.allocator.free(binders);
+                 const body = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
+                 const goals = try scratch.dupe(Obligation, self.quantifierGoals(root));
+                 defer scratch.free(goals);
+@@ -2665,42 +2666,102 @@ pub const Store = struct {
+                     inline for (.{ "ty", "other", "result", "signature" }) |field| changed = changed or @field(goal, field) != @field(original, field);
+                 }
+                 if (!changed) return root;
++                const binders = try scratch.dupe(Id, self.list(.{ .start = value.b, .len = value.c }));
++                defer scratch.free(binders);
+                 return self.reownQuantified(value.tag, body, binders, goals);
+             },
+-            .usage => return self.usage(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), @fromBackingInt(@intCast(value.b)), if (value.c == 0) 0 else try self.substituteDepth(value.c, substitution, copied, scratch, depth + 1)),
++            .usage => {
++                const payload = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
++                var region = value.c;
++                if (region != 0) region = try self.substituteDepth(region, substitution, copied, scratch, depth + 1);
++                if (payload == value.a and region == value.c) return self.unchangedSubstitution(root, value);
++                return self.usage(payload, @fromBackingInt(@intCast(value.b)), region);
++            },
+             .scoped => {
+                 const descriptor = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
+                 var instance: NominalIdentity = .{ .unit = value.b, .decl = value.c };
+                 if (instance.unit == 0) instance.decl = try self.substituteDepth(instance.decl, substitution, copied, scratch, depth + 1);
++                if (descriptor == value.a and instance.decl == value.c) return self.unchangedSubstitution(root, value);
+                 return self.scoped(descriptor, instance);
+             },
+-            .function => return self.functionWithEffects(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substituteDepth(value.b, substitution, copied, scratch, depth + 1), try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1)),
++            .function => {
++                const parameter = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
++                const result = try self.substituteDepth(value.b, substitution, copied, scratch, depth + 1);
++                const row_ = try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1);
++                if (parameter == value.a and result == value.b and row_ == value.c) return self.unchangedSubstitution(root, value);
++                return self.functionWithEffects(parameter, result, row_);
++            },
+             .product => {
+                 var fields: std.ArrayList(Id) = .empty;
+-                defer fields.deinit(self.allocator);
+-                for (0..value.b) |i| try fields.append(self.allocator, try self.substituteDepth(self.extra.items[value.a + i], substitution, copied, scratch, depth + 1));
++                defer fields.deinit(scratch);
++                var changed = false;
++                for (0..value.b) |i| {
++                    const original = self.extra.items[value.a + i];
++                    const child = try self.substituteDepth(original, substitution, copied, scratch, depth + 1);
++                    if (!changed and child != original) {
++                        try fields.ensureTotalCapacity(scratch, value.b);
++                        fields.appendSliceAssumeCapacity(self.extra.items[value.a..][0..i]);
++                        changed = true;
++                    }
++                    if (changed) fields.appendAssumeCapacity(child);
++                }
++                if (!changed) return self.unchangedSubstitution(root, value);
+                 return self.product(fields.items);
+             },
+-            .array, .list, .cursor => return self.sequence(value.tag, try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1)),
+-            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1)),
+-            .provider => return self.provider(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1)),
+-            .state_provider => return self.stateProvider(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1), try self.substituteDepth(value.b, substitution, copied, scratch, depth + 1), try self.substituteDepth(value.c, substitution, copied, scratch, depth + 1)),
+-            .resolver => return self.resolver(try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1)),
++            .array, .list, .cursor, .resolver => {
++                const child = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
++                if (child == value.a) return self.unchangedSubstitution(root, value);
++                if (value.tag == .resolver) return self.resolver(child);
++                return self.sequence(value.tag, child);
++            },
++            .demand, .provider => {
++                const child = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
++                const row_ = try self.substitutedRow(value.c, substitution, copied, scratch, depth + 1);
++                if (child == value.a and row_ == value.c) return self.unchangedSubstitution(root, value);
++                if (value.tag == .demand) return self.demandWithEffects(child, row_);
++                return self.provider(child, row_);
++            },
++            .state_provider => {
++                const read = try self.substituteDepth(value.a, substitution, copied, scratch, depth + 1);
++                const write = try self.substituteDepth(value.b, substitution, copied, scratch, depth + 1);
++                const state = try self.substituteDepth(value.c, substitution, copied, scratch, depth + 1);
++                if (read == value.a and write == value.b and state == value.c) return self.unchangedSubstitution(root, value);
++                return self.stateProvider(read, write, state);
++            },
+             .record => {
+                 var fields: std.ArrayList(Field) = .empty;
+-                defer fields.deinit(self.allocator);
++                defer fields.deinit(scratch);
++                var changed = false;
+                 for (0..value.b) |i| {
+                     const field = self.recordField(value, i);
+-                    try fields.append(self.allocator, .{ .name = field.name, .ty = try self.substituteDepth(field.ty, substitution, copied, scratch, depth + 1) });
++                    const child = try self.substituteDepth(field.ty, substitution, copied, scratch, depth + 1);
++                    if (!changed and child != field.ty) {
++                        try fields.ensureTotalCapacity(scratch, value.b);
++                        for (0..i) |prior| fields.appendAssumeCapacity(self.recordField(value, prior));
++                        changed = true;
++                    }
++                    if (changed) fields.appendAssumeCapacity(.{ .name = field.name, .ty = child });
+                 }
++                if (!changed) return self.unchangedSubstitution(root, value);
+                 return self.record(fields.items);
+             },
+             .nominal, .projection, .instance_selection => {
+-                const prior = try self.allocator.dupe(Id, self.nominalArguments(value));
+-                defer self.allocator.free(prior);
+                 var args: std.ArrayList(Id) = .empty;
+-                defer args.deinit(self.allocator);
+-                for (prior) |child| try args.append(self.allocator, try self.substituteDepth(child, substitution, copied, scratch, depth + 1));
++                defer args.deinit(scratch);
++                const count = self.nominalArguments(value).len;
++                var changed = value.tag == .instance_selection;
++                if (changed) try args.ensureTotalCapacity(scratch, count);
++                for (0..count) |i| {
++                    const original = self.nominalArguments(value)[i];
++                    const child = try self.substituteDepth(original, substitution, copied, scratch, depth + 1);
++                    if (!changed and child != original) {
++                        try args.ensureTotalCapacity(scratch, count);
++                        args.appendSliceAssumeCapacity(self.nominalArguments(value)[0..i]);
++                        changed = true;
++                    }
++                    if (changed) args.appendAssumeCapacity(child);
++                }
++                if (!changed) return self.unchangedSubstitution(root, value);
+                 if (value.tag == .projection) return self.projection(.{ .unit = value.a, .decl = value.b }, self.projectionMember(value), args.items);
+                 if (value.tag == .instance_selection) return self.instanceSelection(.{ .unit = value.a, .decl = value.b }, args.items);
+                 return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
+@@ -2708,6 +2769,25 @@ pub const Store = struct {
+             else => return root,
+         }
+     }
++    /// Reusing a raw node must still perform its constructor's checks: an
++    /// unchanged historical child can acquire a different kind after a write.
++    fn unchangedSubstitution(self: *Store, root: Id, value: Node) Error!Id {
++        switch (value.tag) {
++            .usage => try self.usageKind(value.a, @fromBackingInt(@intCast(value.b)), value.c),
++            .function => if (self.has_rank_types and (self.regionIdentity(value.a) or self.regionIdentity(value.b) or self.rowIdentity(value.a) or self.rowIdentity(value.b))) return error.TypeMismatch,
++            .scoped, .array, .list, .cursor, .demand, .resolver, .provider => try self.dataKind(value.a),
++            .state_provider => try self.dataKind(value.c),
++            .product => for (self.list(.{ .start = value.a, .len = value.b })) |child| try self.dataKind(child),
++            .record => for (0..value.b) |i| try self.dataKind(self.recordField(value, i).ty),
++            .nominal, .projection => {
++                const arguments = self.nominalArguments(value);
++                for (arguments) |child| try self.dataKind(child);
++                if (arguments.len >= std.math.maxInt(u32) or self.extra.items.len > std.math.maxInt(u32) - arguments.len - 1) return error.TypeLimit;
++            },
++            else => unreachable,
++        }
++        return root;
++    }
+ };
+ 
+ fn sharedOccursLaw(allocator: std.mem.Allocator) !void {
+diff --git a/zig-native/src/check/types_tests.zig b/zig-native/src/check/types_tests.zig
+index 489efd3f..85453930 100644
+--- a/zig-native/src/check/types_tests.zig
++++ b/zig-native/src/check/types_tests.zig
+@@ -15,6 +15,9 @@ const boolean = type_store_module.boolean;
+ const u32_type = type_store_module.u32_type;
+ const f32_type = type_store_module.f32_type;
+ const foreign_operation = type_store_module.foreign_operation;
++test {
++    _ = @import("types_substitution_structure_tests.zig");
++}
+ 
+ test "cursor histories retain repeated writes and self references" {
+     var store = try Store.init(std.testing.allocator);
+diff --git a/zig-native/src/check/types_substitution_structure_tests.zig b/zig-native/src/check/types_substitution_structure_tests.zig
+new file mode 100644
+index 00000000..34e9ba57
+--- /dev/null
++++ b/zig-native/src/check/types_substitution_structure_tests.zig
+@@ -0,0 +1,151 @@
++const std = @import("std");
++const T = @import("types.zig");
++const a = std.testing.allocator;
++
++test "nonempty substitution retains unchanged constructors without allocating wide records" {
++    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = a };
++    var store = try T.Store.init(tracked.allocator());
++    defer store.deinit();
++    const irrelevant = try store.fresh();
++    var fields: [64]T.Field = undefined;
++    for (&fields, 0..) |*field, index| field.* = .{ .name = @intCast(index + 1), .ty = T.u32_type };
++    const wide = try store.record(&fields);
++    const before = tracked.counts;
++    const mark = store.mark();
++    for (0..16) |_| try std.testing.expectEqual(wide, try store.substitute(wide, &.{irrelevant}, &.{T.f32_type}));
++    try std.testing.expectEqualDeep(before, tracked.counts);
++    try std.testing.expectEqualDeep(mark, store.mark());
++    const binder = try store.boundType(0, 0);
++    const roots = [_]T.Id{
++        try store.product(&.{ wide, wide }),
++        try store.functionWithEffects(wide, T.f32_type, 0),
++        try store.array(wide),
++        try store.sequence(.list, wide),
++        try store.sequence(.cursor, wide),
++        try store.demandWithEffects(wide, 0),
++        try store.provider(wide, 0),
++        try store.stateProvider(T.u32_type, T.f32_type, wide),
++        try store.resolver(wide),
++        try store.scoped(wide, .{ .unit = 2, .decl = 7 }),
++        try store.nominal(.{ .unit = 2, .decl = 8 }, &.{ wide, wide }),
++        try store.projection(.{ .unit = 2, .decl = 9 }, 31, &.{wide}),
++        try store.usage(wide, .shared, 0),
++        try store.quantified(.forall, try store.function(binder, binder), &.{binder}),
++    };
++    const ready = store.mark();
++    for (roots) |root| try std.testing.expectEqual(root, try store.substitute(root, &.{irrelevant}, &.{T.f32_type}));
++    try std.testing.expectEqualDeep(ready, store.mark());
++}
++
++fn changedFrontier(allocator: std.mem.Allocator) !void {
++    var store = try T.Store.init(allocator);
++    defer store.deinit();
++    const variable = try store.fresh();
++    const fixed = try store.record(&.{ .{ .name = 11, .ty = T.u32_type }, .{ .name = 12, .ty = T.f32_type } });
++    var original: [9]T.Id = undefined;
++    original[0] = try store.product(&.{ fixed, variable, fixed });
++    for (1..original.len) |index| original[index] = try store.product(&.{ original[index - 1], original[index - 1], fixed });
++    const before = store.nodes.items.len;
++    var changed = try store.substitute(original[8], &.{variable}, &.{T.u32_type});
++    try std.testing.expectEqual(@as(usize, 9), store.nodes.items.len - before);
++    var remaining: usize = original.len;
++    while (remaining != 0) {
++        remaining -= 1;
++        const node = store.node(changed);
++        const parts = store.list(.{ .start = node.a, .len = node.b });
++        try std.testing.expectEqual(fixed, parts[2]);
++        if (remaining == 0) {
++            try std.testing.expectEqual(fixed, parts[0]);
++            try std.testing.expectEqual(T.u32_type, parts[1]);
++        } else {
++            try std.testing.expectEqual(parts[0], parts[1]);
++            changed = parts[0];
++        }
++    }
++    const first = try store.fresh();
++    const second = try store.fresh();
++    const left = try store.substitute(original[0], &.{variable}, &.{first});
++    const right = try store.substitute(original[0], &.{variable}, &.{second});
++    try store.unify(first, T.u32_type);
++    try store.unify(second, T.f32_type);
++    const l = store.node(try store.resolve(left, 0));
++    const r = store.node(try store.resolve(right, 0));
++    try std.testing.expectEqual(T.u32_type, store.list(.{ .start = l.a, .len = l.b })[1]);
++    try std.testing.expectEqual(T.f32_type, store.list(.{ .start = r.a, .len = r.b })[1]);
++    try std.testing.expectEqual(variable, store.list(.{ .start = store.node(original[0]).a, .len = 3 })[1]);
++}
++test "substitution copies only changed DAG frontiers through allocation failures" {
++    try changedFrontier(a);
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, changedFrontier, .{});
++}
++
++test "unchanged substitution preserves historical cursors fresh rows and quantified ownership" {
++    var store = try T.Store.init(a);
++    defer store.deinit();
++    const irrelevant = try store.fresh();
++    const captured = try store.fresh();
++    try store.appendVersion(captured, T.u32_type);
++    const future = try store.resolve(captured, store.cursor());
++    const callback = try store.function(T.unit, future);
++    const point = store.mark();
++    try store.appendVersion(captured, T.f32_type);
++    try std.testing.expectEqual(callback, try store.substitute(callback, &.{irrelevant}, &.{T.boolean}));
++    const first = try store.openCovariant(callback);
++    const second = try store.openCovariant(callback);
++    const first_row = store.node(first).c;
++    const second_row = store.node(second).c;
++    try std.testing.expect(store.row(first_row).tail.variable != store.row(second_row).tail.variable);
++    try store.effects.unify(first_row, 0);
++    try store.effects.unify(second_row, try store.effects.row(&.{T.foreign_operation}, .closed));
++    try std.testing.expectEqual(T.f32_type, store.node(try store.resolve(first, 0)).b);
++    store.rollback(point);
++    try store.appendVersion(captured, T.boolean);
++    try std.testing.expectEqual(callback, try store.substitute(callback, &.{irrelevant}, &.{T.u32_type}));
++    try std.testing.expectEqual(T.u32_type, try store.resolve(captured, 0));
++    try std.testing.expectEqual(T.boolean, try store.resolve(future, 0));
++    const outer = try store.fresh();
++    const binder = try store.boundType(0, 0);
++    const quantified = try store.quantifiedWithGoals(.forall, try store.function(binder, binder), &.{binder}, &.{.{ .kind = .contract, .identity = .{ .unit = 2, .decl = 4 }, .ty = outer, .source = 0 }});
++    const instance = try store.substitute(quantified, &.{outer}, &.{T.u32_type});
++    const owned = store.node(instance);
++    const fresh_binder = store.list(.{ .start = owned.b, .len = owned.c })[0];
++    try std.testing.expect(fresh_binder != binder);
++    try std.testing.expectEqual(fresh_binder, store.node(owned.a).a);
++    try std.testing.expectEqual(T.u32_type, store.quantifierGoals(instance)[0].ty);
++    try std.testing.expectEqual(outer, store.quantifierGoals(quantified)[0].ty);
++}
++
++test "unchanged substitution rechecks kind history affine payloads and projection budgets" {
++    var store = try T.Store.init(a);
++    defer store.deinit();
++    const irrelevant = try store.fresh();
++    const payload = try store.fresh();
++    const shared = try store.usage(payload, .shared, 0);
++    const unique = try store.usage(T.u32_type, .unique, 0);
++    const point = store.mark();
++    try store.appendVersion(payload, unique);
++    try std.testing.expectError(error.TypeMismatch, store.substitute(shared, &.{irrelevant}, &.{T.u32_type}));
++    store.rollback(point);
++    try std.testing.expectEqual(shared, try store.substitute(shared, &.{irrelevant}, &.{T.u32_type}));
++    const product = try store.product(&.{T.u32_type});
++    const span: T.List = .{ .start = store.node(product).a, .len = 1 };
++    // Publication may rewrite owned spans after their constructor ran.
++    for ([_]T.Id{ try store.boundType(0, 1), try store.proofKind() }) |invalid| {
++        store.replaceListItem(span, 0, invalid);
++        try std.testing.expectError(error.TypeMismatch, store.substitute(product, &.{irrelevant}, &.{T.u32_type}));
++        store.replaceListItem(span, 0, T.u32_type);
++        try std.testing.expectEqual(product, try store.substitute(product, &.{irrelevant}, &.{T.u32_type}));
++    }
++    const projection = try store.projection(.{ .unit = 2, .decl = 7 }, 31, &.{product});
++    store.projection_steps = 0;
++    store.projection_limit = 2;
++    try std.testing.expectError(error.TypeLimit, store.substitute(projection, &.{irrelevant}, &.{T.u32_type}));
++    store.projection_steps = 0;
++    store.projection_limit = 100;
++    try std.testing.expectEqual(projection, try store.substitute(projection, &.{irrelevant}, &.{T.u32_type}));
++    var deep = T.u32_type;
++    for (0..1024) |_| deep = try store.array(deep);
++    store.projection_steps = 0;
++    store.projection_limit = 100_000;
++    try std.testing.expectError(error.TypeLimit, store.substitute(deep, &.{irrelevant}, &.{T.u32_type}));
++}
+diff --git a/zig-native/tests/substitution_structure_execution.test.ts b/zig-native/tests/substitution_structure_execution.test.ts
+new file mode 100644
+index 00000000..ded741f7
+--- /dev/null
++++ b/zig-native/tests/substitution_structure_execution.test.ts
+@@ -0,0 +1,128 @@
++import { strict as assert } from "node:assert";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++
++function source(bump: number): string {
++  const fields = Array.from({ length: 64 }, (_, index) => `f${index}: U32`)
++    .join(", ");
++  const values = Array.from({ length: 64 }, (_, index) => `f${index}: ${index}`)
++    .join(", ");
++  return `type Box a is data = $Box {fixed: {${fields}}, value: a}
++const fixed = {${values}}
++const record = func (fixed: {${fields}}) -> payload => return {fixed, payload}
++const boxed = func fixed -> value => return $Box {value, fixed}
++const visit = func callback -> value => return callback value
++entry const integers = func (input: U32) => return do:
++  let marker: GrowArray U32 = #[input]
++  let plain = record fixed marker[0]
++  let nominal = boxed plain.fixed (@u32.add plain.payload ${bump})
++  let result = visit (func (value: U32) => return @u32.add value nominal.fixed.f63) nominal.value
++  return #[plain.fixed.f0, plain.fixed.f31, nominal.fixed.f63, plain.payload, nominal.value, result]
++entry const floating = func (input: F32) => return do:
++  let plain = record fixed input
++  let nominal = boxed plain.fixed (@f32.add plain.payload 1.5)
++  return #[plain.payload, nominal.value, @u32.to_f32 nominal.fixed.f63, visit (func value => return value) plain.payload]
++entry const host = func (callback: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
++  let plain = record fixed 7
++  let nominal = boxed plain.fixed plain.payload
++  return visit callback nominal.value
++`;
++}
++
++for (const codegenTier of ["development", "optimized"] as const) {
++  Deno.test(`generic substitution preserves fixed structure and per-use effects (${codegenTier})`, async () => {
++    const directory = await Deno.makeTempDir({
++      prefix: "blot-substitution-structure-",
++    });
++    const entry = `${directory}/main.blot`;
++    const compiler = await createZigProjectCompiler({
++      executable: Deno.args[0],
++      entry,
++      prelude: null,
++      codegenTier,
++      cacheDirectory: false,
++      startupTimeoutMs: 5_000,
++    });
++    let original: Uint8Array | undefined;
++    try {
++      for (const bump of [1, 9, 1]) {
++        const built = await compiler.build({
++          sources: { [entry]: source(bump) },
++          signal: AbortSignal.timeout(5_000),
++        });
++        assert(built.success, JSON.stringify(built));
++        if (bump === 1) {
++          if (original) assert.deepEqual(built.bytes, original);
++          else original = built.bytes;
++        }
++        for (const asynchronous of [false, true]) {
++          const guest = await instantiateGuest(built.bytes, { asynchronous });
++          try {
++            const call = async (
++              name: string,
++              input: Parameters<typeof guest.call>[1],
++            ) => {
++              if (asynchronous) return await guest.callAsync(name, input);
++              return guest.call(name, input);
++            };
++            for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
++              assert.deepEqual(
++                await call("integers", input),
++                new Uint32Array([
++                  0,
++                  31,
++                  63,
++                  input,
++                  input + bump,
++                  input + bump + 63,
++                ]),
++              );
++            }
++            for (const input of [-0, 1.25, -10.5, -0]) {
++              assert.deepEqual(
++                await call("floating", input),
++                new Float32Array([
++                  input,
++                  input + 1.5,
++                  63,
++                  input,
++                ]),
++              );
++            }
++            let calls = 0;
++            let callback: ReturnType<typeof guest.capability>;
++            if (asynchronous) {
++              callback = guest.capabilityAsync({
++                parameter: "U32",
++                result: "U32",
++                call: async (value) => {
++                  calls++;
++                  await Promise.resolve();
++                  return value + 5;
++                },
++              });
++            } else {
++              callback = guest.capability({
++                parameter: "U32",
++                result: "U32",
++                call: (value) => {
++                  calls++;
++                  return value + 5;
++                },
++              });
++            }
++            for (let index = 0; index < 3; index++) {
++              assert.equal(await call("host", callback), 12);
++            }
++            assert.equal(calls, 3);
++          } finally {
++            guest.dispose();
++          }
++        }
++      }
++    } finally {
++      await compiler.dispose();
++      await Deno.remove(directory, { recursive: true });
++    }
++  });
++}

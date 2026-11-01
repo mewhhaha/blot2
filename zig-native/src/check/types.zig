@@ -541,12 +541,14 @@ pub const Store = struct {
     pub fn fresh(self: *Store) Error!Id {
         const index: u32 = @intCast(self.variables.items.len);
         try self.variables.append(self.allocator, .{});
+        self.normalization.type_binders_created +|= 1;
         errdefer _ = self.variables.pop();
         return self.variableView(index, 0);
     }
     pub fn freshRegion(self: *Store) Error!Id {
         const index: u32 = @intCast(self.variables.items.len);
         try self.variables.append(self.allocator, .{ .region = true });
+        self.normalization.type_binders_created +|= 1;
         errdefer _ = self.variables.pop();
         self.has_rank_types = true;
         return self.variableView(index, 0);
@@ -559,6 +561,7 @@ pub const Store = struct {
         const row_ = try self.freshEffects();
         const index: u32 = @intCast(self.variables.items.len);
         try self.variables.append(self.allocator, .{ .row_effect = row_ });
+        self.normalization.type_binders_created +|= 1;
         self.has_rank_types = true;
         return self.variableView(index, 0);
     }
@@ -621,6 +624,7 @@ pub const Store = struct {
         const id = try self.add(.{ .tag = .variable, .a = index, .b = position });
         errdefer _ = self.nodes.pop();
         try self.variable_views.put(self.allocator, key, id);
+        self.normalization.variable_views_created +|= 1;
         return id;
     }
     pub fn function(self: *Store, parameter: Id, result: Id) Error!Id {
@@ -1006,6 +1010,8 @@ pub const Store = struct {
         return certificate;
     }
     pub fn resolve(self: *Store, root: Id, at: Cursor) Error!Id {
+        const attribution_start = self.nodes.items.len;
+        defer self.normalization.resolve_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
         if (self.use_closed_graphs) {
             self.synchronizeClosedGraphs();
             // A certified raw graph has no cursor-dependent children or tails.
@@ -1056,6 +1062,7 @@ pub const Store = struct {
         return result;
     }
     fn resolveDepth(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
+        self.normalization.resolve_depth_entries +|= 1;
         // Rebuilding a shared open graph must retain its shared children.
         // Ordinary legacy stores retain their allocation policy.
         if ((self.has_projections or self.use_closed_graphs) and self.use_resolution_cache and depth != 0 and root > never) {
@@ -2144,6 +2151,8 @@ pub const Store = struct {
     /// Covariant pure rows close in principal schemes; rows tied to callback
     /// parameters, returned values or retained predicates remain polymorphic.
     pub fn closeCovariant(self: *Store, root: Id, generalized: []const u32, protected: []const u32) Error!Id {
+        const attribution_start = self.nodes.items.len;
+        defer self.normalization.close_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
         var memo: CovariantMemo = .{};
         defer memo.deinit(self.allocator);
         return self.closeCovariantDepth(root, generalized, protected, null, &memo, 0);
@@ -2152,6 +2161,8 @@ pub const Store = struct {
     /// covariance rule. They do not mutate inference history or authorize
     /// closing any other unresolved row in a retained body.
     pub fn closeCovariantCertified(self: *Store, root: Id, generalized: []const u32, protected: []const u32) Error!ClosedCovariant {
+        const attribution_start = self.nodes.items.len;
+        defer self.normalization.close_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
         var decisions: std.ArrayList(u32) = .empty;
         defer decisions.deinit(self.allocator);
         var memo: CovariantMemo = .{};
@@ -2167,6 +2178,7 @@ pub const Store = struct {
         }
     };
     fn closeCovariantDepth(self: *Store, root: Id, generalized: []const u32, protected: []const u32, decisions: ?*std.ArrayList(u32), memo: *CovariantMemo, depth: usize) Error!Id {
+        self.normalization.close_depth_entries +|= 1;
         if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
         if (generalized.len == 0) return root;
@@ -2306,11 +2318,14 @@ pub const Store = struct {
     /// remains the exact requirement checked by its producer.
     const OpenCovariantMemo = std.AutoHashMapUnmanaged(CovariantInput, Id);
     pub fn openCovariant(self: *Store, root: Id) Error!Id {
+        const attribution_start = self.nodes.items.len;
+        defer self.normalization.open_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
         var memo: OpenCovariantMemo = .empty;
         defer memo.deinit(self.allocator);
         return self.openCovariantDepth(root, &memo, 0);
     }
     fn openCovariantDepth(self: *Store, root: Id, memo: *OpenCovariantMemo, depth: usize) Error!Id {
+        self.normalization.open_depth_entries +|= 1;
         if (!self.has_projections) {
             if (depth >= 1024) return error.TypeLimit;
             // Invariant leaves cannot open rows and need no receipt storage.
@@ -2552,6 +2567,8 @@ pub const Store = struct {
         return self.substitutePrepared(&substitution, root);
     }
     pub fn substitutePrepared(self: *Store, substitution: *Substitution, root: Id) Error!Id {
+        const attribution_start = self.nodes.items.len;
+        defer self.normalization.substitute_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
         try self.checkReplacementKinds(substitution);
         // A monomorphic scheme needs no type copying. Keep its raw historical
         // view; callers still reopen eligible covariant latent rows separately.
@@ -2631,6 +2648,7 @@ pub const Store = struct {
     // linear graph into an exponential tree. The memo is local to this exact
     // substitution, so historical variable views and fresh identities stay exact.
     fn substituteDepth(self: *Store, root: Id, substitution: *const Substitution, copied: *std.AutoHashMapUnmanaged(Id, Id), scratch: std.mem.Allocator, depth: usize) Error!Id {
+        self.normalization.substitute_depth_entries +|= 1;
         if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
         if (substitution.typeIndex(root)) |index| return substitution.fresh_ids[index];
@@ -2638,8 +2656,12 @@ pub const Store = struct {
         if (self.node(root).tag == .variable) return root;
         // The input graph is acyclic: the initial root cannot recur beneath
         // itself. Leaf signatures then need no memo allocation at all.
-        if (depth != 0) if (copied.get(root)) |known| return known;
+        if (depth != 0) if (copied.get(root)) |known| {
+            self.normalization.substitute_memo_hits +|= 1;
+            return known;
+        };
         const result = try self.substituteNode(root, substitution, copied, scratch, depth);
+        if (result == root) self.normalization.substitute_unchanged +|= 1;
         if (depth != 0) try copied.put(scratch, root, result);
         return result;
     }

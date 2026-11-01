@@ -29,6 +29,25 @@ there is no current whole-game size or fresh frame. Roughly **1 MB** remains the
 expectation. The historical frame-qualified main took 2,188 seconds and produced
 47.4 MB, mostly code. Release builds and release performance remain pending.
 
+The first type-structure architecture experiment is measured and **rejected**.
+Copy-on-change during nonempty substitution passed its semantic laws but reduced
+actual render/matrix/settings type-node creation by less than 0.25%; checker
+time remained flat. Its larger production patch is archived, not installed.
+Fourteen diagnostic counters now separate inclusive node growth and traversal
+entries for import, substitution, resolution and covariance. The real render
+producer creates 9,427 nodes under resolution versus 1,757 under substitution;
+these are counts, not CPU shares. Variable views equal new binders in all three
+producers, so historical-view canonicalization has no measured opportunity.
+Do not add that optimization or a fresh cache. A deeper type representation
+change needs to identify which changed children/rows force normalization copies.
+See [the rejected experiment and attribution](zig-native/measurements/type-structure-experiment-2026-11-01.json).
+
+The next backend batch targets exact typed-call sharing: erase only plain input
+facts already erased by the inline ABI, and treat closure captures as explicit
+parameters with caller-owned aggregate results. Descriptor ownership and
+initialization facts remain exact. Real Ink easing and literal-closure probes
+are bounded discriminators; no whole-game improvement is established yet.
+
 Closed-row certificate paths now hash lazily, preserving exact receipt bytes,
 multiplicity and work limits. Native sparse paths require **2 hashes rather than
 1,026**, and target-free paths require none. Real producer checking improves
@@ -159,15 +178,13 @@ custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `5f12251f` is unchanged by the diagnostic-only batch. The native
-inventory now compiles **2,771 tests**; all five demand and three assembly-option
-laws pass in full fault mode. The earlier **379/380** broader sampled laws pass
-with the independently reproduced associated-partial baseline failure. All **31 affected guests** pass,
-including actual development/optimized aggregate-reader and selected-field
-execution, serial/parallel byte equality, profiling, physical sharing and
-sync/JSPI. Original Gdev language entries pass six entries/11 assertions per
-sync/JSPI mode in both tiers with four workers. Zig lint reports zero findings
-across 571 source files.
+compiler `b66a2a3e` compiles **2,771 native tests**; **427/428** broader sampled
+laws pass with the independently reproduced associated-partial baseline failure.
+All **42 affected guests** pass, including the new generic wide-structure/effects
+law, actual tier execution, sync/JSPI and retained edits. Its baseline also
+passes the new law. The earlier original Gdev language execution qualifies
+`5f12251f`, before diagnostic counters; current whole-main qualification remains
+pending. Zig lint reports zero findings across 571 source files.
 
 Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
 `HOME`, enabling disk-cache contamination between retained and supposedly fresh

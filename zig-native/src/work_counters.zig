@@ -35,6 +35,25 @@ pub const Frontend = struct {
 };
 
 pub const Normalization = struct {
+    // Diagnostic operation attribution. Node deltas include nested operations
+    // and count net appended nodes even on failure; they are not additive
+    // exclusive phases. Depth entries include memo hits and leaf visits.
+    substitute_nodes_added: u64 = 0,
+    substitute_depth_entries: u64 = 0,
+    substitute_memo_hits: u64 = 0,
+    // Completed non-leaf walks returning their original node (not leaf exits).
+    substitute_unchanged: u64 = 0,
+    resolve_nodes_added: u64 = 0,
+    resolve_depth_entries: u64 = 0,
+    open_nodes_added: u64 = 0,
+    open_depth_entries: u64 = 0,
+    close_nodes_added: u64 = 0,
+    close_depth_entries: u64 = 0,
+    import_nodes_added: u64 = 0,
+    import_depth_entries: u64 = 0,
+    // Cumulative creations, including work later discarded by rollback.
+    variable_views_created: u64 = 0,
+    type_binders_created: u64 = 0,
     row_requests: u64 = 0,
     closed_row_hits: u64 = 0,
     epoch_row_hits: u64 = 0,

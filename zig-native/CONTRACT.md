@@ -126,6 +126,11 @@ The complete execution policy remains part of retained whole-output identity.
 
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
+Normalization work counters record recursive entries and inclusive node growth
+under import, substitution, resolution and covariance operations. Nested counts
+can overlap and are not exclusive CPU timings. View and binder counters include
+rolled-back creation work; they grant no type, cache or publication authority.
+
 Recursive normalization receipts retain the cursor, depth and exact type/row
 epochs; changing the depth limit invalidates them. Closing receipts also retain
 the complete protected-row context and their invocation's recorded decisions.

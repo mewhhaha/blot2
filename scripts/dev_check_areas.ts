@@ -440,6 +440,7 @@ export const devCheckAreas = {
       "zig-native/tests/scoped_aggregate_reader_execution.test.ts",
       "zig-native/tests/scoped_selected_fields_execution.test.ts",
       "zig-native/tests/scoped_assembly_options_execution.test.ts",
+      "zig-native/tests/substitution_structure_execution.test.ts",
       "zig-native/tests/principal_replay_execution.test.ts",
       "zig-native/tests/result_execution.test.ts",
       "zig-native/tests/summary_job_principal_reuse.test.ts",
