@@ -1,0 +1,149 @@
+{
+  "date": "2026-11-02",
+  "parent_commit": "4812cd351fd47672f7a0210bbc90c9ee7cc20537",
+  "scope": "Remove lexical substitution hash tombstone exhaustion. No full-main latency win or output size is established yet.",
+  "compiler": {
+    "safe_sha256": "f9c0e4a2af69474fbd8ffc5d2adadb79a23db4eaf921cec17e4573aab8237419",
+    "zig": "0.17.0",
+    "llvm": false
+  },
+  "root_cause": "Rollback removed map keys while returning live-load capacity. Tombstones eventually cover free slots, so missing queries scan the full table despite a small active map. Keep inactive position records and count active capture entries separately; explicit clear resets history.",
+  "release_pre_candidate": {
+    "sha256": "aca7fc2806e82c82a42401065179422270b2f6d1079c8cca38af549535caa821",
+    "compile_evidence": "build/bench/gdev-sparse-release-first/main-58f097502dca6c4e/result.json",
+    "deadline_ms": 30000,
+    "status": "timeout_incomplete",
+    "profile": "build/bench/gdev-sparse-release-late/main-b0d1b5cb7a8bf2ac/cpu-report.json",
+    "latest_nonidentity_cpu_percent": 46.40120816748689,
+    "hash_getindex_hotline_cpu_percent": 47.54219919247004,
+    "outline_count": "392 to615 while functions6190 to8379; disproves the outline-cap coincidence hypothesis"
+  },
+  "isolated_churn": {
+    "scope": "Isolated substitution Stack churn; not Gdev compilation timing",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "llvm": false,
+    "old_ref": "4812cd351fd47672f7a0210bbc90c9ee7cc20537",
+    "old_source": "zig-native/src/backend/storage_type_arguments.zig",
+    "new_source": "working file with retained inactive keys and active_count",
+    "source_sha256": {
+      "old.zig": "84353452386b8ae19ddcc16f25b94bbcc40318b538735686108975e28822bf9e",
+      "new.zig": "92ef99a8756610496d0ce22ff4b8db4fc5480195e8bd9d9af760c37ad092391a",
+      "bench.zig": "a18b8dec5ee6940464a8545fb0a53b6419d117be294acd02346beff83ec51432",
+      "storage_type_arguments_tests.zig": "d1033ef30c1b632423d4f864dbcdfe87619125a22905217e3638a2662e65e58a",
+      "run.py": "185433981342ed573916f8e264cea258967603aa85596a027b3aeacd216368a2",
+      "churn": "d4784c1d07d7342a7075e8d047b9349a433faae3037c16e87ad752f90bd3ed38"
+    },
+    "workload": {
+      "initial_live_keys": 256,
+      "retained_live_anchors": 8,
+      "distinct_ephemeral_keys": 16384,
+      "per_round": "append; hit; rollback; popped miss; unseen miss; anchor hit",
+      "expected_checksum": 188416,
+      "timeout_seconds": 10
+    },
+    "cpu_accounting": "resource.RUSAGE_CHILDREN user+system delta around each isolated executable",
+    "commands": {
+      "build": [
+        "/home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/zig",
+        "build-exe",
+        "/tmp/blot-inactive-keys-churn/bench.zig",
+        "-O",
+        "ReleaseSafe",
+        "-fno-llvm",
+        "-femit-bin=/tmp/blot-inactive-keys-churn/churn"
+      ],
+      "run": [
+        "python3",
+        "/tmp/blot-inactive-keys-churn/run.py"
+      ]
+    },
+    "build_note": "First build required the standalone no-tests import stub; source modules are otherwise exact copies.",
+    "runs": [
+      {
+        "variant": "old",
+        "cpu_ms": 257.862,
+        "wall_ms": 259.0739629958989,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "variant": "new",
+        "cpu_ms": 43.56899999999994,
+        "wall_ms": 44.23183399194386,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "variant": "new",
+        "cpu_ms": 21.799,
+        "wall_ms": 22.12855599645991,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "variant": "old",
+        "cpu_ms": 240.32899999999995,
+        "wall_ms": 241.30860400327947,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "variant": "old",
+        "cpu_ms": 240.437,
+        "wall_ms": 241.4214290038217,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "variant": "new",
+        "cpu_ms": 21.19300000000002,
+        "wall_ms": 21.533865001401864,
+        "success": true,
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "median_cpu_ms": {
+      "old": 240.437,
+      "new": 21.799
+    },
+    "cpu_speedup": 11.029726134226342,
+    "cpu_reduction_percent": 90.93359175168547
+  },
+  "qualification": {
+    "development": "build/bench/inactive-keys-check-dev/run-d4bac10dfe561d3a/results.json",
+    "seconds": 17.114529055,
+    "native_inventory": 2800,
+    "selected_native_laws": 40,
+    "full_fault_seconds": 3.919585392010049,
+    "full_fault_log": "build/bench/inactive-keys-check-dev/full-faults.log",
+    "guests_passed": 11,
+    "zig_lint_findings": 0,
+    "full_gate_log": "/tmp/blot-inactive-keys-full-gate.log",
+    "full_gate_status": "Known baseline48pass/1List-chunk storage_escape; full qualification pending"
+  },
+  "safe_main": "build/bench/gdev-inactive-keys-first/main-b640c3c1353b5b06/result.json",
+  "safe_main_status": "timeout_incomplete30seconds",
+  "pending": "Optimized LLVM full-main timing. Symbolic-owner graph and parameter-copy experiments are outside-tree drafts, not landed.",
+  "real_renderer_control": {
+    "evidence": "build/bench/inactive-keys-kites/pair-940070dd464bfcd9/result.json",
+    "seven_streams_equal": true,
+    "wasm_bytes": 261953,
+    "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+    "baseline_ms": 4891.803180999999,
+    "candidate_ms": 4806.229157000001,
+    "limits": "One profiled pair, not main."
+  }
+}

@@ -23,6 +23,7 @@ pub fn Stack(comptime Argument: type) type {
         arguments: std.ArrayList(Argument) = .empty,
         undo: std.ArrayList(Positions) = .empty,
         positions: std.HashMapUnmanaged(u64, Positions, Context, 80) = .empty,
+        active_count: usize = 0,
         snapshot: ?[]const Argument = null,
         stats: Stats = .{},
 
@@ -46,6 +47,7 @@ pub fn Stack(comptime Argument: type) type {
         fn appendAssumeCapacity(self: *Self, argument: Argument) void {
             const slot = self.positions.getOrPutAssumeCapacity(key(argument.unit, argument.parameter));
             if (!slot.found_existing) slot.value_ptr.* = .{};
+            if (slot.value_ptr.any == null) self.active_count += 1;
             self.undo.appendAssumeCapacity(slot.value_ptr.*);
             const position = self.arguments.items.len;
             self.arguments.appendAssumeCapacity(argument);
@@ -75,12 +77,11 @@ pub fn Stack(comptime Argument: type) type {
                 const argument = self.items[at];
                 const original = self.undo.items[at];
                 const slot = key(argument.unit, argument.parameter);
-                if (original.any != null) {
-                    self.positions.getPtr(slot).?.* = original;
-                } else {
-                    const removed = self.positions.remove(slot);
-                    std.debug.assert(removed);
-                }
+                if (original.any == null) self.active_count -= 1;
+                // Retain inactive keys: removing ephemeral substitutions fills
+                // the table with tombstones while its live load stays tiny.
+                // Misses would then scan the entire table on every lookup.
+                self.positions.getPtr(slot).?.* = original;
             }
             self.arguments.shrinkRetainingCapacity(length);
             self.undo.shrinkRetainingCapacity(length);
@@ -88,10 +89,11 @@ pub fn Stack(comptime Argument: type) type {
             self.snapshot = null;
         }
         pub fn clearRetainingCapacity(self: *Self) void {
-            if (self.items.len == 0) return;
+            if (self.positions.count() == 0) return;
             self.arguments.clearRetainingCapacity();
             self.undo.clearRetainingCapacity();
             self.positions.clearRetainingCapacity();
+            self.active_count = 0;
             self.items = self.arguments.items;
             self.snapshot = null;
         }
@@ -111,7 +113,7 @@ pub fn Stack(comptime Argument: type) type {
                 self.stats.capture_hits +|= 1;
                 return snapshot;
             }
-            const result = try arena.alloc(Argument, self.positions.count());
+            const result = try arena.alloc(Argument, self.active_count);
             var count: usize = 0;
             for (self.items, 0..) |argument, index| {
                 if (self.positions.get(key(argument.unit, argument.parameter)).?.any != index) continue;

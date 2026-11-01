@@ -121,3 +121,58 @@ test "refinement indexes synchronize wide bindings once for repeated lookups" {
     try std.testing.expectEqual(@as(u64, 1), stack.stats.captures);
     try std.testing.expectEqual(@as(u64, 1000), stack.stats.capture_hits);
 }
+
+fn churnLaw(allocator: std.mem.Allocator, rounds: usize) !void {
+    var stack: Stack(Argument) = .empty;
+    defer stack.deinit(allocator);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const base: Argument = .{ .unit = 1, .parameter = 1, .argument = 7, .argument_unit = 2 };
+    try stack.append(allocator, base);
+    // First grow the table with live bindings, then leave a small active prefix.
+    // Deleting later short-lived keys used to fill the large table with
+    // tombstones without triggering growth, making misses probe every slot.
+    for (0..256) |ordinal| try stack.append(allocator, .{ .unit = 2, .parameter = @intCast(ordinal), .argument = 9, .argument_unit = 3 });
+    stack.shrinkRetainingCapacity(1);
+    try std.testing.expectEqual(@as(usize, 1), stack.active_count);
+    for (0..rounds) |ordinal| {
+        const parameter: u32 = @intCast(ordinal);
+        try stack.append(allocator, .{ .unit = 3, .parameter = parameter, .argument = 11, .argument_unit = 4 });
+        try stack.append(allocator, .{ .unit = 3, .parameter = parameter, .argument = parameter, .argument_unit = 3 });
+        try std.testing.expectEqual(@as(?usize, 2), stack.latestAny(3, parameter));
+        try std.testing.expectEqual(@as(?usize, 1), stack.latestNonidentity(3, parameter));
+        stack.shrinkRetainingCapacity(1);
+        try std.testing.expect(stack.latestAny(3, parameter) == null);
+        try std.testing.expect(stack.latestNonidentity(3, parameter) == null);
+        try std.testing.expect(stack.latestNonidentity(4, parameter) == null);
+        try std.testing.expectEqual(@as(?usize, 0), stack.latestNonidentity(1, 1));
+        try std.testing.expectEqual(@as(usize, 1), stack.active_count);
+        try std.testing.expectEqual(ordinal + 258, stack.positions.count());
+    }
+    const snapshot = try stack.capture(arena.allocator());
+    try std.testing.expectEqual(@as(usize, 1), snapshot.len);
+    try std.testing.expect(std.meta.eql(base, snapshot[0]));
+    // Reusing an inactive key restores ordinary shadowing without adding a
+    // table key; capture size counts live keys rather than retained history.
+    const retained = stack.positions.count();
+    try stack.append(allocator, .{ .unit = 3, .parameter = 0, .argument = 13, .argument_unit = 4 });
+    try std.testing.expectEqual(retained, stack.positions.count());
+    try std.testing.expectEqual(@as(usize, 2), (try stack.capture(arena.allocator())).len);
+    stack.shrinkRetainingCapacity(0);
+    try std.testing.expectEqual(@as(usize, 0), stack.active_count);
+    try std.testing.expectEqual(@as(usize, 0), (try stack.capture(arena.allocator())).len);
+    try std.testing.expect(stack.positions.count() != 0);
+    stack.clearRetainingCapacity();
+    try std.testing.expectEqual(@as(usize, 0), stack.positions.count());
+    try std.testing.expectEqual(@as(usize, 0), stack.active_count);
+    try stack.append(allocator, base);
+    try std.testing.expectEqual(@as(?usize, 0), stack.latestAny(1, 1));
+    try std.testing.expectEqual(@as(usize, 1), (try stack.capture(arena.allocator())).len);
+    try std.testing.expectEqual(@as(usize, 1), snapshot.len);
+    try std.testing.expect(std.meta.eql(base, snapshot[0]));
+}
+
+test "refinement indexes retain inactive keys across sustained lexical churn and OOM" {
+    try churnLaw(a, 16_384);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, churnLaw, .{@as(usize, 64)});
+}

@@ -74,6 +74,8 @@ def emission_frame(frame, name, tid, metadata):
             module = pointee(generator["module"])
             metadata["functions"] = int(module["functions"]["items"]["len"])
             metadata["owners"] = int(generator["roots"]["items"]["len"])
+            outlining = pointee(generator["outlining"])
+            metadata["outlines"] = int(outlining["helpers"]["items"]["len"])
         except Exception as error:
             if len(metadata["errors"]) < 4:
                 metadata["errors"].append("counters: " + str(error)[:160])

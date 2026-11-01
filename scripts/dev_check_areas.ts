@@ -498,6 +498,7 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "backend.storage_type_arguments_tests.test.refinement indexes retain inactive keys across sustained lexical churn and OOM",
       "backend.storage_plan_tests.test.owned root metadata sparse union matches dense order filtering and field boundary",
       "backend.storage_plan_tests.test.owned root metadata sparse union owns sorted tails through OOM",
       "backend.storage_plan_tests.test.owned root metadata rootless union skips inventory and allocation while retaining depth",

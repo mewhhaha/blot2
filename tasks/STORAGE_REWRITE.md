@@ -1,6 +1,10 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Substitution-map churn](../zig-native/measurements/substitution-map-churn-2026-11-02.json)
+is the next optimized-compiler cliff: deleted slots make misses scan a whole
+table. Inactive-key retention improves isolated CPU 11.03x; whole-main timing is
+pending and the prior optimized candidate still exceeds 30 seconds.
 [Sparse owner traversal](../zig-native/measurements/sparse-owned-roots-2026-11-02.json)
 replaces the latest measured emission bottleneck. The current pre-candidate LLVM
 compiler finishes the frontend in 1.03 seconds but exceeds 30 seconds on main;
