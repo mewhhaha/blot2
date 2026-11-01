@@ -65,6 +65,8 @@ export const devCheckAreas = {
       "backend.storage_calls_tests.test.nested scalar call publication survives allocation failures",
       "backend.storage_calls_tests.test.closed scalar admission retains only completed bounded call graphs",
       "backend.storage_calls_tests.test.concrete anonymous field instances share body plans through allocation failures",
+      "backend.storage_calls_tests.test.nominal inline field DAGs share bounded definitions across caller values",
+      "backend.storage_calls_tests.test.nominal inline field publication survives allocation failures",
       "backend.storage_calls_tests.test.concrete field recipes retain declaration types order absence and capacity fallback",
       "backend.storage_calls.test.completed call admission owns exact contextual keys and conservative heights",
       "backend.storage_call_graph_tests.test.storage descriptor DAGs share nested reader and writer definitions",

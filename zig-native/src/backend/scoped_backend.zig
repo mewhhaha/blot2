@@ -1999,6 +1999,42 @@ const Generator = struct {
             return null;
         };
     }
+    fn plainInlineValue(value: Value) bool {
+        if ((value.tag != .scalar and value.tag != .aggregate) or value.root != null or value.other_roots.len != 0 or value.host != null or value.demand != null or value.callable != null or value.pool_borrow) return false;
+        for (value.fields) |field| if (!plainInlineValue(field)) return false;
+        return true;
+    }
+    fn inlineCallEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, result: ?Value) Error!?[]const u32 {
+        if (try self.concreteInlineEvidence(m, body)) |evidence| return evidence;
+        const previous = self.diagnostic;
+        return self.nominalInlineEvidence(m, body, arguments, result) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            self.diagnostic = previous;
+            return null;
+        };
+    }
+    fn nominalInlineEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, result_schema: ?Value) Error!?[]const u32 {
+        var evidence: std.ArrayList(u32) = .empty;
+        defer evidence.deinit(self.allocator);
+        try evidence.append(self.allocator, std.math.maxInt(u32) - 6);
+        if (!try self.sharedDescriptorEvidence(m, body, arguments, &evidence)) return null;
+        const result = result_schema orelse try self.shape(m, body.root, m.typeOf(body.root), 0);
+        if (!plainInlineValue(result)) return null;
+        var remaining: usize = 4096;
+        var work: usize = 4096;
+        var keys = selected_types.Builder.init(self.allocator, &work, .{});
+        defer keys.deinit();
+        // Semantic type arguments alone do not determine a constructor-local
+        // payload ABI. Bind both physical inputs and the rebuilt result schema.
+        for (arguments) |argument| {
+            if (!plainInlineValue(argument)) return null;
+            try self.readerLayoutEvidence(m, body.root, argument, &evidence, &keys);
+        }
+        try self.descriptorValueEvidence(m, body.root, result, &evidence, &keys, &remaining, 0);
+        try self.readerLayoutEvidence(m, body.root, result, &evidence, &keys);
+        try self.finishSelectedTypes(m, body.root, &evidence, &keys);
+        return try evidence.toOwnedSlice(self.allocator);
+    }
     // This recognizes the source identity of a field-associated ambient. It
     // does NOT close that ambient: a completed body walk must still admit all
     // other operations, and source/call effect checks remain unchanged.
@@ -2088,6 +2124,10 @@ const Generator = struct {
         if (!try self.sharedDescriptorEvidence(m, body, values, &evidence)) return null;
         return try evidence.toOwnedSlice(self.allocator);
     }
+    fn plainAdmissionEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, values: ?[]const Value) Error!?[]const u32 {
+        if (values) |known| return self.inlineCallEvidence(m, body, known, null);
+        return self.concreteInlineEvidence(m, body);
+    }
     fn admitNumericBody(self: *Generator, m: *const core.Module, target: core.BindingRef, values: ?[]const Value, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool) Error!bool {
         const peak_before = self.numeric_call_peak;
         self.numeric_call_peak = used;
@@ -2104,7 +2144,7 @@ const Generator = struct {
                 return true;
             }
         };
-        if (!readers and !self.planning_writer) if (try self.concreteInlineEvidence(m, body)) |evidence| {
+        if (!readers and !self.planning_writer) if (try self.plainAdmissionEvidence(m, body, values)) |evidence| {
             defer self.allocator.free(evidence);
             const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
             if (self.shared_calls.admitted(key)) |height| {
@@ -2123,7 +2163,7 @@ const Generator = struct {
             try self.descriptor_calls.calls.admit(key, self.numeric_call_peak - used);
             if (self.descriptor_calls.calls.plans.items.len > before) self.emission_work.scoped_descriptor_admissions +|= 1;
         };
-        if (admitted and !readers and !self.planning_writer) if (try self.concreteInlineEvidence(m, body)) |evidence| {
+        if (admitted and !readers and !self.planning_writer) if (try self.plainAdmissionEvidence(m, body, values)) |evidence| {
             defer self.allocator.free(evidence);
             const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
             const before = self.shared_calls.plans.items.len;
@@ -2282,6 +2322,13 @@ const Generator = struct {
                     if (record.tag != .record) {
                         if (!try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1)) return false;
                         const value = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return false;
+                        // Direct named data fields already carry checked field
+                        // evidence, just as expression/planValue projections do.
+                        const spelling = m.fieldSpelling(projection.field) orelse return false;
+                        if (dataField(value, spelling)) |field| {
+                            try self.mapValueTypes(.{ .unit = m.unit, .ty = n.ty }, field, 0);
+                            return true;
+                        }
                         const before = self.type_arguments.items.len;
                         defer self.type_arguments.shrinkRetainingCapacity(before);
                         const selection = (try self.selectedGetter(m, id, value)) orelse return false;
@@ -2635,12 +2682,12 @@ const Generator = struct {
     fn reusableInlineCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         var eligible = !self.planning_writer;
-        for (arguments) |argument| if (!plainShape(argument) or argument.demand != null or argument.host != null) {
+        for (arguments) |argument| if (!plainInlineValue(argument)) {
             eligible = false;
             break;
         };
         var early: ?[]const u32 = null;
-        if (eligible) early = try self.concreteInlineEvidence(m, body);
+        if (eligible) early = try self.inlineCallEvidence(m, body, arguments, null);
         defer if (early) |evidence| self.allocator.free(evidence);
         if (!self.specialize and early == null) return null;
         var completed: ?usize = null;
@@ -2657,7 +2704,7 @@ const Generator = struct {
             if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
         }
         for (m.bodyParameters(body), arguments) |parameter, argument| {
-            if (!plainShape(argument) or argument.demand != null or argument.host != null) return null;
+            if (!plainInlineValue(argument)) return null;
             if (!try self.selectedInlineType(.{ .unit = m.unit, .ty = parameter.ty }, &remaining)) return null;
         }
         const result_type = m.typeOf(body.root);
@@ -2671,7 +2718,7 @@ const Generator = struct {
         const parameter_count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return self.unsupported(m, body.root);
         if (parameter_count > std.math.maxInt(u32)) return self.unsupported(m, body.root);
         var concrete: ?[]const u32 = null;
-        if (eligible) concrete = try self.concreteInlineEvidence(m, body);
+        if (eligible) concrete = try self.inlineCallEvidence(m, body, arguments, result_shape);
         defer if (concrete) |evidence| self.allocator.free(evidence);
         if (!self.specialize and concrete == null) return null;
         var evidence: std.ArrayList(u32) = .empty;

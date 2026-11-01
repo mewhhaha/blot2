@@ -1,6 +1,6 @@
 // Bounded synthetic owned-backend call-graph profile.
 // deno run --allow-all scripts/bench/scoped_calls.ts [--sizes 2,4,8]
-// Field refinement: add --fields 72 (sizes then count repeated record calls).
+// Field refinement: add --fields 72 (sizes count repeated calls); --nominal wraps Row.
 // Optional: --depth 5 --timeout-ms 5000 --profile --blotc PATH
 import { resolve } from "node:path";
 import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
@@ -10,14 +10,22 @@ const args = new Map<string, string | true>();
 for (let at = 0; at < Deno.args.length; at++) {
   const key = Deno.args[at];
   if (
-    !["--sizes", "--fields", "--depth", "--timeout-ms", "--blotc", "--profile"]
+    ![
+      "--sizes",
+      "--fields",
+      "--depth",
+      "--timeout-ms",
+      "--blotc",
+      "--profile",
+      "--nominal",
+    ]
       .includes(
         key,
       )
   ) {
     throw new Error(`Unexpected argument: ${key}`);
   }
-  if (key === "--profile") args.set(key, true);
+  if (key === "--profile" || key === "--nominal") args.set(key, true);
   else {
     const value = Deno.args[++at];
     if (!value || value.startsWith("--")) {
@@ -30,6 +38,7 @@ const option = (name: string, fallback: string) =>
   String(args.get(name) ?? fallback);
 const sizes = option("--sizes", "2,4,8").split(",").map(Number);
 const fields = Number(option("--fields", "0"));
+const nominal = args.has("--nominal");
 const depth = Number(option("--depth", "5"));
 const timeoutMs = Number(option("--timeout-ms", "5000"));
 let maximumSize = 128;
@@ -45,6 +54,7 @@ if (
 if (!Number.isInteger(fields) || fields < 0 || fields > 128) {
   throw new Error("--fields must be an integer from 0 to 128");
 }
+if (nominal && fields === 0) throw new Error("--nominal requires --fields");
 if (!Number.isInteger(depth) || depth < 2 || depth > 12) {
   throw new Error("--depth must be an integer from 2 to 12");
 }
@@ -69,6 +79,13 @@ function fieldSource(repetitions: number, fieldCount: number): string {
     "const read = func row => return do:",
     "  let total = row.f0",
   ];
+  if (nominal) {
+    const members = Array.from(
+      { length: fieldCount },
+      (_, index) => `f${index}: U32`,
+    ).join(", ");
+    lines.unshift(`type Row is data = $Row {${members}}`);
+  }
   for (let index = 1; index < fieldCount; index++) {
     lines.push(`  total := @u32.add total row.f${index}`);
   }
@@ -85,7 +102,11 @@ function fieldSource(repetitions: number, fieldCount: number): string {
     { length: fieldCount },
     (_, index) => `f${index}: @u32.add input ${index}`,
   ).join(", ");
-  lines.push(`const make = func (input: U32) => return {${record}}`);
+  let constructor = "";
+  if (nominal) constructor = "$Row ";
+  lines.push(
+    `const make = func (input: U32) => return ${constructor}{${record}}`,
+  );
   lines.push(
     "entry const answer = func (input: U32): U32 => return do:",
     "  let marker: GrowArray U32 = #[input]",
@@ -172,6 +193,7 @@ for (const width of sizes) {
   if (fields === 0) source = sourceFor(width);
   else source = fieldSource(width, fields);
   let workload = "field_refinement";
+  if (nominal) workload = "nominal_field_refinement";
   if (fields === 0) workload = "call_graph";
   const sourceSha256 = await hashBytes(new TextEncoder().encode(source));
   const started = performance.now();

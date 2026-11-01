@@ -33,9 +33,9 @@ fn publishConcreteFields(allocator: std.mem.Allocator, modules: []const core.Mod
     var result = try scoped.compile(allocator, modules, 1);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
-    // Both source field orders select one read definition. Wrappers with an
-    // uncovered ambient retain ordinary scoped emission.
-    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_inline_definitions);
+    // Both source field orders share each of read, twice and outer once.
+    // The strict semantic key retains their symbolic ambient row identities.
+    try std.testing.expectEqual(@as(u64, 3), result.counters.scoped_inline_definitions);
     try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
     try std.testing.expect(result.counters.scoped_concrete_admission_hits > 0);
     try std.testing.expect(result.counters.scoped_field_recipe_hits > 0);
@@ -978,4 +978,40 @@ test "selected application policies share wide callback type descriptions within
     if (result.diagnostic) |diagnostic| std.debug.print("wide policy diagnostic: {s}\n", .{diagnostic.message()});
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
+}
+
+const nominal_fields_source =
+    \\type Row is data = $Row {left: U32, right: U32}
+    \\const read = func row => return @u32.add row.left row.right
+    \\const twice = func row => return @u32.add (read row) (read row)
+    \\const outer = func row => return @u32.add (twice row) (twice row)
+    \\entry const answer = func (input: U32): U32 => return do:
+    \\  let first: GrowArray U32 = #[input]
+    \\  let second: GrowArray U32 = #[@u32.add input 11]
+    \\  let left = outer ($Row {right: 3, left: first[0]})
+    \\  let right = outer ($Row {left: second[0], right: 5})
+    \\  return @u32.add left right
+;
+
+fn publishNominalFields(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_inline_definitions >= 3);
+    try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
+    try std.testing.expect(result.counters.scoped_emission_expressions < 500);
+    try std.testing.expect(result.counters.scoped_call_admission_nodes < 500);
+}
+
+test "nominal inline field DAGs share bounded definitions across caller values" {
+    var module = try lower(a, nominal_fields_source);
+    defer module.deinit(a);
+    try publishNominalFields(a, &.{module});
+}
+
+test "nominal inline field publication survives allocation failures" {
+    var module = try lower(a, nominal_fields_source);
+    defer module.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishNominalFields, .{@as([]const core.Module, &.{module})});
 }

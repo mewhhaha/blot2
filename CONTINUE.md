@@ -6,6 +6,21 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. The diagnostic runner defaults to
 a five-second build deadline and kills the compiler on timeout.
 
+Plain nominal helpers now share checked inline definitions too. Generic stored
+field reads use their existing data-field evidence rather than requiring an
+associated getter. Strict semantic frontiers and physical input/result schemas
+keep phantom arguments, constructors and caller environments distinct.
+
+Five alternating Safe/noLLVM pairs at eight repeated calls improve the nominal
+field graph from **237.08 ms to 98.16 ms**, Wasm from **88,727 to 4,654 bytes**,
+emission from **11,809 to 121 expressions**, and admission from **9,074 to
+189**.
+[Pinned nominal evidence](zig-native/measurements/nominal-call-sharing-2026-11-01.json)
+also records the smaller controls and unsuccessful probes. A one-off main
+diagnostic still timed out at 30 seconds; no current whole-game size is known.
+Two bounded LLVM release builds (60/120 seconds) produced no new binary, so
+release performance remains unmeasured. Development builds remain noLLVM.
+
 Nested descriptor readers and stable writers now emit shared function calls. The
 first slice accepts plain stored rows, scalar reader results and Unit writers;
 callback keys include their checked semantic frontier. Unsupported witnesses and
@@ -29,8 +44,11 @@ Imported names now register without copying their type graphs. First typed use
 materializes the exact producer scheme; unused imports publish no binding or
 certificate. Producer checking and associated declaration catalogs remain
 complete. Next identify the bounded real build's remaining frontend work and
-unsupported storage helpers before extending the call ABI. The field-refinement
-fixed-point solver remains.
+unsupported storage helpers before extending the call ABI. A concrete source
+proof cliff is now isolated: a tiny nominal depth-eight graph checks each body
+once but repeatedly expands its instantiated dictionaries as a binary tree. That
+source-proof DAG duplication is the next implementation target, with unchanged
+work/depth limits. The field-refinement fixed-point solver remains.
 
 Earlier
 [scalar sharing](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
@@ -96,17 +114,18 @@ Astra xhigh reviewed the semantic fixes and performance batches. Earlier gate
 attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
 host reaches protocol preflight and fails on existing operand-span ends,
 independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The descriptor/import batch compiles all 2,742
-native tests; its storage family passes 108/109 with the recorded
-associated-partial baseline failure. The broader 305-law run passed 303; one
-obsolete import-count expectation was corrected and independently passed, while
-the same associated-partial failure remains. All six new laws pass, including
-two exhaustive allocation-failure sweeps. Affected storage guests pass 66/67
-with the independently reproduced associated-latent baseline, plus both new
-scratch-region guests. Full Zig lint reports zero findings across 567 source
-files. An additional reuse suite hits the same 16 body-cache work assertions on
-both the baseline and candidate; it does not pass. Current performance binaries
-have not qualified a real Gdev frame.
+qualification remains pending. The nominal batch compiles all 2,744 native
+tests; its storage family passes 110/111 with the recorded associated-partial
+baseline failure. Its focused new/updated laws pass, including two exhaustive
+allocation-failure sweeps; 14 focused guests pass across both tiers and
+sync/JSPI. Affected guests pass 50/51 with the associated-latent baseline. The
+earlier descriptor/import batch's broader 305-law run passed 303; one obsolete
+import-count expectation was corrected and independently passed, while the same
+associated-partial failure remains. Its six new laws and both scratch guests
+pass. Full Zig lint reports zero findings across 567 source files. An additional
+reuse suite hits the same 16 body-cache work assertions on both the baseline and
+candidate; it does not pass. Current performance binaries have not qualified a
+real Gdev frame.
 
 ## Remaining execution work
 

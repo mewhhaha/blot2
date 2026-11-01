@@ -29,6 +29,13 @@ includes five alternating pairs and an unchanged scalar control. A 64-field
 depth-six probe reaches the existing source-validation budget; it is a rejected
 workload, not a timing result. Do not raise compiler limits for the benchmark.
 
+Add `--nominal --fields 3 --depth 6 --sizes 1,4,8` to compare generic field
+access through a named data constructor. The independent field recurrence is
+unchanged. The
+[nominal record](../../zig-native/measurements/nominal-call-sharing-2026-11-01.json)
+includes five alternating pairs per size. Depth-eight/eight-call probes still
+hit source-proof validation; reducing emitted code has not removed that cliff.
+
 For nested storage readers and Unit writers:
 
 ```sh
