@@ -6,7 +6,11 @@ remove one repeated semantic traversal with exact Snapshot/context authority:
 world-producer medians improve 8.63 to 7.78 seconds with identical tiny output.
 Whole-main remains over five seconds. Larger automatic copy plans and nominal
 world interfaces missed their gates and were removed; their evidence is linked
-from CONTINUE.md. Task 110 remains unfinished.
+from CONTINUE.md. The
+[opaque draw-batch prototype](../zig-native/measurements/unqualified-draw-batches-2026-11-01.json)
+stopped at unsupported escape/control shapes before performance measurement.
+[Astra's next architecture experiment](../zig-native/measurements/compiler-architecture-review-2026-11-01.json)
+targets repeated whole-type normalization inside structural unification.
 [Engine-boundary measurements](../zig-native/measurements/engine-boundary-experiments-2026-11-01.json)
 now retain incomplete profiles and distinguish checker jobs, backend stages and
 optimizer pass costs. Closed leaf-call plans and two small source-interface

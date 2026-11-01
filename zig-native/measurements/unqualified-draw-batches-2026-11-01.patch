@@ -1,0 +1,805 @@
+diff --git a/build/bench/draw-batch-source/batch.blot b/build/bench/draw-batch-source/batch.blot
+new file mode 100644
+index 00000000..4c0dcafe
+--- /dev/null
++++ b/build/bench/draw-batch-source/batch.blot
+@@ -0,0 +1,60 @@
++import { Vec3 } from "std/vector"
++import { Appearance } from "ink/render"
++import * as math from "ink/math"
++import * as transform from "ink/transform"
++
++type Header is data = $Header {mesh: U32, material: U32, matrix: math.Mat4, has_parameters: Bool, parameters: math.Vec4}
++private type Row is data = $Row {header: Header, start: U32, count: U32}
++opaque type Builder = {rows: ResizeArray Row, vectors: ResizeArray math.Vec4}
++opaque type Batch = {rows: &[Row], vectors: &[math.Vec4]}
++
++// Seed copies preserve a caller's existing vector prefix without sharing pools.
++const with_builder = func (seed: &[math.Vec4]) -> (consume: Builder -> a ! {| e}) => return do:
++  let rows: ResizeArray Row = #[]
++  let vectors: ResizeArray math.Vec4 = #[]
++  for value in seed:
++    @storage.push vectors value
++  consume ($Builder {rows, vectors})
++  return ()
++const append = func (builder: Builder) -> (header: Header) -> (payload: &[math.Vec4]) => return do:
++  let rows = builder.rows
++  let vectors = builder.vectors
++  let start = vectors.length
++  let count = payload.length
++  for index in 0 .. count:
++    @storage.push vectors payload[index]
++  @storage.push rows ($Row {header, start, count})
++  return ()
++const batch = func (builder: Builder): Batch => return do:
++  let rows = builder.rows
++  let vectors = builder.vectors
++  let row_count = rows.length
++  let vector_count = vectors.length
++  return $Batch {rows: &rows[0..row_count], vectors: &vectors[0..vector_count]}
++const count = func (seen: Batch): U32 => return seen.rows.length
++const header = func (seen: Batch) -> (index: U32): Header => return seen.rows[index].header
++const payload = func (seen: Batch) -> (index: U32): &[math.Vec4] => return do:
++  let row = seen.rows[index]
++  let vectors = seen.vectors
++  return &vectors[row.start..row.start + row.count]
++const vector_count = func (seen: Batch): U32 => return seen.vectors.length
++const vector_at = func (seen: Batch) -> (index: U32): math.Vec4 => return seen.vectors[index]
++const append_batch = func (destination: Builder) -> (source: Batch) => return do:
++  let length = count source
++  for index in 0 .. length:
++    append destination (header source index) (payload source index)
++  return ()
++const clear = func (builder: Builder) => return do:
++  @storage.truncate builder.rows 0
++  @storage.truncate builder.vectors 0
++  return ()
++
++// Exact production factory; only the result representation differs below.
++const draw = func pose => return func (appearance: Appearance) => return
++  $Header { mesh: appearance.mesh, material: appearance.material, matrix: transform.matrix pose, has_parameters: false, parameters: math.vec4 0.0 0.0 0.0 0.0 }
++
++// `mesh` in `material` at `position`, turned `yaw` about the vertical and
++// sized by `scale`: the usual way to set a model in the world.
++const placed = func (mesh: U32) => return func (material: U32) => return func (position: Vec3) => return func (yaw: F32) => return func (scale: Vec3) => return
++  draw $transform.Pose3 { position, rotation: math.Quat.yaw yaw, scale } $Appearance { mesh, material }
++
+diff --git a/build/bench/draw-batch-source/run.ts b/build/bench/draw-batch-source/run.ts
+new file mode 100644
+index 00000000..58b1d8cc
+--- /dev/null
++++ b/build/bench/draw-batch-source/run.ts
+@@ -0,0 +1,706 @@
++import { resolve } from "node:path";
++import { parseArgs } from "node:util";
++import { createZigProjectCompiler } from "../../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../../compiler/guest.ts";
++import {
++  expectedRenderStream,
++  ownedRenderSource,
++} from "../../../zig-native/tests/owned_render_copy_fixture.ts";
++const { values } = parseArgs({
++  options: {
++    compiler: {
++      type: "string",
++      default: "zig-native/zig-out-native-dev/bin/blotc",
++    },
++    measure: { type: "boolean", default: false },
++    inventory: { type: "boolean", default: false },
++    repetitions: { type: "string", default: "3" },
++  },
++});
++const repo = resolve(new URL("../../../", import.meta.url).pathname);
++const folder = resolve(new URL("./", import.meta.url).pathname);
++const executable = resolve(repo, values.compiler!);
++const repetitions = Number(values.repetitions);
++if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 9) {
++  throw new Error("Bad repetitions");
++}
++const evidence = await Deno.makeTempDir({ dir: folder, prefix: "run-" });
++const hash = async (bytes: Uint8Array) =>
++  [
++    ...new Uint8Array(
++      await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes)),
++    ),
++  ].map((v) => v.toString(16).padStart(2, "0")).join("");
++const sha = (s: string) => hash(new TextEncoder().encode(s));
++const compilerHash = await hash(await Deno.readFile(executable));
++const apiPath = `${folder}/batch.blot`;
++const api = await Deno.readTextFile(apiPath);
++const common =
++  'import * as batch from "./batch"\nimport * as math from "ink/math"\nconst empty: Array math.Vec4 = #[]\nconst shown = batch.placed 1 2 math.zero3 0.0 math.one3\n';
++const positive = common +
++  `entry const answer = func (input: U32): U32 => return do:
++  let values: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) 2.0 3.0 (-0.0), math.vec4 4.0 5.0 6.0 7.0]
++  let result = #[0]
++  batch.with_builder (&empty[0..0]) (func destination => return do:
++    batch.append destination shown (&values[0..2])
++    let old = batch.batch destination
++    let kept = batch.payload old 0
++    batch.append destination shown (&empty[0..0])
++    if batch.count old != 1 or batch.vector_count old != 2:
++      return @panic "old batch length grew"
++    batch.append_batch destination old
++    batch.with_builder (&empty[0..0]) (func source => return do:
++      batch.append source shown kept
++      let seen = batch.batch source
++      batch.append_batch destination seen
++      batch.clear source
++      batch.append source shown (&empty[0..0])
++      if batch.count (batch.batch source) != 1:
++        return @panic "nested reinitialization failed"
++      return ())
++    if kept[0].x != U32.to_f32 input or batch.count (batch.batch destination) != 4:
++      return @panic "cross batch copy lost roots"
++    batch.clear destination
++    batch.append destination shown (&values[0..2])
++    let last = batch.batch destination
++    if batch.count last != 1 or batch.vector_count last != 2 or (batch.payload last 0)[1].z != 6.0:
++      return @panic "clear and reinitialize failed"
++    result[0] := input + 1
++    return ())
++  return result[0]
++`;
++const negative = (body: string) =>
++  common + `entry const bad = func () => return do:\n${body}\n`;
++const laws = [
++  {
++    name: "raw_pool",
++    code: "private_access",
++    source: negative(
++      "  let out = #[0]\n  batch.with_builder (&empty[0..0]) (func b => return do:\n    out[0] := b.vectors.length)\n  return out[0]",
++    ),
++  },
++  {
++    name: "private_row",
++    code: "unknown_constructor",
++    source: negative(
++      "  let row = $batch.Row {header: shown, start: 0, count: 0}\n  return 0",
++    ),
++  },
++  {
++    name: "forge_batch",
++    code: "private_access",
++    source: negative(
++      "  let forged = $batch.Batch {rows: #[], vectors: #[]}\n  return batch.count forged",
++    ),
++  },
++  {
++    name: "escape_payload",
++    code: "storage_escape",
++    source: negative(
++      "  let escaped: Array (&[math.Vec4]) = #[&empty[0..0]]\n  let values: Array math.Vec4 = #[math.vec4 42.0 0.0 0.0 0.0]\n  batch.with_builder (&empty[0..0]) (func b => return do:\n    batch.append b shown (&values[0..1])\n    escaped[0] := batch.payload (batch.batch b) 0)\n  return F32.to_u32 escaped[0][0].x",
++    ),
++  },
++  {
++    name: "escape_builder",
++    code: "storage_escape",
++    source: negative(
++      "  let escaped: Array (Maybe batch.Builder) = #[$Nothing]\n  batch.with_builder (&empty[0..0]) (func b => return do:\n    escaped[0] := $Some b)\n  let $Some b = escaped[0] else:\n    return 0\n  return batch.count (batch.batch b)",
++    ),
++  },
++  {
++    name: "escape_batch",
++    code: "storage_escape",
++    source: negative(
++      "  let escaped: Array (Maybe batch.Batch) = #[$Nothing]\n  batch.with_builder (&empty[0..0]) (func b => return do:\n    escaped[0] := $Some (batch.batch b))\n  let $Some seen = escaped[0] else:\n    return 0\n  return batch.count seen",
++    ),
++  },
++  ...["batch", "payload", "capture"].map((kind) => {
++    let read = "batch.count seen";
++    if (kind === "payload") read = "F32.to_u32 kept[0].x";
++    if (kind === "capture") read = "read ()";
++    return {
++      name: `clear_live_${kind}`,
++      code: "storage_borrow_conflict",
++      source: negative(
++        `  let values: Array math.Vec4 = #[math.vec4 42.0 0.0 0.0 0.0]\n  let out = #[0]\n  batch.with_builder (&empty[0..0]) (func b => return do:\n    batch.append b shown (&values[0..1])\n    let seen = batch.batch b\n    let kept = batch.payload seen 0\n    let read = func () => return batch.count seen\n    batch.clear b\n    batch.append b shown (&values[0..1])\n    out[0] := ${read})\n  return out[0]`,
++      ),
++    };
++  }),
++];
++const nativeCases = `entry const overlap = func (input: U32) => return do:
++  let values: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0, math.vec4 7.0 8.0 9.0 10.0]
++  let output: GrowArray F32 = #[]
++  batch.with_builder (&values[0..3]) (func builder => return do:
++    let left = batch.placed 1 2 math.zero3 0.0 math.one3
++    left.has_parameters := true
++    left.parameters := math.vec4 (-0.0) 0.0 2.0 3.0
++    batch.append builder left (&values[0..2])
++    let old = batch.batch builder
++    let kept = batch.payload old 0
++    batch.append builder (batch.placed 3 4 math.zero3 0.0 math.one3) (&values[1..3])
++    if kept[1].x != 3.0 or batch.count old != 1:
++      return @panic "overlapping source changed"
++    for lane in pack_batch (batch.batch builder) (&values[0..3]):
++      output.push lane
++    return ())
++  return @storage.freeze output
++entry const self_rows = func (input: U32) => return do:
++  let values: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0]
++  let empty: Array math.Vec4 = #[]
++  let output: GrowArray F32 = #[]
++  batch.with_builder (&empty[0..0]) (func builder => return do:
++    batch.append builder (batch.placed 5 6 math.zero3 0.0 math.one3) (&values[0..2])
++    batch.append_batch builder (batch.batch builder)
++    batch.append_batch builder (batch.batch builder)
++    for lane in pack_batch (batch.batch builder) (&values[0..2]):
++      output.push lane
++    return ())
++  return @storage.freeze output
++entry const cross_copy = func (input: U32) => return do:
++  let values: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0]
++  let empty: Array math.Vec4 = #[]
++  let output: GrowArray F32 = #[]
++  batch.with_builder (&empty[0..0]) (func destination => return do:
++    batch.with_builder (&empty[0..0]) (func source => return do:
++      let left = batch.placed 1 2 math.zero3 0.0 math.one3
++      left.has_parameters := true
++      left.parameters := math.vec4 (-0.0) 0.0 2.0 3.0
++      batch.append source left (&values[0..2])
++      batch.append_batch destination (batch.batch source)
++      batch.clear source
++      batch.append source (batch.placed 9 10 math.zero3 0.0 math.one3) (&values[1..2])
++      return ())
++    for lane in pack_batch (batch.batch destination) (&empty[0..0]):
++      output.push lane
++    return ())
++  return @storage.freeze output
++entry const empty_after_freeze = func (input: U32) => return do:
++  let empty: Array math.Vec4 = #[]
++  let output: GrowArray F32 = #[]
++  batch.with_builder (&empty[0..0]) (func builder => return do:
++    batch.clear builder
++    let seen = batch.batch builder
++    output.push (U32.to_f32 input)
++    output.push (U32.to_f32 (batch.vector_count seen))
++    output.push (U32.to_f32 (batch.count seen))
++    return ())
++  return @storage.freeze output
++`;
++const packing =
++  `const pack_batch = func (seen: batch.Batch) -> (prefix: &[math.Vec4]) => return do:
++  let output: GrowArray F32 = #[]
++  output.push (U32.to_f32 (batch.vector_count seen))
++  for index in 0 .. batch.vector_count seen:
++    let value = batch.vector_at seen index
++    for lane in #[value.x, value.y, value.z, value.w]:
++      output.push lane
++  output.push (U32.to_f32 (batch.count seen))
++  for index in 0 .. batch.count seen:
++    let draw = batch.header seen index
++    output.push (U32.to_f32 draw.mesh)
++    output.push (U32.to_f32 draw.material)
++    for lane in math.Mat4.lanes draw.matrix:
++      output.push lane
++    if draw.has_parameters:
++      output.push 1.0
++      for lane in #[draw.parameters.x, draw.parameters.y, draw.parameters.z, draw.parameters.w]:
++        output.push lane
++    else:
++      output.push 0.0
++    let payload = batch.payload seen index
++    output.push (U32.to_f32 payload.length)
++    for value in payload:
++      for lane in #[value.x, value.y, value.z, value.w]:
++        output.push lane
++  for value in prefix:
++    for lane in #[value.x, value.y, value.z, value.w]:
++      output.push lane
++  return @storage.freeze output
++`;
++function source(callers: number, candidate: boolean) {
++  let baseline = ownedRenderSource(callers);
++  for (let at = 0; at < callers; at++) {
++    let parameters = "$Nothing";
++    if (at % 2 === 0) {
++      parameters = `$Some (math.vec4 (U32.to_f32 input) ${
++        at + 1
++      }.0 (-0.0) (-1.0))`;
++    }
++    const before =
++      `  let rows_${at}: Array render.Draw = #[$render.Draw {mesh: ${
++        at + 1
++      }, material: ${
++        at + 11
++      }, matrix: math.Mat4.identity, parameters: ${parameters}, extra: &extra_${at}[0..2]}]`;
++    const after = `  let shown_${at} = render.placed ${at + 1} ${
++      at + 11
++    } math.zero3 0.0 math.one3\n  shown_${at}.parameters := ${parameters}\n  shown_${at}.extra := &extra_${at}[0..2]\n  let rows_${at}: Array render.Draw = #[shown_${at}]`;
++    if (!baseline.includes(before)) {
++      throw new Error("Original stream fixture changed");
++    }
++    baseline = baseline.replace(before, after);
++  }
++  let geometryModule = "render";
++  let result = baseline;
++  if (candidate) {
++    geometryModule = "batch";
++    const controls = baseline.slice(baseline.indexOf("entry const overlap"))
++      .replaceAll("entry const overlap", "entry const control_overlap")
++      .replaceAll("entry const self_rows", "entry const control_self_rows")
++      .replaceAll(
++        "entry const empty_after_freeze",
++        "entry const control_empty_after_freeze",
++      );
++    result =
++      `import * as batch from "./batch"\nimport * as render from "ink/render"\nimport * as math from "ink/math"\n${
++        baseline.slice(
++          baseline.indexOf("const pack ="),
++          baseline.indexOf("entry const stream"),
++        )
++      }${packing}entry const stream = func (input: U32) => return do:
++  let prefix: Array math.Vec4 = #[math.vec4 (-1.0) (-0.0) 10.0 11.0, math.vec4 (-2.0) 12.0 13.0 14.0]
++  let output: GrowArray F32 = #[]
++  batch.with_builder (&prefix[0..2]) (func builder => return do:
++`;
++    for (let at = 0; at < callers; at++) {
++      result +=
++        `    let extra_${at}: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) ${
++          at + 1
++        }.0 2.0 (-0.0), math.vec4 ${
++          at + 3
++        }.0 4.0 5.0 6.0]\n    let shown_${at} = batch.placed ${at + 1} ${
++          at + 11
++        } math.zero3 0.0 math.one3\n`;
++      if (at % 2 === 0) {
++        result +=
++          `    shown_${at}.has_parameters := true\n    shown_${at}.parameters := math.vec4 (U32.to_f32 input) ${
++            at + 1
++          }.0 (-0.0) (-1.0)\n`;
++      }
++      result += `    batch.append builder shown_${at} (&extra_${at}[0..2])\n`;
++    }
++    result +=
++      `    let packed = pack_batch (batch.batch builder) (&prefix[0..2])\n    for lane in packed:\n      output.push lane\n    return ())\n  return @storage.freeze output\n${controls}${nativeCases}`;
++  }
++  return result +
++    `entry const geometry = func (input: F32) => return do:\n  let draw = ${geometryModule}.placed 1 2 (math.vec3 input (-2.0) 3.0) 0.0 (math.vec3 2.0 3.0 4.0)\n  return math.Mat4.lanes draw.matrix\n`;
++}
++const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
++function expectedCross(input: number): Float32Array<ArrayBuffer> {
++  const a = [input, 1, 2, -0], b = [3, 4, 5, 6];
++  return new Float32Array([
++    2,
++    ...a,
++    ...b,
++    1,
++    1,
++    2,
++    ...identity,
++    1,
++    -0,
++    0,
++    2,
++    3,
++    2,
++    ...a,
++    ...b,
++  ]);
++}
++function expectedOverlap(input: number): Float32Array<ArrayBuffer> {
++  // Original store_draw witness additionally appends one unused vector at end.
++  // Builder exposes only row appends; omit precisely that unused vector.
++  const original = expectedRenderStream("overlap", 1, input);
++  const expected = new Float32Array(original.length - 4);
++  expected.set(original.subarray(0, 29));
++  expected.set(original.subarray(33), 29);
++  expected[0] = 7;
++  return expected;
++}
++const recordedPins = JSON.parse(
++  await Deno.readTextFile(`${folder}/factory_pins.json`),
++);
++async function enforcePins() {
++  for (const [path, expected] of Object.entries(recordedPins)) {
++    if (path === "factory_sha256") continue;
++    if (await hash(await Deno.readFile(path)) !== expected) {
++      throw new Error(`Source pin changed: ${path}`);
++    }
++  }
++  const render = await Deno.readTextFile(
++    resolve(repo, "../ink/lib/render.blot"),
++  );
++  const factory = render.slice(
++    render.indexOf("const draw = func pose"),
++    render.indexOf("// What a frame"),
++  );
++  if (
++    await sha(factory) !== recordedPins.factory_sha256 ||
++    factory !== await Deno.readTextFile(`${folder}/original_factory.blot.txt`)
++  ) throw new Error("Original factory changed");
++  const old =
++    "$Draw { mesh: appearance.mesh, material: appearance.material, matrix: transform.matrix pose, parameters: $Nothing, extra: &no_extra[0..0] }";
++  const replacement =
++    "$Header { mesh: appearance.mesh, material: appearance.material, matrix: transform.matrix pose, has_parameters: false, parameters: math.vec4 0.0 0.0 0.0 0.0 }";
++  if (!api.endsWith(factory.replace(old, replacement))) {
++    throw new Error("Prototype factory differs beyond representation");
++  }
++}
++await enforcePins();
++const reports: Record<string, unknown>[] = [];
++async function build(
++  name: string,
++  source: string,
++  deadline: number,
++  expectedCode?: string,
++  callers?: number,
++) {
++  const entry = `${folder}/${name}.blot`;
++  await Deno.writeTextFile(entry, source);
++  let compiler;
++  let guest;
++  let started;
++  let elapsed;
++  let report: Record<string, unknown>;
++  try {
++    compiler = await createZigProjectCompiler({
++      executable,
++      entry,
++      prelude: `${repo}/std/prelude.blot`,
++      stdRoot: `${repo}/std`,
++      imports: { "ink/": resolve(repo, "../ink/lib") },
++      cacheDirectory: false,
++      startupTimeoutMs: deadline,
++      profileBackend: true,
++      codegenWorkers: 1,
++    });
++    started = performance.now();
++    const result = await compiler.build({
++      sources: { [entry]: source, [apiPath]: api },
++      signal: AbortSignal.timeout(deadline),
++    });
++    elapsed = performance.now() - started;
++    if (expectedCode) {
++      if (
++        result.success ||
++        !result.diagnostics.some((d) => d.code === expectedCode)
++      ) throw new Error(`Expected ${expectedCode}: ${JSON.stringify(result)}`);
++      if (name === "laws-private_row" && !result.success) {
++        const diagnostic = result.diagnostics[0];
++        const at = source.indexOf("$batch.Row") + 1;
++        if (
++          result.diagnostics.length !== 1 || diagnostic.filename !== entry ||
++          diagnostic.stage !== "check-project" || diagnostic.start !== at ||
++          diagnostic.end !== at ||
++          diagnostic.message !== "unknown record constructor: batch.Row"
++        ) {
++          throw new Error(
++            "Private Row hiding failed strict diagnostic contract",
++          );
++        }
++      }
++      report = {
++        status: "complete",
++        rejected: true,
++        expected_code: expectedCode,
++        diagnostics: result.diagnostics,
++      };
++    } else {
++      if (!result.success) throw new Error(JSON.stringify(result.diagnostics));
++      guest = await instantiateGuest(result.bytes);
++      const runs = [];
++      if (callers === undefined) {
++        for (const input of [0, 41, 7]) {
++          const actual = guest.call("answer", input);
++          if (actual !== input + 1) {
++            throw new Error(`Positive laws ${input}: ${actual}`);
++          }
++          runs.push({ entry: "answer", input, actual });
++        }
++      } else {
++        for (const input of [0, 1, 41, 0xffffffff]) {
++          const entries = [
++            "stream",
++            "overlap",
++            "self_rows",
++            "empty_after_freeze",
++          ];
++          const candidate = name.includes("candidate");
++          if (candidate) {
++            entries.push(
++              "cross_copy",
++              "control_overlap",
++              "control_self_rows",
++              "control_empty_after_freeze",
++            );
++          }
++          for (const entry of entries) {
++            const actual = guest.call(entry, input);
++            let referenceEntry = entry;
++            if (entry.startsWith("control_")) {
++              referenceEntry = entry.slice("control_".length);
++            }
++            let expected = expectedRenderStream(referenceEntry, callers, input);
++            if (candidate && entry === "overlap") {
++              expected = expectedOverlap(input);
++            }
++            if (candidate && entry === "cross_copy") {
++              expected = expectedCross(input);
++            }
++            if (!(actual instanceof Float32Array)) {
++              throw new Error("Expected numeric stream");
++            }
++            const a = new Uint32Array(
++                actual.buffer,
++                actual.byteOffset,
++                actual.length,
++              ),
++              b = new Uint32Array(expected.buffer);
++            let difference = -1;
++            for (let i = 0; i < Math.max(a.length, b.length); i++) {
++              if (a[i] !== b[i]) {
++                difference = i;
++                break;
++              }
++            }
++            if (difference !== -1) {
++              throw new Error(
++                `${entry}/${input} differs at ${difference}: ${
++                  a[difference]
++                } != ${b[difference]}`,
++              );
++            }
++            runs.push({
++              entry,
++              input,
++              lanes: actual.length,
++              sha256: await hash(
++                new Uint8Array(
++                  actual.buffer,
++                  actual.byteOffset,
++                  actual.byteLength,
++                ),
++              ),
++            });
++          }
++        }
++        for (const input of [0, 1, -3.5]) {
++          const expected = new Float32Array([
++            2,
++            0,
++            0,
++            0,
++            0,
++            3,
++            0,
++            0,
++            0,
++            0,
++            4,
++            0,
++            input,
++            -2,
++            3,
++            1,
++          ]);
++          const actual = guest.call("geometry", input);
++          if (
++            !(actual instanceof Float32Array) || actual.length !== 16 ||
++            actual.some((v, i) => v !== expected[i])
++          ) throw new Error("Independent placed geometry differs");
++          runs.push({ entry: "geometry", input, lanes: 16 });
++        }
++      }
++      await Deno.writeFile(`${evidence}/${name}.wasm`, result.bytes);
++      report = {
++        status: "complete",
++        wasm_bytes: result.bytes.length,
++        wasm_sha256: await hash(result.bytes),
++        runs,
++        stats: result.stats,
++      };
++    }
++  } catch (error) {
++    if (elapsed === undefined && started !== undefined) {
++      elapsed = performance.now() - started;
++    }
++    let status = "failed";
++    if (/abort|timed out/i.test(String(error))) status = "timeout_incomplete";
++    report = { status, error: String(error) };
++  } finally {
++    guest?.dispose();
++    await compiler?.dispose();
++  }
++  const record: Record<string, unknown> = {
++    name,
++    build_ms: elapsed,
++    source_sha256: await sha(source),
++    ...report,
++  };
++  reports.push(record);
++  await Deno.writeTextFile(
++    `${evidence}/${name}.json`,
++    JSON.stringify(record, null, 2) + "\n",
++  );
++  console.log(
++    JSON.stringify({
++      name,
++      status: record.status,
++      build_ms: elapsed,
++      wasm_bytes: record.wasm_bytes,
++      error: record.error,
++    }),
++  );
++  return record.status === "complete";
++}
++if (values.inventory && values.measure) {
++  throw new Error("Inventory cannot enable measurement");
++}
++let qualified = await build("laws-positive", positive, 5000);
++if (qualified || values.inventory) {
++  for (const law of laws) {
++    if (!await build(`laws-${law.name}`, law.source, 5000, law.code)) {
++      qualified = false;
++      if (!values.inventory) break;
++    }
++  }
++}
++const escapeSlot = (invalid: boolean) => {
++  let target = "outer";
++  if (invalid) target = "inner";
++  return common + `entry const answer = func (input: U32): U32 => return do:
++  let out = #[0]
++  batch.with_builder (&empty[0..0]) (func outer => return do:
++    batch.append outer shown (&empty[0..0])
++    let escaped: Array batch.Builder = #[outer]
++    batch.with_builder (&empty[0..0]) (func inner => return do:
++      escaped[0] := ${target})
++    out[0] := input + batch.count (batch.batch escaped[0])
++    return ())
++  return out[0]
++`;
++};
++if (values.inventory) {
++  const supported = await build(
++    "laws-builder-slot-valid-control",
++    escapeSlot(false),
++    5000,
++  );
++  if (supported) {
++    if (
++      !await build(
++        "laws-builder-slot-escape",
++        escapeSlot(true),
++        5000,
++        "storage_escape",
++      )
++    ) qualified = false;
++  } else qualified = false;
++}
++if (qualified && !values.inventory) {
++  qualification: for (const size of [1, 4, 8]) {
++    for (const candidate of [false, true]) {
++      let label = "baseline";
++      if (candidate) label = "candidate";
++      if (
++        !await build(
++          `qualify-${label}-${size}`,
++          source(size, candidate),
++          10000,
++          undefined,
++          size,
++        )
++      ) {
++        qualified = false;
++        break qualification;
++      }
++    }
++  }
++}
++const medians: Record<string, unknown>[] = [];
++if (qualified && values.measure) {
++  measurement: for (
++    let repetition = 0;
++    repetition < repetitions;
++    repetition++
++  ) {
++    for (const size of [1, 4, 8]) {
++      let order = [false, true];
++      if (repetition % 2 === 1) {
++        order = [true, false];
++      }
++      for (const candidate of order) {
++        let label = "baseline";
++        if (candidate) label = "candidate";
++        if (
++          !await build(
++            `measure-${label}-${size}-${repetition}`,
++            source(size, candidate),
++            5000,
++            undefined,
++            size,
++          )
++        ) {
++          qualified = false;
++          break measurement;
++        }
++      }
++    }
++  }
++  const median = (values: number[]) => {
++    const sorted = values.toSorted((a, b) => a - b);
++    const middle = Math.floor(sorted.length / 2);
++    if (sorted.length % 2) return sorted[middle];
++    return (sorted[middle - 1] + sorted[middle]) / 2;
++  };
++  for (const size of [1, 4, 8]) {
++    const summary: Record<string, number> = {};
++    for (const variant of ["baseline", "candidate"]) {
++      const samples = reports.filter((r) =>
++        String(r.name).startsWith(`measure-${variant}-${size}-`) &&
++        r.status === "complete"
++      );
++      if (samples.length !== repetitions) {
++        qualified = false;
++        continue;
++      }
++      summary[`${variant}_ms`] = median(samples.map((s) => Number(s.build_ms)));
++      summary[`${variant}_bytes`] = median(
++        samples.map((s) => Number(s.wasm_bytes)),
++      );
++    }
++    let decision = "incomplete";
++    if (Object.keys(summary).length === 4) {
++      decision = "rejected";
++      if (
++        summary.candidate_ms <= summary.baseline_ms * 0.8 ||
++        summary.candidate_bytes <= summary.baseline_bytes * 0.7
++      ) decision = "measured_win_pending_integration";
++    }
++    medians.push({ size, ...summary, decision });
++  }
++}
++await enforcePins();
++if (await hash(await Deno.readFile(executable)) !== compilerHash) {
++  throw new Error("Compiler changed during experiment");
++}
++const result = {
++  evidence,
++  qualified,
++  measured: values.measure,
++  diagnostic_inventory: values.inventory,
++  compiler_sha256: compilerHash,
++  api_sha256: await sha(api),
++  factory_pins: JSON.parse(
++    await Deno.readTextFile(`${folder}/factory_pins.json`),
++  ),
++  scope:
++    "Source-only opaque draw batch; real original render factories/fullstream controls, no persistent-cache replacement or whole-game qualification",
++  medians,
++  reports,
++};
++await Deno.writeTextFile(
++  `${evidence}/result.json`,
++  JSON.stringify(result, null, 2) + "\n",
++);
++console.log(JSON.stringify({ evidence, qualified, medians }));
++if (!qualified) Deno.exitCode = 1;
+diff --git a/build/bench/draw-batch-source/original_factory.blot.txt b/build/bench/draw-batch-source/original_factory.blot.txt
+new file mode 100644
+index 00000000..d491b4d4
+--- /dev/null
++++ b/build/bench/draw-batch-source/original_factory.blot.txt
+@@ -0,0 +1,8 @@
++const draw = func pose => return func (appearance: Appearance) => return
++  $Draw { mesh: appearance.mesh, material: appearance.material, matrix: transform.matrix pose, parameters: $Nothing, extra: &no_extra[0..0] }
++
++// `mesh` in `material` at `position`, turned `yaw` about the vertical and
++// sized by `scale`: the usual way to set a model in the world.
++const placed = func (mesh: U32) => return func (material: U32) => return func (position: Vec3) => return func (yaw: F32) => return func (scale: Vec3) => return
++  draw $transform.Pose3 { position, rotation: math.Quat.yaw yaw, scale } $Appearance { mesh, material }
++
+diff --git a/build/bench/draw-batch-source/factory_pins.json b/build/bench/draw-batch-source/factory_pins.json
+new file mode 100644
+index 00000000..7c313383
+--- /dev/null
++++ b/build/bench/draw-batch-source/factory_pins.json
+@@ -0,0 +1,7 @@
++{
++  "/home/jacobt/src/ink/lib/render.blot": "938b52c18d078f52920596d48986e53b12a4f76f2b0d5f2bdf2b9bfaa05aea93",
++  "/home/jacobt/src/ink/lib/math.blot": "77718d79d615e2b49b9ed077f69bd26bbcf20162b895f6420a733c94b626b18d",
++  "/home/jacobt/src/ink/lib/transform.blot": "cff7eb49e30159bece898b84ca6033e23b0f6eb03496bf542ac844aa8daf93a6",
++  "/home/jacobt/src/blot2/zig-native/tests/owned_render_copy_fixture.ts": "b888a282f2acfc9345c6018b82019941214dbe67d9a498952ac05c5c283b1ef2",
++  "factory_sha256": "763af68032dd21386265b81d3b5eef552298bb61cd551d4d73c2153e1668c685"
++}

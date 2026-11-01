@@ -1,0 +1,124 @@
+{
+  "date": "2026-11-01",
+  "checkpoint": "5512bd25d4fec9f773b46f52f2f0a7678a722504",
+  "reviewer": "gpt-6-astra xhigh",
+  "status": "proposal_only_not_implemented",
+  "compiler_sha256": "56a163b9b20c5f8cafaaaf8910a13744df9a0a728ddacd7f55a950fc384e8d19",
+  "measurement_source": "completed-core-validation-2026-11-01.json",
+  "candidate_world_producer_median_phase_us": {
+    "check": 4242815,
+    "lower": 950645,
+    "freeze": 354177,
+    "validation": 888522,
+    "backend": 303624
+  },
+  "top_source_modules": [
+    {
+      "path": "gdev/src/actors/robots.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 423622
+    },
+    {
+      "path": "gdev/src/world_storage.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 403558
+    },
+    {
+      "path": "gdev/src/ui/station.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 390498
+    },
+    {
+      "path": "gdev/src/world/salt.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 315050
+    },
+    {
+      "path": "ink/lib/editor.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 196578
+    },
+    {
+      "path": "gdev/src/ui/menu.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 176778
+    },
+    {
+      "path": "gdev/src/progression/goals.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 169691
+    },
+    {
+      "path": "ink/lib/shapes.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 168233
+    },
+    {
+      "path": "gdev/pen/protocol_render.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 165373
+    },
+    {
+      "path": "gdev/src/player/hand.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 159387
+    },
+    {
+      "path": "gdev/src/ui/build_bar.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 153787
+    },
+    {
+      "path": "gdev/src/progression/tutorial.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 150189
+    },
+    {
+      "path": "gdev/src/world/trails.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 141613
+    },
+    {
+      "path": "gdev/src/progression/progression.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 140337
+    },
+    {
+      "path": "gdev/src/buildings/buildings.blot",
+      "samples": 3,
+      "median_inclusive_check_module_us": 139228
+    }
+  ],
+  "module_clock_limits": "Inclusive check.module sums over signature/body calls; parallel module spans may overlap. Do not sum them with exclusive phase clocks. Source and Core unit IDs have separate namespaces.",
+  "selected_four_outcomes": {
+    "engine_measurement": "Landed bounded cancellation-surviving phases, stages, optimizer pass sums, module timings and source/Core namespaces.",
+    "completed_plans": "Landed exact immutable completed-validation receipts, 9.9% lower measured total; automatic readonly/copy/append call plans missed their unchanged threshold and were removed.",
+    "source_data_flow": "Landed direct caller-pool kite appends with seven bit-identical original streams; opaque draw-batch source prototype remains unqualified and archived.",
+    "source_type_experiments": "Direct Mat4, four callback input annotations and nominal World/host interfaces missed thresholds; no ineffective source expansion remains."
+  },
+  "next_architectural_lever": {
+    "name": "Cursor-aware structural unification",
+    "hypothesis": "unifyMode resolves entire type graphs for each pending pair, then enqueues child pairs and resolves descendants again. Traversing heads and child views directly may remove repeated materialization across many source modules.",
+    "targets": [
+      "zig-native/src/check/types.zig:1862",
+      "zig-native/src/check/types.zig:875"
+    ],
+    "representation": "Pending pairs carry TypeView{id,cursor}; follow variable/version heads while preserving effective child cursor. Existing head returns only an Id and is not a substitute.",
+    "first_slice": "Ordinary first-order pairs only; retain effect-row resolver and full materialization for variable binding, publication and diagnostics. Rich rank/projection/generative paths remain on original solver.",
+    "laws": [
+      "Old/new views through variable chains and nested record/function children preserve effective cursors.",
+      "Binding and occurs-check reject hidden cycles and preserve shared variables.",
+      "Mismatch/OOM rollback restores type versions, effect rows, marks and retry results.",
+      "Independent uses preserve fresh covariant rows and exact callback/effect-operation input requirements.",
+      "Richer types retain existing solver acceptance and diagnostics.",
+      "Final materialized schemes/Core and depth/work-limit rejection boundaries agree."
+    ],
+    "falsification": "Use same pinned full actual world producer with tiny identity output, three rotated fresh current/prototype pairs, ten-second per-build integration cap. Record exclusive check/total, unification resolve visits/nodes and allocation traffic; execute identical artifact outputs.",
+    "gate": ">=20% lower median checking time, improving total and no >5% lower/freeze/validation regression; broader semantic qualification before landing. Remove if work merely moves to binding/publication."
+  },
+  "limits": [
+    "This is a code-informed hypothesis, not measured CPU attribution or a speedup claim.",
+    "Main still exceeds five seconds; being in checking at the deadline does not establish the cost of later backend work.",
+    "No current whole-main Wasm size or fresh frame. Subsecond/~1MB goals remain unfinished."
+  ]
+}

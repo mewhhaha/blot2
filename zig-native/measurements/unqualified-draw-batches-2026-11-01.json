@@ -1,0 +1,286 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "5512bd25d4fec9f773b46f52f2f0a7678a722504",
+  "decision": "unqualified_source_prototype_archived_without_migration",
+  "compiler_sha256": "56a163b9b20c5f8cafaaaf8910a13744df9a0a728ddacd7f55a950fc384e8d19",
+  "qualified": false,
+  "measured": false,
+  "toolchain": "Zig0.17.0 safe/noLLVM; optimized guest; fresh sessions without cache",
+  "deadline_ms": 5000,
+  "patch": "unqualified-draw-batches-2026-11-01.patch",
+  "files": {
+    "batch.blot": "7ce9333ba0312f2d75f45e47694f1c647bbe28171085cd067505da3c8ce55e23",
+    "run.ts": "d537622295b5b38a12f0b8298ffe951c04c323e398bae7d94b79130725e87f99",
+    "original_factory.blot.txt": "763af68032dd21386265b81d3b5eef552298bb61cd551d4d73c2153e1668c685",
+    "factory_pins.json": "523cc2d41a31dd5a426c2efe5b500cb5c2f386a1f427299d6e3c824a62ebed41"
+  },
+  "factory_pins": {
+    "/home/jacobt/src/ink/lib/render.blot": "938b52c18d078f52920596d48986e53b12a4f76f2b0d5f2bdf2b9bfaa05aea93",
+    "/home/jacobt/src/ink/lib/math.blot": "77718d79d615e2b49b9ed077f69bd26bbcf20162b895f6420a733c94b626b18d",
+    "/home/jacobt/src/ink/lib/transform.blot": "cff7eb49e30159bece898b84ca6033e23b0f6eb03496bf542ac844aa8daf93a6",
+    "/home/jacobt/src/blot2/zig-native/tests/owned_render_copy_fixture.ts": "b888a282f2acfc9345c6018b82019941214dbe67d9a498952ac05c5c283b1ef2",
+    "factory_sha256": "763af68032dd21386265b81d3b5eef552298bb61cd551d4d73c2153e1668c685"
+  },
+  "raw_result": {
+    "path": "build/bench/draw-batch-source/run-6b3c1dbe812f6f1/result.json",
+    "sha256": "7232bac6a1c197542c5a92ff90509fea913d2659eec675b64d8f2a3f8c6b0007"
+  },
+  "api": "Opaque Builder owns private row/vector pools inside with_builder; Batch contains real captured-length borrows; public Header has no payload spans. Persistent Stored excluded.",
+  "reports": [
+    {
+      "name": "laws-positive",
+      "build_ms": 581.369504,
+      "source_sha256": "a0cfbb7b6940fbe57bff02952eeabb605ccb823856c8a079b83ce4d13bd0cdb2",
+      "status": "complete",
+      "wasm_bytes": 29804,
+      "wasm_sha256": "fa8721c3474c1c1cf7695527564fbe7855009ebc4a75be907197a84b44988efb",
+      "runs": [
+        {
+          "entry": "answer",
+          "input": 0,
+          "actual": 1
+        },
+        {
+          "entry": "answer",
+          "input": 41,
+          "actual": 42
+        },
+        {
+          "entry": "answer",
+          "input": 7,
+          "actual": 8
+        }
+      ]
+    },
+    {
+      "name": "laws-raw_pool",
+      "build_ms": 436.290659,
+      "source_sha256": "70861c6c0ce2e986a6293ec3bccfc6a25c6d98bec0a864992368d3f4f66ef29f",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "private_access",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-raw_pool.blot",
+          "stage": "check-project",
+          "code": "private_access",
+          "start": 286,
+          "end": 302,
+          "message": "Private declaration or opaque representation is unavailable here",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-private_row",
+      "build_ms": 421.6612690000002,
+      "source_sha256": "6ea9a186c970f796b2eb3d31a57182e62631458bca8d5ca4d9e567c6166392fe",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "unknown_constructor",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-private_row.blot",
+          "stage": "check-project",
+          "code": "unknown_constructor",
+          "start": 210,
+          "end": 210,
+          "message": "unknown record constructor: batch.Row",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-forge_batch",
+      "build_ms": 424.050242,
+      "source_sha256": "ada86e57871eca729ee5021bfa6f0f64a27024bfe50a694226cc40b31b890715",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "private_access",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-forge_batch.blot",
+          "stage": "check-project",
+          "code": "private_access",
+          "start": 213,
+          "end": 213,
+          "message": "Private declaration or opaque representation is unavailable here: batch.Batch",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-escape_payload",
+      "build_ms": 565.7114100000003,
+      "source_sha256": "23a3cb927a1ac2ac4a2476c35b0a7f2ec064529d04265e953bc567247d065ead",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "storage_escape",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-escape_payload.blot",
+          "stage": "emit",
+          "code": "storage_escape",
+          "start": 416,
+          "end": 461,
+          "message": "The stored borrow would outlive its owner",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-escape_builder",
+      "build_ms": 469.1888570000001,
+      "source_sha256": "f6aae65bb609eb2a13eddc015b3a290ff3896492288ef9da626a4816fca504ba",
+      "status": "failed",
+      "error_summary": [
+        "Error",
+        " Expected storage_escape"
+      ],
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-escape_builder.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "This form is not yet supported by the bounded scoped-storage backend",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-escape_batch",
+      "build_ms": 445.5668639999999,
+      "source_sha256": "ed0b2d2dc012c052961bca01b89411aea8ead6a1544d502dfa7d8a19c4a894ca",
+      "status": "failed",
+      "error_summary": [
+        "Error",
+        " Expected storage_escape"
+      ],
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-escape_batch.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "This form is not yet supported by the bounded scoped-storage backend",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-clear_live_batch",
+      "build_ms": 542.3802289999999,
+      "source_sha256": "20a1c819c2840ea7c8613a8f6d4194db9c8c83f7898c7e98f1744bcaffd1d7e1",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "storage_borrow_conflict",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/batch.blot",
+          "stage": "emit",
+          "code": "storage_borrow_conflict",
+          "start": 2235,
+          "end": 2267,
+          "message": "Shrinking would invalidate a live borrow or a consumed growth capability",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-clear_live_payload",
+      "build_ms": 553.3420260000003,
+      "source_sha256": "541a2087cab633499a3517dfbf3c2667f04a42ca24690f1aecc8cfac56996499",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "storage_borrow_conflict",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/batch.blot",
+          "stage": "emit",
+          "code": "storage_borrow_conflict",
+          "start": 2270,
+          "end": 2305,
+          "message": "Shrinking would invalidate a live borrow or a consumed growth capability",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-clear_live_capture",
+      "build_ms": 591.5131369999999,
+      "source_sha256": "3e067de6347cdb8c3496e4de77cf9e8c366096f50acc17a1f15885ea29a2cb19",
+      "status": "complete",
+      "rejected": true,
+      "expected_code": "storage_borrow_conflict",
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/batch.blot",
+          "stage": "emit",
+          "code": "storage_borrow_conflict",
+          "start": 2235,
+          "end": 2267,
+          "message": "Shrinking would invalidate a live borrow or a consumed growth capability",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "name": "laws-builder-slot-valid-control",
+      "build_ms": 562.0669020000005,
+      "source_sha256": "914e4ad9bec3f44b02097212d484ee7ef83e028cf0f9940303f9ce1aee3e1dd2",
+      "status": "failed",
+      "error_summary": [
+        "Error",
+        " [{\"filename\""
+      ],
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/bench/draw-batch-source/laws-builder-slot-valid-control.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 377,
+          "end": 385,
+          "message": "This form is not yet supported by the bounded scoped-storage backend",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    }
+  ],
+  "review": [
+    "Astra xhigh found no source-boundary blocker by inspection; owner and Batch escape laws still required execution.",
+    "The original runner copied three baseline controls unchanged; corrected runner labels them control_* and adds independent batch-native stream cases. Those reference cases were never run.",
+    "Factory/source pins and exact extracted factory algorithm are enforced before and after runs.",
+    "One initialized Builder slot with matched valid control was attempted; valid control is itself storage_unsupported, so no further escape rewrite or compiler extension was attempted."
+  ],
+  "conclusion": [
+    "Positive lifecycle/nesting fixture executed inputs0,41,7 successfully. Privacy, extracted payload escape and three live-borrow clear laws report intended diagnostics.",
+    "Older Maybe slots containing Builder/Batch return generic storage_unsupported rather than intended lifetime diagnostic. This does not establish an accepted unsafe escape or a qualified safe boundary.",
+    "All intended escape laws did not qualify; fullstream equivalence and 1/4/8 paired performance gate were therefore not run.",
+    "No live Ink/Gdev API, ABI, memory safety rule or compiler code changed for this prototype."
+  ],
+  "reproduce": "Apply patch to parent checkpoint, then deno run --no-config --no-lock -A build/bench/draw-batch-source/run.ts --compiler zig-native/zig-out-native-dev/bin/blotc --inventory",
+  "retention_gate": "Only after all safety and original-stream laws pass: >=20% median compile reduction OR >=30% whole-module bytes at actual1/4/8 calls."
+}

@@ -41,10 +41,21 @@ The nominal World/host interface rewrite is likewise removed: three pairs
 regress total/checking latency. See
 [nominal evidence](zig-native/measurements/rejected-nominal-world-2026-11-01.json).
 
-The next source experiment is a small opaque draw-batch boundary: plain public
-headers, privately owned row/vector pools and real borrowed batch views. Public
-flat spans or owner stamps do not preserve truncate/regrow safety. No broad
-renderer migration or language safety cut has landed.
+The small opaque draw-batch prototype is **unqualified and archived**. Its
+positive lifecycle case, three privacy laws, payload escape and three
+live-borrow clear laws pass. Builder/Batch escape forms and even the matched
+valid initialized-slot control hit unsupported storage layouts, so reference
+streams and performance were never run. Public flat spans or owner stamps do
+not preserve truncate/regrow safety. No renderer API migration or safety cut
+landed. See [prototype evidence](zig-native/measurements/unqualified-draw-batches-2026-11-01.json).
+
+Astra xhigh recommends **cursor-aware structural unification** next: compare
+type heads and carry historical cursors into child pairs instead of recursively
+normalizing whole trees at every comparison. This is an unimplemented
+hypothesis. Preserve eager binding/publication and richer-type paths, and require
+at least 20% lower measured checking time with improving total time. The six
+semantic law groups and bounded experiment are in
+[the architecture review](zig-native/measurements/compiler-architecture-review-2026-11-01.json).
 
 The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
 cancellation with exclusive phase checkpoints, module names, balanced
@@ -62,9 +73,8 @@ The attempted completed readonly leaf plan is **rejected and removed**. Original
 ECS readers activate three plans but save only 18 bytes, with effectively flat
 compilation. Matrix6 activates none. Existing sharing already supplies one
 reader definition; wrapping that work is not a general call/storage plan. The
-archived patch and executed witnesses retain the experiment. The next meaningful
-backend family is nested-descriptor `render.emit_owned/store_draw`, including
-writes and borrowed results, not another scalar leaf.
+archived patch and executed witnesses retain the experiment. The broader
+copy/append family was subsequently measured and rejected as recorded above.
 
 The explicit-interface experiments are also rejected: direct matrix composition
 leaves checking flat; four render callback input annotations save about 4%,
