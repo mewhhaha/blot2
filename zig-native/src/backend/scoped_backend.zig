@@ -697,7 +697,8 @@ const Generator = struct {
         }
         return value;
     }
-    fn readElement(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: Local) Error!Value {
+    const ElementPlace = struct { address: Local, element: Value };
+    fn readElementPlace(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: Local) Error!?ElementPlace {
         try self.writerEvent(m, id, array_, .read);
         try self.registerShapeRead(array_);
         const address = try self.c.temp();
@@ -708,7 +709,7 @@ const Generator = struct {
             // borrow roots for this unreachable value. The read frame still
             // rejects a later backedge that adds reachable payload evidence.
             try self.c.op(.unreachable_, 0);
-            return self.terminated();
+            return null;
         }
         var element = (try self.root(m, id, array_)).element;
         // A joined pool can hold borrows into either origin. Preserve the
@@ -720,7 +721,11 @@ const Generator = struct {
             element = try self.cloneShape(element);
             try self.storedShape(m, id, &element, self.roots.items[other].element, std.math.maxInt(usize));
         }
-        return self.loadValue(address, 0, element);
+        return .{ .address = address, .element = element };
+    }
+    fn readElement(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: Local) Error!Value {
+        const place = try self.readElementPlace(m, id, array_, index) orelse return self.terminated();
+        return self.loadValue(place.address, 0, place.element);
     }
     fn emptyUninitialized(self: *const Generator, value: Value) bool {
         const first = value.root orelse return false;
@@ -4835,6 +4840,51 @@ const Generator = struct {
         } else if (variants.len == 1 and variants[0].field < value.fields.len) return &value.fields[variants[0].field];
         return self.unsupported(m, id);
     }
+    fn projectValue(self: *Generator, m: *const core.Module, id: core.Id, original: Value, depth: usize) Error!Value {
+        var value = original;
+        if (value.terminated) return value;
+        const projection = m.node(id).b;
+        if (m.projection(projection).variants.len == 0) {
+            if (m.fieldSpelling(m.projection(projection).field)) |spelling| if (dataField(value, spelling)) |field| return field;
+            return self.getter(m, id, value, depth + 1);
+        }
+        return (try self.projected(m, id, &value, projection)).*;
+    }
+    fn indexedProjection(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!?Value {
+        const projection = m.node(id);
+        const read = m.node(projection.a);
+        if (read.tag != .array_op or m.arrayOperation(projection.a) != .get) return null;
+        const inputs = m.children(projection.a);
+        if (inputs.len != 2) return null;
+        try self.chargeExpression(m, projection.a, depth + 1);
+        const protected_before = self.protected.items.len;
+        defer self.protected.shrinkRetainingCapacity(protected_before);
+        const array_value = try self.expression(m, inputs[0], depth + 3);
+        if (array_value.terminated) return array_value;
+        try self.protected.append(self.allocator, array_value);
+        const subscript = try self.expression(m, inputs[1], depth + 3);
+        if (subscript.terminated) return subscript;
+        try self.protected.append(self.allocator, subscript);
+        const index = try self.elementIndex(m, projection.a, array_value, try self.scalar(m, projection.a, subscript));
+        const place = try self.readElementPlace(m, projection.a, array_value, index) orelse return try self.terminated();
+        if (plainInlineValue(place.element) and stableDescriptorShape(place.element)) {
+            var schema = place.element;
+            const diagnostic_before = self.diagnostic;
+            const selected: ?*Value = self.projected(m, id, &schema, projection.b) catch |err| blk: {
+                if (err == error.OutOfMemory) return err;
+                self.diagnostic = diagnostic_before;
+                break :blk null;
+            };
+            if (selected) |field| {
+                const offset = try fieldOffset(&schema, field) orelse return self.unsupported(m, id);
+                return try self.loadValue(place.address, offset, field.*);
+            }
+        }
+        const loaded = try self.loadValue(place.address, 0, place.element);
+        self.protected.shrinkRetainingCapacity(protected_before);
+        const value = try self.expressionEvidence(m, projection.a, loaded);
+        return try self.projectValue(m, id, value, depth);
+    }
     fn fieldOffset(value: *const Value, target: *const Value) Error!?u32 {
         if (value == target) return 0;
         var offset: u32 = 0;
@@ -4863,8 +4913,14 @@ const Generator = struct {
             const index_value = try self.expression(m, selectors[at].index, depth + 1);
             if (index_value.terminated) return index_value;
             const index = try self.scalar(m, id, index_value);
-            var selected = try self.readElement(m, id, value, index);
-            if (selected.terminated) return selected;
+            const place = try self.readElementPlace(m, id, value, index) orelse return self.terminated();
+            const selected_only = at + 1 < @max(selectors.len, path.len) and plainInlineValue(place.element) and stableDescriptorShape(place.element);
+            var selected: Value = undefined;
+            if (selected_only) {
+                selected = try self.cloneShape(place.element);
+            } else {
+                selected = try self.loadValue(place.address, 0, place.element);
+            }
             // Selecting a writable element pins its extent throughout RHS
             // evaluation, including nested calls. Growth keeps it in place.
             var selected_borrow = value;
@@ -4881,6 +4937,7 @@ const Generator = struct {
                 offset += (try fieldOffset(leaf, field)) orelse return self.unsupported(m, id);
                 leaf = field;
             }
+            if (selected_only) leaf.* = try self.loadValue(place.address, offset, leaf.*);
             const replacement = try self.updateValue(m, id, leaf.*, next, depth + 1);
             if (replacement.terminated) return replacement;
             const name = leaf.name;
@@ -4997,8 +5054,18 @@ const Generator = struct {
         for (carries, values) |carry, value| try self.bind(m, carry.outgoing, value);
         return self.constant(0);
     }
+    fn chargeExpression(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!void {
+        if (self.steps >= self.work_limits.expressions) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its expression budget");
+        self.steps += 1;
+        self.emission_work.scoped_emission_expressions +|= 1;
+        self.emission_work.max_scoped_emission_body_steps = @max(self.emission_work.max_scoped_emission_body_steps, self.steps);
+        if (depth > 128) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its nesting bound");
+    }
     fn expression(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
-        var value = try self.expressionInner(m, id, depth);
+        return self.expressionEvidence(m, id, try self.expressionInner(m, id, depth));
+    }
+    fn expressionEvidence(self: *Generator, m: *const core.Module, id: core.Id, original: Value) Error!Value {
+        var value = original;
         if (!value.terminated and value.type_evidence == null) {
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(id) }, 0);
             // Keep the checked receiver across generic calls, including the
@@ -5016,11 +5083,7 @@ const Generator = struct {
         errdefer if (self.diagnostic == null) {
             self.diagnostic = .{ .unit = m.unit, .span = m.span(id), .code = .storage_unsupported, .detail = "This expression has no admitted storage layout or binding" };
         };
-        if (self.steps >= self.work_limits.expressions) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its expression budget");
-        self.steps += 1;
-        self.emission_work.scoped_emission_expressions +|= 1;
-        self.emission_work.max_scoped_emission_body_steps = @max(self.emission_work.max_scoped_emission_body_steps, self.steps);
-        if (depth > 128) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its nesting bound");
+        try self.chargeExpression(m, id, depth);
         const n = m.node(id);
         switch (n.tag) {
             .task => return self.fail(m, id, .storage_unsupported, "Language tasks are not part of the data-stack model; use isolated host worker jobs and copied packets"),
@@ -5190,13 +5253,9 @@ const Generator = struct {
                 return merged;
             },
             .project => {
-                var value = try self.expression(m, n.a, depth + 1);
-                if (value.terminated) return value;
-                if (m.projection(n.b).variants.len == 0) {
-                    if (m.fieldSpelling(m.projection(n.b).field)) |spelling| if (dataField(value, spelling)) |field| return field;
-                    return self.getter(m, id, value, depth + 1);
-                }
-                return (try self.projected(m, id, &value, n.b)).*;
+                if (try self.indexedProjection(m, id, depth)) |value| return value;
+                const value = try self.expression(m, n.a, depth + 1);
+                return self.projectValue(m, id, value, depth);
             },
             .update => {
                 const info = m.updateInfo(id);

@@ -10,6 +10,8 @@ and
 [exact receipt hashing](../zig-native/measurements/receipt-path-hashing-2026-11-01.json)
 and [closed array locals](../zig-native/measurements/closed-array-locals-2026-11-01.json)
 and [actual aggregate readers](../zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
+Selected-address loads remove wide-row amplification in
+[actual render settings](../zig-native/measurements/selected-field-loads-2026-11-01.json).
 The [declaration-demand inventory](../zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
 is diagnostic only; source checking remains exhaustive. Read
 [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.

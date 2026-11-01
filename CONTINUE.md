@@ -50,13 +50,22 @@ Variant/borrow results keep their existing paths. The Gdev language control is
 roughly flat in latency but grows **273 bytes (1.07%)**. See
 [aggregate-reader evidence](zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
 
-The next direct code-size lever is whole-row scalarization. Indexed field writes
-load the complete row before selecting one field, and field reads do the same.
-Actual `render.Settings` grows from **8,307 to 18,299 bytes** for one versus eight
-blur writes. Start with plain stable rows and selected-address loads; preserve
-bounds checks, RHS `self`, alias writes and owner pinning. Late machine outlining
-extracts already-expanded instructions and spills locals into globals; it does
-not replace source call sharing.
+Selected-address loads now avoid whole-row scalarization for plain, stable
+indexed rows. Actual `render.Settings` with eight blur writes shrinks **18,299
+to 7,131 bytes**; marginal write cost falls **1,427 to 89 bytes**. Source-work
+charges, bounds checks, alias writes, RHS `self` and post-RHS address validation
+remain intact. Matrix control outputs are byte-identical; overall compilation
+latency is roughly flat. See
+[selected-field evidence](zig-native/measurements/selected-field-loads-2026-11-01.json).
+
+The next confirmed issue is owned-backend option forwarding. Its dispatcher
+passes storage settings alone and assembly uses defaults, ignoring requested
+development tier, optimizer workers, IO and profiling. Actual optimized passes
+run, but runtime-optimization stats stay zero because their result is omitted.
+Forward existing policy/IO/profile controls and return real stats before drawing
+conclusions from that zero counter. Tier and workers already belong to retained
+output identity. Do not reorder optimization around machine outlining without
+separate evidence; unused whole-row loads had no general DCE pass to remove them.
 
 A conservative declaration-demand prepass is measured but **not integrated**.
 It omits 680 of 5,957 declarations on main, but still retains 84% of original
@@ -126,13 +135,14 @@ custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `d4c77b40` compiles **2,765 native tests**. All seven focused demand and
-aggregate-reader laws pass in full fault mode; **367/368** broader sampled laws
+compiler `839721a3` compiles **2,767 native tests**. Both focused selected-field
+laws pass in full fault mode; **369/370** broader sampled laws
 pass with the independently reproduced associated-partial baseline failure.
-All 27 affected guests and both new aggregate-reader tests pass; the latter cover
-both tiers, sync/JSPI, independent owners, mixed layouts, projections and variant
-fallback. Original Gdev language entries pass six entries/11 assertions per
-sync/JSPI mode. Zig lint reports zero findings across 569 source files.
+All 25 affected guests and both new selected-field tests pass, including
+sync/JSPI, mutation ordering, relocation, joined owners, temporary-view getter
+mutation and traps before effects. Both tier requests are tested; actual owned
+assembly still uses optimized defaults until the forwarding fix above. Original
+Gdev language entries pass six entries/11 assertions per sync/JSPI mode. Zig lint reports zero findings across 570 source files.
 
 Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
 `HOME`, enabling disk-cache contamination between retained and supposedly fresh

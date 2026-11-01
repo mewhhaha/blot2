@@ -111,6 +111,13 @@ reconstructs its own result shape and scratch slot. No child environment is
 retained. Read-only admission receipts use the same result boundary and preserve
 the original height and work charges; writer aggregates keep their prior path.
 
+Indexed updates and direct indexed projections may load a selected field when
+the complete merged row is plain and variant-free. Whole-owner read tracking,
+bounds checks and source-work charges remain. Updates clone metadata, load the
+old leaf before the RHS, retain extent protection and reacquire the address
+afterward. Getter fallback releases temporary view protection before calling the
+getter; rows with variants or borrows retain whole-value loading.
+
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
 Recursive normalization receipts retain the cursor, depth and exact type/row

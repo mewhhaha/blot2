@@ -279,6 +279,8 @@ export const devCheckAreas = {
       "backend.storage_calls_tests.test.shared aggregate readers retain nominal physical schemas across independent owners",
       "backend.storage_calls_tests.test.shared aggregate reader diamonds keep emission growth bounded",
       "backend.storage_calls_tests.test.shared aggregate reader publication survives allocation failures",
+      "backend.storage_selected_fields_tests.test.selected stored field access cost stays bounded as plain row width grows",
+      "backend.storage_selected_fields_tests.test.selected stored field publication survives allocation failures",
       "check.scheme_dependencies.test.scheme dependency watches preserve type effect future and rollback histories through OOM",
       "check.ordered_membership.test.ordered scheme membership preserves sparse IDs duplicates and append order through OOM",
       "reuse.parallel_check_tests.test.parallel module checking preserves serial Core and counters with independent solver ownership",
@@ -431,6 +433,8 @@ export const devCheckAreas = {
     ],
     guests: [
       "zig-native/tests/arena.test.ts",
+      "zig-native/tests/scoped_aggregate_reader_execution.test.ts",
+      "zig-native/tests/scoped_selected_fields_execution.test.ts",
       "zig-native/tests/principal_replay_execution.test.ts",
       "zig-native/tests/result_execution.test.ts",
       "zig-native/tests/summary_job_principal_reuse.test.ts",
