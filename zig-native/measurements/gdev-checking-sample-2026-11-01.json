@@ -1,0 +1,116 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "4ef33ede099a9d4688e429260c2a328318738558",
+  "compiler_sha256": "5f12251f3b7b62c7efcae451e5e54d5e7517520970c9dfa68528943d973484d3",
+  "toolchain": {
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false
+  },
+  "purpose": "Determine the observed phase of bounded whole-Gdev work before choosing another optimization. Not a latency benchmark or a statistical CPU profile.",
+  "sample": {
+    "entry": "../gdev/src/main.blot",
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "codegen_tier": "development",
+    "codegen_workers": 4,
+    "profile_backend": true,
+    "native_assets": "Original pen.json settings; unchanged sources/assets.",
+    "debugger": "gdb --quiet --nx --batch, native child started with starti, SIGINT after 3.0 seconds; all-thread 16-frame backtrace then quit kills child.",
+    "active_stack": [
+      "#0  0x0000000002760aa1 in hash_map.getAutoHashFn__struct_8573.hash (ctx=..., key=...) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:24",
+      "#1  0x000000000275fc64 in hash_map.Custom(check.types.Store.CovariantInput,u32,hash_map.AutoContext(check.types.Store.CovariantInput),80).getOrPutAssumeCapacityAdapted__func_8572 (self=0x7ffff7ce1980, key=..., ctx=...) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:1149",
+      "#2  0x000000000275e0a1 in hash_map.Custom(check.types.Store.CovariantInput,u32,hash_map.AutoContext(check.types.Store.CovariantInput),80).getOrPutContextAdapted__func_8570 (self=0x7ffff7ce1980, allocator=..., key=..., key_ctx=..., ctx=...) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:1130",
+      "#3  0x000000000275dbee in hash_map.Custom(check.types.Store.CovariantInput,u32,hash_map.AutoContext(check.types.Store.CovariantInput),80).getOrPutContext (self=0x7ffff7ce1980, allocator=..., key=..., ctx=...) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:1103",
+      "#4  0x000000000275d9f7 in hash_map.Custom(check.types.Store.CovariantInput,u32,hash_map.AutoContext(check.types.Store.CovariantInput),80).putContext (self=0x7ffff7ce1980, allocator=..., key=..., value=13323, ctx=...) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:1029",
+      "#5  0x000000000275d8ad in hash_map.Custom(check.types.Store.CovariantInput,u32,hash_map.AutoContext(check.types.Store.CovariantInput),80).put (self=0x7ffff7ce1980, allocator=..., key=..., value=13323) at /home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/lib/std/hash_map.zig:1026",
+      "#6  0x000000000275d06f in check.types.Store.openCovariantDepth (self=0x7ffff7cfb450, root=13323, memo=0x7ffff7ce1980, depth=0) at /home/jacobt/src/blot2/zig-native/src/check/types.zig:2328",
+      "#7  0x000000000275c6e3 in check.types.Store.openCovariant (self=0x7ffff7cfb450, root=13323) at /home/jacobt/src/blot2/zig-native/src/check/types.zig:2311",
+      "#8  0x0000000003bd8cfe in check.check.Engine.instantiate (self=0x7ffff7cfaa08, binding=905, source=5151) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:10367",
+      "#9  0x0000000003d9fda3 in check.check.Engine.qualifiedValue (self=0x7ffff7cfaa08, id=5151, name=5740) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:8026",
+      "#10 0x0000000003d9ecf9 in check.check.Engine.nameExpression (self=0x7ffff7cfaa08, id=5151) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:12203",
+      "#11 0x0000000003cb180d in check.check.Engine.expression (self=0x7ffff7cfaa08, id=5151) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:12779",
+      "#12 0x0000000003cc08b1 in check.check.Engine.loopStatement (self=0x7ffff7cfaa08, id=5178) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:13958",
+      "#13 0x0000000003cbb5c9 in check.check.Engine.statement (self=0x7ffff7cfaa08, id=5178) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:13585",
+      "#14 0x0000000003cbacd9 in check.check.Engine.suite (self=0x7ffff7cfaa08, id=5179) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:13611",
+      "#15 0x0000000003cbc51a in check.check.Engine.conditional (self=0x7ffff7cfaa08, id=5180) at /home/jacobt/src/blot2/zig-native/src/check/check.zig:14309"
+    ],
+    "observations": [
+      "The active compiler thread is in check.Engine.instantiate -> Store.openCovariant -> openCovariantDepth -> hash-map insertion.",
+      "Three frontend IO workers wait on their work condition and the server coordinator waits for the compiling thread.",
+      "No backend assembly or optimizer frame appears in this single sample."
+    ],
+    "raw_trace_sha256": "259e8697b30c3ac5f203a6701819b00e5e6d00f20cd82f0893f0d0a240c14770",
+    "limits": [
+      "One interrupted debugger sample; no measured hot-path percentage or full compile completion.",
+      "The timer starts at native starti, before the client finishes opening/build submission. It is not a three-second compile latency measurement.",
+      "Debugger quit intentionally terminates the child, producing Unexpected EOF/truncated response in the client. This is not a compiler semantic failure.",
+      "has_projections and exact type shape were not captured; the memo insertion does not alone justify a new cache."
+    ]
+  },
+  "natural_variant_discriminator": {
+    "evidence": "/home/jacobt/src/blot2/build/bench/scoped-options/robot-flight/main-a4319197963ca486",
+    "identity": "68c579c49e4ce2c9f4103bc8ebea809c44510bcff9a4ad2deba0e57ee75d7f33",
+    "compiler": "/home/jacobt/src/blot2/zig-native/zig-out-native-dev/bin/blotc",
+    "compilerSha256": "5f12251f3b7b62c7efcae451e5e54d5e7517520970c9dfa68528943d973484d3",
+    "entry": "/home/jacobt/src/gdev/tests/robot_flight.blot",
+    "sourceCheckpoint": {
+      "entrySha256": "4fc72b288b3f2e8a9e21e06cbcda45fc42e91a37a395330451ea854b1b71dde2",
+      "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "deadlineMs": 5000,
+    "codegenTier": "optimized",
+    "codegenWorkers": 4,
+    "buildMs": 5003.8704370000005,
+    "profileBackend": true,
+    "success": false,
+    "compiled": false,
+    "status": "timeout_incomplete",
+    "error": "Zig project build aborted"
+  },
+  "source_audit": {
+    "robot_type": "../gdev/src/actors/actor_state.blot:13; five-case Robot union.",
+    "draw_path": "robots.present -> present_actor matches Maybe Robot; draw snapshots carry &[Maybe Robot].",
+    "small_natural_fixture": "../gdev/tests/robot_flight.blot:97; flying pose and five-case save/load entries. All entries compile together in this probe.",
+    "admission_boundary": "stableDescriptorShape rejects variants on descriptor reader/writer paths. The separate reusableInlineCall path uses plainInlineValue, which does not reject variant_tags; variant helper reuse is not universally disabled.",
+    "conclusion": "Natural variant fixture still exceeds five seconds. No evidence yet that variants explain costly helper-sharing misses."
+  },
+  "next_measurement": "First remeasure the diagnostic demand inventory without blanket initializer/attribute roots: existing runtime semantics are lazy for unreachable declarations. Keep associated/operator/implementation seeds conservative and exhaustive checking mandatory. Separately count unchanged substitution copies on a bounded completed producer; preserve per-use fresh covariant rows and exact callback requirements.",
+  "limits": [
+    "No current whole-game Wasm size, one-second build, 1 MB validation or fresh frame. Existing gate failure and release qualification status are unchanged."
+  ],
+  "source_checkpoints": {
+    "gdev": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "pen": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf"
+  },
+  "prelude_sha256": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+  "followup_local_inspection": {
+    "method": "Second debugger run: interrupt after 3s, set openCovariant entry and root-publication breakpoints, resume for at most one second, then quit. Debugger overhead is substantial; this is not an exhaustive count or a time comparison.",
+    "observations": [
+      {
+        "root": 11463,
+        "result": 11469,
+        "root_tag": "function",
+        "has_projections": false,
+        "memo_size": 0,
+        "added_nodes": 5,
+        "unit": 163,
+        "binding": 55,
+        "type_quantifiers": 1,
+        "row_quantifiers": 0
+      },
+      {
+        "root": 11469,
+        "result": 11469,
+        "root_tag": "function",
+        "has_projections": false,
+        "memo_size": 4,
+        "added_nodes": 0
+      }
+    ],
+    "limits": [
+      "Only two root-publication observations. One changed generic function created five nodes; one no-op function publication had four memo entries. Neither proves dominant cost.",
+      "A non-projected invariant leaf can return before the observed publication, so this sample cannot estimate the no-op fraction of all openings."
+    ]
+  }
+}

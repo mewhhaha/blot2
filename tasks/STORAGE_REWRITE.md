@@ -14,6 +14,8 @@ Selected-address loads remove wide-row amplification in
 [actual render settings](../zig-native/measurements/selected-field-loads-2026-11-01.json).
 Owned assembly now honors tier, worker and sharing controls and reports
 [actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
+A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
+observes source type instantiation before assembly; it is not a completed build.
 The [declaration-demand inventory](../zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
 is diagnostic only; source checking remains exhaustive. Read
 [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.

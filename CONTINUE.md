@@ -68,13 +68,22 @@ stay optimized/serial/unshared; complete execution policy already belongs to
 retained output identity. See
 [owned assembly evidence](zig-native/measurements/owned-assembly-options-2026-11-01.json).
 
-Next investigate source-call expansion involving variant-bearing rows. Current
-aggregate helper admission requires variant-free physical schemas. First find a
-repeated, reachable Gdev call and a bounded original producer discriminator;
-synthetic variant gains alone would not rank its whole-game impact. Outline bank
-slot reuse is secondary: historical global counts are huge, but code bodies
-account for most of the 47.4 MB. Do not repeat unchanged main diagnostics or
-reorder optimization around outlining without new evidence.
+A three-second debugger sample catches actual main in source checking:
+`Engine.instantiate -> Store.openCovariant -> memo insertion`, while three
+frontend workers wait. This is one observed phase, not a CPU percentage or full
+latency measurement. A short follow-up captures two root publications, too few
+to rank hot paths. Measure unchanged substitution copies on a completed producer
+before changing row opening; preserve fresh rows and exact callback requirements. See
+[the bounded checking sample](zig-native/measurements/gdev-checking-sample-2026-11-01.json).
+
+Variant-bearing descriptor helpers remain a separate hypothesis. The real Robot
+presentation path carries `Maybe Robot`, and original `robot_flight.blot` also
+exceeds five seconds. `stableDescriptorShape` rejects variants for descriptor
+reader/writer schemas, but the separate inline-call path already admits plain
+variant values. Measure actual misses before widening that guard. Outline bank
+slot reuse is secondary: historical globals are huge, but code bodies account
+for most of the 47.4 MB. Do not repeat unchanged main diagnostics or reorder
+optimization around outlining without new evidence.
 
 A conservative declaration-demand prepass is measured but **not integrated**.
 It omits 680 of 5,957 declarations on main, but still retains 84% of original
