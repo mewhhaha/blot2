@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-01",
+  "source_commit": "0aac64f2e42dcc658bf07502e52d047aabe7b0cb",
+  "purpose": "One bounded LLVM release-compiler build for performance verification, after development qualification.",
+  "toolchain": {
+    "zig": "0.17.0",
+    "optimize": "fast",
+    "llvm": true
+  },
+  "command": "timeout -k 3s 90s deno task build:compiler --fixtures= --jobs=2",
+  "deadline_seconds": 90,
+  "exit_code": 124,
+  "status": "timeout_incomplete",
+  "log_sha256": "096a5f903839f4f692c558743b1542a41baf7df9feebb9a6bc291f7d82256a21",
+  "log": "Task build:compiler deno run --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts '--fixtures=' '--jobs=2'\nBuilding Blot with Zig 0.17.0\n",
+  "previous_release_sha256": "e3977f57aa67b18ef8c34d999753f50744b5ce71ac33ca038e5761783a4f85ba",
+  "installed_release_sha256_after_attempt": "e3977f57aa67b18ef8c34d999753f50744b5ce71ac33ca038e5761783a4f85ba",
+  "new_compiler_installed": false,
+  "performance_measurement_performed": false,
+  "reason": "Build did not complete; installed binary remained unchanged. Never use stale artifacts as candidate performance evidence.",
+  "cleanup": "No surviving Zig build/compiler processes found after the timed-out group exited.",
+  "limits": [
+    "No release compiler qualification or release Gdev performance claim.",
+    "Checked safe/noLLVM results belong to fca4f6a1; the release binary is an older, separately pinned artifact.",
+    "A separate fast/noLLVM development build is being investigated for short iteration; it is not an LLVM release result."
+  ]
+}

@@ -64,6 +64,16 @@ still exceeds five seconds, so no game source change is installed. Robot
 accessory and crystal draw arrays have the same pattern; preserve draw order
 and qualify an actual original stream before changing them.
 
+A final LLVM/fast compiler build hit its **90-second cap** without installing a
+new binary; the previous release hash remains unchanged and was not used for
+new performance claims. See [the attempt](zig-native/measurements/typed-call-release-attempt-2026-11-01.json).
+A separate `fast`/noLLVM development build finishes in about **5 seconds**, passes
+six focused guests and executes all original language assertions with the same
+25,651-byte output. Main still exceeds five seconds. This alternate configuration
+has narrower coverage than the reviewed safe compiler and is not an LLVM release
+result. See [the native-fast diagnostic](zig-native/measurements/native-fast-diagnostic-2026-11-01.json).
+Neither attempt changes Pen settings or publishes a running environment.
+
 Closed-row certificate paths now hash lazily, preserving exact receipt bytes,
 multiplicity and work limits. Native sparse paths require **2 hashes rather than
 1,026**, and target-free paths require none. Real producer checking improves

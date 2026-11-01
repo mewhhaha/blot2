@@ -17,6 +17,9 @@ Owned assembly now honors tier, worker and sharing controls and reports
 [Typed call sharing](../zig-native/measurements/typed-call-sharing-2026-11-01.json)
 now covers literal closures across shared parents and canonical plain input keys.
 Real closure/easing probes shrink; whole-game completion remains pending.
+The [LLVM release attempt](../zig-native/measurements/typed-call-release-attempt-2026-11-01.json)
+is incomplete; [native-fast diagnostics](../zig-native/measurements/native-fast-diagnostic-2026-11-01.json)
+remain separate from full qualification.
 A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
 observes source type instantiation before assembly; it is not a completed build.
 The [type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
