@@ -3,58 +3,43 @@
 ## Current frontier
 
 Compilation latency is the active priority: **subsecond Gdev compilation**. Do
-not repeat the recorded 36-minute main build. The diagnostic runner defaults to
-a five-second build deadline and kills the compiler on timeout.
+not repeat the recorded 36-minute main build. Diagnostics default to a
+five-second deadline and kill the compiler on timeout.
 
-Plain nominal helpers now share checked inline definitions too. Generic stored
-field reads use their existing data-field evidence rather than requiring an
-associated getter. Strict semantic frontiers and physical input/result schemas
-keep phantom arguments, constructors and caller environments distinct.
+Completed ground callee prerequisites now share proofs within one equation
+inquiry. A nominal depth-ten/eight-call graph that exhausted the unchanged work
+budget now completes with **80 expansions and 80 hits**. Requested field
+equations still follow their original proof path, and temporary solver
+identities never enter receipts.
 
-Five alternating Safe/noLLVM pairs at eight repeated calls improve the nominal
-field graph from **237.08 ms to 98.16 ms**, Wasm from **88,727 to 4,654 bytes**,
-emission from **11,809 to 121 expressions**, and admission from **9,074 to
-189**.
-[Pinned nominal evidence](zig-native/measurements/nominal-call-sharing-2026-11-01.json)
-also records the smaller controls and unsuccessful probes. A one-off main
-diagnostic still timed out at 30 seconds; no current whole-game size is known.
-Two bounded LLVM release builds (60/120 seconds) produced no new binary, so
-release performance remains unmeasured. Development builds remain noLLVM.
+Covariance and normalization now preserve shared type graphs instead of copying
+binary trees. Closing uses its existing exact context memo for source stores
+too. The depth-sixteen source probe falls from roughly **3.5 seconds to 0.1
+second**, with **858,720 to 6,750 type nodes** and identical **2,935-byte
+Wasm**. The deeper case now completes below 0.2 seconds instead of exceeding
+five seconds.
+[Pinned evidence](zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
+keeps intermediate failures, matched pairs, real-workload controls and compiler
+identities separate. A smaller Gdev fixture still has a modest latency
+regression; the final invariant-leaf shortcut reduces that overhead.
 
-Nested descriptor readers and stable writers now emit shared function calls. The
-first slice accepts plain stored rows, scalar reader results and Unit writers;
-callback keys include their checked semantic frontier. Unsupported witnesses and
-aggregate results retain ordinary scoped emission. Nested calls replay
-read/write facts and transitive scratch-region requirements. Completed admission
-is shared too, so the initial call graph no longer expands repeatedly.
+Whole Gdev remains unfinished. The graph-sharing candidate exceeds both a
+five-second diagnostic and one bounded thirty-second run; there is no current
+whole-game size or fresh frame. Roughly **1 MB** remains the owner's
+expectation. The historical frame-qualified main took 2,188 seconds and produced
+47.4 MB, mostly code. Release builds and release performance remain pending.
 
-Five alternating Safe/noLLVM pairs on depth-ten storage graphs improve writer
-build time from **247.06 ms to 88.61 ms**, Wasm from **195,293 to 8,794 bytes**,
-and emission expressions from **19,565 to 218**. Reader builds improve from
-**188.07 ms to 78.78 ms**, Wasm from **57,599 to 4,930 bytes**, and admission
-nodes from **81,893 to 165**.
-[Pinned evidence](zig-native/measurements/storage-call-graph-2026-11-01.json)
-keeps these synthetic results separate from Gdev: its original language fixture
-compiles in about **469 ms** and passes six entries/11 assertions in sync and
-JSPI. Actor presentation and main still exceed the five-second cutoff. Roughly
-**1 MB of Wasm** is the owner's working expectation; the old successful main
-produced 47.4 MB, mostly code. No current whole-game size is established.
+A fresh bounded profile still spends substantial frontend work capturing body
+reuse receipts: closed-row certificate paths, repeated type eligibility hashes
+and syntax hashes. Next make receipt capture proportional to the retained graph,
+starting with exact lazy path hashing. Preserve certificate bytes, multiplicity,
+work limits and retained-edit behavior. Do not revive a synthetic-only speedup:
+recursive normalization caching alone regressed the source probe until
+covariance copying was fixed too.
 
-Imported names now register without copying their type graphs. First typed use
-materializes the exact producer scheme; unused imports publish no binding or
-certificate. Producer checking and associated declaration catalogs remain
-complete. Next identify the bounded real build's remaining frontend work and
-unsupported storage helpers before extending the call ABI. A concrete source
-proof cliff is now isolated: a tiny nominal depth-eight graph checks each body
-once but repeatedly expands its instantiated dictionaries as a binary tree. That
-source-proof DAG duplication is the next implementation target, with unchanged
-work/depth limits. The field-refinement fixed-point solver remains.
-
-Earlier
-[scalar sharing](zig-native/measurements/scoped-call-sharing-2026-10-31.json)
-and
-[concrete-field sharing](zig-native/measurements/concrete-fields-2026-10-31.json)
-retain their separately pinned measurements.
+Earlier descriptor, nominal and scalar call-sharing results remain in their
+linked records under `zig-native/measurements/`. Those changes reduce synthetic
+Wasm growth; they do not establish a current whole-game result.
 
 This is a greenfield project. Breaking changes are welcome; remove superseded
 APIs and implementations. Preserve useful behavior, assertions, deterministic
@@ -114,18 +99,16 @@ Astra xhigh reviewed the semantic fixes and performance batches. Earlier gate
 attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
 host reaches protocol preflight and fails on existing operand-span ends,
 independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The nominal batch compiles all 2,744 native
-tests; its storage family passes 110/111 with the recorded associated-partial
-baseline failure. Its focused new/updated laws pass, including two exhaustive
-allocation-failure sweeps; 14 focused guests pass across both tiers and
-sync/JSPI. Affected guests pass 50/51 with the associated-latent baseline. The
-earlier descriptor/import batch's broader 305-law run passed 303; one obsolete
-import-count expectation was corrected and independently passed, while the same
-associated-partial failure remains. Its six new laws and both scratch guests
-pass. Full Zig lint reports zero findings across 567 source files. An additional
-reuse suite hits the same 16 body-cache work assertions on both the baseline and
-candidate; it does not pass. Current performance binaries have not qualified a
-real Gdev frame.
+qualification remains pending. The current batch compiles all **2,751 native
+tests**. Its broader sampled selection passes **345/346**, with the same
+independently reproduced associated-partial baseline failure. Seven focused laws
+pass in full allocation-failure mode, including four exhaustive sweeps. All 28
+focused guest tests pass across development/optimized tiers and sync/JSPI, and
+the original Gdev language fixture passes its six entries/11 assertions per
+mode. Full Zig lint reports zero findings across 567 source files. The required
+full gate still stops at the existing protocol operand-span preflight failure.
+The older reuse-suite work assertions and broader integration/release coverage
+remain pending, as recorded in the earlier evidence.
 
 ## Remaining execution work
 

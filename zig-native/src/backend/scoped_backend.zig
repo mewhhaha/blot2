@@ -5544,11 +5544,13 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
         error.OutOfMemory => return error.OutOfMemory,
         else => unreachable,
     };
+    var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var proof_cache = source_proof.SourceProofCache.initWithInventoryBudget(allocator, views) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidArtifact => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid source proof context" } },
     };
     defer proof_cache.deinit();
+    proof_cache.work = &emission_work;
     var dispatches: Dispatches = .empty;
     defer dispatches.deinit(allocator);
     var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };
@@ -5564,7 +5566,6 @@ pub fn compileWithWorkLimits(allocator: std.mem.Allocator, units: []const core.M
     defer descriptor_calls.deinit();
     var shared_calls: call_plan.Cache = .{ .allocator = allocator };
     defer shared_calls.deinit();
-    var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
     var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry };

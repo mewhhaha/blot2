@@ -43,6 +43,73 @@ fn convert(err: T.Error) Error {
     if (err == error.OutOfMemory) return error.OutOfMemory;
     return error.InvalidArtifact;
 }
+/// Receipts contain only IDs in the solver's immutable copied prefix. A
+/// rollback can discard an imported graph without recycling this evidence.
+pub const SharedGoal = struct {
+    producer: *const core.Module,
+    origin: ?*const core.Module,
+    binding: core.BindingId,
+    call_owner: core.Id,
+    resolver_callback: core.Id,
+    goal_depth: usize,
+    ambient: T.Effects.Id,
+    foreign_allowed: bool,
+    type_count: u8,
+    row_count: u8,
+    arguments: [128]T.Id = @splat(0),
+};
+/// One inquiry may mutate row/instance facts while choosing evidence. Reuse
+/// only the exact lexical authority first observed by this solver.
+const SharedAuthority = struct {
+    context: *const anyopaque,
+    pure_rows: @import("package_row_facts.zig").Facts,
+    closed_rows: @import("package_row_facts.zig").Facts,
+    instance_variables: @import("package_row_facts.zig").Facts,
+    instance_rows: @import("package_row_facts.zig").Facts,
+    schemes: [128]T.Scheme = @splat(.{}),
+    scheme_count: usize,
+    generic_variables: T.List,
+    generic_rows: T.List,
+    obligations: []const core.Obligation,
+    source_obligations: []const T.Obligation,
+    source_instances: bool,
+    executable: bool,
+    large_plain_graph: bool,
+
+    fn eligible(views: anytype) bool {
+        return views.formal == null and views.formal_count == 0 and views.opening_count == 0 and
+            !views.witness and views.representation_floor == null and views.projection_resolver == null;
+    }
+    fn init(views: anytype) SharedAuthority {
+        var result: SharedAuthority = .{
+            .context = views,
+            .pure_rows = views.pure_rows,
+            .closed_rows = views.closed_rows,
+            .instance_variables = views.instance_variables,
+            .instance_rows = views.instance_rows,
+            .scheme_count = views.scheme_count,
+            .generic_variables = views.generic_variables,
+            .generic_rows = views.generic_rows,
+            .obligations = views.obligations,
+            .source_obligations = views.source_obligations,
+            .source_instances = views.source_instances,
+            .executable = views.executable,
+            .large_plain_graph = views.large_plain_graph,
+        };
+        @memcpy(result.schemes[0..views.scheme_count], views.schemes[0..views.scheme_count]);
+        return result;
+    }
+    fn matches(self: *const SharedAuthority, views: anytype) bool {
+        if (!eligible(views) or self.context != @as(*const anyopaque, views) or self.scheme_count != views.scheme_count or
+            !std.meta.eql(self.generic_variables, views.generic_variables) or !std.meta.eql(self.generic_rows, views.generic_rows) or
+            self.obligations.ptr != views.obligations.ptr or self.obligations.len != views.obligations.len or
+            self.source_obligations.ptr != views.source_obligations.ptr or self.source_obligations.len != views.source_obligations.len or
+            self.source_instances != views.source_instances or self.executable != views.executable or self.large_plain_graph != views.large_plain_graph) return false;
+        for (self.schemes[0..self.scheme_count], views.schemes[0..views.scheme_count]) |before, after| if (!std.meta.eql(before, after)) return false;
+        return self.pure_rows.eql(&views.pure_rows) and self.closed_rows.eql(&views.closed_rows) and
+            self.instance_variables.eql(&views.instance_variables) and self.instance_rows.eql(&views.instance_rows);
+    }
+};
 pub const Solver = struct {
     store: T.Store,
     graph: core.Types = undefined,
@@ -53,6 +120,14 @@ pub const Solver = struct {
     rigid_type_overflow: std.AutoHashMapUnmanaged(T.Id, void) = .empty,
     rigid_rows: std.AutoHashMapUnmanaged(u32, void) = .empty,
     remaining: *usize,
+    prefix_nodes: usize,
+    prefix_rows: usize,
+    prefix_operations: usize,
+    prefix_extra: usize,
+    prefix_row_variables: usize,
+    shared_authority: ?*SharedAuthority = null,
+    shared_goals: std.AutoHashMapUnmanaged(SharedGoal, usize) = .empty,
+    shared_goal_hits: usize = 0,
     pub fn init(allocator: std.mem.Allocator, module: *const core.Module, views: anytype, remaining: *usize) Error!Solver {
         // This private store owns its mutation/rollback epochs. Reuse exact
         // epoch resolutions (including rank walks), never cross-epoch or
@@ -124,7 +199,7 @@ pub const Solver = struct {
         store.has_projections = true;
         store.has_rank_types = true;
         store.has_usage_types = true;
-        var result: Solver = .{ .store = store, .scope = scope, .remaining = remaining, .rigid_types = rigid_types, .rigid_type_overflow = rigid_type_overflow, .rigid_rows = rigid_rows };
+        var result: Solver = .{ .store = store, .scope = scope, .remaining = remaining, .rigid_types = rigid_types, .rigid_type_overflow = rigid_type_overflow, .rigid_rows = rigid_rows, .prefix_nodes = store.nodes.items.len, .prefix_rows = store.effects.rows.items.len, .prefix_operations = store.operations.items.len, .prefix_extra = store.extra.items.len, .prefix_row_variables = module.types.effects.variable_count };
         result.refresh();
         return result;
     }
@@ -137,7 +212,54 @@ pub const Solver = struct {
         if (node.c == 0) return if (node.b < self.rigid_types.capacity()) self.rigid_types.isSet(node.b) else self.rigid_type_overflow.contains(node.b);
         return node.c == 1 and self.rigid_rows.contains(node.b);
     }
+    fn prefixFacts(facts: @import("package_row_facts.zig").Facts, limit: usize) bool {
+        for (facts.pages) |page| {
+            if (page.bits == 0) continue;
+            const first = (page.key - 1) * 64;
+            if (first >= limit) return false;
+            const count = limit - first;
+            if (count < 64 and page.bits >> @intCast(count) != 0) return false;
+        }
+        return true;
+    }
+    pub fn sharedAuthority(self: *Solver, views: anytype) Error!bool {
+        if (!SharedAuthority.eligible(views) or
+            !prefixFacts(views.pure_rows, self.prefix_rows) or !prefixFacts(views.closed_rows, self.prefix_rows) or
+            !prefixFacts(views.instance_variables, self.prefix_nodes) or !prefixFacts(views.instance_rows, self.prefix_row_variables)) return false;
+        for (views.schemes[0..views.scheme_count]) |scheme| {
+            if (scheme.root >= self.prefix_nodes or scheme.generative.len != 0) return false;
+            inline for (.{ "variables", "row_variables", "closed_rows" }) |name| {
+                const span = @field(scheme, name);
+                if (span.start > self.prefix_extra or span.len > self.prefix_extra - span.start) return false;
+                const maximum = if (comptime std.mem.eql(u8, name, "variables")) self.prefix_nodes else self.prefix_row_variables;
+                for (self.store.list(span)) |id| if (id >= maximum) return false;
+            }
+        }
+        if (self.shared_authority) |authority| return authority.matches(views);
+        const authority = try self.store.allocator.create(SharedAuthority);
+        authority.* = SharedAuthority.init(views);
+        self.shared_authority = authority;
+        return true;
+    }
+    pub fn sharedGoalHit(self: *Solver, key: SharedGoal, depth: usize) bool {
+        const proved_depth = self.shared_goals.get(key) orelse return false;
+        if (depth > proved_depth) return false;
+        self.shared_goal_hits += 1;
+        return true;
+    }
+    pub fn rememberSharedGoal(self: *Solver, key: SharedGoal, depth: usize) Error!void {
+        if (self.shared_goals.getPtr(key)) |proved_depth| {
+            proved_depth.* = @max(proved_depth.*, depth);
+            return;
+        }
+        // This optional receipt table cannot grow with an unbounded inquiry.
+        // At capacity the completed ordinary proof simply remains uncached.
+        if (self.shared_goals.count() >= 65_536) return;
+        try self.shared_goals.put(self.store.allocator, key, depth);
+    }
     pub fn deinit(self: *Solver) void {
+        if (self.shared_authority) |authority| self.store.allocator.destroy(authority);
+        self.shared_goals.deinit(self.store.allocator);
         self.rigid_type_overflow.deinit(self.store.allocator);
         self.rigid_rows.deinit(self.store.allocator);
         self.store.deinit();

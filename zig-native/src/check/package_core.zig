@@ -24,6 +24,7 @@ pub const SourceProofCache = struct {
     };
     allocator: std.mem.Allocator,
     units: []const *const core.Module,
+    work: ?*@import("../work_counters.zig").Counters = null,
     completed: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
     targets: std.AutoHashMapUnmanaged(TargetKey, std.ArrayList(core.BindingId)) = .empty,
     indexed_catalogs: std.AutoHashMapUnmanaged(u32, void) = .empty,
@@ -1513,6 +1514,98 @@ const Walker = struct {
         }
         return reachableHeaderMetadata(solver.store.allocator, self.units(), self.origin orelse self.module, initial, binding, wanted, depth, self.scopes.remaining) catch |err| return solver.readerError(err);
     }
+    fn sharedDataPrefix(self: *Self, solver: *Equations.Solver, root: T.Id, work: *usize) Equations.Error!bool {
+        if (work.* == 0 or root == 0 or root >= solver.prefix_nodes) return false;
+        work.* -= 1;
+        try solver.step();
+        const node = solver.store.node(root);
+        switch (node.tag) {
+            .unit, .boolean, .u32, .f32, .never => return true,
+            .array, .list, .cursor => return self.sharedDataPrefix(solver, node.a, work),
+            .product => {
+                for (solver.store.list(.{ .start = node.a, .len = node.b })) |child| if (!try self.sharedDataPrefix(solver, child, work)) return false;
+                return true;
+            },
+            .record => {
+                for (0..node.b) |index| if (!try self.sharedDataPrefix(solver, solver.store.recordField(node, index).ty, work)) return false;
+                return true;
+            },
+            .nominal => {
+                const type_arguments = solver.store.nominalArguments(node);
+                for (type_arguments) |child| if (!try self.sharedDataPrefix(solver, child, work)) return false;
+                if (@import("storage_types.zig").identity(node.a, node.b) != null) return type_arguments.len == 1;
+                // A public identity can hide private, scoped or higher-rank
+                // payload witnesses. Initially admit only a monomorphic public
+                // data declaration whose actual payload is also ordinary data.
+                if (type_arguments.len != 0) return false;
+                for (self.module.nominals, 0..) |nominal, index| {
+                    if (nominal.identity.unit != node.a or nominal.identity.decl != node.b) continue;
+                    if (nominal.private or nominal.is_opaque or nominal.variables.len != 0 or nominal.parameters.len != 0 or nominal.constructors.len == 0) return false;
+                    for (self.module.constructors) |constructor| {
+                        if (constructor.nominal != index) continue;
+                        if (constructor.payload != 0 and !try self.sharedDataPrefix(solver, constructor.payload, work)) return false;
+                    }
+                    return true;
+                }
+                return false;
+            },
+            else => return false,
+        }
+    }
+    fn sharedRowPrefix(self: *Self, solver: *Equations.Solver, row: T.Effects.Id, work: *usize) Equations.Error!bool {
+        if (work.* == 0 or row >= solver.prefix_rows) return false;
+        work.* -= 1;
+        try solver.step();
+        if (solver.store.row(row).tail != .closed) return false;
+        for (solver.store.rowLabels(row)) |label| {
+            if (label >= solver.prefix_operations) return false;
+            const operation = solver.store.operations.items[label];
+            if (operation.instance.unit != 0 or operation.instance.decl != 0) return false;
+            // Core omits source effect-family visibility. A bare label ID
+            // cannot prove a public witness; initially reuse pure/Foreign rows.
+            if (label != T.foreign_operation) return false;
+            for (solver.store.list(operation.arguments)) |argument| if (!try self.sharedDataPrefix(solver, argument, work)) return false;
+        }
+        return true;
+    }
+    fn sharedGoalKey(self: *Self, solver: *Equations.Solver, owner: *const core.Module, binding: core.BindingId, given: core.Obligation) Equations.Error!?Equations.SharedGoal {
+        const declaration = owner.binding(binding);
+        if (!self.admission.source_bodies or declaration.scheme.generative.len != 0 or self.scope_owner != null or self.handled_count != 0 or
+            declaration.public_variables.len + declaration.public_rows.len > 128) return null;
+        const product = solver.store.node(given.ty);
+        var key: Equations.SharedGoal = .{
+            .producer = owner,
+            .origin = self.origin,
+            .binding = binding,
+            .call_owner = self.call_owner,
+            .resolver_callback = self.resolver_callback,
+            .goal_depth = self.goal_depth,
+            .ambient = try solver.resolveRow(self.body_row),
+            .foreign_allowed = self.foreign_allowed,
+            .type_count = @intCast(declaration.public_variables.len),
+            .row_count = @intCast(declaration.public_rows.len),
+        };
+        var work: usize = 256;
+        if (!try self.sharedRowPrefix(solver, key.ambient, &work)) return null;
+        // Resolving can grow the graph; use an owned fixed argument table and
+        // read each product slot again through the store after every resolve.
+        for (0..product.b) |index| {
+            const actual = solver.store.list(.{ .start = product.a, .len = product.b })[index];
+            if (index < declaration.public_variables.len) {
+                const root = try solver.resolve(actual);
+                if (!try self.sharedDataPrefix(solver, root, &work)) return null;
+                key.arguments[index] = root;
+            } else {
+                const carrier = solver.store.node(try solver.resolve(actual));
+                if (carrier.tag != .function or carrier.a != T.unit or carrier.b != T.unit) return null;
+                const row = try solver.resolveRow(carrier.c);
+                if (!try self.sharedRowPrefix(solver, row, &work)) return null;
+                key.arguments[index] = row;
+            }
+        }
+        if (!try solver.sharedAuthority(self.scopes)) return null;
+        return key;
+    }
     fn sharedGoal(self: *Self, wanted: ?core.Obligation, given: core.Obligation, depth: usize) Error!bool {
         try self.step(depth);
         const solver = self.scopes.solver orelse return false;
@@ -1547,6 +1640,19 @@ const Walker = struct {
         if (self.admission.source_bodies) try sourceBody(owner, binding, self.context, self.admission);
         const product = self.module.types.node(given.ty);
         try require(product.tag == .product and product.b == declaration.public_variables.len + declaration.public_rows.len);
+        var memo: ?Equations.SharedGoal = null;
+        if (wanted == null) {
+            memo = self.sharedGoalKey(solver, owner, binding, given) catch |err| return solver.readerError(err);
+            if (memo) |key| if (solver.sharedGoalHit(key, depth)) {
+                if (self.context.source_proofs) |cache| if (cache.work) |work| {
+                    work.scoped_source_proof_hits += 1;
+                };
+                return true;
+            };
+            if (self.context.source_proofs) |cache| if (cache.work) |work| {
+                work.scoped_source_proof_instances += 1;
+            };
+        }
         const parts = solver.store.allocator.dupe(T.Id, self.module.types.list(.{ .start = product.a, .len = product.b })) catch {
             solver.oom = true;
             return error.InvalidArtifact;
@@ -1603,6 +1709,10 @@ const Walker = struct {
             return false;
         }
         try self.solverGoals(solver, owner, declaration.scheme, &copy, depth + 1);
+        if (memo) |key| {
+            const completed = self.sharedGoalKey(solver, owner, binding, given) catch |err| return solver.readerError(err);
+            if (completed) |after| if (std.meta.eql(key, after)) solver.rememberSharedGoal(key, depth) catch |err| return solver.readerError(err);
+        }
         accepted = true;
         return true;
     }
@@ -4038,3 +4148,197 @@ const Walker = struct {
         }
     }
 };
+
+fn sharedGoalReceiptScenario(allocator: std.mem.Allocator) !void {
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    const variable = try source.fresh();
+    const formal = try source.saveList(&.{variable});
+    const payload = try source.record(&.{.{ .name = 1, .ty = T.u32_type }});
+    const nominal_type = try source.nominal(.{ .unit = 1, .decl = 1 }, &.{});
+    const public_pack = try source.product(&.{nominal_type});
+    const other_pack = try source.product(&.{T.f32_type});
+    const function = try source.function(T.unit, T.u32_type);
+    const private_scope = try source.scoped(T.u32_type, .{ .unit = 1, .decl = 7 });
+    const foreign_row = try source.effects.row(&.{T.foreign_operation}, .closed);
+    var bodies = [_]core.Body{.{}};
+    var bindings = [_]core.Binding{ headerTestBinding(.local, 0, 0), headerTestBinding(.global, 0, 0) };
+    bindings[1].scheme = .{ .root = variable, .variables = formal };
+    bindings[1].public_variables = formal;
+    var module = headerTestModule(1, &bindings, &bodies, &.{});
+    module.types = .{ .nodes = source.nodes.items, .extra = source.extra.items, .operations = source.operations.items, .effects = .{ .rows = source.effects.rows.items, .labels = source.effects.labels.items, .variable_count = @intCast(source.effects.variables.items.len) } };
+    var nominals = [_]core.Nominal{.{ .identity = .{ .unit = 1, .decl = 1 }, .variables = .{}, .parameters = .{}, .constructors = .{ .len = 1 } }};
+    module.nominals = &nominals;
+    var constructors = [_]core.Constructor{.{ .identity = .{ .unit = 1, .decl = 1 }, .nominal = 0, .tag = 0, .scheme = .{}, .payload = payload }};
+    module.constructors = &constructors;
+    var remaining: usize = 65_536;
+    var scopes: contracts.Context = .{ .types = &module.types, .remaining = &remaining, .source_instances = true };
+    var solver = try Equations.Solver.init(allocator, &module, &scopes, &remaining);
+    defer solver.deinit();
+    solver.view = &module.types;
+    solver.refresh();
+    scopes.solver = &solver;
+    var workspace: Equations.Workspace = .{ .allocator = allocator };
+    var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
+    var walker: Walker = .{ .module = &module, .context = .{}, .scopes = &scopes, .admission = &admission, .call_owner = 84, .goal_depth = 1 };
+    const goal: core.Obligation = .{ .kind = .callee_use, .ty = public_pack, .identity = .{ .unit = 1, .decl = 1 }, .span = .{ .start = 0, .end = 0 } };
+    const key = (try walker.sharedGoalKey(&solver, &module, 1, goal)).?;
+    try std.testing.expectEqual(@as(u32, 0), solver.shared_goals.count());
+    try solver.rememberSharedGoal(key, 12);
+    try std.testing.expect(solver.sharedGoalHit(key, 12));
+    try std.testing.expect(solver.sharedGoalHit(key, 11));
+    try std.testing.expect(!solver.sharedGoalHit(key, 13));
+    var other = goal;
+    other.ty = other_pack;
+    try std.testing.expect(!solver.sharedGoalHit((try walker.sharedGoalKey(&solver, &module, 1, other)).?, 12));
+    walker.body_row = foreign_row;
+    walker.foreign_allowed = true;
+    try std.testing.expect(!solver.sharedGoalHit((try walker.sharedGoalKey(&solver, &module, 1, goal)).?, 12));
+    walker.body_row = 0;
+    walker.foreign_allowed = false;
+    // Success cannot lend a row fact or a private type witness to another
+    // lexical context, even when the visible public argument is unchanged.
+    const closed = scopes.closed_rows;
+    try scopes.closed_rows.set(0);
+    try std.testing.expect(try walker.sharedGoalKey(&solver, &module, 1, goal) == null);
+    scopes.closed_rows = closed;
+    nominals[0].private = true;
+    try std.testing.expect(try walker.sharedGoalKey(&solver, &module, 1, goal) == null);
+    nominals[0].private = false;
+    for ([_]T.Id{ variable, function, private_scope }) |unsupported| {
+        var work: usize = 256;
+        try std.testing.expect(!try walker.sharedDataPrefix(&solver, unsupported, &work));
+    }
+    const mark = solver.store.mark();
+    const temporary = try solver.store.record(&.{.{ .name = 2, .ty = T.u32_type }});
+    var work: usize = 256;
+    try std.testing.expect(!try walker.sharedDataPrefix(&solver, temporary, &work));
+    solver.rollback(mark);
+    const recycled = try solver.store.function(T.unit, T.f32_type);
+    try std.testing.expectEqual(temporary, recycled);
+    work = 256;
+    try std.testing.expect(!try walker.sharedDataPrefix(&solver, recycled, &work));
+    solver.rollback(mark);
+    const after = (try walker.sharedGoalKey(&solver, &module, 1, goal)).?;
+    try std.testing.expectEqualDeep(key, after);
+    try std.testing.expect(solver.sharedGoalHit(after, 12));
+}
+
+test "source shared goal receipts preserve prefix identity depth effects authority and rollback through OOM" {
+    try sharedGoalReceiptScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedGoalReceiptScenario, .{});
+}
+
+fn sharedGoalFailureScenario(allocator: std.mem.Allocator, producer: *const core.Module, binding: core.BindingId, nominal_type: T.Id, field_name: u32) !void {
+    var cache = try SourceProofCache.init(allocator, &.{producer});
+    defer cache.deinit();
+    var remaining: usize = 1_000_000;
+    try checkedInterfaceBodyCached(&cache, producer, binding, &remaining, null, null);
+    var temporary = producer.*;
+    var scopes: contracts.Context = .{ .types = &producer.types, .remaining = &remaining, .source_instances = true, .large_plain_graph = true, .obligations = producer.obligations };
+    var solver = try Equations.Solver.init(allocator, producer, &scopes, &remaining);
+    defer solver.deinit();
+    solver.view = &temporary.types;
+    solver.refresh();
+    scopes.types = &temporary.types;
+    scopes.solver = &solver;
+    var workspace: Equations.Workspace = .{ .allocator = allocator };
+    var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
+    defer admission.bodies.deinit(allocator);
+    defer {
+        for (admission.source_rows.items) |index| allocator.free(index.rows);
+        admission.source_rows.deinit(allocator);
+        for (admission.source_definitions.items) |index| allocator.free(index.values);
+        admission.source_definitions.deinit(allocator);
+    }
+    var walker: Walker = .{ .module = &temporary, .origin = producer, .context = .{ .units = &.{producer}, .source_proofs = &cache }, .scopes = &scopes, .admission = &admission };
+    const declaration = producer.binding(binding);
+    try std.testing.expectEqual(@as(u32, 1), declaration.public_variables.len);
+    var actuals: [128]T.Id = @splat(0);
+    actuals[0] = nominal_type;
+    const count = declaration.public_variables.len + declaration.public_rows.len;
+    for (actuals[1..count]) |*actual| actual.* = try solver.store.function(T.unit, T.unit);
+    const pack = try solver.store.product(actuals[0..count]);
+    actuals[0] = T.f32_type;
+    const wrong_pack = try solver.store.product(actuals[0..count]);
+    solver.refresh();
+    const goal: core.Obligation = .{ .kind = .callee_use, .ty = pack, .identity = .{ .unit = producer.unit, .decl = binding }, .span = .{ .start = 0, .end = 0 } };
+    var wrong = goal;
+    wrong.ty = wrong_pack;
+    const before = solver.store.mark();
+    if (walker.sharedGoal(null, wrong, 0)) |_| return error.TestUnexpectedResult else |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
+    try std.testing.expectEqual(@as(u32, 0), solver.shared_goals.count());
+    try std.testing.expectEqualDeep(before, solver.store.mark());
+    try std.testing.expect(walker.sharedGoal(null, goal, 0) catch |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        return err;
+    });
+    const receipts = solver.shared_goals.count();
+    try std.testing.expect(receipts > 0);
+    solver.rollback(before);
+    const hits = solver.shared_goal_hits;
+    try std.testing.expect(walker.sharedGoal(null, goal, 0) catch |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        return err;
+    });
+    try std.testing.expectEqual(hits + 1, solver.shared_goal_hits);
+    // A receipt proves prerequisite satisfaction, never an exported equation.
+    // An explicit requested field must still bind its fresh result normally.
+    const result = try solver.store.fresh();
+    solver.refresh();
+    const wanted: core.Obligation = .{ .kind = .field, .ty = nominal_type, .result = result, .name = field_name, .span = .{ .start = 0, .end = 0 } };
+    const before_export = solver.shared_goal_hits;
+    try std.testing.expect(walker.sharedGoal(wanted, goal, 0) catch |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        return err;
+    });
+    try std.testing.expectEqual(before_export, solver.shared_goal_hits);
+    try std.testing.expectEqual(T.u32_type, solver.store.head(result, 0));
+    if (walker.sharedGoal(null, wrong, 0)) |_| return error.TestUnexpectedResult else |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
+    try std.testing.expectEqual(receipts, solver.shared_goals.count());
+    const before_fallback = solver.shared_goal_hits;
+    try std.testing.expect(walker.sharedGoal(null, goal, 0) catch |err| {
+        if (solver.oom or workspace.oom) return error.OutOfMemory;
+        return err;
+    });
+    try std.testing.expectEqual(before_fallback + 1, solver.shared_goal_hits);
+}
+
+test "source shared prerequisites never publish failed expansions or replay exported equations through OOM" {
+    const allocator = std.testing.allocator;
+    const text =
+        \\type Row is data = $Row {value:U32}
+        \\const read = func row => return @u32.add row.value 0
+        \\const twice = func row => return @u32.add (read row) (read row)
+        \\entry const answer = func (input:U32): U32 => return twice ($Row {value:input})
+    ;
+    var tokens = try @import("../parse/lexer.zig").lex(allocator, text);
+    defer tokens.deinit(allocator);
+    var names: @import("../parse/symbols.zig").Pool = .{};
+    defer names.deinit(allocator);
+    var tree = try @import("../parse/parser.zig").parse(allocator, text, tokens.tokens.items, &names);
+    defer tree.deinit(allocator);
+    var checked = try @import("check.zig").checkModule(allocator, &tree, &names, &.{}, &.{}, 1);
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var module = try core.lower(allocator, &tree, &names, &checked);
+    defer module.deinit(allocator);
+    var binding: core.BindingId = 0;
+    for (module.bodies) |body| if (std.mem.eql(u8, module.name(body.declaration_name), "twice")) {
+        binding = body.binding;
+    };
+    var nominal_type: T.Id = 0;
+    for (module.types.nodes, 0..) |node, index| if (node.tag == .nominal and node.a == module.unit) {
+        nominal_type = @intCast(index);
+        break;
+    };
+    try std.testing.expect(binding != 0 and nominal_type != 0);
+    try sharedGoalFailureScenario(allocator, &module, binding, nominal_type, names.lookup("value").?);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, sharedGoalFailureScenario, .{ &module, binding, nominal_type, names.lookup("value").? });
+}

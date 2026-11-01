@@ -238,6 +238,7 @@ for (const width of sizes) {
       latency_ms: performance.now() - started,
       build_ms: buildMs,
       wasm_bytes: result.bytes.length,
+      wasm_sha256: await hashBytes(result.bytes),
       work_counters: result.stats.workCounters,
       source_sha256: sourceSha256,
       compiler_sha256: compilerSha256,

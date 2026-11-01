@@ -47,6 +47,12 @@ source scope and are published only after every prerequisite succeeds. They do
 not assert purity, closure or Foreign authority, and invocation rows still have
 to match the body's ambient effects. Portable admission does not use them.
 
+One source equation inquiry may reuse completed callee prerequisites with exact
+immutable-prefix data arguments, closed rows and unchanged lexical authority.
+Receipts retain the successful depth and never contain temporary solver IDs.
+Failed proofs publish nothing; requested predicates still reconstruct their
+exported equations. These receipts remain private to the inquiry.
+
 ## Storage and ownership
 
 Guest storage migration is specified in [SCOPED_STORAGE.md](SCOPED_STORAGE.md).
@@ -90,6 +96,12 @@ index spans scoped to one generalization. Buffer growth cannot invalidate a
 candidate, and publication retains no temporary span. Schemes without residual
 predicates keep their ordinary quantified types and rows; they omit only
 metadata for shared-predicate instantiation, which they cannot request.
+
+Type transformations preserve shared subgraphs. Ordinary covariance opening
+reuses unchanged data while keeping changed occurrences' fresh rows independent.
+Recursive normalization receipts retain the cursor, depth and exact type/row
+epochs; changing the depth limit invalidates them. Closing receipts also retain
+the complete protected-row context and their invocation's recorded decisions.
 
 Requirement dependency caches are local to one checker and pending ordinal. They
 preserve ordered variable discovery and invalidate on type/effect writes,

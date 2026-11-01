@@ -2,9 +2,10 @@
 
 The active priority is subsecond Gdev compilation with bounded iteration. The
 scalar, concrete-field, nominal and descriptor-call batches have measured
-synthetic gains; whole-game compilation exceeds the five-second diagnostic
-cutoff. See
-[the latest pinned evidence](../zig-native/measurements/nominal-call-sharing-2026-11-01.json)
+synthetic gains. Proof-instance reuse and shared type transformations remove two
+exponential source cliffs; whole-game compilation still exceeds the bounded
+diagnostics. See
+[the latest pinned evidence](../zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
 and [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact

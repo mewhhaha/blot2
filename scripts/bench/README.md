@@ -34,7 +34,25 @@ access through a named data constructor. The independent field recurrence is
 unchanged. The
 [nominal record](../../zig-native/measurements/nominal-call-sharing-2026-11-01.json)
 includes five alternating pairs per size. Depth-eight/eight-call probes still
-hit source-proof validation; reducing emitted code has not removed that cliff.
+hit source-proof validation on that candidate. The later
+[proof/type-sharing record](../../zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
+preserves that rejection and the completed proof-instance fix. Run its six-cell
+acceptance matrix with unchanged limits:
+
+```sh
+deno run --no-config --no-lock -A scripts/bench/source_proof.ts --blotc zig-native/zig-out-native-dev/bin/blotc
+```
+
+For frontend type-graph copying, use unused generic pair helpers:
+
+```sh
+deno run --no-config --no-lock -A scripts/bench/open_type_dag.ts --blotc zig-native/zig-out-native-dev/bin/blotc --depths 8,12,16,20
+```
+
+This instrumented development-tier probe reports phase clocks, type-node counts,
+source/compiler/output hashes and executed entry checks. Its output stays 2,935
+bytes while the signature depth grows. Each startup/build has a five-second
+deadline. Keep these profiled samples separate from unprofiled throughput.
 
 For nested storage readers and Unit writers:
 

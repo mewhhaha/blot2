@@ -705,3 +705,26 @@ test "a lexical closure over outer variables expands its shared callee in place"
     try f.valid();
     try std.testing.expect(f.checked.counters.shared_uses > 0);
 }
+
+test "unused generic pair helpers keep checker type graphs bounded" {
+    var smaller_nodes: usize = 0;
+    for ([_]usize{ 8, 16 }) |depth| {
+        var source: std.ArrayList(u8) = .empty;
+        defer source.deinit(a);
+        try source.appendSlice(a, "const nest0 = func value => return (value, value)\n");
+        for (1..depth) |level| try source.print(a, "const nest{d} = func value => return do:\n  let previous = nest{d} value\n  return (previous, previous)\n", .{ level, level - 1 });
+        try source.appendSlice(a, "entry const answer = func (input: U32): U32 => return do:\n  let marker: GrowArray U32 = #[input]\n  return marker[0]\n");
+        var fixture = try Fixture.init(source.items);
+        defer fixture.deinit();
+        try fixture.valid();
+        for (0..depth) |level| {
+            const name = try a.print("nest{d}", .{level});
+            defer a.free(name);
+            try std.testing.expect(fixture.binding(name).?.scheme.root != 0);
+        }
+        const nodes = fixture.checked.types.nodes.items.len;
+        try std.testing.expect(nodes < 8_192);
+        if (smaller_nodes != 0) try std.testing.expect(nodes < smaller_nodes * 4);
+        smaller_nodes = nodes;
+    }
+}

@@ -162,6 +162,7 @@ pub const Store = struct {
     associated_equations: std.AutoHashMapUnmanaged(Id, Id) = .empty,
     projection_resolution_types: u64 = 0,
     projection_resolution_rows: u64 = 0,
+    projection_resolution_limit: usize = 0,
     projection_resolutions: std.AutoHashMapUnmanaged(ProjectionResolution, Id) = .empty,
     closed_generation: u16 = 1,
     closed_effect_physical_epoch: u64 = 0,
@@ -1052,17 +1053,20 @@ pub const Store = struct {
         return result;
     }
     fn resolveDepth(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
-        // Associated equations produce shared open DAGs. Keep exact recursive
-        // results in the same epoch as the root query; legacy stores retain
-        // their ordinary path and allocation policy.
-        if (self.has_projections and self.use_resolution_cache and depth != 0 and root > never) {
+        // Rebuilding a shared open graph must retain its shared children.
+        // Ordinary legacy stores retain their allocation policy.
+        if ((self.has_projections or self.use_closed_graphs) and self.use_resolution_cache and depth != 0 and root > never) {
+            // Closed certificates need no hash lookup. resolveNode still checks
+            // both the current depth and the certified remaining height.
+            if (self.closedHeight(root) != 0) return self.resolveNode(root, at, depth);
             if (self.mutation_epoch == std.math.maxInt(u64) or self.effects.mutation_epoch == std.math.maxInt(u64)) return self.resolveNode(root, at, depth);
-            if (self.projection_resolution_types != self.mutation_epoch or self.projection_resolution_rows != self.effects.mutation_epoch) {
+            if (self.projection_resolution_types != self.mutation_epoch or self.projection_resolution_rows != self.effects.mutation_epoch or self.projection_resolution_limit != self.resolution_depth_limit) {
                 self.projection_resolutions.clearRetainingCapacity();
                 self.projection_resolution_types = self.mutation_epoch;
                 self.projection_resolution_rows = self.effects.mutation_epoch;
+                self.projection_resolution_limit = self.resolution_depth_limit;
             }
-            try self.chargeProjection();
+            if (self.has_projections) try self.chargeProjection();
             const key: ProjectionResolution = .{ .root = root, .at = at, .depth = @as(u32, @intCast(depth)) };
             if (self.projection_resolutions.get(key)) |result| return result;
             const result = try self.resolveNode(root, at, depth);
@@ -2162,8 +2166,8 @@ pub const Store = struct {
     fn closeCovariantDepth(self: *Store, root: Id, generalized: []const u32, protected: []const u32, decisions: ?*std.ArrayList(u32), memo: *CovariantMemo, depth: usize) Error!Id {
         if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
-        if (self.has_projections) {
-            if (generalized.len == 0) return root;
+        if (generalized.len == 0) return root;
+        if (self.has_projections or self.use_closed_graphs) {
             for (memo.entries.items) |entry| if (entry.root == root and entry.depth == depth and std.mem.eql(u32, entry.protected, protected)) return entry.result;
             const rows = try self.freeRowVariables(root);
             defer self.allocator.free(rows);
@@ -2173,7 +2177,7 @@ pub const Store = struct {
             if (!changes) return root;
         }
         const result = try self.closeCovariantNode(root, generalized, protected, decisions, memo, depth);
-        if (self.has_projections and memo.entries.items.len < 65_536) {
+        if ((self.has_projections or self.use_closed_graphs) and memo.entries.items.len < 65_536) {
             const owned = try self.allocator.dupe(u32, protected);
             errdefer self.allocator.free(owned);
             try memo.entries.append(self.allocator, .{ .root = root, .depth = depth, .protected = owned, .result = result });
@@ -2193,6 +2197,7 @@ pub const Store = struct {
                     if (decisions) |recorded| if (!has(recorded.items, tail.variable)) try recorded.append(self.allocator, tail.variable);
                     effect_row = self.effects.row(self.rowLabels(effect_row), .closed) catch |err| return effectError(err);
                 }
+                if (effect_row == value.c) return root;
                 return self.provider(value.a, effect_row);
             },
             .function => {
@@ -2215,7 +2220,9 @@ pub const Store = struct {
                 try self.unionInto(&nested, parameter_free);
                 const closed_tail = self.effects.node(effect_row).tail;
                 if (closed_tail == .variable) try self.unionInto(&nested, &.{closed_tail.variable});
-                return self.functionWithEffects(value.a, try self.closeCovariantDepth(value.b, generalized, nested.items, decisions, memo, depth + 1), effect_row);
+                const result = try self.closeCovariantDepth(value.b, generalized, nested.items, decisions, memo, depth + 1);
+                if (result == value.b and effect_row == value.c) return root;
+                return self.functionWithEffects(value.a, result, effect_row);
             },
             .product, .record => {
                 var protected_siblings: std.ArrayList(u32) = .empty;
@@ -2229,15 +2236,26 @@ pub const Store = struct {
                 defer children.deinit(self.allocator);
                 var fields: std.ArrayList(Field) = .empty;
                 defer fields.deinit(self.allocator);
+                var changed = false;
                 for (0..value.b) |i| {
                     const field = if (value.tag == .record) self.recordField(value, i) else Field{ .name = 0, .ty = self.extra.items[value.a + i] };
                     const child = try self.closeCovariantDepth(field.ty, generalized, protected_siblings.items, decisions, memo, depth + 1);
+                    changed = changed or child != field.ty;
                     if (value.tag == .record) try fields.append(self.allocator, .{ .name = field.name, .ty = child }) else try children.append(self.allocator, child);
                 }
+                if (!changed) return root;
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
-            .usage => return self.usage(try self.closeCovariantDepth(value.a, generalized, protected, decisions, memo, depth + 1), @fromBackingInt(@intCast(value.b)), value.c),
-            .array, .list, .cursor => return self.sequence(value.tag, try self.closeCovariantDepth(value.a, generalized, protected, decisions, memo, depth + 1)),
+            .usage => {
+                const child = try self.closeCovariantDepth(value.a, generalized, protected, decisions, memo, depth + 1);
+                if (child == value.a) return root;
+                return self.usage(child, @fromBackingInt(@intCast(value.b)), value.c);
+            },
+            .array, .list, .cursor => {
+                const child = try self.closeCovariantDepth(value.a, generalized, protected, decisions, memo, depth + 1);
+                if (child == value.a) return root;
+                return self.sequence(value.tag, child);
+            },
             // Nominal arguments and Demand's latent computation are invariant.
             else => return root,
         }
@@ -2252,7 +2270,7 @@ pub const Store = struct {
     fn covariantInputsSeen(self: *Store, root: Id, out: *std.ArrayList(u32), depth: usize, seen: *CovariantSeen) Error!void {
         if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
-        if (self.has_projections) {
+        if (self.has_projections or self.use_closed_graphs) {
             const entry = try seen.getOrPut(self.allocator, .{ .root = root, .depth = depth });
             if (entry.found_existing) return;
         }
@@ -2283,21 +2301,31 @@ pub const Store = struct {
     }
     /// Each use opens only covariant closed rows. A callback's parameter row
     /// remains the exact requirement checked by its producer.
+    const OpenCovariantMemo = std.AutoHashMapUnmanaged(CovariantInput, Id);
     pub fn openCovariant(self: *Store, root: Id) Error!Id {
-        var memo: std.AutoHashMapUnmanaged(Id, Id) = .empty;
+        var memo: OpenCovariantMemo = .empty;
         defer memo.deinit(self.allocator);
         return self.openCovariantDepth(root, &memo, 0);
     }
-    fn openCovariantDepth(self: *Store, root: Id, memo: *std.AutoHashMapUnmanaged(Id, Id), depth: usize) Error!Id {
-        if (self.has_projections) {
-            if (memo.get(root)) |result| return result;
-            const result = try self.openCovariantNode(root, memo, depth);
-            if (memo.count() < 65_536) try memo.put(self.allocator, root, result);
-            return result;
+    fn openCovariantDepth(self: *Store, root: Id, memo: *OpenCovariantMemo, depth: usize) Error!Id {
+        if (!self.has_projections) {
+            if (depth >= 1024) return error.TypeLimit;
+            // Invariant leaves cannot open rows and need no receipt storage.
+            switch (self.node(root).tag) {
+                .function, .provider, .product, .record, .usage, .array, .list, .cursor => {},
+                else => return root,
+            }
         }
-        return self.openCovariantNode(root, memo, depth);
+        var query: CovariantInput = .{ .root = root, .depth = depth };
+        // Projected schemes retain their existing correlated instantiations.
+        // Ordinary schemes only share unchanged answers, never fresh rows.
+        if (self.has_projections) query.depth = 0;
+        if (memo.get(query)) |result| return result;
+        const result = try self.openCovariantNode(root, memo, depth);
+        if ((self.has_projections or result == root) and memo.count() < 65_536) try memo.put(self.allocator, query, result);
+        return result;
     }
-    fn openCovariantNode(self: *Store, root: Id, memo: *std.AutoHashMapUnmanaged(Id, Id), depth: usize) Error!Id {
+    fn openCovariantNode(self: *Store, root: Id, memo: *OpenCovariantMemo, depth: usize) Error!Id {
         if (self.has_projections) try self.chargeProjection();
         if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
@@ -2308,6 +2336,7 @@ pub const Store = struct {
                     const opened_row = try self.freshEffects();
                     effect_row = self.effects.row(self.rowLabels(effect_row), self.effects.node(opened_row).tail) catch |err| return effectError(err);
                 }
+                if (effect_row == value.c) return root;
                 return self.provider(value.a, effect_row);
             },
             .function => {
@@ -2317,6 +2346,7 @@ pub const Store = struct {
                     const opened_row = try self.freshEffects();
                     effect_row = self.effects.row(self.rowLabels(effect_row), self.effects.node(opened_row).tail) catch |err| return effectError(err);
                 }
+                if (result == value.b and effect_row == value.c) return root;
                 return self.functionWithEffects(value.a, result, effect_row);
             },
             .product, .record => {
@@ -2324,20 +2354,29 @@ pub const Store = struct {
                 defer children.deinit(self.allocator);
                 var fields: std.ArrayList(Field) = .empty;
                 defer fields.deinit(self.allocator);
+                var changed = false;
                 for (0..value.b) |i| {
                     const field = if (value.tag == .record) self.recordField(value, i) else Field{ .name = 0, .ty = self.extra.items[value.a + i] };
                     const child = try self.openCovariantDepth(field.ty, memo, depth + 1);
+                    changed = changed or child != field.ty;
                     if (value.tag == .record) try fields.append(self.allocator, .{ .name = field.name, .ty = child }) else try children.append(self.allocator, child);
                 }
+                if (!changed) return root;
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
             .usage => {
                 // Cleanup descriptors promise one exact non-suspending host role.
                 // Reopening their row would erase that portable authority.
                 if (value.b == @backingInt(UsageKind.cleanup) or value.b == @backingInt(UsageKind.concurrent)) return root;
-                return self.usage(try self.openCovariantDepth(value.a, memo, depth + 1), @fromBackingInt(@intCast(value.b)), value.c);
+                const child = try self.openCovariantDepth(value.a, memo, depth + 1);
+                if (child == value.a) return root;
+                return self.usage(child, @fromBackingInt(@intCast(value.b)), value.c);
             },
-            .array, .list, .cursor => return self.sequence(value.tag, try self.openCovariantDepth(value.a, memo, depth + 1)),
+            .array, .list, .cursor => {
+                const child = try self.openCovariantDepth(value.a, memo, depth + 1);
+                if (child == value.a) return root;
+                return self.sequence(value.tag, child);
+            },
             else => return root,
         }
     }
@@ -3121,4 +3160,230 @@ fn operationRowScenario(allocator: std.mem.Allocator) !void {
 test "operation row normalization preserves unresolved arguments histories depth rollback and saturated epochs through OOM" {
     try operationRowScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, operationRowScenario, .{});
+}
+
+test "unchanged covariance preserves shared data graphs without creating type nodes" {
+    var store = try Store.initWithOptions(std.testing.allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    var root = try store.fresh();
+    for (0..20) |_| root = try store.product(&.{ root, root });
+    root = try store.array(try store.record(&.{.{ .name = 7, .ty = root }}));
+    const before = store.nodes.items.len;
+    const closed = try store.closeCovariantCertified(root, &.{}, &.{});
+    try std.testing.expectEqual(root, closed.root);
+    try std.testing.expectEqual(@as(u32, 0), closed.closed_rows.len);
+    const irrelevant = store.row(try store.freshEffects()).tail.variable;
+    const generalized = try store.closeCovariantCertified(root, &.{irrelevant}, &.{});
+    try std.testing.expectEqual(root, generalized.root);
+    try std.testing.expectEqual(@as(u32, 0), generalized.closed_rows.len);
+    var protected: std.ArrayList(u32) = .empty;
+    defer protected.deinit(store.allocator);
+    try store.covariantInputs(root, &protected, 0);
+    try std.testing.expectEqual(@as(usize, 0), protected.items.len);
+    try std.testing.expectEqual(root, try store.openCovariant(root));
+    try std.testing.expectEqual(before, store.nodes.items.len);
+    var memo: Store.OpenCovariantMemo = .empty;
+    defer memo.deinit(store.allocator);
+    try std.testing.expectEqual(root, try store.openCovariantDepth(root, &memo, 0));
+    try std.testing.expectError(error.TypeLimit, store.openCovariantDepth(root, &memo, 1020));
+}
+
+fn covarianceSharingLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer store.deinit();
+    const variable = try store.fresh();
+    const data = try store.product(&.{ variable, variable });
+    const parameter_row = try store.freshEffects();
+    const parameter = try store.functionWithEffects(unit, u32_type, parameter_row);
+    const callback = try store.function(parameter, u32_type);
+    const callbacks = try store.product(&.{ callback, callback });
+    const root = try store.record(&.{ .{ .name = 1, .ty = data }, .{ .name = 2, .ty = callbacks }, .{ .name = 3, .ty = data } });
+    const point = store.mark();
+    const first = try store.openCovariant(root);
+    const second = try store.openCovariant(root);
+    var tails: [4]u32 = undefined;
+    for ([_]Id{ first, second }, 0..) |opened, side| {
+        const record_ = store.node(opened);
+        try std.testing.expectEqual(data, store.recordField(record_, 0).ty);
+        try std.testing.expectEqual(data, store.recordField(record_, 2).ty);
+        const pair = store.node(store.recordField(record_, 1).ty);
+        for (store.list(.{ .start = pair.a, .len = pair.b }), 0..) |item, index| {
+            const arrow = store.node(item);
+            try std.testing.expectEqual(parameter, arrow.a);
+            tails[side * 2 + index] = store.row(arrow.c).tail.variable;
+        }
+    }
+    for (tails, 0..) |tail, index| for (tails[0..index]) |earlier| try std.testing.expect(tail != earlier);
+    const closed = try store.closeCovariantCertified(first, tails[0..2], &.{tails[1]});
+    try std.testing.expectEqualSlices(u32, &.{tails[0]}, store.list(closed.closed_rows));
+    const closed_pair = store.node(store.recordField(store.node(closed.root), 1).ty);
+    const closed_callbacks = store.list(.{ .start = closed_pair.a, .len = closed_pair.b });
+    try std.testing.expect(store.row(store.node(closed_callbacks[0]).c).tail == .closed);
+    try std.testing.expectEqual(tails[1], store.row(store.node(closed_callbacks[1]).c).tail.variable);
+    try std.testing.expect(store.row(parameter_row).tail == .variable);
+    try store.effects.appendVersion(tails[0], try store.effects.row(&.{foreign_operation}, .closed));
+    const first_pair = store.node(store.recordField(store.node(first), 1).ty);
+    const first_callbacks = store.list(.{ .start = first_pair.a, .len = first_pair.b });
+    try std.testing.expectEqualSlices(Effects.Label, &.{foreign_operation}, store.rowLabels(try store.resolveEffects(store.node(first_callbacks[0]).c, 0)));
+    try std.testing.expect(store.row(try store.resolveEffects(store.node(first_callbacks[1]).c, 0)).tail == .variable);
+    try store.appendVersion(variable, f32_type);
+    const after = try store.openCovariant(root);
+    try std.testing.expectEqual(data, store.recordField(store.node(after), 0).ty);
+    store.rollback(point);
+    const recycled = try store.openCovariant(root);
+    try std.testing.expectEqual(first, recycled);
+    try std.testing.expectEqual(data, store.recordField(store.node(recycled), 0).ty);
+}
+
+test "covariance data sharing preserves independent callback rows history rollback and allocation failures" {
+    try covarianceSharingLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, covarianceSharingLaw, .{});
+}
+
+test "recursive resolution visits shared open function and product graphs once" {
+    const allocator = std.testing.allocator;
+    for ([_]usize{ 6, 8, 10, 12 }) |depth| {
+        var cached = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+        defer cached.deinit();
+        var oracle = try Store.initWithOptions(allocator, .{ .resolution_cache = false });
+        defer oracle.deinit();
+        var roots: [2]Id = undefined;
+        var leaves: [2]Id = undefined;
+        for ([_]*Store{ &cached, &oracle }, &roots, 0..) |store, *root, side| {
+            leaves[side] = try store.fresh();
+            root.* = leaves[side];
+            for (0..depth) |level| {
+                if (level % 2 == 0) root.* = try store.function(root.*, root.*) else root.* = try store.product(&.{ root.*, root.* });
+            }
+        }
+        try std.testing.expectEqual(roots[0], try cached.resolve(roots[0], 0));
+        try std.testing.expectEqual(roots[1], try oracle.resolve(roots[1], 0));
+        try std.testing.expect(cached.resolution_steps <= depth + 1);
+        try std.testing.expectEqual((@as(u64, 1) << @as(u6, @intCast(depth + 1))) - 1, oracle.resolution_steps);
+        try std.testing.expect(cached.projection_resolutions.count() > 0);
+        try std.testing.expectEqual(@as(usize, 0), cached.projection_steps);
+        // A changed leaf stays open. Normalization must rebuild each distinct
+        // ancestor once and preserve both edges to its one rebuilt child.
+        const replacement = try cached.fresh();
+        try cached.appendVersion(leaves[0], replacement);
+        const before = cached.nodes.items.len;
+        var resolved = try cached.resolve(roots[0], 0);
+        try std.testing.expect(cached.nodes.items.len - before <= depth);
+        for (0..depth) |_| {
+            const n = cached.node(resolved);
+            if (n.tag == .function) {
+                try std.testing.expectEqual(n.a, n.b);
+                resolved = n.a;
+            } else {
+                try std.testing.expectEqual(Tag.product, n.tag);
+                const children = cached.list(.{ .start = n.a, .len = n.b });
+                try std.testing.expectEqualSlices(Id, &.{ children[0], children[0] }, children);
+                resolved = children[0];
+            }
+        }
+        try std.testing.expectEqual(replacement, resolved);
+    }
+}
+
+fn compareRecursiveResolution(left: *const Store, lhs: Id, right: *const Store, rhs: Id) !void {
+    const l = left.node(lhs);
+    const r = right.node(rhs);
+    try std.testing.expectEqual(l.tag, r.tag);
+    switch (l.tag) {
+        .variable => {
+            try std.testing.expectEqual(l.a, r.a);
+            try std.testing.expectEqual(l.b, r.b);
+        },
+        .function => {
+            try compareRecursiveResolution(left, l.a, right, r.a);
+            try compareRecursiveResolution(left, l.b, right, r.b);
+            try std.testing.expectEqualDeep(left.row(l.c).tail, right.row(r.c).tail);
+            try std.testing.expectEqual(left.row(l.c).cursor, right.row(r.c).cursor);
+            try std.testing.expectEqualSlices(Effects.Label, left.rowLabels(l.c), right.rowLabels(r.c));
+        },
+        .product => {
+            const ls = left.list(.{ .start = l.a, .len = l.b });
+            const rs = right.list(.{ .start = r.a, .len = r.b });
+            try std.testing.expectEqual(ls.len, rs.len);
+            for (ls, rs) |lc, rc| try compareRecursiveResolution(left, lc, right, rc);
+        },
+        else => try std.testing.expect(lhs <= never and rhs <= never),
+    }
+}
+
+fn recursiveResolutionHistoryLaw(allocator: std.mem.Allocator) !void {
+    var cached = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer cached.deinit();
+    var oracle = try Store.initWithOptions(allocator, .{ .resolution_cache = false });
+    defer oracle.deinit();
+    const stores = [_]*Store{ &cached, &oracle };
+    var roots: [2]Id = undefined;
+    var leaves: [2]Id = undefined;
+    var rows: [2]Effects.Id = undefined;
+    for (stores, 0..) |store, side| {
+        leaves[side] = try store.fresh();
+        rows[side] = try store.freshEffects();
+        roots[side] = try store.functionWithEffects(leaves[side], leaves[side], rows[side]);
+        for (0..4) |_| roots[side] = try store.product(&.{ roots[side], roots[side] });
+    }
+    try compareRecursiveResolution(&cached, try cached.resolve(roots[0], 0), &oracle, try oracle.resolve(roots[1], 0));
+    const marks = [_]Mark{ cached.mark(), oracle.mark() };
+    for (stores, 0..) |store, side| {
+        try store.appendVersion(leaves[side], u32_type);
+        try store.appendVersion(leaves[side], f32_type);
+        const variable = store.row(rows[side]).tail.variable;
+        try store.effects.appendVersion(variable, try store.effects.row(&.{foreign_operation}, .closed));
+        try store.effects.appendVersion(variable, 0);
+    }
+    for (0..6) |at| try compareRecursiveResolution(&cached, try cached.resolve(roots[0], @intCast(at)), &oracle, try oracle.resolve(roots[1], @intCast(at)));
+    for (stores, marks) |store, point| store.rollback(point);
+    try compareRecursiveResolution(&cached, try cached.resolve(roots[0], 0), &oracle, try oracle.resolve(roots[1], 0));
+
+    // Distinct parents isolate recursive receipts from the root-query cache.
+    for ([_]bool{ false, true }) |projections| {
+        cached.has_projections = projections;
+        for (stores, 0..) |store, side| {
+            _ = try store.resolve(try store.product(&.{ roots[side], roots[side] }), 0);
+            store.resolution_depth_limit = 3;
+            try std.testing.expectError(error.TypeLimit, store.resolve(try store.product(&.{ roots[side], roots[side] }), 0));
+            store.resolution_depth_limit = 1024;
+        }
+    }
+    cached.has_projections = false;
+
+    const recycle_marks = [_]Mark{ cached.mark(), oracle.mark() };
+    var recycled: [2]Id = undefined;
+    for (stores, 0..) |store, side| {
+        recycled[side] = try store.product(&.{ leaves[side], leaves[side] });
+        _ = try store.resolve(try store.product(&.{ recycled[side], recycled[side] }), 0);
+    }
+    for (stores, recycle_marks, 0..) |store, point, side| {
+        store.rollback(point);
+        const child = try store.product(&.{ leaves[side], u32_type });
+        try std.testing.expectEqual(recycled[side], child);
+        roots[side] = try store.product(&.{ child, child });
+    }
+    try compareRecursiveResolution(&cached, try cached.resolve(roots[0], 0), &oracle, try oracle.resolve(roots[1], 0));
+    for (stores, 0..) |store, side| {
+        const child = store.list(.{ .start = store.node(roots[side]).a, .len = 2 })[0];
+        store.replaceListItem(.{ .start = store.node(child).a, .len = 2 }, 1, f32_type);
+    }
+    try compareRecursiveResolution(&cached, try cached.resolve(roots[0], 0), &oracle, try oracle.resolve(roots[1], 0));
+    for ([_]bool{ false, true }) |rows_saturate| {
+        var saturated = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+        defer saturated.deinit();
+        const variable = try saturated.fresh();
+        const child = try saturated.product(&.{ variable, variable });
+        _ = try saturated.resolve(try saturated.product(&.{ child, child }), 0);
+        if (rows_saturate) saturated.effects.mutation_epoch = std.math.maxInt(u64) else saturated.mutation_epoch = std.math.maxInt(u64);
+        const visits = saturated.resolution_steps;
+        const parent = try saturated.product(&.{ child, child });
+        try std.testing.expectEqual(parent, try saturated.resolve(parent, 0));
+        try std.testing.expectEqual(@as(u64, 7), saturated.resolution_steps - visits);
+    }
+}
+
+test "recursive resolution preserves open histories depth rollback recycled IDs and saturation through OOM" {
+    try recursiveResolutionHistoryLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, recursiveResolutionHistoryLaw, .{});
 }
