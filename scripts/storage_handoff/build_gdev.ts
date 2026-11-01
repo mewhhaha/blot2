@@ -12,6 +12,7 @@ const { values, positionals } = parseArgs({
     trace: { type: "boolean", default: false },
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },
+    "frontend-workers": { type: "string", default: "4" },
   },
 });
 if (values.tier !== "development" && values.tier !== "optimized") {
@@ -20,6 +21,13 @@ if (values.tier !== "development" && values.tier !== "optimized") {
 const workers = Number(values.workers);
 if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
   throw new Error("--workers must be an integer from 1 to 16");
+}
+const frontendWorkers = Number(values["frontend-workers"]);
+if (
+  !Number.isInteger(frontendWorkers) || frontendWorkers < 1 ||
+  frontendWorkers > 16
+) {
+  throw new Error("--frontend-workers must be an integer from 1 to 16");
 }
 const parentArg = positionals[0] ?? "build/gdev-first-frame";
 if (positionals.length > 1) {
@@ -81,6 +89,7 @@ try {
     profileTrace: values.trace,
     codegenTier: values.tier,
     codegenWorkers: workers,
+    frontendWorkers,
   });
   buildStarted = performance.now();
   const result = await compiler.build({
@@ -137,6 +146,7 @@ const output = {
   deadlineMs: timeoutMs,
   codegenTier: values.tier,
   codegenWorkers: workers,
+  frontendWorkers,
   buildMs,
   profileBackend: values.profile || values.trace,
   profileTrace: values.trace,

@@ -12,6 +12,11 @@ const { values } = parseArgs({
     world: { type: "boolean", default: false },
     sample: { type: "boolean", default: false },
     "sample-focus": { type: "string" },
+    "frontend-workers": { type: "string" },
+    "worker-sweep": { type: "boolean", default: false },
+    "worker-counts": { type: "string", default: "1,2,4,8" },
+    "no-profile": { type: "boolean", default: false },
+    retained: { type: "boolean", default: false },
     repetitions: { type: "string", default: "3" },
     "timeout-ms": { type: "string", default: "5000" },
     "baseline-gdev": {
@@ -40,7 +45,13 @@ const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) =>
     b.toString(16).padStart(2, "0")
   ).join("");
-let versions = [
+type Version = {
+  name: string;
+  executable: string;
+  trace: boolean;
+  frontendWorkers?: number;
+};
+let versions: Version[] = [
   {
     name: "baseline",
     executable: resolve(
@@ -96,6 +107,38 @@ let probes = [
 ];
 const repetitions = Number(values.repetitions);
 const timeoutMs = Number(values["timeout-ms"]);
+const frontendWorkers = Number(values["frontend-workers"] ?? "4");
+if (
+  !Number.isInteger(frontendWorkers) || frontendWorkers < 1 ||
+  frontendWorkers > 16
+) {
+  throw new Error("--frontend-workers must be 1..16");
+}
+if (
+  values["worker-sweep"] &&
+  (!values.world || values.sample || values.baseline !== undefined ||
+    values["frontend-workers"] !== undefined)
+) {
+  throw new Error(
+    "--worker-sweep requires --world without sampling, baseline or frontend-workers",
+  );
+}
+if (values["no-profile"] && values.sample) {
+  throw new Error("--sample requires profiling");
+}
+if (values.retained && (!values.world || values.sample)) {
+  throw new Error("--retained requires --world without sampling");
+}
+const workerCounts = values["worker-counts"]!.split(",").map(Number);
+if (
+  workerCounts.length === 0 ||
+  new Set(workerCounts).size !== workerCounts.length ||
+  workerCounts.some((count) =>
+    !Number.isInteger(count) || count < 1 || count > 16
+  )
+) {
+  throw new Error("--worker-counts requires distinct worker counts in 1..16");
+}
 if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 9) {
   throw new Error("--repetitions must be 1..9");
 }
@@ -177,6 +220,47 @@ if (values.world && values.baseline !== undefined) {
     }
   }
 }
+if (values["worker-sweep"]) {
+  versions = workerCounts.map((workers) => ({
+    name: `workers-${workers}`,
+    executable: resolve(values.compiler!),
+    trace: false,
+    frontendWorkers: workers,
+  }));
+}
+const cpuClock = await new Deno.Command("getconf", {
+  args: ["CLK_TCK"],
+  stdout: "piped",
+}).output();
+const cpuHz = Number(new TextDecoder().decode(cpuClock.stdout).trim());
+async function processCpuMs(pid: number) {
+  if (!cpuClock.success || !Number.isFinite(cpuHz) || cpuHz <= 0) return null;
+  try {
+    const stat = await Deno.readTextFile(`/proc/${pid}/stat`);
+    const fields = stat.slice(stat.lastIndexOf(") ") + 2).trim().split(/\s+/);
+    return (Number(fields[11]) + Number(fields[12])) * 1000 / cpuHz;
+  } catch {
+    return null;
+  }
+}
+async function execute(bytes: Uint8Array<ArrayBuffer>, expected: number) {
+  const guest = await instantiateGuest(bytes);
+  try {
+    if (guest.call("answer", 41) !== expected) {
+      throw new Error("Incorrect actual-source result");
+    }
+  } finally {
+    guest.dispose();
+  }
+}
+type RetainedSample = {
+  label: string;
+  buildMs: number;
+  processCpuMs: number | null;
+  wasmBytes: number;
+  wasmSha256: string;
+  stats: unknown;
+};
 const samples = [];
 for (let repetition = 0; repetition < repetitions; repetition++) {
   for (const probe of probes) {
@@ -190,12 +274,15 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
         prelude: resolve(repo, "std/prelude.blot"),
         stdRoot: resolve(repo, "std"),
         imports: { "ink/": resolve(repo, "../ink/lib") },
-        profileBackend: true,
+        profileBackend: !values["no-profile"],
+        frontendWorkers: version.frontendWorkers ?? frontendWorkers,
         cacheDirectory: false,
         codegenWorkers: 1,
         startupTimeoutMs: timeoutMs,
       };
-      if (version.trace || values.world) options.profileTrace = true;
+      if (!values["no-profile"] && (version.trace || values.world)) {
+        options.profileTrace = true;
+      }
       if (probe.native) {
         options.imports = Object.fromEntries(
           Object.entries(settings.imports).map((
@@ -251,11 +338,14 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           values["sample-focus"],
         );
       }
+      const openStarted = performance.now();
       const compiler = sampling?.compiler ??
         await createZigProjectCompiler(options);
+      const openMs = performance.now() - openStarted;
+      const cpuBefore = await processCpuMs(compiler.pid);
+      const start = performance.now();
       let sample;
       try {
-        const start = performance.now();
         let sources: Record<string, string> | undefined;
         if (values.world && version.name === "baseline") {
           sources = worldBaseline;
@@ -271,31 +361,110 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
         if (!result.success) {
           throw new Error(JSON.stringify(result.diagnostics));
         }
-        const guest = await instantiateGuest(result.bytes);
-        try {
-          if (guest.call("answer", 41) !== probe.expected) {
-            throw new Error("Incorrect actual-source result");
-          }
-        } finally {
-          guest.dispose();
-        }
+        const cpuAfterBuild = await processCpuMs(compiler.pid);
+        await execute(result.bytes, probe.expected);
         sample = {
+          status: "complete",
+          processCpuMs: null as number | null,
           probe: probe.name,
           version: version.name,
           repetition,
+          frontendWorkers: options.frontendWorkers,
+          profileBackend: options.profileBackend,
+          profileTrace: options.profileTrace ?? false,
           buildMs,
+          openMs,
+          openAndBuildMs: openMs + buildMs,
           compilerSha256: await hash(await Deno.readFile(version.executable)),
           sourceSha256: await hash(new TextEncoder().encode(probe.source)),
           wasmBytes: result.bytes.length,
           wasmSha256: await hash(result.bytes),
           stats: result.stats,
           progress: compiler.profileProgress,
+          retained: [] as RetainedSample[],
+        };
+        if (cpuBefore !== null && cpuAfterBuild !== null) {
+          sample.processCpuMs = cpuAfterBuild - cpuBefore;
+        }
+        if (values.retained) {
+          sample.progress = structuredClone(compiler.profileProgress);
+          for (const label of ["body-edit", "revert"]) {
+            let source = probe.source;
+            let expected = probe.expected;
+            if (label === "body-edit") {
+              source = source.replace(
+                "return marker[0]",
+                "return @u32.add marker[0] 1",
+              );
+              if (source === probe.source) {
+                throw new Error("Missing retained-edit source marker");
+              }
+              expected += 1;
+            }
+            const before = await processCpuMs(compiler.pid);
+            const started = performance.now();
+            const edited = await compiler.build({
+              sources: { [entry]: source },
+              signal: AbortSignal.timeout(Math.min(timeoutMs, 5000)),
+            });
+            const buildMs = performance.now() - started;
+            const after = await processCpuMs(compiler.pid);
+            if (!edited.success) {
+              throw new Error(JSON.stringify(edited.diagnostics));
+            }
+            const wasmSha256 = await hash(edited.bytes);
+            if (label === "revert" && wasmSha256 !== sample.wasmSha256) {
+              throw new Error("Retained revert changed original bytes");
+            }
+            await execute(edited.bytes, expected);
+            let cpuDeltaMs: number | null = null;
+            if (before !== null && after !== null) {
+              cpuDeltaMs = after - before;
+            }
+            sample.retained.push({
+              label,
+              buildMs,
+              processCpuMs: cpuDeltaMs,
+              wasmBytes: edited.bytes.length,
+              wasmSha256,
+              stats: edited.stats,
+            });
+          }
+        }
+      } catch (error) {
+        if (!values["worker-sweep"]) throw error;
+        let status = "failed";
+        if (error instanceof DOMException && error.name === "AbortError") {
+          status = "deadline";
+        }
+        sample = {
+          probe: probe.name,
+          version: version.name,
+          repetition,
+          frontendWorkers: options.frontendWorkers,
+          profileBackend: options.profileBackend,
+          profileTrace: options.profileTrace ?? false,
+          status,
+          processCpuMs: null as number | null,
+          error: String(error),
+          buildMs: performance.now() - start,
+          openMs,
+          compilerSha256: await hash(await Deno.readFile(version.executable)),
+          sourceSha256: await hash(new TextEncoder().encode(probe.source)),
+          progress: compiler.profileProgress,
         };
       } finally {
+        const cpuAfter = await processCpuMs(compiler.pid);
+        if (sample && sample.status !== "complete") {
+          sample.processCpuMs = null;
+          if (cpuBefore !== null && cpuAfter !== null) {
+            sample.processCpuMs = cpuAfter - cpuBefore;
+          }
+        }
         if (sampling) await sampling.dispose();
         else await compiler.dispose();
       }
-      sample.progress = compiler.profileProgress;
+      if (!values.retained) sample.progress = compiler.profileProgress;
       samples.push(sample);
       await Deno.writeTextFile(
         resolve(output, "partial.json"),
@@ -310,6 +479,8 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           probe: sample.probe,
           version: sample.version,
           buildMs: sample.buildMs,
+          status: sample.status,
+          processCpuMs: sample.processCpuMs,
           wasmBytes: sample.wasmBytes,
         }),
       );
@@ -335,6 +506,7 @@ await Deno.writeTextFile(
       worldPins,
       repetitions,
       timeoutMs,
+      complete: samples.every((sample) => sample.status === "complete"),
       producerExecutionQualified: !values.world,
       samples,
     },
@@ -342,3 +514,4 @@ await Deno.writeTextFile(
     2,
   ) + "\n",
 );
+if (samples.some((sample) => sample.status !== "complete")) Deno.exit(1);

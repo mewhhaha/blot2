@@ -5,6 +5,13 @@ const lowering = @import("../check/core_builder.zig");
 const structural = @import("../structural.zig");
 const profile = @import("../phase_profile.zig");
 const A = std.mem.Allocator;
+const Frontend = @import("../work_counters.zig").Frontend;
+
+fn expectNoParallelClocks(counts: Frontend) !void {
+    inline for (.{ "parallel_prepare_us", "parallel_batch_us", "parallel_capacity_us", "parallel_worker_us", "parallel_worker_cpu_us", "parallel_worker_cpu_samples", "parallel_worker_slots", "parallel_worker_jobs" }) |field| {
+        try std.testing.expectEqual(@as(u64, 0), @field(counts, field));
+    }
+}
 
 const Fixture = struct {
     dir: std.testing.TmpDir,
@@ -47,7 +54,57 @@ test "parallel module checking preserves serial Core and counters with independe
         defer parallel.deinit(a);
         try std.testing.expectEqual(@as(u64, fixture.source.order.items.len), counts.parallel_jobs);
         try std.testing.expectEqual(@as(u64, 0), counts.parallel_retries);
+        try expectNoParallelClocks(counts);
         try std.testing.expectEqual(@as(usize, 0), parallel.diagnostics.len);
+        try std.testing.expectEqual(serial.body_elaborations, parallel.body_elaborations);
+        try std.testing.expectEqual(serial.imported_schemes, parallel.imported_schemes);
+        for (fixture.source.units.items, 1..) |*unit, id| {
+            var expected = try lowering.lower(a, &unit.tree, &fixture.source.symbols, &serial.module(@intCast(id)).checked);
+            defer expected.deinit(a);
+            var actual = try lowering.lower(a, &unit.tree, &fixture.source.symbols, &parallel.module(@intCast(id)).checked);
+            defer actual.deinit(a);
+            try std.testing.expect(structural.equal(expected, actual));
+        }
+    }
+}
+
+test "parallel worker trace diagnostics are bounded and preserve serial Core and rejection diagnostics" {
+    const a = std.testing.allocator;
+    for ([_]bool{ false, true }) |rejected| {
+        var fixture = try Fixture.init(a, rejected);
+        defer fixture.deinit(a);
+        var serial = try checker.checkProject(a, &fixture.source);
+        defer serial.deinit(a);
+        fixture.source.checking = .{ .io = std.testing.io, .workers = 16 };
+        var counts: Frontend = .{};
+        const capture = profile.captureChecking(&counts);
+        defer capture.restore();
+        var trace: profile.Trace = .init(std.testing.io, 0);
+        const installation = profile.installTrace(&trace);
+        defer installation.restore();
+        var parallel = try checker.checkProjectWithPrivateExecution(a, &fixture.source, .{ .parallel_min_nodes = 0 });
+        defer parallel.deinit(a);
+        try std.testing.expect(counts.parallel_prepare_us > 0);
+        try std.testing.expect(counts.parallel_batch_us > 0);
+        try std.testing.expect(counts.parallel_worker_us > 0);
+        try std.testing.expect(counts.parallel_worker_slots >= counts.parallel_batches);
+        try std.testing.expect(counts.parallel_worker_slots <= 16 * counts.parallel_batches);
+        try std.testing.expect(counts.parallel_capacity_us >= counts.parallel_batch_us);
+        try std.testing.expect(counts.parallel_worker_us <= counts.parallel_capacity_us);
+        try std.testing.expect(counts.parallel_worker_cpu_samples <= counts.parallel_worker_slots);
+        if (@import("builtin").os.tag == .linux) try std.testing.expect(counts.parallel_worker_cpu_samples > 0);
+        try std.testing.expectEqual(counts.parallel_jobs, counts.parallel_worker_jobs);
+        try std.testing.expectEqual(serial.diagnostics.len, parallel.diagnostics.len);
+        for (serial.diagnostics, parallel.diagnostics) |expected, actual| {
+            try std.testing.expectEqual(expected.unit, actual.unit);
+            try std.testing.expectEqual(expected.code, actual.code);
+            try std.testing.expectEqual(expected.semantic, actual.semantic);
+            try std.testing.expectEqualDeep(expected.span, actual.span);
+        }
+        if (rejected) {
+            try std.testing.expect(counts.parallel_retries > 0);
+            continue;
+        }
         try std.testing.expectEqual(serial.body_elaborations, parallel.body_elaborations);
         try std.testing.expectEqual(serial.imported_schemes, parallel.imported_schemes);
         for (fixture.source.units.items, 1..) |*unit, id| {
@@ -79,6 +136,60 @@ test "parallel module rejection replays serial diagnostic order" {
         try std.testing.expectEqual(expected.code, actual.code);
         try std.testing.expectEqual(expected.semantic, actual.semantic);
         try std.testing.expectEqualDeep(expected.span, actual.span);
+    }
+}
+
+test "unequal independent module bodies preserve serial Core and diagnostic order under parallel dispatch" {
+    const a = std.testing.allocator;
+    for ([_]bool{ false, true }) |rejected| {
+        const left = if (rejected) "import {identity} from \"./shared\"\nconst first: U32 = 1.5\n" else "import {identity} from \"./shared\"\nconst first = func value => return identity value\n";
+        const right = if (rejected) "import {identity} from \"./shared\"\nconst second: U32 = 1.5\nconst compose = func value => return identity (identity (identity value))\n" else "import {identity} from \"./shared\"\nconst second = func value => return identity (identity (identity value))\nconst compose = func value => return second (second value)\n";
+        var fixture = try Fixture.initTexts(a, "const identity = func value => return value\n", left, right, "import {first} from \"./left\"\nimport {second} from \"./right\"\nentry const answer: U32 = first (second 42)\n");
+        defer fixture.deinit(a);
+        var left_at: ?usize = null;
+        var right_at: ?usize = null;
+        for (fixture.source.order.items, 0..) |unit, at| {
+            const name = fixture.source.filename(unit);
+            if (std.mem.endsWith(u8, name, "left.blot")) left_at = at;
+            if (std.mem.endsWith(u8, name, "right.blot")) right_at = at;
+        }
+        // The larger independent module appears later in serial traversal, so
+        // size-first dispatch must reverse this pair while retaining its laws.
+        try std.testing.expect(left_at.? < right_at.?);
+        const left_unit = fixture.source.order.items[left_at.?];
+        const right_unit = fixture.source.order.items[right_at.?];
+        try std.testing.expect(fixture.source.unit(left_unit).tree.nodes.items.len < fixture.source.unit(right_unit).tree.nodes.items.len);
+        var serial = try checker.checkProject(a, &fixture.source);
+        defer serial.deinit(a);
+        fixture.source.checking = .{ .io = std.testing.io, .workers = 2 };
+        var counts: Frontend = .{};
+        const capture = profile.captureChecking(&counts);
+        defer capture.restore();
+        var parallel = try checker.checkProjectWithPrivateExecution(a, &fixture.source, .{ .parallel_min_nodes = 0 });
+        defer parallel.deinit(a);
+        try std.testing.expect(counts.parallel_jobs >= 3);
+        try std.testing.expectEqual(serial.diagnostics.len, parallel.diagnostics.len);
+        for (serial.diagnostics, parallel.diagnostics) |expected, actual| {
+            try std.testing.expectEqual(expected.unit, actual.unit);
+            try std.testing.expectEqual(expected.code, actual.code);
+            try std.testing.expectEqual(expected.semantic, actual.semantic);
+            try std.testing.expectEqualDeep(expected.span, actual.span);
+        }
+        if (rejected) {
+            try std.testing.expect(serial.diagnostics.len >= 2);
+            try std.testing.expectEqual(left_unit, serial.diagnostics[0].unit);
+            try std.testing.expect(counts.parallel_retries > 0);
+            continue;
+        }
+        try std.testing.expectEqual(@as(usize, 0), serial.diagnostics.len);
+        try std.testing.expectEqual(@as(u64, 0), counts.parallel_retries);
+        for (fixture.source.units.items, 1..) |*unit, id| {
+            var expected = try lowering.lower(a, &unit.tree, &fixture.source.symbols, &serial.module(@intCast(id)).checked);
+            defer expected.deinit(a);
+            var actual = try lowering.lower(a, &unit.tree, &fixture.source.symbols, &parallel.module(@intCast(id)).checked);
+            defer actual.deinit(a);
+            try std.testing.expect(structural.equal(expected, actual));
+        }
     }
 }
 

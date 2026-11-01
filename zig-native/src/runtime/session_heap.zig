@@ -13,6 +13,7 @@
 //! Small allocation/free operations take one short lock. Concurrent jobs may
 //! use this allocator directly; `memory.shareable` recognizes its vtable.
 const std = @import("std");
+const builtin = @import("builtin");
 const Alignment = std.mem.Alignment;
 const PageAllocator = std.heap.PageAllocator;
 
@@ -22,9 +23,36 @@ const min_class = std.math.log2(@sizeOf(usize));
 const class_count = std.math.log2(slab_len) - min_class;
 
 pub const ClassStats = struct { block_bytes: usize, slabs: usize, free_bytes: usize = 0, unused_bytes: usize = 0, live_class_bytes: usize = 0 };
+/// Opt-in instrumentation changes scheduling and must not benchmark latency.
+/// Wait time sums blocked worker intervals; it is not elapsed build time.
+pub const Diagnostic = struct {
+    diagnostic: bool = true,
+    acquisitions: u64 = 0,
+    contended_acquisitions: u64 = 0,
+    /// Failed tryLock calls, including the first failure of each wait.
+    spin_attempts: u64 = 0,
+    wait_kind: enum { worker_sum } = .worker_sum,
+    wait_clock: enum { linux_monotonic, unavailable } = .unavailable,
+    wait_ns: ?u64 = null,
+
+    fn add(self: *Diagnostic, spins: u64, wait: ?u64) void {
+        self.acquisitions +|= 1;
+        if (spins == 0) return;
+        self.contended_acquisitions +|= 1;
+        self.spin_attempts +|= spins;
+        if (self.wait_ns != null and wait != null) {
+            self.wait_ns.? +|= wait.?;
+        } else {
+            self.wait_ns = null;
+            self.wait_clock = .unavailable;
+        }
+    }
+};
+
 pub const Stats = struct {
     // Rounded small-allocation capacity only; directly mapped large blocks
     // and the process's other mappings are outside this observation.
+    diagnostic: ?Diagnostic = null,
     slab_bytes: usize = 0,
     free_bytes: usize = 0,
     unused_bytes: usize = 0,
@@ -43,6 +71,10 @@ pub const Heap = struct {
     /// Slabs mapped so far; they are never unmapped.
     slabs: usize = 0,
     class_slabs: [class_count]usize = @splat(0),
+    // Setup/teardown require joined workers. Only totals mutate while active,
+    // under mutex; the hot path reads this stable flag without another atomic.
+    diagnostic_enabled: bool = false,
+    diagnostic: Diagnostic = .{},
 
     pub fn allocator(self: *Heap) std.mem.Allocator {
         return .{ .ptr = self, .vtable = &vtable };
@@ -50,14 +82,40 @@ pub const Heap = struct {
     pub fn isAllocator(a: std.mem.Allocator) bool {
         return a.vtable == &vtable;
     }
+    /// Begin a fresh build diagnostic. Call only before workers start; no IO,
+    /// allocator adapter or build-owned pointer is retained by the heap.
+    pub fn beginDiagnostics(a: std.mem.Allocator) void {
+        if (!isAllocator(a)) return;
+        const self: *Heap = @ptrCast(@alignCast(a.ptr));
+        self.lockRaw();
+        defer self.unlock();
+        self.diagnostic = .{};
+        if (comptime builtin.os.tag == .linux) {
+            self.diagnostic.wait_clock = .linux_monotonic;
+            self.diagnostic.wait_ns = 0;
+        }
+        self.diagnostic_enabled = true;
+    }
+    /// Call after all workers join, including on build failure. Counters are
+    /// copied out; subsequent unprofiled allocations do no diagnostic work.
+    pub fn endDiagnostics(a: std.mem.Allocator) ?Diagnostic {
+        if (!isAllocator(a)) return null;
+        const self: *Heap = @ptrCast(@alignCast(a.ptr));
+        self.lockRaw();
+        defer self.unlock();
+        if (!self.diagnostic_enabled) return null;
+        self.diagnostic_enabled = false;
+        return self.diagnostic;
+    }
     /// Profiling-only traversal, performed after compiler workers have joined.
-    /// No allocation/free hot-path counters or extra retained pointers.
+    /// The traversal itself is excluded from allocation-lock diagnostics.
     pub fn snapshot(a: std.mem.Allocator) ?Stats {
         if (!isAllocator(a)) return null;
         const self: *Heap = @ptrCast(@alignCast(a.ptr));
-        self.lock();
+        self.lockRaw();
         defer self.unlock();
         var result: Stats = .{ .slab_bytes = self.slabs * slab_len };
+        if (self.diagnostic_enabled) result.diagnostic = self.diagnostic;
         for (&result.classes, 0..) |*entry, class| {
             entry.* = .{ .block_bytes = blockSize(class), .slabs = self.class_slabs[class] };
             const capacity = entry.slabs * slab_len;
@@ -79,6 +137,28 @@ pub const Heap = struct {
     const vtable: std.mem.Allocator.VTable = .{ .alloc = alloc, .resize = resize, .remap = remap, .free = free };
 
     fn lock(self: *Heap) void {
+        if (!self.diagnostic_enabled) return self.lockRaw();
+        if (self.mutex.tryLock()) {
+            self.diagnostic.add(0, null);
+            return;
+        }
+        self.lockContended();
+    }
+    // The first tryLock has failed. Keep retries local until the lock is held;
+    // no clock or shared diagnostic counter is touched inside the spin loop.
+    fn lockContended(self: *Heap) void {
+        const started = monotonicNanos();
+        var spins: u64 = 1;
+        while (!self.mutex.tryLock()) {
+            spins +|= 1;
+            std.atomic.spinLoopHint();
+        }
+        const ended = monotonicNanos();
+        var wait: ?u64 = null;
+        if (started != null and ended != null) wait = ended.? -| started.?;
+        self.diagnostic.add(spins, wait);
+    }
+    fn lockRaw(self: *Heap) void {
         while (!self.mutex.tryLock()) std.atomic.spinLoopHint();
     }
     fn unlock(self: *Heap) void {
@@ -138,6 +218,13 @@ pub const Heap = struct {
         self.frees[class] = @intFromPtr(memory.ptr);
     }
 };
+
+fn monotonicNanos() ?u64 {
+    if (comptime builtin.os.tag != .linux) return null;
+    var stamp: std.os.linux.timespec = undefined;
+    if (std.os.linux.clock_gettime(.MONOTONIC, &stamp) != 0) return null;
+    return @as(u64, @intCast(stamp.sec)) * std.time.ns_per_s + @as(u64, @intCast(stamp.nsec));
+}
 
 fn classIndex(len: usize, alignment: Alignment) usize {
     return @max(@bitSizeOf(usize) - @clz(len - 1), @backingInt(alignment), min_class) - min_class;
@@ -249,4 +336,107 @@ test "concurrent allocation keeps every block distinct" {
     var threads: [4]std.Thread = undefined;
     for (&threads, 0..) |*thread, index| thread.* = try std.Thread.spawn(.{}, Worker.run, .{ &heap, @as(u8, @intCast(index + 1)) });
     for (threads) |thread| thread.join();
+}
+
+test "session heap diagnostics default off reset per build and preserve retained blocks" {
+    var heap: Heap = .{};
+    const a = heap.allocator();
+    const retained = try a.alloc(u8, 24);
+    defer a.free(retained);
+    @memset(retained, 0xa7);
+    const reusable = try a.alloc(u8, 24);
+    a.free(reusable);
+    const before = Heap.snapshot(a).?;
+    try std.testing.expect(before.diagnostic == null);
+    try std.testing.expect(Heap.endDiagnostics(a) == null);
+    Heap.beginDiagnostics(std.testing.allocator);
+    try std.testing.expect(Heap.endDiagnostics(std.testing.allocator) == null);
+
+    Heap.beginDiagnostics(a);
+    const reused = try a.alloc(u8, 24);
+    try std.testing.expectEqual(reusable.ptr, reused.ptr);
+    a.free(reused);
+    const active = Heap.snapshot(a).?;
+    try std.testing.expectEqual(@as(u64, 2), active.diagnostic.?.acquisitions);
+    try std.testing.expectEqual(@as(u64, 0), active.diagnostic.?.contended_acquisitions);
+    try std.testing.expectEqual(@as(u64, 0), active.diagnostic.?.spin_attempts);
+    try std.testing.expectEqualDeep(active.diagnostic.?, Heap.endDiagnostics(a).?);
+    const after = Heap.snapshot(a).?;
+    try std.testing.expectEqualDeep(before, after);
+    for (retained) |byte| try std.testing.expectEqual(@as(u8, 0xa7), byte);
+
+    Heap.beginDiagnostics(a);
+    const reset = Heap.endDiagnostics(a).?;
+    try std.testing.expectEqual(@as(u64, 0), reset.acquisitions);
+    try std.testing.expectEqual(@as(u64, 0), reset.contended_acquisitions);
+    try std.testing.expectEqual(@as(u64, 0), reset.spin_attempts);
+    // Later ordinary activity must neither revive nor alter the old interval.
+    const ordinary = try a.alloc(u8, 24);
+    a.free(ordinary);
+    try std.testing.expect(Heap.snapshot(a).?.diagnostic == null);
+    try std.testing.expectEqualDeep(reset, heap.diagnostic);
+}
+
+test "session heap diagnostic waits sum acquisitions and mark unavailable clocks" {
+    var diagnostic: Diagnostic = .{ .wait_clock = .linux_monotonic, .wait_ns = 0 };
+    diagnostic.add(0, null);
+    diagnostic.add(3, 13);
+    diagnostic.add(5, 17);
+    try std.testing.expectEqual(@as(u64, 3), diagnostic.acquisitions);
+    try std.testing.expectEqual(@as(u64, 2), diagnostic.contended_acquisitions);
+    try std.testing.expectEqual(@as(u64, 8), diagnostic.spin_attempts);
+    try std.testing.expectEqual(@as(?u64, 30), diagnostic.wait_ns);
+    try std.testing.expectEqual(.worker_sum, diagnostic.wait_kind);
+    diagnostic.add(1, null);
+    diagnostic.add(2, 100);
+    try std.testing.expectEqual(.unavailable, diagnostic.wait_clock);
+    try std.testing.expect(diagnostic.wait_ns == null);
+    try std.testing.expectEqual(@as(u64, 4), diagnostic.contended_acquisitions);
+}
+
+test "session heap diagnostic concurrent blocked acquisitions accumulate under the mutex" {
+    var heap: Heap = .{};
+    const a = heap.allocator();
+    Heap.beginDiagnostics(a);
+    defer _ = Heap.endDiagnostics(a);
+    const Worker = struct {
+        heap: *Heap,
+        ready: std.atomic.Value(u32) = .init(0),
+        wait_totals: [2]?u64 = @splat(null),
+
+        fn run(self: *@This()) void {
+            // The coordinator holds the mutex until BOTH first attempts fail.
+            // Enter the same slow path as lock(), with that first retry known.
+            if (self.heap.mutex.tryLock()) unreachable;
+            _ = self.ready.fetchAdd(1, .release);
+            self.heap.lockContended();
+            const index: usize = @intCast(self.heap.diagnostic.acquisitions - 1);
+            self.wait_totals[index] = self.heap.diagnostic.wait_ns;
+            self.heap.unlock();
+        }
+    };
+    var worker: Worker = .{ .heap = &heap };
+    heap.lockRaw();
+    const first = std.Thread.spawn(.{}, Worker.run, .{&worker}) catch |err| {
+        heap.unlock();
+        return err;
+    };
+    const second = std.Thread.spawn(.{}, Worker.run, .{&worker}) catch |err| {
+        heap.unlock();
+        first.join();
+        return err;
+    };
+    while (worker.ready.load(.acquire) != 2) std.atomic.spinLoopHint();
+    heap.unlock();
+    first.join();
+    second.join();
+    const diagnostic = Heap.snapshot(a).?.diagnostic.?;
+    try std.testing.expectEqual(@as(u64, 2), diagnostic.acquisitions);
+    try std.testing.expectEqual(@as(u64, 2), diagnostic.contended_acquisitions);
+    try std.testing.expect(diagnostic.spin_attempts >= 2);
+    try std.testing.expectEqual(worker.wait_totals[1], diagnostic.wait_ns);
+    if (worker.wait_totals[0]) |first_wait| {
+        if (worker.wait_totals[1]) |total_wait| try std.testing.expect(total_wait >= first_wait);
+    }
+    try std.testing.expectEqual(@as(usize, 0), heap.slabs);
 }

@@ -218,6 +218,23 @@ Add `--sample-focus validation` to begin at the completed producer closure's
 validation boundary, excluding the empty seed checked during opening. The report
 includes separate validation buckets and checking caller costs.
 
+For worker scaling, run `engine_stages.ts --world --worker-sweep --no-profile
+--repetitions 1 --timeout-ms 10000 --compiler PATH --output DIRECTORY` first.
+Repeat completed counts with `--worker-counts 2,4,8 --repetitions 3`; each
+repetition rotates their order. Deadline samples remain incomplete and the
+runner continues other worker counts, then exits unsuccessfully. Total build
+request time, session-opening time and process CPU are separate fields. Add
+`--retained` for an executed entry-body edit and byte-identical revert, each
+capped at five seconds. These are complete World-producer checks with tiny
+identity emission, not whole-game compilation or gameplay hot reload.
+
+For matched compiler pairs, omit `--worker-sweep` and choose
+`--frontend-workers 4 --baseline BASELINE --compiler CANDIDATE`. Keep
+`--no-profile` for latency; omit it in a separate diagnostic run for
+`phaseProfile.checking.parallel_*` and `sessionHeap.diagnostic` counters.
+Worker CPU includes allocator spinning; heap waits sum worker wall intervals.
+Profiling changes scheduling and must not replace the unprofiled control.
+
 `deno run -A scripts/bench/aggregate_readers.ts --compiler PATH` measures actual
 Ink `transform.matrix` reader DAGs and `render.Settings` field updates. Every
 build has a five-second deadline and executes independent numeric witnesses.

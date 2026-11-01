@@ -176,6 +176,20 @@ failure releases speculative modules and replays the serial check. Allocation
 failure joins all workers before returning. No worker owns the borrowed symbol
 pool.
 
+Ready checker jobs dispatch by descending syntax size with a stable unit-ID
+tie break. Name preparation, ordered budget charging, diagnostics and publication
+retain dependency traversal order; the dispatch queue grants no new readiness.
+With `profileTrace`, bounded per-worker clocks report preparation, batch capacity
+and worker wall/CPU sums after joining. Capacity gaps include narrow batches,
+launch delay and uneven work; worker CPU includes allocator spin.
+
+The same opt-in trace records pooled allocation-lock diagnostics. Waits sum
+elapsed acquisition intervals across workers, including scheduling delay, rather
+than elapsed build time or exclusive CPU. Counters reset per build and disable
+after joined cleanup. The emitted successful-result snapshot excludes later
+reply/cleanup work; failed or cancelled builds publish no heap summary. These
+diagnostics change no allocator ownership, retained-memory bounds or authority.
+
 A staged callable may accept data containing unobserved open callback rows.
 Selected source emission retains that callable and its exact Session-owned
 captures without materializing a closed semantic header. It rechecks the body

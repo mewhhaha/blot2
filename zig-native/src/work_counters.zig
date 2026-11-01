@@ -1,7 +1,7 @@
-//! Deterministic, always-on compiler work counters. They are plain integer
-//! increments on existing evaluator and solver structs: no clocks, allocation,
-//! identity or semantic decision reads them, so a budget can assert on them
-//! without wall-time noise. A retained revision counts only the work it ran.
+//! Deterministic compiler work counters plus trace-only timing diagnostics.
+//! Work counts use plain integer increments without clocks or allocation.
+//! Identity and semantic decisions never read these fields. A retained
+//! revision counts only the work it ran.
 pub const InferenceStage = enum { general, specialization, preparation, lowering };
 
 /// Completed checker invocations in the project-check phase, aggregated across
@@ -10,6 +10,18 @@ pub const Frontend = struct {
     parallel_batches: u64 = 0,
     parallel_jobs: u64 = 0,
     parallel_retries: u64 = 0,
+    /// Trace-only inclusive clocks. Worker wall/CPU includes waiting inside
+    /// checking and allocator calls; it is not exclusive useful work.
+    parallel_prepare_us: u64 = 0,
+    parallel_batch_us: u64 = 0,
+    parallel_capacity_us: u64 = 0,
+    parallel_worker_us: u64 = 0,
+    parallel_worker_cpu_us: u64 = 0,
+    parallel_worker_cpu_samples: u64 = 0,
+    /// Successfully started workers, including the coordinator, summed over
+    /// batches. Jobs may finish before another admitted worker begins.
+    parallel_worker_slots: u64 = 0,
+    parallel_worker_jobs: u64 = 0,
     modules: u64 = 0,
     scheme_calls: u64 = 0,
     closed_array_locals: u64 = 0,

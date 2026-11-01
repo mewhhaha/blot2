@@ -1,0 +1,974 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "93f4de718e5ba1205670aeb6ee383562e37953dc",
+  "status": "accepted_largest_ready_first_and_opt_in_diagnostics",
+  "requested_scope": "Measure frontend worker scaling and allocator contention; report total compile time. Read hotel as total, and measure retained entry edits separately.",
+  "summary": {
+    "fresh_producer_default_four_workers_ms": 7150.7625620000035,
+    "fresh_producer_eight_workers_ms": 6893.408189999998,
+    "default_four_worker_matched_improvement_percent": 4.1797760688911385,
+    "retained_producer_entry_body_edit_ms": 502.53126099999645,
+    "retained_producer_entry_revert_ms": 512.4467870000008,
+    "whole_gdev_main_total_ms": null,
+    "whole_gdev_main_status": "Incomplete at5000ms; no whole-game total, Wasm size or frame claim.",
+    "default_frontend_workers": 4,
+    "allocator_cache_or_sharding_added": false
+  },
+  "workload": {
+    "description": "Actual world_storage imports, all240source modules checked; tiny identity entry executes41. Retained body edit adds1 and executes42; revert restores exact original Wasm. No World initialization, game hot reload or whole-game emission.",
+    "modules": 240,
+    "source_bytes": 2371542,
+    "source_pins": {
+      "gdev/src/world_storage.blot": {
+        "baseline": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+        "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+      },
+      "gdev/tests/minor_support/owned.blot": {
+        "baseline": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2",
+        "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+      },
+      "gdev/tests/minor_support/game.blot": {
+        "baseline": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940",
+        "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+      },
+      "ink/lib/pen/host.blot": {
+        "baseline": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+        "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+      }
+    },
+    "gdev_commit": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "toolchain": "Zig0.17.0 safe/noLLVM, Deno2.9.8; optimized guest, one codegen worker; frontend workers vary explicitly.",
+    "fresh_sessions": true,
+    "disk_cache": false,
+    "profile_for_latency": false,
+    "producer_deadline_ms": 10000,
+    "retained_edit_deadline_ms": 5000,
+    "cpu_window": "Linux /proc/PID/stat user+system ticks over build request; getconf CLK_TCK. Process CPU is summed across threads, not wall latency. Opening and build request times are separate.",
+    "cohort_rule": "Compare only within a rotated cohort. Prior profiled producer totals and separate worker/paired cohorts cannot be subtracted to claim improvements."
+  },
+  "worker_scaling": {
+    "raw": {
+      "path": "build/bench/concurrency/scaling-unprofiled/result.json",
+      "sha256": "aa440c287d6e727fca72e419d07cc3a5bfbc730b3bc400ae3b04e3dd69d4c05f"
+    },
+    "repetitions": 3,
+    "rotated_order": true,
+    "versions": {
+      "2": {
+        "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+        "frontend_workers": 2,
+        "profile_backend": false,
+        "profile_trace": false,
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_total_build_ms": 7894.4273969999995,
+        "median_open_and_build_ms": 7896.434085,
+        "median_process_cpu_ms": 10800,
+        "build_ms": [
+          7891.650061,
+          7911.091825000003,
+          7894.4273969999995
+        ],
+        "process_cpu_ms": [
+          10800,
+          10810,
+          10770
+        ]
+      },
+      "4": {
+        "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+        "frontend_workers": 4,
+        "profile_backend": false,
+        "profile_trace": false,
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_total_build_ms": 7040.203696999997,
+        "median_open_and_build_ms": 7041.737020999997,
+        "median_process_cpu_ms": 11240,
+        "build_ms": [
+          7002.213941,
+          7040.203696999997,
+          7253.9224389999945
+        ],
+        "process_cpu_ms": [
+          11170,
+          11240,
+          11690
+        ]
+      },
+      "8": {
+        "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+        "frontend_workers": 8,
+        "profile_backend": false,
+        "profile_trace": false,
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_total_build_ms": 6897.728474,
+        "median_open_and_build_ms": 6899.2131359999985,
+        "median_process_cpu_ms": 11940,
+        "build_ms": [
+          6879.786927000001,
+          6897.728474,
+          6900.572953000003
+        ],
+        "process_cpu_ms": [
+          11930,
+          11940,
+          11980
+        ]
+      }
+    },
+    "one_worker": {
+      "status": "deadline_incomplete",
+      "deadline_ms": 10000,
+      "completed_samples": 0,
+      "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+      "raw_log": {
+        "path": "/tmp/blot-concurrency-pilot.log",
+        "sha256": "859d93ae696ea98fee40b871e78e53dfe97751a72d6c51668156d6a28214d337"
+      },
+      "note": "Initial pilot preceded failure-preserving sweep support; aborted on first one-worker build. No serial median and no deadline extension. Sweep driver now records deadline samples, continues independent counts and exits unsuccessfully if any are incomplete."
+    },
+    "decision": "Four remains default. In this cohort8reduces total only2.0% versus4while process CPU rises6.2%; no broad8worker default change."
+  },
+  "largest_ready_first_pairs": {
+    "4": {
+      "raw": {
+        "path": "build/bench/concurrency/ready-order-pairs-4/result.json",
+        "sha256": "914b4ed4556ff5bb32dee93ef9863f39bad8522fafbd7fb1fa599233b47368a0"
+      },
+      "repetitions": 3,
+      "versions": {
+        "baseline": {
+          "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+          "frontend_workers": 4,
+          "profile_backend": false,
+          "profile_trace": false,
+          "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "median_total_build_ms": 7462.6861309999995,
+          "median_open_and_build_ms": 7481.997793000002,
+          "median_process_cpu_ms": 11990,
+          "build_ms": [
+            7462.6861309999995,
+            7425.568124999998,
+            7480.657084000006
+          ],
+          "process_cpu_ms": [
+            11990,
+            12000,
+            11980
+          ],
+          "retained": {
+            "body-edit": {
+              "median_build_ms": 508.6884340000033,
+              "median_process_cpu_ms": 500,
+              "build_ms": [
+                503.4218340000007,
+                508.6884340000033,
+                509.81040600000415
+              ],
+              "wasm_bytes": 2946,
+              "wasm_sha256": "0ecffee9c4c0910dee1596f5f13243d965df854550535c0323566c83bd4e85f6"
+            },
+            "revert": {
+              "median_build_ms": 512.5800410000011,
+              "median_process_cpu_ms": 510,
+              "build_ms": [
+                511.3082650000015,
+                512.5800410000011,
+                523.1428879999949
+              ],
+              "wasm_bytes": 2935,
+              "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+            }
+          }
+        },
+        "candidate": {
+          "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+          "frontend_workers": 4,
+          "profile_backend": false,
+          "profile_trace": false,
+          "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "median_total_build_ms": 7150.7625620000035,
+          "median_open_and_build_ms": 7152.032535999999,
+          "median_process_cpu_ms": 11780,
+          "build_ms": [
+            7196.8038430000015,
+            6927.685634000001,
+            7150.7625620000035
+          ],
+          "process_cpu_ms": [
+            11910,
+            11450,
+            11780
+          ],
+          "retained": {
+            "body-edit": {
+              "median_build_ms": 502.53126099999645,
+              "median_process_cpu_ms": 490,
+              "build_ms": [
+                503.42172400000163,
+                495.4088130000018,
+                502.53126099999645
+              ],
+              "wasm_bytes": 2946,
+              "wasm_sha256": "0ecffee9c4c0910dee1596f5f13243d965df854550535c0323566c83bd4e85f6"
+            },
+            "revert": {
+              "median_build_ms": 512.4467870000008,
+              "median_process_cpu_ms": 510,
+              "build_ms": [
+                521.3802289999985,
+                500.0736990000005,
+                512.4467870000008
+              ],
+              "wasm_bytes": 2935,
+              "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+            }
+          }
+        }
+      },
+      "total_improvement_percent": 4.1797760688911385,
+      "process_cpu_improvement_percent": 1.7514595496246899
+    },
+    "8": {
+      "raw": {
+        "path": "build/bench/concurrency/ready-order-pairs-8/result.json",
+        "sha256": "39bbd2e917235007a45955ab25797980c908db1f3f978bdb3b85c7e070ad8f42"
+      },
+      "repetitions": 3,
+      "versions": {
+        "baseline": {
+          "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+          "frontend_workers": 8,
+          "profile_backend": false,
+          "profile_trace": false,
+          "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "median_total_build_ms": 7001.544365999998,
+          "median_open_and_build_ms": 7003.464104999999,
+          "median_process_cpu_ms": 12280,
+          "build_ms": [
+            6995.160211,
+            7001.544365999998,
+            7041.085822000001
+          ],
+          "process_cpu_ms": [
+            12340,
+            12130,
+            12280
+          ],
+          "retained": {
+            "body-edit": {
+              "median_build_ms": 503.7137870000006,
+              "median_process_cpu_ms": 500,
+              "build_ms": [
+                503.7137870000006,
+                506.1918760000008,
+                496.02895900000294
+              ],
+              "wasm_bytes": 2946,
+              "wasm_sha256": "0ecffee9c4c0910dee1596f5f13243d965df854550535c0323566c83bd4e85f6"
+            },
+            "revert": {
+              "median_build_ms": 504.12215200000355,
+              "median_process_cpu_ms": 510,
+              "build_ms": [
+                510.02011400000083,
+                502.3278320000027,
+                504.12215200000355
+              ],
+              "wasm_bytes": 2935,
+              "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+            }
+          }
+        },
+        "candidate": {
+          "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+          "frontend_workers": 8,
+          "profile_backend": false,
+          "profile_trace": false,
+          "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+          "wasm_bytes": 2935,
+          "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+          "median_total_build_ms": 6893.408189999998,
+          "median_open_and_build_ms": 6895.014272999997,
+          "median_process_cpu_ms": 12280,
+          "build_ms": [
+            6893.408189999998,
+            6885.626235,
+            6902.038982999999
+          ],
+          "process_cpu_ms": [
+            12280,
+            12110,
+            12300
+          ],
+          "retained": {
+            "body-edit": {
+              "median_build_ms": 505.561437999997,
+              "median_process_cpu_ms": 500,
+              "build_ms": [
+                507.47573700000066,
+                494.5087399999975,
+                505.561437999997
+              ],
+              "wasm_bytes": 2946,
+              "wasm_sha256": "0ecffee9c4c0910dee1596f5f13243d965df854550535c0323566c83bd4e85f6"
+            },
+            "revert": {
+              "median_build_ms": 503.8662260000001,
+              "median_process_cpu_ms": 500,
+              "build_ms": [
+                503.8662260000001,
+                501.8441930000008,
+                513.5631070000018
+              ],
+              "wasm_bytes": 2935,
+              "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+            }
+          }
+        }
+      },
+      "total_improvement_percent": 1.5444617693935792,
+      "process_cpu_improvement_percent": 0.0
+    }
+  },
+  "diagnostics": {
+    "raw": {
+      "path": "build/bench/concurrency/diagnostic-sweep/result.json",
+      "sha256": "576d245a997fad090bdb112b5453e5e45bb68d3c3281ba8e0cc14600b7bb9215"
+    },
+    "scope": "Separate instrumented runs before dispatch ordering. These times are diagnostic, not latency controls.",
+    "runs": [
+      {
+        "frontend_workers": 2,
+        "compiler_sha256": "1c8747c9995002ad320297a2ba37b06ae98ca7a48c1c5ab5c1bc54473d052470",
+        "diagnostic_only_build_ms": 8567.482469,
+        "exclusive_phase_us": {
+          "other": 32741,
+          "assets": 280774,
+          "inputs": 1109,
+          "load": 45381,
+          "lex": 405437,
+          "parse": 261542,
+          "check": 5205111,
+          "lower": 953369,
+          "freeze": 359119,
+          "validation": 707012,
+          "backend": 310230
+        },
+        "worker_totals": {
+          "parallel_batches": 25,
+          "parallel_jobs": 239,
+          "parallel_retries": 0,
+          "parallel_prepare_us": 58615,
+          "parallel_batch_us": 5119539,
+          "parallel_capacity_us": 9588139,
+          "parallel_worker_us": 8364301,
+          "parallel_worker_cpu_us": 8288469,
+          "parallel_worker_cpu_samples": 46,
+          "parallel_worker_slots": 46,
+          "parallel_worker_jobs": 239
+        },
+        "heap": {
+          "diagnostic": true,
+          "acquisitions": 3612059,
+          "contended_acquisitions": 16935,
+          "spin_attempts": 185789,
+          "wait_kind": "worker_sum",
+          "wait_clock": "linux_monotonic",
+          "wait_ns": 5191124
+        },
+        "derived": {
+          "average_worker_cpu_cores_in_batches": 1.6189873736678244,
+          "narrow_batch_capacity_gap_percent": 6.3573985860836295,
+          "admitted_capacity_tail_gap_percent": 12.764082790205688
+        },
+        "slow_modules": [
+          {
+            "filename": "/home/jacobt/src/gdev/src/actors/robots.blot",
+            "wall_us": 423286,
+            "cpu_us": 421375,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world_storage.blot",
+            "wall_us": 404527,
+            "cpu_us": 402920,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/station.blot",
+            "wall_us": 402616,
+            "cpu_us": 399128,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world/salt.blot",
+            "wall_us": 328317,
+            "cpu_us": 323276,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/menu.blot",
+            "wall_us": 175927,
+            "cpu_us": 173568,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/ink/lib/editor.blot",
+            "wall_us": 167777,
+            "cpu_us": 166986,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/pen/protocol_render.blot",
+            "wall_us": 163950,
+            "cpu_us": 163224,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/player/hand.blot",
+            "wall_us": 158591,
+            "cpu_us": 157934,
+            "calls": 2
+          }
+        ]
+      },
+      {
+        "frontend_workers": 4,
+        "compiler_sha256": "1c8747c9995002ad320297a2ba37b06ae98ca7a48c1c5ab5c1bc54473d052470",
+        "diagnostic_only_build_ms": 7697.685556000002,
+        "exclusive_phase_us": {
+          "other": 32939,
+          "assets": 279022,
+          "inputs": 1077,
+          "load": 44227,
+          "lex": 399862,
+          "parse": 260594,
+          "check": 4329595,
+          "lower": 953720,
+          "freeze": 359238,
+          "validation": 727988,
+          "backend": 306328
+        },
+        "worker_totals": {
+          "parallel_batches": 25,
+          "parallel_jobs": 239,
+          "parallel_retries": 0,
+          "parallel_prepare_us": 61181,
+          "parallel_batch_us": 4243087,
+          "parallel_capacity_us": 13890385,
+          "parallel_worker_us": 9156723,
+          "parallel_worker_cpu_us": 9044087,
+          "parallel_worker_cpu_samples": 83,
+          "parallel_worker_slots": 83,
+          "parallel_worker_jobs": 239
+        },
+        "heap": {
+          "diagnostic": true,
+          "acquisitions": 3612059,
+          "contended_acquisitions": 46226,
+          "spin_attempts": 485580,
+          "wait_kind": "worker_sum",
+          "wait_clock": "linux_monotonic",
+          "wait_ns": 16105369
+        },
+        "derived": {
+          "average_worker_cpu_cores_in_batches": 2.1314875231170136,
+          "narrow_batch_capacity_gap_percent": 18.158730895689857,
+          "admitted_capacity_tail_gap_percent": 34.078695442926886
+        },
+        "slow_modules": [
+          {
+            "filename": "/home/jacobt/src/gdev/src/actors/robots.blot",
+            "wall_us": 434496,
+            "cpu_us": 431521,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/station.blot",
+            "wall_us": 415855,
+            "cpu_us": 411365,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world_storage.blot",
+            "wall_us": 405254,
+            "cpu_us": 403790,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world/salt.blot",
+            "wall_us": 314477,
+            "cpu_us": 313159,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/menu.blot",
+            "wall_us": 189367,
+            "cpu_us": 188149,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/ink/lib/editor.blot",
+            "wall_us": 187203,
+            "cpu_us": 186018,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/progression/goals.blot",
+            "wall_us": 177060,
+            "cpu_us": 175150,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/ink/lib/shapes.blot",
+            "wall_us": 174537,
+            "cpu_us": 172985,
+            "calls": 2
+          }
+        ]
+      },
+      {
+        "frontend_workers": 8,
+        "compiler_sha256": "1c8747c9995002ad320297a2ba37b06ae98ca7a48c1c5ab5c1bc54473d052470",
+        "diagnostic_only_build_ms": 8085.1447960000005,
+        "exclusive_phase_us": {
+          "other": 33300,
+          "assets": 304408,
+          "inputs": 1060,
+          "load": 55213,
+          "lex": 510176,
+          "parse": 322523,
+          "check": 4309516,
+          "lower": 1046074,
+          "freeze": 407197,
+          "validation": 773077,
+          "backend": 318468
+        },
+        "worker_totals": {
+          "parallel_batches": 25,
+          "parallel_jobs": 239,
+          "parallel_retries": 0,
+          "parallel_prepare_us": 63867,
+          "parallel_batch_us": 4220032,
+          "parallel_capacity_us": 20056329,
+          "parallel_worker_us": 10452917,
+          "parallel_worker_cpu_us": 10201618,
+          "parallel_worker_cpu_samples": 129,
+          "parallel_worker_slots": 129,
+          "parallel_worker_jobs": 239
+        },
+        "heap": {
+          "diagnostic": true,
+          "acquisitions": 3612059,
+          "contended_acquisitions": 137778,
+          "spin_attempts": 1801972,
+          "wait_kind": "worker_sum",
+          "wait_clock": "linux_monotonic",
+          "wait_ns": 116823865
+        },
+        "derived": {
+          "average_worker_cpu_cores_in_batches": 2.4174266924990144,
+          "narrow_batch_capacity_gap_percent": 40.59189302356001,
+          "admitted_capacity_tail_gap_percent": 47.882202171693535
+        },
+        "slow_modules": [
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/station.blot",
+            "wall_us": 477713,
+            "cpu_us": 472542,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world_storage.blot",
+            "wall_us": 437525,
+            "cpu_us": 429144,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/actors/robots.blot",
+            "wall_us": 436719,
+            "cpu_us": 433892,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/world/salt.blot",
+            "wall_us": 344835,
+            "cpu_us": 339445,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/ink/lib/editor.blot",
+            "wall_us": 214041,
+            "cpu_us": 211598,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/ink/lib/shapes.blot",
+            "wall_us": 189176,
+            "cpu_us": 186556,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/src/ui/menu.blot",
+            "wall_us": 187007,
+            "cpu_us": 185766,
+            "calls": 2
+          },
+          {
+            "filename": "/home/jacobt/src/gdev/pen/protocol_render.blot",
+            "wall_us": 181818,
+            "cpu_us": 180320,
+            "calls": 2
+          }
+        ]
+      }
+    ],
+    "heap_interpretation": "At4workers, explicit contended heap-acquisition waits sum16.1ms; at8workers116.8ms. These are worker-summed elapsed waits including descheduling, not build latency or pure spin CPU. They omit successful acquisition/coherence cost and ordinary allocator work.",
+    "worker_interpretation": "Four workers average2.13worker CPU cores during batches; eight average2.42. Configured versus admitted capacity describes narrow ready batches. Admitted-capacity minus worker-wall also includes launch delay, early completion and join tails; it is not uniquely dependency idle time. CPU includes allocator spinning. Preparation is only~61ms at4.",
+    "coverage": "All25batches and239module jobs complete with zero retries. Heap acquisition scope covers pooled alloc/free until successful stats snapshot, excluding later reply/cleanup; large mappings bypass the lock. Failed/cancelled builds have no heap summary.",
+    "decision": "No measured evidence justifies allocator magazines or sharded locks. Preserve canonical pooled reuse and retained-memory bounds; prioritize scheduling/module critical path."
+  },
+  "cpu_sampling": {
+    "attribution": {
+      "diagnostic": "One CPU-weighted random-stop run; inclusive cohorts overlap; not latency or exact lost CPU.",
+      "complete_intervals": 79,
+      "coverage_ratio": 0.8434140072580645,
+      "truncated_stack_cpu_ms": 0.0,
+      "covered_cpu_ms": 11504.167059,
+      "heap_inclusive_cpu_ms": 327.692833,
+      "heap_inclusive_percent": 2.8484707438565717,
+      "heap_lock_inclusive_cpu_ms": 128.594704,
+      "heap_lock_inclusive_percent": 1.1178097757142453,
+      "any_lock_inclusive_cpu_ms": 128.594704,
+      "checking_heap_percent": 2.0411361244011434,
+      "limits": [
+        "Heap frames include ordinary allocation/free work, not only lock overhead.",
+        "The profile activates diagnostic counters and trace, affecting scheduling.",
+        "Uncovered CPU and endpoint attribution limit precision; successful lock coherence latency may be sampled in lock instructions."
+      ]
+    },
+    "raw_report": {
+      "path": "build/bench/concurrency/cpu-diagnostic/cpu-report.json",
+      "sha256": "326bb16c88bb461b586ea55a6239834866fcc5f84abad1cec6157d12f42a52ee"
+    },
+    "raw_attribution": {
+      "path": "build/bench/concurrency/cpu-diagnostic/heap-attribution.json",
+      "sha256": "9f47926b325c977b9d57dc517e97584aad8e435dba66ec7e0dc037cf890f7c4a"
+    },
+    "raw_samples": {
+      "path": "build/bench/concurrency/cpu-diagnostic/samples.jsonl",
+      "sha256": "ba8f7beccbb630987eb420473a8e8d0e7d6d79015a34ee8e0d29d1bffe9c520d"
+    },
+    "raw_builds": {
+      "path": "build/bench/concurrency/cpu-diagnostic/builds.jsonl",
+      "sha256": "feec0f852a431731c013c925e5ad58c4e6b0da27870e685c22500bc416f9ef1d"
+    },
+    "sampling_config": {
+      "path": "build/bench/concurrency/cpu-diagnostic/sampling.json",
+      "sha256": "ea1495ff23fdde7cc25774558b52946514985301b2f3e1cbcf5a0d042de29b74"
+    },
+    "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+    "method": "Same complete build-window intervals as summarize_stacks.py. Heap cohort: any frame containing runtime.session_heap.; lock cohort additionally contains Heap.lock, Mutex.tryLock or spinLoopHint. Count each stack CPU weight once per cohort; inclusive cohorts overlap.",
+    "decision": "Heap frames cover~2.85% of sampled process CPU; heap-lock frames~1.12%. This corroborates low priority, not an exact CPU/latency upper bound."
+  },
+  "implementation": {
+    "dispatch": "A reusable separate job order sorts by descending syntax-node count then unit ID. Readiness, original name preparation, budget/retry handling, diagnostics, allocator restoration and publication still use original ready order. No new scheduler authority or persistent cache.",
+    "worker_diagnostics": "Bounded16slot stack-owned per-worker timings; clock reads only with profileTrace, aggregate after join; trace-off fields zero. Existing diagnostic order and serial Core parity retained across unequal jobs.",
+    "heap_diagnostics": "Opt-in profileTrace activation on exact raw serving Heap, reset per build, disabled after joined cleanup. Local spin counters merge under acquired mutex; clocks only on contended diagnostic path; nullable Linux monotonic worker-sum waits. No allocator policy/ownership/free-list changes.",
+    "driver": "Selectable worker counts, unprofiled latency mode, rotated sweeps, failure-preserving incomplete samples, process CPU/open timings, executed retained edit/revert, and explicit frontend workers in real Gdev runner.",
+    "source_pins": {
+      "scripts/bench/engine_stages.ts": "4911bb2d5250ef555f13df185ecaff7e1c716ddc243d6500e50000494dbd3045",
+      "scripts/dev_check_areas.ts": "a1df5589f1048c7d0c11585dc074248ff672f78632ba2d91c4040aed8144c25a",
+      "scripts/storage_handoff/build_gdev.ts": "dfbe54c9d7c475232972d10596f30ea4f83a8b151d763e194e2c9b6720d4b88b",
+      "zig-native/src/phase_profile.zig": "170022b8513af27b267e4e6c19f43cb1ba3044765652dcb4d784d28fad5c6c2c",
+      "zig-native/src/reuse/parallel_check_tests.zig": "f78570e6009e8d22761c8cf9d688df29a970673f215e62888e4e8d7af397fe4f",
+      "zig-native/src/reuse/project_check.zig": "5fef2e7658473b94615deb35428abd56653d99eb1f53573979728e0248ab249f",
+      "zig-native/src/reuse/zig_project_server.zig": "92c3acad1abb971bfefa6af9236d77f8df5bdfbef3226c3555deb827468a7167",
+      "zig-native/src/runtime/session_heap.zig": "8884ae5e71a3aa054a385225b0c21fb13bd3aa4b014698d4e731ee8a2f495e1f",
+      "zig-native/src/work_counters.zig": "5496c8ba53216e0be88e3fb471d84d2de56cd953677d17de0666d08382a325c0",
+      "zig-native/tests/parallel_profile_execution.test.ts": "796e53e0f63eb9975ac9081849076442832c4ae38eba09224f6b9203f32f2602"
+    }
+  },
+  "qualification": {
+    "development": {
+      "raw": {
+        "path": "build/bench/concurrency/final-dev/run-7f0d4755abfd3f2f/results.json",
+        "sha256": "12e508b04770747ad3140266067db37603ee54d8b180b65deecf2e072f3b6750"
+      },
+      "success": true,
+      "wall_seconds": 6.7137934480000006,
+      "compiled_native_tests": 2790,
+      "selected_native_tests": 24,
+      "guest_tests": 11,
+      "zig_lint_findings": 0,
+      "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+      "native_binary_sha256": "24dc726a0307e2b36383ce0b4b3cc17ab05395786b738fb91ea19f33f8d42afb"
+    },
+    "selected_native_full_faults": {
+      "raw": {
+        "path": "build/bench/concurrency/native-full.json",
+        "sha256": "334baa7bca3b06aa9abdc7d9f6990a38b7707eb5afcdf2929a4d1e20ce93ed98"
+      },
+      "complete": true,
+      "wall_seconds": 3.519948186003603,
+      "selected": 24,
+      "passed": 24,
+      "allocation_failures": "full"
+    },
+    "kite_streams": {
+      "raw": {
+        "path": "build/bench/concurrency/kites-stream/pair-58fe7bd6c65c29c9/result.json",
+        "sha256": "b7501a201c83f56cb4744e9a7516f4cfe11bc431bb1c0f9b7af635416b2ca501"
+      },
+      "pins": {
+        "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "76989b7a1d28a284e093c47a5cec9120bb85861a5929f3ce848829a632b29e65",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ],
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 6229.036658,
+          "wasm_bytes": 262967,
+          "wasm_sha256": "621d1819bbcd79e1852470fbc00b02c110ffa8be726c6c77f2b75cbbbca558d4",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_reference": true,
+          "streams_match_pinned_reference": true
+        },
+        {
+          "name": "candidate",
+          "build_ms": 6096.006277000001,
+          "wasm_bytes": 261953,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_reference": true,
+          "streams_match_pinned_reference": true
+        }
+      ],
+      "timing_note": "Single integration source pair, not a compiler latency comparison."
+    },
+    "full_gate": {
+      "raw": {
+        "path": "build/bench/concurrency/full-gate/timings.json",
+        "sha256": "3e532e1fc706537997a36e51ea0a225917c214d51d8142243a1f38b259b42f43"
+      },
+      "log": {
+        "path": "/tmp/blot-concurrency-full-gate.log",
+        "sha256": "9ac300180a30e4cabb45699040e97844c8c3c8524f6791e7b8d243df028651af"
+      },
+      "success": false,
+      "wall_seconds": 3.192665183,
+      "passed": 48,
+      "failed": 1,
+      "failure": "Known List/chunk emit storage_escape at312..345; full native/guest execution remains pending."
+    },
+    "whole_game": {
+      "raw": {
+        "path": "build/bench/concurrency/main/main-148b2c8477efd758/result.json",
+        "sha256": "e76c4d14c77a64771d4e664111e3eca4bd4e8d63bf57ac77303ee6bb5a70bc0c"
+      },
+      "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+      "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+      "frontend_workers": 4,
+      "codegen_workers": 4,
+      "tier": "optimized",
+      "profile_backend": false,
+      "profile_trace": false,
+      "status": "timeout_incomplete",
+      "completed": false,
+      "deadline_ms": 5000,
+      "abort_observed_ms": 5002.854437,
+      "total_compile_ms": null,
+      "current_whole_game_artifact": false
+    },
+    "intermediate_checks": [
+      {
+        "raw": {
+          "path": "build/bench/concurrency/diagnostic-dev/run-8cea932a34f6e985/results.json",
+          "sha256": "bf8b6df354962b93e182014228f7ab8112d16c9d58ed5bae360cf29733c82220"
+        },
+        "reason": "New worker counter local shadowed diagnostic method; renamed batch_counts before successful build."
+      },
+      {
+        "raw": {
+          "path": "build/bench/concurrency/ready-order-dev/run-11a5b8cf5ba44d2c/results.json",
+          "sha256": "3228316d2b2497a96cba86fbc4d6ca6ae3cf6d712a08188c2ed5ccde80090085"
+        },
+        "reason": "Native and guests passed, but benchmark-tool inputs changed during qualification; correctly marked stale/incomplete and rerun after edits stopped."
+      }
+    ]
+  },
+  "astra_review": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "result": "No final blocker. Sorted queue changes dispatch only; ownership, joins, original ordered authority and default-off diagnostics remain sound. Small measured waits do not justify allocator sharding. Keep known List failure and unknown whole-main total explicit."
+  },
+  "commands": {
+    "scaling": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --worker-sweep --worker-counts 2,4,8 --no-profile --repetitions 3 --timeout-ms 10000 --compiler zig-native/zig-out-concurrency-baseline/bin/blotc --output DIRECTORY",
+    "matched_pairs": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --frontend-workers 4 --no-profile --retained --repetitions 3 --timeout-ms 10000 --compiler zig-native/zig-out-dev/bin/blotc --baseline zig-native/zig-out-concurrency-baseline/bin/blotc --output DIRECTORY",
+    "diagnostic": "Same sweep without --no-profile; instrumented totals cannot benchmark latency.",
+    "development": "deno task check:dev --area type-effects --budget-seconds 150 --timings-dir build/bench/concurrency/final-dev",
+    "full_gate": "deno task test:compiler --budget-seconds 45 --phase-seconds 30 --timings-dir build/bench/concurrency/full-gate",
+    "whole_main": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 5000 --workers 4 --frontend-workers 4 build/bench/concurrency/main"
+  },
+  "limits": [
+    "Fresh producer and retained-entry totals are not whole-game compilation or hot reload. All240producer modules are checked fresh despite cachedModules referring to same-build frozen handoff.",
+    "Profiling/heap wait clocks/GDB sampling perturb scheduling. Timing decisions use unprofiled rotated pairs; diagnostic counters are inclusive and overlap.",
+    "Worker scaling and compiler pairs are separate cohorts on one host. No comparison with earlier profiled8.25s or other historical medians.",
+    "No SIMD implementation, worker-local allocator caches, per-class sharding, default worker-count change or solver rewrite in this batch.",
+    "No completed main, whole-game size, new PNG/frame, LLVM release or full-gate pass claim. Subsecond fresh-game target remains open. ABI8, session protocol2 and Gdev saved schema26 unchanged; sibling source/assets preserved."
+  ]
+}

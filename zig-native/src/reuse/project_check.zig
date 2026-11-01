@@ -11,6 +11,7 @@ const entry_cutoff = @import("entry_frontend_cutoff.zig");
 const binding_relocation = @import("frontend_binding_relocation.zig");
 const frozen_dependency = @import("frozen_dependency.zig");
 const reference_relocation = @import("frontend_reference_relocation.zig");
+const profile = @import("../phase_profile.zig");
 
 pub const EditorQuery = struct {
     unit: project.UnitId,
@@ -322,12 +323,29 @@ const Engine = struct {
         units: []const u32,
         jobs: []ParallelJob,
         next: std.atomic.Value(usize) = .init(0),
+        timings: [16]WorkerTiming = @splat(.{}),
 
-        fn execute(self: *ParallelWork) void {
+        const WorkerTiming = struct { us: u64 = 0, cpu_us: u64 = 0, cpu_samples: u64 = 0, jobs: u64 = 0 };
+
+        fn execute(self: *ParallelWork, index: usize) void {
             const space_scope = @import("../phase_profile.zig").enterSpace(self.trace_space);
             defer space_scope.restore();
             const trace_installation = @import("../phase_profile.zig").installTrace(self.trace);
             defer trace_installation.restore();
+            var started: ?std.Io.Timestamp = null;
+            var cpu: ?u64 = null;
+            if (self.trace) |trace| {
+                started = std.Io.Clock.awake.now(trace.io);
+                cpu = profile.cpuNanos();
+            }
+            defer if (self.trace) |trace| {
+                const timing = &self.timings[index];
+                timing.us = @intCast(@max(0, started.?.durationTo(std.Io.Clock.awake.now(trace.io)).toMicroseconds()));
+                if (cpu) |before| if (profile.cpuNanos()) |after| {
+                    timing.cpu_us = (after -| before) / std.time.ns_per_us;
+                    timing.cpu_samples = 1;
+                };
+            };
             while (true) {
                 const at = self.next.fetchAdd(1, .monotonic);
                 if (at >= self.units.len) return;
@@ -353,6 +371,7 @@ const Engine = struct {
                 job.resolution_used = self.parent.resolution_remaining - worker.resolution_remaining;
                 job.associated_used = self.parent.associated_remaining - worker.associated_remaining;
                 job.work.parallel_jobs += 1;
+                if (self.trace != null) self.timings[index].jobs += 1;
             }
         }
     };
@@ -366,6 +385,12 @@ const Engine = struct {
             if (!done[prelude - 1] and self.source.compiledModule(prelude) == null) return false;
         }
         return true;
+    }
+    fn largerModuleFirst(source: *const project.Project, left: u32, right: u32) bool {
+        const left_nodes = source.unit(left).tree.nodes.items.len;
+        const right_nodes = source.unit(right).tree.nodes.items.len;
+        if (left_nodes != right_nodes) return left_nodes > right_nodes;
+        return left < right;
     }
     fn discardParallel(self: *Engine, resolution: usize, associated: usize) void {
         for (self.result.modules) |*slot| if (slot.*) |*module_| {
@@ -414,6 +439,8 @@ const Engine = struct {
         };
         var ready: std.ArrayList(u32) = .empty;
         defer ready.deinit(self.allocator);
+        var work_order: std.ArrayList(u32) = .empty;
+        defer work_order.deinit(self.allocator);
         var locked: @import("../eval/parallel_allocator.zig").LockedAllocator = .{ .backing = self.allocator, .io = io };
         while (remaining != 0) {
             ready.clearRetainingCapacity();
@@ -425,29 +452,59 @@ const Engine = struct {
                 self.discardParallel(initial_resolution, initial_associated);
                 return false;
             }
-            for (ready.items) |unit| {
-                var preparation = self.*;
-                preparation.prepare_names = true;
-                preparation.diagnostics = .empty;
-                defer preparation.deinitDiagnostics();
-                try preparation.checkModule(unit);
-                if (preparation.diagnostics.items.len != 0) {
-                    self.discardParallel(initial_resolution, initial_associated);
-                    return false;
+            const trace = profile.currentTrace();
+            {
+                var started: ?std.Io.Timestamp = null;
+                if (trace) |owner| started = std.Io.Clock.awake.now(owner.io);
+                defer if (trace) |owner| {
+                    profile.recordChecking(.{ .parallel_prepare_us = @intCast(@max(0, started.?.durationTo(std.Io.Clock.awake.now(owner.io)).toMicroseconds())) });
+                };
+                for (ready.items) |unit| {
+                    var preparation = self.*;
+                    preparation.prepare_names = true;
+                    preparation.diagnostics = .empty;
+                    defer preparation.deinitDiagnostics();
+                    try preparation.checkModule(unit);
+                    if (preparation.diagnostics.items.len != 0) {
+                        self.discardParallel(initial_resolution, initial_associated);
+                        return false;
+                    }
                 }
             }
-            var work: ParallelWork = .{ .trace = @import("../phase_profile.zig").currentTrace(), .trace_space = @import("../phase_profile.zig").currentSpace(), .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
+            // Dispatch large bodies first; preparation, budgets and publication
+            // keep dependency traversal order in `ready`.
+            work_order.clearRetainingCapacity();
+            try work_order.appendSlice(self.allocator, ready.items);
+            std.mem.sort(u32, work_order.items, @as(*const project.Project, self.source), largerModuleFirst);
+            var work: ParallelWork = .{ .trace = trace, .trace_space = @import("../phase_profile.zig").currentSpace(), .parent = self, .allocator = locked.allocator(), .units = work_order.items, .jobs = jobs };
             {
                 var group: std.Io.Group = .init;
                 const protection = io.swapCancelProtection(.blocked);
                 defer _ = io.swapCancelProtection(protection);
                 defer group.cancel(io);
                 const count = @min(@as(usize, requested), @min(ready.items.len, 16));
-                for (1..count) |_| group.concurrent(io, ParallelWork.execute, .{&work}) catch break;
-                work.execute();
+                var started: ?std.Io.Timestamp = null;
+                if (trace) |owner| started = std.Io.Clock.awake.now(owner.io);
+                var actual_workers: usize = 1;
+                for (1..count) |index| {
+                    group.concurrent(io, ParallelWork.execute, .{ &work, index }) catch break;
+                    actual_workers += 1;
+                }
+                work.execute(0);
                 const wait_region = @import("../phase_profile.zig").region("check.worker-join", 0, 0, 0);
                 group.await(io) catch unreachable;
                 wait_region.exit();
+                if (trace) |owner| {
+                    const batch_us: u64 = @intCast(@max(0, started.?.durationTo(std.Io.Clock.awake.now(owner.io)).toMicroseconds()));
+                    var batch_counts: @import("../work_counters.zig").Frontend = .{ .parallel_batch_us = batch_us, .parallel_capacity_us = batch_us *| actual_workers, .parallel_worker_slots = actual_workers };
+                    for (work.timings[0..actual_workers]) |timing| {
+                        batch_counts.parallel_worker_us +|= timing.us;
+                        batch_counts.parallel_worker_cpu_us +|= timing.cpu_us;
+                        batch_counts.parallel_worker_cpu_samples += timing.cpu_samples;
+                        batch_counts.parallel_worker_jobs += timing.jobs;
+                    }
+                    profile.recordChecking(batch_counts);
+                }
             }
             // Store allocators must not retain the temporary lock adapter.
             for (ready.items) |unit| if (self.result.modules[unit - 1]) |*module_| {

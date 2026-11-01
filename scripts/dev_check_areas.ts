@@ -489,6 +489,13 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "runtime.session_heap.test.session heap diagnostics default off reset per build and preserve retained blocks",
+      "runtime.session_heap.test.session heap diagnostic waits sum acquisitions and mark unavailable clocks",
+      "runtime.session_heap.test.session heap diagnostic concurrent blocked acquisitions accumulate under the mutex",
+      "reuse.parallel_check_tests.test.parallel module checking preserves serial Core and counters with independent solver ownership",
+      "reuse.parallel_check_tests.test.parallel worker trace diagnostics are bounded and preserve serial Core and rejection diagnostics",
+      "reuse.parallel_check_tests.test.unequal independent module bodies preserve serial Core and diagnostic order under parallel dispatch",
+      "reuse.parallel_check_tests.test.parallel module workers release joined results and solver allocators across concurrent allocation failures",
       "check.frozen_core_validation_tests.test.Core validation batch preserves ordinary graph source bounds and forbidden owner checks through OOM",
       "check.frozen_core_validation_tests.test.Core validation batch keeps spawn calls captures malformed wrappers and standalone fallback",
       "check.frozen_core_validation_tests.test.Core task batch recomputes exact changed entry context instead of retaining absence",
@@ -511,6 +518,7 @@ export const devCheckAreas = {
       "zig-native/tests/type_identity_execution.test.ts",
       "zig-native/tests/symbolic_effect_rows.test.ts",
       "zig-native/tests/inference_budget_config.test.ts",
+      "zig-native/tests/parallel_profile_execution.test.ts",
     ],
     "guestFilters": {} as Record<string, string>,
   },

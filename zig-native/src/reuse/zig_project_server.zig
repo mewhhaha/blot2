@@ -15,6 +15,7 @@ const Io = std.Io;
 const restart_cache = @import("restart_cache.zig");
 const native_assets = @import("../backend/native_assets.zig");
 const phase_profile = @import("../phase_profile.zig");
+const session_heap = @import("../runtime/session_heap.zig");
 
 /// Optimizer workers for a session whose open names none. Four beat one on
 /// every gdev build and edit measured (CT89: game wall -3.9%, a literal edit
@@ -361,6 +362,13 @@ const AssetRange = struct { id: u32, path: []const u8, mediaType: []const u8, sh
 const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
 
 fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
+    // Use the raw process allocator, never the session's counting adapter.
+    // Preparation joins every worker before returning, and its cleanup runs
+    // before this defer on every success/error path. No build pointer escapes.
+    if (opened.profile_trace) session_heap.Heap.beginDiagnostics(a);
+    defer if (opened.profile_trace) {
+        _ = session_heap.Heap.endDiagnostics(a);
+    };
     // Profiled sessions clock this build until its stats are published.
     var diagnostic_trace: ?phase_profile.Trace = if (opened.profile_trace) .init(io, id) else null;
     const trace_installation = phase_profile.installTrace(if (diagnostic_trace) |*owner| owner else null);
@@ -420,7 +428,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .sourceValidation = result.result.compiled.source_validation,
                 .backendTiming = result.result.compiled.timing,
                 .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
-                .sessionHeap = if (profile != null) @import("../runtime/session_heap.zig").Heap.snapshot(a) else null,
+                .sessionHeap = if (profile != null or opened.profile_trace) session_heap.Heap.snapshot(a) else null,
                 .workCounters = result.result.compiled.counters,
                 .demandLowering = result.result.compiled.demand_lowering,
                 .allocationSites = result.result.compiled.allocation_emission,

@@ -229,7 +229,7 @@ pub fn installTrace(value: ?*Trace) TraceInstallation {
     return .{ .previous = previous };
 }
 
-fn cpuNanos() ?u64 {
+pub fn cpuNanos() ?u64 {
     if (comptime builtin.os.tag != .linux) return null;
     var stamp: std.os.linux.timespec = undefined;
     if (std.os.linux.clock_gettime(.THREAD_CPUTIME_ID, &stamp) != 0) return null;

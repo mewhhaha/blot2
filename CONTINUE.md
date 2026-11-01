@@ -6,6 +6,33 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+Ready checker jobs now start largest syntax units first, while preparation,
+budgets, diagnostics and publication keep their original order. Three matched
+unprofiled four-worker pairs improve total World-producer compilation **7.46 to
+7.15 seconds (4.2%)**. Separate eight-worker pairs improve **7.00 to 6.89
+seconds (1.5%)**. Retained entry-body edits take **0.50 seconds**, with
+byte-identical reverts around **0.51 seconds**. These execute a tiny identity
+export after checking all 240 producer modules; they do not initialize the World
+or measure game hot reload. Do not compare these unprofiled controls directly
+with earlier profiled phase totals.
+
+Raw worker scaling measures 2/4/8 workers at 7.89/7.04/6.90 seconds; one worker
+hits the ten-second cap. Keep the default four: eight consumes more CPU for a
+small wall-time gain. Separate opt-in diagnostics observe only **16 ms summed
+heap-lock wait** at four workers, versus 117 ms at eight. No allocator caches or
+sharding are justified. Narrow dependency batches and uneven work constrain
+parallelism; the slowest measured modules are robots, station, world_storage and
+salt. Worker capacity/CPU and heap waits are diagnostic, overlapping sums.
+
+Compiler `9361e10` compiles 2,790 native laws. The current family passes **24
+selected native laws**, all with full allocation-failure mode, **11 guests** and
+zero Zig lint findings. Seven original kite scenarios retain identical complete
+streams and Wasm bytes. The required full gate remains **48 passed/one baseline
+List/chunk storage_escape** at bytes 312..345. Actual unprofiled Gdev main still
+exceeds its **five-second deadline**; total whole-game compile time, size, frame
+and release qualification remain unknown/pending. See
+[the concurrency and total-time evidence](zig-native/measurements/concurrency-and-total-time-2026-11-01.json).
+
 Closure validation now computes whole-context spawn-contract presence once per
 immutable batch. Three matched fresh World-producer pairs improve validation
 **883 to 693 ms (21.5%)** and total compilation **7.69 to 7.41 seconds (3.7%)**.
@@ -27,7 +54,7 @@ selected native laws pass full allocation faults, 11 guests pass, and seven
 original kite streams plus Wasm bytes remain identical. The patch, failed
 intermediate checks and pinned comparisons are preserved in
 [the rejected experiment](zig-native/measurements/rejected-cursor-reads-2026-11-01.json).
-The installed compiler is restored to `4c9635bb`; do not extend this adapter.
+That experiment restored `4c9635bb`; do not extend its removed adapter.
 
 The earlier completed-Core validation receipt independently removes repeated
 producer validation while preserving backend bounds and fresh-entry checks. Its
@@ -44,7 +71,8 @@ validation. Source and Core trace IDs now have separate namespaces, with bounded
 per-module completed clocks; source ordinals must never be attributed using Core
 names.
 
-Compiler `4c9635bb` compiles 2,785 native laws. The type-effects cycle passes 17
+The previous `4c9635bb` checkpoint compiles 2,785 native laws. Its type-effects
+cycle passes 17
 selected native laws, nine guests and zero Zig lint findings in 22.13 seconds;
 the same 17 native laws pass full allocation-failure mode in 3.07 seconds. Seven
 original kite draw-stream scenarios pass, with both producer Wasm binaries and

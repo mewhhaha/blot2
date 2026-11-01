@@ -1,6 +1,12 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Measured worker scaling and largest-first dispatch](../zig-native/measurements/concurrency-and-total-time-2026-11-01.json)
+improve matched unprofiled four-worker producer compilation 7.46 to 7.15 seconds;
+the eight-worker candidate takes 6.89 seconds in separate pairs. Retained entry
+edits take about 0.50 seconds. Heap contention is small; no allocator caches were
+added. Actual Gdev main remains incomplete at the five-second cap, with whole-game
+total/size/frame qualification pending.
 [Scoped validation batches and list-copy deletion](../zig-native/measurements/checker-validation-reduction-2026-11-01.json)
 improve matched fresh World-producer validation 883 to 693 ms and total 7.69 to
 7.41 seconds. Checking improves only 1.5%; the ineffective nominal memo and
