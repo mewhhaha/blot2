@@ -1,0 +1,386 @@
+diff --git a/scripts/dev_check_areas.ts b/scripts/dev_check_areas.ts
+index 13c846d7..3bec3481 100644
+--- a/scripts/dev_check_areas.ts
++++ b/scripts/dev_check_areas.ts
+@@ -489,6 +489,10 @@ export const devCheckAreas = {
+     "description":
+       "Type identity, substitution, effect-row rollback and owned evidence.",
+     "native": [
++      "check.types_tests.test.completed unification preserves historical record functions and reuses unchanged open children",
++      "check.types_tests.test.completed unification invalidates queued children after type and latent row writes",
++      "check.types_tests.test.completed unification rolls back every allocation failure and permits retry",
++      "check.types_tests.test.completed unification preserves warm parent cold child depth failures",
+       "check.types_tests.test.principal scheme substitution creates independent uses",
+       "check.types_tests.test.occurs and mismatch rollback preserve prior constraints",
+       "check.types_tests.test.rejected function effect rows roll back type and row writes and shared chronology",
+diff --git a/zig-native/src/check/types.zig b/zig-native/src/check/types.zig
+index f91f1fb1..90c2d590 100644
+--- a/zig-native/src/check/types.zig
++++ b/zig-native/src/check/types.zig
+@@ -158,6 +158,10 @@ pub const Store = struct {
+     projection_limit: usize = 1_000_000,
+     projection_steps: usize = 0,
+     resolution_depth_limit: usize = 1024,
++    // Invocation-local worklists may borrow completed parent normalization.
++    // An owner that observes a custom depth limit permanently declines: the
++    // older root-resolution cache has no limit provenance.
++    use_completed_unification: bool = true,
+     projection_exhausted: bool = false,
+     associated_equations: std.AutoHashMapUnmanaged(Id, Id) = .empty,
+     projection_resolution_types: u64 = 0,
+@@ -204,7 +208,7 @@ pub const Store = struct {
+     quantifier_obligations: std.ArrayList(Obligation) = .empty,
+ 
+     /// Owned per-store policy; uncached instances preserve the same chronology.
+-    pub const Options = struct { resolution_cache: bool = true, closed_graphs: bool = false, composite_cache: bool = true, composite_min_growth: usize = 4 };
++    pub const Options = struct { resolution_cache: bool = true, closed_graphs: bool = false, composite_cache: bool = true, composite_min_growth: usize = 4, completed_unification: bool = true };
+ 
+     pub fn init(allocator: std.mem.Allocator) Error!Store {
+         return initWithOptions(allocator, .{});
+@@ -213,6 +217,7 @@ pub const Store = struct {
+         var self: Store = .{ .allocator = allocator, .use_closed_graphs = options.closed_graphs, .use_resolution_cache = options.resolution_cache, .effects = Effects.Store.initWithOptions(allocator, .{ .resolution_cache = options.resolution_cache }) catch |err| return effectError(err) };
+         self.use_composite_cache = options.composite_cache and options.closed_graphs;
+         self.composite_min_growth = options.composite_min_growth;
++        self.use_completed_unification = options.completed_unification;
+         errdefer self.deinit();
+         try self.nodes.appendSlice(allocator, &.{ .{ .tag = .absent }, .{ .tag = .unit }, .{ .tag = .boolean }, .{ .tag = .u32 }, .{ .tag = .f32 }, .{ .tag = .never } });
+         try self.operations.appendSlice(allocator, &.{ .{ .identity = .{ .unit = 0, .decl = 0 } }, .{ .identity = .{ .unit = 0, .decl = 1 } } });
+@@ -1010,6 +1015,7 @@ pub const Store = struct {
+         return certificate;
+     }
+     pub fn resolve(self: *Store, root: Id, at: Cursor) Error!Id {
++        if (self.resolution_depth_limit != 1024) self.use_completed_unification = false;
+         const attribution_start = self.nodes.items.len;
+         defer self.normalization.resolve_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
+         if (self.use_closed_graphs) {
+@@ -1859,13 +1865,57 @@ pub const Store = struct {
+     pub fn unifyPattern(self: *Store, left: Id, right: Id) Error!void {
+         return self.unifyMode(left, right, null, true);
+     }
++    const UnificationStamp = struct {
++        types: u64,
++        rows: u64,
++        physical_rows: u64,
++        depth_limit: usize,
++        fn of(store: *const Store) UnificationStamp {
++            return .{ .types = store.mutation_epoch, .rows = store.effects.mutation_epoch, .physical_rows = store.effects.physical_epoch, .depth_limit = store.resolution_depth_limit };
++        }
++        fn usable(self: UnificationStamp) bool {
++            return self.types != std.math.maxInt(u64) and self.rows != std.math.maxInt(u64) and self.physical_rows != std.math.maxInt(u64) and self.depth_limit == 1024;
++        }
++    };
++    const NormalizedWork = struct {
++        stamp: UnificationStamp,
++        generation: u32 = 1,
++        fn sync(self: *NormalizedWork, store: *const Store) void {
++            const current = UnificationStamp.of(store);
++            if (!std.meta.eql(self.stamp, current)) {
++                // Zero permanently declines after a local generation wraps.
++                if (self.generation != 0) self.generation +%= 1;
++                self.stamp = current;
++            }
++            if (!current.usable()) self.generation = 0;
++        }
++    };
++    fn resolveUnification(self: *Store, root: Id) Error!Id {
++        const entries = self.normalization.resolve_depth_entries;
++        const nodes = self.nodes.items.len;
++        self.normalization.unify_resolve_calls +|= 1;
++        defer {
++            self.normalization.unify_resolve_entries +|= self.normalization.resolve_depth_entries -| entries;
++            self.normalization.unify_resolve_nodes +|= @intCast(self.nodes.items.len -| nodes);
++        }
++        return self.resolve(root, 0);
++    }
++    fn ordinaryUnificationHead(self: *const Store, root: Id) bool {
++        const value = self.node(root);
++        return switch (value.tag) {
++            .variable => !self.variables.items[value.a].region and self.variables.items[value.a].row_effect == none,
++            .absent, .unit, .boolean, .u32, .f32, .never, .function, .product, .record, .nominal, .array, .list, .cursor, .resolver, .demand, .provider, .state_provider, .type_constructor, .erased_proof => true,
++            else => false,
++        };
++    }
+     fn unifyMode(self: *Store, left: Id, right: Id, reporter: ?MismatchReporter, comptime associated: bool) Error!void {
+         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+         const scratch_allocator = scratch.allocator();
+         const point = self.mark();
+         errdefer self.rollback(point);
+-        const Pair = struct { a: Id, b: Id, effect_row: bool = false };
++        const Pair = struct { a: Id, b: Id, effect_row: bool = false, normalized: u32 = 0 };
++        var work: NormalizedWork = .{ .stamp = UnificationStamp.of(self) };
+         var seen: std.AutoHashMapUnmanaged(Pair, void) = .empty;
+         defer seen.deinit(scratch_allocator);
+         var pending: std.ArrayList(Pair) = .empty;
+@@ -1888,8 +1938,24 @@ pub const Store = struct {
+                 try self.unifyEffects(pair.a, pair.b);
+                 continue;
+             }
+-            const a = try self.resolve(pair.a, 0);
+-            const b = try self.resolve(pair.b, 0);
++            work.sync(self);
++            const generation = work.generation;
++            self.normalization.unify_pairs +|= 1;
++            if (self.has_projections) self.normalization.unify_projected_pairs +|= 1;
++            var a = pair.a;
++            var b = pair.b;
++            if (!associated and !self.has_projections and self.use_completed_unification and generation != 0 and pair.normalized == generation and self.ordinaryUnificationHead(a) and self.ordinaryUnificationHead(b)) {
++                self.normalization.unify_completed_pairs +|= 1;
++            } else {
++                a = try self.resolveUnification(a);
++                b = try self.resolveUnification(b);
++            }
++            work.sync(self);
++            // Only direct descendants of these two fully normalized parents
++            // inherit the proof. Writes between pairs revoke all older tags.
++            // Alpha-renamed and otherwise synthesized children stay fresh.
++            var children_normalized: u32 = 0;
++            if (!associated and !self.has_projections and self.use_completed_unification and work.generation == generation) children_normalized = work.generation;
+             const an = self.node(a);
+             const bn = self.node(b);
+             if (self.rowIdentity(a) or self.rowIdentity(b)) {
+@@ -1950,26 +2016,26 @@ pub const Store = struct {
+                 .function => {
+                     // Stack order makes parameter constraints precede results.
+                     try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c, .effect_row = true });
+-                    try pending.append(scratch_allocator, .{ .a = an.b, .b = bn.b });
+-                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
++                    try pending.append(scratch_allocator, .{ .a = an.b, .b = bn.b, .normalized = children_normalized });
++                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a, .normalized = children_normalized });
+                 },
+                 .product => {
+                     if (an.b != bn.b) return self.mismatch(reporter, a, b);
+                     var i: usize = an.b;
+                     while (i != 0) {
+                         i -= 1;
+-                        try pending.append(scratch_allocator, .{ .a = self.extra.items[an.a + i], .b = self.extra.items[bn.a + i] });
++                        try pending.append(scratch_allocator, .{ .a = self.extra.items[an.a + i], .b = self.extra.items[bn.a + i], .normalized = children_normalized });
+                     }
+                 },
+-                .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a }),
++                .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a, .normalized = children_normalized }),
+                 .demand, .provider => {
+                     try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c, .effect_row = true });
+-                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
++                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a, .normalized = children_normalized });
+                 },
+                 .state_provider => {
+-                    try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c });
+-                    try pending.append(scratch_allocator, .{ .a = an.b, .b = bn.b });
+-                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
++                    try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c, .normalized = children_normalized });
++                    try pending.append(scratch_allocator, .{ .a = an.b, .b = bn.b, .normalized = children_normalized });
++                    try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a, .normalized = children_normalized });
+                 },
+                 .scoped => {
+                     // An ordinary capability parameter binds to the whole
+@@ -2005,10 +2071,12 @@ pub const Store = struct {
+                     const aa = self.nominalArguments(an);
+                     const bb = self.nominalArguments(bn);
+                     if (aa.len != bb.len) return self.mismatch(reporter, a, b);
++                    var arguments_normalized: u32 = 0;
++                    if (an.tag == .nominal) arguments_normalized = children_normalized;
+                     var i = aa.len;
+                     while (i != 0) {
+                         i -= 1;
+-                        try pending.append(scratch_allocator, .{ .a = aa[i], .b = bb[i] });
++                        try pending.append(scratch_allocator, .{ .a = aa[i], .b = bb[i], .normalized = arguments_normalized });
+                     }
+                 },
+                 .record => {
+@@ -2023,7 +2091,7 @@ pub const Store = struct {
+                                 break;
+                             }
+                         }
+-                        try pending.append(scratch_allocator, .{ .a = af.ty, .b = found orelse return self.mismatch(reporter, a, b) });
++                        try pending.append(scratch_allocator, .{ .a = af.ty, .b = found orelse return self.mismatch(reporter, a, b), .normalized = children_normalized });
+                     }
+                 },
+                 else => {},
+diff --git a/zig-native/src/check/types_tests.zig b/zig-native/src/check/types_tests.zig
+index 489efd3f..93d5302f 100644
+--- a/zig-native/src/check/types_tests.zig
++++ b/zig-native/src/check/types_tests.zig
+@@ -16,6 +16,165 @@ const u32_type = type_store_module.u32_type;
+ const f32_type = type_store_module.f32_type;
+ const foreign_operation = type_store_module.foreign_operation;
+ 
++test "completed unification preserves historical record functions and reuses unchanged open children" {
++    var entries: [2]u64 = undefined;
++    for ([_]bool{ false, true }, 0..) |enabled, mode| {
++        var store = try Store.initWithOptions(std.testing.allocator, .{ .completed_unification = enabled, .resolution_cache = false });
++        defer store.deinit();
++        const leaf = try store.fresh();
++        const alias = try store.fresh();
++        const owner = try store.fresh();
++        try store.appendVersion(leaf, boolean);
++        try store.appendVersion(owner, try store.record(&.{.{ .name = 7, .ty = try store.function(leaf, alias) }}));
++        try store.appendVersion(leaf, alias);
++        try store.appendVersion(alias, u32_type);
++        try store.appendVersion(alias, f32_type);
++        const expected = try store.record(&.{.{ .name = 7, .ty = try store.function(u32_type, u32_type) }});
++        try store.unify(owner, expected);
++        const resolved = store.node(try store.resolve(owner, 0));
++        try std.testing.expectEqual(Tag.record, resolved.tag);
++        const field = store.recordField(resolved, 0);
++        try std.testing.expectEqual(@as(u32, 7), field.name);
++        const signature = store.node(field.ty);
++        try std.testing.expectEqual(Tag.function, signature.tag);
++        try std.testing.expectEqual(u32_type, signature.a);
++        try std.testing.expectEqual(u32_type, signature.b);
++        // The direct leaf still sees its earlier write, unlike owner's view.
++        try std.testing.expectEqual(boolean, try store.resolve(leaf, 0));
++        const wrong = try store.record(&.{.{ .name = 7, .ty = try store.function(u32_type, f32_type) }});
++        const point = store.mark();
++        try std.testing.expectError(error.TypeMismatch, store.unify(owner, wrong));
++        try std.testing.expectEqualDeep(point, store.mark());
++
++        const open = try store.fresh();
++        const left_child = try store.function(open, open);
++        const right_child = try store.function(open, open);
++        const left = try store.product(&.{ left_child, left_child, left_child });
++        const right = try store.product(&.{ right_child, right_child, right_child });
++        const before_entries = store.normalization.unify_resolve_entries;
++        const before_reused = store.normalization.unify_completed_pairs;
++        try store.unify(left, right);
++        entries[mode] = store.normalization.unify_resolve_entries - before_entries;
++        if (enabled) {
++            try std.testing.expect(store.normalization.unify_completed_pairs > before_reused);
++        } else {
++            try std.testing.expectEqual(before_reused, store.normalization.unify_completed_pairs);
++        }
++        try std.testing.expectEqual(Tag.variable, store.node(try store.resolve(open, 0)).tag);
++    }
++    try std.testing.expect(entries[1] < entries[0]);
++}
++
++test "completed unification invalidates queued children after type and latent row writes" {
++    for ([_]bool{ false, true }) |enabled| {
++        var store = try Store.initWithOptions(std.testing.allocator, .{ .completed_unification = enabled });
++        defer store.deinit();
++        const x = try store.fresh();
++        const left = try store.function(x, x);
++        const right = try store.function(u32_type, f32_type);
++        const point = store.mark();
++        try std.testing.expectError(error.TypeMismatch, store.unify(left, right));
++        try std.testing.expectEqualDeep(point, store.mark());
++        try std.testing.expectEqual(x, try store.resolve(x, 0));
++        const y = try store.fresh();
++        const recursive = try store.function(y, try store.array(y));
++        const occurs_point = store.mark();
++        try std.testing.expectError(error.InfiniteType, store.unify(left, recursive));
++        try std.testing.expectEqualDeep(occurs_point, store.mark());
++        try std.testing.expectEqual(y, try store.resolve(y, 0));
++        // A solved first callback changes the row visible in the queued second
++        // callback, even though neither callback writes a type variable.
++        const row = try store.freshEffects();
++        const callback = try store.functionWithEffects(unit, u32_type, row);
++        const impure = try store.functionWithEffects(unit, u32_type, try store.effects.row(&.{foreign_operation}, .closed));
++        const pure = try store.function(unit, u32_type);
++        const callbacks = try store.product(&.{ callback, callback });
++        const incompatible = try store.product(&.{ impure, pure });
++        const row_point = store.mark();
++        const cursor = store.cursor();
++        try std.testing.expectError(error.EffectMismatch, store.unify(callbacks, incompatible));
++        try std.testing.expectEqualDeep(row_point, store.mark());
++        try std.testing.expectEqual(cursor, store.cursor());
++        try std.testing.expectEqual(Effects.Tail.variable, std.meta.activeTag(store.row(try store.resolveEffects(row, 0)).tail));
++        const compatible = try store.product(&.{ impure, impure });
++        const type_epoch = store.mutation_epoch;
++        const effect_epoch = store.effects.mutation_epoch;
++        const resolve_calls = store.normalization.unify_resolve_calls;
++        try store.unify(callbacks, compatible);
++        try std.testing.expectEqual(type_epoch, store.mutation_epoch);
++        try std.testing.expect(store.effects.mutation_epoch > effect_epoch);
++        // Parent preparation and the stale second callback must both resolve.
++        // The row write alone revokes the latter's completed parent receipt.
++        try std.testing.expect(store.normalization.unify_resolve_calls - resolve_calls >= 4);
++        const result = store.node(try store.resolve(callbacks, 0));
++        for (store.list(.{ .start = result.a, .len = result.b })) |child| {
++            const signature = store.node(child);
++            try std.testing.expectEqualSlices(Effects.Label, &.{foreign_operation}, store.rowLabels(signature.c));
++            try std.testing.expectEqual(Effects.Tail.closed, std.meta.activeTag(store.row(signature.c).tail));
++        }
++    }
++}
++
++fn completedUnificationFailureLaw(allocator: std.mem.Allocator) !void {
++    // This law is called only by the allocation-failure runner, which supplies
++    // a FailingAllocator. Disable its one injected fault for transaction retry.
++    const failing: *std.testing.FailingAllocator = @ptrCast(@alignCast(allocator.ptr));
++    var store = try Store.init(allocator);
++    defer store.deinit();
++    const x = try store.fresh();
++    var open: [40]Id = undefined;
++    var closed: [40]Id = undefined;
++    @memset(&open, x);
++    @memset(&closed, u32_type);
++    const left = try store.function(x, try store.product(&open));
++    const right = try store.function(u32_type, try store.product(&closed));
++    const point = store.mark();
++    store.unify(left, right) catch |err| {
++        try std.testing.expectEqualDeep(point, store.mark());
++        try std.testing.expectEqual(Tag.variable, store.node(x).tag);
++        const fail_index = failing.fail_index;
++        failing.fail_index = std.math.maxInt(usize);
++        defer failing.fail_index = fail_index;
++        try store.unify(left, right);
++        try std.testing.expectEqual(u32_type, try store.resolve(x, 0));
++        return err;
++    };
++    try std.testing.expectEqual(u32_type, try store.resolve(x, 0));
++}
++
++test "completed unification rolls back every allocation failure and permits retry" {
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, completedUnificationFailureLaw, .{});
++}
++
++test "completed unification preserves warm parent cold child depth failures" {
++    for ([_]bool{ false, true }) |enabled| {
++        for ([_]usize{ 2, 1024 }) |height| {
++            var store = try Store.initWithOptions(std.testing.allocator, .{ .completed_unification = enabled, .composite_cache = false });
++            defer store.deinit();
++            const leaf = try store.fresh();
++            var child = leaf;
++            for (0..height) |_| child = try store.array(child);
++            const left = try store.product(&.{child});
++            const right = try store.product(&.{child});
++            try store.appendVersion(leaf, u32_type);
++            store.resolution_depth_limit = 2048;
++            if (height == 2) store.resolution_depth_limit = 1024;
++            _ = try store.resolve(left, 0);
++            _ = try store.resolve(right, 0);
++            store.resolution_depth_limit = height;
++            // Root-query hits retain their original limit history. Their
++            // uncached children must still undergo the ordinary depth check.
++            _ = try store.resolve(left, 0);
++            _ = try store.resolve(right, 0);
++            const point = store.mark();
++            const reused = store.normalization.unify_completed_pairs;
++            try std.testing.expectError(error.TypeLimit, store.unify(left, right));
++            try std.testing.expectEqualDeep(point, store.mark());
++            try std.testing.expectEqual(reused, store.normalization.unify_completed_pairs);
++        }
++    }
++}
++
+ test "cursor histories retain repeated writes and self references" {
+     var store = try Store.init(std.testing.allocator);
+     defer store.deinit();
+diff --git a/zig-native/src/work_counters.zig b/zig-native/src/work_counters.zig
+index 81cdcdab..c7884dea 100644
+--- a/zig-native/src/work_counters.zig
++++ b/zig-native/src/work_counters.zig
+@@ -45,6 +45,12 @@ pub const Normalization = struct {
+     substitute_unchanged: u64 = 0,
+     resolve_nodes_added: u64 = 0,
+     resolve_depth_entries: u64 = 0,
++    unify_pairs: u64 = 0,
++    unify_completed_pairs: u64 = 0,
++    unify_projected_pairs: u64 = 0,
++    unify_resolve_calls: u64 = 0,
++    unify_resolve_entries: u64 = 0,
++    unify_resolve_nodes: u64 = 0,
+     open_nodes_added: u64 = 0,
+     open_depth_entries: u64 = 0,
+     close_nodes_added: u64 = 0,

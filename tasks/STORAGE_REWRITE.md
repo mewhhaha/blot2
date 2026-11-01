@@ -9,8 +9,11 @@ world interfaces missed their gates and were removed; their evidence is linked
 from CONTINUE.md. The
 [opaque draw-batch prototype](../zig-native/measurements/unqualified-draw-batches-2026-11-01.json)
 stopped at unsupported escape/control shapes before performance measurement.
-[Astra's next architecture experiment](../zig-native/measurements/compiler-architecture-review-2026-11-01.json)
-targets repeated whole-type normalization inside structural unification.
+[The completed-child unification experiment](../zig-native/measurements/rejected-completed-unification-2026-11-01.json)
+missed its 20% checking gate and was removed. The
+[bounded CPU profile](../zig-native/measurements/normalization-cpu-attribution-2026-11-01.json)
+now places normalization across application/finish paths; audit actual
+historical observations before changing the shared inference representation.
 [Engine-boundary measurements](../zig-native/measurements/engine-boundary-experiments-2026-11-01.json)
 now retain incomplete profiles and distinguish checker jobs, backend stages and
 optimizer pass costs. Closed leaf-call plans and two small source-interface

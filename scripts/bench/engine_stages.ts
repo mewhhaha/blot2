@@ -6,9 +6,11 @@ import {
   type ZigProjectCompilerOptions,
 } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
+import { createSampledCompiler } from "./engine_sampling.ts";
 const { values } = parseArgs({
   options: {
     world: { type: "boolean", default: false },
+    sample: { type: "boolean", default: false },
     repetitions: { type: "string", default: "3" },
     "timeout-ms": { type: "string", default: "5000" },
     "baseline-gdev": {
@@ -99,12 +101,23 @@ if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 9) {
 if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30000) {
   throw new Error("--timeout-ms must be 100..30000");
 }
+if (values.sample) {
+  if (!values.world || repetitions !== 1 || values.baseline !== undefined) {
+    throw new Error(
+      "--sample requires --world --repetitions 1 and no --baseline",
+    );
+  }
+  if (timeoutMs > 10000) throw new Error("--sample timeout must be <=10000 ms");
+  versions = versions.filter((version) => version.name === "candidate");
+}
 const worldBaseline: Record<string, string> = {};
-const worldPins: Record<string, { baseline: string; candidate: string }> = {};
+const worldPins: Record<string, { baseline?: string; candidate: string }> = {};
 if (values.world) {
-  versions = versions.slice(0, 2);
-  if (values.baseline === undefined) {
-    versions[0].executable = versions[1].executable;
+  if (!values.sample) {
+    versions = versions.slice(0, 2);
+    if (values.baseline === undefined) {
+      versions[0].executable = versions[1].executable;
+    }
   }
   probes = [{
     name: "world-producer",
@@ -124,6 +137,13 @@ if (values.world) {
     ] as const
   ) {
     for (const path of paths) {
+      const absolute = resolve(repo, "../", project, path);
+      if (values.sample) {
+        worldPins[`${project}/${path}`] = {
+          candidate: await hash(await Deno.readFile(absolute)),
+        };
+        continue;
+      }
       const result = await new Deno.Command("git", {
         cwd: resolve(repo, "../", project),
         args: ["show", `${ref}:${path}`],
@@ -133,7 +153,6 @@ if (values.world) {
       if (!result.success) {
         throw new Error(new TextDecoder().decode(result.stderr));
       }
-      const absolute = resolve(repo, "../", project, path);
       worldBaseline[absolute] = new TextDecoder().decode(result.stdout);
       worldPins[`${project}/${path}`] = {
         baseline: await hash(result.stdout),
@@ -191,7 +210,36 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
         options.storage = settings.storage;
         options.inferenceBudget = settings.inferenceBudget;
       }
-      const compiler = await createZigProjectCompiler(options);
+      let sampling:
+        | Awaited<ReturnType<typeof createSampledCompiler>>
+        | undefined;
+      if (values.sample) {
+        await Deno.writeTextFile(
+          resolve(output, "sampling.json"),
+          JSON.stringify(
+            {
+              diagnostic: "CPU attribution only; no latency comparison",
+              compilerSha256: await hash(
+                await Deno.readFile(version.executable),
+              ),
+              sourceSha256: await hash(new TextEncoder().encode(probe.source)),
+              worldPins,
+              options,
+              timeoutMs,
+              summarize: [
+                "python3",
+                "scripts/bench/summarize_stacks.py",
+                output,
+              ],
+            },
+            null,
+            2,
+          ) + "\n",
+        );
+        sampling = await createSampledCompiler(options, output, repo);
+      }
+      const compiler = sampling?.compiler ??
+        await createZigProjectCompiler(options);
       let sample;
       try {
         const start = performance.now();
@@ -199,10 +247,13 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
         if (values.world && version.name === "baseline") {
           sources = worldBaseline;
         }
-        const result = await compiler.build({
+        const buildOptions = {
           sources,
           signal: AbortSignal.timeout(timeoutMs),
-        });
+        };
+        let result;
+        if (sampling) result = await sampling.build(buildOptions);
+        else result = await compiler.build(buildOptions);
         const buildMs = performance.now() - start;
         if (!result.success) {
           throw new Error(JSON.stringify(result.diagnostics));
@@ -228,7 +279,8 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           progress: compiler.profileProgress,
         };
       } finally {
-        await compiler.dispose();
+        if (sampling) await sampling.dispose();
+        else await compiler.dispose();
       }
       sample.progress = compiler.profileProgress;
       samples.push(sample);
@@ -251,12 +303,22 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
     }
   }
 }
+let toolchain =
+  "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; rotated repetitions";
+if (values.sample) {
+  toolchain = "Single candidate; gdb diagnostic; cache disabled";
+}
 await Deno.writeTextFile(
   resolve(output, "result.json"),
   JSON.stringify(
     {
-      toolchain:
-        "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; rotated repetitions",
+      toolchain,
+      ...(values.sample && {
+        sampling: {
+          diagnostic: "CPU attribution only; no latency comparison",
+          summarize: `python3 scripts/bench/summarize_stacks.py ${output}`,
+        },
+      }),
       worldPins,
       repetitions,
       timeoutMs,

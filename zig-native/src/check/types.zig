@@ -1859,6 +1859,16 @@ pub const Store = struct {
     pub fn unifyPattern(self: *Store, left: Id, right: Id) Error!void {
         return self.unifyMode(left, right, null, true);
     }
+    fn resolveUnification(self: *Store, root: Id) Error!Id {
+        const entries = self.normalization.resolve_depth_entries;
+        const nodes = self.nodes.items.len;
+        self.normalization.unify_resolve_calls +|= 1;
+        defer {
+            self.normalization.unify_resolve_entries +|= self.normalization.resolve_depth_entries -| entries;
+            self.normalization.unify_resolve_nodes +|= @intCast(self.nodes.items.len -| nodes);
+        }
+        return self.resolve(root, 0);
+    }
     fn unifyMode(self: *Store, left: Id, right: Id, reporter: ?MismatchReporter, comptime associated: bool) Error!void {
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
@@ -1888,8 +1898,10 @@ pub const Store = struct {
                 try self.unifyEffects(pair.a, pair.b);
                 continue;
             }
-            const a = try self.resolve(pair.a, 0);
-            const b = try self.resolve(pair.b, 0);
+            self.normalization.unify_pairs +|= 1;
+            if (self.has_projections) self.normalization.unify_projected_pairs +|= 1;
+            const a = try self.resolveUnification(pair.a);
+            const b = try self.resolveUnification(pair.b);
             const an = self.node(a);
             const bn = self.node(b);
             if (self.rowIdentity(a) or self.rowIdentity(b)) {

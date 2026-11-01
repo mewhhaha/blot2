@@ -45,17 +45,38 @@ The small opaque draw-batch prototype is **unqualified and archived**. Its
 positive lifecycle case, three privacy laws, payload escape and three
 live-borrow clear laws pass. Builder/Batch escape forms and even the matched
 valid initialized-slot control hit unsupported storage layouts, so reference
-streams and performance were never run. Public flat spans or owner stamps do
-not preserve truncate/regrow safety. No renderer API migration or safety cut
-landed. See [prototype evidence](zig-native/measurements/unqualified-draw-batches-2026-11-01.json).
+streams and performance were never run. Public flat spans or owner stamps do not
+preserve truncate/regrow safety. No renderer API migration or safety cut landed.
+See
+[prototype evidence](zig-native/measurements/unqualified-draw-batches-2026-11-01.json).
 
-Astra xhigh recommends **cursor-aware structural unification** next: compare
-type heads and carry historical cursors into child pairs instead of recursively
-normalizing whole trees at every comparison. This is an unimplemented
-hypothesis. Preserve eager binding/publication and richer-type paths, and require
-at least 20% lower measured checking time with improving total time. The six
-semantic law groups and bounded experiment are in
-[the architecture review](zig-native/measurements/compiler-architecture-review-2026-11-01.json).
+The first cursor-aware-unification step is **rejected and removed**. Reusing
+completed parent normalization for unchanged queued children passes four new
+native law groups, including full allocation faults, but three World-producer
+pairs improve checking only **4.62 to 4.45 seconds (3.7%)**, below the 20% gate.
+Total compilation is 8.42/8.24 seconds with identical tiny Wasm. This does not
+falsify the larger cursor-view representation; it rejects the smaller worklist
+receipt. See
+[the archived experiment](zig-native/measurements/rejected-completed-unification-2026-11-01.json).
+
+A bounded CPU profile now observes roughly **6%** of identified checking CPU
+under unification and **25%** under normalization spread across application,
+finish and obligation paths. These are approximate overlapping sample cohorts,
+not phase clocks or upper bounds. The repaired sampler stops at the real Linux
+thread entry instead of unwinding thousands of unknown tail frames; 79 complete
+intervals cover 85.5% of process CPU with zero frame-limit truncation. The
+producer completes inside its ten-second diagnostic cap. See
+[CPU attribution and Astra's next experiment](zig-native/measurements/normalization-cpu-attribution-2026-11-01.json).
+
+The next discriminator audits actual historical observations before attempting
+mutable first-order monotypes with immutable publication and a rollback trail.
+Rebinding already creates successor bindings; removing that syntax would not
+remove solver chronology. No language feature cut is justified yet. Current
+compiler `c835cc58` retains only diagnostic counters: the type-effects cycle
+passes 13 native laws and nine guests in 7.66 seconds, with 2,781 native laws
+compiled and zero Zig lint findings. The required full gate remains 48 passed/
+one baseline List/chunk failure. Whole-main, release and frame qualification are
+still pending.
 
 The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
 cancellation with exclusive phase checkpoints, module names, balanced

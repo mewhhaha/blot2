@@ -42,8 +42,22 @@ def stack(thread):
     thread.switch()
     frame = gdb.newest_frame()
     frames = []
+    physical = set()
+    reason = "end"
     while frame is not None and len(frames) < 4096:
         try:
+            # Some native DWARF tails keep yielding unknown frames at PC zero
+            # instead of ending. They are not recursive compiler work.
+            pc = frame.pc()
+            if pc == 0:
+                reason = "zero_pc"
+                break
+            if frame.type() != gdb.INLINE_FRAME:
+                key = (pc, int(frame.read_register("sp")))
+                if key in physical:
+                    reason = "physical_cycle"
+                    break
+                physical.add(key)
             sal = frame.find_sal()
             frames.append([
                 frame.name() or "??",
@@ -51,13 +65,25 @@ def stack(thread):
                 sal.line,
                 frame.type() == gdb.INLINE_FRAME,
             ])
+            # Linux clone starts this function on a new stack. There is no
+            # caller beyond its thread trampoline, although native DWARF can
+            # invent an unbounded unknown tail there.
+            name = frames[-1][0]
+            if name.startswith("Thread.LinuxThreadImpl.spawn") and name.endswith(".Instance.entryFn"):
+                reason = "thread_root"
+                break
         except gdb.error:
             frames.append(["??", "", 0, False])
+            reason = "unwind_error"
+            break
         try:
             frame = frame.older()
         except gdb.error:
+            reason = "unwind_error"
             break
-    return frames
+    if len(frames) == 4096:
+        reason = "frame_limit"
+    return frames, reason
 
 
 wait_for("pid")
@@ -95,16 +121,17 @@ with open(os.environ["SAMPLE_OUT"], "a") as out:
         if flag("stop"):
             break  # The measured builds finished while this stop was pending.
         try:
-            stacks, tids, cpu_ns = [], [], []
+            stacks, tids, cpu_ns, tails = [], [], [], []
             for thread in gdb.selected_inferior().threads():
                 tid = thread.ptid[1]
                 current = thread_cpu(tid)
                 previous = previous_cpu.get(tid)
                 previous_cpu[tid] = current
-                frames = stack(thread)
+                frames, tail = stack(thread)
                 if any(f[0] == "main.main" for f in frames):
                     continue
                 stacks.append(frames)
+                tails.append(tail)
                 tids.append(tid)
                 cpu_ns.append(None if current is None or previous is None
                               else max(0, current - previous))
@@ -112,7 +139,7 @@ with open(os.environ["SAMPLE_OUT"], "a") as out:
             break
         out.write(json.dumps({"t": time.time() - started, "wall_ns": time.time_ns(),
                               "run": int(os.environ.get("SAMPLE_RUN", "0")), "frame_limit": 4096, "st": stacks,
-                              "tid": tids, "cpu_ns": cpu_ns}) + "\n")
+                              "tid": tids, "cpu_ns": cpu_ns, "tail": tails}) + "\n")
         out.flush()
         taken += 1
 try:

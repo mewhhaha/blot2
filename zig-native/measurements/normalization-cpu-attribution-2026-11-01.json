@@ -1,0 +1,178 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "84020a97c4b822cb8ce2c9892d86dc390ae773e2",
+  "scope": "One bounded CPU-weighted World producer diagnostic; identity export only. Inclusive stack categories overlap and are approximate.",
+  "compiler_sha256": "56a163b9b20c5f8cafaaaf8910a13744df9a0a728ddacd7f55a950fc384e8d19",
+  "compiler_policy": "Zig0.17.0 safe/noLLVM; fresh session, cache disabled, profileBackend/profileTrace enabled, one codegen worker",
+  "source_checkpoints": {
+    "gdev": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5"
+  },
+  "source_pins": {
+    "gdev/src/world_storage.blot": {
+      "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+    },
+    "gdev/tests/minor_support/owned.blot": {
+      "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+    },
+    "gdev/tests/minor_support/game.blot": {
+      "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+    },
+    "ink/lib/pen/host.blot": {
+      "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+    }
+  },
+  "entry_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+  "deadline_ms": 10000,
+  "completed": true,
+  "artifact_bytes": 2935,
+  "artifact_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+  "execution": "Tiny identity entry returns41; no actual world initialization/game frame executed.",
+  "sampling": {
+    "complete_intervals": 79,
+    "discarded_boundary_intervals": 1,
+    "covered_cpu_ms": 10741.041618,
+    "sampled_process_cpu_ms": 12560,
+    "coverage_ratio": 0.8551784727707006,
+    "uncovered_cpu_ms": 1818.9583820000007,
+    "missing_stack_cpu_ms": 0.0,
+    "truncated_stack_cpu_ms": 0.0
+  },
+  "checking": {
+    "scope": "Stacks containing project_check/check.Engine frames; inclusive categories overlap, and missing callers are outside this cohort.",
+    "cpu_ms": {
+      "all": 7717.222882,
+      "unification_inclusive": 456.937984,
+      "normalization_inclusive": 1923.430813,
+      "normalization_under_unification": 334.909954
+    },
+    "normalization_callers": [
+      {
+        "name": "check.check.Engine.finish",
+        "cpu_ms": 388.623185,
+        "checking_sample_cpu_percent": 5.035790606831407
+      },
+      {
+        "name": "check.check.Engine.resolveUse",
+        "cpu_ms": 323.251667,
+        "checking_sample_cpu_percent": 4.188704563062016
+      },
+      {
+        "name": "check.check.Engine.ordinaryApplication",
+        "cpu_ms": 321.692658,
+        "checking_sample_cpu_percent": 4.168502878805413
+      },
+      {
+        "name": "check.types.Store.unifyMode__func_2938",
+        "cpu_ms": 222.724728,
+        "checking_sample_cpu_percent": 2.8860735449211044
+      },
+      {
+        "name": "check.check.Engine.applicationFlow",
+        "cpu_ms": 221.690072,
+        "checking_sample_cpu_percent": 2.8726664421871235
+      },
+      {
+        "name": "check.check.Engine.attemptPending",
+        "cpu_ms": 208.790976,
+        "checking_sample_cpu_percent": 2.7055195786426425
+      },
+      {
+        "name": "check.check.Engine.demandCallee",
+        "cpu_ms": 124.472301,
+        "checking_sample_cpu_percent": 1.612915719854675
+      },
+      {
+        "name": "check.types.Store.occurs",
+        "cpu_ms": 112.185226,
+        "checking_sample_cpu_percent": 1.453699442342995
+      }
+    ],
+    "other_inclusive_ms": {
+      "free_rows": 293.16814,
+      "covariance_open": 370.98063,
+      "scheme_import": 491.278677,
+      "body_cache": 1033.65296,
+      "substitution": 118.132272
+    }
+  },
+  "raw_pins": {
+    "samples.jsonl": "9b781a5b52d76487b54e2d6ecc30dcfa37ff4a73468bc7c6c8457b42f0a30f25",
+    "sampling.json": "1da9bf2aed8eddb2e69f05d4c861d56e65ddc6118e5f29165dd3a5a3464ef6ec",
+    "builds.jsonl": "59b304f0f1d2114a5e8126f183e4d58f9b5cd91775d03e8862ca153f51cfad66",
+    "result.json": "2b913e551250c615ef91f6793ea8b04a502f67272c2cb3ef2d6ceea9214dd755",
+    "gdb.log": "d1058b8c0a6aeea9d3bca7ab7dfcf7bca2212a0a38c55ef99610da7ef317666b"
+  },
+  "tool_pins": {
+    "scripts/bench/gdb_sampler.py": "68f3ad2a9384b6480ae5f04f0a6b7f24dc469f26ae8b3c6fa1fe8036300d4ce6",
+    "scripts/bench/engine_sampling.ts": "17d2ef317b741724ce5951b7e58b5bb514e70246cf00885c4011983de422f3fc",
+    "scripts/bench/engine_stages.ts": "4d12bed7291bfb8dba8aa05183f3c7ee67ca450330094b48b0ac96fec42e7b16",
+    "scripts/bench/summarize_stacks.py": "59866de9e5b516d3c077fb9b0b37ff9a6496d32bedfd8642578302abb1d6efe0"
+  },
+  "sampler_repair": {
+    "failure": "Native DWARF yielded thousands of unknown frames beyond Linux thread entry; earlier zero-PC/physical-cycle guards alone did not terminate that tail.",
+    "fix": "Stop at the Zig Linux thread entry trampoline, the actual start of its new stack; retain explicit termination reasons. Verified against Zig0.17.0 Thread.zig entryFn.",
+    "earlier_attempts": [
+      {
+        "path": "build/bench/completed-unification/cpu",
+        "status": "ten-second timeout, malformed terminal unwind, not usable caller coverage"
+      },
+      {
+        "path": "build/bench/completed-unification/cpu-fixed-unwind",
+        "status": "ten-second timeout, malformed terminal unwind, not usable caller coverage"
+      }
+    ],
+    "result": "79 complete intervals, zero frame-limit truncation; full producer build completes inside existing ten-second cap. Debugger build time is not a latency benchmark."
+  },
+  "interpretation": [
+    "Unification inclusive is about5.9percent of identified checking CPU; normalization beneath it about4.3percent. This does not support a large unification-only rewrite for a20percent checking target.",
+    "Normalization across application/finish/obligation/generalization is about24.9percent of identified checking CPU; it is distributed, not one call-site bottleneck.",
+    "The completed-normalization worklist experiment missed its gate and is removed, with source/laws/performance archived separately."
+  ],
+  "limits": [
+    "One random-stop diagnostic, not stable CPU shares or an upper-bound proof.85.5percent processCPU coverage; missing and waiting-endpoint work may be unattributed.",
+    "Thread CPU deltas weight endpoint stacks. A worker can execute useful work then wait before sampling; waiting stacks with positive deltas must not be mistaken for expensive futex work.",
+    "Checking cohort identified by project_check/check.Engine names. Inclusive categories overlap; never sum them with exclusive phase clocks.",
+    "No release performance, whole-main size/latency or fresh frame."
+  ],
+  "next_experiment": {
+    "reviewer": "gpt-6-astra xhigh",
+    "status": "proposal_only",
+    "name": "Ordinary mutable monotypes with explicit immutable publication",
+    "first_discriminator": "On pinned actual producer, attribute second live type writes, nonlatest/skipped chronological type observations including head, and effect-row observations changed by ignoring chronology. Raw appendVersion oracle fixtures do not qualify a source-compatibility claim.",
+    "source_finding": "rebindStatement/rebindFields already create successor bindings. Removing type-changing assignment is neither necessary nor sufficient to remove solver chronology.",
+    "conditional_prototype": "Only after an ordinary history-independent inference subset is demonstrated: mutable variable links plus rollback trail, immutable schemes at generalization/publication, existing effect/rank/scoped chronology across explicit snapshots. Reject mixed boundaries without valid snapshots.",
+    "boundaries": [
+      "Store.unify/appendVersion",
+      "bindRankAnnotation",
+      "Effects.bind/extractView",
+      "Engine.finish",
+      "body_check_cache.captureIntoResolved"
+    ],
+    "witnesses": [
+      "Independent generic instantiations and captured-variable refinement",
+      "Exact callback/effect-operation requirements and diagnostic distinctions",
+      "Effect-row multiplicity and chronological extraction",
+      "Scoped owner separation, escape rejection and successor rebinding",
+      "Equivalent diagnostics, published interfaces/Core and executed outputs"
+    ],
+    "gate": ">=20percent lower median checking time in three rotated full-producer pairs, improving total and <=5percent lower/freeze/validation regression. Stop if history witnesses are common or snapshot cost erases benefit.",
+    "feature_cuts": "No source feature removal justified by current evidence."
+  },
+  "current_checkpoint_qualification": {
+    "compiler_sha256": "c835cc58f070021b1b1261eba7d5bdcb5f38fbf8f23b82608c7bb167e4ca2f83",
+    "native_inventory_compiled": 2781,
+    "development_report": "build/bench/completed-unification/final-dev/run-86dab706ce3e73ae/results.json",
+    "native_laws": 13,
+    "guest_tests": 9,
+    "development_seconds": 7.656240014,
+    "development_passed": true,
+    "full_gate": "Required full gate48pass/one known baseline List/chunk storage_escape bytes312..345; full qualification remains pending.",
+    "full_gate_journal": "build/bench/completed-unification/full-gate/run-c0c278719d289584",
+    "kept_changes": "Unification resolver-work counters, bounded source-engine CPU sampling and the sampler unwind repair; no changed inference behavior."
+  },
+  "reproduce": [
+    "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --sample --repetitions 1 --timeout-ms 10000 --compiler zig-native/zig-out-cursor-baseline/bin/blotc --output build/bench/completed-unification/cpu-thread-root",
+    "python3 scripts/bench/summarize_stacks.py build/bench/completed-unification/cpu-thread-root"
+  ]
+}

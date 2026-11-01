@@ -200,10 +200,19 @@ separate from unprofiled process CPU and end-to-end latency. See the
 for the CT114 findings and remaining representation changes.
 
 `deno run -A scripts/bench/render_producer.ts --compiler PATH` checks the actual
-Gdev `pen/protocol_render` import with its native-asset settings and a five-second
-deadline. It emits and executes only a tiny identity entry. Compare alternating
-compiler runs using `phaseProfile.checking`; the emitted size does not measure
-the renderer or whole game.
+Gdev `pen/protocol_render` import with its native-asset settings and a
+five-second deadline. It emits and executes only a tiny identity entry. Compare
+alternating compiler runs using `phaseProfile.checking`; the emitted size does
+not measure the renderer or whole game.
+
+`deno run -A scripts/bench/engine_stages.ts --world --sample --repetitions 1
+--timeout-ms 10000 --compiler PATH --output DIRECTORY`
+samples one actual World producer build with the existing GDB sampler. It
+records source/compiler pins, thread CPU deltas and bounded build/handshake
+evidence. Run `python3 scripts/bench/summarize_stacks.py DIRECTORY` for caller
+attribution. Inclusive categories overlap, and work ending at waiting-thread
+endpoints can remain unattributed. Sampled build time is diagnostic, not a
+latency benchmark.
 
 `deno run -A scripts/bench/aggregate_readers.ts --compiler PATH` measures actual
 Ink `transform.matrix` reader DAGs and `render.Settings` field updates. Every
@@ -212,11 +221,12 @@ Compare alternating compilers; keep unchanged controls and output-size
 regressions alongside wins.
 
 `zig build demand-inventory -Doptimize=safe -Dllvm=false --prefix
-zig-out-native-dev` in `zig-native/` installs `blot-demand-inventory`. Run that
-binary from the repository root, optionally with `--tiny-entry`, to inventory
-conservative AST declaration demand on real Gdev with its generated native
-assets. It stops before semantic checking. Counts and body-source bytes do not
-predict checker time or establish that unchecked interfaces can be published.
+zig-out-native-dev`
+in `zig-native/` installs `blot-demand-inventory`. Run that binary from the
+repository root, optionally with `--tiny-entry`, to inventory conservative AST
+declaration demand on real Gdev with its generated native assets. It stops
+before semantic checking. Counts and body-source bytes do not predict checker
+time or establish that unchecked interfaces can be published.
 
 ## Idiomatic Blot/Rust programs
 

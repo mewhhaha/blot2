@@ -140,6 +140,9 @@ Normalization work counters record recursive entries and inclusive node growth
 under import, substitution, resolution and covariance operations. Nested counts
 can overlap and are not exclusive CPU timings. View and binder counters include
 rolled-back creation work; they grant no type, cache or publication authority.
+Unification caller counters attribute its type pairs and resolver work, including
+projection-bearing stores. They preserve the original normalization path and do
+not establish a CPU share or reusable inference result.
 
 Recursive normalization receipts retain the cursor, depth and exact type/row
 epochs; changing the depth limit invalidates them. Closing receipts also retain
