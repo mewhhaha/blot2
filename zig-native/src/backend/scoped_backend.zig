@@ -2033,7 +2033,7 @@ const Generator = struct {
         // payload ABI. Bind both physical inputs and the rebuilt result schema.
         for (arguments) |argument| {
             if (!plainInlineValue(argument)) return null;
-            try self.readerLayoutEvidence(m, body.root, argument, &evidence, &keys);
+            try self.inlineLayoutEvidence(m, body.root, argument, &evidence, &keys);
         }
         try self.descriptorValueEvidence(m, body.root, result, &evidence, &keys, &remaining, 0);
         try self.readerLayoutEvidence(m, body.root, result, &evidence, &keys);
@@ -2872,10 +2872,21 @@ const Generator = struct {
         }
     }
     fn readerLayoutEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
+        return self.callLayoutEvidence(m, id, value, evidence, keys, true);
+    }
+    fn inlineLayoutEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
+        std.debug.assert(plainInlineValue(value));
+        return self.callLayoutEvidence(m, id, value, evidence, keys, false);
+    }
+    fn callLayoutEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), keys: *selected_types.Builder, refinements: bool) Error!void {
         const remaining = keys.remaining;
         if (remaining.* == 0 or value.name.len >= remaining.*) return self.fail(m, id, .storage_unsupported, "The static callback capture schema exceeds its supported bound");
         remaining.* -= 1;
-        try evidence.appendSlice(self.allocator, &.{ @backingInt(value.tag), @backingInt(value.mode), @intFromBool(value.sequence), @intFromBool(value.floating), @intCast(value.fields.len), @intCast(value.variant_tags.len), @intCast(value.name.len), if (value.variant_index) |selected| @intCast(selected) else std.math.maxInt(u32) });
+        var selected_variant: u32 = std.math.maxInt(u32);
+        if (refinements) if (value.variant_index) |selected| {
+            selected_variant = @intCast(selected);
+        };
+        try evidence.appendSlice(self.allocator, &.{ @backingInt(value.tag), @backingInt(value.mode), @intFromBool(value.sequence), @intFromBool(value.floating), @intCast(value.fields.len), @intCast(value.variant_tags.len), @intCast(value.name.len), selected_variant });
         for (value.name) |byte| {
             try evidence.append(self.allocator, byte);
             remaining.* -= 1;
@@ -2891,9 +2902,11 @@ const Generator = struct {
             for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty, .environment = callable.types }, evidence, keys, 0);
         }
         try evidence.appendSlice(self.allocator, value.variant_tags);
-        try evidence.append(self.allocator, @intCast(value.variant_possible.len));
-        for (value.variant_possible) |possible| try evidence.append(self.allocator, @intFromBool(possible));
-        for (value.fields) |field| try self.readerLayoutEvidence(m, id, field, evidence, keys);
+        var possible_count: usize = 0;
+        if (refinements) possible_count = value.variant_possible.len;
+        try evidence.append(self.allocator, @intCast(possible_count));
+        for (value.variant_possible[0..possible_count]) |possible| try evidence.append(self.allocator, @intFromBool(possible));
+        for (value.fields) |field| try self.callLayoutEvidence(m, id, field, evidence, keys, refinements);
     }
     fn readerReads(self: *Generator, m: *const core.Module, id: core.Id, value: Value) Error!void {
         if (value.tag == .aggregate or value.tag == .callable) {
@@ -3845,7 +3858,7 @@ const Generator = struct {
         if (arguments.len > parameters.len) {
             if (depth > 128) return self.unsupported(m, body.root);
             var function = try self.invoke(target, arguments[0..parameters.len], depth + 1);
-            for (arguments[parameters.len..]) |argument| function = try self.applyUse(m, body.root, function, argument, depth + 1, false);
+            for (arguments[parameters.len..]) |argument| function = try self.applyUse(m, body.root, function, argument, depth + 1, .{ .checked = false });
             return function;
         }
         for (parameters, arguments) |parameter, value| {
@@ -3908,58 +3921,124 @@ const Generator = struct {
         }
         return result;
     }
-    fn reusableClosure(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value) Error!?Value {
-        if (function.demand != null or argument.tag != .scalar or argument.demand != null) return null;
-        var descriptor = false;
-        var words: usize = 1;
-        for (function.fields) |capture| {
-            if (capture.demand != null or capture.host != null) return null;
-            switch (capture.tag) {
-                .scalar => {},
-                .array, .ref, .link, .view => {
-                    const capture_root = capture.root orelse return null;
-                    if (!plainShape(self.roots.items[capture_root].element)) return null;
-                    for (capture.other_roots) |other| if (!plainShape(self.roots.items[other].element)) return null;
-                    descriptor = true;
-                },
-                else => return null,
-            }
-            words = std.math.add(usize, words, readerWords(capture)) catch return null;
+    fn closureEvidence(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, result: Value, evidence: *std.ArrayList(u32)) Error!bool {
+        const before = evidence.items.len;
+        const diagnostic_before = self.diagnostic;
+        self.closureEvidenceInner(m, id, function, argument, result, evidence) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            evidence.shrinkRetainingCapacity(before);
+            self.diagnostic = diagnostic_before;
+            return false;
+        };
+        return true;
+    }
+    fn closureEvidenceInner(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, result: Value, evidence: *std.ArrayList(u32)) Error!void {
+        const callable = function.callable.?;
+        const owner = try self.unit(callable.unit);
+        const closure = owner.closure(callable.node);
+        if (callable.goals.len != 0 or closure.qualifier != 0 or !plainInlineValue(result) or !stableDescriptorShape(result)) return error.Declined;
+        var remaining: usize = 4096;
+        var work: usize = 4096;
+        var keys = selected_types.Builder.init(self.allocator, &work, .{});
+        defer keys.deinit();
+        try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 7, callable.node, @intCast(function.fields.len) });
+        try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = closure.function_type }, evidence, &keys, &remaining);
+        for (callable.captures, function.fields) |binding, capture| {
+            try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, evidence, &keys, &remaining);
+            try self.descriptorValueEvidence(m, id, capture, evidence, &keys, &remaining, 0);
+            if (plainInlineValue(capture)) try self.inlineLayoutEvidence(m, id, capture, evidence, &keys) else try self.readerLayoutEvidence(m, id, capture, evidence, &keys);
         }
-        if (words > std.math.maxInt(u32)) return null;
+        try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, evidence, &keys, &remaining);
+        try self.descriptorValueEvidence(m, id, argument, evidence, &keys, &remaining, 0);
+        if (plainInlineValue(argument)) try self.inlineLayoutEvidence(m, id, argument, evidence, &keys) else try self.readerLayoutEvidence(m, id, argument, evidence, &keys);
+        try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, evidence, &keys, &remaining);
+        try self.descriptorValueEvidence(m, id, result, evidence, &keys, &remaining, 0);
+        try self.readerLayoutEvidence(m, id, result, evidence, &keys);
+        try self.finishSelectedTypes(m, id, evidence, &keys);
+    }
+    fn reusableClosure(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, checked_use: bool) Error!?Value {
+        if (function.demand != null) return null;
         const callable = function.callable.?;
         const owner = try self.unit(callable.unit);
         const closure = owner.closure(callable.node);
         var remaining: usize = 100_000;
-        if (descriptor) {
-            if (!call_plan.readerBody(owner, closure.body, &remaining, 0)) return null;
-        } else if (!call_plan.scalarBody(owner, closure.body, &remaining, 0)) return null;
-        const result_type = owner.typeOf(closure.body);
-        if (result_type != T.unit and result_type != T.boolean and result_type != T.u32_type and result_type != T.f32_type) return null;
+        if (!try self.selectedDataType(.{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, true, &remaining, 0)) return null;
+        var result_shape = try self.shape(owner, closure.body, owner.typeOf(closure.body), 0);
+        if (!plainInlineValue(result_shape)) return null;
+        const aggregate_result = result_shape.tag == .aggregate;
+        if (aggregate_result and self.destination != null) return null;
+        var descriptor = false;
+        if (!self.readerArgument(argument, &descriptor, &remaining)) return null;
+        var words = readerWords(argument);
+        for (function.fields) |capture| {
+            if (!self.readerArgument(capture, &descriptor, &remaining)) return null;
+            words = std.math.add(usize, words, readerWords(capture)) catch return null;
+        }
+        const parameter_count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return null;
+        if (parameter_count > std.math.maxInt(u32)) return null;
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
-        try evidence.appendSlice(self.allocator, &.{ callable.node, result_type, @intFromBool(argument.floating) });
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (callable.captures, function.fields) |binding, capture| {
-            try evidence.appendSlice(self.allocator, &.{ @backingInt(capture.tag), @backingInt(capture.mode), @intFromBool(capture.sequence), @intFromBool(capture.floating) });
-            try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &evidence, &type_key, 0);
-            if (capture.tag != .scalar) try self.registerShapeRead(capture);
+        var shared = try self.closureEvidence(m, id, function, argument, result_shape, &evidence);
+        if (!shared) {
+            // Qualified and abstract callbacks keep their invocation-local path.
+            if (!self.specialize or !checked_use or aggregate_result or argument.tag != .scalar) return null;
+            const raw_result = owner.typeOf(closure.body);
+            if (raw_result != T.unit and raw_result != T.boolean and raw_result != T.u32_type and raw_result != T.f32_type) return null;
+            for (function.fields) |capture| switch (capture.tag) {
+                .scalar, .array, .ref, .link, .view => {},
+                else => return null,
+            };
+            try evidence.appendSlice(self.allocator, &.{ callable.node, owner.typeOf(closure.body), @intFromBool(argument.floating) });
+            var work: usize = 4096;
+            var keys = selected_types.Builder.init(self.allocator, &work, .{});
+            defer keys.deinit();
+            for (callable.captures, function.fields) |binding, capture| {
+                try self.readerLayoutEvidence(m, id, capture, &evidence, &keys);
+                try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &evidence, &keys, 0);
+            }
+            try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &evidence, &keys, 0);
+            try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, &evidence, &keys, 0);
+            try self.finishSelectedTypes(m, id, &evidence, &keys);
         }
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &evidence, &type_key, 0);
-        try self.selectedType(m, id, .{ .unit = owner.unit, .ty = result_type }, &evidence, &type_key, 0);
-        try self.finishSelectedTypes(m, id, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = owner.unit, .binding = 0, .context = self.invocationContext(), .evidence = evidence.items };
-        const index = if (self.calls.find(key)) |found| found else blk: {
-            const signature = try self.allocator.alloc(wasm.ValueType, words);
+        var cache = &self.calls;
+        if (shared) cache = self.shared_calls;
+        var key: call_plan.Key = .{ .unit = owner.unit, .binding = 0, .context = self.invocationContext(), .evidence = evidence.items };
+        var existing = cache.find(key);
+        if (existing == null) {
+            if (!shared) {
+                if (descriptor) {
+                    if (!call_plan.readerBody(owner, closure.body, &remaining, 0)) return null;
+                } else if (!call_plan.scalarBody(owner, closure.body, &remaining, 0)) return null;
+            } else if (!call_plan.readerBody(owner, closure.body, &remaining, 0)) {
+                const planning_before = self.planning_writer;
+                self.planning_writer = false;
+                defer self.planning_writer = planning_before;
+                var active: [128]core.BindingRef = undefined;
+                if (!try self.plannedCallback(function, argument, &remaining, &active, 0, 0)) return null;
+            }
+            // Admission borrows a restored instance. Rebuild the exact shared
+            // key and caller-owned shape after that temporary context is gone.
+            if (shared) {
+                evidence.clearRetainingCapacity();
+                result_shape = try self.shape(owner, closure.body, owner.typeOf(closure.body), 0);
+                shared = try self.closureEvidence(m, id, function, argument, result_shape, &evidence);
+                if (!shared) return null;
+                key.evidence = evidence.items;
+                existing = cache.find(key);
+            }
+        }
+        for (function.fields) |capture| try self.readerReads(m, id, capture);
+        try self.readerReads(m, id, argument);
+        if (existing != null) self.emission_work.scoped_closure_cache_hits +|= 1;
+        const index = if (existing) |found| found else blk: {
+            const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
             defer self.allocator.free(signature);
             @memset(signature, .i32);
             const target = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => return self.unsupported(m, id),
             };
-            const inserted = try self.calls.insert(key, target, result_type == T.f32_type);
+            const inserted = try cache.insert(key, target, result_shape.floating);
             var child: Generator = .{
                 .allocator = self.allocator,
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
@@ -3992,36 +4071,54 @@ const Generator = struct {
             var input = function;
             input.fields = try child.arena.allocator().alloc(Value, function.fields.len);
             var next: u32 = 0;
-            for (input.fields, function.fields) |*capture, original| try self.readerParameter(&child, capture, original, &next);
-            const output = child.apply(m, id, input, .{ .word = .{ .id = next }, .floating = argument.floating }, 0) catch |err| {
+            for (input.fields, function.fields) |*capture, original| {
+                if (shared and plainInlineValue(original)) capture.* = try child.inlineParameter(original, &next) else try self.readerParameter(&child, capture, original, &next);
+            }
+            var input_argument: Value = undefined;
+            if (shared and plainInlineValue(argument)) input_argument = try child.inlineParameter(argument, &next) else try self.readerParameter(&child, &input_argument, argument, &next);
+            const output = child.applyUse(m, id, input, input_argument, 0, .{ .checked = false, .reuse = false }) catch |err| {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
-            try child.c.value(try child.scalar(m, id, output));
-            self.calls.entries.items[inserted].building = false;
+            if (aggregate_result) {
+                if (!output.terminated and !plainReaderResultABI(output, result_shape)) return self.fail(m, id, .storage_unsupported, "Shared callback output differs from its checked layout");
+                try child.storeValue(.{ .id = next }, 0, output);
+                try child.c.value(0);
+            } else try child.c.value(try child.scalar(m, id, output));
+            cache.entries.items[inserted].building = false;
+            self.emission_work.scoped_closure_definitions +|= 1;
             break :blk inserted;
         };
-        const entry = self.calls.entries.items[index];
+        const entry = cache.entries.items[index];
         if (entry.building) return self.fail(m, id, .storage_unsupported, "Recursive callback specialization is not admitted");
-        for (function.fields) |capture| {
-            try self.c.value(capture.word);
-            if (capture.tag == .scalar) continue;
-            try self.c.value(capture.token);
-            try self.c.value(capture.epoch_low);
-            try self.c.value(capture.epoch_high);
-            if (capture.tag != .array) try self.c.value(capture.index);
-            if (capture.tag == .view) try self.c.value(capture.length);
+        const first_root = self.roots.items.len;
+        const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
+        var address: ?Local = null;
+        if (aggregate_result) {
+            const slot = try self.arrayWithShape(m, id, (try self.constant(1)).word, .fixed, result_shape);
+            address = try self.c.temp();
+            try self.c.set(address.?, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
         }
-        try self.c.value(argument.word);
+        for (function.fields) |capture| try self.readerValues(capture);
+        try self.readerValues(argument);
+        if (address) |pointer| try self.c.value(pointer);
         try self.c.op(.call, entry.function);
         const word = try self.c.temp();
         try self.c.op(.local_set, word.id);
-        return .{ .word = word, .floating = entry.floating, .type_evidence = .{ .root = .{ .unit = owner.unit, .ty = result_type }, .arguments = &.{} } };
+        var result = Value{ .word = word, .floating = entry.floating };
+        if (address) |pointer| result = try self.loadValue(pointer, 0, result_shape);
+        if (mark) |saved| {
+            try self.release(first_root, null);
+            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
+        }
+        result.type_evidence = .{ .root = .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, .arguments = try self.captureTypes() };
+        return result;
     }
     fn apply(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, depth: usize) Error!Value {
-        return self.applyUse(m, id, function, argument, depth, true);
+        return self.applyUse(m, id, function, argument, depth, .{});
     }
-    fn applyUse(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, depth: usize, checked_use: bool) Error!Value {
+    const ApplyOptions = struct { checked: bool = true, reuse: bool = true };
+    fn applyUse(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, depth: usize, options: ApplyOptions) Error!Value {
         if (function.host != null) return self.hostCall(m, id, function, argument);
         const callable = function.callable orelse return self.fail(m, id, .storage_unsupported, "A callback must have a statically known function body");
         const types_before = self.type_arguments.items.len;
@@ -4029,13 +4126,13 @@ const Generator = struct {
         // Resolve the caller's current instance before entering the captured
         // environment. Static inference IDs can be shared by distinct active
         // instantiations; a capture must not rewrite the checked use's result.
-        const use_input: ?TypeRef = if (checked_use and m.node(id).tag == .apply) try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(m.node(id).b) }, 0) else null;
-        const use_output: ?TypeRef = if (checked_use and m.node(id).tag == .apply) try self.resolveType(.{ .unit = m.unit, .ty = m.node(id).ty }, 0) else null;
+        const use_input: ?TypeRef = if (options.checked and m.node(id).tag == .apply) try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(m.node(id).b) }, 0) else null;
+        const use_output: ?TypeRef = if (options.checked and m.node(id).tag == .apply) try self.resolveType(.{ .unit = m.unit, .ty = m.node(id).ty }, 0) else null;
         try self.restoreTypes(callable.types);
         // A partial application may have been captured before its remaining
         // generic inputs were known. The checked use owns the final instance;
         // refine after restoring the capture's earlier type environment.
-        if (checked_use and m.node(id).tag == .apply) {
+        if (options.checked and m.node(id).tag == .apply) {
             const owner = try self.unit(callable.unit);
             var signature = if (callable.node == 0) owner.binding(callable.target).ty else owner.closure(callable.node).function_type;
             var skipped: usize = 0;
@@ -4089,7 +4186,7 @@ const Generator = struct {
         try self.finishSelectedTypes(m, id, &selected, &type_key);
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, id, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, id, .storage_unsupported, "Selected calls exceeded their active call bound");
-        if (self.specialize and checked_use) if (try self.reusableClosure(m, id, function, argument)) |value| return value;
+        if (options.reuse) if (try self.reusableClosure(m, id, function, argument, options.checked)) |value| return value;
         if (!try self.active_calls.enter(selected_target, selected.items)) return self.fail(m, id, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         defer self.active_calls.leave();
         const uses = @import("storage_liveness.zig").count(self.allocator, owner, closure.body) catch |err| {

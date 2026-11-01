@@ -42,11 +42,27 @@ Do not add that optimization or a fresh cache. A deeper type representation
 change needs to identify which changed children/rows force normalization copies.
 See [the rejected experiment and attribution](zig-native/measurements/type-structure-experiment-2026-11-01.json).
 
-The next backend batch targets exact typed-call sharing: erase only plain input
-facts already erased by the inline ABI, and treat closure captures as explicit
-parameters with caller-owned aggregate results. Descriptor ownership and
-initialization facts remain exact. Real Ink easing and literal-closure probes
-are bounded discriminators; no whole-game improvement is established yet.
+Literal closures now share exact typed definitions across parent generators.
+Captures and arguments travel as ordinary parameters; plain aggregate results
+use caller-owned scratch. The actual returned-closure Mat4 probe at eight sites
+shrinks **21,826 to 19,206 bytes**, with matched median **279 to 255 ms**. One
+site grows **403 bytes** from call/scratch overhead. Native laws require one
+closure definition reused inside two shared callback-reader parents.
+
+Plain inline keys now omit only constructor refinements erased by that ABI.
+Actual Ink easing over nine constructor states drops **10 to 2 definitions**,
+**76 to 68 functions** and **9,132 to 8,300 bytes**; compilation time is flat.
+Descriptor-reader/writer ownership and initialization facts remain exact.
+Qualified/goaled closures and pending array destinations retain conservative
+fallbacks. Six prior Ink controls are byte-identical, and Gdev language entries
+execute unchanged. See [typed-call evidence](zig-native/measurements/typed-call-sharing-2026-11-01.json).
+
+Ink/Gdev source rewrites are authorized. The first concrete candidate is
+`kites.draw`: append directly to the caller frame pool instead of constructing,
+freezing and copying a temporary draw array. Its original integration fixture
+still exceeds five seconds, so no game source change is installed. Robot
+accessory and crystal draw arrays have the same pattern; preserve draw order
+and qualify an actual original stream before changing them.
 
 Closed-row certificate paths now hash lazily, preserving exact receipt bytes,
 multiplicity and work limits. Native sparse paths require **2 hashes rather than
@@ -178,13 +194,13 @@ custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
 Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `b66a2a3e` compiles **2,771 native tests**; **427/428** broader sampled
-laws pass with the independently reproduced associated-partial baseline failure.
-All **42 affected guests** pass, including the new generic wide-structure/effects
-law, actual tier execution, sync/JSPI and retained edits. Its baseline also
-passes the new law. The earlier original Gdev language execution qualifies
-`5f12251f`, before diagnostic counters; current whole-main qualification remains
-pending. Zig lint reports zero findings across 571 source files.
+compiler `fca4f6a1` compiles **2,776 native tests**. All five focused typed-call
+laws pass in full fault mode, including allocation failures; **434/435** broader
+sampled laws pass with the independently reproduced associated-partial baseline
+failure. All **68 affected guests** pass, including mixed aggregate/callback
+schemas, descriptor aliases, read replay, both tiers, sync/JSPI and retained
+edits. Original Gdev language entries pass six entries/11 assertions per mode;
+the same 25,651-byte output remains. Zig lint has zero findings across 572 files.
 
 Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
 `HOME`, enabling disk-cache contamination between retained and supposedly fresh

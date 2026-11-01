@@ -126,6 +126,16 @@ The complete execution policy remains part of retained whole-output identity.
 
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
+Exact typed literal-closure definitions may be shared across generators when
+signature, capture and result evidence is complete and read-only admission
+succeeds. Runtime captures/arguments are parameters; plain aggregate results
+travel through caller-owned scratch loaded before release/rewind. Caller
+refinement and definition reuse are independent. Each use replays descriptor
+reads into enclosing loops and writers. Qualified/goaled closures keep the
+checked scalar leaf fallback; pending array destinations still decline aggregate
+scratch calls. Plain inline keys omit only variant refinements erased by their
+parameter ABI; descriptor ownership/initialization evidence remains exact.
+
 Normalization work counters record recursive entries and inclusive node growth
 under import, substitution, resolution and covariance operations. Nested counts
 can overlap and are not exclusive CPU timings. View and binder counters include

@@ -10,6 +10,7 @@ test {
     _ = @import("scoped_opaque_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");
+    _ = @import("storage_typed_closure_tests.zig");
 }
 fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 512 } });

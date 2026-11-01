@@ -14,6 +14,9 @@ Selected-address loads remove wide-row amplification in
 [actual render settings](../zig-native/measurements/selected-field-loads-2026-11-01.json).
 Owned assembly now honors tier, worker and sharing controls and reports
 [actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
+[Typed call sharing](../zig-native/measurements/typed-call-sharing-2026-11-01.json)
+now covers literal closures across shared parents and canonical plain input keys.
+Real closure/easing probes shrink; whole-game completion remains pending.
 A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
 observes source type instantiation before assembly; it is not a completed build.
 The [type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
