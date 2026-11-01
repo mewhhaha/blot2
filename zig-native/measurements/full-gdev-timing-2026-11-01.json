@@ -1,0 +1,479 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "9b1e087e7fb972baf5a831f00b63a462189dd084",
+  "request": "Find current full Gdev compile time rather than tiny-export producer time.",
+  "status": "incomplete_after_explicit_five_minute_full_measurement",
+  "conclusion": {
+    "full_compile_lower_bound_seconds": 300,
+    "full_compile_completion_seconds": null,
+    "completed": false,
+    "current_game_artifact": false,
+    "sampled_peak_rss_mib": 2306.5,
+    "native_cpu_seconds_last_sample": 303.1,
+    "average_cpu_cores_after_first_sample": 0.9926055721044331,
+    "traced_frontend_to_backend_seconds": 9.018733,
+    "traced_owned_emit_begin_seconds": 9.426042,
+    "observed_emit_still_active_at_seconds": 30,
+    "interpretation": "The6.89-7.15sproducer benchmark never measured game emission. Main is still far above the intended compilation budget. The30strace demonstrates a long synchronous owned.emit window; the long run does not identify internal phase transitions after30s."
+  },
+  "pins": {
+    "compiler_sha256": "9361e106166f176af04571858bade512d5a3883a59c7a16a06344366368412dd",
+    "compiler_identity": "af4bc166b1843c191ddb0cba2da3258ceb943b4b664900c58db9595e2c6345fa",
+    "entry": "/home/jacobt/src/gdev/src/main.blot",
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e",
+    "gdev_commit": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "backend_source_sha256": "9c82712072291041aff89572652a574ff1a76f1cc67d8417c7dea4bb317ad8a6",
+    "runner": {
+      "path": "scripts/storage_handoff/build_gdev.ts",
+      "sha256": "147ec2075650f1d23a1f004dc2544a63de59bd0ca31d1f1b8e29e3967585c2f4"
+    }
+  },
+  "toolchain": "Existing Zig0.17.0 safe/noLLVM compiler; optimized guest; four frontend and four codegen workers; fresh session, disk cache disabled. Not an LLVM release timing.",
+  "attempts": [
+    {
+      "raw": {
+        "path": "build/bench/gdev-total-time/unprofiled-30s/main-cf34aa0575b951f7/result.json",
+        "sha256": "c4b35a0d94ae4dfa3aba6a3f6c1860c6e0ccbeb0548a92c1761fad6ce7263ae1"
+      },
+      "deadline_ms": 30000,
+      "observed_abort_ms": 30002.882832,
+      "profile_backend": false,
+      "profile_trace": false,
+      "status": "timeout_incomplete"
+    },
+    {
+      "raw": {
+        "path": "build/bench/gdev-total-time/traced-30s/main-f0c664f20f0f6171/result.json",
+        "sha256": "125fc2a42943e63c5ac287315481d56e9dea70bc9b1a537b1471dc30998ba1d1"
+      },
+      "deadline_ms": 30000,
+      "observed_abort_ms": 30002.245078999997,
+      "profile_backend": true,
+      "profile_trace": true,
+      "status": "timeout_incomplete",
+      "trace_checkpoint": {
+        "kind": "phases",
+        "build": 2,
+        "space": "source",
+        "active": "backend",
+        "phase_us": [
+          38364,
+          294618,
+          1090,
+          57474,
+          448176,
+          288093,
+          5410632,
+          1128397,
+          444395,
+          907432,
+          0
+        ],
+        "at_us": 9018733
+      },
+      "active_regions": [
+        {
+          "kind": "begin",
+          "build": 2,
+          "space": "core",
+          "id": 6491,
+          "thread": 2267718,
+          "stage": "owned.emit",
+          "unit": 264,
+          "start": 0,
+          "end": 0,
+          "at_us": 9426042,
+          "filename": "/home/jacobt/src/gdev/src/main.blot"
+        }
+      ],
+      "completed_source_module_timings": 263,
+      "slow_regions": [
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 6454,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 241,
+          "start": 0,
+          "end": 22439,
+          "at_us": 6417118,
+          "us": 962829,
+          "cpu_us": 931969,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/game.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 6477,
+          "thread": 2267718,
+          "stage": "check.declaration",
+          "unit": 241,
+          "start": 14311,
+          "end": 21247,
+          "at_us": 6299168,
+          "us": 751386,
+          "cpu_us": 725995,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/game.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 5316,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 138,
+          "start": 0,
+          "end": 129432,
+          "at_us": 3875956,
+          "us": 436424,
+          "cpu_us": 431013,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/actors/robots.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 6406,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 3,
+          "start": 0,
+          "end": 64541,
+          "at_us": 5387322,
+          "us": 435533,
+          "cpu_us": 421463,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/world_storage.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 5928,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 185,
+          "start": 0,
+          "end": 84171,
+          "at_us": 4552163,
+          "us": 430157,
+          "cpu_us": 415300,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/ui/station.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "core",
+          "id": 6489,
+          "thread": 2267718,
+          "stage": "owned.validate-core",
+          "unit": 264,
+          "start": 0,
+          "end": 0,
+          "at_us": 9425731,
+          "us": 406077,
+          "cpu_us": 396263,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/main.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 4290,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 114,
+          "start": 0,
+          "end": 86758,
+          "at_us": 2860771,
+          "us": 330247,
+          "cpu_us": 326501,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/gdev/src/world/salt.blot"
+        },
+        {
+          "kind": "end",
+          "build": 2,
+          "space": "source",
+          "id": 3417,
+          "thread": 2267718,
+          "stage": "check.module",
+          "unit": 108,
+          "start": 0,
+          "end": 58676,
+          "at_us": 2239664,
+          "us": 204731,
+          "cpu_us": 200412,
+          "input_items": 0,
+          "output_items": 0,
+          "filename": "/home/jacobt/src/ink/lib/editor.blot"
+        }
+      ]
+    },
+    {
+      "raw": {
+        "path": "build/bench/gdev-total-time/full-measurement/run/main-caec4353a7b0efac/result.json",
+        "sha256": "958173990b272adca47bbb80a0fdc22ab36fdd0f925e7de35e4a47c7cfe3e95c"
+      },
+      "deadline_ms": 300000,
+      "observed_abort_ms": 300073.322751,
+      "profile_backend": false,
+      "profile_trace": false,
+      "full_timing_measurement": true,
+      "status": "timeout_incomplete",
+      "process_monitor": {
+        "path": "build/bench/gdev-total-time/full-measurement/monitor.json",
+        "sha256": "e5c97b1bc7b5ea057e515f779a533d9d930ee821aac8da208b27402589616a1b"
+      },
+      "process_samples": {
+        "path": "build/bench/gdev-total-time/full-measurement/process.jsonl",
+        "sha256": "bb595dee3385b584dcc5aca7617fbef29a6212bdb273ab2ad002baa939678a19"
+      },
+      "last_sample": {
+        "elapsed_s": 300.37,
+        "pid": 2270551,
+        "cpu_s": 303.1,
+        "rss_mib": 2306.5,
+        "threads": 5
+      },
+      "monitor_memory_guard_mib": 4096,
+      "monitor_outer_deadline_seconds": 310,
+      "monitor_stop_reason": null
+    }
+  ],
+  "process_samples": [
+    {
+      "elapsed_s": 15.02,
+      "pid": 2270551,
+      "cpu_s": 19.86,
+      "rss_mib": 483.7,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 30.03,
+      "pid": 2270551,
+      "cpu_s": 34.73,
+      "rss_mib": 508.1,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 45.05,
+      "pid": 2270551,
+      "cpu_s": 49.65,
+      "rss_mib": 516.3,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 60.07,
+      "pid": 2270551,
+      "cpu_s": 64.54,
+      "rss_mib": 559.9,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 75.09,
+      "pid": 2270551,
+      "cpu_s": 79.42,
+      "rss_mib": 582.3,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 90.12,
+      "pid": 2270551,
+      "cpu_s": 94.33,
+      "rss_mib": 612.3,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 105.15,
+      "pid": 2270551,
+      "cpu_s": 109.22,
+      "rss_mib": 722.1,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 120.17,
+      "pid": 2270551,
+      "cpu_s": 124.14,
+      "rss_mib": 848.8,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 135.18,
+      "pid": 2270551,
+      "cpu_s": 139.05,
+      "rss_mib": 985.5,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 150.2,
+      "pid": 2270551,
+      "cpu_s": 153.97,
+      "rss_mib": 1110.1,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 165.22,
+      "pid": 2270551,
+      "cpu_s": 168.9,
+      "rss_mib": 1240.2,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 180.23,
+      "pid": 2270551,
+      "cpu_s": 183.83,
+      "rss_mib": 1323.6,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 195.25,
+      "pid": 2270551,
+      "cpu_s": 198.74,
+      "rss_mib": 1407.5,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 210.28,
+      "pid": 2270551,
+      "cpu_s": 213.66,
+      "rss_mib": 1530.1,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 225.29,
+      "pid": 2270551,
+      "cpu_s": 228.56,
+      "rss_mib": 1670.0,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 240.31,
+      "pid": 2270551,
+      "cpu_s": 243.32,
+      "rss_mib": 1781.6,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 255.33,
+      "pid": 2270551,
+      "cpu_s": 258.27,
+      "rss_mib": 1915.5,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 270.34,
+      "pid": 2270551,
+      "cpu_s": 273.19,
+      "rss_mib": 2051.5,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 285.36,
+      "pid": 2270551,
+      "cpu_s": 288.15,
+      "rss_mib": 2182.9,
+      "threads": 5
+    },
+    {
+      "elapsed_s": 300.37,
+      "pid": 2270551,
+      "cpu_s": 303.1,
+      "rss_mib": 2306.5,
+      "threads": 5
+    }
+  ],
+  "backend_boundary_review": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "facts": [
+      "owned.emit calls one synchronous Generator.emit; options.workers reaches only later module.assembleWithOptions. More codegen workers cannot accelerate the observed emission window.",
+      "owned.emit includes call-proof preparation, type/field refinement, attempted scalar/inline/reader/writer sharing, fallback caller-body expansion and inline outline extraction. owned.outline later names only finalization.",
+      "The500kexpression allowance is per export/reusable child with outlining credits, not a whole-compilation wall-time/expression cap.",
+      "No periodic emission-counter heartbeat currently exists. Completion counters are unavailable when this build is aborted."
+    ],
+    "limits": [
+      "The review identifies possible hot work, not sampled CPU attribution.",
+      "No late-stage trace exists for the unprofiled300secondrun. Do not claim all300seconds were spent in owned.emit, or that assembly never began.",
+      "No historical47.4MB/2188second result is current evidence."
+    ]
+  },
+  "runner_change": {
+    "default_deadline_ms": 5000,
+    "ordinary_max_deadline_ms": 30000,
+    "explicit_full_measurement_option": "--measure-total",
+    "full_measurement_max_deadline_ms": 300000,
+    "reason": "Latest user expressly requested the actual whole-game measurement after repeated short-budget results. Allow a single finite measurement while preserving normal iteration caps.",
+    "validation": [
+      "deno check --no-config --no-lock scripts/storage_handoff/build_gdev.ts",
+      "Normal --timeout-ms30001 rejects before compilation.",
+      "--measure-total --timeout-ms300001 rejects before compilation.",
+      "The actual --measure-total --timeout-ms300000 run reaches its deadline and disposes the compiler."
+    ],
+    "guard_logs": [
+      {
+        "path": "build/bench/gdev-total-time/invalid-budget-0.log",
+        "sha256": "b684105eeadafab8f49866f29cddd1d7e5e90674f617c89e133e8fb55bd2bfcd"
+      },
+      {
+        "path": "build/bench/gdev-total-time/invalid-budget-1.log",
+        "sha256": "95609895e41e8b4476e570d51aac3c96bdcfc425a18fca1dda499f9d7f74c196"
+      }
+    ]
+  },
+  "commands": {
+    "unprofiled_30s": "deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 30000 --workers 4 --frontend-workers 4 build/bench/gdev-total-time/unprofiled-30s",
+    "traced_30s": "Same with --trace and output traced-30s; diagnostic timing only.",
+    "full_measurement": [
+      "deno",
+      "run",
+      "--no-config",
+      "--no-lock",
+      "-A",
+      "scripts/storage_handoff/build_gdev.ts",
+      "--compiler",
+      "zig-native/zig-out-dev/bin/blotc",
+      "--timeout-ms",
+      "300000",
+      "--measure-total",
+      "--workers",
+      "4",
+      "--frontend-workers",
+      "4",
+      "build/bench/gdev-total-time/full-measurement/run"
+    ]
+  },
+  "qualification": {
+    "compiler_semantic_changes": false,
+    "compiler_and_source_pins_match": true,
+    "current_whole_game_execution_or_frame": false,
+    "new_full_gate_claim": false,
+    "existing_full_gate": "9361compiler remains the previous checked24native/11guest/seven kite-stream candidate; known48passed/one List/chunk failure. This batch changes only the timing runner and evidence/documentation."
+  },
+  "next_priority": "Measure hot call admission/refinement, fallback expansion and inline outlining on the real owned.emit path; stop using a tiny identity export as a whole-game throughput proxy. Do not repeat this long measurement unchanged.",
+  "limitations": [
+    "Only a lower bound is established; the exact full compile time remains unknown.",
+    "The five-minute run is unprofiled except low-frequency external CPU/RSS monitoring; monitor wall includes Deno startup and polling separately from buildMs.",
+    "Sampled memory is not exact peak RSS; clock/tick resolution and15second sampling limit precision.",
+    "The30secondtrace is instrumented and not an exact unprofiled frontend timing; backend phase_us=0 denotes an active uncompleted phase, not zero backend work.",
+    "No new current game Wasm size, validation or PNG exists. ABI8/session2/schema26 unchanged."
+  ]
+}

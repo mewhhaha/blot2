@@ -13,6 +13,7 @@ const { values, positionals } = parseArgs({
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },
     "frontend-workers": { type: "string", default: "4" },
+    "measure-total": { type: "boolean", default: false },
   },
 });
 if (values.tier !== "development" && values.tier !== "optimized") {
@@ -34,8 +35,10 @@ if (positionals.length > 1) {
   throw new Error("Expected at most one output directory");
 }
 const timeoutMs = Number(values["timeout-ms"]);
-if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
-  throw new Error("--timeout-ms must be an integer from 100 to 30000");
+let maximumMs = 30_000;
+if (values["measure-total"]) maximumMs = 300_000;
+if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > maximumMs) {
+  throw new Error(`--timeout-ms must be an integer from 100 to ${maximumMs}`);
 }
 
 const parent = resolve(parentArg);
@@ -144,6 +147,7 @@ const output = {
     penJsonSha256: await sha256(penBytes),
   },
   deadlineMs: timeoutMs,
+  fullTimingMeasurement: values["measure-total"],
   codegenTier: values.tier,
   codegenWorkers: workers,
   frontendWorkers,

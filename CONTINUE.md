@@ -6,6 +6,18 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+An owner-requested full timing run now establishes **Gdev main exceeds five
+minutes**, not seven seconds. The unprofiled `9361e10` build was aborted at
+300.07 seconds, with about 2.25 GiB sampled resident memory and roughly one CPU
+core after the frontend. It produced no current game artifact; exact completion
+time and size remain unknown. A separate 30-second trace reaches the backend at
+9.02 seconds and enters `owned.emit` at 9.43 seconds, still active at timeout.
+That window is synchronous emission, including call admission/refinement,
+expansion and inline outlining; codegen workers apply only to later assembly.
+The long unprofiled run has no internal phase trace after that boundary. Target
+full-game backend work before extrapolating tiny-export producer improvements.
+See [the full-game timing evidence](zig-native/measurements/full-gdev-timing-2026-11-01.json).
+
 Ready checker jobs now start largest syntax units first, while preparation,
 budgets, diagnostics and publication keep their original order. Three matched
 unprofiled four-worker pairs improve total World-producer compilation **7.46 to
@@ -28,8 +40,8 @@ Compiler `9361e10` compiles 2,790 native laws. The current family passes **24
 selected native laws**, all with full allocation-failure mode, **11 guests** and
 zero Zig lint findings. Seven original kite scenarios retain identical complete
 streams and Wasm bytes. The required full gate remains **48 passed/one baseline
-List/chunk storage_escape** at bytes 312..345. Actual unprofiled Gdev main still
-exceeds its **five-second deadline**; total whole-game compile time, size, frame
+List/chunk storage_escape** at bytes 312..345. Actual unprofiled Gdev main now
+exceeds the explicit **five-minute measurement**; total completion time, size, frame
 and release qualification remain unknown/pending. See
 [the concurrency and total-time evidence](zig-native/measurements/concurrency-and-total-time-2026-11-01.json).
 
@@ -460,7 +472,10 @@ python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 
 Use `--entry tests/language_compatibility.blot` for the small real fixture and
 `--profile` for completed-build phase attribution. The diagnostic accepts at
-most 30 seconds; a timeout remains incomplete. Defer the Pen frame driver's
+most 30 seconds. Only an explicitly requested full timing measurement may use
+`--measure-total --timeout-ms 300000`; the default remains five seconds, and
+timeouts remain incomplete. Do not use this long allowance for iteration.
+Defer the Pen frame driver's
 regular application pipeline until bounded compilation is fast enough. The older
 PNG does not qualify a later compiler.
 
