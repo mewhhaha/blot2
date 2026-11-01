@@ -567,16 +567,7 @@ const Generator = struct {
         return @import("storage_layout.zig").bytes(value) catch error.Declined;
     }
     fn unionRoots(self: *Generator, target: *Value, value: Value) Error!void {
-        var roots: std.ArrayList(usize) = .empty;
-        defer roots.deinit(self.allocator);
-        for (self.roots.items, 0..) |_, index| {
-            if (target.root == index or value.root == index or std.mem.findScalar(usize, target.other_roots, index) != null or std.mem.findScalar(usize, value.other_roots, index) != null) try roots.append(self.allocator, index);
-        }
-        if (roots.items.len != 0) {
-            target.root = roots.items[0];
-            target.other_roots = try self.arena.allocator().dupe(usize, roots.items[1..]);
-        }
-        target.depth = @max(target.depth, value.depth);
+        return storage_plan.unionRootMetadata(self.allocator, self.arena.allocator(), self.roots.items.len, target, value);
     }
     fn storedShape(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, owner_depth: usize) Error!void {
         if (target.tag != value.tag or target.fields.len != value.fields.len or target.floating != value.floating) return self.unsupported(m, id);
@@ -922,9 +913,12 @@ const Generator = struct {
     }
     fn promote(self: *Generator, value: *Value, boundary: usize) void {
         if (value.tag == .array) {
-            for (self.roots.items, 0..) |*owner, index| if (hasRoot(value.*, index) and owner.depth >= boundary) {
-                owner.depth = boundary - 1;
-            };
+            var cursor: usize = 0;
+            while (storage_plan.nextRoot(value.*, cursor, self.roots.items.len)) |index| {
+                const owner = &self.roots.items[index];
+                if (owner.depth >= boundary) owner.depth = boundary - 1;
+                cursor = index + 1;
+            }
             value.depth = @min(value.depth, boundary - 1);
         }
         for (value.fields) |*field| self.promote(field, boundary);
@@ -938,13 +932,19 @@ const Generator = struct {
         if (value.tag == .ref or value.tag == .view or value.tag == .link) {
             if (value.root == null) {
                 if (value.depth >= boundary) return self.fail(m, id, .storage_escape, "A borrowed result would outlive its local value");
-            } else for (self.roots.items, 0..) |owner, index| {
-                if (hasRoot(value, index) and owner.depth >= boundary) return self.fail(m, id, .storage_escape, "A borrowed result would outlive its data-stack owner");
+            } else {
+                var cursor: usize = 0;
+                while (storage_plan.nextRoot(value, cursor, self.roots.items.len)) |index| {
+                    if (self.roots.items[index].depth >= boundary) return self.fail(m, id, .storage_escape, "A borrowed result would outlive its data-stack owner");
+                    cursor = index + 1;
+                }
             }
         } else if (value.tag == .array) {
-            for (self.roots.items, 0..) |owner, index| if (hasRoot(value, index)) {
-                try self.checkEscape(m, id, owner.element, boundary);
-            };
+            var cursor: usize = 0;
+            while (storage_plan.nextRoot(value, cursor, self.roots.items.len)) |index| {
+                try self.checkEscape(m, id, self.roots.items[index].element, boundary);
+                cursor = index + 1;
+            }
         }
         for (value.fields) |field| try self.checkEscape(m, id, field, boundary);
     }

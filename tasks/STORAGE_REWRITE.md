@@ -1,6 +1,10 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Sparse owner traversal](../zig-native/measurements/sparse-owned-roots-2026-11-02.json)
+replaces the latest measured emission bottleneck. The current pre-candidate LLVM
+compiler finishes the frontend in 1.03 seconds but exceeds 30 seconds on main;
+new optimized timing and whole-game output remain pending.
 [Closed source provenance and indexed type environments](../zig-native/measurements/source-completion-and-environments-2026-11-01.json)
 remove source-proof reconstruction from the late actual-main profile and replace
 repeated type-environment searches/copies. Main still exceeds 30 seconds with

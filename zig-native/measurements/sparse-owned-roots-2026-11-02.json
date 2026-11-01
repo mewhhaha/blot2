@@ -1,0 +1,234 @@
+{
+  "date": "2026-11-02",
+  "parent_commit": "f86548fd322159aff38dcd8f21a491f7b0bf71c3",
+  "scope": "Sparse direct-root unions and allocation-free recursive owner traversal. Full-main under-five-second target remains open.",
+  "compiler": {
+    "safe_candidate_sha256": "730bce4984fa5cae39a97c670585add0864c06bd9a4be9c28ca5e30ce852fe44",
+    "release_pre_candidate_sha256": "a31bb1f207ce46e8915a7b3d6da8dbdca02b04a33b148a9f3a30ac55f89680b6",
+    "zig": "0.17.0",
+    "release_source": "f86548fd322159aff38dcd8f21a491f7b0bf71c3",
+    "release_optimize": "fast",
+    "release_llvm": true,
+    "release_build_log": "/tmp/blot-source-env-release-build.log",
+    "release_build_summary": "5 minutes, MaxRSS4G, success"
+  },
+  "release_control": {
+    "unprofiled": "build/bench/gdev-source-env-release-first/main-e62c4b6dd0b7c110/result.json",
+    "status": "timeout_incomplete",
+    "deadline_ms": 30000,
+    "frontend_to_backend_ms": 1031.169,
+    "owned_emit_start_ms": 1077.157,
+    "output": null
+  },
+  "changes": [
+    "unionRoots collects valid direct IDs, sorts/deduplicates, preserves empty-union metadata and depth, and arena-owns the tail instead of scanning every owner.",
+    "promote/checkEscape enumerate ascending distinct roots through every field, including unselected variants; borrowed-root-null behavior and first-diagnostic order stay unchanged."
+  ],
+  "profiles": [
+    {
+      "path": "build/bench/gdev-release-late/main-9b0641d876043b22",
+      "coverage_ratio": 0.9831877953525642,
+      "top_compiler_owner": [
+        {
+          "name": "backend.scoped_backend.Generator.unionRoots",
+          "cpu_ms": 1231.224588,
+          "sampled_cpu_percent": 20.068560007048617
+        },
+        {
+          "name": "backend.scoped_backend.Generator.checkEscape",
+          "cpu_ms": 1192.010746,
+          "sampled_cpu_percent": 19.429387146992056
+        },
+        {
+          "name": "backend.scoped_backend.Generator.promote",
+          "cpu_ms": 627.93069,
+          "sampled_cpu_percent": 10.235065848548862
+        },
+        {
+          "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).latestNonidentity",
+          "cpu_ms": 574.910843,
+          "sampled_cpu_percent": 9.370859601001087
+        },
+        {
+          "name": "backend.storage_plan.hasRoot__func_10939",
+          "cpu_ms": 342.756015,
+          "sampled_cpu_percent": 5.586811473589867
+        },
+        {
+          "name": "backend.scoped_backend.Generator.shape",
+          "cpu_ms": 167.147529,
+          "sampled_cpu_percent": 2.724450314312923
+        }
+      ],
+      "first": {
+        "expressions": 332608,
+        "functions": 4803,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 157274,
+          "scoped_type_environment_capture_hits": 129365,
+          "scoped_type_environment_copied_bindings": 13107120
+        },
+        "type_bindings": 506
+      },
+      "last": {
+        "expressions": 477196,
+        "functions": 5694,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 243913,
+          "scoped_type_environment_capture_hits": 191243,
+          "scoped_type_environment_copied_bindings": 20854483
+        },
+        "type_bindings": 522
+      }
+    },
+    {
+      "path": "build/bench/gdev-env-stack-late/main-e3f82703c3258105",
+      "coverage_ratio": 0.9886725466981132,
+      "top_compiler_owner": [
+        {
+          "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).capture",
+          "cpu_ms": 1318.482267,
+          "sampled_cpu_percent": 20.968371503742237
+        },
+        {
+          "name": "backend.scoped_backend.Generator.unionRoots",
+          "cpu_ms": 789.612107,
+          "sampled_cpu_percent": 12.55752953060283
+        },
+        {
+          "name": "backend.scoped_backend.Generator.checkEscape",
+          "cpu_ms": 681.414072,
+          "sampled_cpu_percent": 10.836811208757622
+        },
+        {
+          "name": "backend.scoped_backend.Generator.shape",
+          "cpu_ms": 440.494278,
+          "sampled_cpu_percent": 7.005363589297868
+        },
+        {
+          "name": "backend.scoped_backend.Generator.promote",
+          "cpu_ms": 358.915858,
+          "sampled_cpu_percent": 5.707988068927433
+        },
+        {
+          "name": "backend.storage_type_key.Builder.enter",
+          "cpu_ms": 314.030095,
+          "sampled_cpu_percent": 4.994151123699161
+        }
+      ],
+      "first": {
+        "expressions": 54921,
+        "functions": 1179,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 11592,
+          "scoped_type_environment_capture_hits": 15952,
+          "scoped_type_environment_copied_bindings": 695304
+        },
+        "type_bindings": 4464
+      },
+      "last": {
+        "expressions": 73405,
+        "functions": 1919,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 23468,
+          "scoped_type_environment_capture_hits": 24689,
+          "scoped_type_environment_copied_bindings": 1503937
+        },
+        "type_bindings": 494
+      }
+    },
+    {
+      "path": "build/bench/gdev-sparse-roots-late/main-5103c3977d73f901",
+      "coverage_ratio": 0.9896418199680511,
+      "top_compiler_owner": [
+        {
+          "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).capture",
+          "cpu_ms": 1728.796986,
+          "sampled_cpu_percent": 27.905616672966637
+        },
+        {
+          "name": "backend.storage_type_key.Builder.enter",
+          "cpu_ms": 448.138333,
+          "sampled_cpu_percent": 7.233687146861023
+        },
+        {
+          "name": "backend.wasm_scope_outline.Proof.scan",
+          "cpu_ms": 373.07639,
+          "sampled_cpu_percent": 6.022064368102852
+        },
+        {
+          "name": "backend.storage_type_key.Builder.complete",
+          "cpu_ms": 353.677072,
+          "sampled_cpu_percent": 5.708927582113
+        },
+        {
+          "name": "backend.scoped_backend.Generator.mapValueTypes",
+          "cpu_ms": 312.325875,
+          "sampled_cpu_percent": 5.041451492210603
+        },
+        {
+          "name": "backend.wasm_scope_outline.prepareBody",
+          "cpu_ms": 255.397687,
+          "sampled_cpu_percent": 4.122537238495807
+        }
+      ],
+      "first": {
+        "expressions": 57292,
+        "functions": 1232,
+        "owners": 3079,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 13271,
+          "scoped_type_environment_capture_hits": 17288,
+          "scoped_type_environment_copied_bindings": 817958
+        },
+        "type_bindings": 4480
+      },
+      "last": {
+        "expressions": 87515,
+        "functions": 2166,
+        "owners": 3689,
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 32335,
+          "scoped_type_environment_capture_hits": 32545,
+          "scoped_type_environment_copied_bindings": 2255407
+        },
+        "type_bindings": 625
+      }
+    }
+  ],
+  "limits": "Different bounded CPU windows establish removed work and forward progress; they do not establish total latency or full-game artifact size.",
+  "checks": {
+    "report": "build/bench/sparse-roots-check-dev/run-cf089640d878fd3c/results.json",
+    "seconds": 17.631606672999997,
+    "native_inventory": 2799,
+    "selected_native_laws": 39,
+    "full_fault_seconds": 3.9702940520073753,
+    "full_fault_log": "build/bench/sparse-roots-check-dev/full-faults.log",
+    "guests_passed": 11,
+    "zig_lint_findings": 0,
+    "full_gate": "build/bench/sparse-roots-full-gate/run-c9c314c896946259",
+    "full_gate_status": "Known baseline48pass/1List-chunk storage_escape; full qualification pending"
+  },
+  "actual_renderer": {
+    "evidence": "build/bench/sparse-roots-kites/pair-269ec2cb36c7d311/result.json",
+    "seven_streams_equal": true,
+    "wasm_bytes": 261953,
+    "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+    "baseline_ms": 4868.091796000001,
+    "candidate_ms": 4849.2731380000005,
+    "limits": "One profiled pair; no meaningful renderer latency win claimed."
+  },
+  "actual_main_safe_candidate": {
+    "evidence": "build/bench/gdev-sparse-roots-first/main-60f809ed3f9035b/result.json",
+    "status": "timeout_incomplete",
+    "deadline_ms": 30000,
+    "artifact": null
+  },
+  "next": "Optimized LLVM candidate timing, then general symbolic-owner call sharing only if needed; outside draft is not landed."
+}

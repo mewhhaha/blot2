@@ -47,3 +47,114 @@ test "owned root evidence retains joined and nested borrow origins" {
     try std.testing.expect(plan.hasRoot(result, 5));
     try std.testing.expect(!plan.borrows(result, Value{ .tag = .array, .root = 7 }));
 }
+
+const RootFacts = struct {
+    root: ?usize = null,
+    other_roots: []const usize = &.{},
+    fields: []const @This() = &.{},
+    depth: usize = 0,
+    variant_index: ?usize = null,
+    variant_possible: []const bool = &.{},
+};
+
+test "owned root metadata sparse union matches dense order filtering and field boundary" {
+    const roots = [_]?usize{ null, 0, 1, 4, 5, std.math.maxInt(usize) };
+    const alternatives = [_][]const usize{ &.{}, &.{ 0, 2 }, &.{ 4, 1, 4, 9 }, &.{99} };
+    const children = [_]RootFacts{.{ .root = 3, .depth = 11 }};
+    var arena = std.heap.ArenaAllocator.init(a);
+    defer arena.deinit();
+    for (roots) |left| for (roots) |right| for (alternatives) |left_others| for (alternatives) |right_others| {
+        var target: RootFacts = .{ .root = left, .other_roots = left_others, .fields = &children, .depth = 2 };
+        const value: RootFacts = .{ .root = right, .other_roots = right_others, .fields = &children, .depth = 7 };
+        var expected: [5]usize = undefined;
+        var count: usize = 0;
+        for (0..5) |owner| {
+            if (left == owner or right == owner or std.mem.findScalar(usize, left_others, owner) != null or std.mem.findScalar(usize, right_others, owner) != null) {
+                expected[count] = owner;
+                count += 1;
+            }
+        }
+        try plan.unionRootMetadata(a, arena.allocator(), 5, &target, value);
+        if (count == 0) {
+            try std.testing.expectEqual(left, target.root);
+            try std.testing.expectEqual(left_others.ptr, target.other_roots.ptr);
+            try std.testing.expectEqualSlices(usize, left_others, target.other_roots);
+        } else {
+            try std.testing.expectEqual(@as(?usize, expected[0]), target.root);
+            try std.testing.expectEqualSlices(usize, expected[1..count], target.other_roots);
+        }
+        try std.testing.expectEqual(@as(usize, 7), target.depth);
+        try std.testing.expectEqual(children[0..].ptr, target.fields.ptr);
+        // The metadata join ignores fields; recursive lifetime queries do not.
+        try std.testing.expect(plan.hasRoot(target, 3));
+        try std.testing.expectEqual(@as(usize, 11), target.fields[0].depth);
+    };
+}
+
+fn sparseRootOwnership(allocator: std.mem.Allocator) !void {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var left = [_]usize{ 8, 2, 8, 4096 };
+    var right = [_]usize{ 4, 2, 0, 8192 };
+    var target: RootFacts = .{ .root = 8, .other_roots = &left, .depth = 9 };
+    try plan.unionRootMetadata(allocator, arena.allocator(), 4096, &target, RootFacts{ .root = 4, .other_roots = &right, .depth = 3 });
+    @memset(&left, 7777);
+    @memset(&right, 8888);
+    try std.testing.expectEqual(@as(?usize, 0), target.root);
+    try std.testing.expectEqualSlices(usize, &.{ 2, 4, 8 }, target.other_roots);
+    try std.testing.expectEqual(@as(usize, 9), target.depth);
+}
+
+test "owned root metadata sparse union owns sorted tails through OOM" {
+    try sparseRootOwnership(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, sparseRootOwnership, .{});
+}
+
+test "owned root metadata rootless union skips inventory and allocation while retaining depth" {
+    var failing = std.testing.FailingAllocator.init(a, .{ .fail_index = 0 });
+    const children = [_]RootFacts{.{ .root = 123 }};
+    var target: RootFacts = .{ .fields = &children, .depth = 2 };
+    try plan.unionRootMetadata(failing.allocator(), failing.allocator(), 1_000_000, &target, RootFacts{ .depth = 9 });
+    try std.testing.expect(!failing.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), failing.alloc_index);
+    try std.testing.expectEqual(@as(usize, 9), target.depth);
+    try std.testing.expect(target.root == null);
+    try std.testing.expectEqual(@as(usize, 0), target.other_roots.len);
+    try std.testing.expect(plan.hasRoot(target, 123));
+}
+
+test "owned root metadata sparse traversal matches dense membership order across every variant field" {
+    const roots = [_]?usize{ null, 0, 1, 4, 5, std.math.maxInt(usize) };
+    const alternatives = [_][]const usize{ &.{}, &.{ 0, 2 }, &.{ 4, 1, 4, 9 }, &.{99} };
+    const inner = [_]RootFacts{ .{ .root = 1 }, .{ .root = 4, .other_roots = &.{ 0, 1, 5 } } };
+    const fields = [_]RootFacts{ .{ .root = 3 }, .{ .fields = &inner, .variant_index = 0, .variant_possible = &.{ true, false } } };
+    for (roots) |root| for (alternatives) |others| {
+        const value: RootFacts = .{ .root = root, .other_roots = others, .fields = &fields, .variant_index = 0, .variant_possible = &.{ true, false } };
+        for (0..7) |owner_count| {
+            for (0..9) |start| {
+                var expected: ?usize = null;
+                var owner = start;
+                while (owner < owner_count) : (owner += 1) {
+                    if (plan.hasRoot(value, owner)) {
+                        expected = owner;
+                        break;
+                    }
+                }
+                try std.testing.expectEqual(expected, plan.nextRoot(value, start, owner_count));
+            }
+            // This is also the old diagnostic/recursive-owner visitation order.
+            var cursor: usize = 0;
+            for (0..owner_count) |owner| {
+                if (!plan.hasRoot(value, owner)) continue;
+                try std.testing.expectEqual(@as(?usize, owner), plan.nextRoot(value, cursor, owner_count));
+                cursor = owner + 1;
+            }
+            try std.testing.expect(plan.nextRoot(value, cursor, owner_count) == null);
+        }
+    };
+    const empty: RootFacts = .{};
+    try std.testing.expect(plan.nextRoot(empty, 0, 1_000_000) == null);
+    const maximum: RootFacts = .{ .root = std.math.maxInt(usize) - 1, .other_roots = &.{std.math.maxInt(usize)} };
+    try std.testing.expectEqual(maximum.root, plan.nextRoot(maximum, 0, std.math.maxInt(usize)));
+    try std.testing.expect(plan.nextRoot(maximum, std.math.maxInt(usize), std.math.maxInt(usize)) == null);
+}

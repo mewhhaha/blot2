@@ -104,6 +104,35 @@ pub const Summary = struct {
     writes: bool = false,
 };
 
+/// Join direct root metadata only. Nested fields retain their separate joins;
+/// recursive hasRoot remains the conservative lifetime/escape predicate.
+pub fn unionRootMetadata(allocator: std.mem.Allocator, arena: std.mem.Allocator, owner_count: usize, target: anytype, value: @TypeOf(target.*)) std.mem.Allocator.Error!void {
+    if (target.root == null and value.root == null and target.other_roots.len == 0 and value.other_roots.len == 0) {
+        target.depth = @max(target.depth, value.depth);
+        return;
+    }
+    var roots: std.ArrayList(usize) = .empty;
+    defer roots.deinit(allocator);
+    if (target.root) |owner| if (owner < owner_count) try roots.append(allocator, owner);
+    if (value.root) |owner| if (owner < owner_count) try roots.append(allocator, owner);
+    for (target.other_roots) |owner| if (owner < owner_count) try roots.append(allocator, owner);
+    for (value.other_roots) |owner| if (owner < owner_count) try roots.append(allocator, owner);
+    std.mem.sortUnstable(usize, roots.items, {}, std.sort.asc(usize));
+    var count: usize = 0;
+    for (roots.items) |owner| {
+        if (count != 0 and roots.items[count - 1] == owner) continue;
+        roots.items[count] = owner;
+        count += 1;
+    }
+    // An empty union retains the original metadata, including out-of-range
+    // inputs, exactly as the former owner-inventory scan did.
+    if (count != 0) {
+        target.root = roots.items[0];
+        target.other_roots = try arena.dupe(usize, roots.items[1..count]);
+    }
+    target.depth = @max(target.depth, value.depth);
+}
+
 /// Root identity follows every fixed field, including unselected ADT payload
 /// alternatives. Physical selection never narrows conservative root evidence.
 pub fn hasRoot(value: anytype, owner: usize) bool {
@@ -111,6 +140,30 @@ pub fn hasRoot(value: anytype, owner: usize) bool {
     for (value.other_roots) |candidate| if (candidate == owner) return true;
     for (value.fields) |field| if (hasRoot(field, owner)) return true;
     return false;
+}
+
+/// Ascending, distinct membership equivalent to scanning owners with hasRoot.
+/// Every field participates, including physically unselected variant payloads.
+pub fn nextRoot(value: anytype, start: usize, owner_count: usize) ?usize {
+    if (start >= owner_count) return null;
+    var next: ?usize = null;
+    if (value.root) |owner| if (owner >= start and owner < owner_count) {
+        if (owner == start) return owner;
+        next = owner;
+    };
+    for (value.other_roots) |owner| {
+        if (owner < start or owner >= owner_count) continue;
+        if (owner == start) return owner;
+        if (next) |known| if (owner >= known) continue;
+        next = owner;
+    }
+    for (value.fields) |field| {
+        const owner = nextRoot(field, start, owner_count) orelse continue;
+        if (owner == start) return owner;
+        if (next) |known| if (owner >= known) continue;
+        next = owner;
+    }
+    return next;
 }
 
 pub fn borrows(value: anytype, owner: @TypeOf(value)) bool {

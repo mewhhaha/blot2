@@ -6,6 +6,17 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+The first current LLVM release compiler built successfully in five minutes (4
+GiB build RSS). Actual main still exceeds its 30-second cap, but its frontend
+finishes in **1.03 seconds**. Late emission spends over half its sampled CPU in
+owner-inventory scans. Sparse root unions and allocation-free traversal now
+replace those scans while preserving nested/unselected fields and diagnostic
+order. All 2,799 laws compile; 39 selected laws pass full faults, 11 guests
+pass, Zig lint is clean, and seven real renderer streams/Wasm remain identical.
+The safe candidate still exceeds 30 seconds; optimized candidate timing is next.
+See
+[sparse-owner evidence](zig-native/measurements/sparse-owned-roots-2026-11-02.json).
+
 The private source checker/lowerer now carries completed body authority into
 emission. Its process-local receipts match the exact immutable prefix, fresh
 entry and identity; decoded/precomputed/mixed/copied-entry paths reconstruct.

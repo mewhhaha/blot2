@@ -498,6 +498,10 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "backend.storage_plan_tests.test.owned root metadata sparse union matches dense order filtering and field boundary",
+      "backend.storage_plan_tests.test.owned root metadata sparse union owns sorted tails through OOM",
+      "backend.storage_plan_tests.test.owned root metadata rootless union skips inventory and allocation while retaining depth",
+      "backend.storage_plan_tests.test.owned root metadata sparse traversal matches dense membership order across every variant field",
       "reuse.source_completion_tests.test.closed source completion binds immutable prefix entry identity and ownership transfers",
       "reuse.source_completion_tests.test.precomputed and decoded Core cannot mint completed source authority",
       "reuse.source_completion_tests.test.completed source emission preserves ordinary generic and storage output",
