@@ -1,6 +1,11 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Closed source provenance and indexed type environments](../zig-native/measurements/source-completion-and-environments-2026-11-01.json)
+remove source-proof reconstruction from the late actual-main profile and replace
+repeated type-environment searches/copies. Main still exceeds 30 seconds with
+the safe/noLLVM compiler; optimized LLVM full-game timing is next. No current
+whole-game artifact or five-second qualification is established.
 [Actual-main CPU sampling](../zig-native/measurements/bounds-and-source-proof-2026-11-01.json)
 finds and removes the 128-module bounds-cache cutoff and avoids large witness
 initialization for unrelated goal headers. Actual main still exceeds 30 seconds;

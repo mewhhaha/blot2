@@ -13,6 +13,7 @@ const capture = @import("artifact_capture.zig");
 const inputs = @import("revision_inputs.zig");
 const closure = @import("dependency_closure.zig");
 const retained_dependency = @import("retained_dependency.zig");
+const source_completion = @import("source_completion.zig");
 const checker = @import("project_check.zig");
 const settings = @import("dependency_cli.zig").settings;
 const phase_profile = @import("../phase_profile.zig");
@@ -713,8 +714,11 @@ pub const Session = struct {
         var deferred: ?checker.CheckedProject = null;
         defer if (deferred) |*checked| checked.deinit(a);
         if (source.diagnostics.items.len == 0 and !outputIsSource(&source, output_identity)) {
-            deferred = try checker.checkProjectDeferringEntryToFirstDiagnostic(a, &source, check_offer);
-            if (try self.consumeDeferred(io, entry_path, output_identity, snapshot, &source, &deferred.?, candidate_seed, counts, body_offer)) |consumer| return consumer;
+            const population = try source_completion.checkAndFreezeDependencies(a, &source, check_offer);
+            deferred = population.checked;
+            if (population.snapshot) |owner| {
+                if (try self.consumeDeferred(io, entry_path, output_identity, snapshot, &source, &deferred.?, owner, candidate_seed, counts, body_offer)) |consumer| return consumer;
+            }
             try checker.checkDeferredEntry(a, &source, &deferred.?, check_offer);
         }
         // Both lanes retain the ordinary source/check/lower validation order.
@@ -857,19 +861,13 @@ pub const Session = struct {
     /// against the live dependencies would report identically; nothing is
     /// seeded from a rejection. Null leaves the candidate seed and counts
     /// untouched.
-    fn consumeDeferred(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, source: *project.Project, checked: *const checker.CheckedProject, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, body_offer: ?partial.EntryPrevious) !?partial.Preparation {
+    fn consumeDeferred(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, source: *project.Project, checked: *const checker.CheckedProject, owner: *retained_dependency.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, body_offer: ?partial.EntryPrevious) !?partial.Preparation {
         const a = self.allocator;
-        if (checked.deferred_entry == null or checked.diagnostics.len != 0) return null;
-        // A lowering diagnostic or limit is reported by the ordinary lane.
-        const owner = closure.freezeDeferringEntrySnapshot(a, source, checked) catch |err| {
-            if (err == error.OutOfMemory) return error.OutOfMemory;
-            return null;
-        };
         const frozen = owner.value;
         var seed: retained_dependency.Seed = .{ .value = frozen, .snapshot = owner };
         var seed_alive = true;
         defer if (seed_alive) seed.deinit(a);
-        var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &seed.value, snapshot.provider(), body_offer);
+        var consumer = try source_completion.prepareEntry(a, io, entry_path, output_identity, snapshot.options, owner, snapshot.provider(), body_offer);
         if (consumer == .rejected) {
             if (consumer.rejected.portable) {
                 counts.portable_rejection = true;
@@ -983,6 +981,12 @@ pub const Session = struct {
                 // graphs even when a dependency seed had to be rebuilt.
                 const prior_compatible = !rebuilt;
                 const compatible = prior_compatible or std.mem.eql(u8, &self.seed_settings, &settings_key);
+                const source_proof: source_completion.Borrow = proof: {
+                    if (candidate_seed) |seed| {
+                        if (seed.snapshot) |owner| break :proof .{ .prefix = owner.source_completion };
+                    } else if (self.seed_snapshot) |owner| break :proof .{ .prefix = owner.source_completion };
+                    break :proof .{};
+                };
                 var result = emitted: {
                     const timing = phase_profile.enter(.backend);
                     defer timing.exit();
@@ -1000,6 +1004,7 @@ pub const Session = struct {
                         .principal_previous = if (rebuilt) self.currentArtifacts() else null,
                         .cached_units = prepared.cached,
                         .completed_core_validation = if (candidate_seed) |*seed| if (seed.snapshot) |owner| if (owner.core_validation) |receipt| receipt.borrow(&seed.value) else null else null else if (self.seed_snapshot) |owner| if (owner.core_validation) |receipt| receipt.borrow(&self.seed) else null else null,
+                        .source_completion = source_proof,
                     });
                 };
                 errdefer result.deinit(a);

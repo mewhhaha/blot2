@@ -487,6 +487,9 @@ fn preparedStamp(value: partial.Prepared) [32]u8 {
     const cache_types = @import("body_check_cache.zig");
     var hash = std.crypto.hash.Blake3.init(.{});
     inline for (@typeInfo(partial.Prepared).@"struct".field_names) |name| {
+        // Process-local authority has no structural/serialized identity. Its
+        // underlying Core and spelling tables are still hashed below.
+        if (comptime std.mem.eql(u8, name, "source_completion")) continue;
         if (comptime !std.mem.eql(u8, name, "body_caches")) {
             structural.hash(&hash, @field(value, name));
         } else {

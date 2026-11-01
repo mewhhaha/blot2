@@ -6,6 +6,27 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+The private source checker/lowerer now carries completed body authority into
+emission. Its process-local receipts match the exact immutable prefix, fresh
+entry and identity; decoded/precomputed/mixed/copied-entry paths reconstruct.
+Bounds, Core and storage ownership checks remain. A late actual-main sample
+removes source-proof reconstruction completely: 5,973 bodies are admitted from
+the checked source pipeline. Source-body membership also uses a transactional
+index instead of a repeated linear scan.
+
+Indexed lexical substitutions replace repeated reverse searches and preserve
+both identity and nonidentity shadow rules. Captures reuse immutable snapshots
+until mutation. In separate six-second emission windows, progress rises from
+1,985 expressions/37 functions to 18,484 expressions/740 functions; these are
+different bounded samples, not a total-time ratio. Actual main still exceeds 30
+seconds with the safe/noLLVM compiler. Next is one optimized LLVM compiler
+build, then comparable full-game timing. The current checkpoint compiles 2,795
+native laws, passes 35 selected laws with full faults, 11 guests and zero Zig
+lint findings. The broader static family passes 167 laws/30 guests with one ECS
+storage_unsupported reproduced on both preserved pre-candidates. The full gate
+retains its known 48-pass/one List/chunk failure. See
+[source and environment evidence](zig-native/measurements/source-completion-and-environments-2026-11-01.json).
+
 Actual-main emission sampling found a **128-module bounds-cache cliff**: large
 contexts repeatedly validated entire catalogs during source proofs. Bounds
 receipts now own a scalable exact context and retain more than 128 results.
@@ -15,12 +36,14 @@ sample removes repeated bounds validation from the hot list and places 58% of
 sampled emission CPU in source-body proofs. Both fixes still time out on actual
 main at 30 seconds; no five-second or whole-game output claim is established.
 The checked checkpoint passes 27 selected native laws, 28 full-fault laws, 11
-guests, zero Zig lint findings and seven unchanged real kite streams. The full
-gate retains the known 48-pass/one List/chunk failure. See
+guests, zero Zig lint findings and seven unchanged real kite streams. Three
+alternating compiler pairs with the same actual renderer source improve backend
+time **1.291 to 1.120 seconds (13.2%)** and total **5.257 to 5.074 seconds
+(3.5%)**. All produce identical 261,953-byte Wasm and seven complete streams.
+These are profiled renderer builds; main still exceeds its cap. The full gate
+retains the known 48-pass/one List/chunk failure. See
 [bounds and source-proof evidence](zig-native/measurements/bounds-and-source-proof-2026-11-01.json).
-Next: a private successful source-check/lowerer receipt may replace duplicate
-body reconstruction. The existing Core-validation receipt alone grants no such
-authority; arbitrary/mixed/decoded Core must retain reconstruction.
+The earlier bounds-only receipt grants no source-body authority by itself.
 
 An owner-requested full timing run now establishes **Gdev main exceeds five
 minutes**, not seven seconds. The unprofiled `9361e10` build was aborted at

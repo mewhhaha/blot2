@@ -2321,6 +2321,7 @@ const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults
 pub const CompileOptions = struct {
     /// Live immutable dependency owner receipt; never persisted or hashed.
     completed_core_validation: ?@import("../reuse/completed_core_validation.zig").Borrow = null,
+    source_completion: @import("../reuse/source_completion.zig").Borrow = .{},
     /// Bounded guest data-region and copied-packet budgets.
     storage: ?@import("storage_plan.zig").Config = null,
     /// Private ABI inspection control; avoids hiding callees through inlining.
@@ -2381,6 +2382,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         .io = options.io,
         .profile = options.profile_backend,
         .completed_core_validation = options.completed_core_validation,
+        .source_completion = options.source_completion,
     });
     return compileLocals(allocator, units, entry, options, true) catch |err| {
         if (err != error.SpeculativeLocalRetry) return @errorCast(err);

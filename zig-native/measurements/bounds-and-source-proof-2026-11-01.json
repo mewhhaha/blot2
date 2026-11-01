@@ -113,5 +113,79 @@
     ],
     "latency_limit": "Five-second attempts incomplete; ten-second cap completes. No matched latency claim across separate controls/worker settings."
   },
-  "next": "Replace repeated source-body reconstruction only with authority minted by a closed successful checker/lowerer factory. Existing Core-validation receipt is insufficient; standalone/mixed/decoded paths stay checked."
+  "next": "Replace repeated source-body reconstruction only with authority minted by a closed successful checker/lowerer factory. Existing Core-validation receipt is insufficient; standalone/mixed/decoded paths stay checked.",
+  "matched_actual_renderer": {
+    "scope": "Actual kites renderer source unchanged across both compilers; backend profiling enabled on both. This is not whole main.",
+    "frontend_workers": "client default",
+    "codegen_workers": 4,
+    "deadline_ms": 10000,
+    "pairs": [
+      {
+        "evidence": "build/bench/bounds-matched-kites/pair-865ef4d22af7f4c3/result.json",
+        "order": [
+          "candidate",
+          "baseline"
+        ],
+        "candidate": {
+          "build_ms": 5107.719857,
+          "backend_ms": 1110.929,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        },
+        "baseline": {
+          "build_ms": 5310.208224,
+          "backend_ms": 1290.661,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        }
+      },
+      {
+        "evidence": "build/bench/bounds-matched-kites/pair-a9b53acc8a9c4e8a/result.json",
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "baseline": {
+          "build_ms": 5256.536088,
+          "backend_ms": 1291.76,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        },
+        "candidate": {
+          "build_ms": 5068.601092,
+          "backend_ms": 1119.989,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        }
+      },
+      {
+        "evidence": "build/bench/bounds-matched-kites/pair-ac82648de266b0b1/result.json",
+        "order": [
+          "baseline",
+          "candidate"
+        ],
+        "baseline": {
+          "build_ms": 5185.336555999999,
+          "backend_ms": 1274.166,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        },
+        "candidate": {
+          "build_ms": 5074.082552,
+          "backend_ms": 1126.019,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "wasm_bytes": 261953
+        }
+      }
+    ],
+    "median_build_ms": {
+      "baseline": 5256.536088,
+      "candidate": 5074.082552
+    },
+    "median_backend_ms": {
+      "baseline": 1290.661,
+      "candidate": 1119.989
+    },
+    "output": "261953 bytes; f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98; seven complete streams identical in all pairs"
+  }
 }

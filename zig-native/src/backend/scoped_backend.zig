@@ -203,8 +203,7 @@ const Generator = struct {
     c: Code = undefined,
     stacks: std.ArrayList(bool) = .empty,
     globals: std.ArrayList(Global) = .empty,
-    type_arguments: std.ArrayList(TypeArgument) = .empty,
-    refinement_index: ?*type_arguments_index.Index = null,
+    type_arguments: type_arguments_index.Stack(TypeArgument) = .empty,
     max_stacks: u32 = 0,
     used_regions: std.AutoHashMapUnmanaged(usize, void) = .empty,
     roots: std.ArrayList(Root) = .empty,
@@ -1432,48 +1431,25 @@ const Generator = struct {
     }
     fn restoreTypes(self: *Generator, arguments: []const TypeArgument) Error!void {
         for (arguments) |argument| {
-            var at = self.type_arguments.items.len;
-            const present = while (at != 0) {
-                at -= 1;
-                const previous = self.type_arguments.items[at];
-                if (previous.unit == argument.unit and previous.parameter == argument.parameter) break std.meta.eql(previous, argument);
-            } else false;
+            var present = false;
+            if (self.type_arguments.latestAny(argument.unit, argument.parameter)) |position| present = std.meta.eql(self.type_arguments.items[position], argument);
             if (!present) try self.type_arguments.append(self.allocator, argument);
         }
     }
     fn captureTypes(self: *Generator) Error![]const TypeArgument {
-        var seen: std.AutoHashMapUnmanaged(u64, void) = .empty;
-        defer seen.deinit(self.allocator);
-        var captured: std.ArrayList(TypeArgument) = .empty;
-        defer captured.deinit(self.allocator);
-        var at = self.type_arguments.items.len;
-        while (at != 0) {
-            at -= 1;
-            const argument = self.type_arguments.items[at];
-            const key = (@as(u64, argument.unit) << 32) | argument.parameter;
-            if ((try seen.getOrPut(self.allocator, key)).found_existing) continue;
-            try captured.append(self.allocator, argument);
-        }
-        std.mem.reverse(TypeArgument, captured.items);
-        return self.arena.allocator().dupe(TypeArgument, captured.items);
+        const before = self.type_arguments.stats;
+        const captured = try self.type_arguments.capture(self.arena.allocator());
+        self.emission_work.scoped_type_environment_captures +|= self.type_arguments.stats.captures - before.captures;
+        self.emission_work.scoped_type_environment_capture_hits +|= self.type_arguments.stats.capture_hits - before.capture_hits;
+        if (self.type_arguments.stats.captures != before.captures) self.emission_work.scoped_type_environment_copied_bindings +|= captured.len;
+        return captured;
     }
     fn resolveType(self: *Generator, input: TypeRef, depth: usize) Error!TypeRef {
         if (depth > 128) return error.Declined;
         if (input.environment) |environment| return self.resolveActual(.{ .unit = input.unit, .ty = input.ty }, environment, depth + 1);
-        if (self.refinement_index) |index| {
-            const position = try index.find(self.type_arguments.items, input.unit, input.ty) orelse return input;
-            const argument = self.type_arguments.items[position];
-            return self.resolveType(.{ .unit = argument.argument_unit, .ty = argument.argument, .environment = argument.environment }, depth + 1);
-        }
-        var i = self.type_arguments.items.len;
-        while (i != 0) {
-            i -= 1;
-            const argument = self.type_arguments.items[i];
-            if (argument.unit != input.unit or argument.parameter != input.ty) continue;
-            if (argument.argument_unit == input.unit and argument.argument == input.ty) continue;
-            return self.resolveType(.{ .unit = argument.argument_unit, .ty = argument.argument, .environment = argument.environment }, depth + 1);
-        }
-        return input;
+        const position = self.type_arguments.latestNonidentity(input.unit, input.ty) orelse return input;
+        const argument = self.type_arguments.items[position];
+        return self.resolveType(.{ .unit = argument.argument_unit, .ty = argument.argument, .environment = argument.environment }, depth + 1);
     }
     fn mapTypes(self: *Generator, formal: TypeRef, input: TypeRef, depth: usize) Error!void {
         return self.mapTypesUnder(formal, input, null, depth);
@@ -1578,18 +1554,10 @@ const Generator = struct {
     /// result; the spelling of a member never implies a collection element type.
     fn refineFields(self: *Generator, m: *const core.Module, goals: []const core.Obligation) Error!void {
         self.emission_work.scoped_field_refinements +|= 1;
-        // This call graph only reads or appends substitutions. Other emission
-        // scopes may restore/shrink/swap them and must keep ordinary resolution.
-        var binding_index: type_arguments_index.Index = .{ .allocator = self.allocator };
-        const previous = self.refinement_index;
-        self.refinement_index = &binding_index;
+        const before_stats = self.type_arguments.stats;
         defer {
-            self.refinement_index = previous;
-            self.emission_work.scoped_refinement_lookups +|= binding_index.stats.lookups;
-            self.emission_work.scoped_refinement_indexed_bindings +|= binding_index.stats.synchronized;
-            self.emission_work.scoped_refinement_linear_bindings +|= binding_index.stats.linear;
-            self.emission_work.scoped_refinement_index_declines +|= binding_index.stats.declines;
-            binding_index.deinit();
+            self.emission_work.scoped_refinement_lookups +|= self.type_arguments.stats.lookups - before_stats.lookups;
+            self.emission_work.scoped_refinement_indexed_bindings +|= self.type_arguments.stats.synchronized - before_stats.synchronized;
         }
         var passes: usize = 0;
         while (passes <= goals.len) : (passes += 1) {
@@ -5793,6 +5761,7 @@ pub fn compile(allocator: std.mem.Allocator, units: []const core.Module, entry: 
 }
 pub const CompileOptions = struct {
     completed_core_validation: ?@import("../reuse/completed_core_validation.zig").Borrow = null,
+    source_completion: @import("../reuse/source_completion.zig").Borrow = .{},
     identity: ?@import("runtime_identity.zig").View = null,
     storage: storage_plan.Config = .{},
     work_limits: WorkLimits = .{},
@@ -5855,6 +5824,11 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     };
     defer proof_cache.deinit();
     proof_cache.work = &emission_work;
+    if (options.identity) |names| proof_cache.admitCompletedSource(options.source_completion, units, entry, names) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidArtifact => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid completed source context" } },
+    };
+    @import("../phase_profile.zig").detail("owned.source.completed", entry, 0, 0, emission_work.scoped_source_completed_bodies);
     var dispatches: Dispatches = .empty;
     defer dispatches.deinit(allocator);
     var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };

@@ -2600,24 +2600,34 @@ test "compile scoped source proofs reuse completed bodies without lending caller
     for (module.bodies) |*body| if (body.binding == invoke) {
         body.scheme.root = pure_type;
     };
+    try sourceBatchMembershipScenario(allocator, &module, good, invoke);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, sourceBatchMembershipScenario, .{ &module, good, invoke });
+    try immutableUsageFactScenario(allocator);
+    try moduleSourceBudgetScenario(allocator);
+}
+
+fn sourceBatchMembershipScenario(allocator: std.mem.Allocator, module: *const core.Module, good: core.BindingId, invoke: core.BindingId) !void {
     const package = @import("package_core.zig");
-    var cache = try package.SourceProofCache.init(allocator, &.{&module});
+    var cache = try package.SourceProofCache.init(allocator, &.{module});
     defer cache.deinit();
     var remaining: usize = 65_536;
-    try package.checkedInterfaceBodyCached(&cache, &module, good, &remaining, null, null);
+    try package.checkedInterfaceBodyCached(&cache, module, good, &remaining, null, null);
     const completed = cache.completed.count();
     try std.testing.expect(completed >= 2);
     const after_first = remaining;
-    try package.checkedInterfaceBodyCached(&cache, &module, good, &remaining, null, null);
+    try package.checkedInterfaceBodyCached(&cache, module, good, &remaining, null, null);
     try std.testing.expectEqual(after_first, remaining);
     try std.testing.expectEqual(completed, cache.completed.count());
-    try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBodyCached(&cache, &module, invoke, &remaining, null, null));
+    if (package.checkedInterfaceBodyCached(&cache, module, invoke, &remaining, null, null)) |_| {
+        return error.InvalidSourceBatchAccepted;
+    } else |err| {
+        if (err == error.OutOfMemory) return err;
+        try std.testing.expectEqual(error.InvalidArtifact, err);
+    }
     // A failed root may validate extra locally, but publishes no new claims.
     try std.testing.expectEqual(completed, cache.completed.count());
-    var different_view = module;
+    var different_view = module.*;
     try std.testing.expectError(error.InvalidArtifact, package.checkedInterfaceBodyCached(&cache, &different_view, good, &remaining, null, null));
-    try immutableUsageFactScenario(allocator);
-    try moduleSourceBudgetScenario(allocator);
 }
 
 fn moduleSourceBudgetScenario(allocator: std.mem.Allocator) !void {

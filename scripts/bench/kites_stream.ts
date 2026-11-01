@@ -9,6 +9,7 @@ import { instantiateGuest } from "../../compiler/guest.ts";
 const { values } = parseArgs({
   options: {
     compiler: { type: "string" },
+    "baseline-compiler": { type: "string" },
     "timeout-ms": { type: "string", default: "5000" },
     trace: { type: "boolean", default: false },
     "baseline-ref": {
@@ -37,6 +38,7 @@ const root = resolve(repo, "../gdev");
 const executable = resolve(
   values.compiler ?? `${repo}/zig-native/zig-out-native-dev/bin/blotc`,
 );
+const baselineExecutable = resolve(values["baseline-compiler"] ?? executable);
 const entry = `${root}/tests/kites_render.blot`;
 const producer = `${root}/src/actors/kites.blot`;
 const entrySource = await Deno.readTextFile(entry);
@@ -75,6 +77,8 @@ const builds: Record<string, unknown>[] = [];
 for (
   const [name, source] of [["baseline", baseline], ["candidate", candidate]]
 ) {
+  let runExecutable = executable;
+  if (name === "baseline") runExecutable = baselineExecutable;
   let compiler;
   let guest;
   let started;
@@ -82,7 +86,7 @@ for (
   let outcome: Record<string, unknown>;
   try {
     compiler = await createZigProjectCompiler({
-      executable,
+      executable: runExecutable,
       entry,
       prelude: `${repo}/std/prelude.blot`,
       stdRoot: `${repo}/std`,
@@ -218,6 +222,9 @@ const report = {
   baseline_source: values["baseline-source"] ?? null,
   pins: {
     compiler_sha256: await hash(await Deno.readFile(executable)),
+    baseline_compiler_sha256: await hash(
+      await Deno.readFile(baselineExecutable),
+    ),
     entry_sha256: await hashText(entrySource),
     baseline_producer_sha256: await hashText(baseline),
     candidate_producer_sha256: await hashText(candidate),

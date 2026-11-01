@@ -1,0 +1,619 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "18c6d8e550d5380650d6554e7b35f3471f89824d",
+  "scope": "Closed checked-source authority, indexed source-body membership, indexed lexical substitutions and immutable snapshot reuse. Actual Gdev main still exceeds 30 seconds with safe/noLLVM compiler; target remains unmet.",
+  "candidate": {
+    "compiler_sha256": "c7c55bf916474b43fc3a2042a38fb6de92d208d075fc8357fbdc10341f6ff74b",
+    "native_binary_sha256": "412f22decc7cb897e5a55b151a9675ca1cef848c4ce490c7f1537ee0a43deca4",
+    "zig": "0.17.0",
+    "optimize": "safe",
+    "llvm": false
+  },
+  "workload": {
+    "gdev": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5",
+    "main_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "cache": false,
+    "codegen_tier": "optimized",
+    "frontend_workers": 4,
+    "codegen_workers": 4
+  },
+  "changes": [
+    "A private factory executes source checking/lowering before minting process-local source-body authority. Exact live Core and identity are required; decoded, precomputed, mixed and copied-entry paths keep reconstruction. All bounds/Core/storage checks remain.",
+    "Source-body batch membership uses exact module-pointer/binding keys, with transactional rollback and no partial publication on OOM.",
+    "Lexical substitutions own latest-any/latest-nonidentity indexes with undo. Captured environments preserve order and identity and reuse immutable snapshots until mutation. Removed the superseded scoped Index."
+  ],
+  "profiles": [
+    {
+      "directory": "build/bench/gdev-preflight-late-emission/main-11d16b97bf12be37",
+      "sampling_cpu_ms": 6190.0,
+      "coverage_ratio": 0.9878006525040388,
+      "compiler_owner": [
+        {
+          "name": "check.package_core.sourceBody",
+          "cpu_ms": 2360.324591,
+          "sampled_cpu_percent": 38.60217483440393
+        },
+        {
+          "name": "check.types.Store.resolveDepth",
+          "cpu_ms": 430.187807,
+          "sampled_cpu_percent": 7.035551381688256
+        },
+        {
+          "name": "check.package_core.Walker.target",
+          "cpu_ms": 385.088584,
+          "sampled_cpu_percent": 6.29797143282021
+        },
+        {
+          "name": "check.package_core.Walker.goalGivenMode",
+          "cpu_ms": 327.731688,
+          "sampled_cpu_percent": 5.35992209172824
+        },
+        {
+          "name": "check.scheme_equations.Solver.init__func_3248",
+          "cpu_ms": 273.178362,
+          "sampled_cpu_percent": 4.4677240287668925
+        },
+        {
+          "name": "check.package_core.SourceProofCache.possibleHeader",
+          "cpu_ms": 239.660383,
+          "sampled_cpu_percent": 3.9195507434537458
+        },
+        {
+          "name": "check.package_core.SourceProofCache.owns",
+          "cpu_ms": 232.288565,
+          "sampled_cpu_percent": 3.7989875766891092
+        },
+        {
+          "name": "check.check_scheme_import.Copier.copy",
+          "cpu_ms": 162.652997,
+          "sampled_cpu_percent": 2.660125413036371
+        }
+      ],
+      "first_state": {
+        "invocations": [
+          {
+            "unit": 264,
+            "binding": 1,
+            "tid": 2297708,
+            "body_root": 7,
+            "span": {
+              "start": 267,
+              "end": 465
+            }
+          }
+        ],
+        "invocations_truncated": false,
+        "invocation_limit": 8,
+        "invocation_probes": 1,
+        "counter_probes": 1,
+        "expressions": 34797,
+        "functions": 266,
+        "errors": []
+      },
+      "last_state": {
+        "invocations": [
+          {
+            "unit": 264,
+            "binding": 1,
+            "tid": 2297708,
+            "body_root": 7,
+            "span": {
+              "start": 267,
+              "end": 465
+            }
+          }
+        ],
+        "invocations_truncated": false,
+        "invocation_limit": 8,
+        "invocation_probes": 1,
+        "counter_probes": 1,
+        "expressions": 34797,
+        "functions": 266,
+        "errors": []
+      }
+    },
+    {
+      "directory": "build/bench/gdev-source-completion-late/main-878a90f392983da1",
+      "sampling_cpu_ms": 6330.0,
+      "coverage_ratio": 0.9880197827804107,
+      "compiler_owner": [
+        {
+          "name": "backend.scoped_backend.Generator.captureTypes",
+          "cpu_ms": 3938.985298,
+          "sampled_cpu_percent": 62.98179143484333
+        },
+        {
+          "name": "backend.scoped_backend.Generator.resolveType",
+          "cpu_ms": 1671.750977,
+          "sampled_cpu_percent": 26.7302016633243
+        },
+        {
+          "name": "backend.scoped_backend.Generator.shape",
+          "cpu_ms": 208.449634,
+          "sampled_cpu_percent": 3.332972930851855
+        },
+        {
+          "name": "backend.scoped_backend.Generator.restoreTypes",
+          "cpu_ms": 150.399169,
+          "sampled_cpu_percent": 2.404784069323976
+        },
+        {
+          "name": "backend.storage_type_arguments.Index.find__func_11057",
+          "cpu_ms": 100.549285,
+          "sampled_cpu_percent": 1.607717119433793
+        },
+        {
+          "name": "(no compiler frame)",
+          "cpu_ms": 94.358388,
+          "sampled_cpu_percent": 1.5087287368555249
+        },
+        {
+          "name": "check.core.Module.node",
+          "cpu_ms": 89.672474,
+          "sampled_cpu_percent": 1.4338040453672216
+        }
+      ],
+      "first_state": {
+        "invocations": [
+          {
+            "unit": 108,
+            "binding": 10,
+            "tid": 2299605,
+            "body_root": 58,
+            "span": {
+              "start": 1481,
+              "end": 1756
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 11,
+            "tid": 2299605,
+            "body_root": 86,
+            "span": {
+              "start": 1756,
+              "end": 2295
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 19,
+            "tid": 2299605,
+            "body_root": 514,
+            "span": {
+              "start": 5761,
+              "end": 5915
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 3,
+            "tid": 2299605,
+            "body_root": 1106,
+            "span": {
+              "start": 23906,
+              "end": 29377
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 27,
+            "tid": 2299605,
+            "body_root": 987,
+            "span": {
+              "start": 10865,
+              "end": 11161
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 11,
+            "tid": 2299605,
+            "body_root": 2362,
+            "span": {
+              "start": 39002,
+              "end": 39161
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 29,
+            "tid": 2299605,
+            "body_root": 1290,
+            "span": {
+              "start": 15882,
+              "end": 17920
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 31,
+            "tid": 2299605,
+            "body_root": 1542,
+            "span": {
+              "start": 19392,
+              "end": 20660
+            }
+          }
+        ],
+        "invocations_truncated": true,
+        "invocation_limit": 8,
+        "invocation_probes": 13,
+        "counter_probes": 1,
+        "expressions": 43755,
+        "functions": 893,
+        "errors": []
+      },
+      "last_state": {
+        "invocations": [
+          {
+            "unit": 108,
+            "binding": 11,
+            "tid": 2299605,
+            "body_root": 86,
+            "span": {
+              "start": 1756,
+              "end": 2295
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 19,
+            "tid": 2299605,
+            "body_root": 514,
+            "span": {
+              "start": 5761,
+              "end": 5915
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 3,
+            "tid": 2299605,
+            "body_root": 1106,
+            "span": {
+              "start": 23906,
+              "end": 29377
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 27,
+            "tid": 2299605,
+            "body_root": 987,
+            "span": {
+              "start": 10865,
+              "end": 11161
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 11,
+            "tid": 2299605,
+            "body_root": 2362,
+            "span": {
+              "start": 39002,
+              "end": 39161
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 29,
+            "tid": 2299605,
+            "body_root": 1290,
+            "span": {
+              "start": 15882,
+              "end": 17920
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 31,
+            "tid": 2299605,
+            "body_root": 1542,
+            "span": {
+              "start": 19392,
+              "end": 20660
+            }
+          },
+          {
+            "unit": 193,
+            "binding": 12,
+            "tid": 2299605,
+            "body_root": 64,
+            "span": {
+              "start": 1190,
+              "end": 2557
+            }
+          }
+        ],
+        "invocations_truncated": true,
+        "invocation_limit": 8,
+        "invocation_probes": 12,
+        "counter_probes": 1,
+        "expressions": 45740,
+        "functions": 930,
+        "errors": []
+      }
+    },
+    {
+      "directory": "build/bench/gdev-env-stack-late/main-e3f82703c3258105",
+      "sampling_cpu_ms": 6360.0,
+      "coverage_ratio": 0.9886725466981132,
+      "compiler_owner": [
+        {
+          "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).capture",
+          "cpu_ms": 1318.482267,
+          "sampled_cpu_percent": 20.968371503742237
+        },
+        {
+          "name": "backend.scoped_backend.Generator.unionRoots",
+          "cpu_ms": 789.612107,
+          "sampled_cpu_percent": 12.55752953060283
+        },
+        {
+          "name": "backend.scoped_backend.Generator.checkEscape",
+          "cpu_ms": 681.414072,
+          "sampled_cpu_percent": 10.836811208757622
+        },
+        {
+          "name": "backend.scoped_backend.Generator.shape",
+          "cpu_ms": 440.494278,
+          "sampled_cpu_percent": 7.005363589297868
+        },
+        {
+          "name": "backend.scoped_backend.Generator.promote",
+          "cpu_ms": 358.915858,
+          "sampled_cpu_percent": 5.707988068927433
+        },
+        {
+          "name": "backend.storage_type_key.Builder.enter",
+          "cpu_ms": 314.030095,
+          "sampled_cpu_percent": 4.994151123699161
+        },
+        {
+          "name": "backend.wasm_scope_outline.Proof.scan",
+          "cpu_ms": 240.607813,
+          "sampled_cpu_percent": 3.826486055945522
+        },
+        {
+          "name": "backend.storage_plan.hasRoot__func_11027",
+          "cpu_ms": 240.1714,
+          "sampled_cpu_percent": 3.8195455986165934
+        }
+      ],
+      "first_state": {
+        "invocations": [
+          {
+            "unit": 1,
+            "binding": 151,
+            "tid": 2303082,
+            "body_root": 796,
+            "span": {
+              "start": 15754,
+              "end": 15858
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 23,
+            "tid": 2303082,
+            "body_root": 653,
+            "span": {
+              "start": 7414,
+              "end": 7987
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 24,
+            "tid": 2303082,
+            "body_root": 708,
+            "span": {
+              "start": 7987,
+              "end": 8376
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 3,
+            "tid": 2303082,
+            "body_root": 1106,
+            "span": {
+              "start": 23906,
+              "end": 29377
+            }
+          },
+          {
+            "unit": 108,
+            "binding": 27,
+            "tid": 2303082,
+            "body_root": 987,
+            "span": {
+              "start": 10865,
+              "end": 11161
+            }
+          },
+          {
+            "unit": 2,
+            "binding": 11,
+            "tid": 2303082,
+            "body_root": 2362,
+            "span": {
+              "start": 39002,
+              "end": 39161
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 29,
+            "tid": 2303082,
+            "body_root": 1290,
+            "span": {
+              "start": 15882,
+              "end": 17920
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 31,
+            "tid": 2303082,
+            "body_root": 1542,
+            "span": {
+              "start": 19392,
+              "end": 20660
+            }
+          }
+        ],
+        "invocations_truncated": true,
+        "invocation_limit": 8,
+        "invocation_probes": 13,
+        "counter_probes": 1,
+        "expressions": 54921,
+        "functions": 1179,
+        "errors": [],
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 11592,
+          "scoped_type_environment_capture_hits": 15952,
+          "scoped_type_environment_copied_bindings": 695304
+        },
+        "type_bindings": 4464
+      },
+      "last_state": {
+        "invocations": [
+          {
+            "unit": 184,
+            "binding": 27,
+            "tid": 2303082,
+            "body_root": 208,
+            "span": {
+              "start": 6182,
+              "end": 6304
+            }
+          },
+          {
+            "unit": 184,
+            "binding": 138,
+            "tid": 2303082,
+            "body_root": 4530,
+            "span": {
+              "start": 49717,
+              "end": 50776
+            }
+          },
+          {
+            "unit": 31,
+            "binding": 19,
+            "tid": 2303082,
+            "body_root": 111,
+            "span": {
+              "start": 2481,
+              "end": 2831
+            }
+          },
+          {
+            "unit": 31,
+            "binding": 20,
+            "tid": 2303082,
+            "body_root": 148,
+            "span": {
+              "start": 2831,
+              "end": 3534
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 29,
+            "tid": 2303082,
+            "body_root": 1290,
+            "span": {
+              "start": 15882,
+              "end": 17920
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 30,
+            "tid": 2303082,
+            "body_root": 1541,
+            "span": {
+              "start": 17920,
+              "end": 19391
+            }
+          },
+          {
+            "unit": 191,
+            "binding": 31,
+            "tid": 2303082,
+            "body_root": 1542,
+            "span": {
+              "start": 19392,
+              "end": 20660
+            }
+          },
+          {
+            "unit": 193,
+            "binding": 12,
+            "tid": 2303082,
+            "body_root": 64,
+            "span": {
+              "start": 1190,
+              "end": 2557
+            }
+          }
+        ],
+        "invocations_truncated": true,
+        "invocation_limit": 8,
+        "invocation_probes": 12,
+        "counter_probes": 1,
+        "expressions": 73405,
+        "functions": 1919,
+        "errors": [],
+        "work": {
+          "scoped_source_completed_bodies": 5973,
+          "scoped_type_environment_captures": 23468,
+          "scoped_type_environment_capture_hits": 24689,
+          "scoped_type_environment_copied_bindings": 1503937
+        },
+        "type_bindings": 494
+      }
+    }
+  ],
+  "profile_limits": "Different bounded endpoint-weighted CPU windows. They establish eliminated/replaced work and progress, not a total-time speedup or whole-game size. Inclusive categories overlap.",
+  "actual_main": {
+    "source_completion_first": "build/bench/gdev-source-completion-first/main-29561d5b6344cf3f/result.json",
+    "env_stack_first": "build/bench/gdev-env-stack-first/main-a7adb40c4f22976a/result.json",
+    "status": "timeout_incomplete",
+    "deadline_ms": 30000,
+    "artifact": null,
+    "total_time_and_size": "unknown"
+  },
+  "qualification": {
+    "development_report": "build/bench/env-stack-check-dev/run-d82ec5f25a5d5d27/results.json",
+    "seconds": 17.337377887,
+    "native_inventory": 2795,
+    "selected_native_laws": 35,
+    "guests_passed": 11,
+    "zig_lint_findings": 0,
+    "full_fault_selected_laws": 35,
+    "full_fault_seconds": 4.020348978010588,
+    "full_fault_log": "build/bench/env-stack-check-dev/full-faults.log",
+    "source_authority_and_membership_five_full_fault_laws": "build/bench/env-stack-check-dev/source-completion-laws.log",
+    "broader_static_family": "167 selected native laws pass; 30 guests pass and ECS summary_job_principal_reuse fails storage_unsupported at bytes1230..1320, reproduced with both9361e10 anddd3bc143 pre-candidates.",
+    "full_gate": "build/bench/env-stack-full-gate/run-ea6fa11e6445b79b",
+    "full_gate_status": "48 passed; known baseline List/chunk storage_escape at bytes312..345. Full native/guest/release qualification pending."
+  },
+  "actual_renderer_control": {
+    "evidence": "build/bench/source-env-matched-kites/pair-80b300dcda1af7de/result.json",
+    "comparison": "Same real kites source, both compilers, seven complete streams; one pair, profiled, not main",
+    "status": "complete",
+    "baseline_compiler_sha256": "dd3bc14365ad1d336edaf67de9013248354dafe816bc6db919031d8e8d8477d8",
+    "candidate_compiler_sha256": "c7c55bf916474b43fc3a2042a38fb6de92d208d075fc8357fbdc10341f6ff74b",
+    "wasm_bytes": 261953,
+    "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+    "all_streams_equal": true
+  },
+  "next": "Build one optimized LLVM release compiler for comparable full-main timing; development compiler and historical LLVM timings are different modes. Do not repeat five-minute Gdev builds."
+}

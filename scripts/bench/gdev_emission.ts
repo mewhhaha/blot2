@@ -12,11 +12,22 @@ const { values } = parseArgs({
     },
     output: { type: "string", default: "build/bench/gdev-emission" },
     "timeout-ms": { type: "string", default: "30000" },
+    "emission-delay-ms": {
+      type: "string",
+      default: Deno.env.get("SAMPLE_EMISSION_DELAY_MS") ?? "0",
+    },
   },
 });
 const timeoutMs = Number(values["timeout-ms"]);
+const emissionDelayMs = Number(values["emission-delay-ms"]);
 if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30000) {
   throw new Error("--timeout-ms must be 100..30000");
+}
+if (
+  !Number.isInteger(emissionDelayMs) || emissionDelayMs < 0 ||
+  emissionDelayMs > 15000
+) {
+  throw new Error("--emission-delay-ms must be 0..15000");
 }
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const root = resolve(repo, "../gdev");
@@ -105,6 +116,7 @@ await Deno.writeTextFile(
       options,
       timeoutMs,
       sampleFocus: "emission",
+      emissionDelayMs,
       filePins,
       sourcePins,
       summarize: ["python3", "scripts/bench/summarize_stacks.py", output],
@@ -120,7 +132,13 @@ let sampling: Awaited<ReturnType<typeof createSampledCompiler>> | undefined;
 let buildStarted: number | undefined;
 let report: Record<string, unknown> = { success: false, compiled: false };
 try {
-  sampling = await createSampledCompiler(options, output, repo, "emission");
+  sampling = await createSampledCompiler(
+    options,
+    output,
+    repo,
+    "emission",
+    emissionDelayMs,
+  );
   buildStarted = performance.now();
   const result = await sampling.build({
     signal: AbortSignal.timeout(timeoutMs),

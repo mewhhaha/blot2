@@ -10,6 +10,7 @@
 #   SAMPLE_LIMIT    stop after this many samples (default unlimited)
 #   SAMPLE_FOCUS    validation: wait for closure validation, then sample at 8-12ms
 #                   emission: wait for actual owned Generator.emit
+#   SAMPLE_EMISSION_DELAY_MS  continue 0..15000 ms after emission starts
 #
 # Handshake: the driver writes `pid`; this script attaches and writes
 # `attached`; the driver writes `start` before the measured builds and `stop`
@@ -40,7 +41,87 @@ def wait_for(name):
         time.sleep(0.005)
 
 
-def stack(thread):
+def pointee(value):
+    if value.type.strip_typedefs().code in (gdb.TYPE_CODE_PTR, gdb.TYPE_CODE_REF):
+        return value.dereference()
+    return value
+
+
+def emission_frame(frame, name, tid, metadata):
+    # Debug information can omit/optimize any local. Attribution remains useful
+    # without it, and failed metadata probes must never truncate a stack.
+    if not name.startswith("backend.scoped_backend.Generator."):
+        return
+    if metadata["counter_probes"] < 16 and (
+            metadata["expressions"] is None or metadata["functions"] is None):
+        metadata["counter_probes"] += 1
+        try:
+            generator = pointee(frame.read_var("self"))
+            counters = pointee(generator["emission_work"])
+            metadata["expressions"] = int(counters["scoped_emission_expressions"])
+            work = {}
+            for key in ("scoped_source_completed_bodies", "scoped_type_environment_captures",
+                        "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings"):
+                try:
+                    work[key] = int(counters[key])
+                except Exception:
+                    pass
+            metadata["work"] = work
+            try:
+                metadata["type_bindings"] = int(generator["type_arguments"]["items"]["len"])
+            except Exception:
+                pass
+            module = pointee(generator["module"])
+            metadata["functions"] = int(module["functions"]["items"]["len"])
+        except Exception as error:
+            if len(metadata["errors"]) < 4:
+                metadata["errors"].append("counters: " + str(error)[:160])
+    if not name.startswith("backend.scoped_backend.Generator.invokeBody"):
+        return
+    if metadata["invocation_probes"] >= 32:
+        metadata["invocations_truncated"] = True
+        return
+    metadata["invocation_probes"] += 1
+    try:
+        target = frame.read_var("target")
+        unit, binding = int(target["unit"]), int(target["binding"])
+        if any(item["unit"] == unit and item["binding"] == binding
+               for item in metadata["invocations"]):
+            return
+        if len(metadata["invocations"]) >= 8:
+            metadata["invocations_truncated"] = True
+            return
+        invocation = {"unit": unit, "binding": binding, "tid": tid,
+                      "body_root": None, "span": None}
+        metadata["invocations"].append(invocation)
+        try:
+            try:
+                body = pointee(frame.read_var("body"))
+            except Exception:
+                owner = pointee(frame.read_var("m"))
+                if binding >= int(owner["bindings"]["len"]):
+                    return
+                body_id = int(owner["bindings"]["ptr"][binding]["body_id"])
+                if body_id == 0 or body_id >= int(owner["bodies"]["len"]):
+                    return
+                body = owner["bodies"]["ptr"][body_id]
+            invocation["body_root"] = int(body["root"])
+            invocation["span"] = {"start": int(body["span"]["start"]),
+                                  "end": int(body["span"]["end"])}
+        except Exception:
+            pass
+    except Exception as error:
+        if len(metadata["errors"]) < 4:
+            metadata["errors"].append("invokeBody: " + str(error)[:160])
+
+
+def interrupt_after(delay):
+    subprocess.Popen([
+        "/bin/sh", "-c", "sleep %f; kill -USR1 %d 2>/dev/null" % (delay, pid)
+    ])
+
+
+def stack(thread, metadata=None):
     thread.switch()
     frame = gdb.newest_frame()
     frames = []
@@ -71,6 +152,8 @@ def stack(thread):
             # caller beyond its thread trampoline, although native DWARF can
             # invent an unbounded unknown tail there.
             name = frames[-1][0]
+            if metadata is not None:
+                emission_frame(frame, name, thread.ptid[1], metadata)
             if name.startswith("Thread.LinuxThreadImpl.spawn") and name.endswith(".Instance.entryFn"):
                 reason = "thread_root"
                 break
@@ -133,6 +216,11 @@ def thread_cpu(tid):
 before_ticks = None
 save_window()
 try:
+    emission_delay_ms = 0
+    if focus == "emission":
+        emission_delay_ms = int(os.environ.get("SAMPLE_EMISSION_DELAY_MS", "0"))
+        if not 0 <= emission_delay_ms <= 15000:
+            raise RuntimeError("SAMPLE_EMISSION_DELAY_MS must be 0..15000")
     if focus in ("validation", "emission"):
         symbol = "backend.scoped_backend.Generator.emit"
         if focus == "validation":
@@ -150,6 +238,16 @@ try:
         boundary.delete()
         if focus == "validation":
             low, high, limit = 0.008, 0.012, 200
+    if focus == "emission":
+        window.update(focus_reached=True, focus_started_ns=time.time_ns(),
+                      emission_delay_ms=emission_delay_ms)
+        if emission_delay_ms:
+            window["status"] = "delaying"
+            save_window()
+            interrupt_after(emission_delay_ms / 1000)
+            gdb.execute("continue", to_string=True)
+            if flag("stop") or not gdb.selected_inferior().threads():
+                raise RuntimeError("Compiler stopped during emission sampling delay")
     window.update(focus_reached=True, status="sampling", started_ns=time.time_ns(),
                   interval_min_ms=low * 1000, interval_max_ms=high * 1000,
                   sample_limit=limit)
@@ -161,9 +259,7 @@ try:
     with open(os.environ["SAMPLE_OUT"], "a") as out:
         while not flag("stop") and (limit is None or taken < limit):
             delay = random.uniform(low, high)
-            subprocess.Popen([
-                "/bin/sh", "-c", "sleep %f; kill -USR1 %d 2>/dev/null" % (delay, pid)
-            ])
+            interrupt_after(delay)
             try:
                 gdb.execute("continue", to_string=True)
             except gdb.error:
@@ -174,12 +270,18 @@ try:
                 break
             try:
                 stacks, tids, cpu_ns, tails = [], [], [], []
+                metadata = None
+                if focus == "emission":
+                    metadata = {"invocations": [], "invocations_truncated": False,
+                                "invocation_limit": 8, "invocation_probes": 0,
+                                "counter_probes": 0, "expressions": None,
+                                "functions": None, "errors": []}
                 for thread in gdb.selected_inferior().threads():
                     tid = thread.ptid[1]
                     current = thread_cpu(tid)
                     previous = previous_cpu.get(tid)
                     previous_cpu[tid] = current
-                    frames, tail = stack(thread)
+                    frames, tail = stack(thread, metadata)
                     if any(f[0] == "main.main" for f in frames):
                         continue
                     stacks.append(frames)
@@ -189,10 +291,13 @@ try:
                                   else max(0, current - previous))
             except gdb.error:
                 break
-            out.write(json.dumps({"t": time.time() - started, "wall_ns": time.time_ns(),
-                                  "run": int(os.environ.get("SAMPLE_RUN", "0")), "frame_limit": 4096, "st": stacks,
-                                  "tid": tids, "cpu_ns": cpu_ns, "tail": tails,
-                                  "focus": focus}) + "\n")
+            sample = {"t": time.time() - started, "wall_ns": time.time_ns(),
+                      "run": int(os.environ.get("SAMPLE_RUN", "0")),
+                      "frame_limit": 4096, "st": stacks, "tid": tids,
+                      "cpu_ns": cpu_ns, "tail": tails, "focus": focus}
+            if metadata is not None:
+                sample["emission"] = metadata
+            out.write(json.dumps(sample) + "\n")
             out.flush()
             taken += 1
     window["status"] = "process_exited"
@@ -200,7 +305,7 @@ try:
         window["status"] = "stopped"
     elif limit is not None and taken >= limit:
         window["status"] = "sample_limit"
-except (gdb.error, RuntimeError) as error:
+except (gdb.error, RuntimeError, ValueError) as error:
     window.update(status="interrupted", error=str(error))
 finally:
     after_ticks = process_ticks()

@@ -124,6 +124,28 @@ pub const SourceProofCache = struct {
         std.debug.assert(self.owns(module));
         self.completed.putAssumeCapacity(.{ .unit = module.unit, .binding = binding }, {});
     }
+    /// Only the closed source checker/lowerer can provide this opaque receipt.
+    /// All-unit bounds/Core validation precedes admission; call instances,
+    /// effect rows and storage ownership remain the caller's responsibility.
+    pub fn admitCompletedSource(self: *SourceProofCache, receipt: @import("../reuse/source_completion.zig").Borrow, units: []const core.Module, entry: u32, names: @import("../backend/runtime_identity.zig").View) Equations.Error!void {
+        if (units.len != self.units.len) return error.InvalidArtifact;
+        for (units, self.units) |*unit, owner| if (unit != owner) return error.InvalidArtifact;
+        const count = receipt.covered(units, entry, names);
+        var bodies: usize = 0;
+        for (units[0..count]) |*unit| {
+            for (unit.bindings, 0..) |binding, id| {
+                if (id != 0 and binding.kind == .global and unit.body(@intCast(id)) != null) bodies += 1;
+            }
+        }
+        // Publish no partial authority on allocation failure.
+        try self.reserve(bodies);
+        for (units[0..count]) |*unit| {
+            for (unit.bindings, 0..) |binding, id| {
+                if (id != 0 and binding.kind == .global and unit.body(@intCast(id)) != null) self.publish(unit, @intCast(id));
+            }
+        }
+        if (self.work) |work| work.scoped_source_completed_bodies +|= bodies;
+    }
     /// Immutable negative metadata, never an instantiated predicate receipt.
     /// A possible header still requires the ordinary body/type/row proof.
     fn possibleHeader(self: *SourceProofCache, initial: *const core.Module, binding: core.BindingId, wanted: core.Obligation, depth: usize, remaining: *usize) Equations.Error!bool {
@@ -640,7 +662,7 @@ pub fn checkedInterfaceBodyOrigin(module: *const core.Module, binding: core.Bind
     var workspace: Equations.Workspace = .{ .allocator = allocator };
     defer workspace.deinit();
     var admission: Admission = .{ .remaining = remaining, .workspace = &workspace, .source_bodies = true, .source_failure = failure };
-    defer admission.bodies.deinit(allocator);
+    defer admission.deinitBodies(allocator);
     defer {
         for (admission.source_rows.items) |index| allocator.free(index.rows);
         admission.source_rows.deinit(allocator);
@@ -678,7 +700,8 @@ fn sourceBody(module: *const core.Module, binding: core.BindingId, context: Cont
     errdefer if (admission.source_failure) |failure| {
         if (failure.* == null) failure.* = .{ .unit = module.unit, .span = body.span };
     };
-    for (admission.bodies.items) |prior| if (prior.module == module and prior.binding == binding) return;
+    const claim: @TypeOf(admission.bodies.items[0]) = .{ .module = module, .binding = binding };
+    if (admission.body_index.contains(claim)) return;
     const prior_remaining = admission.remaining;
     if (context.source_proofs) |cache| if (cache.moduleWork(module)) |work| {
         admission.remaining = work;
@@ -689,12 +712,17 @@ fn sourceBody(module: *const core.Module, binding: core.BindingId, context: Cont
     };
     try require(admission.bodies.items.len < 65_536);
     const before = admission.bodies.items.len;
-    errdefer admission.bodies.shrinkRetainingCapacity(before);
+    errdefer admission.rollbackBodies(before);
     const workspace = admission.workspace orelse return error.InvalidArtifact;
-    admission.bodies.append(workspace.allocator, .{ .module = module, .binding = binding }) catch {
+    admission.body_index.ensureUnusedCapacity(workspace.allocator, 1) catch {
         workspace.oom = true;
         return error.InvalidArtifact;
     };
+    admission.bodies.append(workspace.allocator, claim) catch {
+        workspace.oom = true;
+        return error.InvalidArtifact;
+    };
+    admission.body_index.putAssumeCapacityNoClobber(claim, {});
     var scopes: contracts.Context = .{ .types = &module.types, .remaining = admission.remaining, .executable = true, .obligations = module.obligations, .large_plain_graph = true, .source_instances = true };
     try scopes.initialize();
     var walker: Walker = .{ .module = module, .context = context, .scopes = &scopes, .admission = admission };
@@ -4289,7 +4317,7 @@ fn sharedGoalFailureScenario(allocator: std.mem.Allocator, producer: *const core
     var workspace: Equations.Workspace = .{ .allocator = allocator };
     defer workspace.deinit();
     var admission: Admission = .{ .remaining = &remaining, .workspace = &workspace, .source_bodies = true };
-    defer admission.bodies.deinit(allocator);
+    defer admission.deinitBodies(allocator);
     defer {
         for (admission.source_rows.items) |index| allocator.free(index.rows);
         admission.source_rows.deinit(allocator);

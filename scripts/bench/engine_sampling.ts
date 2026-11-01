@@ -28,7 +28,14 @@ export async function createSampledCompiler(
   output: string,
   repo: string,
   focus?: string,
+  emissionDelayMs = 0,
 ) {
+  if (
+    !Number.isInteger(emissionDelayMs) || emissionDelayMs < 0 ||
+    emissionDelayMs > 15000
+  ) {
+    throw new Error("Emission sampling delay must be 0..15000 ms");
+  }
   const binary = String(options.executable);
   const control = `${output}/control-0`;
   await Deno.mkdir(control, { recursive: true });
@@ -115,6 +122,7 @@ os.execv(${JSON.stringify(binary)}, [${JSON.stringify(binary)}] + sys.argv[1:])
         SAMPLE_MAX_MS: "100",
         SAMPLE_LIMIT: "80",
         SAMPLE_FOCUS: focus ?? "",
+        SAMPLE_EMISSION_DELAY_MS: String(emissionDelayMs),
       },
       stdout: "piped",
       stderr: "piped",

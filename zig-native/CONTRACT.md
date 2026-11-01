@@ -41,6 +41,12 @@ to pass; failure revokes nested claims. This mode never establishes serialized
 package authority. Lexical row facts are bounded sparse pages copied by value
 for rollback; saturation declines the optional proof. Open substitutions remain
 private, and ordinary package admission retains its existing size limits.
+Completed source-body authority may instead come from the private factory that
+itself checks and lowers the exact source context. Its live prefix/entry receipts
+are distinct from Core-validation receipts, match immutable Core and identity,
+and are revoked on ownership transfer. Decoded, precomputed, mixed and copied
+entry inputs retain reconstruction. All backend bounds, Core, instantiated-call
+and storage ownership checks still apply; this authority is never serialized.
 Successful checked source instantiation may retain lexical ownership of its
 exact generic row-tail witnesses. These facts are copied and restored with the
 source scope and are published only after every prerequisite succeeds. They do

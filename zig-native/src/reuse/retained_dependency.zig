@@ -41,6 +41,9 @@ pub const Snapshot = struct {
     validated: bool = false,
     /// Borrowed emission may use this only while this immutable owner is live.
     core_validation: ?*@import("completed_core_validation.zig").Receipt = null,
+    /// Distinct source provenance, present only after the closed checker/lowerer
+    /// factory succeeds. Shared/decoded/validation-only snapshots lack it.
+    source_completion: ?*@import("source_completion.zig").Prefix = null,
 
     /// Takes ownership of symbols only on success. Module slots are filled by
     /// appendOwned/appendShared; teardown also accepts a partial construction.
@@ -108,6 +111,7 @@ pub const Snapshot = struct {
 
     pub fn deinit(self: *Snapshot) void {
         const a = self.allocator;
+        if (self.source_completion) |receipt| receipt.deinit();
         if (self.core_validation) |receipt| receipt.deinit(a);
         for (self.modules[0..self.initialized]) |module| module.release();
         a.free(self.modules);

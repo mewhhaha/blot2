@@ -15,9 +15,18 @@ pub const Admission = struct {
     count: usize = 0,
     source_bodies: bool = false,
     bodies: std.ArrayList(Body) = .empty,
+    body_index: std.AutoHashMapUnmanaged(Body, void) = .empty,
     source_rows: std.ArrayList(struct { module: *const core.Module, rows: []T.Effects.Id }) = .empty,
     source_definitions: std.ArrayList(struct { module: *const core.Module, values: []core.Id }) = .empty,
     source_failure: ?*?SourceFailure = null,
+    pub fn deinitBodies(self: *Admission, allocator: std.mem.Allocator) void {
+        self.body_index.deinit(allocator);
+        self.bodies.deinit(allocator);
+    }
+    pub fn rollbackBodies(self: *Admission, before: usize) void {
+        for (self.bodies.items[before..]) |body| std.debug.assert(self.body_index.remove(body));
+        self.bodies.shrinkRetainingCapacity(before);
+    }
 };
 pub const Workspace = struct {
     allocator: std.mem.Allocator,

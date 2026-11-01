@@ -46,6 +46,9 @@ pub const Result = struct {
 /// must outlive Prepared. Backend work does not consult source files or PI.
 /// This owner grants no cross-revision staging/code-cache validity by itself.
 pub const Prepared = struct {
+    /// While present, Core payloads and their identity are immutable. Ownership
+    /// transfers below revoke the receipt before replacing or moving any Core.
+    source_completion: ?*@import("source_completion.zig").Entry = null,
     source_digests: [][32]u8 = &.{},
     body_caches: []@import("body_check_cache.zig").Cache = &.{},
     units: []core.Module,
@@ -67,6 +70,7 @@ pub const Prepared = struct {
         try copyBodyCacheOffers(a, self.body_caches, self.paths, null, caches, paths);
     }
     pub fn deinit(self: *Prepared, a: Allocator) void {
+        if (self.source_completion) |receipt| receipt.deinit();
         a.free(self.source_digests);
         for (self.body_caches) |*cache| cache.deinit(a);
         a.free(self.body_caches);
@@ -91,6 +95,8 @@ pub const Prepared = struct {
     /// safe to release or rebind. Borrowed seed Core is never moved.
     pub fn takeCore(self: *Prepared, index: usize) error{InvalidArtifact}!core.Module {
         if (index >= self.units.len or self.isBorrowed(index)) return error.InvalidArtifact;
+        if (self.source_completion) |receipt| receipt.deinit();
+        self.source_completion = null;
         const value = self.units[index];
         self.units[index] = .{ .unit = value.unit, .types = .{ .nodes = &.{}, .extra = &.{} }, .nodes = &.{}, .spans = &.{}, .extra = &.{}, .bindings = &.{}, .bodies = &.{}, .parameters = &.{}, .references = &.{}, .calls = &.{}, .merges = &.{}, .merge_ranges = &.{}, .names = &.{}, .obligations = &.{}, .diagnostics = &.{}, .body_lowerings = 0 };
         return value;
@@ -121,6 +127,8 @@ pub const Prepared = struct {
             if (module.core.unit != id or module.interface.unit != id or self.units[index].unit != id or module.core.diagnostics.len != 0) return error.InvalidArtifact;
             if (!std.mem.eql(u8, self.paths[index], module.identity.normalized_path) or !std.mem.eql(u8, names.owner(id) orelse return error.InvalidArtifact, module.identity.normalized_path)) return error.InvalidArtifact;
         }
+        if (self.source_completion) |receipt| receipt.deinit();
+        self.source_completion = null;
         for (seed.modules, 0..) |*module, index| {
             if (!self.isBorrowed(index)) self.units[index].deinit(a);
             self.units[index] = module.core;
@@ -136,6 +144,7 @@ pub const Prepared = struct {
     }
     pub fn emitWithOptions(self: *const Prepared, a: Allocator, options: backend.CompileOptions) !Result {
         var actual = options;
+        actual.source_completion.entry = self.source_completion;
         actual.identity = self.identity.view();
         actual.diagnostic_source_digests = self.source_digests;
         actual.unit_order = self.unit_order;
