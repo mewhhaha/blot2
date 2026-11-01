@@ -17,6 +17,18 @@ nominal preparation and application-normalization guards showed no meaningful
 checker gain and were removed; their patch and executed witnesses are archived.
 See [the matched controls and rejected work](zig-native/measurements/checker-validation-reduction-2026-11-01.json).
 
+The cursor-view adapter is **rejected and removed**. Fused covariance opening
+and view-aware application/pending-use reads eliminate **28.4%** of
+resolver-created nodes, with zero fallback across 445,342 view requests. Yet
+three matched pairs regress checking **4.67 to 4.99 seconds (6.8%)** and total
+compilation **8.25 to 8.78 seconds (6.3%)**. Admission and validation add about
+2.22 million and 1.74 million visits; pooled live bytes barely change. All 29
+selected native laws pass full allocation faults, 11 guests pass, and seven
+original kite streams plus Wasm bytes remain identical. The patch, failed
+intermediate checks and pinned comparisons are preserved in
+[the rejected experiment](zig-native/measurements/rejected-cursor-reads-2026-11-01.json).
+The installed compiler is restored to `4c9635bb`; do not extend this adapter.
+
 The earlier completed-Core validation receipt independently removes repeated
 producer validation while preserving backend bounds and fresh-entry checks. Its
 separate matched controls improved 8.63 to 7.78 seconds; do not combine medians
@@ -87,16 +99,15 @@ checking remains the first priority: normalization and fresh-build body cache
 capture are the largest identified costs. See
 [the checker/validation cost map](zig-native/measurements/checker-validation-costs-2026-11-01.json).
 
-Astra's next discriminator is cursor-aware ordinary-type reads across
-application checking and pending-use resolution. Keep the selected history
-cursor on child views, perform the same full depth validation, and materialize
-at unchanged solver/publication boundaries. Keep exact effects, rich-type
-fallbacks, rollback, diagnostic order and mandatory all-root finalization. Run
-three matched World-producer pairs; require **20% checking improvement** for
-this larger mechanism. If fewer rebuilt nodes leave time flat, reject it. If
-solver boundaries immediately force equivalent rebuilding, explicitly assess a
-view-aware solver instead of adding caches. The present evidence does not
-justify deleting history or language features.
+Astra's next discriminator requires a solver/validation-contract replacement.
+Unification would consume `(id, cursor)` children directly and materialize at
+variable binding/publication. Remove normalize-before-compare and duplicate
+whole-root validation; give depth/work limits an explicit construction, binding
+or publication boundary. Preserve histories, occurs checks, exact effects and
+rollback. If the required validation behavior still demands preliminary full
+walks, stop this direction: the adapter already measured that tradeoff. This
+larger experiment keeps the **20% checking improvement** gate and does not
+justify deleting history or language features. It is not implemented.
 
 The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
 cancellation with exclusive phase checkpoints, module names, balanced

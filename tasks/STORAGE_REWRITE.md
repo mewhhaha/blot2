@@ -4,9 +4,12 @@ The active priority is subsecond Gdev compilation with bounded iteration.
 [Scoped validation batches and list-copy deletion](../zig-native/measurements/checker-validation-reduction-2026-11-01.json)
 improve matched fresh World-producer validation 883 to 693 ms and total 7.69 to
 7.41 seconds. Checking improves only 1.5%; the ineffective nominal memo and
-application guards were removed and archived. Astra's next discriminator is
-cursor-aware ordinary-type reads across application/pending-use checking, with
-the same depth/history/effect laws and a 20% checking gate.
+application guards were removed and archived. The
+[cursor-view adapter](../zig-native/measurements/rejected-cursor-reads-2026-11-01.json)
+also fails its 20% checking gate: resolver-created nodes fall 28.4%, but extra
+admission/validation walks slow checking 6.8%. It is removed. A genuinely
+view-aware solver needs an explicit replacement for eager depth/work validation;
+that larger architecture experiment is not implemented.
 [Completed producer-validation receipts](../zig-native/measurements/completed-core-validation-2026-11-01.json)
 remove one repeated semantic traversal with exact Snapshot/context authority:
 world-producer medians improve 8.63 to 7.78 seconds with identical tiny output.

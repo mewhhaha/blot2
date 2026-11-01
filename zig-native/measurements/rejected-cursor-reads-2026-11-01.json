@@ -1,0 +1,646 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "a7c181bcfeec613016a4a62a474d65e33d2a537f",
+  "status": "rejected_and_removed",
+  "scope": "Cursor-aware ordinary type reads across application/pending-use checking plus fused resolution/covariance opening, with unchanged solver and mandatory final normalization. This is an eager full-validation adapter, not a view-aware solver.",
+  "gate": {
+    "required_checking_improvement_percent": 20,
+    "observed_checking_regression_percent": 6.827356467060786,
+    "observed_total_regression_percent": 6.330457941646106,
+    "decision": "Remove entire prototype, counters and new tests from live tree; preserve exact patch and qualification."
+  },
+  "workload": {
+    "description": "Actual world_storage source and all imports, identity export executes41. No world initialization, whole main, current game size or frame measurement.",
+    "modules": 240,
+    "source_bytes": 2371542,
+    "toolchain": "Zig0.17.0 safe/noLLVM; Deno2.9.8; optimized guest; one codegen worker; existing dependency-ready source scheduler.",
+    "fresh_sessions": true,
+    "disk_cache": false,
+    "profile_backend": true,
+    "profile_trace": true,
+    "repetitions": 3,
+    "deadline_ms": 10000,
+    "source_pins": {
+      "gdev/src/world_storage.blot": {
+        "baseline": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+        "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+      },
+      "gdev/tests/minor_support/owned.blot": {
+        "baseline": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2",
+        "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+      },
+      "gdev/tests/minor_support/game.blot": {
+        "baseline": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940",
+        "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+      },
+      "ink/lib/pen/host.blot": {
+        "baseline": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+        "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+      }
+    },
+    "gdev_commit": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5"
+  },
+  "versions": {
+    "baseline": {
+      "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+      "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+      "wasm_bytes": 2935,
+      "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+      "median_build_ms": 8252.872854000001,
+      "median_phase_us": {
+        "other": 35321,
+        "assets": 298028,
+        "inputs": 1195,
+        "load": 48334,
+        "lex": 426661,
+        "parse": 271686,
+        "check": 4668249,
+        "lower": 1013240,
+        "freeze": 371500,
+        "validation": 753685,
+        "backend": 334342
+      },
+      "checking": {
+        "parallel_batches": 25,
+        "parallel_jobs": 239,
+        "parallel_retries": 0,
+        "modules": 240,
+        "scheme_calls": 11722,
+        "closed_array_locals": 2569,
+        "candidate_scans": 3295990,
+        "candidates": 58982,
+        "candidate_parts": 148338,
+        "candidate_variables": 83978,
+        "candidate_rows": 18814,
+        "dependency_hits": 49159,
+        "dependency_recomputations": 9823,
+        "import_requests": 424062,
+        "imported_schemes": 41277,
+        "imported_summary_reuses": 3626,
+        "imported_read": 8927,
+        "type_nodes": 1256344,
+        "normalization": {
+          "substitute_nodes_added": 126825,
+          "substitute_depth_entries": 307967,
+          "substitute_memo_hits": 428,
+          "substitute_unchanged": 0,
+          "resolve_nodes_added": 378993,
+          "resolve_depth_entries": 3855578,
+          "unify_pairs": 402078,
+          "unify_projected_pairs": 0,
+          "unify_resolve_calls": 804156,
+          "unify_resolve_entries": 900992,
+          "unify_resolve_nodes": 23912,
+          "open_nodes_added": 64701,
+          "open_depth_entries": 359424,
+          "close_nodes_added": 15035,
+          "close_depth_entries": 35459,
+          "import_nodes_added": 292131,
+          "import_depth_entries": 726984,
+          "variable_views_created": 207932,
+          "type_binders_created": 207932,
+          "row_requests": 1208013,
+          "closed_row_hits": 1538,
+          "epoch_row_hits": 0,
+          "epoch_row_probes": 983,
+          "epoch_row_collisions": 909,
+          "epoch_row_stale": 2,
+          "epoch_row_context_misses": 0,
+          "epoch_row_publications": 983,
+          "composite_probes": 986679,
+          "composite_hits": 392,
+          "composite_collisions": 511697,
+          "composite_stale_dependencies": 76,
+          "composite_future_clock_misses": 0,
+          "composite_frontier_declines": 1573,
+          "composite_publications": 11096,
+          "free_type_queries": 30697,
+          "free_type_visits": 139760,
+          "free_row_queries": 145675,
+          "free_row_visits": 609222,
+          "argument_rows": 983,
+          "labels": 983,
+          "arguments": 0,
+          "changed_rows": 0,
+          "closed_row_evictions": 1910,
+          "interner_requests": 2,
+          "interner_candidates": 2,
+          "interner_arguments": 0,
+          "interner_linked": 2,
+          "interner_rebuilds": 2,
+          "closed_operation_hits": 977,
+          "argument_height_checks": 0
+        }
+      },
+      "check_allocations": 1231285,
+      "check_requested_bytes": 585193205,
+      "median_peak_rss_kib": 292920,
+      "session_heap": {
+        "slab_bytes": 136118272,
+        "free_bytes": 82975200,
+        "unused_bytes": 442936,
+        "live_class_bytes": 52700136,
+        "complete": true
+      },
+      "trials": [
+        {
+          "repetition": 0,
+          "build_ms": 8324.198325,
+          "check_us": 4668249,
+          "validation_us": 762323,
+          "peak_rss_kib": 292512,
+          "pooled_live_class_bytes": 52700136
+        },
+        {
+          "repetition": 1,
+          "build_ms": 8252.872854000001,
+          "check_us": 4701994,
+          "validation_us": 753685,
+          "peak_rss_kib": 294148,
+          "pooled_live_class_bytes": 52700136
+        },
+        {
+          "repetition": 2,
+          "build_ms": 8126.492930999993,
+          "check_us": 4609191,
+          "validation_us": 730300,
+          "peak_rss_kib": 292920,
+          "pooled_live_class_bytes": 52700136
+        }
+      ]
+    },
+    "candidate": {
+      "compiler_sha256": "6325619cfbf3d4cc5d29da69a60bc5f44dc17b8399f7a42999bb1605f2cafdd5",
+      "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+      "wasm_bytes": 2935,
+      "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+      "median_build_ms": 8775.317499,
+      "median_phase_us": {
+        "other": 35480,
+        "assets": 303671,
+        "inputs": 1144,
+        "load": 53746,
+        "lex": 438517,
+        "parse": 282100,
+        "check": 4986967,
+        "lower": 1078866,
+        "freeze": 395912,
+        "validation": 769494,
+        "backend": 327678
+      },
+      "checking": {
+        "parallel_batches": 25,
+        "parallel_jobs": 239,
+        "parallel_retries": 0,
+        "modules": 240,
+        "scheme_calls": 11722,
+        "closed_array_locals": 2569,
+        "candidate_scans": 3295990,
+        "candidates": 58982,
+        "candidate_parts": 148338,
+        "candidate_variables": 83978,
+        "candidate_rows": 18814,
+        "dependency_hits": 49159,
+        "dependency_recomputations": 9823,
+        "import_requests": 424062,
+        "imported_schemes": 41277,
+        "imported_summary_reuses": 3626,
+        "imported_read": 8927,
+        "type_nodes": 1182568,
+        "normalization": {
+          "substitute_nodes_added": 126825,
+          "substitute_depth_entries": 307967,
+          "substitute_memo_hits": 428,
+          "substitute_unchanged": 0,
+          "resolve_nodes_added": 271406,
+          "resolve_depth_entries": 3052581,
+          "view_requests": 445342,
+          "view_entries": 1741375,
+          "view_admission_entries": 2220916,
+          "view_open_entries": 116278,
+          "view_fallbacks": 0,
+          "view_materializations": 119175,
+          "view_open_requests": 35156,
+          "view_open_fallbacks": 0,
+          "unify_pairs": 402078,
+          "unify_projected_pairs": 0,
+          "unify_resolve_calls": 804156,
+          "unify_resolve_entries": 1032873,
+          "unify_resolve_nodes": 35662,
+          "open_nodes_added": 98917,
+          "open_depth_entries": 243146,
+          "close_nodes_added": 15035,
+          "close_depth_entries": 35459,
+          "import_nodes_added": 292131,
+          "import_depth_entries": 726984,
+          "variable_views_created": 207932,
+          "type_binders_created": 207932,
+          "row_requests": 1405584,
+          "closed_row_hits": 1825,
+          "epoch_row_hits": 0,
+          "epoch_row_probes": 997,
+          "epoch_row_collisions": 921,
+          "epoch_row_stale": 4,
+          "epoch_row_context_misses": 0,
+          "epoch_row_publications": 997,
+          "composite_probes": 805395,
+          "composite_hits": 391,
+          "composite_collisions": 355492,
+          "composite_stale_dependencies": 31,
+          "composite_future_clock_misses": 0,
+          "composite_frontier_declines": 1130,
+          "composite_publications": 9023,
+          "free_type_queries": 30697,
+          "free_type_visits": 139760,
+          "free_row_queries": 145675,
+          "free_row_visits": 609222,
+          "argument_rows": 997,
+          "labels": 997,
+          "arguments": 0,
+          "changed_rows": 0,
+          "closed_row_evictions": 1924,
+          "interner_requests": 2,
+          "interner_candidates": 2,
+          "interner_arguments": 0,
+          "interner_linked": 2,
+          "interner_rebuilds": 2,
+          "closed_operation_hits": 991,
+          "argument_height_checks": 0
+        }
+      },
+      "check_allocations": 1211963,
+      "check_requested_bytes": 581416337,
+      "median_peak_rss_kib": 300544,
+      "session_heap": {
+        "slab_bytes": 135987200,
+        "free_bytes": 82909664,
+        "unused_bytes": 421752,
+        "live_class_bytes": 52655784,
+        "complete": true
+      },
+      "trials": [
+        {
+          "repetition": 0,
+          "build_ms": 9144.43294,
+          "check_us": 5164768,
+          "validation_us": 827156,
+          "peak_rss_kib": 302424,
+          "pooled_live_class_bytes": 52655784
+        },
+        {
+          "repetition": 1,
+          "build_ms": 8775.317499,
+          "check_us": 4986967,
+          "validation_us": 768931,
+          "peak_rss_kib": 300544,
+          "pooled_live_class_bytes": 52655784
+        },
+        {
+          "repetition": 2,
+          "build_ms": 8364.447721999997,
+          "check_us": 4760652,
+          "validation_us": 769494,
+          "peak_rss_kib": 299760,
+          "pooled_live_class_bytes": 52655784
+        }
+      ]
+    }
+  },
+  "attribution": {
+    "resolver_created_nodes_reduction_percent": 28.387595549258172,
+    "total_type_nodes_reduction_percent": 5.872277019669769,
+    "resolve_depth_entries_reduction_percent": 20.82689028726692,
+    "pooled_live_class_bytes_reduction_percent": 0.08415917560440356,
+    "unifier_resolve_entries_increase_percent": 14.6373108751243,
+    "view_coverage": {
+      "view_requests": 445342,
+      "view_entries": 1741375,
+      "view_admission_entries": 2220916,
+      "view_open_entries": 116278,
+      "view_fallbacks": 0,
+      "view_materializations": 119175,
+      "view_open_requests": 35156,
+      "view_open_fallbacks": 0
+    },
+    "interpretation": [
+      "Zero fallback across445342view requests and35156fused openings confirms real ordinary-workload coverage. The result is not a failed activation.",
+      "Avoided intermediate normalization reduces resolver-created nodes28.4%, but total nodes only5.9%. Invariant branches still materialize at the unchanged solver boundary. Unifier resolver visits rise14.6%.",
+      "Pure admission adds2220916entries, ordered validation1741375entries and fused opening116278entries. These replace less resolver work than they introduce traversal; they are not equal-cost CPU units.",
+      "Only44352rounded pooled live bytes are saved. sessionHeap observes small-allocation slab classes only; directly mapped large allocations and other process mappings are excluded. Peak RSS grows in these controls.",
+      "Normalization node counters are inclusive attribution; existing resolve/open families overlap. Do not sum them into allocations or CPU. Admission counts type visits, row-history hops and labels, while validation/open counters are separate walk entries."
+    ]
+  },
+  "prototype": {
+    "patch": {
+      "path": "zig-native/measurements/rejected-cursor-reads-2026-11-01.patch",
+      "sha256": "c7ab750ffd355ddf25b1cd327faa4b2ced6d34ec52cfb1d63a60a4af25bdcc98"
+    },
+    "applies_to_parent_source": true,
+    "api": "TypeView{id,at}; child inherits selected cursor. readView pure bounded per-graph admission then full ordered validation, selectView and materializeView. openCovariantView fuses ordinary reading/covariant opening; normalization-only shared graphs reuse invocation-local answers, fresh rows remain independent.",
+    "fallback": "Projection/associated/custom-depth use original resolver and original recursive key queries. Rich/rank/scoped/proof/sorted leaves decline per graph; has_rank_types alone does not disable a mixed Store. Admission capped65536including row hops/labels.",
+    "consumer_boundary": "ordinaryApplication begins with concrete fused-open Id; metadata/contextual/lazy/rich child refs preserve original head and raw Id behavior. Pending products and closed keys propagate cursor into type children and operation rows. expandUse, post-solve output capture, constraint solving and final Checked/Core publication remain materialization boundaries.",
+    "depth_policy": "New view API is internal and scoped to fixed-policy Engine invocations. It does not emulate eager resolver root-cache warming under arbitrary later Store.resolution_depth_limit mutation. Views retain no validation authority; later materialization uses current policy. Existing resolve/cache behavior was unchanged.",
+    "ownership": "Views borrow existing solver nodes; no pointers/slices retained across array growth, solver rollback or publication. Numeric spans reread keys/inputs safely. No persistent view cache/receipt.",
+    "counters": "Temporary diagnostic view counters are archived with the rejected prototype; no new fields remain in the live compiler."
+  },
+  "qualification": {
+    "candidate_development": {
+      "raw": {
+        "path": "build/bench/cursor-reads/dev-reviewed/run-2be85cb35a415703/results.json",
+        "sha256": "7065a85d0bea88b68a11635d1633fce9be76da58167dfdac8e1f254e715042fd"
+      },
+      "success": true,
+      "wall_seconds": 24.872885755,
+      "compiled_native_tests": 2793,
+      "selected_native_tests": 29,
+      "guest_tests": 11,
+      "zig_lint_findings": 0,
+      "compiler_sha256": "6325619cfbf3d4cc5d29da69a60bc5f44dc17b8399f7a42999bb1605f2cafdd5",
+      "native_binary_sha256": "ddd70bb7266eb269ea0fde923ca1d52715b4c988091acbbd0076cb8e4b25a59a"
+    },
+    "candidate_native_full": {
+      "raw": {
+        "path": "build/bench/cursor-reads/native-full.json",
+        "sha256": "95e5eff99e0e62d2ac5575273877fe7ac27d88bdbe94485ff1919eb8027378d8"
+      },
+      "wall_seconds": 3.470236309993197,
+      "selected": 29,
+      "passed": 29,
+      "complete": true,
+      "allocation_failures": "full"
+    },
+    "actual_kite_streams": {
+      "raw": {
+        "path": "build/bench/cursor-reads/kites-stream/pair-daa60ee847345887/result.json",
+        "sha256": "6b81b80f36a2b3a17e1a66d0baea5504a51a301ac7163f4b3dd4edb313aab3b8"
+      },
+      "pins": {
+        "compiler_sha256": "6325619cfbf3d4cc5d29da69a60bc5f44dc17b8399f7a42999bb1605f2cafdd5",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "76989b7a1d28a284e093c47a5cec9120bb85861a5929f3ce848829a632b29e65",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ],
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 6147.459883,
+          "wasm_bytes": 262967,
+          "wasm_sha256": "621d1819bbcd79e1852470fbc00b02c110ffa8be726c6c77f2b75cbbbca558d4",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_reference": true,
+          "streams_match_pinned_reference": true
+        },
+        {
+          "name": "candidate",
+          "build_ms": 6175.483767000001,
+          "wasm_bytes": 261953,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_reference": true,
+          "streams_match_pinned_reference": true
+        }
+      ],
+      "timing_note": "One integration source pair, not a compiler latency benchmark."
+    },
+    "full_gates": {
+      "candidate": {
+        "raw": {
+          "path": "build/bench/cursor-reads/candidate-full-gate/timings.json",
+          "sha256": "be2713f9bc8ae0034229b2628ff1ff4ad9a889d972ebfc9418f069eb74416313"
+        },
+        "log": {
+          "path": "/tmp/blot-cursor-reads-candidate-full-gate.log",
+          "sha256": "bd5680b4aa657e49c441f1571e0e002cebef7afdc3a2009a22437c81d328b454"
+        },
+        "success": false,
+        "wall_seconds": 3.19076737,
+        "passed": 48,
+        "failed": 1,
+        "failure": "chunk runtime and static chains survive dependency bundles and retained entry edits; emit storage_escape at312..345",
+        "full_native_execution": "pending; gate stops in smoke"
+      },
+      "restored": {
+        "raw": {
+          "path": "build/bench/cursor-reads/restored-full-gate/timings.json",
+          "sha256": "541b0181fade23549c1cf2fd1e88149b26c5ed08629532784f96ee07f0f4d658"
+        },
+        "log": {
+          "path": "/tmp/blot-cursor-reads-restored-full-gate.log",
+          "sha256": "7a63724db57dcd37d80df29d753ec66bef07021b10e6cd6dd06af8b2950830f0"
+        },
+        "success": false,
+        "wall_seconds": 3.1148656089999998,
+        "passed": 48,
+        "failed": 1,
+        "failure": "chunk runtime and static chains survive dependency bundles and retained entry edits; emit storage_escape at312..345",
+        "full_native_execution": "pending; gate stops in smoke"
+      }
+    },
+    "restored_development": {
+      "raw": {
+        "path": "build/bench/cursor-reads/restored-dev/run-379230fb75c3d029/results.json",
+        "sha256": "dc14e23853275d6e9f8e93ed8b596e5053c7e2150ec2ade984222dde5fa2b43b"
+      },
+      "success": true,
+      "wall_seconds": 16.396122862,
+      "compiled_native_tests": 2785,
+      "selected_native_tests": 17,
+      "guest_tests": 9,
+      "zig_lint_findings": 0,
+      "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4"
+    },
+    "intermediate_failures": [
+      {
+        "raw": {
+          "path": "build/bench/cursor-reads/dev/run-3c647bf49c9a5230/results.json",
+          "sha256": "f97d0fd0638f622162ace1fdb2b361d42d034546306a488e2d7e08ddf2780e00"
+        },
+        "reason": "Prototype local fresh variable shadowed Store.fresh declaration; renamed opened_fresh."
+      },
+      {
+        "raw": {
+          "path": "build/bench/cursor-reads/dev-fixed/run-578cdeb453787194/results.json",
+          "sha256": "24cee8543ebc44f9b11cfe3c197bd1c3ccec9f4ce61df12b2027cecfa70ccbaa"
+        },
+        "reason": "28of29native laws pass. New warm-depth test expected unchanged new-root resolution to populate root cache, which baseline does not do. Revised law forces a changed graph via bound leaf before warming. Consumer charged-path review fixes completed before final candidate."
+      }
+    ]
+  },
+  "astra_review": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "safety": "No remaining blocker in documented fixed-policy Engine path after concrete-arrow/head/raw-child restoration, exact fallback query points, counted bounded row admission, and history/effect/OOM laws.",
+    "decision": "Reject this eager-validation adapter. Lower materialization with substantially more traversals is not the desired hill. This does not falsify a truly view-aware solver.",
+    "next_discriminator": "Unification/application/pending-use consumers would inspect(id,cursor)children directly without normalize-before-compare and duplicate whole-root validation. Materialize at variable binding/publication and assign depth/work enforcement one explicit construction/binding/publication boundary. Preserve history, occurs checks, row semantics and rollback. If required validation behavior still forces preliminary full walks, stop this direction.",
+    "next_scope": "Solver and validation-contract replacement; not another memo or extension of this patch. Not implemented in this batch."
+  },
+  "commands": {
+    "development": "deno task check:dev --area type-effects --budget-seconds 150 --timings-dir build/bench/cursor-reads/dev-reviewed",
+    "pairs": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --repetitions 3 --timeout-ms 10000 --compiler zig-native/zig-out-dev/bin/blotc --baseline zig-native/zig-out-cursor-read-baseline/bin/blotc --output build/bench/cursor-reads/world-pairs",
+    "native_full": "zig-native/zig-out-native-dev/bin/blot-tests --allocation-failures=full plus29 exact --test names in development report",
+    "integration": "deno run --no-config --no-lock -A scripts/bench/kites_stream.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 10000 --output build/bench/cursor-reads/kites-stream",
+    "restored_development": "deno task check:dev --area type-effects --budget-seconds 150 --timings-dir build/bench/cursor-reads/restored-dev",
+    "full_gate": "deno task test:compiler --budget-seconds 45 --phase-seconds 30 --timings-dir build/bench/cursor-reads/restored-full-gate"
+  },
+  "raw_pins": {
+    "world_pairs": {
+      "path": "build/bench/cursor-reads/world-pairs/result.json",
+      "sha256": "ff12b4ae72e9ff31a8e418e2d12b905c312adcde703a58f4f5bd7c4992149c5b"
+    },
+    "bench_tool": {
+      "path": "scripts/bench/engine_stages.ts",
+      "sha256": "7e2c68582131a79900fc3bd7e3c047d76bd01cca13c3d734b38a9f07efa18ff8"
+    },
+    "stream_tool": {
+      "path": "scripts/bench/kites_stream.ts",
+      "sha256": "4f44f35b5a088d7014d1e3116196f4988fb5e3fd7f3b3246e4f8178ad09da3ce"
+    }
+  },
+  "limits": [
+    "Three rotated fresh pairs on one host; compare only within this cohort. Prior7.41second median is another matched run and must not be subtracted from current8.25control.",
+    "Every timed/integration build completed below its explicit10second cap. Ordinary diagnostic default remains5seconds; no unbounded main compile.",
+    "All240modules are source-checked each fresh trial. cachedModules denotes same-build frozen producer handoff, not warm source checking.",
+    "Full gate still stops at known List/chunk failure on both prototype and restored compiler. No full qualification or LLVM release claim.",
+    "No whole-game Wasm, size or new frame/PNG; subsecond target remains open. ABI8, protocol2 and saved schema26 unchanged. Existing Ink/Gdev sources/assets remain clean.",
+    "Final compiler source equals parenta7c181bc and installed executable is exact original4c9635bb. Only experiment evidence and frontier documentation are checkpointed."
+  ]
+}

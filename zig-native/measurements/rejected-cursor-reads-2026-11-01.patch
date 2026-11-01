@@ -1,0 +1,1020 @@
+diff --git a/scripts/dev_check_areas.ts b/scripts/dev_check_areas.ts
+index eadadded..b499bc1c 100644
+--- a/scripts/dev_check_areas.ts
++++ b/scripts/dev_check_areas.ts
+@@ -489,6 +489,18 @@ export const devCheckAreas = {
+     "description":
+       "Type identity, substitution, effect-row rollback and owned evidence.",
+     "native": [
++      "check.check_nominal_tests.test.ordinary curried calls preserve intrinsic divergence and named record diagnostics",
++      "check.check_nominal_tests.test.application normalization retains deep ordinary type rejection before publication",
++      "check.types_tests.test.cursor views inherit parent history without rebuilding ordinary graphs",
++      "check.types_tests.test.cursor views preserve cold depth errors custom limits and warm fallback",
++      "check.types_tests.test.cursor view materialization uses current depth policy without retained validation authority",
++      "check.types_tests.test.cursor views retain exact operation argument depth and rich per graph fallback",
++      "check.types_tests.test.cursor covariance preserves exact parameters invariant leaves independent rows rollback and allocation failures",
++      "check.types_tests.test.cursor covariance shares normalization only changes in an open diamond graph",
++      "check.check_shared_scheme_tests.test.higher order callees are solved at their use",
++      "check.check_shared_scheme_tests.test.return type polymorphism preserves independent expected results through shared uses",
++      "check.check_shared_scheme_tests.test.a conflicting operand reports the same outcome through a shared callee",
++      "check.check_shared_scheme_tests.test.a lexical closure over outer variables expands its shared callee in place",
+       "check.frozen_core_validation_tests.test.Core validation batch preserves ordinary graph source bounds and forbidden owner checks through OOM",
+       "check.frozen_core_validation_tests.test.Core validation batch keeps spawn calls captures malformed wrappers and standalone fallback",
+       "check.frozen_core_validation_tests.test.Core task batch recomputes exact changed entry context instead of retaining absence",
+@@ -511,6 +523,7 @@ export const devCheckAreas = {
+       "zig-native/tests/type_identity_execution.test.ts",
+       "zig-native/tests/symbolic_effect_rows.test.ts",
+       "zig-native/tests/inference_budget_config.test.ts",
++      "zig-native/tests/checker_normalization_execution.test.ts",
+     ],
+     "guestFilters": {} as Record<string, string>,
+   },
+diff --git a/zig-native/src/check/check.zig b/zig-native/src/check/check.zig
+index c4fe035f..72052d62 100644
+--- a/zig-native/src/check/check.zig
++++ b/zig-native/src/check/check.zig
+@@ -12543,7 +12543,7 @@ const Engine = struct {
+     fn ordinaryApplication(self: *Engine, id: ast.Id, leaf: ast.Id) T.Error!T.Id {
+         const node = self.tree.node(id);
+         const pending_begin = self.pending.items.len;
+-        var function_ty = try self.types.openCovariant(try self.types.resolve(try self.expression(node.a), 0));
++        var function_ty = try self.types.openCovariantView(try self.expression(node.a));
+         var rank_goals: T.List = .{};
+         if (self.types.node(function_ty).tag == .forall) {
+             const instance = try self.types.instantiateRank(function_ty, false);
+@@ -12553,20 +12553,29 @@ const Engine = struct {
+             // continues to expose the declared universal principal.
+             self.expr_types[node.a] = function_ty;
+         }
+-        const qualified_id = try self.types.resolve(function_ty, 0);
+-        const qualified_function = self.types.node(qualified_id);
++        const qualified = try self.types.readView(function_ty, 0);
++        const qualified_function = self.types.node(qualified.id);
+         const cleanup_call = qualified_function.tag == .usage and qualified_function.b == @backingInt(T.UsageKind.cleanup);
+         const concurrent_call = qualified_function.tag == .usage and qualified_function.b == @backingInt(T.UsageKind.concurrent);
+         if (qualified_function.tag == .usage and (qualified_function.b == @backingInt(T.UsageKind.once) or qualified_function.b == @backingInt(T.UsageKind.many) or cleanup_call or concurrent_call)) function_ty = qualified_function.a;
+         function_ty = try self.freshGenerativeInvocation(id, function_ty);
+         self.expr_types[node.a] = function_ty;
+-        if (cleanup_call or concurrent_call) self.expr_types[node.a] = qualified_id;
+-        const function = self.types.node(try self.types.resolve(function_ty, 0));
++        if (cleanup_call or concurrent_call) self.expr_types[node.a] = qualified.id;
++        const function_view = try self.types.readView(function_ty, 0);
++        const function = self.types.node(function_view.id);
++        // Covariance opening publishes a concrete arrow. Its children already
++        // encode their selected history, including the original rich fallback.
++        if (function.tag == .function) std.debug.assert(function_view.at == 0);
++        const parameter_view = function_view.child(function.a);
+         const lazy = function.tag == .function and self.types.node(self.types.head(function.a, 0)).tag == .demand;
+         const saved_exact = self.exact_argument_types;
+         self.exact_argument_types = saved_exact or try self.evidenceCall(node.a, 0);
+         const argument = blk_argument: {
+-            if (function.tag == .function and (self.types.node(try self.types.resolve(function.a, 0)).tag == .forall or self.types.node(self.types.head(function.a, 0)).tag == .usage or storage_types.isArray(&self.types, self.types.head(function.a, 0)))) break :blk_argument try self.contextualLambda(node.b, function.a);
++            if (function.tag == .function) {
++                const expected = try self.types.readView(parameter_view.id, parameter_view.at);
++                const expected_id = expected.id;
++                if (self.types.node(expected_id).tag == .forall or self.types.node(expected_id).tag == .usage or storage_types.isArray(&self.types, expected_id)) break :blk_argument try self.contextualLambda(node.b, function.a);
++            }
+             break :blk_argument self.checkArgument(node.b, lazy);
+         } catch |err| {
+             self.exact_argument_types = saved_exact;
+@@ -12581,7 +12590,7 @@ const Engine = struct {
+             var supplied_source = node.b;
+             while (self.tree.node(supplied_source).tag == .group) supplied_source = self.tree.node(supplied_source).a;
+             const supplied = self.tree.node(supplied_source);
+-            const expected = self.types.node(try self.types.resolve(function.a, 0));
++            const expected = self.types.node((try self.types.readView(parameter_view.id, parameter_view.at)).id);
+             if (supplied.tag == .record and supplied.a == 0 and expected.tag == .record) {
+                 for (self.tree.children(supplied_source)) |field_source| {
+                     const name = self.tree.node(field_source).a;
+@@ -12599,7 +12608,7 @@ const Engine = struct {
+         }
+         if (function.tag == .function and self.types.node(self.types.head(function.a, 0)).tag == .erased_proof) {
+             if (!try self.proofCall(id, node.b)) return try self.types.fresh();
+-        } else if (self.types.node(try self.types.resolve(argument, 0)).tag == .erased_proof) {
++        } else if (self.types.node((try self.types.readView(argument, 0)).id).tag == .erased_proof) {
+             try self.diagnostic(.proof_runtime_use, node.b);
+             return try self.types.fresh();
+         }
+@@ -12976,7 +12985,7 @@ const Engine = struct {
+         var diverges = false;
+         while (self.tree.node(head).tag == .apply) {
+             const node = self.tree.node(head);
+-            diverges = diverges or try self.types.resolve(self.expr_types[node.b], 0) == T.never;
++            diverges = diverges or self.types.node((try self.types.readView(self.expr_types[node.b], 0)).id).tag == .never;
+             count += 1;
+             head = node.a;
+         }
+@@ -12988,9 +12997,11 @@ const Engine = struct {
+                 if (count == arity) return if (diverges) T.never else result;
+             }
+         }
+-        const function = self.types.node(try self.types.resolve(callee, 0));
+-        const never_result = function.tag == .function and try self.types.resolve(function.b, 0) == T.never;
+-        return if (function.tag == .never or never_result or try self.types.resolve(argument, 0) == T.never) T.never else result;
++        const view = try self.types.readView(callee, 0);
++        const function = self.types.node(view.id);
++        const never_result = function.tag == .function and self.types.node((try self.types.readView(function.b, view.at)).id).tag == .never;
++        if (function.tag == .never or never_result or self.types.node((try self.types.readView(argument, 0)).id).tag == .never) return T.never;
++        return result;
+     }
+     fn evidenceCall(self: *Engine, source: ast.Id, depth: usize) T.Error!bool {
+         if (self.implementations.items.len == 0) return false;
+@@ -13046,8 +13057,9 @@ const Engine = struct {
+         return self.types.demandWithEffects(result, latent);
+     }
+     fn demandCallee(self: *Engine, ty: T.Id) T.Error!bool {
+-        const node = self.types.node(try self.types.resolve(ty, 0));
+-        return node.tag == .function and self.types.node(self.types.head(node.a, 0)).tag == .demand;
++        const view = try self.types.readView(ty, 0);
++        const node = self.types.node(view.id);
++        return node.tag == .function and self.types.node(self.types.selectView(view.child(node.a)).id).tag == .demand;
+     }
+     fn binary(self: *Engine, id: ast.Id) T.Error!T.Id {
+         const node = self.tree.node(id);
+@@ -14648,9 +14660,11 @@ const Engine = struct {
+     fn resolveUse(self: *Engine, index: usize) T.Error!bool {
+         const use = self.pending.items[index];
+         const callee = self.bindings.items[use.value.identity.decl];
+-        const product = self.types.node(try self.types.resolve(use.value.ty, 0));
+-        const instance = try self.allocator.dupe(T.Id, self.types.list(.{ .start = product.a, .len = product.b }));
++        const product_view = try self.types.readView(use.value.ty, 0);
++        const product = self.types.node(product_view.id);
++        const instance = try self.allocator.alloc(T.TypeView, product.b);
+         defer self.allocator.free(instance);
++        for (instance, 0..) |*part, position| part.* = self.types.selectView(product_view.child(self.types.list(.{ .start = product.a, .len = product.b })[position]));
+         const type_count = callee.summary.public_variables.len;
+         var key: std.ArrayList(u8) = .empty;
+         defer key.deinit(self.allocator);
+@@ -14661,14 +14675,14 @@ const Engine = struct {
+         defer seen_types.deinit(self.allocator);
+         var seen_rows: std.ArrayList(u32) = .empty;
+         defer seen_rows.deinit(self.allocator);
+-        const inputs = self.types.list(callee.summary.public_inputs);
++        const inputs = callee.summary.public_inputs;
+         var input_open = false;
+         var input_partial = false;
+         var plain = true;
+         for (instance, 0..) |item, position| {
+             if (position < type_count) {
+-                const value = self.types.node(item);
+-                const input = inputs[position] != 0;
++                const value = self.types.node(item.id);
++                const input = self.types.list(inputs)[position] != 0;
+                 if (value.tag == .variable) {
+                     if (input) input_open = true;
+                     if (inList(seen_types.items, value.a)) plain = false else try seen_types.append(self.allocator, value.a);
+@@ -14676,13 +14690,13 @@ const Engine = struct {
+                     try key.append(self.allocator, 0);
+                 } else {
+                     try key.append(self.allocator, 1);
+-                    if (!try self.closedKey(item, &key, 0)) {
++                    if (!try self.closedViewKey(item, &key, 0)) {
+                         plain = false;
+                         if (input) input_partial = true;
+                     }
+                 }
+             } else {
+-                const row = try self.types.resolveEffects(self.types.node(item).c, 0);
++                const row = try self.types.resolveEffects(self.types.node(item.id).c, item.at);
+                 const value = self.types.row(row);
+                 if (value.tail == .variable and value.labels.len == 0) {
+                     if (inList(seen_rows.items, value.tail.variable)) plain = false else try seen_rows.append(self.allocator, value.tail.variable);
+@@ -14696,10 +14710,14 @@ const Engine = struct {
+         }
+         if (callee.summary.only_result_selected) {
+             var result_ready = true;
+-            for (self.types.list(callee.summary.public_outputs), instance[0..type_count]) |output, actual| if (output != 0 and !try self.types.equalClosed(actual, actual)) {
+-                result_ready = false;
+-                break;
+-            };
++            for (instance[0..type_count], 0..) |actual, position| {
++                if (self.types.list(callee.summary.public_outputs)[position] == 0) continue;
++                const materialized = try self.instanceTypeId(actual);
++                if (!try self.types.equalClosed(materialized, materialized)) {
++                    result_ready = false;
++                    break;
++                }
++            }
+             // Only a fixed destination can infer an input for this class of
+             // schemes. Keep unknown destinations as graph edges even when an
+             // argument has already supplied a concrete type.
+@@ -14731,15 +14749,20 @@ const Engine = struct {
+             var matched = true;
+             for (open.items, 0..) |position, slot| {
+                 if (position < type_count) {
+-                    if (outcome.types[slot] != unchanged_output) self.types.unify(instance[position], outcome.types[slot]) catch |err| switch (err) {
++                    if (outcome.types[slot] != unchanged_output) self.types.unify(try self.instanceTypeId(instance[position]), outcome.types[slot]) catch |err| switch (err) {
+                         error.OutOfMemory, error.TypeLimit => return err,
+                         else => matched = false,
+                     };
+                 } else {
+-                    if (outcome.rows[slot] != unchanged_output) self.types.unifyEffects(self.types.node(instance[position]).c, outcome.rows[slot]) catch |err| switch (err) {
+-                        error.OutOfMemory, error.TypeLimit => return err,
+-                        else => matched = false,
+-                    };
++                    if (outcome.rows[slot] != unchanged_output) {
++                        const part = instance[position];
++                        var row = self.types.node(part.id).c;
++                        if (!self.originalTypeReads()) row = try self.types.resolveEffects(row, part.at);
++                        self.types.unifyEffects(row, outcome.rows[slot]) catch |err| switch (err) {
++                            error.OutOfMemory, error.TypeLimit => return err,
++                            else => matched = false,
++                        };
++                    }
+                 }
+             }
+             if (matched) {
+@@ -14777,7 +14800,7 @@ const Engine = struct {
+         seen_rows.clearRetainingCapacity();
+         if (complete) for (open.items, 0..) |position, slot| {
+             if (position < type_count) {
+-                const closed = try self.types.resolve(instance[position], 0);
++                const closed = try self.types.materializeView(instance[position]);
+                 const shape = self.types.node(closed);
+                 if (shape.tag == .variable) {
+                     if (inList(seen_types.items, shape.a)) {
+@@ -14793,7 +14816,8 @@ const Engine = struct {
+                     break;
+                 }
+             } else {
+-                const row = try self.types.resolveEffects(self.types.node(instance[position]).c, 0);
++                const part = instance[position];
++                const row = try self.types.resolveEffects(self.types.node(part.id).c, part.at);
+                 const shape = self.types.row(row);
+                 if (shape.tail == .variable and shape.labels.len == 0) {
+                     if (inList(seen_rows.items, shape.tail.variable)) {
+@@ -14827,19 +14851,42 @@ const Engine = struct {
+     }
+     /// Canonical bytes of a closed type, or false for a type that is open or
+     /// has no canonical form. Equal bytes mean equal types.
++    fn originalTypeReads(self: *const Engine) bool {
++        return self.types.has_projections or self.types.associated_equations.count() != 0 or self.types.resolution_depth_limit != 1024;
++    }
++    fn instanceTypeId(self: *Engine, view: T.TypeView) T.Error!T.Id {
++        // Eager fallback products already contain the original normalized
++        // member IDs. Another root resolve would add projection work charges.
++        if (self.originalTypeReads()) return view.id;
++        return self.types.materializeView(view);
++    }
+     fn closedKey(self: *Engine, ty: T.Id, out: *std.ArrayList(u8), depth: usize) T.Error!bool {
+         if (depth >= 256) return false;
+-        const value = self.types.node(try self.types.resolve(ty, 0));
++        if (self.originalTypeReads()) return self.closedViewKey(.{ .id = ty }, out, depth);
++        return self.closedViewKey(try self.types.readView(ty, 0), out, depth);
++    }
++    fn closedViewKey(self: *Engine, root: T.TypeView, out: *std.ArrayList(u8), depth: usize) T.Error!bool {
++        if (depth >= 256) return false;
++        var view: T.TypeView = undefined;
++        if (self.originalTypeReads()) {
++            view = try self.types.readView(root.id, root.at);
++        } else {
++            view = self.types.selectView(root);
++        }
++        const value = self.types.node(view.id);
+         try out.append(self.allocator, @backingInt(value.tag));
+         switch (value.tag) {
+             .unit, .boolean, .u32, .f32, .never => return true,
+             .function => {
+-                if (!try self.closedRowKey(try self.types.resolveEffects(value.c, 0), out, depth + 1)) return false;
+-                return try self.closedKey(value.a, out, depth + 1) and try self.closedKey(value.b, out, depth + 1);
++                if (!try self.closedRowKey(try self.types.resolveEffects(value.c, view.at), out, depth + 1)) return false;
++                return try self.closedViewKey(view.child(value.a), out, depth + 1) and try self.closedViewKey(view.child(value.b), out, depth + 1);
+             },
+             .product => {
+                 try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+-                for (self.types.list(.{ .start = value.a, .len = value.b })) |child| if (!try self.closedKey(child, out, depth + 1)) return false;
++                for (0..value.b) |position| {
++                    const child = self.types.list(.{ .start = value.a, .len = value.b })[position];
++                    if (!try self.closedViewKey(view.child(child), out, depth + 1)) return false;
++                }
+                 return true;
+             },
+             .record => {
+@@ -14858,19 +14905,22 @@ const Engine = struct {
+                 for (order) |at| {
+                     const field = self.types.recordField(value, at);
+                     try out.appendSlice(self.allocator, std.mem.asBytes(&field.name));
+-                    if (!try self.closedKey(field.ty, out, depth + 1)) return false;
++                    if (!try self.closedViewKey(view.child(field.ty), out, depth + 1)) return false;
+                 }
+                 return true;
+             },
+             .nominal => {
+                 try out.appendSlice(self.allocator, std.mem.asBytes(&value.a));
+                 try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+-                const arguments = self.types.nominalArguments(value);
+-                try out.appendSlice(self.allocator, std.mem.asBytes(&arguments.len));
+-                for (arguments) |child| if (!try self.closedKey(child, out, depth + 1)) return false;
++                const count = self.types.nominalArguments(value).len;
++                try out.appendSlice(self.allocator, std.mem.asBytes(&count));
++                for (0..count) |position| {
++                    const child = self.types.nominalArguments(value)[position];
++                    if (!try self.closedViewKey(view.child(child), out, depth + 1)) return false;
++                }
+                 return true;
+             },
+-            .array, .list, .cursor, .resolver => return self.closedKey(value.a, out, depth + 1),
++            .array, .list, .cursor, .resolver => return self.closedViewKey(view.child(value.a), out, depth + 1),
+             .type_constructor => {
+                 try out.appendSlice(self.allocator, std.mem.asBytes(&value.a));
+                 try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+@@ -14900,10 +14950,13 @@ const Engine = struct {
+             try bytes.appendSlice(self.allocator, std.mem.asBytes(&operation.identity.decl));
+             try bytes.appendSlice(self.allocator, std.mem.asBytes(&operation.instance.unit));
+             try bytes.appendSlice(self.allocator, std.mem.asBytes(&operation.instance.decl));
+-            for (self.types.operationArguments(label)) |argument| if (!try self.closedKey(argument, &bytes, depth + 1)) {
+-                bytes.deinit(self.allocator);
+-                return false;
+-            };
++            for (0..operation.arguments.len) |position| {
++                const argument = self.types.operationArguments(label)[position];
++                if (!try self.closedKey(argument, &bytes, depth + 1)) {
++                    bytes.deinit(self.allocator);
++                    return false;
++                }
++            }
+             try encoded.ensureUnusedCapacity(self.allocator, 1);
+             encoded.appendAssumeCapacity(try bytes.toOwnedSlice(self.allocator));
+         }
+@@ -14929,7 +14982,8 @@ const Engine = struct {
+             while (i < self.pending.items.len) : (i += 1) {
+                 const item = self.pending.items[i];
+                 if (item.solved or item.suspended or item.value.kind != .callee_use or !inList(group, item.owner)) continue;
+-                const product = self.types.node(try self.types.resolve(item.value.ty, 0));
++                const product_view = try self.types.readView(item.value.ty, 0);
++                const product = self.types.node(product_view.id);
+                 const summary = self.bindings.items[item.value.identity.decl].summary;
+                 const type_count = summary.public_variables.len;
+                 if (!recursive and summary.only_result_selected) {
+@@ -14938,17 +14992,24 @@ const Engine = struct {
+                 }
+                 if (!recursive and summary.has_explicit) {
+                     var closed = true;
+-                    for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (!try self.types.equalClosed(part, part)) {
+-                        closed = false;
+-                        break;
+-                    };
++                    for (0..type_count) |position| {
++                        const part = self.types.list(.{ .start = product.a, .len = product.b })[position];
++                        const materialized = try self.instanceTypeId(product_view.child(part));
++                        if (!try self.types.equalClosed(materialized, materialized)) {
++                            closed = false;
++                            break;
++                        }
++                    }
+                     if (closed) continue;
+                 }
+                 var informed = recursive;
+-                for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (self.types.node(part).tag != .variable) {
+-                    informed = true;
+-                    break;
+-                };
++                for (0..type_count) |position| {
++                    const part = self.types.list(.{ .start = product.a, .len = product.b })[position];
++                    if (self.types.node(self.types.selectView(product_view.child(part)).id).tag != .variable) {
++                        informed = true;
++                        break;
++                    }
++                }
+                 if (!informed) continue;
+                 self.pending.items[i].solved = true;
+                 self.counters.use_expansions += 1;
+diff --git a/zig-native/src/check/check_nominal_tests.zig b/zig-native/src/check/check_nominal_tests.zig
+index c88763c1..a69cf4a6 100644
+--- a/zig-native/src/check/check_nominal_tests.zig
++++ b/zig-native/src/check/check_nominal_tests.zig
+@@ -34,6 +34,66 @@ const Fixture = struct {
+         try std.testing.expectEqual(@as(usize, 0), self.checked.diagnostics.len);
+     }
+ };
++test "ordinary curried calls preserve intrinsic divergence and named record diagnostics" {
++    const source =
++        \\const pick = func (left: U32) -> (right: U32) => return right
++        \\const named = func (values: {left: U32, right: U32}) => return @u32.add values.left values.right
++        \\const ordinary = func () => return pick (@panic "earlier") 7
++        \\const intrinsic = func () => return @u32.add (@panic "earlier") 7
++        \\entry const answer = func (input: U32) => return named {right: pick 1 2, left: input}
++    ;
++    var valid = try Fixture.init(source);
++    defer valid.deinit();
++    try valid.valid();
++    var never: usize = 0;
++    for (valid.tree.nodes.items, 0..) |node, id| {
++        if (node.tag != .apply) continue;
++        const span = valid.tree.span(@intCast(id));
++        const text = source[span.start..span.end];
++        if (!std.mem.eql(u8, text, "pick (@panic \"earlier\") 7") and !std.mem.eql(u8, text, "@u32.add (@panic \"earlier\") 7")) continue;
++        try std.testing.expectEqual(T.never, valid.checked.expr_types[id]);
++        never += 1;
++    }
++    try std.testing.expectEqual(@as(usize, 2), never);
++    const invalid = "const named = func (values: {left: U32, right: U32}) => return values.left\nentry const answer = named {left: 1, wrong: 2}\n";
++    var rejected = try Fixture.init(invalid);
++    defer rejected.deinit();
++    const start = std.mem.find(u8, invalid, "wrong").?;
++    try std.testing.expect(rejected.checked.diagnostics.len != 0);
++    try std.testing.expectEqual(check.Code.unknown_field, rejected.checked.diagnostics[0].code);
++    try std.testing.expectEqual(start, rejected.checked.diagnostics[0].span.start);
++}
++
++test "application normalization retains deep ordinary type rejection before publication" {
++    for ([_]usize{ 7, 10 }) |depth| {
++        var source: std.ArrayList(u8) = .empty;
++        defer source.deinit(a);
++        try source.appendSlice(a, "const layer_0 = func value => return #[value]\n");
++        for (1..depth + 1) |level| {
++            const line = try a.print("const layer_{d} = func value => return layer_{d} (layer_{d} value)\n", .{ level, level - 1, level - 1 });
++            defer a.free(line);
++            try source.appendSlice(a, line);
++        }
++        const entry = try a.print("entry const answer = func (input: U32) => return layer_{d} input\n", .{depth});
++        defer a.free(entry);
++        try source.appendSlice(a, entry);
++        if (depth == 10) {
++            if (Fixture.init(source.items)) |value| {
++                var rejected = value;
++                defer rejected.deinit();
++                var nesting = false;
++                for (rejected.checked.diagnostics) |diagnostic| {
++                    if (diagnostic.code == .nesting_limit) nesting = true;
++                }
++                try std.testing.expect(nesting);
++            } else |err| try std.testing.expectEqual(error.TypeLimit, err);
++        } else {
++            var valid = try Fixture.init(source.items);
++            defer valid.deinit();
++            try valid.valid();
++        }
++    }
++}
+ pub const records_source =
+     \\infixl 60 (+) = _fixity_add
+     \\type Vec2 is data = $Vec2 { x: F32, y: F32 }
+diff --git a/zig-native/src/check/types.zig b/zig-native/src/check/types.zig
+index ba8c85ad..0e1cb245 100644
+--- a/zig-native/src/check/types.zig
++++ b/zig-native/src/check/types.zig
+@@ -8,6 +8,16 @@ const composite_cache = @import("../reuse/composite_resolution_cache.zig");
+ pub const Effects = @import("effects.zig");
+ pub const Id = u32;
+ pub const Cursor = u32;
++/// A query handle within an invocation with a fixed Store depth policy, rather
++/// than a validation certificate. Children inherit the selected history.
++pub const TypeView = struct {
++    id: Id,
++    at: Cursor = 0,
++
++    pub fn child(self: TypeView, id: Id) TypeView {
++        return .{ .id = id, .at = self.at };
++    }
++};
+ pub const absent: Id = 0;
+ pub const unit: Id = 1;
+ pub const boolean: Id = 2;
+@@ -1009,6 +1019,160 @@ pub const Store = struct {
+         }
+         return certificate;
+     }
++    const ViewKey = struct { id: Id, at: Cursor, depth: usize };
++    const ViewVisits = struct {
++        entries: [128]?ViewKey = @splat(null),
++        work: usize = 0,
++
++        fn slot(key: ViewKey) usize {
++            return ((@as(usize, key.id) *% 31 +% key.at) *% 31 +% key.depth) % 128;
++        }
++        fn contains(self: *const ViewVisits, key: ViewKey) bool {
++            const previous = self.entries[slot(key)] orelse return false;
++            return std.meta.eql(previous, key);
++        }
++        fn put(self: *ViewVisits, key: ViewKey) void {
++            self.entries[slot(key)] = key;
++        }
++    };
++
++    pub fn selectView(self: *const Store, view: TypeView) TypeView {
++        var selected = view;
++        while (self.node(selected.id).tag == .variable) {
++            const variable = self.node(selected.id);
++            selected.at = @max(selected.at, variable.b);
++            const write = self.replacement(variable.a, selected.at) orelse break;
++            selected = .{ .id = write.replacement, .at = write.position + 1 };
++        }
++        return selected;
++    }
++
++    /// Admission is pure: a declined graph takes the original resolver, which
++    /// retains its diagnostic order, projection charges and depth policy.
++    fn ordinaryView(self: *Store, input: TypeView, depth: usize, seen: *ViewVisits) bool {
++        self.normalization.view_admission_entries +|= 1;
++        if (seen.work == 65_536) return false;
++        seen.work += 1;
++        if (depth >= 1024) return false;
++        const view = self.selectView(input);
++        const key: ViewKey = .{ .id = view.id, .at = view.at, .depth = depth };
++        if (seen.contains(key)) return true;
++        const value = self.node(view.id);
++        switch (value.tag) {
++            .variable => {
++                const variable = self.variables.items[value.a];
++                if (variable.region or variable.row_effect != none) return false;
++            },
++            .function => {
++                if (!self.ordinaryView(view.child(value.a), depth + 1, seen)) return false;
++                if (!self.ordinaryView(view.child(value.b), depth + 1, seen)) return false;
++                if (!self.ordinaryViewRow(value.c, view.at, depth + 1, seen)) return false;
++            },
++            .demand, .provider => {
++                if (!self.ordinaryView(view.child(value.a), depth + 1, seen)) return false;
++                if (!self.ordinaryViewRow(value.c, view.at, depth + 1, seen)) return false;
++            },
++            .array, .list, .cursor, .resolver => if (!self.ordinaryView(view.child(value.a), depth + 1, seen)) return false,
++            .state_provider => for ([_]Id{ value.a, value.b, value.c }) |child| {
++                if (!self.ordinaryView(view.child(child), depth + 1, seen)) return false;
++            },
++            .product => for (self.list(.{ .start = value.a, .len = value.b })) |child| {
++                if (!self.ordinaryView(view.child(child), depth + 1, seen)) return false;
++            },
++            .record => for (0..value.b) |i| {
++                if (!self.ordinaryView(view.child(self.recordField(value, i).ty), depth + 1, seen)) return false;
++            },
++            .nominal => for (self.nominalArguments(value)) |child| {
++                if (!self.ordinaryView(view.child(child), depth + 1, seen)) return false;
++            },
++            .absent, .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
++            else => return false,
++        }
++        seen.put(key);
++        return true;
++    }
++    fn ordinaryViewRow(self: *Store, root: Effects.Id, at: Cursor, depth: usize, seen: *ViewVisits) bool {
++        if (depth >= 1024) return false;
++        var row_ = self.row(root);
++        var position = at;
++        while (true) {
++            self.normalization.view_admission_entries +|= 1;
++            if (seen.work == 65_536) return false;
++            seen.work += 1;
++            for (self.effects.list(row_.labels)) |label| {
++                self.normalization.view_admission_entries +|= 1;
++                if (seen.work == 65_536) return false;
++                seen.work += 1;
++                const operation_ = self.operation(label);
++                if (operation_.instance.unit == 0 and operation_.instance.decl != 0) return false;
++                for (self.list(operation_.arguments)) |argument| {
++                    if (!self.ordinaryView(.{ .id = argument, .at = at }, depth + 1, seen)) return false;
++                }
++            }
++            if (row_.tail == .formal) return false;
++            if (row_.tail != .variable) return true;
++            position = @max(position, row_.cursor);
++            const write = self.effects.replacementAt(row_.tail.variable, position) orelse return true;
++            row_ = self.row(write.replacement);
++            position = write.position + 1;
++        }
++    }
++    fn viewAdmitted(self: *Store, view: TypeView) bool {
++        if (self.has_projections or self.associated_equations.count() != 0 or self.resolution_depth_limit != 1024) return false;
++        var seen: ViewVisits = .{};
++        return self.ordinaryView(view, 0, &seen);
++    }
++    fn validateView(self: *Store, input: TypeView, depth: usize, seen: *ViewVisits) Error!void {
++        self.normalization.view_entries +|= 1;
++        if (depth >= self.resolution_depth_limit) return error.TypeLimit;
++        const view = self.selectView(input);
++        const key: ViewKey = .{ .id = view.id, .at = view.at, .depth = depth };
++        if (seen.contains(key)) return;
++        const value = self.node(view.id);
++        switch (value.tag) {
++            .function => {
++                try self.validateView(view.child(value.a), depth + 1, seen);
++                try self.validateView(view.child(value.b), depth + 1, seen);
++                _ = try self.resolveOperationRow(value.c, view.at, depth + 1);
++            },
++            .demand, .provider => {
++                try self.validateView(view.child(value.a), depth + 1, seen);
++                _ = try self.resolveOperationRow(value.c, view.at, depth + 1);
++            },
++            .array, .list, .cursor, .resolver => try self.validateView(view.child(value.a), depth + 1, seen),
++            .state_provider => for ([_]Id{ value.a, value.b, value.c }) |child| try self.validateView(view.child(child), depth + 1, seen),
++            .product => for (0..value.b) |i| try self.validateView(view.child(self.extra.items[value.a + i]), depth + 1, seen),
++            .record => for (0..value.b) |i| try self.validateView(view.child(self.recordField(value, i).ty), depth + 1, seen),
++            .nominal => {
++                const count = self.extra.items[value.c];
++                for (0..count) |i| try self.validateView(view.child(self.extra.items[value.c + 1 + i]), depth + 1, seen);
++            },
++            else => {},
++        }
++        seen.put(key);
++    }
++    /// Validate under the current policy without warming a materialized root
++    /// cache. Callers reread after solver writes; a view grants no authority to
++    /// skip current-policy validation at a later materialization boundary.
++    pub fn readView(self: *Store, root: Id, at: Cursor) Error!TypeView {
++        self.normalization.view_requests +|= 1;
++        const view: TypeView = .{ .id = root, .at = at };
++        if (!self.viewAdmitted(view)) {
++            self.normalization.view_fallbacks +|= 1;
++            return .{ .id = try self.resolve(root, at) };
++        }
++        var seen: ViewVisits = .{};
++        try self.validateView(view, 0, &seen);
++        return self.selectView(view);
++    }
++    /// Use the ordinary resolver and its current policy/cache. An earlier view
++    /// read does not reproduce eager resolution's cache-warming side effects
++    /// across arbitrary later changes of resolution_depth_limit.
++    pub fn materializeView(self: *Store, view: TypeView) Error!Id {
++        self.normalization.view_materializations +|= 1;
++        return self.resolve(view.id, view.at);
++    }
++
+     pub fn resolve(self: *Store, root: Id, at: Cursor) Error!Id {
+         const attribution_start = self.nodes.items.len;
+         defer self.normalization.resolve_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
+@@ -2329,6 +2493,112 @@ pub const Store = struct {
+     /// Each use opens only covariant closed rows. A callback's parameter row
+     /// remains the exact requirement checked by its producer.
+     const OpenCovariantMemo = std.AutoHashMapUnmanaged(CovariantInput, Id);
++    /// Normalize invariant branches once, and open covariant branches directly
++    /// from their historical observations rather than building an intermediate
++    /// resolved callable/aggregate graph.
++    pub fn openCovariantView(self: *Store, root: Id) Error!Id {
++        self.normalization.view_open_requests +|= 1;
++        self.normalization.view_requests +|= 1;
++        const view: TypeView = .{ .id = root };
++        if (!self.viewAdmitted(view)) {
++            self.normalization.view_fallbacks +|= 1;
++            self.normalization.view_open_fallbacks +|= 1;
++            return self.openCovariant(try self.resolve(root, 0));
++        }
++        var validated: ViewVisits = .{};
++        try self.validateView(view, 0, &validated);
++        var unchanged: ViewAnswers = .empty;
++        defer unchanged.deinit(self.allocator);
++        const attribution_start = self.nodes.items.len;
++        defer self.normalization.open_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
++        return (try self.openViewDepth(view, 0, &unchanged)).id;
++    }
++    const ViewAnswers = std.AutoHashMapUnmanaged(ViewKey, Id);
++    const OpenedView = struct { id: Id, fresh: bool = false };
++    fn openViewDepth(self: *Store, input: TypeView, depth: usize, unchanged: *ViewAnswers) Error!OpenedView {
++        self.normalization.view_open_entries +|= 1;
++        if (depth >= 1024) return error.TypeLimit;
++        const view = self.selectView(input);
++        const key: ViewKey = .{ .id = view.id, .at = view.at, .depth = depth };
++        switch (self.node(view.id).tag) {
++            .function, .provider, .product, .record, .array, .list, .cursor => {},
++            else => return self.openViewNode(view, depth, unchanged),
++        }
++        if (unchanged.get(key)) |id| return .{ .id = id };
++        const result = try self.openViewNode(view, depth, unchanged);
++        // A changed occurrence can own a fresh row. It never grants another
++        // occurrence permission to share that row, even within this invocation.
++        if (!result.fresh and unchanged.count() < 65_536) try unchanged.put(self.allocator, key, result.id);
++        return result;
++    }
++    fn openViewNode(self: *Store, view: TypeView, depth: usize, unchanged: *ViewAnswers) Error!OpenedView {
++        const value = self.node(view.id);
++        switch (value.tag) {
++            .function, .provider => {
++                const parameter = try self.materializeView(view.child(value.a));
++                var result: OpenedView = .{ .id = 0 };
++                if (value.tag == .function) result = try self.openViewDepth(view.child(value.b), depth + 1, unchanged);
++                const resolved_row = try self.resolveOperationRow(value.c, view.at, depth + 1);
++                var effect_row = resolved_row;
++                var opened_fresh = result.fresh;
++                if (self.effects.node(effect_row).tail == .closed) {
++                    opened_fresh = true;
++                    const opened_row = try self.freshEffects();
++                    effect_row = self.effects.row(self.rowLabels(effect_row), self.effects.node(opened_row).tail) catch |err| return effectError(err);
++                }
++                if (value.tag == .provider) {
++                    if (parameter == value.a and effect_row == value.c) return .{ .id = view.id, .fresh = opened_fresh };
++                    return .{ .id = try self.provider(parameter, effect_row), .fresh = opened_fresh };
++                }
++                if (parameter == value.a and result.id == value.b and effect_row == value.c) return .{ .id = view.id, .fresh = opened_fresh };
++                return .{ .id = try self.functionWithEffects(parameter, result.id, effect_row), .fresh = opened_fresh };
++            },
++            .product => {
++                var children: std.ArrayList(Id) = .empty;
++                defer children.deinit(self.allocator);
++                var changed = false;
++                var opened_fresh = false;
++                for (0..value.b) |i| {
++                    const old = self.extra.items[value.a + i];
++                    const child = try self.openViewDepth(view.child(old), depth + 1, unchanged);
++                    opened_fresh = opened_fresh or child.fresh;
++                    if (!changed and child.id != old) {
++                        try children.ensureTotalCapacity(self.allocator, value.b);
++                        children.appendSliceAssumeCapacity(self.extra.items[value.a..][0..i]);
++                        changed = true;
++                    }
++                    if (changed) children.appendAssumeCapacity(child.id);
++                }
++                if (!changed) return .{ .id = view.id, .fresh = opened_fresh };
++                return .{ .id = try self.product(children.items), .fresh = opened_fresh };
++            },
++            .record => {
++                var fields: std.ArrayList(Field) = .empty;
++                defer fields.deinit(self.allocator);
++                var changed = false;
++                var opened_fresh = false;
++                for (0..value.b) |i| {
++                    const old = self.recordField(value, i);
++                    const child = try self.openViewDepth(view.child(old.ty), depth + 1, unchanged);
++                    opened_fresh = opened_fresh or child.fresh;
++                    if (!changed and child.id != old.ty) {
++                        try fields.ensureTotalCapacity(self.allocator, value.b);
++                        for (0..i) |prefix| fields.appendAssumeCapacity(self.recordField(value, prefix));
++                        changed = true;
++                    }
++                    if (changed) fields.appendAssumeCapacity(.{ .name = old.name, .ty = child.id });
++                }
++                if (!changed) return .{ .id = view.id, .fresh = opened_fresh };
++                return .{ .id = try self.record(fields.items), .fresh = opened_fresh };
++            },
++            .array, .list, .cursor => {
++                const child = try self.openViewDepth(view.child(value.a), depth + 1, unchanged);
++                if (child.id == value.a) return .{ .id = view.id, .fresh = child.fresh };
++                return .{ .id = try self.sequence(value.tag, child.id), .fresh = child.fresh };
++            },
++            else => return .{ .id = try self.materializeView(view) },
++        }
++    }
+     pub fn openCovariant(self: *Store, root: Id) Error!Id {
+         const attribution_start = self.nodes.items.len;
+         defer self.normalization.open_nodes_added +|= @intCast(self.nodes.items.len -| attribution_start);
+diff --git a/zig-native/src/check/types_tests.zig b/zig-native/src/check/types_tests.zig
+index 489efd3f..82b1cbde 100644
+--- a/zig-native/src/check/types_tests.zig
++++ b/zig-native/src/check/types_tests.zig
+@@ -16,6 +16,145 @@ const u32_type = type_store_module.u32_type;
+ const f32_type = type_store_module.f32_type;
+ const foreign_operation = type_store_module.foreign_operation;
+ 
++test "cursor views inherit parent history without rebuilding ordinary graphs" {
++    var store = try Store.init(std.testing.allocator);
++    defer store.deinit();
++    const parent = try store.fresh();
++    const child = try store.fresh();
++    try store.appendVersion(child, u32_type);
++    const arrow = try store.function(child, child);
++    try store.appendVersion(parent, arrow);
++    try store.appendVersion(child, f32_type);
++    const before = store.nodes.items.len;
++    const view = try store.readView(parent, 0);
++    try std.testing.expectEqual(arrow, view.id);
++    try std.testing.expectEqual(@as(u32, 2), view.at);
++    try std.testing.expectEqual(f32_type, store.selectView(view.child(store.node(view.id).a)).id);
++    try std.testing.expectEqual(before, store.nodes.items.len);
++    const materialized = try store.materializeView(view);
++    try std.testing.expectEqual(f32_type, store.node(materialized).a);
++    try std.testing.expectEqual(f32_type, store.node(materialized).b);
++    try std.testing.expectEqual(u32_type, store.selectView(try store.readView(child, 0)).id);
++}
++
++test "cursor views preserve cold depth errors custom limits and warm fallback" {
++    var store = try Store.init(std.testing.allocator);
++    defer store.deinit();
++    const leaf = try store.fresh();
++    var deep = leaf;
++    for (0..1024) |_| deep = try store.sequence(.array, deep);
++    try std.testing.expectError(error.TypeLimit, store.readView(deep, 0));
++    try store.appendVersion(leaf, u32_type);
++    store.resolution_depth_limit = 2048;
++    const warmed = try store.resolve(deep, 0);
++    store.resolution_depth_limit = 1024;
++    try std.testing.expectEqual(warmed, (try store.readView(deep, 0)).id);
++    store.resolution_depth_limit = 2;
++    const cold = try store.sequence(.list, try store.sequence(.array, boolean));
++    try std.testing.expectError(error.TypeLimit, store.readView(cold, 0));
++}
++
++test "cursor views retain exact operation argument depth and rich per graph fallback" {
++    var store = try Store.init(std.testing.allocator);
++    defer store.deinit();
++    const bound = try store.boundType(0, 0);
++    const ranked = try store.quantified(.forall, try store.function(bound, bound), &.{bound});
++    const ordinary = try store.function(u32_type, boolean);
++    const before = store.normalization.view_fallbacks;
++    _ = try store.readView(ordinary, 0);
++    try std.testing.expectEqual(before, store.normalization.view_fallbacks);
++    _ = try store.readView(ranked, 0);
++    try std.testing.expectEqual(before + 1, store.normalization.view_fallbacks);
++    const label = try store.internSymbolicOperation(.{ .unit = 2, .decl = 1 }, &.{try store.sequence(.array, u32_type)});
++    const row = store.effects.row(&.{label}, .closed) catch |err| return effectError(err);
++    var deep = try store.functionWithEffects(unit, unit, row);
++    for (0..1021) |_| deep = try store.sequence(.array, deep);
++    try std.testing.expectError(error.TypeLimit, store.readView(deep, 0));
++    const row_variable = try store.freshRowType();
++    const container = try store.product(&.{u32_type});
++    store.replaceListItem(.{ .start = store.node(container).a, .len = 1 }, 0, row_variable);
++    _ = try store.readView(container, 0);
++    try std.testing.expect(store.normalization.view_fallbacks >= before + 3);
++}
++
++test "cursor view materialization uses current depth policy without retained validation authority" {
++    var store = try Store.init(std.testing.allocator);
++    defer store.deinit();
++    const variable = try store.fresh();
++    const root = try store.sequence(.array, try store.sequence(.list, variable));
++    try store.appendVersion(variable, f32_type);
++    const view = try store.readView(root, 0);
++    store.resolution_depth_limit = 2;
++    try std.testing.expectError(error.TypeLimit, store.materializeView(view));
++    store.resolution_depth_limit = 1024;
++    const materialized = try store.materializeView(view);
++    try std.testing.expectEqual(f32_type, store.node(store.node(materialized).a).a);
++}
++
++fn cursorCovarianceLaw(allocator: std.mem.Allocator) !void {
++    var store = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
++    defer store.deinit();
++    const variable = try store.fresh();
++    const exact = try store.functionWithEffects(unit, variable, store.effects.row(&.{foreign_operation}, .closed) catch |err| return effectError(err));
++    const callback = try store.function(exact, variable);
++    const nominal = try store.nominal(.{ .unit = 1, .decl = 1 }, &.{callback});
++    const demand = try store.demandWithEffects(callback, 0);
++    const root = try store.product(&.{ callback, callback, nominal, demand });
++    try store.appendVersion(variable, f32_type);
++    const point = store.mark();
++    const opened = store.openCovariantView(root) catch |err| {
++        store.rollback(point);
++        try std.testing.expectEqual(point, store.mark());
++        return err;
++    };
++    const values = store.list(.{ .start = store.node(opened).a, .len = 4 });
++    var tails: [2]u32 = undefined;
++    for (values[0..2], 0..) |value, i| {
++        const arrow = store.node(value);
++        try std.testing.expectEqual(f32_type, arrow.b);
++        const parameter = store.node(arrow.a);
++        try std.testing.expectEqual(f32_type, parameter.b);
++        try std.testing.expect(store.row(parameter.c).tail == .closed);
++        try std.testing.expectEqualSlices(Effects.Label, &.{foreign_operation}, store.rowLabels(parameter.c));
++        tails[i] = store.row(arrow.c).tail.variable;
++    }
++    try std.testing.expect(tails[0] != tails[1]);
++    const nominal_callback = store.node(store.nominalArguments(store.node(values[2]))[0]);
++    try std.testing.expect(store.row(nominal_callback.c).tail == .closed);
++    const demand_callback = store.node(store.node(values[3]).a);
++    try std.testing.expect(store.row(demand_callback.c).tail == .closed);
++    try store.effects.appendVersion(tails[0], store.effects.row(&.{foreign_operation}, .closed) catch |err| return effectError(err));
++    try std.testing.expect(store.row(try store.resolveEffects(store.node(values[1]).c, 0)).tail == .variable);
++    store.rollback(point);
++    try std.testing.expectEqual(point, store.mark());
++    try std.testing.expectEqual(opened, try store.openCovariantView(root));
++}
++
++test "cursor covariance preserves exact parameters invariant leaves independent rows rollback and allocation failures" {
++    try cursorCovarianceLaw(std.testing.allocator);
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, cursorCovarianceLaw, .{});
++}
++
++test "cursor covariance shares normalization only changes in an open diamond graph" {
++    var store = try Store.initWithOptions(std.testing.allocator, .{ .closed_graphs = true });
++    defer store.deinit();
++    const variable = try store.fresh();
++    var diamond = variable;
++    for (0..18) |_| diamond = try store.product(&.{ diamond, diamond });
++    try store.appendVersion(variable, f32_type);
++    const before = store.nodes.items.len;
++    const opened = try store.openCovariantView(diamond);
++    try std.testing.expect(store.nodes.items.len - before <= 18);
++    try std.testing.expect(store.normalization.view_open_entries <= 37);
++    var cursor_ = opened;
++    for (0..18) |_| {
++        const pair = store.node(cursor_);
++        try std.testing.expectEqual(store.extra.items[pair.a], store.extra.items[pair.a + 1]);
++        cursor_ = store.extra.items[pair.a];
++    }
++    try std.testing.expectEqual(f32_type, cursor_);
++}
++
+ test "cursor histories retain repeated writes and self references" {
+     var store = try Store.init(std.testing.allocator);
+     defer store.deinit();
+diff --git a/zig-native/src/work_counters.zig b/zig-native/src/work_counters.zig
+index 45c3f0d8..7205005e 100644
+--- a/zig-native/src/work_counters.zig
++++ b/zig-native/src/work_counters.zig
+@@ -45,6 +45,14 @@ pub const Normalization = struct {
+     substitute_unchanged: u64 = 0,
+     resolve_nodes_added: u64 = 0,
+     resolve_depth_entries: u64 = 0,
++    view_requests: u64 = 0,
++    view_entries: u64 = 0,
++    view_admission_entries: u64 = 0,
++    view_open_entries: u64 = 0,
++    view_fallbacks: u64 = 0,
++    view_materializations: u64 = 0,
++    view_open_requests: u64 = 0,
++    view_open_fallbacks: u64 = 0,
+     unify_pairs: u64 = 0,
+     unify_projected_pairs: u64 = 0,
+     unify_resolve_calls: u64 = 0,
+diff --git a/zig-native/tests/checker_normalization_execution.test.ts b/zig-native/tests/checker_normalization_execution.test.ts
+new file mode 100644
+--- /dev/null
++++ b/zig-native/tests/checker_normalization_execution.test.ts
+@@ -0,0 +1,99 @@
++import { strict as assert } from "node:assert";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++
++const source = `const pick = func (first: U32) -> (second: U32) => return second
++const named = func (values: {left: U32, right: U32}) => return @u32.add values.left values.right
++const encode = func (first: U32) -> (second: U32) => return @u32.add (@u32.mul first 10) second
++const many = func (a: U32) -> (b: U32) -> (c: U32) -> (d: U32) -> (e: U32) -> (f: U32) -> (g: U32) -> (h: U32) => return
++  @u32.add a (@u32.add b (@u32.add c (@u32.add d (@u32.add e (@u32.add f (@u32.add g h))))))
++entry const answer = func (input: U32): U32 => return named {right: many 1 2 3 4 5 6 7 8, left: pick 0 input}
++entry const sequence = func (callback: U32 -> U32 ! {Foreign}) => return encode (callback 1) (callback 2)
++entry const ordinary_stop = func (input: U32): U32 => return do:
++  if @u32.eq input 0:
++    return pick (@panic "earlier ordinary") 7
++  return input
++entry const intrinsic_stop = func (input: U32): U32 => return do:
++  if @u32.eq input 0:
++    return @u32.add (@panic "earlier intrinsic") 7
++  return input
++`;
++
++for (const codegenTier of ["development", "optimized"] as const) {
++  Deno.test(`checker normalization preserves currying, effects and retained errors (${codegenTier})`, async () => {
++    const directory = await Deno.makeTempDir({
++      prefix: "blot-check-normalize-",
++    });
++    const entry = `${directory}/main.blot`;
++    const compiler = await createZigProjectCompiler({
++      executable: Deno.args[0],
++      entry,
++      prelude: null,
++      codegenTier,
++      cacheDirectory: false,
++      startupTimeoutMs: 5000,
++    });
++    try {
++      let original: Uint8Array<ArrayBuffer> | undefined;
++      for (const extra of [0, 1, 0]) {
++        const current = source.replace(
++          "many 1 2 3 4 5 6 7 8",
++          `many 1 2 3 4 5 6 7 ${8 + extra}`,
++        );
++        const built = await compiler.build({
++          sources: { [entry]: current },
++          signal: AbortSignal.timeout(5000),
++        });
++        assert(built.success, JSON.stringify(built));
++        if (extra === 0) {
++          if (original) assert.deepEqual(built.bytes, original);
++          else original = built.bytes.slice();
++        }
++        for (const asynchronous of [false, true]) {
++          const guest = await instantiateGuest(built.bytes, { asynchronous });
++          try {
++            const seen: number[] = [];
++            const capability = {
++              parameter: "U32" as const,
++              result: "U32" as const,
++              call(value: number) {
++                seen.push(value);
++                return value + 2;
++              },
++            };
++            const callback = guest.capability(capability);
++            const invoke = async (
++              name: string,
++              value: Parameters<typeof guest.call>[1],
++            ) => {
++              if (asynchronous) return await guest.callAsync(name, value);
++              return guest.call(name, value);
++            };
++            for (const input of [1, 7, 41]) {
++              assert.equal(await invoke("answer", input), input + 36 + extra);
++              assert.equal(await invoke("ordinary_stop", input), input);
++              assert.equal(await invoke("intrinsic_stop", input), input);
++            }
++            assert.equal(await invoke("sequence", callback), 34);
++            assert.deepEqual(seen, [1, 2]);
++            await assert.rejects(() => invoke("ordinary_stop", 0));
++            await assert.rejects(() => invoke("intrinsic_stop", 0));
++          } finally {
++            guest.dispose();
++          }
++        }
++        const bad = current.replace("right: many", "wrong: many");
++        const rejected = await compiler.build({
++          sources: { [entry]: bad },
++          signal: AbortSignal.timeout(5000),
++        });
++        assert(!rejected.success);
++        assert.equal(rejected.diagnostics[0].code, "unknown_field");
++        assert.equal(rejected.diagnostics[0].start, bad.indexOf("wrong: many"));
++      }
++    } finally {
++      await compiler.dispose();
++      await Deno.remove(directory, { recursive: true });
++    }
++  });
++}
