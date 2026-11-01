@@ -27,6 +27,7 @@ export async function createSampledCompiler(
   options: ZigProjectCompilerOptions,
   output: string,
   repo: string,
+  focus?: string,
 ) {
   const binary = String(options.executable);
   const control = `${output}/control-0`;
@@ -110,6 +111,7 @@ os.execv(${JSON.stringify(binary)}, [${JSON.stringify(binary)}] + sys.argv[1:])
         SAMPLE_MIN_MS: "50",
         SAMPLE_MAX_MS: "100",
         SAMPLE_LIMIT: "80",
+        SAMPLE_FOCUS: focus ?? "",
       },
       stdout: "piped",
       stderr: "piped",

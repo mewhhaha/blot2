@@ -214,6 +214,10 @@ attribution. Inclusive categories overlap, and work ending at waiting-thread
 endpoints can remain unattributed. Sampled build time is diagnostic, not a
 latency benchmark.
 
+Add `--sample-focus validation` to begin at the completed producer closure's
+validation boundary, excluding the empty seed checked during opening. The report
+includes separate validation buckets and checking caller costs.
+
 `deno run -A scripts/bench/aggregate_readers.ts --compiler PATH` measures actual
 Ink `transform.matrix` reader DAGs and `render.Settings` field updates. Every
 build has a five-second deadline and executes independent numeric witnesses.

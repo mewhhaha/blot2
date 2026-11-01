@@ -1,0 +1,148 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "52d204b7b4f07a64753cf39d523e187b23f2e699",
+  "scope": "Detailed cost diagnosis, no compiler semantic or optimization changes. Actual World producer source; identity export only.",
+  "compiler_sha256": "c835cc58f070021b1b1261eba7d5bdcb5f38fbf8f23b82608c7bb167e4ca2f83",
+  "toolchain": "Zig0.17.0 safe/noLLVM; fresh source session, cache disabled, profileBackend/profileTrace; one codegen worker",
+  "source_pins": {
+    "gdev/src/world_storage.blot": {
+      "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+    },
+    "gdev/tests/minor_support/owned.blot": {
+      "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+    },
+    "gdev/tests/minor_support/game.blot": {
+      "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+    },
+    "ink/lib/pen/host.blot": {
+      "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+    }
+  },
+  "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+  "build_completed": true,
+  "deadline_ms": 10000,
+  "wasm_bytes": 2935,
+  "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+  "checking": {
+    "recorded_unprofiled_control_seconds": 4.62076,
+    "aggregate_work": {
+      "modules": 240,
+      "type_nodes": 1256344,
+      "candidate_scans": 3295990,
+      "scheme_calls": 11722,
+      "import_requests": 424062,
+      "imported_schemes": 41277
+    },
+    "resolution": {
+      "resolve_depth_entries": 3855578,
+      "resolve_nodes_added": 378993,
+      "substitute_depth_entries": 307967,
+      "import_depth_entries": 726984,
+      "import_nodes_added": 292131
+    },
+    "cpu_profile_reference": "normalization-cpu-attribution-2026-11-01.json",
+    "sampled_cpu_percent": {
+      "normalization_inclusive": 24.923872776647375,
+      "unification_inclusive": 5.921015771953183,
+      "free_rows": 3.7988813396046734,
+      "covariance_open": 4.807177862716548,
+      "scheme_import": 6.366003477052356,
+      "body_cache": 13.394105312300088,
+      "substitution": 1.5307614384902248
+    },
+    "explanation": [
+      "Normalization repeatedly follows chronological substitutions, visits child types and materializes resolved graphs across applications, pending requirements and finish.",
+      "Body cache capture traverses/hashes syntax, types/effects, dependencies and ownership facts and freezes copies for future retained edits; its cost belongs to checking phase even on a fresh build.",
+      "Scheme import copies producer type graphs and creates independent type/effect binders; covariance opening preserves fresh callback rows.",
+      "Type checking covers240modules and about2.37MB source even though emitted identity output is tiny. Work counters describe visits/allocations, not CPU shares."
+    ]
+  },
+  "validation": {
+    "recorded_unprofiled_control_seconds": 0.96166,
+    "profile": {
+      "scope": "Closure validateMode stacks; first matching bucket is exclusive. Source identity checks and backend entry/bounds validation are outside this cohort.",
+      "cpu_ms": 859.617912,
+      "buckets": [
+        {
+          "name": "bounds",
+          "cpu_ms": 347.387969,
+          "validation_sample_cpu_percent": 40.41190442295018
+        },
+        {
+          "name": "other",
+          "cpu_ms": 97.598977,
+          "validation_sample_cpu_percent": 11.353762600516868
+        },
+        {
+          "name": "list_roles",
+          "cpu_ms": 50.796723,
+          "validation_sample_cpu_percent": 5.909221095895452
+        },
+        {
+          "name": "task_context",
+          "cpu_ms": 167.984412,
+          "validation_sample_cpu_percent": 19.541753336568444
+        },
+        {
+          "name": "principal_interfaces",
+          "cpu_ms": 85.304547,
+          "validation_sample_cpu_percent": 9.923542286540906
+        },
+        {
+          "name": "cycles",
+          "cpu_ms": 110.545284,
+          "validation_sample_cpu_percent": 12.859816257528147
+        }
+      ]
+    },
+    "complete_intervals": 107,
+    "truncated_stack_cpu_ms": 0.0,
+    "core_validation_inclusive_sample_percent": 84.41898695568364,
+    "hot_source_observation": {
+      "file": "zig-native/src/check/task_core.zig",
+      "line": 417,
+      "sampled_cpu_ms": 167.984412,
+      "detail": "For each module, task-context admission scans every context unit binding to detect spawn_task contracts. All task-context samples in this capture land on this scan."
+    },
+    "source_structure": [
+      "Per-module principal-interface graph validation and complete Core validation; Core covers bounds/types/catalogs, cycles/list roles, staging/storage and semantic proofs.",
+      "Closure-wide import/storage/associated/implementation admission follows, then source identity/digest checks in a separate validation region.",
+      "The completed snapshot receipt already removes the duplicate full producer semantic validation at backend emission; backend bounds and fresh-entry checks remain separate."
+    ],
+    "next_targets": [
+      "Hoist exact whole-context task-contract presence scan to one immutable-context computation, preserving actual checks and budgets.",
+      "Measure and reduce repeated owner/context scans within bounds validation; retain graph/index/ownership rejection laws."
+    ]
+  },
+  "profile_method": {
+    "focus": "Break at dependency_closure.validateMode only when padded_entry=true; empty session seed must not trigger focus.",
+    "interval_ms": [
+      8,
+      12
+    ],
+    "max_samples": 200,
+    "stop_boundary": "build completion or sample limit; only validateMode stacks form validation cohort.",
+    "first_attempt": "build/bench/validation-focus/cpu completed but focused on empty seed and sampled loading/checking; zero validation cohort, excluded from validation claims.",
+    "command": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --sample --sample-focus validation --repetitions 1 --timeout-ms 10000 --compiler zig-native/zig-out-native-dev/bin/blotc --output build/bench/validation-focus/closure-cpu",
+    "report_command": "python3 scripts/bench/summarize_stacks.py build/bench/validation-focus/closure-cpu"
+  },
+  "raw_pins": {
+    "samples.jsonl": "d8ef1b35113b7323724d61b07bc74875dc0d712616c323aa2cf57958ce73933b",
+    "builds.jsonl": "af2db37e7ce24a078d038c624b60c0db682996c470c105bfbc3a85bab712ec4b",
+    "sampling.json": "c95721bb009e60260570c1007fd976590db795a9a1861df0bb4bae3e7a63e9ea",
+    "gdb.log": "789d7c8a9413118c6f72c7c794e232392a2c7122bbd3f26adaf1ccf5262fd660",
+    "result.json": "4e3468a7695a7590f5d7cc1de34a071e8f4ed6589c970d73b25cb6dc6f826c2d"
+  },
+  "tool_pins": {
+    "scripts/bench/engine_stages.ts": "7e2c68582131a79900fc3bd7e3c047d76bd01cca13c3d734b38a9f07efa18ff8",
+    "scripts/bench/engine_sampling.ts": "237c5324b6aa8afc0b3712d5b4858353ad2bf376d4c927d5a8f7a03d2013bdea",
+    "scripts/bench/gdb_sampler.py": "c4ce897056c7d06c538e05f5314ee6674b29e421739777b699ce1f7a0cfe8368",
+    "scripts/bench/summarize_stacks.py": "8f56e998841cc957e301f73a9f4a584f0c3e7a71e47e2d124b14608585327b86"
+  },
+  "limits": [
+    "One focused random-stop run: approximate CPU distribution, not stable exclusive phase timings. Never scale percentages into exact wall-time savings.",
+    "Checker CPU categories overlap; validation buckets use first matching stack family and are exclusive within the closure-validation cohort.",
+    "Validation cohort excludes source identity and backend entry/bounds work. Profiled validation wall-time includes debugger pauses.",
+    "No current whole-game artifact/size, fresh frame, release timing or new full-gate claim. Existing List/chunk failure remains pending."
+  ]
+}

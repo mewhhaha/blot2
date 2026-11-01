@@ -68,6 +68,14 @@ intervals cover 85.5% of process CPU with zero frame-limit truncation. The
 producer completes inside its ten-second diagnostic cap. See
 [CPU attribution and Astra's next experiment](zig-native/measurements/normalization-cpu-attribution-2026-11-01.json).
 
+Focused validation sampling now identifies about **40%** of closure-validation
+CPU in bounds/integrity checks, **20%** in task-context validation (the repeated
+whole-context spawn-contract scan), **13%** in cycles and **10%** in principal
+interfaces. These are diagnostic sample shares, not exact wall-time splits. Type
+checking remains the first priority: normalization and fresh-build body cache
+capture are the largest identified costs. See
+[the checker/validation cost map](zig-native/measurements/checker-validation-costs-2026-11-01.json).
+
 The next discriminator audits actual historical observations before attempting
 mutable first-order monotypes with immutable publication and a rollback trail.
 Rebinding already creates successor bindings; removing that syntax would not

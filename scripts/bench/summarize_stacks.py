@@ -20,6 +20,7 @@ assert windows, 'No sampled build windows'
 rows = [json.loads(line) for line in (root / 'samples.jsonl').read_text().splitlines() if line]
 leaf, owner, inclusive, directories, lines = (Counter() for _ in range(5))
 checking, normalization_callers, checking_families = (Counter() for _ in range(3))
+validation = Counter()
 previous = {}
 covered = unknown = truncated = intervals = discarded = 0
 for row in rows:
@@ -45,6 +46,18 @@ for row in rows:
         directories[owned[1].split('/zig-native/src/', 1)[1].split('/')[0] if owned else '(no compiler frame)'] += weight
         for name in set(f[0] for f in stack): inclusive[name] += weight
         names = [f[0] for f in stack]
+        if any(n.startswith('reuse.dependency_closure.validateMode') for n in names):
+            validation['all'] += weight
+            bucket = 'other'
+            for label, prefix in [('bounds', 'check.frozen_core_validation.validateBounds'),
+                                  ('task_context', 'check.task_core.validateContextWorkspace'),
+                                  ('cycles', 'check.frozen_core_validation.cycles'),
+                                  ('principal_interfaces', 'reuse.dependency_interface_validation.'),
+                                  ('list_roles', 'check.frozen_core_validation.listRoles')]:
+                if any(n.startswith(prefix) for n in names):
+                    bucket = label
+                    break
+            validation[bucket] += weight
         if any(n.startswith(('reuse.project_check.', 'check.check.')) for n in names):
             checking['all'] += weight
             unification = any(n.startswith('check.types.Store.unifyMode') for n in names)
@@ -80,6 +93,13 @@ report['checking'] = {
                                'checking_sample_cpu_percent': 100 * weight / checking['all']}
                               for name, weight in normalization_callers.most_common(40)],
     'other_inclusive_ms': {name: weight / 1e6 for name, weight in checking_families.items()},
+}
+report['validation'] = {
+    'scope': 'Closure validateMode stacks; first matching bucket is exclusive. Source identity checks and backend entry/bounds validation are outside this cohort.',
+    'cpu_ms': validation['all'] / 1e6,
+    'buckets': [{'name': name, 'cpu_ms': weight / 1e6,
+                  'validation_sample_cpu_percent': 100 * weight / validation['all']}
+                for name, weight in validation.items() if name != 'all'],
 }
 assert covered > 0
 (root / 'cpu-report.json').write_text(json.dumps(report, indent=2) + '\n')

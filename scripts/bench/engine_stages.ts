@@ -11,6 +11,7 @@ const { values } = parseArgs({
   options: {
     world: { type: "boolean", default: false },
     sample: { type: "boolean", default: false },
+    "sample-focus": { type: "string" },
     repetitions: { type: "string", default: "3" },
     "timeout-ms": { type: "string", default: "5000" },
     "baseline-gdev": {
@@ -109,6 +110,12 @@ if (values.sample) {
   }
   if (timeoutMs > 10000) throw new Error("--sample timeout must be <=10000 ms");
   versions = versions.filter((version) => version.name === "candidate");
+}
+if (
+  values["sample-focus"] !== undefined &&
+  (!values.sample || values["sample-focus"] !== "validation")
+) {
+  throw new Error("--sample-focus supports validation with --sample only");
 }
 const worldBaseline: Record<string, string> = {};
 const worldPins: Record<string, { baseline?: string; candidate: string }> = {};
@@ -226,6 +233,7 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
               worldPins,
               options,
               timeoutMs,
+              sampleFocus: values["sample-focus"] ?? null,
               summarize: [
                 "python3",
                 "scripts/bench/summarize_stacks.py",
@@ -236,7 +244,12 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
             2,
           ) + "\n",
         );
-        sampling = await createSampledCompiler(options, output, repo);
+        sampling = await createSampledCompiler(
+          options,
+          output,
+          repo,
+          values["sample-focus"],
+        );
       }
       const compiler = sampling?.compiler ??
         await createZigProjectCompiler(options);

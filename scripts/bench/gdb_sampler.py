@@ -8,6 +8,7 @@
 #   SAMPLE_OUT      JSON-lines output, one record per stop
 #   SAMPLE_MIN_MS / SAMPLE_MAX_MS  random interval between stops (default 3-10)
 #   SAMPLE_LIMIT    stop after this many samples (default unlimited)
+#   SAMPLE_FOCUS    validation: wait for closure validation, then sample at8-12ms
 #
 # Handshake: the driver writes `pid`; this script attaches and writes
 # `attached`; the driver writes `start` before the measured builds and `stop`
@@ -97,6 +98,15 @@ gdb.execute("attach %d" % pid)
 gdb.execute("handle SIGUSR1 nopass stop print")
 open(os.path.join(control, "attached"), "w").write("1")
 wait_for("start")
+focus = os.environ.get("SAMPLE_FOCUS", "")
+if focus == "validation":
+    boundary = gdb.Breakpoint("reuse.dependency_closure.validateMode", internal=True)
+    # Opening a source session also validates an empty seed. The completed
+    # closure uses the padded future-entry context after source checking.
+    boundary.condition = "padded_entry"
+    gdb.execute("continue", to_string=True)
+    boundary.delete()
+    low, high, limit = 0.008, 0.012, 200
 started = time.time()
 taken = 0
 def thread_cpu(tid):
@@ -139,7 +149,8 @@ with open(os.environ["SAMPLE_OUT"], "a") as out:
             break
         out.write(json.dumps({"t": time.time() - started, "wall_ns": time.time_ns(),
                               "run": int(os.environ.get("SAMPLE_RUN", "0")), "frame_limit": 4096, "st": stacks,
-                              "tid": tids, "cpu_ns": cpu_ns, "tail": tails}) + "\n")
+                              "tid": tids, "cpu_ns": cpu_ns, "tail": tails,
+                              "focus": focus}) + "\n")
         out.flush()
         taken += 1
 try:
