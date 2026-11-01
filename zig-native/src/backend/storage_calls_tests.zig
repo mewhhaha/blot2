@@ -1015,3 +1015,123 @@ test "nominal inline field publication survives allocation failures" {
     defer module.deinit(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishNominalFields, .{@as([]const core.Module, &.{module})});
 }
+
+const aggregate_reader_source =
+    \\type Sample a is data = $Sample {value: a}
+    \\const read = func (access: {rows: GrowArray a, stamp: U32}) => return {sample: $Sample {value: access.rows[0]}, stamp: access.stamp}
+    \\const twice = func access => return do:
+    \\  let first = read access
+    \\  let second = read access
+    \\  return {stamp: first.stamp, sample: second.sample}
+    \\const outer = func access => return do:
+    \\  let first = twice access
+    \\  let second = twice access
+    \\  return {sample: first.sample, stamp: second.stamp}
+    \\entry const integers = func (input: U32) => return do:
+    \\  let left: GrowArray U32 = #[input]
+    \\  let right: GrowArray U32 = #[@u32.add input 11]
+    \\  let first = outer {rows: left, stamp: 3}
+    \\  let second = outer {stamp: 7, rows: right}
+    \\  left[0] := @u32.add left[0] 19
+    \\  let third = outer {stamp: 13, rows: left}
+    \\  return #[first.sample.value, first.stamp, second.sample.value, second.stamp, third.sample.value, third.stamp, right[0]]
+    \\entry const floats = func (input: F32) => return do:
+    \\  let left: GrowArray F32 = #[input]
+    \\  let right: GrowArray F32 = #[@f32.add input 2.5]
+    \\  let first = outer {stamp: 17, rows: left}
+    \\  let second = outer {rows: right, stamp: 23}
+    \\  left[0] := @f32.add left[0] 7.25
+    \\  let third = outer {rows: left, stamp: 29}
+    \\  return #[first.sample.value, @u32.to_f32 first.stamp, second.sample.value, @u32.to_f32 second.stamp, third.sample.value, @u32.to_f32 third.stamp, right[0]]
+    \\type Vec3 is data = $Vec3 {x: F32, y: F32, z: F32}
+    \\const position = func (rows: GrowArray {position: Vec3}) => return rows[0].position
+    \\const position_twice = func rows => return do:
+    \\  let first = position rows
+    \\  let second = position rows
+    \\  return second
+    \\const tuple = func (rows: GrowArray {left: F32, right: F32}) => return (rows[0].left, rows[0].right)
+    \\const tuple_twice = func rows => return do:
+    \\  let (left, ignored) = tuple rows
+    \\  let (unused, right) = tuple rows
+    \\  return (left, right)
+    \\entry const projections = func (input: F32) => return do:
+    \\  let poses: GrowArray {position: Vec3} = #[{position: $Vec3 {z: 3.5, x: input, y: -0.0}}]
+    \\  let pairs: GrowArray {left: F32, right: F32} = #[{right: -0.0, left: input}]
+    \\  let point = position_twice poses
+    \\  let (left, right) = tuple_twice pairs
+    \\  return #[point.x, point.y, point.z, left, right]
+    \\type Choice is data = $Count U32 | $Empty
+    \\const choice_read = func (rows: GrowArray Choice): Choice => return rows[0]
+    \\const choice_twice = func rows => return do:
+    \\  let first = choice_read rows
+    \\  let second = choice_read rows
+    \\  return second
+    \\const choice_value = func (choice: Choice): U32 => return case choice of
+    \\  $Count value => value
+    \\  $Empty => 31
+    \\entry const variants = func (input: U32) => return do:
+    \\  let left: GrowArray Choice = #[$Count input]
+    \\  let right: GrowArray Choice = #[$Empty]
+    \\  let first = choice_twice left
+    \\  let second = choice_twice right
+    \\  left[0] := $Empty
+    \\  right[0] := $Count (@u32.add input 9)
+    \\  let third = choice_twice left
+    \\  let fourth = choice_twice right
+    \\  return #[choice_value first, choice_value second, choice_value third, choice_value fourth]
+;
+
+test "shared aggregate readers retain nominal physical schemas across independent owners" {
+    var module = try lower(a, aggregate_reader_source);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_reader_definitions >= 3);
+    try std.testing.expect(result.counters.scoped_reader_cache_hits >= 4);
+    try std.testing.expect(result.counters.scoped_emission_expressions < 2000);
+}
+
+fn aggregateReaderDag(allocator: std.mem.Allocator, depth: usize) !core.Module {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(allocator);
+    try source.appendSlice(allocator, "type Sample is data = $Sample {value: U32}\nconst level0 = func (rows: GrowArray U32) => return {sample: $Sample {value: rows[0]}, stamp: rows[1]}\n");
+    for (1..depth + 1) |level| {
+        const definition = try allocator.print("const level{d} = func (rows: GrowArray U32) => return do:\n  let first = level{d} rows\n  let second = level{d} rows\n  return {{stamp: first.stamp, sample: second.sample}}\n", .{ level, level - 1, level - 1 });
+        defer allocator.free(definition);
+        try source.appendSlice(allocator, definition);
+    }
+    const entry = try allocator.print("entry const answer = func (input: U32) => return do:\n  let left: GrowArray U32 = #[input, 3]\n  let right: GrowArray U32 = #[@u32.add input 11, 7]\n  let first = level{d} left\n  let second = level{d} right\n  return @u32.add first.sample.value (@u32.add second.sample.value second.stamp)\n", .{ depth, depth });
+    defer allocator.free(entry);
+    try source.appendSlice(allocator, entry);
+    return lower(allocator, source.items);
+}
+
+test "shared aggregate reader diamonds keep emission growth bounded" {
+    var shallow = try aggregateReaderDag(a, 2);
+    defer shallow.deinit(a);
+    var deep = try aggregateReaderDag(a, 6);
+    defer deep.deinit(a);
+    var first = try scoped.compile(a, &.{shallow}, 1);
+    defer first.deinit(a);
+    var second = try scoped.compile(a, &.{deep}, 1);
+    defer second.deinit(a);
+    try std.testing.expect(first.diagnostic == null and second.diagnostic == null);
+    try std.testing.expect(second.counters.scoped_reader_cache_hits >= 6);
+    try std.testing.expect(second.counters.scoped_emission_expressions < first.counters.scoped_emission_expressions * 3);
+    try std.testing.expect(second.counters.scoped_emission_expressions < 1200);
+}
+
+fn publishAggregateReader(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_reader_cache_hits > 0);
+}
+
+test "shared aggregate reader publication survives allocation failures" {
+    var module = try aggregateReaderDag(a, 1);
+    defer module.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateReader, .{@as([]const core.Module, &.{module})});
+}

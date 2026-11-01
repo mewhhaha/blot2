@@ -34,6 +34,7 @@ comptime {
     _ = @import("reuse/dependency_format_tests.zig");
     _ = @import("reuse/principal_type_graph.zig");
     _ = @import("reuse/project.zig");
+    _ = @import("reuse/declaration_demand.zig");
     _ = @import("reuse/project_check_tests.zig");
     _ = @import("reuse/project_pipeline_tests.zig");
     _ = @import("reuse/project_prelude_tests.zig");

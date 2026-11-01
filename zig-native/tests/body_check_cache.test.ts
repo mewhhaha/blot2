@@ -1,9 +1,14 @@
 import { strict as assert } from "node:assert";
-import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
+import { createZigProjectCompiler as createCompiler } from "../../compiler/zig_project_client.ts";
 import { instantiateGuest } from "../../compiler/guest.ts";
 
 const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
+
+function createZigProjectCompiler(options: Parameters<typeof createCompiler>[0]) {
+  // Fresh comparisons must not load a retained client's disk checkpoint.
+  return createCompiler({ ...options, cacheDirectory: false });
+}
 
 function primitiveSpine(value: string) {
   for (let step = 0; step < 12; step++) value = `@u32.add (${value}) 0`;

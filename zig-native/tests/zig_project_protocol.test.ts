@@ -405,12 +405,12 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
           {
             kind: "left_operand",
             path: peer.entry,
-            span: { start: first, end: first + 5 },
+            span: { start: first, end: first + "true".length },
           },
           {
             kind: "right_operand",
             path: peer.entry,
-            span: { start: second, end: second + 5 },
+            span: { start: second, end: second + "true".length },
           },
         ]);
         const { contexts: _contexts, ...withoutContexts } = explanation;

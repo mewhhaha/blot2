@@ -1,0 +1,6281 @@
+{
+  "date": "2026-11-01",
+  "scope": "Diagnostic AST demand inventory only. Does not change executable checking, lowering, retained keys or interface publication.",
+  "runner": "zig build demand-inventory -Doptimize=safe -Dllvm=false --prefix zig-out-native-dev; then installed blot-demand-inventory [--tiny-entry]",
+  "binary_sha256": "194c2683f05347fb4359e71572eac8908b8e6c0913f066df40ea0a034c28ba6c",
+  "sources": {
+    "zig-native/src/reuse/declaration_demand.zig": "ea96199682d24e7f382d4e3cb6e0695ac8b6f3a6d90026485c1cbb87e0989b78",
+    "zig-native/src/bench_declaration_demand.zig": "d112f1d1803ace634e9b546b66a6630c6692ffe33c78e728b641c47112a668c0",
+    "zig-native/src/reuse/global_references.zig": "69ba9c97b2736cad6a3a10d5850d8a85b5e2c9107580175bf5428a18fec0c722"
+  },
+  "compiler_snapshot": "d4c77b40f8b1ad8ed0479c51b2834c15266964ed69c1000f0b544cab34656dca",
+  "root_policy": "Seed entry exports, potentially eager non-lambda values, attributed declarations, associated/operator/implementation bodies. Follow lexical references through imports/reexports/prelude. Keep source-name manifests separate from typed authority. Unsupported packages/escaped namespaces conservatively fall back; compiled prefixes decline.",
+  "results": {
+    "main": {
+      "kind": "declaration-demand-inventory-v1",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "ablated": false,
+      "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "effective_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "semantic_check": false,
+      "lowering": false,
+      "compilation": false,
+      "module_count": 264,
+      "import_count": 2019,
+      "source_bytes": 2537356,
+      "asset_us": 287331,
+      "load_us": 682800,
+      "plan_us": 164863,
+      "assets": {
+        "parsed": 72,
+        "reused": 0,
+        "input_bytes": 758288,
+        "generated_bytes": 168093
+      },
+      "plan": {
+        "total": 5957,
+        "reached": 5277,
+        "fallback_units": 0,
+        "transitions": 356826
+      },
+      "body_weights": {
+        "scope": "top_level_and_implementation_members",
+        "original_modules": {
+          "lambda": {
+            "declarations": 3321,
+            "selected": 2643,
+            "source_bytes": 1707052,
+            "selected_source_bytes": 1428857
+          },
+          "non_lambda": {
+            "declarations": 2380,
+            "selected": 2380,
+            "source_bytes": 340046,
+            "selected_source_bytes": 340046
+          }
+        },
+        "generated_asset_modules": {
+          "lambda": {
+            "declarations": 2,
+            "selected": 0,
+            "source_bytes": 197,
+            "selected_source_bytes": 0
+          },
+          "non_lambda": {
+            "declarations": 254,
+            "selected": 254,
+            "source_bytes": 29995,
+            "selected_source_bytes": 29995
+          }
+        }
+      }
+    },
+    "tiny": {
+      "kind": "declaration-demand-inventory-v1",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "ablated": true,
+      "original_entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "effective_entry_sha256": "c9a49f7930a669770146ae7b9d744d08f754d16d0d6c53ae1a168b87c9178259",
+      "semantic_check": false,
+      "lowering": false,
+      "compilation": false,
+      "module_count": 264,
+      "import_count": 2019,
+      "source_bytes": 2537063,
+      "asset_us": 261366,
+      "load_us": 666933,
+      "plan_us": 157616,
+      "assets": {
+        "parsed": 72,
+        "reused": 0,
+        "input_bytes": 758288,
+        "generated_bytes": 168093
+      },
+      "plan": {
+        "total": 5957,
+        "reached": 5139,
+        "fallback_units": 0,
+        "transitions": 338526
+      },
+      "body_weights": {
+        "scope": "top_level_and_implementation_members",
+        "original_modules": {
+          "lambda": {
+            "declarations": 3321,
+            "selected": 2505,
+            "source_bytes": 1706912,
+            "selected_source_bytes": 1317906
+          },
+          "non_lambda": {
+            "declarations": 2380,
+            "selected": 2380,
+            "source_bytes": 340046,
+            "selected_source_bytes": 340046
+          }
+        },
+        "generated_asset_modules": {
+          "lambda": {
+            "declarations": 2,
+            "selected": 0,
+            "source_bytes": 197,
+            "selected_source_bytes": 0
+          },
+          "non_lambda": {
+            "declarations": 254,
+            "selected": 254,
+            "source_bytes": 29995,
+            "selected_source_bytes": 29995
+          }
+        }
+      },
+      "module_changes_from_main": [
+        {
+          "unit": 2,
+          "source_sha256": "c9a49f7930a669770146ae7b9d744d08f754d16d0d6c53ae1a168b87c9178259",
+          "bodies": {
+            "lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 39,
+              "selected_source_bytes": 39
+            },
+            "non_lambda": {
+              "declarations": 0,
+              "selected": 0,
+              "source_bytes": 0,
+              "selected_source_bytes": 0
+            }
+          }
+        },
+        {
+          "unit": 3,
+          "selected": 1,
+          "skipped": 29,
+          "bodies": {
+            "lambda": {
+              "declarations": 30,
+              "selected": 1,
+              "source_bytes": 53517,
+              "selected_source_bytes": 5022
+            },
+            "non_lambda": {
+              "declarations": 0,
+              "selected": 0,
+              "source_bytes": 0,
+              "selected_source_bytes": 0
+            }
+          }
+        },
+        {
+          "unit": 12,
+          "selected": 22,
+          "skipped": 3,
+          "bodies": {
+            "lambda": {
+              "declarations": 24,
+              "selected": 21,
+              "source_bytes": 6185,
+              "selected_source_bytes": 4927
+            },
+            "non_lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 8,
+              "selected_source_bytes": 8
+            }
+          }
+        },
+        {
+          "unit": 14,
+          "selected": 16,
+          "skipped": 12,
+          "bodies": {
+            "lambda": {
+              "declarations": 25,
+              "selected": 13,
+              "source_bytes": 5383,
+              "selected_source_bytes": 3055
+            },
+            "non_lambda": {
+              "declarations": 3,
+              "selected": 3,
+              "source_bytes": 34,
+              "selected_source_bytes": 34
+            }
+          }
+        },
+        {
+          "unit": 29,
+          "selected": 55,
+          "skipped": 5,
+          "bodies": {
+            "lambda": {
+              "declarations": 53,
+              "selected": 48,
+              "source_bytes": 24360,
+              "selected_source_bytes": 20919
+            },
+            "non_lambda": {
+              "declarations": 7,
+              "selected": 7,
+              "source_bytes": 133,
+              "selected_source_bytes": 133
+            }
+          }
+        },
+        {
+          "unit": 32,
+          "selected": 13,
+          "skipped": 8,
+          "bodies": {
+            "lambda": {
+              "declarations": 20,
+              "selected": 12,
+              "source_bytes": 2750,
+              "selected_source_bytes": 2428
+            },
+            "non_lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 107,
+              "selected_source_bytes": 107
+            }
+          }
+        },
+        {
+          "unit": 33,
+          "selected": 5,
+          "skipped": 3,
+          "bodies": {
+            "lambda": {
+              "declarations": 7,
+              "selected": 4,
+              "source_bytes": 1871,
+              "selected_source_bytes": 1293
+            },
+            "non_lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 34,
+              "selected_source_bytes": 34
+            }
+          }
+        },
+        {
+          "unit": 44,
+          "selected": 129,
+          "skipped": 8,
+          "bodies": {
+            "lambda": {
+              "declarations": 90,
+              "selected": 82,
+              "source_bytes": 38661,
+              "selected_source_bytes": 33993
+            },
+            "non_lambda": {
+              "declarations": 47,
+              "selected": 47,
+              "source_bytes": 5732,
+              "selected_source_bytes": 5732
+            }
+          }
+        },
+        {
+          "unit": 61,
+          "selected": 22,
+          "skipped": 14,
+          "bodies": {
+            "lambda": {
+              "declarations": 28,
+              "selected": 14,
+              "source_bytes": 13824,
+              "selected_source_bytes": 6783
+            },
+            "non_lambda": {
+              "declarations": 8,
+              "selected": 8,
+              "source_bytes": 53,
+              "selected_source_bytes": 53
+            }
+          }
+        },
+        {
+          "unit": 62,
+          "selected": 35,
+          "skipped": 17,
+          "bodies": {
+            "lambda": {
+              "declarations": 48,
+              "selected": 31,
+              "source_bytes": 25358,
+              "selected_source_bytes": 13636
+            },
+            "non_lambda": {
+              "declarations": 4,
+              "selected": 4,
+              "source_bytes": 51,
+              "selected_source_bytes": 51
+            }
+          }
+        },
+        {
+          "unit": 89,
+          "selected": 72,
+          "skipped": 19,
+          "bodies": {
+            "lambda": {
+              "declarations": 66,
+              "selected": 47,
+              "source_bytes": 34308,
+              "selected_source_bytes": 25143
+            },
+            "non_lambda": {
+              "declarations": 25,
+              "selected": 25,
+              "source_bytes": 994,
+              "selected_source_bytes": 994
+            }
+          }
+        },
+        {
+          "unit": 94,
+          "selected": 4,
+          "skipped": 5,
+          "bodies": {
+            "lambda": {
+              "declarations": 7,
+              "selected": 2,
+              "source_bytes": 1717,
+              "selected_source_bytes": 437
+            },
+            "non_lambda": {
+              "declarations": 2,
+              "selected": 2,
+              "source_bytes": 25,
+              "selected_source_bytes": 25
+            }
+          }
+        },
+        {
+          "unit": 105,
+          "selected": 35,
+          "skipped": 8,
+          "bodies": {
+            "lambda": {
+              "declarations": 34,
+              "selected": 26,
+              "source_bytes": 20624,
+              "selected_source_bytes": 17278
+            },
+            "non_lambda": {
+              "declarations": 9,
+              "selected": 9,
+              "source_bytes": 134,
+              "selected_source_bytes": 134
+            }
+          }
+        },
+        {
+          "unit": 108,
+          "selected": 116,
+          "skipped": 6,
+          "bodies": {
+            "lambda": {
+              "declarations": 93,
+              "selected": 87,
+              "source_bytes": 49755,
+              "selected_source_bytes": 45800
+            },
+            "non_lambda": {
+              "declarations": 29,
+              "selected": 29,
+              "source_bytes": 1185,
+              "selected_source_bytes": 1185
+            }
+          }
+        },
+        {
+          "unit": 109,
+          "selected": 6,
+          "skipped": 28,
+          "bodies": {
+            "lambda": {
+              "declarations": 31,
+              "selected": 3,
+              "source_bytes": 14815,
+              "selected_source_bytes": 389
+            },
+            "non_lambda": {
+              "declarations": 3,
+              "selected": 3,
+              "source_bytes": 18,
+              "selected_source_bytes": 18
+            }
+          }
+        },
+        {
+          "unit": 110,
+          "selected": 4,
+          "skipped": 4,
+          "bodies": {
+            "lambda": {
+              "declarations": 7,
+              "selected": 3,
+              "source_bytes": 2411,
+              "selected_source_bytes": 1890
+            },
+            "non_lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 10,
+              "selected_source_bytes": 10
+            }
+          }
+        },
+        {
+          "unit": 114,
+          "selected": 200,
+          "skipped": 23,
+          "bodies": {
+            "lambda": {
+              "declarations": 147,
+              "selected": 124,
+              "source_bytes": 66814,
+              "selected_source_bytes": 58877
+            },
+            "non_lambda": {
+              "declarations": 76,
+              "selected": 76,
+              "source_bytes": 1824,
+              "selected_source_bytes": 1824
+            }
+          }
+        },
+        {
+          "unit": 116,
+          "selected": 14,
+          "skipped": 1,
+          "bodies": {
+            "lambda": {
+              "declarations": 14,
+              "selected": 13,
+              "source_bytes": 12044,
+              "selected_source_bytes": 11896
+            },
+            "non_lambda": {
+              "declarations": 1,
+              "selected": 1,
+              "source_bytes": 196,
+              "selected_source_bytes": 196
+            }
+          }
+        },
+        {
+          "unit": 118,
+          "selected": 23,
+          "skipped": 2,
+          "bodies": {
+            "lambda": {
+              "declarations": 17,
+              "selected": 15,
+              "source_bytes": 6125,
+              "selected_source_bytes": 4760
+            },
+            "non_lambda": {
+              "declarations": 8,
+              "selected": 8,
+              "source_bytes": 280,
+              "selected_source_bytes": 280
+            }
+          }
+        },
+        {
+          "unit": 137,
+          "selected": 103,
+          "skipped": 7,
+          "bodies": {
+            "lambda": {
+              "declarations": 49,
+              "selected": 42,
+              "source_bytes": 21012,
+              "selected_source_bytes": 17332
+            },
+            "non_lambda": {
+              "declarations": 61,
+              "selected": 61,
+              "source_bytes": 19238,
+              "selected_source_bytes": 19238
+            }
+          }
+        },
+        {
+          "unit": 138,
+          "selected": 182,
+          "skipped": 21,
+          "bodies": {
+            "lambda": {
+              "declarations": 150,
+              "selected": 129,
+              "source_bytes": 114609,
+              "selected_source_bytes": 107258
+            },
+            "non_lambda": {
+              "declarations": 53,
+              "selected": 53,
+              "source_bytes": 1789,
+              "selected_source_bytes": 1789
+            }
+          }
+        },
+        {
+          "unit": 153,
+          "selected": 24,
+          "skipped": 1,
+          "bodies": {
+            "lambda": {
+              "declarations": 11,
+              "selected": 10,
+              "source_bytes": 7811,
+              "selected_source_bytes": 7722
+            },
+            "non_lambda": {
+              "declarations": 14,
+              "selected": 14,
+              "source_bytes": 648,
+              "selected_source_bytes": 648
+            }
+          }
+        },
+        {
+          "unit": 161,
+          "selected": 99,
+          "skipped": 4,
+          "bodies": {
+            "lambda": {
+              "declarations": 18,
+              "selected": 14,
+              "source_bytes": 8723,
+              "selected_source_bytes": 6014
+            },
+            "non_lambda": {
+              "declarations": 85,
+              "selected": 85,
+              "source_bytes": 391,
+              "selected_source_bytes": 391
+            }
+          }
+        },
+        {
+          "unit": 162,
+          "selected": 74,
+          "skipped": 3,
+          "bodies": {
+            "lambda": {
+              "declarations": 58,
+              "selected": 55,
+              "source_bytes": 32151,
+              "selected_source_bytes": 30745
+            },
+            "non_lambda": {
+              "declarations": 19,
+              "selected": 19,
+              "source_bytes": 635,
+              "selected_source_bytes": 635
+            }
+          }
+        },
+        {
+          "unit": 174,
+          "selected": 31,
+          "skipped": 1,
+          "bodies": {
+            "lambda": {
+              "declarations": 21,
+              "selected": 20,
+              "source_bytes": 10584,
+              "selected_source_bytes": 9633
+            },
+            "non_lambda": {
+              "declarations": 11,
+              "selected": 11,
+              "source_bytes": 279,
+              "selected_source_bytes": 279
+            }
+          }
+        },
+        {
+          "unit": 185,
+          "selected": 155,
+          "skipped": 13,
+          "bodies": {
+            "lambda": {
+              "declarations": 128,
+              "selected": 115,
+              "source_bytes": 74771,
+              "selected_source_bytes": 71873
+            },
+            "non_lambda": {
+              "declarations": 40,
+              "selected": 40,
+              "source_bytes": 1111,
+              "selected_source_bytes": 1111
+            }
+          }
+        },
+        {
+          "unit": 199,
+          "selected": 7,
+          "skipped": 6,
+          "bodies": {
+            "lambda": {
+              "declarations": 11,
+              "selected": 5,
+              "source_bytes": 4325,
+              "selected_source_bytes": 1881
+            },
+            "non_lambda": {
+              "declarations": 2,
+              "selected": 2,
+              "source_bytes": 163,
+              "selected_source_bytes": 163
+            }
+          }
+        },
+        {
+          "unit": 201,
+          "selected": 25,
+          "skipped": 3,
+          "bodies": {
+            "lambda": {
+              "declarations": 22,
+              "selected": 19,
+              "source_bytes": 15541,
+              "selected_source_bytes": 14383
+            },
+            "non_lambda": {
+              "declarations": 6,
+              "selected": 6,
+              "source_bytes": 272,
+              "selected_source_bytes": 272
+            }
+          }
+        },
+        {
+          "unit": 204,
+          "selected": 8,
+          "skipped": 1,
+          "bodies": {
+            "lambda": {
+              "declarations": 7,
+              "selected": 6,
+              "source_bytes": 5276,
+              "selected_source_bytes": 4999
+            },
+            "non_lambda": {
+              "declarations": 2,
+              "selected": 2,
+              "source_bytes": 222,
+              "selected_source_bytes": 222
+            }
+          }
+        },
+        {
+          "unit": 210,
+          "selected": 23,
+          "skipped": 2,
+          "bodies": {
+            "lambda": {
+              "declarations": 15,
+              "selected": 13,
+              "source_bytes": 7891,
+              "selected_source_bytes": 6204
+            },
+            "non_lambda": {
+              "declarations": 10,
+              "selected": 10,
+              "source_bytes": 206,
+              "selected_source_bytes": 206
+            }
+          }
+        },
+        {
+          "unit": 215,
+          "selected": 30,
+          "skipped": 2,
+          "bodies": {
+            "lambda": {
+              "declarations": 15,
+              "selected": 13,
+              "source_bytes": 10564,
+              "selected_source_bytes": 9122
+            },
+            "non_lambda": {
+              "declarations": 17,
+              "selected": 17,
+              "source_bytes": 267,
+              "selected_source_bytes": 267
+            }
+          }
+        }
+      ]
+    }
+  },
+  "rejected_initial_results": {
+    "main_reached": 5957,
+    "tiny_reached": 5957,
+    "fallback_units": 263,
+    "causes": [
+      "Imported record paths required segmentation even when compound suffix is not interned.",
+      "Reserved and/or have no source producer and must not cause unknown-operator fallback."
+    ],
+    "status": "Both corrected and covered by existing first law; final fallback count zero."
+  },
+  "conclusion": "Conservative demand omits680declarations/main and818/tiny. It still retains83.7%/77.2% of original lambda body source bytes and every non-lambda initializer, adding roughly0.16s planning. Not integrated into build semantics; this coarse frontier alone is not the massive lever. Count source body bytes as a proxy only, not predicted checker time. Precise associated/initializer demand or a simpler compilation path remains future work.",
+  "module_manifest_and_main_selection": [
+    {
+      "path": "/home/jacobt/src/blot2/std/prelude.blot",
+      "source_sha256": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+      "generated_asset": false,
+      "selected": 151,
+      "skipped": 8,
+      "bodies": {
+        "lambda": {
+          "declarations": 145,
+          "selected": 137,
+          "source_bytes": 11993,
+          "selected_source_bytes": 11563
+        },
+        "non_lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 148,
+          "selected_source_bytes": 148
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/main.blot",
+      "source_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 179,
+          "selected_source_bytes": 179
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world_storage.blot",
+      "source_sha256": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+      "generated_asset": false,
+      "selected": 30,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 30,
+          "selected": 30,
+          "source_bytes": 53517,
+          "selected_source_bytes": 53517
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/salt_state.blot",
+      "source_sha256": "ea062ba1dbf18e1698526b080a272069b900c93a520a6cfcf20571100b245cd2",
+      "generated_asset": false,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/blot2/std/vector.blot",
+      "source_sha256": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e",
+      "generated_asset": false,
+      "selected": 19,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 19,
+          "selected": 19,
+          "source_bytes": 1482,
+          "selected_source_bytes": 1482
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/derived/keyed.blot",
+      "source_sha256": "b813084df92ee059ee0eb65b1b767db476cd29fa288dc6a326ebc5b68e1ade2d",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 4,
+          "source_bytes": 1090,
+          "selected_source_bytes": 507
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 33,
+          "selected_source_bytes": 33
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/spatial/point_grid.blot",
+      "source_sha256": "02a2a3c18c3c229163ff9df43fccb3a78902e9b9c4ccc8901facfc9903846f5b",
+      "generated_asset": false,
+      "selected": 10,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 5363,
+          "selected_source_bytes": 5363
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 39,
+          "selected_source_bytes": 39
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/blot2/std/array.blot",
+      "source_sha256": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+      "generated_asset": false,
+      "selected": 13,
+      "skipped": 12,
+      "bodies": {
+        "lambda": {
+          "declarations": 25,
+          "selected": 13,
+          "source_bytes": 5318,
+          "selected_source_bytes": 2823
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/robot_wakes.blot",
+      "source_sha256": "ba110062a12f822f6cbb8181ba841cea8af853b2669d25a1bdcea50af24a7303",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 3592,
+          "selected_source_bytes": 3592
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 26,
+          "selected_source_bytes": 26
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/transform.blot",
+      "source_sha256": "cff7eb49e30159bece898b84ca6033e23b0f6eb03496bf542ac844aa8daf93a6",
+      "generated_asset": false,
+      "selected": 16,
+      "skipped": 17,
+      "bodies": {
+        "lambda": {
+          "declarations": 28,
+          "selected": 11,
+          "source_bytes": 7612,
+          "selected_source_bytes": 2642
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 327,
+          "selected_source_bytes": 327
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/math.blot",
+      "source_sha256": "77718d79d615e2b49b9ed077f69bd26bbcf20162b895f6420a733c94b626b18d",
+      "generated_asset": false,
+      "selected": 78,
+      "skipped": 10,
+      "bodies": {
+        "lambda": {
+          "declarations": 76,
+          "selected": 66,
+          "source_bytes": 22149,
+          "selected_source_bytes": 17526
+        },
+        "non_lambda": {
+          "declarations": 12,
+          "selected": 12,
+          "source_bytes": 435,
+          "selected_source_bytes": 435
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/lanes.blot",
+      "source_sha256": "d2b730f5bbfbd0c075165104bcad1b522012a0d651a90ec0a1aed722b124c78b",
+      "generated_asset": false,
+      "selected": 23,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 24,
+          "selected": 22,
+          "source_bytes": 6185,
+          "selected_source_bytes": 5190
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 8,
+          "selected_source_bytes": 8
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/blot2/std/simd.blot",
+      "source_sha256": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+      "generated_asset": false,
+      "selected": 13,
+      "skipped": 59,
+      "bodies": {
+        "lambda": {
+          "declarations": 71,
+          "selected": 12,
+          "source_bytes": 4641,
+          "selected_source_bytes": 652
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 48,
+          "selected_source_bytes": 48
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ecs.blot",
+      "source_sha256": "1ba26a8529edfd9e43e5748cc6a1cc8415483a2fd61ed4efce26556e63a91386",
+      "generated_asset": false,
+      "selected": 20,
+      "skipped": 8,
+      "bodies": {
+        "lambda": {
+          "declarations": 25,
+          "selected": 17,
+          "source_bytes": 5383,
+          "selected_source_bytes": 3350
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 34,
+          "selected_source_bytes": 34
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/journal.blot",
+      "source_sha256": "a772eb74f57db1861be0ee923a118068d2dae8c83d35195487320e268ff8d1bd",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 5,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 0,
+          "source_bytes": 1489,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 32,
+          "selected_source_bytes": 32
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/messages.blot",
+      "source_sha256": "510df72de3efe940c4e38fdbdaa591137023aa8e3992703199b290c20a8d571f",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 2,
+          "source_bytes": 1831,
+          "selected_source_bytes": 155
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/changes.blot",
+      "source_sha256": "554f77c5be82b3b3814f0a2ded17bca71b12f3f231b7ba3950856d5cc69cfa91",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 8,
+      "bodies": {
+        "lambda": {
+          "declarations": 10,
+          "selected": 2,
+          "source_bytes": 5363,
+          "selected_source_bytes": 946
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/sort.blot",
+      "source_sha256": "68a801c696219c294ce84f9bfbbc1b00cac3729d7b6b658e5c297dad135c7809",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 2491,
+          "selected_source_bytes": 2491
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/map.blot",
+      "source_sha256": "2d1e5bc61eb8e0bab0669a3eda45c1045cc8381208564edd69c937f3fab72061",
+      "generated_asset": false,
+      "selected": 20,
+      "skipped": 8,
+      "bodies": {
+        "lambda": {
+          "declarations": 25,
+          "selected": 17,
+          "source_bytes": 5833,
+          "selected_source_bytes": 4182
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 91,
+          "selected_source_bytes": 91
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/hash.blot",
+      "source_sha256": "933f0f7ab45199817e5a4c00ffbc38624adad39bda0c240d11da87590b96e87c",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 438,
+          "selected_source_bytes": 293
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/actor_state.blot",
+      "source_sha256": "f1651856b2b9ed872bf323c8cad5180670e7a98fa756e7415ccc512bda566ea8",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 212,
+          "selected_source_bytes": 212
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/identities.blot",
+      "source_sha256": "991be58e315a06704726b936f4cd3d8e531ece72fb90bca6a5fa0b45346c951c",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 254,
+          "selected_source_bytes": 254
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/jetpack.blot",
+      "source_sha256": "25b1e06799086fa88200e188d07e46d6757f3fcdd5af0004356f87b256ded53f",
+      "generated_asset": false,
+      "selected": 31,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 25,
+          "selected": 24,
+          "source_bytes": 10634,
+          "selected_source_bytes": 10551
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 20,
+          "selected_source_bytes": 20
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/actor_stages.blot",
+      "source_sha256": "f1a894605678522d7202fb16d7509ae33ca37294038398c5ccfeef597a66e342",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 1328,
+          "selected_source_bytes": 1328
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/blot2/std/equality.blot",
+      "source_sha256": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 5,
+          "source_bytes": 450,
+          "selected_source_bytes": 405
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/motion.blot",
+      "source_sha256": "b249572d848f26ca70c19e0a689f41f8997e4d169918e626e50e47920da9f25b",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 13,
+      "bodies": {
+        "lambda": {
+          "declarations": 23,
+          "selected": 10,
+          "source_bytes": 9374,
+          "selected_source_bytes": 5140
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 98,
+          "selected_source_bytes": 98
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/random.blot",
+      "source_sha256": "43f96a22cf04ddcaa7ce6179fcdbf8e39d7a2701c3beb5efd925fda29c7e9e03",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 732,
+          "selected_source_bytes": 732
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/navigation/ground.blot",
+      "source_sha256": "2cea5a6b87054e0026d5ea152d7c7f04005d8bbd430b31d10b41e5324c4f8f5a",
+      "generated_asset": false,
+      "selected": 26,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 24,
+          "selected": 21,
+          "source_bytes": 20011,
+          "selected_source_bytes": 16987
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 272,
+          "selected_source_bytes": 272
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/brush.blot",
+      "source_sha256": "1315a898cc7de5ac625eedd38f7dfa46ca42cedb152e41488af651fbe2e05d78",
+      "generated_asset": false,
+      "selected": 57,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 53,
+          "selected": 50,
+          "source_bytes": 24360,
+          "selected_source_bytes": 23845
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 133,
+          "selected_source_bytes": 133
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/logic.blot",
+      "source_sha256": "061293c76faf1cea2878e275c76f47d7b4ccc8e533f09069db88e981807c306f",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 231,
+          "selected_source_bytes": 231
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/render.blot",
+      "source_sha256": "938b52c18d078f52920596d48986e53b12a4f76f2b0d5f2bdf2b9bfaa05aea93",
+      "generated_asset": false,
+      "selected": 32,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 31,
+          "selected": 25,
+          "source_bytes": 13328,
+          "selected_source_bytes": 11978
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 1038,
+          "selected_source_bytes": 1038
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/app.blot",
+      "source_sha256": "08024ab9f5c843f6d2b0227f97b5893332f55860119aedf27ab4acedc8f9e530",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 20,
+          "selected": 14,
+          "source_bytes": 2750,
+          "selected_source_bytes": 2520
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 107,
+          "selected_source_bytes": 107
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/clock.blot",
+      "source_sha256": "8f766faba9885d923a4543ae24826a37a6ae99619284eb9169eb91cac8a52c3f",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 1871,
+          "selected_source_bytes": 1871
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 34,
+          "selected_source_bytes": 34
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/time.blot",
+      "source_sha256": "fd90d9f07616a6acdd4c6e41da9e85fce968a2306c9665f3511cf63ad0b04800",
+      "generated_asset": false,
+      "selected": 4,
+      "skipped": 4,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 4,
+          "source_bytes": 2841,
+          "selected_source_bytes": 2069
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/events.blot",
+      "source_sha256": "e2037d9e9927d6b558fa29e6c0ace654dfe4f686cafefade134c9ed4cf286b69",
+      "generated_asset": false,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/spatial.blot",
+      "source_sha256": "d2cf6ff2d1f116ca7e550cb76759ddb405d04ef70b45d4665f5fc64378d45181",
+      "generated_asset": false,
+      "selected": 14,
+      "skipped": 9,
+      "bodies": {
+        "lambda": {
+          "declarations": 22,
+          "selected": 13,
+          "source_bytes": 18794,
+          "selected_source_bytes": 12739
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 11,
+          "selected_source_bytes": 11
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/rig.blot",
+      "source_sha256": "25dfaf5c609bf1159db503140b9d4313442decfa5fae2d9458b140e8d5b5c421",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 14,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 1,
+          "source_bytes": 10265,
+          "selected_source_bytes": 378
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/scene.blot",
+      "source_sha256": "df30fe1964349d213267f8beb21e9536ed363bf3a0bfe0fbdde8398e0390addd",
+      "generated_asset": false,
+      "selected": 14,
+      "skipped": 49,
+      "bodies": {
+        "lambda": {
+          "declarations": 54,
+          "selected": 5,
+          "source_bytes": 26195,
+          "selected_source_bytes": 1737
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 616,
+          "selected_source_bytes": 616
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/shapes.blot",
+      "source_sha256": "902fbcaf22761d9d235c7948076b35c8ee551d5b641b0e6e34ba0f909fc6ccb9",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 44,
+      "bodies": {
+        "lambda": {
+          "declarations": 51,
+          "selected": 7,
+          "source_bytes": 42519,
+          "selected_source_bytes": 2775
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 335,
+          "selected_source_bytes": 335
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/terrain.blot",
+      "source_sha256": "2f6f74d75942cfa80e49cc7a857a0acc52163e697de68dbf10aca7955d9e5800",
+      "generated_asset": false,
+      "selected": 4,
+      "skipped": 17,
+      "bodies": {
+        "lambda": {
+          "declarations": 19,
+          "selected": 2,
+          "source_bytes": 6541,
+          "selected_source_bytes": 822
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 9,
+          "selected_source_bytes": 9
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/noise.blot",
+      "source_sha256": "597cfdbb38b020f4cd55f884008bd0e241ddc99013ecbc1ab721ca5492d9cd3a",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 15,
+      "bodies": {
+        "lambda": {
+          "declarations": 18,
+          "selected": 3,
+          "source_bytes": 6370,
+          "selected_source_bytes": 1272
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/spline.blot",
+      "source_sha256": "e7529ff77502f2087a4841797355d7deedd3a51559a7c2f67e9bc1ec0912fa52",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 19,
+      "bodies": {
+        "lambda": {
+          "declarations": 19,
+          "selected": 0,
+          "source_bytes": 13743,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 12,
+          "selected_source_bytes": 12
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/view.blot",
+      "source_sha256": "3deccb603c400beed52409915e916b3369ed77d78fc722e7a8ff4c7d5be00841",
+      "generated_asset": false,
+      "selected": 10,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 9,
+          "source_bytes": 3183,
+          "selected_source_bytes": 2878
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 80,
+          "selected_source_bytes": 80
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/buildings.blot",
+      "source_sha256": "e6b9b8b630c335b98b9f492152e8d95fab153c0466082392f5d89b9663ea5fca",
+      "generated_asset": false,
+      "selected": 131,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 90,
+          "selected": 84,
+          "source_bytes": 38661,
+          "selected_source_bytes": 36714
+        },
+        "non_lambda": {
+          "declarations": 47,
+          "selected": 47,
+          "source_bytes": 5732,
+          "selected_source_bytes": 5732
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/text.blot",
+      "source_sha256": "2aa633962fa1b9b728950f3caa9a52d85aba374d16dd50348ed353e2d53435ed",
+      "generated_asset": false,
+      "selected": 408,
+      "skipped": 18,
+      "bodies": {
+        "lambda": {
+          "declarations": 21,
+          "selected": 3,
+          "source_bytes": 16348,
+          "selected_source_bytes": 15764
+        },
+        "non_lambda": {
+          "declarations": 405,
+          "selected": 405,
+          "source_bytes": 59952,
+          "selected_source_bytes": 59952
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/construction_kit.blot",
+      "source_sha256": "f84b0673da52ffa78c184ee8505824b5309e42a2b350c81a54f354772deea87c",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 6,
+          "source_bytes": 2598,
+          "selected_source_bytes": 2314
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 27,
+          "selected_source_bytes": 27
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/commands.blot",
+      "source_sha256": "b3c11be76854c376d8be06df8f045d54bbcdd0224f6df2b01c3fc07714e35af1",
+      "generated_asset": false,
+      "selected": 19,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 1,
+          "source_bytes": 4964,
+          "selected_source_bytes": 323
+        },
+        "non_lambda": {
+          "declarations": 18,
+          "selected": 18,
+          "source_bytes": 78,
+          "selected_source_bytes": 78
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/construction_kit_assets.blot",
+      "source_sha256": "7613a6fc6895fe899de6b43380c3724a9165191dadc390ae56faac02bbc99821",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 17354,
+          "selected_source_bytes": 17354
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/catalog.json.blot",
+      "source_sha256": "ff0db25679c8a262776a5689d97fef99d66fa3da20051deab99633b39fe70e3d",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 10356,
+          "selected_source_bytes": 10356
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/system_names.json.blot",
+      "source_sha256": "41a8fa2dc4567670bf8197c30763a8230d20123bbc4d90b6925a68ec7f231fe0",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 11683,
+          "selected_source_bytes": 11683
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/lighting_look.blot",
+      "source_sha256": "1ceeea6016415635793023bdfc8d051e11d8d262efa6a4f65204ac5cfd5fff85",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 3,
+          "source_bytes": 1245,
+          "selected_source_bytes": 545
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 127,
+          "selected_source_bytes": 127
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/salt.wgsl.blot",
+      "source_sha256": "dd19f3c772ad816e5534a3143b05168a124f10eb1aaef099ac6e0485c7e55341",
+      "generated_asset": true,
+      "selected": 21,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 21,
+          "selected": 21,
+          "source_bytes": 142,
+          "selected_source_bytes": 142
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/robot3d.wgsl.blot",
+      "source_sha256": "191ed935480510eb57de0f8b6daef860d52a087c6163f72069e2c533f965692b",
+      "generated_asset": true,
+      "selected": 17,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 17,
+          "selected": 17,
+          "source_bytes": 53,
+          "selected_source_bytes": 53
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/building_lights.blot",
+      "source_sha256": "00aa6002db34f8aa138b7dabbec07e111b82fe4e20518d64e87775f66f3fd1e0",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 6,
+          "source_bytes": 2401,
+          "selected_source_bytes": 2240
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/stage_lights.blot",
+      "source_sha256": "38e3f8c5aee231f606e70f84f316f213fbca94e092801f626d3432eadc5a41c8",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 2873,
+          "selected_source_bytes": 2873
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 25,
+          "selected_source_bytes": 25
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/daylight.blot",
+      "source_sha256": "9b6626a5b572905a2ac07ef3577a036e3e204a2723c07ec998439cf7d661e6ea",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 2520,
+          "selected_source_bytes": 2290
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 376,
+          "selected_source_bytes": 376
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/cycle.blot",
+      "source_sha256": "3e64507d1a0b107cde2ebd7a7b035217b25d75fa6e7ec0be6bc5260da73ae306",
+      "generated_asset": false,
+      "selected": 28,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 12,
+          "source_bytes": 3529,
+          "selected_source_bytes": 3040
+        },
+        "non_lambda": {
+          "declarations": 16,
+          "selected": 16,
+          "source_bytes": 487,
+          "selected_source_bytes": 487
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/library.blot",
+      "source_sha256": "7a88a29cdc22be2e5b175e3b3a7ef6835f495c721a2d60d24b5a2b9e46d69d08",
+      "generated_asset": false,
+      "selected": 19,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 1128,
+          "selected_source_bytes": 1128
+        },
+        "non_lambda": {
+          "declarations": 12,
+          "selected": 12,
+          "source_bytes": 835,
+          "selected_source_bytes": 835
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/sound.blot",
+      "source_sha256": "7aa18376cccd5ae4e3122a5a187222a9378190e996982f9de9909b478e0c0a11",
+      "generated_asset": false,
+      "selected": 21,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 13,
+          "selected": 11,
+          "source_bytes": 3506,
+          "selected_source_bytes": 2973
+        },
+        "non_lambda": {
+          "declarations": 10,
+          "selected": 10,
+          "source_bytes": 250,
+          "selected_source_bytes": 250
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/preferences.blot",
+      "source_sha256": "c25834095345d92df1078cb0f873d08f5e3ce2044e220619993022b16383542c",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 10,
+          "source_bytes": 4348,
+          "selected_source_bytes": 4183
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 97,
+          "selected_source_bytes": 97
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/services.blot",
+      "source_sha256": "fd12e193b5725ab62ba6252fea1176b882beaa32f8557c960502b740f6ff02b8",
+      "generated_asset": false,
+      "selected": 33,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 28,
+          "selected": 25,
+          "source_bytes": 13824,
+          "selected_source_bytes": 13427
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 53,
+          "selected_source_bytes": 53
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui/tree.blot",
+      "source_sha256": "62e955e182db9cacf9fcd2b0a8404dd90f2cbed38f3ddc4e8a358c4c77569bf4",
+      "generated_asset": false,
+      "selected": 38,
+      "skipped": 14,
+      "bodies": {
+        "lambda": {
+          "declarations": 48,
+          "selected": 34,
+          "source_bytes": 25358,
+          "selected_source_bytes": 16608
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 51,
+          "selected_source_bytes": 51
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/graph.blot",
+      "source_sha256": "37960e8cccb4b085fe4d9959efe332be974b6cc6314be00d95791632907e8ea5",
+      "generated_asset": false,
+      "selected": 0,
+      "skipped": 7,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 0,
+          "source_bytes": 6478,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/lookup.blot",
+      "source_sha256": "defdeebc48ec07550bc0a14f111cad19ff38d522f8e5520aa4acc77abbfe30ea",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 1,
+          "source_bytes": 918,
+          "selected_source_bytes": 461
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/input/keys.blot",
+      "source_sha256": "fb55195bb45d4cbf5162bbfcee573446140fb1c6ddab08e4598a485c7322f4b9",
+      "generated_asset": false,
+      "selected": 54,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 54,
+          "selected": 54,
+          "source_bytes": 234,
+          "selected_source_bytes": 234
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui/vocabulary.blot",
+      "source_sha256": "0a9fb5eed74a31cb2a6a4eb180926877c36ef1f4df16258b5708b5352707389f",
+      "generated_asset": false,
+      "selected": 39,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 39,
+          "selected": 39,
+          "source_bytes": 53,
+          "selected_source_bytes": 53
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/orbit.blot",
+      "source_sha256": "299fa5395188e340d715aba0db88da49fdf41feb35f92f9ca547335acb8f9808",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 5722,
+          "selected_source_bytes": 5722
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 80,
+          "selected_source_bytes": 80
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/input.blot",
+      "source_sha256": "aae291cd7b0f91855f624b4e82f986b5b7d774cba8ddbb17d2305fedec76d88d",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 12,
+          "selected": 10,
+          "source_bytes": 5365,
+          "selected_source_bytes": 2814
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 65,
+          "selected_source_bytes": 65
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui/font.blot",
+      "source_sha256": "baba301fa689f348e4a1e53dc738dc9d9bd010907d54fe0de4e69f26276bf964",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 393,
+          "selected_source_bytes": 393
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/font.blot",
+      "source_sha256": "226cf2395444adddc8d8f57cceb8de5ac6858ec728e35c2934aba900c8ee9f33",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 0,
+          "source_bytes": 140,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 71577,
+          "selected_source_bytes": 71577
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/announcement_font.blot",
+      "source_sha256": "106f00875c7029c66185ac900c742f9d403da50d4b2c384de329398b0b4850af",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 0,
+          "source_bytes": 140,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 1980,
+          "selected_source_bytes": 1980
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/stage_light.wgsl.blot",
+      "source_sha256": "34a271155be6a756ab1b1ae672386c8309836663dc1cc390b63eb5b7864fdd4a",
+      "generated_asset": true,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 74,
+          "selected_source_bytes": 74
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/stage_beam.wgsl.blot",
+      "source_sha256": "33f6cc4df7fc1d8f8759778ba300233f4b1b0ff29f4b7baa09611628e85c7cee",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/professions.blot",
+      "source_sha256": "68fe3ab1048b91557514d47ac280fbe1ac284353c113f00cb2b2007af0bb568f",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 1921,
+          "selected_source_bytes": 1921
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/polar.blot",
+      "source_sha256": "385d74407169ccb98e03ea4d72089c1c0b17db5ffaa7d255136b37dbd21507d4",
+      "generated_asset": false,
+      "selected": 10,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 12,
+          "selected": 10,
+          "source_bytes": 4329,
+          "selected_source_bytes": 3974
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/impact.blot",
+      "source_sha256": "88f3a5bf43abddddf64405e365f2d1ce655f82cebda382bf598863caef3d9aea",
+      "generated_asset": false,
+      "selected": 14,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 13,
+          "selected": 13,
+          "source_bytes": 3700,
+          "selected_source_bytes": 3700
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 30,
+          "selected_source_bytes": 30
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/access.blot",
+      "source_sha256": "c7e4511a7b3fecab91f7878e182cad80ecd5a582e613d4f363c74861f00c094a",
+      "generated_asset": false,
+      "selected": 17,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 13,
+          "selected": 12,
+          "source_bytes": 4777,
+          "selected_source_bytes": 4707
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 202,
+          "selected_source_bytes": 202
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/protocol.blot",
+      "source_sha256": "e27c200fef326cc4407f77e6ef50860fd5519f5f15e654e4ef422165618a1802",
+      "generated_asset": false,
+      "selected": 651,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 5931,
+          "selected_source_bytes": 5931
+        },
+        "non_lambda": {
+          "declarations": 649,
+          "selected": 649,
+          "source_bytes": 1252,
+          "selected_source_bytes": 1252
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/lanes.blot",
+      "source_sha256": "7ed0bc420c7ff2928b684e4b275bd78bddfe32c5a367b7298968f43312a37302",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 432,
+          "selected_source_bytes": 432
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 8,
+          "selected_source_bytes": 8
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui.blot",
+      "source_sha256": "3ff019de86dbe61b1c91559c1d406e66c84d43257b50f54b254ffa896451eafe",
+      "generated_asset": false,
+      "selected": 66,
+      "skipped": 14,
+      "bodies": {
+        "lambda": {
+          "declarations": 54,
+          "selected": 40,
+          "source_bytes": 25052,
+          "selected_source_bytes": 18013
+        },
+        "non_lambda": {
+          "declarations": 26,
+          "selected": 26,
+          "source_bytes": 762,
+          "selected_source_bytes": 762
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/rock.blot",
+      "source_sha256": "0b96a865c3ff149604cb46ca2221e610c57d8e7a945119bddc58ef6d6c64040b",
+      "generated_asset": false,
+      "selected": 43,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 25,
+          "selected": 24,
+          "source_bytes": 11310,
+          "selected_source_bytes": 11198
+        },
+        "non_lambda": {
+          "declarations": 19,
+          "selected": 19,
+          "source_bytes": 695,
+          "selected_source_bytes": 695
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/rock_landings.blot",
+      "source_sha256": "d311d1eff9bea1205d89b087d5df7d4f0f19bf521ebdb11b36a3c4fdf6b8ac6f",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 103,
+          "selected_source_bytes": 103
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 36862,
+          "selected_source_bytes": 36862
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/building_fringe.wgsl.blot",
+      "source_sha256": "2c08c9fd3bca105745620a1c23d180b1e012b7caec817764bda18684082a1ed2",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/render/cache.blot",
+      "source_sha256": "f8a4a28c04d74d322ae0420ed95f74f16f0bb0fc56b66ec3d6256ecebbd8a235",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 11,
+      "bodies": {
+        "lambda": {
+          "declarations": 13,
+          "selected": 2,
+          "source_bytes": 4155,
+          "selected_source_bytes": 1025
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/building_grid.blot",
+      "source_sha256": "6b687cff7181df34460a54e572e23e3603732a1c9b105b54ccc3977f59bddf4d",
+      "generated_asset": false,
+      "selected": 17,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 1619,
+          "selected_source_bytes": 706
+        },
+        "non_lambda": {
+          "declarations": 15,
+          "selected": 15,
+          "source_bytes": 322,
+          "selected_source_bytes": 322
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/gizmos.blot",
+      "source_sha256": "d3467eb5776600407864c26c8c9da4342c56029d5301fd830c2359c41089fea9",
+      "generated_asset": false,
+      "selected": 4,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 4,
+          "source_bytes": 4058,
+          "selected_source_bytes": 1252
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/plot_fill.wgsl.blot",
+      "source_sha256": "9b6b63236152d83fd63447a162e45d34ba40bce61357496860d9278602a4a89a",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/arena.blot",
+      "source_sha256": "dbef2c8df8d8faaa39c33e027e8acec2bd060578750db2a8108f73a9029d420e",
+      "generated_asset": false,
+      "selected": 23,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 16,
+          "selected": 15,
+          "source_bytes": 2646,
+          "selected_source_bytes": 2539
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 120,
+          "selected_source_bytes": 120
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/trails.blot",
+      "source_sha256": "dd5fc7ed902e4b4c39e7c2285556e902abc895fe2bc9105bcdd8ecdefaba621a",
+      "generated_asset": false,
+      "selected": 76,
+      "skipped": 15,
+      "bodies": {
+        "lambda": {
+          "declarations": 66,
+          "selected": 51,
+          "source_bytes": 34308,
+          "selected_source_bytes": 27983
+        },
+        "non_lambda": {
+          "declarations": 25,
+          "selected": 25,
+          "source_bytes": 994,
+          "selected_source_bytes": 994
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/set.blot",
+      "source_sha256": "54e8cc7d4a97add604e12e9105f2d1399366a6ac9593c85b29f666d2224962f1",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 3,
+          "source_bytes": 1177,
+          "selected_source_bytes": 323
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 84,
+          "selected_source_bytes": 84
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/field.blot",
+      "source_sha256": "649d24b04173f8f6e49e48e19536a6d650e21b5bdf919c424bea480f6be8b828",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 5,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 3,
+          "source_bytes": 4110,
+          "selected_source_bytes": 719
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/field/buckets.blot",
+      "source_sha256": "681a8cb86af3428fd0c9f716d7565be0fa12b1e0d4971491fc90a6ec57764d6e",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 2262,
+          "selected_source_bytes": 2262
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/radial.blot",
+      "source_sha256": "161036a6523ef90349ced12e7c2b0ca06d014c02150ff99d527c46facefd7edd",
+      "generated_asset": false,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 2499,
+          "selected_source_bytes": 2499
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/tune.blot",
+      "source_sha256": "6563d81bc699ed9fafe49d33faac97a92905873550dd2b2c13b0e3fcab1d6442",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 5,
+          "source_bytes": 1717,
+          "selected_source_bytes": 1334
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 25,
+          "selected_source_bytes": 25
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/salt_surface.wgsl.blot",
+      "source_sha256": "7b0fba95c563c2784bc3b95449db9949b3709d48942704266869779f32e68fa9",
+      "generated_asset": true,
+      "selected": 22,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 22,
+          "selected": 22,
+          "source_bytes": 255,
+          "selected_source_bytes": 255
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/tunables.json.blot",
+      "source_sha256": "9fa1683f618948053be702dcb136df2832e28f34e26daab2ea8fc4942fb87b52",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 0,
+          "source_bytes": 197,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 5868,
+          "selected_source_bytes": 5868
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/cargo.blot",
+      "source_sha256": "7e4ecfbcdc3994c0a10ffb04c6bb9b8f6140d187e68f57cc02686b1117974990",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 1209,
+          "selected_source_bytes": 1209
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 33,
+          "selected_source_bytes": 33
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/grass.wgsl.blot",
+      "source_sha256": "211744bb96e707afc31ec920ced9eaa7517de8eea8f97a3a6cf8849bbf98cba3",
+      "generated_asset": true,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 66,
+          "selected_source_bytes": 66
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/progress_bar.blot",
+      "source_sha256": "70f65419569908446d47ca5cd879a76c18a918846acde419f1e5fcc4460c5540",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 778,
+          "selected_source_bytes": 778
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/progress_bar.wgsl.blot",
+      "source_sha256": "d700d0beaee29f283b08d6ef8641dcf141853afbf8bbc83e285e3fc6659bc9bf",
+      "generated_asset": true,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 12,
+          "selected_source_bytes": 12
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/cannon_layout.blot",
+      "source_sha256": "349a0c31726247a06ccd53faf00ed59d52c1f30afd5fe29011d994812d5811b4",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 1210,
+          "selected_source_bytes": 1210
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/ground_blueprint.wgsl.blot",
+      "source_sha256": "7326c7c313b89167eb2f5bfcadf46d384e7444e8cabaf4654cb1eb681732ee8f",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/rock_summits.blot",
+      "source_sha256": "27506eaeebf85407082fff88e46feb8ad51733b2647598c8435bfeb95efe0192",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 311,
+          "selected_source_bytes": 311
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/rocket_wake.wgsl.blot",
+      "source_sha256": "5c8ec707060aeaee90024069b82fd7324d912d8448e4013313f4c64495a25ff3",
+      "generated_asset": true,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 59,
+          "selected_source_bytes": 59
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/cannon.blot",
+      "source_sha256": "39b42cb7fc24db2651554e7019e86f2bd89ae94cdaffb9be7809d45d2be814f8",
+      "generated_asset": false,
+      "selected": 39,
+      "skipped": 4,
+      "bodies": {
+        "lambda": {
+          "declarations": 34,
+          "selected": 30,
+          "source_bytes": 20624,
+          "selected_source_bytes": 19243
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 134,
+          "selected_source_bytes": 134
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/gyro_visual.blot",
+      "source_sha256": "127a37a9bf41e4029ff7f0138375d4d5fe377f20431d9096b14e3673222cb78b",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 723,
+          "selected_source_bytes": 723
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/world_ground.blot",
+      "source_sha256": "c94462734bbfbf4614fac7ffd8f8b14ad7a3e5acf8015723ae962d54168643ea",
+      "generated_asset": false,
+      "selected": 25,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 21,
+          "selected": 19,
+          "source_bytes": 13241,
+          "selected_source_bytes": 12183
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 539,
+          "selected_source_bytes": 539
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/editor.blot",
+      "source_sha256": "6b1f04769aeb766e9d826deb212aa3cf88788a6786728674255eb83f6412f987",
+      "generated_asset": false,
+      "selected": 121,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 93,
+          "selected": 92,
+          "source_bytes": 49755,
+          "selected_source_bytes": 49329
+        },
+        "non_lambda": {
+          "declarations": 29,
+          "selected": 29,
+          "source_bytes": 1185,
+          "selected_source_bytes": 1185
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/persist.blot",
+      "source_sha256": "6717f43dc878bf95114535fc551b4d99172462278f3d19f31695e55a1a809c11",
+      "generated_asset": false,
+      "selected": 34,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 31,
+          "selected": 31,
+          "source_bytes": 14815,
+          "selected_source_bytes": 14815
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 18,
+          "selected_source_bytes": 18
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/editor/history.blot",
+      "source_sha256": "a5362c059b13e8d93cb1f843d6344d3247fd9a4262fe896d3b30166fa75fb868",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 6,
+          "source_bytes": 2411,
+          "selected_source_bytes": 2236
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 10,
+          "selected_source_bytes": 10
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/crater.blot",
+      "source_sha256": "c62904f1808226846befb0a911c87fa272e61706e535e79543e283c5394291be",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 1288,
+          "selected_source_bytes": 1288
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 82,
+          "selected_source_bytes": 82
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/crater.wgsl.blot",
+      "source_sha256": "391136ec2b4ed2ca59899984e720daae35cea7d5a846e02d9c6836abf26cf26c",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 3,
+          "selected_source_bytes": 3
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/depot.blot",
+      "source_sha256": "1aaf9b7dc094e7a2fe7601f6a5033dd9f91c8b74e4397c5d9286defec97fb027",
+      "generated_asset": false,
+      "selected": 27,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 18,
+          "selected": 18,
+          "source_bytes": 8044,
+          "selected_source_bytes": 8044
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 197,
+          "selected_source_bytes": 197
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/salt.blot",
+      "source_sha256": "6150827229ae20d38582dd0de0e30c8f443c9c68a0971f42e0fbf708bc710e88",
+      "generated_asset": false,
+      "selected": 209,
+      "skipped": 14,
+      "bodies": {
+        "lambda": {
+          "declarations": 147,
+          "selected": 133,
+          "source_bytes": 66814,
+          "selected_source_bytes": 64606
+        },
+        "non_lambda": {
+          "declarations": 76,
+          "selected": 76,
+          "source_bytes": 1824,
+          "selected_source_bytes": 1824
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/reconcile.blot",
+      "source_sha256": "0aa2a53d02a75b24cb49f191a34dc76b8bc67df3cebdee8ff115d50a752b42bd",
+      "generated_asset": false,
+      "selected": 0,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 0,
+          "source_bytes": 1665,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/salt_pictures.blot",
+      "source_sha256": "1975d384805e2265f52a2b2bb1286179a3620a0ef14ae45872d025622c20ea60",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 12044,
+          "selected_source_bytes": 12044
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 196,
+          "selected_source_bytes": 196
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/salt_simulation.blot",
+      "source_sha256": "9ef072c8f3ed7df49b878c6ecf769f1421f9b6ba01393bd7d469044bd3fa47b2",
+      "generated_asset": false,
+      "selected": 10,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 10,
+          "selected": 10,
+          "source_bytes": 9809,
+          "selected_source_bytes": 9809
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/celebrations.blot",
+      "source_sha256": "b392cf7d8b998c3d4395d0a60ed7fb8653a7dd9ee82a445d50be233d75cb35b4",
+      "generated_asset": false,
+      "selected": 24,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 17,
+          "selected": 16,
+          "source_bytes": 6125,
+          "selected_source_bytes": 5658
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 280,
+          "selected_source_bytes": 280
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/palette.blot",
+      "source_sha256": "d79d8e9c8b8cbb17a1c5208e7d681d8c6cb2851f266a4f9ce3424abc745661c1",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 275,
+          "selected_source_bytes": 275
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/celebration.wgsl.blot",
+      "source_sha256": "137b66f3dce22fb10aa28b52b17307aa07cc7e7be503e18809a0347ca27423ce",
+      "generated_asset": true,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 101,
+          "selected_source_bytes": 101
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/salt_reservations.blot",
+      "source_sha256": "f5d7e884c5c4d61b0738a75319b25790167ffabfca4751b4960705027747b28e",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 11,
+          "source_bytes": 7604,
+          "selected_source_bytes": 7604
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 45,
+          "selected_source_bytes": 45
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/drop_ray.wgsl.blot",
+      "source_sha256": "9c84e66e30e0c8d38b33b70596169820905a82e3979bf09394a60443d46af0a1",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 4,
+          "selected_source_bytes": 4
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/brick_ghost.wgsl.blot",
+      "source_sha256": "20a42f5f76487756a0e09e992aeda851848822977ff544b678826d2f482bc885",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 3,
+          "selected_source_bytes": 3
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/salt_stack.wgsl.blot",
+      "source_sha256": "e93f68f812d2a96fa35702bc400f2544b0560d7bb6c216ec90d9445a64facdec",
+      "generated_asset": true,
+      "selected": 27,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 27,
+          "selected": 27,
+          "source_bytes": 196,
+          "selected_source_bytes": 196
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/sounds.blot",
+      "source_sha256": "2bbf0d95a1317263828cff108690fe1b8ecccb84a9411f5126164ce71b38be59",
+      "generated_asset": false,
+      "selected": 23,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 2013,
+          "selected_source_bytes": 2013
+        },
+        "non_lambda": {
+          "declarations": 21,
+          "selected": 21,
+          "source_bytes": 229,
+          "selected_source_bytes": 229
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/depot_layout.blot",
+      "source_sha256": "7d3d4a118f9e1f76fed8138f09062a0e9d38ca6e39fa458d3cc51d007cf7ed83",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 88,
+          "selected_source_bytes": 88
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/deposits.blot",
+      "source_sha256": "62eedf9cf00978d530bcb89f703d6d1856857ea0b1877d2c3c212d53155d1dac",
+      "generated_asset": false,
+      "selected": 35,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 23,
+          "selected": 20,
+          "source_bytes": 11660,
+          "selected_source_bytes": 9474
+        },
+        "non_lambda": {
+          "declarations": 15,
+          "selected": 15,
+          "source_bytes": 283,
+          "selected_source_bytes": 283
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/salt_mountain.wgsl.blot",
+      "source_sha256": "d5acfa5c529df21aaa55fd88a3edcf1dfa4f7cdce62abe136dab2faadea1c15b",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 38,
+          "selected_source_bytes": 38
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/presence.blot",
+      "source_sha256": "4eeb71b7d183aed458f9f0e17b3d59c0436d05aa938b28df46396c5184fdfbc9",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 1103,
+          "selected_source_bytes": 1103
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 115,
+          "selected_source_bytes": 115
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/dust.wgsl.blot",
+      "source_sha256": "59942dedeccefda75d07555fbe882683141b57ebf4f14bd1d9204f701f4d27fb",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 18,
+          "selected_source_bytes": 18
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/elements.blot",
+      "source_sha256": "19445ab90f98795c135d874ea3676507058ca3fd0cc06ea5205190a7cfb08627",
+      "generated_asset": false,
+      "selected": 30,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 17,
+          "selected": 17,
+          "source_bytes": 11176,
+          "selected_source_bytes": 11176
+        },
+        "non_lambda": {
+          "declarations": 13,
+          "selected": 13,
+          "source_bytes": 257,
+          "selected_source_bytes": 257
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/element_bar.wgsl.blot",
+      "source_sha256": "ae51882880a6db7bbc4afebd5fb6ad34e66ef4a13023233e7f0c468064ab2b2d",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 12,
+          "selected_source_bytes": 12
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/rock_frost.wgsl.blot",
+      "source_sha256": "ebfe9328c168f959cb8cc2c58efec904522defe1d291ae79a7ed74643443cd8d",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/rock_fire.wgsl.blot",
+      "source_sha256": "54b8bf2d208f2fd6eb2d3b2d330295c7f3f78ecf5f7caf26611e5edeea32339e",
+      "generated_asset": true,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 23,
+          "selected_source_bytes": 23
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/rock_heat.wgsl.blot",
+      "source_sha256": "1fa7c32914d9df3a82ef8574f8a6143f2fbaf17dfdc839107861662294af9899",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/fire_sources.blot",
+      "source_sha256": "4ca455c4131a617a02110adb1771cf4485990efa2c76b7bbc71c5eec9f169110",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 146,
+          "selected_source_bytes": 146
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/progression/progression.blot",
+      "source_sha256": "87c607483a8a36d21f4725870c9df867a223efc703d10dc06949840ad5a97a73",
+      "generated_asset": false,
+      "selected": 104,
+      "skipped": 6,
+      "bodies": {
+        "lambda": {
+          "declarations": 49,
+          "selected": 43,
+          "source_bytes": 21012,
+          "selected_source_bytes": 20077
+        },
+        "non_lambda": {
+          "declarations": 61,
+          "selected": 61,
+          "source_bytes": 19238,
+          "selected_source_bytes": 19238
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/robots.blot",
+      "source_sha256": "e9054145cbb0c51e14604a8f6b9c93f7e7a718dea261e1d9611c35ebc33a20a9",
+      "generated_asset": false,
+      "selected": 184,
+      "skipped": 19,
+      "bodies": {
+        "lambda": {
+          "declarations": 150,
+          "selected": 131,
+          "source_bytes": 114609,
+          "selected_source_bytes": 108163
+        },
+        "non_lambda": {
+          "declarations": 53,
+          "selected": 53,
+          "source_bytes": 1789,
+          "selected_source_bytes": 1789
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/actor_policy.blot",
+      "source_sha256": "f4ee32f78c346a801a21d82663c775f80f4c43b68650b01ae89b63bfc97a81ee",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 798,
+          "selected_source_bytes": 798
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/workforce.blot",
+      "source_sha256": "f9a729648815227c90876d1c04806d36e2ca4cc1420742a6ca599eec49cfa18d",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 2,
+          "source_bytes": 896,
+          "selected_source_bytes": 373
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/hauler_cargo.blot",
+      "source_sha256": "3aed638ff94afbf276147fcc49e1f65c5837cb400541103f50ff64a25c4ee141",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 2134,
+          "selected_source_bytes": 2134
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/hauling_plan.blot",
+      "source_sha256": "c1b6281f08fd0333d522027ffd148edafebcac3002e37adbb366b9a231a025c0",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 1588,
+          "selected_source_bytes": 1276
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 18,
+          "selected_source_bytes": 18
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/pile_batch.blot",
+      "source_sha256": "3ded7955bf0b354f2d697ece62667302dc31e9d9f728a53798327a62ada87685",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 5,
+          "source_bytes": 2119,
+          "selected_source_bytes": 2043
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 64,
+          "selected_source_bytes": 64
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/spatial/points.blot",
+      "source_sha256": "953818efdeb27fd056177fb456109ed355e4d7fa5ab826a8ada6f2eeed5a25a6",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 5,
+          "source_bytes": 2548,
+          "selected_source_bytes": 2474
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 70,
+          "selected_source_bytes": 70
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/construction_plan.blot",
+      "source_sha256": "2232a66eb36eb3b1ae14a3a8cc1d66cbc5ec03169e1198fe081d8f8d98652d86",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 2467,
+          "selected_source_bytes": 2467
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/actor_trace.blot",
+      "source_sha256": "1b3829638e79871bcb125c8caf38cc0f240019e03d0b61faa0886f451550247e",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 2775,
+          "selected_source_bytes": 2775
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 91,
+          "selected_source_bytes": 91
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/meals.blot",
+      "source_sha256": "41f283954e0848ca55aac9035cd75c4ccd797cc66ed321098af133773869dd9c",
+      "generated_asset": false,
+      "selected": 19,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 14,
+          "selected": 12,
+          "source_bytes": 2082,
+          "selected_source_bytes": 1591
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 354,
+          "selected_source_bytes": 354
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/electricity.blot",
+      "source_sha256": "0f0b6abeeaeda0772f3efcce1f90f5612fc14baebb23368b6d11bf3c239acd6c",
+      "generated_asset": false,
+      "selected": 16,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 12,
+          "selected": 9,
+          "source_bytes": 2376,
+          "selected_source_bytes": 1634
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 181,
+          "selected_source_bytes": 181
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/beacon.blot",
+      "source_sha256": "5c1de2eb2eadc30784252185ac6ce64d204befe4384b500ea650d8fa4b54f86c",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 2315,
+          "selected_source_bytes": 2315
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 12,
+          "selected_source_bytes": 12
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/navigation/locomotion.blot",
+      "source_sha256": "15de3b245cc1f01d3b62817935e7b62732f0a52d5235efd07445f17eecaa3e84",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 1273,
+          "selected_source_bytes": 1273
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/steering.blot",
+      "source_sha256": "58814ca0b0fbc4029f6b309e06434e92ed42ead7b0e212b5a6f0269d113f9cc7",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 12,
+      "bodies": {
+        "lambda": {
+          "declarations": 18,
+          "selected": 6,
+          "source_bytes": 15064,
+          "selected_source_bytes": 8147
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 122,
+          "selected_source_bytes": 122
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/jetpack_exhaust.wgsl.blot",
+      "source_sha256": "1748f92ea2fc655835561d2716298711c6172fd99c1ef63c54e4b23f85d708e3",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 19,
+          "selected_source_bytes": 19
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/hud.blot",
+      "source_sha256": "d77c0809f5d8e2795875870d561d831bb9affd64b37f07038c8a78c9e299527d",
+      "generated_asset": false,
+      "selected": 25,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 11,
+          "source_bytes": 7811,
+          "selected_source_bytes": 7811
+        },
+        "non_lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 648,
+          "selected_source_bytes": 648
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/frame_icon.blot",
+      "source_sha256": "ab48219698083389fb973abec4b46903a44d6b1d4a72399ce7be791eb71ff613",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 760,
+          "selected_source_bytes": 760
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/progression/goals.blot",
+      "source_sha256": "c9ddf5831ae9e831ef4a89ce96f45074f4b5f41fca6038728037240bdbdb1a1c",
+      "generated_asset": false,
+      "selected": 81,
+      "skipped": 15,
+      "bodies": {
+        "lambda": {
+          "declarations": 62,
+          "selected": 47,
+          "source_bytes": 33242,
+          "selected_source_bytes": 28480
+        },
+        "non_lambda": {
+          "declarations": 34,
+          "selected": 34,
+          "source_bytes": 961,
+          "selected_source_bytes": 961
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/labels.blot",
+      "source_sha256": "60267ef147c5f7de1087987539394c4807049969b5389364993749a010466acc",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 2,
+          "source_bytes": 1689,
+          "selected_source_bytes": 473
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 24,
+          "selected_source_bytes": 24
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/day_clock.wgsl.blot",
+      "source_sha256": "a05f7029d4b164721f7309e2cd210ee154f7ff78c6ca202e285edd990f7e8a6a",
+      "generated_asset": true,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 32,
+          "selected_source_bytes": 32
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/ascend_border.wgsl.blot",
+      "source_sha256": "6b31fed543ca5fcb273620197ee3e250cfa38b6b5398137780102e3fc78791b5",
+      "generated_asset": true,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 32,
+          "selected_source_bytes": 32
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/ascension_announcement.wgsl.blot",
+      "source_sha256": "1392d718d207c75c60a21facb74038749159da1ee75541ff4dc89ad2e039b04e",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/gnorp_icon.blot",
+      "source_sha256": "9f946fccfde2c13f0a13a998d407f001b90db4270232d4703d9fe52dc0219cf0",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 1846,
+          "selected_source_bytes": 1846
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 87,
+          "selected_source_bytes": 87
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/locale.blot",
+      "source_sha256": "053ac8f16907a494859739a2d13fc19621ecbe505fe5726b8824799abceb732d",
+      "generated_asset": false,
+      "selected": 103,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 18,
+          "selected": 18,
+          "source_bytes": 8723,
+          "selected_source_bytes": 8723
+        },
+        "non_lambda": {
+          "declarations": 85,
+          "selected": 85,
+          "source_bytes": 391,
+          "selected_source_bytes": 391
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/progression/tutorial.blot",
+      "source_sha256": "cbd765788d872a16cc9194f98149608bb7c741f6e6bb7f9aa65213833725c4c7",
+      "generated_asset": false,
+      "selected": 76,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 58,
+          "selected": 57,
+          "source_bytes": 32151,
+          "selected_source_bytes": 32094
+        },
+        "non_lambda": {
+          "declarations": 19,
+          "selected": 19,
+          "source_bytes": 635,
+          "selected_source_bytes": 635
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/build_bar.blot",
+      "source_sha256": "9768771fbe4a8a0717c68fe2bf66e5d31ea644a116c6a2e9c9764e3b6c4728b0",
+      "generated_asset": false,
+      "selected": 59,
+      "skipped": 5,
+      "bodies": {
+        "lambda": {
+          "declarations": 50,
+          "selected": 45,
+          "source_bytes": 31329,
+          "selected_source_bytes": 30745
+        },
+        "non_lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 370,
+          "selected_source_bytes": 370
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui/dialog.blot",
+      "source_sha256": "0e14fc394b5c12837891b514663b238c03bfc22e5c1661d858185e946c317388",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 2449,
+          "selected_source_bytes": 2449
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 147,
+          "selected_source_bytes": 147
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/placement.blot",
+      "source_sha256": "b6fbb3e08e52b1a4a59fab43162269b96604ecfc4a90e6106a9029f4d198d814",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 3093,
+          "selected_source_bytes": 3093
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 45,
+          "selected_source_bytes": 45
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/build_label.wgsl.blot",
+      "source_sha256": "acc93c0568a69ec118ef1a5cafc33679bb5df74b235b2a25d91ac598f8d41f9c",
+      "generated_asset": true,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 40,
+          "selected_source_bytes": 40
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/blueprint.wgsl.blot",
+      "source_sha256": "10a4198741f56ac9c1951604637775fb47d86e092fb80d1994276e1cb2cfc91e",
+      "generated_asset": true,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 96,
+          "selected_source_bytes": 96
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/building_stage.wgsl.blot",
+      "source_sha256": "e62e3a705149cd61897218442a3cdf3526da8e9c92864c2f1ff43c53b95f3659",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/interaction.blot",
+      "source_sha256": "a51f1135aaa610871f928c1667f1d433325056b747a8bd7f703e7a8e26418d4d",
+      "generated_asset": false,
+      "selected": 14,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 13,
+          "source_bytes": 7634,
+          "selected_source_bytes": 7252
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 49,
+          "selected_source_bytes": 49
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/selection.blot",
+      "source_sha256": "2873fcde14ba2f1820b8c3aa8f8afe4efdf99ddf54c81fb8efaea62c30bda369",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 818,
+          "selected_source_bytes": 818
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/hand_geometry.blot",
+      "source_sha256": "7a7636bc1a46664aa914ff166d3af9b2ed5a691fbc03101ccfea1370627329d7",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 2931,
+          "selected_source_bytes": 2931
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 204,
+          "selected_source_bytes": 204
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/god_hand.wgsl.blot",
+      "source_sha256": "31d6473065422cc25b494c7e0a625e044a2411418ab6bd393fab39f5dc8ffb81",
+      "generated_asset": true,
+      "selected": 10,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 10,
+          "selected": 10,
+          "source_bytes": 139,
+          "selected_source_bytes": 139
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/god_hand_rig.blot",
+      "source_sha256": "69a4c3d26addf085259ac8e947712bfde07747d6c0cf2a5982318c01e923ae2a",
+      "generated_asset": false,
+      "selected": 18,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 18,
+          "selected": 18,
+          "source_bytes": 805,
+          "selected_source_bytes": 805
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/crystals.blot",
+      "source_sha256": "2ac40365af88d83f375360eef10bbb069e9a48995364235fe939dc35867e131d",
+      "generated_asset": false,
+      "selected": 32,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 21,
+          "selected": 21,
+          "source_bytes": 10584,
+          "selected_source_bytes": 10584
+        },
+        "non_lambda": {
+          "declarations": 11,
+          "selected": 11,
+          "source_bytes": 279,
+          "selected_source_bytes": 279
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/crystal_spots.blot",
+      "source_sha256": "919d0df42bf7a019a2826ac0281bd90bcbcfef5da986a9709a1b1500b8649c1b",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 103,
+          "selected_source_bytes": 103
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 16153,
+          "selected_source_bytes": 16153
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/crystal.wgsl.blot",
+      "source_sha256": "ea2ed37a69c2181f4631fd82fc0fc05a70fbc99a18495f128608a6b27157bd23",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/darkness.wgsl.blot",
+      "source_sha256": "3bcd6542e8bdfdb3ba3387b6587f909969373062d04c0bf3eb8654457d82c968",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 39,
+          "selected_source_bytes": 39
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/scene.wgsl.blot",
+      "source_sha256": "606186603f0e834da17fc7895375269fc3bcea88bd7e72e871f666b2d061fc3b",
+      "generated_asset": true,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 3,
+          "selected_source_bytes": 3
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/earth.blot",
+      "source_sha256": "7fed31ec5c2b36bdb9e6eba4f0472a382240909fb9e6a9cdb2e7cccd654152d8",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 3134,
+          "selected_source_bytes": 3134
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 66,
+          "selected_source_bytes": 66
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/earth.wgsl.blot",
+      "source_sha256": "b57c05dc47aa4e082c8f769de65fe6c6d7d6b4bb21467d3abad172b81eb4e2c0",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 24,
+          "selected_source_bytes": 24
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/ground.wgsl.blot",
+      "source_sha256": "b02b44831d5ff8cdb9d4710d56c4c921e50e1a6214d763f208be0247c033ab2d",
+      "generated_asset": true,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 57,
+          "selected_source_bytes": 57
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/output.blot",
+      "source_sha256": "771cca3d111bf643766b6d0fcfd0e2209aa1232a15737dc95ac677e39a927fbf",
+      "generated_asset": false,
+      "selected": 28,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 20,
+          "selected": 20,
+          "source_bytes": 17666,
+          "selected_source_bytes": 17666
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 313,
+          "selected_source_bytes": 313
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/output_chart.blot",
+      "source_sha256": "5ef9267489978ae7ef1e9952792beb6195a6297d5ea755f0d9b5f87f1c4456b6",
+      "generated_asset": false,
+      "selected": 11,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 6531,
+          "selected_source_bytes": 6531
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 136,
+          "selected_source_bytes": 136
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/hand_icon.blot",
+      "source_sha256": "a30e115fbc013159a433da80532767ad217847110fa39ac4cff26907f1e00fc6",
+      "generated_asset": false,
+      "selected": 4,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 1574,
+          "selected_source_bytes": 1574
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/station.blot",
+      "source_sha256": "b3c7334d4b24e0bcd92d54d2e9dc9ab961104e86b3610c548e07ef8434ae6b28",
+      "generated_asset": false,
+      "selected": 157,
+      "skipped": 11,
+      "bodies": {
+        "lambda": {
+          "declarations": 128,
+          "selected": 117,
+          "source_bytes": 74771,
+          "selected_source_bytes": 73001
+        },
+        "non_lambda": {
+          "declarations": 40,
+          "selected": 40,
+          "source_bytes": 1111,
+          "selected_source_bytes": 1111
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/shop_rows.blot",
+      "source_sha256": "d5ea1f478be65991b5e00445f857101c058ecb7c6d7883d1d7a04b5f741a83f3",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 14,
+          "selected": 12,
+          "source_bytes": 5326,
+          "selected_source_bytes": 5123
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 35,
+          "selected_source_bytes": 35
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/shop_trace.blot",
+      "source_sha256": "6eab058ce9df399b004fec91a09df74d9552cf40a6a4a2190c79f3b7e36fbfe0",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 4668,
+          "selected_source_bytes": 4668
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/upgrade_panel.wgsl.blot",
+      "source_sha256": "e50a499283151dffae79db5ebd2ffc132b8d73a617ee8266aaaf3aff48762eba",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 40,
+          "selected_source_bytes": 40
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/progression/purchases.blot",
+      "source_sha256": "63995bdac3871088a0542e64f3754a011eeb809b2cfc69dc68d694050268c8d3",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 2948,
+          "selected_source_bytes": 2948
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/ui/split_flap.blot",
+      "source_sha256": "c69cae3463ac455b6c54a2a4340e9b9e796a510d2b9b2b744724f896d9200f6f",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 2701,
+          "selected_source_bytes": 2701
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/ammo_switch.wgsl.blot",
+      "source_sha256": "6bf58c10ab2baff822e24e2b6ab0f2673678d0235869287c03b4b8df19a58f97",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/host.blot",
+      "source_sha256": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+      "generated_asset": false,
+      "selected": 32,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 31,
+          "selected": 30,
+          "source_bytes": 17799,
+          "selected_source_bytes": 17662
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 1378,
+          "selected_source_bytes": 1378
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/graphics.blot",
+      "source_sha256": "8e43538f572e721023e6a09704eb00975c18beaf895037e851a8f21e803552fc",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 3031,
+          "selected_source_bytes": 3031
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 101,
+          "selected_source_bytes": 101
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/program.blot",
+      "source_sha256": "f8377b5fd2f5262cf3ce16e8d473c3a84794a9edf5854f537180adcda455a086",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 2110,
+          "selected_source_bytes": 2110
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 19,
+          "selected_source_bytes": 19
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/protocol_render.blot",
+      "source_sha256": "987e1f0ec97d2537b93cfdb4fff35f7322df4cf9c61502b7e066bdcd0e9be288",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 21,
+      "bodies": {
+        "lambda": {
+          "declarations": 22,
+          "selected": 1,
+          "source_bytes": 46752,
+          "selected_source_bytes": 28205
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/types.blot",
+      "source_sha256": "eb61fb2a57688e5c62be2727916d8f752327ed51232e2af3565fb71c9485db47",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 40,
+          "selected_source_bytes": 40
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/events.blot",
+      "source_sha256": "a4c4d99820fe57b21ea9051525afc1a257b25b577c637cae0b96bee41c800ed6",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 1,
+          "source_bytes": 2435,
+          "selected_source_bytes": 2185
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 21,
+          "selected_source_bytes": 21
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/frame.blot",
+      "source_sha256": "7051e1be51a2fad639b4e5b6951a633451d7ed9e16743b5693cc254cbd56e98e",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 1476,
+          "selected_source_bytes": 1476
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 227,
+          "selected_source_bytes": 227
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/platform.blot",
+      "source_sha256": "1a7c2397f2c4ff780489240822661df6cd46ff3d0750124d7abb9f6816df1a72",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 10,
+          "source_bytes": 4325,
+          "selected_source_bytes": 3862
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 163,
+          "selected_source_bytes": 163
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/services.blot",
+      "source_sha256": "26715e929e1e53fb967fd3fbe1887a540cffb7b1994a9282e31851fdab295a7a",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 4,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 5,
+          "source_bytes": 1624,
+          "selected_source_bytes": 899
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/village.blot",
+      "source_sha256": "ea786585a27dd40e149eb94ab56b8be39c467707abc4cd1e89a6804fda34c0f0",
+      "generated_asset": false,
+      "selected": 27,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 22,
+          "selected": 21,
+          "source_bytes": 15541,
+          "selected_source_bytes": 15257
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 272,
+          "selected_source_bytes": 272
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/minors.blot",
+      "source_sha256": "825ae80e486854ddc930aba59dad4f9e2f9f9c50a1963222e3302775303997d6",
+      "generated_asset": false,
+      "selected": 20,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 14,
+          "selected": 11,
+          "source_bytes": 18092,
+          "selected_source_bytes": 17338
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 196,
+          "selected_source_bytes": 196
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/material_batch.blot",
+      "source_sha256": "40843ba2176ba91cb305c66aafa640d3301316068003c5110f2c20e9e6e14baf",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 5766,
+          "selected_source_bytes": 5766
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/colony_paths.blot",
+      "source_sha256": "e3eb6717c24f559fa65b285a0c951abf36df95d73e51d85642e85d1fe2f08d77",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 5276,
+          "selected_source_bytes": 5276
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 222,
+          "selected_source_bytes": 222
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/navigation.blot",
+      "source_sha256": "e3a7de2ee6c340826ba1aa1490d439bc63915f7e34d511e04f7625742babdc93",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 4,
+          "source_bytes": 15269,
+          "selected_source_bytes": 13040
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 4,
+          "selected_source_bytes": 4
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/claims.blot",
+      "source_sha256": "2a174a91a47ed5d705d67fca8ada7ac09c73370ab0b819709665ef968dc13e72",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 681,
+          "selected_source_bytes": 681
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/shader_styles.blot",
+      "source_sha256": "72f53395862e538107409470c91de20937cac9f0517efd8eea7057f6a98c568c",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 1385,
+          "selected_source_bytes": 1385
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 48,
+          "selected_source_bytes": 48
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/scene_style.wgsl.blot",
+      "source_sha256": "da804945446d685d2c4d5ffce8d4cedb3212729b3417a80e1d1ae9d5da7e86ce",
+      "generated_asset": true,
+      "selected": 7,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 21,
+          "selected_source_bytes": 21
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/kites.blot",
+      "source_sha256": "76989b7a1d28a284e093c47a5cec9120bb85861a5929f3ce848829a632b29e65",
+      "generated_asset": false,
+      "selected": 29,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 22,
+          "selected": 22,
+          "source_bytes": 17710,
+          "selected_source_bytes": 17710
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 223,
+          "selected_source_bytes": 223
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/wind.blot",
+      "source_sha256": "f02e2e37e45c8243a753ad656c83c8ff9d39f9a3c116f0fbfd1f4ebfb80fcbab",
+      "generated_asset": false,
+      "selected": 24,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 14,
+          "source_bytes": 7891,
+          "selected_source_bytes": 7278
+        },
+        "non_lambda": {
+          "declarations": 10,
+          "selected": 10,
+          "source_bytes": 206,
+          "selected_source_bytes": 206
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/wind.wgsl.blot",
+      "source_sha256": "5da9cc5f455cd2fd987d82ab7761e6894729c900f8878130b5ad1312fdbc4dee",
+      "generated_asset": true,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 22,
+          "selected_source_bytes": 22
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/electricity.wgsl.blot",
+      "source_sha256": "984a900f01183e8d208b15ddf0f1149b59c39fb1c506011df52437ad5ed0054e",
+      "generated_asset": true,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 81,
+          "selected_source_bytes": 81
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/robot_electric.wgsl.blot",
+      "source_sha256": "1c5e1a62540b82ea3f17797744f257d614f3cc469d1b6899920857a0d494eb05",
+      "generated_asset": true,
+      "selected": 17,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 17,
+          "selected": 17,
+          "source_bytes": 66,
+          "selected_source_bytes": 66
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/kite.wgsl.blot",
+      "source_sha256": "aeeb854ebdeadd1e966fcae55cdfb971c8f4b3a03b0f4accbe54803ae643b4ec",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/speech.blot",
+      "source_sha256": "171154072203a30af4b412e08ab5c1237a2c234c95192ed90e9fcff29edc58a9",
+      "generated_asset": false,
+      "selected": 31,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 14,
+          "source_bytes": 10564,
+          "selected_source_bytes": 10087
+        },
+        "non_lambda": {
+          "declarations": 17,
+          "selected": 17,
+          "source_bytes": 267,
+          "selected_source_bytes": 267
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/bubble.wgsl.blot",
+      "source_sha256": "4130eb63f1fe077d4f80f9533ffab8b250528f0ed472de70f45249d5aee47992",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/hand.blot",
+      "source_sha256": "cd06f0367c7681dc48c7a5f1d1ea83aa8c750fb17b68159c8ffb7f6782b06c23",
+      "generated_asset": false,
+      "selected": 31,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 29,
+          "selected": 27,
+          "source_bytes": 23377,
+          "selected_source_bytes": 23171
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 164,
+          "selected_source_bytes": 164
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/pickup.blot",
+      "source_sha256": "231be1629be79a5304b1617df9f1db20a439f89d9a2646fb1608e01467571063",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 1293,
+          "selected_source_bytes": 1293
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/hover.blot",
+      "source_sha256": "e5a0858cdebd97102e99137f1c568d0739d11f5a32efa60b961157da472ae253",
+      "generated_asset": false,
+      "selected": 26,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 20,
+          "selected": 17,
+          "source_bytes": 11692,
+          "selected_source_bytes": 11319
+        },
+        "non_lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 162,
+          "selected_source_bytes": 162
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/effects/pickup_outline.blot",
+      "source_sha256": "22d88a5d849bd2be9f2aedac0176ad46eb1d385721292cb374124d391d41a91b",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 887,
+          "selected_source_bytes": 887
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/pickup_outline.wgsl.blot",
+      "source_sha256": "e75354c69acdc9bcc502484944ca30fb544b9a6fe96a9d343f9bd6c0646dc33b",
+      "generated_asset": true,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 6,
+          "selected_source_bytes": 6
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/title_state.blot",
+      "source_sha256": "eeaf08704e8f568d8586d1b45093173e5231d0ec943292d76fe03f7414a7cbbb",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 1734,
+          "selected_source_bytes": 1734
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 156,
+          "selected_source_bytes": 156
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/menu.blot",
+      "source_sha256": "7c8d22eb0531c8027cf58350ddd166aeca909d76af396eb957d830774e8d7333",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 15,
+          "selected": 14,
+          "source_bytes": 10635,
+          "selected_source_bytes": 9676
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 29,
+          "selected_source_bytes": 29
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/loading.blot",
+      "source_sha256": "a6519c83a26222a25c577980864745ec43854e94ff5aee8b691d6bb24927ca96",
+      "generated_asset": false,
+      "selected": 13,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 5359,
+          "selected_source_bytes": 5359
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 191,
+          "selected_source_bytes": 191
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/title_scene.blot",
+      "source_sha256": "6addd74114bd7f069d7798ec4e4a8cf470582185ecf2561651749cab0c367ca5",
+      "generated_asset": false,
+      "selected": 10,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 5411,
+          "selected_source_bytes": 5411
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 368,
+          "selected_source_bytes": 368
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/title_font.blot",
+      "source_sha256": "fbfc626209d86920b9efb3ccb70d8eacb9e9c06b967a9b3f6dcd29905da2a1fe",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 1,
+          "source_bytes": 1016,
+          "selected_source_bytes": 876
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 66248,
+          "selected_source_bytes": 66248
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/title_surface.wgsl.blot",
+      "source_sha256": "f38afcdc74e14bfae142de88d00bf324dec0129b406c396f03a506c80f9cd3c9",
+      "generated_asset": true,
+      "selected": 12,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 12,
+          "selected": 12,
+          "source_bytes": 133,
+          "selected_source_bytes": 133
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/title_foliage.wgsl.blot",
+      "source_sha256": "2249e03489b9e71b658085d34e2b6da23237a3e2deaed1b2fb03a3a90e95247f",
+      "generated_asset": true,
+      "selected": 13,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 13,
+          "selected": 13,
+          "source_bytes": 78,
+          "selected_source_bytes": 78
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/title_backdrop.wgsl.blot",
+      "source_sha256": "74d47fb9ea245324a3aefc882f4138583db3a613f5eb86ef3e2c3fb1f69d1167",
+      "generated_asset": true,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 37,
+          "selected_source_bytes": 37
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/title_veil.wgsl.blot",
+      "source_sha256": "66abd9df6c4afb2211e2aebf592c1ef7b88dba56b348da333e5d6dcabc84b2ea",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/rounded_box.wgsl.blot",
+      "source_sha256": "8510b394a939b780f7fee13a39c52c72c39efa118031bac95daba832d2bf9adf",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/menu.blot",
+      "source_sha256": "5a30023b408749ce74825367de80882f0734ddefc6c24d27c0d849b469f8a033",
+      "generated_asset": false,
+      "selected": 72,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 51,
+          "selected": 51,
+          "source_bytes": 33401,
+          "selected_source_bytes": 33401
+        },
+        "non_lambda": {
+          "declarations": 21,
+          "selected": 21,
+          "source_bytes": 1095,
+          "selected_source_bytes": 1095
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/settings.blot",
+      "source_sha256": "154c393dc5a5779a75c61a2fcbe81d0f62df38b25347e7838c2f86e8182a4229",
+      "generated_asset": false,
+      "selected": 15,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 8,
+          "source_bytes": 4301,
+          "selected_source_bytes": 4127
+        },
+        "non_lambda": {
+          "declarations": 7,
+          "selected": 7,
+          "source_bytes": 70,
+          "selected_source_bytes": 70
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/reports.blot",
+      "source_sha256": "5c66383070ec4965bb587af634725ad88437ce25a3a9ea742f5c6cbfe078297f",
+      "generated_asset": false,
+      "selected": 14,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 2294,
+          "selected_source_bytes": 2294
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 431,
+          "selected_source_bytes": 431
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/services/typed.blot",
+      "source_sha256": "b753300d4fb228365c7ea4060fef0bd6b5ec80d1a1f84422d7ffdac27be89838",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 1395,
+          "selected_source_bytes": 1395
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/menu_cut.wgsl.blot",
+      "source_sha256": "8c643deb6a7f86c2bf71d7cae0f4cf91665d79300c197b1068eedca2bd8ca33c",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 53,
+          "selected_source_bytes": 53
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/menu_backdrop.blot",
+      "source_sha256": "c34020c30df51a2b14d06b95f34e643f900127b5a29fc35cd6f29e43b92e0ae4",
+      "generated_asset": false,
+      "selected": 1,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 471,
+          "selected_source_bytes": 471
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/platform/achievements.blot",
+      "source_sha256": "506cb623daa4f0288d3d3347de9fdcfc9a1288f8aea9064addd0e5f6431da642",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 2540,
+          "selected_source_bytes": 2540
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 180,
+          "selected_source_bytes": 180
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/cursor.blot",
+      "source_sha256": "322af6c2e1dd60301947fae6fba63e6cd6de9b11ebcac6522fb85374869a81cc",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 6,
+          "source_bytes": 2345,
+          "selected_source_bytes": 2185
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 108,
+          "selected_source_bytes": 108
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/menu_cursor.wgsl.blot",
+      "source_sha256": "345f01e6210fb08f4341a6f8bf4b748acd5eaf9e65dbf0b8f29f2e76c405c17c",
+      "generated_asset": true,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 11,
+          "selected_source_bytes": 11
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/game.blot",
+      "source_sha256": "79045466ea0e9f3d5f18bf9fd7ce9d15a7a6e08c60aaf15b0ff847f60b08c591",
+      "generated_asset": false,
+      "selected": 30,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 23,
+          "selected": 22,
+          "source_bytes": 16416,
+          "selected_source_bytes": 16289
+        },
+        "non_lambda": {
+          "declarations": 8,
+          "selected": 8,
+          "source_bytes": 629,
+          "selected_source_bytes": 629
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/boxing.blot",
+      "source_sha256": "494d66373aa87a37d93365689a16afeae6ea3c91c0a4f517faa20eb36244132c",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 6269,
+          "selected_source_bytes": 6269
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/boxing_contacts.blot",
+      "source_sha256": "c430e3bcde4b8c17a3b4ba22bc4a3a898c9c9317b13061055842f5b838c2e9ac",
+      "generated_asset": false,
+      "selected": 3,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 103,
+          "selected_source_bytes": 103
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 5702,
+          "selected_source_bytes": 5702
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/layers.blot",
+      "source_sha256": "a16ff4528da395b295460f7b954bb94507729f4da8e283d7bfae115fca65b834",
+      "generated_asset": false,
+      "selected": 16,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 205,
+          "selected_source_bytes": 149
+        },
+        "non_lambda": {
+          "declarations": 14,
+          "selected": 14,
+          "source_bytes": 26,
+          "selected_source_bytes": 26
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/actor_inspect.blot",
+      "source_sha256": "af1d3bd4fce475ec54e848ed6728351ed3c65a9427baad9ceb83613d9004bf56",
+      "generated_asset": false,
+      "selected": 12,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 11,
+          "source_bytes": 4946,
+          "selected_source_bytes": 4946
+        },
+        "non_lambda": {
+          "declarations": 1,
+          "selected": 1,
+          "source_bytes": 53,
+          "selected_source_bytes": 53
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/codec.blot",
+      "source_sha256": "c35ec16bca8d0be1d2ad5b85774dac1a5d715d474c7d7b2eb7613d4d5818657b",
+      "generated_asset": false,
+      "selected": 26,
+      "skipped": 7,
+      "bodies": {
+        "lambda": {
+          "declarations": 33,
+          "selected": 26,
+          "source_bytes": 8974,
+          "selected_source_bytes": 4652
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/blot2/std/codec.blot",
+      "source_sha256": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 11,
+          "selected": 9,
+          "source_bytes": 1764,
+          "selected_source_bytes": 1315
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/pen/semantic.blot",
+      "source_sha256": "db397963e6b5560666626bdd5e5beb347bf2fba70f2b6478f4d9933093ee7fb6",
+      "generated_asset": false,
+      "selected": 57,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 27,
+          "selected": 25,
+          "source_bytes": 7496,
+          "selected_source_bytes": 7087
+        },
+        "non_lambda": {
+          "declarations": 32,
+          "selected": 32,
+          "source_bytes": 1063,
+          "selected_source_bytes": 1063
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/ink/lib/text.blot",
+      "source_sha256": "3e9d45a1ce15c041cc68de57bb97c1ef43266459d2dd668206cf0c516cd288b7",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 15,
+      "bodies": {
+        "lambda": {
+          "declarations": 16,
+          "selected": 1,
+          "source_bytes": 7968,
+          "selected_source_bytes": 87
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 10,
+          "selected_source_bytes": 10
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/pen/extensions.blot",
+      "source_sha256": "7f254d502b1b21b2dad0b623a9fea5f51c286ec5bf80bffe2db1c7e26c0e9398",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 3,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 0,
+          "source_bytes": 1884,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 3,
+          "selected_source_bytes": 3
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/actor_observation.blot",
+      "source_sha256": "2ccea587203019a4865d5272435dd0cd4c864851c3d9aad1590db567fa9947ca",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 7,
+          "selected": 6,
+          "source_bytes": 2807,
+          "selected_source_bytes": 2685
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 1892,
+          "selected_source_bytes": 1892
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/cache_inspect.blot",
+      "source_sha256": "375dc5a1dd26667c729d13706e6c1c3f59198774178acd4a8581aa64e9a2b388",
+      "generated_asset": false,
+      "selected": 6,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 6,
+          "source_bytes": 4326,
+          "selected_source_bytes": 4326
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/level.blot",
+      "source_sha256": "9366ab9fed949b21b0bc8840f7374c1a184cdfa0e22d6c5ce3836b4d111c30e8",
+      "generated_asset": false,
+      "selected": 20,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 929,
+          "selected_source_bytes": 929
+        },
+        "non_lambda": {
+          "declarations": 15,
+          "selected": 15,
+          "source_bytes": 589,
+          "selected_source_bytes": 589
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/actor_draw.blot",
+      "source_sha256": "3a2f3f4a11ee5572244b4d6dc9b443fa97fb838a7ebc8d0abb9e3f109231e2d6",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 522,
+          "selected_source_bytes": 522
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/god_hand.blot",
+      "source_sha256": "52ef3c4b6daf2a894c40aba564276dfdf349ee5cf94bbf198d439ffdbfe05fc1",
+      "generated_asset": false,
+      "selected": 40,
+      "skipped": 2,
+      "bodies": {
+        "lambda": {
+          "declarations": 26,
+          "selected": 24,
+          "source_bytes": 19826,
+          "selected_source_bytes": 19659
+        },
+        "non_lambda": {
+          "declarations": 16,
+          "selected": 16,
+          "source_bytes": 648,
+          "selected_source_bytes": 648
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/bubble.blot",
+      "source_sha256": "d9e5b4b8967030aa78dd6a19d170fd0fb2c0b5b320ab3559ab483ea19634a952",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 2,
+          "source_bytes": 1641,
+          "selected_source_bytes": 1416
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 58,
+          "selected_source_bytes": 58
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/player/aim.blot",
+      "source_sha256": "b736f222eda4d0f65d01418a8da84e58371f0ae6b699802617d123dd925fc82e",
+      "generated_asset": false,
+      "selected": 8,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 2338,
+          "selected_source_bytes": 2338
+        },
+        "non_lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 10,
+          "selected_source_bytes": 10
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/world/meadow.blot",
+      "source_sha256": "33eaa1cd7d7da5dd214422330f13d4ec9b48443b4fd3469661c3f11b16210f9f",
+      "generated_asset": false,
+      "selected": 7,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 3,
+          "selected": 3,
+          "source_bytes": 1416,
+          "selected_source_bytes": 1416
+        },
+        "non_lambda": {
+          "declarations": 4,
+          "selected": 4,
+          "source_bytes": 56,
+          "selected_source_bytes": 56
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/ui/title.blot",
+      "source_sha256": "9728ea2496b8865220e03741ed29eb04440ca696389bd0a28da93013d1ac83d1",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 9,
+          "selected": 9,
+          "source_bytes": 7338,
+          "selected_source_bytes": 7338
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/progression/scenes.blot",
+      "source_sha256": "9c4205bf20ae819236a816d52be1d6513d986d3e0f804e0fde28922b6d165ea8",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 2481,
+          "selected_source_bytes": 2481
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/debug/scenarios.blot",
+      "source_sha256": "85f33dc79b485ecb9d24c517e5924c01e995110347972248152fa6e8b096278d",
+      "generated_asset": false,
+      "selected": 9,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 5,
+          "selected": 4,
+          "source_bytes": 7303,
+          "selected_source_bytes": 7103
+        },
+        "non_lambda": {
+          "declarations": 5,
+          "selected": 5,
+          "source_bytes": 88,
+          "selected_source_bytes": 88
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/assets/title_neon.wgsl.blot",
+      "source_sha256": "5938a00b015d29f74e48f94f2a7d67687b52e3c52c1a81d245972a4bd91e608f",
+      "generated_asset": true,
+      "selected": 0,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/buildings/construction.blot",
+      "source_sha256": "87858230c92407f3e33790933e23eb795167f70c09f99d071ab2a409af944562",
+      "generated_asset": false,
+      "selected": 5,
+      "skipped": 1,
+      "bodies": {
+        "lambda": {
+          "declarations": 6,
+          "selected": 5,
+          "source_bytes": 9337,
+          "selected_source_bytes": 7421
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    },
+    {
+      "path": "/home/jacobt/src/gdev/src/actors/equipment.blot",
+      "source_sha256": "112937f5c92bbb1eee29e735e141bc1eb18732b8f09947f8935d77efdea5dc24",
+      "generated_asset": false,
+      "selected": 2,
+      "skipped": 0,
+      "bodies": {
+        "lambda": {
+          "declarations": 2,
+          "selected": 2,
+          "source_bytes": 2946,
+          "selected_source_bytes": 2946
+        },
+        "non_lambda": {
+          "declarations": 0,
+          "selected": 0,
+          "source_bytes": 0,
+          "selected_source_bytes": 0
+        }
+      }
+    }
+  ],
+  "result_encoding": "Main module manifest is ordered by1-based unitID; tiny module changes replace only differing fields, with identical paths/order otherwise."
+}

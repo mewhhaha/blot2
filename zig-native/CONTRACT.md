@@ -104,6 +104,13 @@ before the inherited-explicit exclusion, then declines retained methods or
 explicit predicates. It preserves the binding's raw type and resolved root.
 Open elements, open callback rows and revoked certificates use generalization.
 
+Shared read-only aggregate results require plain, stable layouts without variant
+tags or borrowed roots. Their keys bind the result's semantic and physical
+schema; emitted output must match that ABI before publication. Each caller
+reconstructs its own result shape and scratch slot. No child environment is
+retained. Read-only admission receipts use the same result boundary and preserve
+the original height and work charges; writer aggregates keep their prior path.
+
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
 Recursive normalization receipts retain the cursor, depth and exact type/row

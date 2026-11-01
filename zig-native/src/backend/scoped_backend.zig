@@ -2017,7 +2017,7 @@ const Generator = struct {
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
         try evidence.append(self.allocator, std.math.maxInt(u32) - 6);
-        if (!try self.sharedDescriptorEvidence(m, body, arguments, &evidence)) return null;
+        if (!try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null)) return null;
         const result = result_schema orelse try self.shape(m, body.root, m.typeOf(body.root), 0);
         if (!plainInlineValue(result)) return null;
         var remaining: usize = 4096;
@@ -2095,14 +2095,27 @@ const Generator = struct {
     }
     fn descriptorAdmissionEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, values: []const Value) Error!?[]const u32 {
         const result = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
+        var aggregate_result = false;
         switch ((try self.unit(result.unit)).types.node(result.ty).tag) {
             .unit, .boolean, .u32, .f32 => {},
-            else => return null,
+            else => aggregate_result = true,
         }
+        if (aggregate_result and self.planning_writer) return null;
         var remaining: usize = 4096;
         var has_descriptor = false;
         for (values) |value| if (!self.readerArgument(value, &has_descriptor, &remaining)) return null;
         if (!has_descriptor) return null;
+        var result_schema: ?Value = null;
+        if (aggregate_result) {
+            const diagnostic_before = self.diagnostic;
+            const schema = self.shape(m, body.root, m.typeOf(body.root), 0) catch |err| {
+                if (err == error.OutOfMemory) return err;
+                self.diagnostic = diagnostic_before;
+                return null;
+            };
+            if (!plainInlineValue(schema) or !stableDescriptorShape(schema)) return null;
+            result_schema = schema;
+        }
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
         // Admission mode changes which operations are permitted.
@@ -2121,7 +2134,7 @@ const Generator = struct {
             for (owners.items) |owner_id| if (!stableDescriptorShape(self.roots.items[owner_id].element)) return null;
             if (!try self.optionalWriterEvidence(m, body, values, descriptors.items, owners.items, &evidence)) return null;
         } else if (!try self.optionalReaderEvidence(m, body, values, &evidence)) return null;
-        if (!try self.sharedDescriptorEvidence(m, body, values, &evidence)) return null;
+        if (!try self.sharedDescriptorEvidence(m, body, values, &evidence, result_schema)) return null;
         return try evidence.toOwnedSlice(self.allocator);
     }
     fn plainAdmissionEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, values: ?[]const Value) Error!?[]const u32 {
@@ -3176,10 +3189,10 @@ const Generator = struct {
         }
         for (value.fields) |field| try self.descriptorValueEvidence(m, id, field, evidence, keys, remaining, depth + 1);
     }
-    fn sharedDescriptorEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32)) Error!bool {
+    fn sharedDescriptorEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32), result_schema: ?Value) Error!bool {
         const before = evidence.items.len;
         const diagnostic_before = self.diagnostic;
-        self.descriptorEvidence(m, body, arguments, evidence) catch |err| {
+        self.descriptorEvidence(m, body, arguments, evidence, result_schema) catch |err| {
             if (err == error.OutOfMemory) return err;
             evidence.shrinkRetainingCapacity(before);
             self.diagnostic = diagnostic_before;
@@ -3187,7 +3200,8 @@ const Generator = struct {
         };
         return true;
     }
-    fn descriptorEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32)) Error!void {
+    fn descriptorEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32), result_schema: ?Value) Error!void {
+        if (result_schema) |result| if (!plainInlineValue(result) or !stableDescriptorShape(result)) return error.Declined;
         var remaining: usize = 4096;
         var work: usize = 4096;
         var keys = selected_types.Builder.init(self.allocator, &work, .{});
@@ -3197,6 +3211,12 @@ const Generator = struct {
         try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = m.typeOf(body.root) }, evidence, &keys, &remaining);
         try self.descriptorBodyEvidence(m, body, null, evidence, &keys, &remaining);
         for (arguments) |argument| try self.descriptorValueEvidence(m, body.root, argument, evidence, &keys, &remaining, 0);
+        if (result_schema) |result| {
+            // A shared result owns no child environment. Bind its complete
+            // physical schema before reconstructing it in another caller.
+            try self.descriptorValueEvidence(m, body.root, result, evidence, &keys, &remaining, 0);
+            try self.readerLayoutEvidence(m, body.root, result, evidence, &keys);
+        }
         try self.finishSelectedTypes(m, body.root, evidence, &keys);
     }
     fn retainDescriptorShape(self: *Generator, source: Value) Error!Value {
@@ -3212,6 +3232,13 @@ const Generator = struct {
         result.variant_possible = try arena.dupe(bool, source.variant_possible);
         for (result.fields, source.fields) |*field, original| field.* = try self.retainDescriptorShape(original);
         return result;
+    }
+    fn plainReaderResultABI(value: Value, expected: Value) bool {
+        if (!plainInlineValue(value) or !stableDescriptorShape(value)) return false;
+        if (value.tag != expected.tag or value.floating != expected.floating or !std.meta.eql(value.nominal, expected.nominal) or value.fields.len != expected.fields.len) return false;
+        if (expected.name.len != 0 and !std.mem.eql(u8, value.name, expected.name)) return false;
+        for (value.fields, expected.fields) |field, schema| if (!plainReaderResultABI(field, schema)) return false;
+        return true;
     }
     fn stableDescriptorShape(value: Value) bool {
         if (!plainShape(value) or value.variant_tags.len != 0) return false;
@@ -3270,7 +3297,9 @@ const Generator = struct {
         defer evidence.deinit(self.allocator);
         if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
         if (aggregate_result and self.destination != null) return null;
-        var shared = !aggregate_result and try self.sharedDescriptorEvidence(m, body, arguments, &evidence);
+        var result_schema: ?Value = null;
+        if (aggregate_result) result_schema = result_shape;
+        var shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
         if (!self.specialize and !shared) return null;
         var cache = &self.calls;
         if (shared) cache = &self.descriptor_calls.calls;
@@ -3288,7 +3317,7 @@ const Generator = struct {
             }
             evidence.clearRetainingCapacity();
             if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
-            shared = !aggregate_result and try self.sharedDescriptorEvidence(m, body, arguments, &evidence);
+            shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
             if (!self.specialize and !shared) return null;
             cache = &self.calls;
             if (shared) cache = &self.descriptor_calls.calls;
@@ -3346,10 +3375,14 @@ const Generator = struct {
                 return err;
             };
             if (aggregate_result) {
-                var copies: EnvironmentCopies = .empty;
-                defer copies.deinit(self.allocator);
-                const template = try self.retainReaderResult(output, descriptors.items.len, &copies, true, 0);
-                try self.reader_results.put(self.allocator, function, template);
+                if (shared) {
+                    if (!plainReaderResultABI(output, result_shape)) return self.fail(m, body.root, .storage_unsupported, "Shared reader output differs from its checked layout");
+                } else {
+                    var copies: EnvironmentCopies = .empty;
+                    defer copies.deinit(self.allocator);
+                    const template = try self.retainReaderResult(output, descriptors.items.len, &copies, true, 0);
+                    try self.reader_results.put(self.allocator, function, template);
+                }
                 try child.storeReaderResult(.{ .id = next }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, body.root, output));
@@ -3359,7 +3392,8 @@ const Generator = struct {
         };
         const entry = cache.entries.items[index];
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive reader specializations are not admitted");
-        const result_template = if (aggregate_result) try self.readerResult(self.reader_results.get(entry.function) orelse return self.unsupported(m, body.root), descriptors.items) else result_shape;
+        var result_template = result_shape;
+        if (aggregate_result and !shared) result_template = try self.readerResult(self.reader_results.get(entry.function) orelse return self.unsupported(m, body.root), descriptors.items);
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
         var address: ?Local = null;
@@ -3458,7 +3492,7 @@ const Generator = struct {
         for (owners.items) |owner_id| {
             if (!stableDescriptorShape(self.roots.items[owner_id].element)) stable = false;
         }
-        var shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence);
+        var shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null);
         if (!self.specialize and !shared) return null;
         var key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
         var existing: ?usize = null;
@@ -3481,7 +3515,7 @@ const Generator = struct {
             }
             evidence.clearRetainingCapacity();
             if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
-            shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence);
+            shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null);
             if (!self.specialize and !shared) return null;
             key.evidence = evidence.items;
             existing = try self.writerCacheEntry(m, body.root, key, shared);

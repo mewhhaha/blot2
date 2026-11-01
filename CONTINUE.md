@@ -23,9 +23,9 @@ keeps intermediate failures, matched pairs, real-workload controls and compiler
 identities separate. A smaller Gdev fixture still has a modest latency
 regression; the final invariant-leaf shortcut reduces that overhead.
 
-Whole Gdev remains unfinished. The graph-sharing candidate exceeds both a
-five-second diagnostic and one bounded thirty-second run; there is no current
-whole-game size or fresh frame. Roughly **1 MB** remains the owner's
+Whole Gdev remains unfinished. The current aggregate-reader candidate exceeds a
+ten-second main diagnostic and a five-second actor diagnostic; there is no
+current whole-game size or fresh frame. Roughly **1 MB** remains the owner's
 expectation. The historical frame-qualified main took 2,188 seconds and produced
 47.4 MB, mostly code. Release builds and release performance remain pending.
 
@@ -42,14 +42,30 @@ Three matched pairs improve **882 to 642 ms**, with checking **509 to 258 ms**
 and identical tiny-entry output. This is producer checking, not whole-game
 emission. See the [array-local evidence](zig-native/measurements/closed-array-locals-2026-11-01.json).
 
-Main, actor presentation and the same-imports/tiny-entry ablation still exceed
-five seconds. The next major lever is declaration demand: executable builds
-should check reached bodies while explicit checks remain exhaustive. Keep
-headers and implementation coherence eager; use the existing lexical reference
-walker and a conservative authority frontier first. Unchecked names must never
-be published as completed typed interfaces. Count selected declarations on real
-Gdev before expanding this change. The game imports about 45,000 source lines
-across 207 modules, including the prelude.
+Plain aggregate readers now share definitions and exact admission receipts.
+Actual Ink `transform.matrix` reader DAGs at depth six improve **669 to 375 ms**,
+**26,185 to 14,266 bytes**, and **96,094 to 4,140 admission visits**. Result keys
+bind semantic and physical layout; every caller owns its shape and scratch.
+Variant/borrow results keep their existing paths. The Gdev language control is
+roughly flat in latency but grows **273 bytes (1.07%)**. See
+[aggregate-reader evidence](zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
+
+The next direct code-size lever is whole-row scalarization. Indexed field writes
+load the complete row before selecting one field, and field reads do the same.
+Actual `render.Settings` grows from **8,307 to 18,299 bytes** for one versus eight
+blur writes. Start with plain stable rows and selected-address loads; preserve
+bounds checks, RHS `self`, alias writes and owner pinning. Late machine outlining
+extracts already-expanded instructions and spills locals into globals; it does
+not replace source call sharing.
+
+A conservative declaration-demand prepass is measured but **not integrated**.
+It omits 680 of 5,957 declarations on main, but still retains 84% of original
+lambda body bytes; even the tiny-entry ablation retains 77%. Planning costs
+about 0.16 seconds. This coarse associated/initializer frontier alone is not the
+massive lever. See [the AST inventory](zig-native/measurements/declaration-demand-inventory-2026-11-01.json).
+It includes generated assets: 264 loaded modules versus the original static
+source graph's 207. Unchecked source names must never become completed typed
+interfaces; exhaustive source checks remain unchanged.
 
 Earlier descriptor, nominal and scalar call-sharing results remain in their
 linked records under `zig-native/measurements/`. Those changes reduce synthetic
@@ -109,28 +125,25 @@ context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
-Astra xhigh reviewed the semantic fixes and performance batches. Earlier gate
-attempts on the frame candidate were blocked fetching locked Baba 9.0.1. This
-host reaches protocol preflight and fails on existing operand-span ends,
-independently reproduced with the preserved baseline compiler. Full
-qualification remains pending. The graph-sharing batch's seven focused laws and
-28 guests pass on its pinned candidate. The receipt batch compiles **2,754
-native tests**, passes **350/351** broader sampled laws with the same
-associated-partial baseline failure, and passes all three exact eager-oracle
-laws without heap allocation. The original Gdev language fixture passes six
-entries/11 assertions per sync/JSPI mode. The body-reuse suite remains **17
-passed/16 failed** on both baseline and candidate; those existing work
-assertions are not a pass. Full Zig lint reports zero findings across 567 source
-files. The required full gate still stops at the existing protocol operand-span
-preflight failure. Broader integration and release coverage remain open.
+Astra xhigh reviewed the semantic and performance boundaries. The current
+compiler `d4c77b40` compiles **2,765 native tests**. All seven focused demand and
+aggregate-reader laws pass in full fault mode; **367/368** broader sampled laws
+pass with the independently reproduced associated-partial baseline failure.
+All 27 affected guests and both new aggregate-reader tests pass; the latter cover
+both tiers, sync/JSPI, independent owners, mixed layouts, projections and variant
+fallback. Original Gdev language entries pass six entries/11 assertions per
+sync/JSPI mode. Zig lint reports zero findings across 569 source files.
 
-The array-local candidate compiles **2,758 native tests**, passes all four
-focused laws in full fault mode and **354/355** broader sampled laws with that
-same baseline failure. All 27 selected executed-Wasm tests and original Gdev
-language entries pass; body-reuse/text tests retain the same 17/16 result.
-Full Zig lint remains clean; the required full gate retains its protocol-span
-blocker. The production compiler is `0faa0cbb`; exact pins are in the array-local
-record.
+Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
+`HOME`, enabling disk-cache contamination between retained and supposedly fresh
+clients. The body-reuse harness now explicitly disables persistence. Those old
+figures were not compiler semantic regressions. The stale five-character `true`
+span assertion is also corrected; all 42 protocol tests pass.
+
+The required full gate passes 31 body preflight tests, then reaches **47 passed,
+one failed** in smoke. The remaining list/chunk loop owner-escape failure is
+independently reproduced on preserved `0faa0cbb`; it is not a passing gate.
+Release, full-native and broader integration qualification remain pending.
 
 ## Remaining execution work
 

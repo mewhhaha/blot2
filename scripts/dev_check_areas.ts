@@ -272,6 +272,13 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "reuse.declaration_demand.test.declaration demand follows namespace named reexports and ordinary helpers through allocation failures",
+      "reuse.declaration_demand.test.declaration demand preserves named aliases prelude producers and lexical shadowing",
+      "reuse.declaration_demand.test.declaration demand retains operator associated implementation attributed and eager roots",
+      "reuse.declaration_demand.test.declaration demand falls back for escaped namespace authority and declines compiled owners",
+      "backend.storage_calls_tests.test.shared aggregate readers retain nominal physical schemas across independent owners",
+      "backend.storage_calls_tests.test.shared aggregate reader diamonds keep emission growth bounded",
+      "backend.storage_calls_tests.test.shared aggregate reader publication survives allocation failures",
       "check.scheme_dependencies.test.scheme dependency watches preserve type effect future and rollback histories through OOM",
       "check.ordered_membership.test.ordered scheme membership preserves sparse IDs duplicates and append order through OOM",
       "reuse.parallel_check_tests.test.parallel module checking preserves serial Core and counters with independent solver ownership",

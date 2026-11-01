@@ -84,6 +84,19 @@ pub fn build(b: *std.Build) void {
     const run = b.addRunArtifact(exe);
     run.addPassthruArgs();
     b.step("run", "Run the source compiler").dependOn(&run.step);
+    const demand_inventory_module = b.createModule(.{
+        .root_source_file = b.path("src/bench_declaration_demand.zig"),
+        .target = target,
+        .optimize = .safe,
+    });
+    const demand_inventory_exe = b.addExecutable(.{
+        .name = "blot-demand-inventory",
+        .root_module = demand_inventory_module,
+        .use_llvm = false,
+    });
+    const install_demand_inventory = b.addInstallArtifact(demand_inventory_exe, .{});
+    const demand_inventory = b.step("demand-inventory", "Inventory real project declaration demand before semantic checking");
+    demand_inventory.dependOn(&install_demand_inventory.step);
     addRuntimeFixture(b, target, .arena, "arena-fixture", "Generate the memory/array ABI execution fixture");
     addRuntimeFixture(b, target, .shared_rc, "shared-rc-fixture", "Generate checked retain/release execution laws");
     addRuntimeFixture(b, target, .cohort, "cohort-fixture", "Generate bounded activation cohort protocol laws");

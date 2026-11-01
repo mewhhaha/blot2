@@ -205,6 +205,19 @@ deadline. It emits and executes only a tiny identity entry. Compare alternating
 compiler runs using `phaseProfile.checking`; the emitted size does not measure
 the renderer or whole game.
 
+`deno run -A scripts/bench/aggregate_readers.ts --compiler PATH` measures actual
+Ink `transform.matrix` reader DAGs and `render.Settings` field updates. Every
+build has a five-second deadline and executes independent numeric witnesses.
+Compare alternating compilers; keep unchanged controls and output-size
+regressions alongside wins.
+
+`zig build demand-inventory -Doptimize=safe -Dllvm=false --prefix
+zig-out-native-dev` in `zig-native/` installs `blot-demand-inventory`. Run that
+binary from the repository root, optionally with `--tiny-entry`, to inventory
+conservative AST declaration demand on real Gdev with its generated native
+assets. It stops before semantic checking. Counts and body-source bytes do not
+predict checker time or establish that unchecked interfaces can be published.
+
 ## Idiomatic Blot/Rust programs
 
 `deno task bench:idiomatic` measures eighteen public source pairs with fresh
