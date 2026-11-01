@@ -1,0 +1,239 @@
+diff --git a/scripts/bench/world_access.ts b/scripts/bench/world_access.ts
+new file mode 100644
+index 00000000..fa0d4638
+--- /dev/null
++++ b/scripts/bench/world_access.ts
+@@ -0,0 +1,233 @@
++// Execute actual owner initialization and nested frame lifetimes on both sources.
++// Only the baseline fixture's new owner_access projection is adapted to identity.
++import { resolve } from "node:path";
++import { parseArgs } from "node:util";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++const { values } = parseArgs({
++  options: {
++    compiler: {
++      type: "string",
++      default: "zig-native/zig-out-native-dev/bin/blotc",
++    },
++    "baseline-gdev": {
++      type: "string",
++      default: "7733add6f89cf03deb62e1474dfaf13ef46de375",
++    },
++    "baseline-ink": {
++      type: "string",
++      default: "d520a903a13479455a4380680f64ce590e8d58c5",
++    },
++    output: { type: "string", default: "build/bench/world-access" },
++  },
++});
++const repo = resolve(new URL("../..", import.meta.url).pathname);
++const root = resolve(repo, "../gdev");
++const executable = resolve(repo, values.compiler!);
++const output = resolve(repo, values.output!);
++await Deno.mkdir(output, { recursive: true });
++const evidence = await Deno.makeTempDir({ dir: output, prefix: "pair-" });
++const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
++  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
++    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
++const hashText = (source: string) => hash(new TextEncoder().encode(source));
++const compilerSha256 = await hash(await Deno.readFile(executable));
++const penBytes = await Deno.readFile(`${root}/pen.json`);
++const settings =
++  JSON.parse(new TextDecoder().decode(penBytes)).compiler.settings;
++const entry = `${root}/tests/world_access.blot`;
++const candidateEntry = await Deno.readTextFile(entry);
++const projection = "let owners = world.owner_access framed";
++if (candidateEntry.split(projection).length !== 2) {
++  throw new Error("Expected exactly one new owner_access projection");
++}
++const baselineEntry = candidateEntry.replace(projection, "let owners = framed");
++const sources: Record<string, Record<string, string>> = {
++  baseline: { [entry]: baselineEntry },
++  candidate: { [entry]: candidateEntry },
++};
++const pins: Record<string, { baseline: string; candidate: string }> = {
++  "gdev/tests/world_access.blot": {
++    baseline: await hashText(baselineEntry),
++    candidate: await hashText(candidateEntry),
++  },
++};
++for (
++  const [project, ref, paths] of [
++    ["gdev", values["baseline-gdev"]!, [
++      "src/world_storage.blot",
++      "tests/minor_support/owned.blot",
++      "tests/minor_support/game.blot",
++    ]],
++    ["ink", values["baseline-ink"]!, ["lib/pen/host.blot"]],
++  ] as const
++) {
++  for (const path of paths) {
++    const absolute = resolve(repo, "../", project, path);
++    const original = await new Deno.Command("git", {
++      cwd: resolve(repo, "../", project),
++      args: ["show", `${ref}:${path}`],
++      stdout: "piped",
++      stderr: "piped",
++    }).output();
++    if (!original.success) {
++      throw new Error(new TextDecoder().decode(original.stderr));
++    }
++    sources.baseline[absolute] = new TextDecoder().decode(original.stdout);
++    sources.candidate[absolute] = await Deno.readTextFile(absolute);
++    pins[`${project}/${path}`] = {
++      baseline: await hashText(sources.baseline[absolute]),
++      candidate: await hashText(sources.candidate[absolute]),
++    };
++  }
++}
++// Save exact source strings, including both fixture versions, for replay.
++for (const variant of ["baseline", "candidate"]) {
++  for (const [path, source] of Object.entries(sources[variant])) {
++    const relative = path.slice(resolve(repo, "..").length + 1);
++    const saved = resolve(evidence, variant, relative);
++    await Deno.mkdir(resolve(saved, ".."), { recursive: true });
++    await Deno.writeTextFile(saved, source);
++  }
++}
++const samples: Record<string, unknown>[] = [];
++for (const variant of ["baseline", "candidate"]) {
++  let compiler;
++  let guest;
++  let started;
++  let buildMs;
++  let outcome: Record<string, unknown>;
++  try {
++    compiler = await createZigProjectCompiler({
++      executable,
++      entry,
++      prelude: `${repo}/std/prelude.blot`,
++      stdRoot: `${repo}/std`,
++      imports: Object.fromEntries(
++        Object.entries(settings.imports).map(
++          ([name, path]) => [name, resolve(root, path as string)],
++        ),
++      ),
++      nativeAssets: {
++        roots: settings.nativeAssets.roots.map((path: string) =>
++          resolve(root, path)
++        ),
++        imports: settings.nativeAssets.imports.map((
++          item: Record<string, string>,
++        ) => ({
++          ...item,
++          module: resolve(root, item.module),
++          path: resolve(root, item.path),
++        })),
++      },
++      inferenceBudget: settings.inferenceBudget,
++      storage: settings.storage,
++      startupTimeoutMs: 10000,
++      cacheDirectory: false,
++      profileBackend: true,
++      codegenWorkers: 1,
++    });
++    started = performance.now();
++    const result = await compiler.build({
++      sources: sources[variant],
++      signal: AbortSignal.timeout(10000),
++    });
++    buildMs = performance.now() - started;
++    if (!result.success) {
++      outcome = { status: "failed", diagnostics: result.diagnostics };
++      Deno.exitCode = 1;
++    } else {
++      await Deno.writeFile(`${evidence}/${variant}.wasm`, result.bytes);
++      guest = await instantiateGuest(result.bytes);
++      if (guest.abi.version !== 8) {
++        throw new Error("Expected unchanged guest ABI 8");
++      }
++      const exchanges: { input: number; response: number }[] = [];
++      const callback = guest.capability({
++        parameter: "U32",
++        result: "U32",
++        call: (input) => {
++          const response = input * 2 + 1;
++          exchanges.push({ input, response });
++          return response;
++        },
++      });
++      const results = [];
++      for (let invocation = 0; invocation < 2; invocation++) {
++        const before = exchanges.length;
++        const actual = guest.call("exercise", callback);
++        if (
++          actual !== 83 || exchanges.length !== before + 1 ||
++          exchanges[before].input !== 41
++        ) {
++          throw new Error(
++            `Bad owner/frame/Foreign witness at invocation ${invocation}`,
++          );
++        }
++        results.push(actual);
++      }
++      outcome = {
++        status: "complete",
++        abi: guest.abi.version,
++        wasm_bytes: result.bytes.length,
++        wasm_sha256: await hash(result.bytes),
++        results,
++        exchanges,
++        stats: result.stats,
++      };
++    }
++  } catch (error) {
++    if (buildMs === undefined && started !== undefined) {
++      buildMs = performance.now() - started;
++    }
++    let status = "failed";
++    if (/abort|timed out/i.test(String(error))) status = "timeout_incomplete";
++    outcome = { status, error: String(error) };
++    Deno.exitCode = 1;
++  } finally {
++    guest?.dispose();
++    await compiler?.dispose();
++  }
++  const sample = { variant, build_ms: buildMs, ...outcome };
++  samples.push(sample);
++  console.log(JSON.stringify(sample));
++}
++if (await hash(await Deno.readFile(executable)) !== compilerSha256) {
++  throw new Error("Compiler changed during the source pair");
++}
++let status = "incomplete";
++if (samples.every((sample) => sample.status === "complete")) {
++  status = "complete";
++}
++const report = {
++  workload: "actual_world_owner_and_frame_execution",
++  status,
++  evidence,
++  compiler: executable,
++  compiler_sha256: compilerSha256,
++  baseline_gdev: values["baseline-gdev"],
++  baseline_ink: values["baseline-ink"],
++  pen_json_sha256: await hash(penBytes),
++  source_versions: pins,
++  baseline_fixture_adapter: {
++    before: projection,
++    after: "let owners = framed",
++  },
++  deadline_ms_per_startup_and_build: 10000,
++  expected: {
++    results: [83, 83],
++    exchanges: [{ input: 41, response: 83 }, { input: 41, response: 83 }],
++  },
++  witness_assertions: [
++    "Original production owner initializers execute on both sides.",
++    "Foreign effects propagate through with_owners; its ignored continuation returns 17 and its result is constrained to Unit.",
++    "Actual reset/despawn callbacks retain owner aliases; nested frame outputs are independent while persistent aliases remain shared.",
++    "An outer borrowed frame view remains valid through the nested frame invocation.",
++  ],
++  samples,
++};
++await Deno.writeTextFile(
++  `${evidence}/result.json`,
++  `${JSON.stringify(report, null, 2)}\n`,
++);
++console.log(JSON.stringify({ status, evidence }));

@@ -1,0 +1,161 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "0b067c7f928ba1a572f842b6d3eda795a944f4a5",
+  "workload": "Complete actual world_storage producer source and imports; tiny identity export emits2935B",
+  "toolchain": "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; rotated repetitions",
+  "execution_policy": {
+    "tier": "optimized",
+    "codegen_workers": 1,
+    "profile_backend": true,
+    "profile_trace": true,
+    "cache": false,
+    "fresh_sessions": true,
+    "repetitions": 3,
+    "deadline_ms": 10000
+  },
+  "source_pins": {
+    "gdev/src/world_storage.blot": {
+      "baseline": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+      "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+    },
+    "gdev/tests/minor_support/owned.blot": {
+      "baseline": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2",
+      "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+    },
+    "gdev/tests/minor_support/game.blot": {
+      "baseline": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940",
+      "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+    },
+    "ink/lib/pen/host.blot": {
+      "baseline": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+      "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+    }
+  },
+  "versions": {
+    "baseline": {
+      "compiler_sha256": "e4af8647647ba87a9b78f799ed5ab93d29f3fa82cb44f5c2da4856e1a81c70d4",
+      "fresh_build_ms": [
+        8450.759899,
+        8634.981301999997,
+        9785.131369000002
+      ],
+      "median_build_ms": 8634.981301999997,
+      "median_phase_us": {
+        "other": 34339,
+        "assets": 282676,
+        "inputs": 1172,
+        "load": 43729,
+        "lex": 397018,
+        "parse": 258541,
+        "check": 4261888,
+        "lower": 1083543,
+        "freeze": 398219,
+        "validation": 930508,
+        "backend": 983236
+      },
+      "wasm_bytes": 2935,
+      "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+      "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505"
+    },
+    "candidate": {
+      "compiler_sha256": "56a163b9b20c5f8cafaaaf8910a13744df9a0a728ddacd7f55a950fc384e8d19",
+      "fresh_build_ms": [
+        7780.433021999999,
+        7646.930711999998,
+        8243.989428
+      ],
+      "median_build_ms": 7780.433021999999,
+      "median_phase_us": {
+        "other": 32742,
+        "assets": 295117,
+        "inputs": 1108,
+        "load": 44073,
+        "lex": 411982,
+        "parse": 253612,
+        "check": 4242815,
+        "lower": 950645,
+        "freeze": 354177,
+        "validation": 888522,
+        "backend": 303624
+      },
+      "wasm_bytes": 2935,
+      "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+      "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+      "validation_units": {
+        "scoped_core_validation_reused": 239,
+        "scoped_core_validation_fresh": 1
+      },
+      "median_owned_validation_us": 301219
+    }
+  },
+  "median_total_improvement": 0.09896353565954685,
+  "median_backend_improvement": 0.6911992644695678,
+  "byte_identical": true,
+  "implementation": [
+    "Receipt is minted privately after complete closure validation and owned by an immutable dependency Snapshot.",
+    "One full validation pass uses final-sized context with inert future entry; forbidden_owner excludes future references without lowering owner-loop budgets.",
+    "Matching requires exact borrowed module descriptors, owner tables, ordinal order and symbol prefix; added consumer symbols are allowed.",
+    "Every backend unit retains the bounds barrier. Fresh entry and unmatched/shared lanes retain ordinary full semantic validation.",
+    "Entry spawn_task/inputInvokes declines reuse; all proof data remains process-local under pinned owner lifetime.",
+    "Source/Core trace namespaces prevent module-ID remapping from corrupting source attribution; per-module completed clocks remain bounded."
+  ],
+  "qualification": {
+    "native_inventory": 2781,
+    "receipt_laws": "4/4 full fault mode, including allocation failures, rich effect scope, future-owner reference and workspace/context cache restriction",
+    "guests": "6/6 tests; original Ink copies plus aggregate readers in both tiers; copy fixtures execute sync and JSPI independently",
+    "required_full_gate": "48 pass/one independently reproduced baseline List/chunk storage_escape bytes312..345; full qualification not passed",
+    "zig_lint": "573 source files plus fixture, zero findings"
+  },
+  "reproduce": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --baseline zig-native/zig-out-engine-stage-baseline/bin/blotc --compiler zig-native/zig-out-native-dev/bin/blotc --repetitions 3 --timeout-ms 10000",
+  "limits": [
+    "This is complete producer checking, lowering, freeze, validation and tiny emission; it does not execute world initialization or game/main.",
+    "Safe/noLLVM compiler diagnostics, not LLVM release timing. Shared host load and only three repetitions limit small phase comparisons.",
+    "No current whole-main Wasm or new PNG; five-second main diagnostics remain incomplete.",
+    "Automatic source-body matching and nominal world interfaces missed their thresholds and are archived/removed."
+  ],
+  "whole_main_diagnostic": {
+    "compilerSha256": "56a163b9b20c5f8cafaaaf8910a13744df9a0a728ddacd7f55a950fc384e8d19",
+    "sourceCheckpoint": {
+      "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "deadlineMs": 5000,
+    "buildMs": 5002.175229,
+    "status": "timeout_incomplete",
+    "phase_snapshot": {
+      "kind": "phases",
+      "build": 2,
+      "space": "source",
+      "active": "check",
+      "phase_us": [
+        460,
+        278784,
+        1058,
+        43779,
+        447338,
+        272547,
+        0,
+        0,
+        0,
+        22,
+        0
+      ],
+      "at_us": 1043993
+    },
+    "active": [
+      {
+        "kind": "begin",
+        "build": 2,
+        "space": "source",
+        "id": 6406,
+        "thread": 1234238,
+        "stage": "check.module",
+        "unit": 3,
+        "start": 0,
+        "end": 64541,
+        "at_us": 4949254,
+        "filename": "/home/jacobt/src/gdev/src/world_storage.blot"
+      }
+    ]
+  }
+}

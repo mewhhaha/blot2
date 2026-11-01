@@ -33,6 +33,7 @@ pub const Workspace = struct {
         module: *const core.Module,
         symbol_count: ?usize,
         source_length: ?u32,
+        forbidden_owner: ?u32,
     };
     pub fn proved(self: *const Workspace, module: *const core.Module) bool {
         for (self.modules[0..self.module_count]) |candidate| if (candidate == module) return true;
@@ -330,7 +331,7 @@ pub const Solver = struct {
 /// Semantic module admission is a separate receipt and never follows from this.
 pub fn bounds(workspace: ?*Workspace, module: *const core.Module, context: @import("frozen_core_validation.zig").Context) error{InvalidArtifact}!void {
     comptime {
-        if (@typeInfo(@TypeOf(context)).@"struct".field_names.len != 3) @compileError("register every bounds Context field in the receipt");
+        if (@typeInfo(@TypeOf(context)).@"struct".field_names.len != 4) @compileError("register every bounds Context field in the receipt");
     }
     const owner = workspace orelse return @import("frozen_core_validation.zig").validateBounds(module, context);
     var same_context = context.units.len <= owner.bounds_units.len;
@@ -343,10 +344,10 @@ pub fn bounds(workspace: ?*Workspace, module: *const core.Module, context: @impo
         }
     }
     if (same_context) for (owner.bounds_receipts[0..owner.bounds_count]) |receipt| {
-        if (receipt.module == module and receipt.symbol_count == context.symbol_count and receipt.source_length == context.source_length) return;
+        if (receipt.module == module and receipt.symbol_count == context.symbol_count and receipt.source_length == context.source_length and receipt.forbidden_owner == context.forbidden_owner) return;
     };
     try @import("frozen_core_validation.zig").validateBounds(module, context);
     if (!same_context or owner.bounds_count == owner.bounds_receipts.len) return;
-    owner.bounds_receipts[owner.bounds_count] = .{ .module = module, .symbol_count = context.symbol_count, .source_length = context.source_length };
+    owner.bounds_receipts[owner.bounds_count] = .{ .module = module, .symbol_count = context.symbol_count, .source_length = context.source_length, .forbidden_owner = context.forbidden_owner };
     owner.bounds_count += 1;
 }

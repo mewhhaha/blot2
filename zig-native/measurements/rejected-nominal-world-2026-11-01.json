@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-01",
+  "decision": "rejected_and_removed",
+  "scope": "Concrete nominal world owner, callback-capture and frame interfaces; real complete world module with a tiny identity export.",
+  "reason": "Three rotated same-compiler pairs miss the required 20 percent checking-time improvement and regress median total/checking latency. Do not retain the roughly 400-line interface expansion without a measured win.",
+  "toolchain": "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; three rotated repetitions",
+  "compiler_sha256": [
+    "e4af8647647ba87a9b78f799ed5ab93d29f3fa82cb44f5c2da4856e1a81c70d4"
+  ],
+  "baseline_refs": {
+    "gdev": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink": "d520a903a13479455a4380680f64ce590e8d58c5"
+  },
+  "deadline_ms": 10000,
+  "repetitions": 3,
+  "median": {
+    "baseline": {
+      "build_ms": 8982.165976999997,
+      "total_us": 8978591,
+      "check_us": 4513976,
+      "type_nodes": 1256344,
+      "resolve_depth_entries": 3855578,
+      "open_depth_entries": 359424,
+      "wasm_bytes": 2935,
+      "wasm_sha256": [
+        "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+      ]
+    },
+    "candidate": {
+      "build_ms": 9409.370935000003,
+      "total_us": 9405879,
+      "check_us": 4601016,
+      "type_nodes": 1252881,
+      "resolve_depth_entries": 3560514,
+      "open_depth_entries": 322210,
+      "wasm_bytes": 2935,
+      "wasm_sha256": [
+        "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c"
+      ]
+    }
+  },
+  "relative_candidate_change": {
+    "build_ms": 0.04756146335905176,
+    "check_us": 0.01928233557289616
+  },
+  "producer_execution_qualified": false,
+  "runtime_witness": "Archived, typechecked execution runner and fixture were not built or executed. Nominal owner initialization, callbacks, Foreign effects and nested-frame behavior remain unqualified.",
+  "module_timing_attribution": "UNUSABLE in these samples. Core remaps unit IDs and overwrote Source filenames. The initial apparent World-module 20 percent win is withdrawn; aggregate clocks and counters remain the evidence.",
+  "raw_evidence": "build/bench/nominal-world/three-pairs/result.json",
+  "raw_evidence_sha256": "37d57b5c3a8e67da0712abad7778867e4076fbced791ded4766d892583047df1",
+  "source_hashes": {
+    "gdev/src/world_storage.blot": {
+      "baseline": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+      "candidate": "92683a01b5a380a7a20c9e9d8f3bcfd0024ecc1bd991458425d7e38390b168b5"
+    },
+    "gdev/tests/minor_support/game.blot": {
+      "baseline": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940",
+      "candidate": "bd794fe3f5cf8e4878ba7e90097cb625cd47717402a5c5db0e890dff783f55cf"
+    },
+    "gdev/tests/minor_support/owned.blot": {
+      "baseline": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2",
+      "candidate": "74934170e234254af141c8fa57904a078d73e5118b99f39f188e1d5af84db046"
+    },
+    "ink/lib/pen/host.blot": {
+      "baseline": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+      "candidate": "4f579dd83ddcb53c33a76b2ee3236598f135c86ca95530deadfafbbc1d6a1d0f"
+    },
+    "gdev/tests/world_access.blot": {
+      "candidate": "2695e364fcffed17f76b0ba8c09e56ac9d4e61fb46149c66f65ad3398a5a4856"
+    },
+    "blot2/scripts/bench/world_access.ts": {
+      "candidate": "1caec525c9dd502ed1cc9325243ec4eb61642a6b77b95b901a1daffeebcfb29e"
+    }
+  },
+  "archives": {
+    "gdev": {
+      "path": "zig-native/measurements/rejected-nominal-world-2026-11-01-gdev.patch",
+      "sha256": "b875c53d2d117ef8bf55d3434a2176ee11339810bf2eb628211601e5b7c4a0d2"
+    },
+    "ink": {
+      "path": "zig-native/measurements/rejected-nominal-world-2026-11-01-ink.patch",
+      "sha256": "db99fee132fe224d66aa9c79e8798b8fc2f69a555c46826b916d196f2460e892"
+    },
+    "root": {
+      "path": "zig-native/measurements/rejected-nominal-world-2026-11-01-root.patch",
+      "sha256": "edbef5852cfebe94ee5a8be34e5258fe331bec5338eb1ea6c32536a23819387a"
+    }
+  },
+  "preserved": "Committed kites direct destination rewrite, engine_stages --world runner and raw measurements. No compiler files changed by this rollback."
+}

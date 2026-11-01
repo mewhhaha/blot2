@@ -39,6 +39,8 @@ pub const Snapshot = struct {
     /// Set only after the complete dependency validator succeeds for this
     /// immutable snapshot. It grants no source or semantic cache admission.
     validated: bool = false,
+    /// Borrowed emission may use this only while this immutable owner is live.
+    core_validation: ?*@import("completed_core_validation.zig").Receipt = null,
 
     /// Takes ownership of symbols only on success. Module slots are filled by
     /// appendOwned/appendShared; teardown also accepts a partial construction.
@@ -106,6 +108,7 @@ pub const Snapshot = struct {
 
     pub fn deinit(self: *Snapshot) void {
         const a = self.allocator;
+        if (self.core_validation) |receipt| receipt.deinit(a);
         for (self.modules[0..self.initialized]) |module| module.release();
         a.free(self.modules);
         a.free(self.value.modules);

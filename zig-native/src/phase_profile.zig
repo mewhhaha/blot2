@@ -139,6 +139,7 @@ threadlocal var checking_capture: ?*@import("work_counters.zig").Frontend = null
 /// Independent diagnostic stream. Records own no compiler data and never
 /// participate in artifact identity. The client retains a bounded tail plus
 /// the latest phase totals/module names, even when the process is killed.
+pub const Space = enum { source, core };
 pub const OptimizationPass = enum { @"inline", scalar, vector, row_products, lifetime, reduce, rc };
 const PassTotals = struct { us: u64 = 0, cpu_us: u64 = 0, input: u64 = 0, output: u64 = 0, calls: u64 = 0 };
 
@@ -159,23 +160,29 @@ pub const Trace = struct {
         inline for (@typeInfo(OptimizationPass).@"enum".field_names, 0..) |name, index| {
             const totals = &self.passes[index];
             const calls = @atomicLoad(u64, &totals.calls, .monotonic);
-            if (calls != 0) self.write(.{ .kind = "end", .id = 0, .thread = 0, .stage = "runtime-ir.total." ++ name, .unit = 0, .start = 0, .end = 0, .at_us = self.elapsed(), .us = @atomicLoad(u64, &totals.us, .monotonic), .cpu_us = @atomicLoad(u64, &totals.cpu_us, .monotonic), .input_items = @atomicLoad(u64, &totals.input, .monotonic), .output_items = @atomicLoad(u64, &totals.output, .monotonic), .calls = calls });
+            if (calls != 0) self.writeAt(.core, .{ .kind = "end", .id = 0, .thread = 0, .stage = "runtime-ir.total." ++ name, .unit = 0, .start = 0, .end = 0, .at_us = self.elapsed(), .us = @atomicLoad(u64, &totals.us, .monotonic), .cpu_us = @atomicLoad(u64, &totals.cpu_us, .monotonic), .input_items = @atomicLoad(u64, &totals.input, .monotonic), .output_items = @atomicLoad(u64, &totals.output, .monotonic), .calls = calls });
         }
     }
     fn elapsed(self: *const Trace) u64 {
         return @intCast(@max(0, self.started.durationTo(std.Io.Clock.awake.now(self.io)).toMicroseconds()));
     }
     fn write(self: *Trace, value: anytype) void {
+        self.writeAt(trace_space, value);
+    }
+    fn writeAt(self: *Trace, namespace: Space, value: anytype) void {
         var bytes: [4096]u8 = undefined;
         var writer = std.Io.Writer.fixed(&bytes);
         writer.writeAll("BLOT_PROFILE ") catch return;
         const Envelope = struct {
             build: u32,
+            space: Space,
             event: @TypeOf(value),
             pub fn jsonStringify(envelope: @This(), stream: *std.json.Stringify) std.Io.Writer.Error!void {
                 try stream.beginObject();
                 try stream.objectField("build");
                 try stream.write(envelope.build);
+                try stream.objectField("space");
+                try stream.write(envelope.space);
                 inline for (@typeInfo(@TypeOf(value)).@"struct".field_names) |field| {
                     try stream.objectField(field);
                     try stream.write(@field(envelope.event, field));
@@ -183,7 +190,7 @@ pub const Trace = struct {
                 try stream.endObject();
             }
         };
-        std.json.Stringify.value(Envelope{ .build = self.build, .event = value }, .{}, &writer) catch return;
+        std.json.Stringify.value(Envelope{ .build = self.build, .space = namespace, .event = value }, .{}, &writer) catch return;
         writer.writeByte('\n') catch return;
         self.mutex.lockUncancelable(self.io);
         defer self.mutex.unlock(self.io);
@@ -192,6 +199,21 @@ pub const Trace = struct {
 };
 
 threadlocal var trace: ?*Trace = null;
+threadlocal var trace_space: Space = .source;
+pub const SpaceScope = struct {
+    previous: Space,
+    pub fn restore(self: SpaceScope) void {
+        trace_space = self.previous;
+    }
+};
+pub fn currentSpace() Space {
+    return trace_space;
+}
+pub fn enterSpace(namespace: Space) SpaceScope {
+    const previous = trace_space;
+    trace_space = namespace;
+    return .{ .previous = previous };
+}
 pub const TraceInstallation = struct {
     previous: ?*Trace,
     pub fn restore(self: TraceInstallation) void {
@@ -220,6 +242,7 @@ fn threadId() u32 {
 
 pub const Region = struct {
     owner: ?*Trace = null,
+    space: Space = .source,
     id: u64 = 0,
     stage: []const u8 = "",
     unit: u32 = 0,
@@ -244,14 +267,14 @@ pub const Region = struct {
             _ = @atomicRmw(u64, &totals.calls, .Add, 1, .monotonic);
             return;
         }
-        owner.write(.{ .kind = "end", .id = self.id, .thread = threadId(), .stage = self.stage, .unit = self.unit, .start = self.start, .end = self.end, .at_us = now, .us = now -| self.started, .input_items = input_items, .output_items = output_items, .cpu_us = if (cpu != null and self.cpu != null) (cpu.? -| self.cpu.?) / std.time.ns_per_us else null });
+        owner.writeAt(self.space, .{ .kind = "end", .id = self.id, .thread = threadId(), .stage = self.stage, .unit = self.unit, .start = self.start, .end = self.end, .at_us = now, .us = now -| self.started, .input_items = input_items, .output_items = output_items, .cpu_us = if (cpu != null and self.cpu != null) (cpu.? -| self.cpu.?) / std.time.ns_per_us else null });
     }
 };
 /// Region wall/CPU clocks are inclusive and may overlap other regions. They
 /// must not be summed with exclusive phase clocks or across nested regions.
 pub fn region(stage: []const u8, unit: u32, start: u32, end: u32) Region {
     const owner = trace orelse return .{};
-    const value: Region = .{ .owner = owner, .id = owner.next.fetchAdd(1, .monotonic), .stage = stage, .unit = unit, .start = start, .end = end, .started = owner.elapsed(), .cpu = cpuNanos() };
+    const value: Region = .{ .owner = owner, .space = trace_space, .id = owner.next.fetchAdd(1, .monotonic), .stage = stage, .unit = unit, .start = start, .end = end, .started = owner.elapsed(), .cpu = cpuNanos() };
     owner.write(.{ .kind = "begin", .id = value.id, .thread = threadId(), .stage = stage, .unit = unit, .start = start, .end = end, .at_us = value.started });
     return value;
 }

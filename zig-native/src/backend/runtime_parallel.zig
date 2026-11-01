@@ -20,6 +20,7 @@ fn heavier(_: void, left: Job, right: Job) bool {
 }
 const Work = struct {
     trace: ?*@import("../phase_profile.zig").Trace = null,
+    trace_space: @import("../phase_profile.zig").Space = .source,
     session: *const pipeline.Session,
     matcher: ?*const retained.Matcher,
     allocator: A,
@@ -34,6 +35,8 @@ const Work = struct {
         return @intCast(@max(0, self.started.?.durationTo(std.Io.Clock.awake.now(io)).toMicroseconds()));
     }
     fn execute(self: *Work, worker: usize) void {
+        const space_scope = @import("../phase_profile.zig").enterSpace(self.trace_space);
+        defer space_scope.restore();
         const trace_installation = @import("../phase_profile.zig").installTrace(self.trace);
         defer trace_installation.restore();
         // Count in private stack storage and publish once. Profile collection
@@ -133,7 +136,7 @@ pub const Batch = struct {
         std.mem.sort(Job, queue.items, {}, heavier);
         var locked: LockedAllocator = .{ .backing = a, .io = io };
         if (profile) batch.timings = @splat(.{});
-        var work: Work = .{ .trace = @import("../phase_profile.zig").currentTrace(), .allocator = locked.allocator(), .session = session, .matcher = matcher, .slots = batch.slots, .jobs = queue.items, .clock = if (profile) io else null, .started = if (profile) std.Io.Clock.awake.now(io) else null, .timings = if (batch.timings) |*timings| timings else null };
+        var work: Work = .{ .trace = @import("../phase_profile.zig").currentTrace(), .trace_space = @import("../phase_profile.zig").currentSpace(), .allocator = locked.allocator(), .session = session, .matcher = matcher, .slots = batch.slots, .jobs = queue.items, .clock = if (profile) io else null, .started = if (profile) std.Io.Clock.awake.now(io) else null, .timings = if (batch.timings) |*timings| timings else null };
         var group: std.Io.Group = .init;
         // The compiler's CPU phases have no cancellation points. Keep this
         // bounded join in the same regime; pending cancellation resumes at the

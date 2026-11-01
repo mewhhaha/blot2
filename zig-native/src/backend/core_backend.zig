@@ -2319,6 +2319,8 @@ pub fn compile(allocator: Allocator, units: []const core.Module, entry: u32) Err
 
 const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.artifact_replay else false;
 pub const CompileOptions = struct {
+    /// Live immutable dependency owner receipt; never persisted or hashed.
+    completed_core_validation: ?@import("../reuse/completed_core_validation.zig").Borrow = null,
     /// Bounded guest data-region and copied-packet budgets.
     storage: ?@import("storage_plan.zig").Config = null,
     /// Private ABI inspection control; avoids hiding callees through inlining.
@@ -2368,6 +2370,8 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 }
 
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
+    const trace_space = @import("../phase_profile.zig").enterSpace(.core);
+    defer trace_space.restore();
     if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithOptions(allocator, units, entry, .{
         .identity = options.identity,
         .storage = options.storage orelse options.policy.storage.config(),
@@ -2376,6 +2380,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         .share_machine_code = options.policy.share_machine_code,
         .io = options.io,
         .profile = options.profile_backend,
+        .completed_core_validation = options.completed_core_validation,
     });
     return compileLocals(allocator, units, entry, options, true) catch |err| {
         if (err != error.SpeculativeLocalRetry) return @errorCast(err);

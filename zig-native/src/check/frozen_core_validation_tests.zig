@@ -43,6 +43,39 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return result;
 }
 
+test "forbidden Core owner restricts bounds, captured contexts and equation workspace receipts" {
+    var module = try lower(a, "const identity = func value => return value\n");
+    defer module.deinit(a);
+    var foreign = module;
+    foreign.unit = 2;
+    const ordinary: V.Context = .{ .units = &.{ &module, &foreign } };
+    var restricted = ordinary;
+    restricted.forbidden_owner = 2;
+    try V.validateBounds(&module, restricted);
+    try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&foreign, restricted));
+    try std.testing.expect(!V.equivalentContextFacts(ordinary, restricted));
+    var image = try V.ContextImage.capture(a, ordinary, &.{&module});
+    defer image.deinit(a);
+    try std.testing.expect(image.matches(ordinary, &.{&module}));
+    try std.testing.expect(!image.matches(restricted, &.{&module}));
+    var restricted_image = try V.ContextImage.capture(a, restricted, &.{&module});
+    defer restricted_image.deinit(a);
+    try std.testing.expect(!restricted_image.matches(ordinary, &.{&module}));
+    const equations = @import("scheme_equations.zig");
+    // Keep the executable identity body and its inferred parameter contract
+    // intact. A foreign declaration dependency is independently legal here.
+    try std.testing.expectEqual(0, module.dependency_references.len);
+    var references = [_]core.BindingRef{.{ .unit = 2, .binding = 1 }};
+    const previous = module.dependency_references;
+    module.dependency_references = &references;
+    defer module.dependency_references = previous;
+    try V.validateBounds(&module, ordinary);
+    try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&module, restricted));
+    var workspace: equations.Workspace = .{ .allocator = a };
+    try equations.bounds(&workspace, &module, ordinary);
+    try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, restricted));
+}
+
 fn digest(module: *const core.Module) u64 {
     var h = std.hash.Wyhash.init(0);
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {

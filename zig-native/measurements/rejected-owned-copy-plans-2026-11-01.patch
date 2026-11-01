@@ -1,0 +1,1914 @@
+diff --git a/zig-native/src/backend/scoped_backend.zig b/zig-native/src/backend/scoped_backend.zig
+--- a/zig-native/src/backend/scoped_backend.zig
++++ b/zig-native/src/backend/scoped_backend.zig
+@@ -3904,7 +3904,545 @@
+         defer self.specialization_origin = previous;
+         return self.invoke(target, arguments, depth);
+     }
++    fn copyPathValue(value: *Value, path: storage_plan.CallPath) ?*Value {
++        var current = value;
++        for (path.fields[0..path.len]) |index| {
++            if (index >= current.fields.len) return null;
++            current = &current.fields[index];
++        }
++        return current;
++    }
++    fn copyFindPath(value: *Value, target: *Value, path: *storage_plan.CallPath) bool {
++        if (value == target) return true;
++        if (path.len == path.fields.len) return false;
++        for (value.fields, 0..) |*field, index| {
++            path.fields[path.len] = @intCast(index);
++            path.len += 1;
++            if (copyFindPath(field, target, path)) return true;
++            path.len -= 1;
++        }
++        return false;
++    }
++    fn copyResolvePath(self: *Generator, original: Value, source: call_plan.CopySource.Path) Error!?storage_plan.CallPath {
++        var value = try self.cloneShape(original);
++        var selected = &value;
++        for (source.fields[0..source.len]) |field| selected = try self.projected(try self.unit(field.unit), 0, selected, field.projection);
++        var path: storage_plan.CallPath = .{};
++        if (!copyFindPath(&value, selected, &path)) return null;
++        return path;
++    }
++    fn copyElement(self: *Generator, m: *const core.Module, id: core.Id, value: Value) Error!Value {
++        var element = try self.cloneShape((try self.root(m, id, value)).element);
++        for (value.other_roots) |other| {
++            if (!self.roots.items[other].element_initialized) continue;
++            try self.storedShape(m, id, &element, self.roots.items[other].element, std.math.maxInt(usize));
++        }
++        return element;
++    }
++    fn copyHasView(value: Value, remaining: *usize) bool {
++        if (remaining.* == 0) return false;
++        remaining.* -= 1;
++        if (value.tag == .view) return true;
++        if (value.tag != .aggregate) return false;
++        for (value.fields) |field| if (copyHasView(field, remaining)) return true;
++        return false;
++    }
++    fn copyCandidate(self: *Generator, arguments: []const Value) bool {
++        if (arguments.len < 2 or arguments.len > 3) return false;
++        var remaining: usize = 128;
++        for (arguments) |argument| {
++            if (copyHasView(argument, &remaining)) return true;
++            if (argument.tag == .array or argument.tag == .view) if (argument.root) |root_id| {
++                if (copyHasView(self.roots.items[root_id].element, &remaining)) return true;
++            };
++        }
++        return false;
++    }
++    fn copySchema(self: *Generator, value: Value, evidence: *std.ArrayList(u32), remaining: *usize) Error!void {
++        if (remaining.* == 0) return error.Declined;
++        remaining.* -= 1;
++        // Runtime refinements are deliberately absent. These operations never
++        // inspect a constructor arm: unchanged fields remain caller values.
++        try evidence.appendSlice(self.allocator, &.{ @backingInt(value.tag), @backingInt(value.mode), @intFromBool(value.sequence), @intFromBool(value.floating), @intCast(value.fields.len), @intCast(value.variant_tags.len), @intCast(value.name.len) });
++        for (value.name) |byte| try evidence.append(self.allocator, byte);
++        if (value.nominal) |nominal| try evidence.appendSlice(self.allocator, &.{ 1, nominal.unit, nominal.decl }) else try evidence.append(self.allocator, 0);
++        try evidence.appendSlice(self.allocator, value.variant_tags);
++        for (value.fields) |field| try self.copySchema(field, evidence, remaining);
++    }
++    fn copyKey(self: *Generator, m: *const core.Module, plan: storage_plan.OwnedCopy, arguments: []const Value, evidence: *std.ArrayList(u32)) Error!void {
++        const types_before = self.type_arguments.items.len;
++        defer self.type_arguments.shrinkRetainingCapacity(types_before);
++        var remaining: usize = 4096;
++        try evidence.append(self.allocator, std.math.maxInt(u32) - 9);
++        switch (plan.operation) {
++            .copy_tail => |step| {
++                if (step.row >= arguments.len or step.vectors >= arguments.len) return error.Declined;
++                var row = arguments[step.row];
++                const view = copyPathValue(&row, step.view) orelse return error.Declined;
++                if (view.tag != .view) return error.Declined;
++                try evidence.append(self.allocator, 1);
++                try self.copySchema(row, evidence, &remaining);
++                try self.copySchema(try self.copyElement(m, plan.root, arguments[step.vectors]), evidence, &remaining);
++            },
++            .append_rows => |step| {
++                if (step.rows >= arguments.len or step.output >= arguments.len) return error.Declined;
++                var output = arguments[step.output];
++                const destination = copyPathValue(&output, step.output_path) orelse return error.Declined;
++                try evidence.append(self.allocator, 2);
++                try self.copySchema(arguments[step.rows], evidence, &remaining);
++                try self.copySchema(try self.copyElement(m, plan.root, arguments[step.rows]), evidence, &remaining);
++                try self.copySchema(destination.*, evidence, &remaining);
++                // Destination initialization/borrow history is replayed with
++                // actual roots; the emitted typed stores use the source schema.
++                if (step.vectors) |index| try self.copySchema(try self.copyElement(m, plan.root, arguments[index]), evidence, &remaining);
++            },
++        }
++        var type_work: usize = 4096;
++        var keys = selected_types.Builder.init(self.allocator, &type_work, .{});
++        defer keys.deinit();
++        // Semantic nominal arguments and checked rows remain exact, including
++        // phantom arguments that physical widths alone would erase.
++        for (arguments) |argument| if (argument.type_evidence) |known| try self.selectedType(m, plan.root, .{ .unit = known.root.unit, .ty = known.root.ty, .environment = known.arguments }, evidence, &keys, 0);
++        try self.finishSelectedTypes(m, plan.root, evidence, &keys);
++    }
++    fn copyProveSource(self: *Generator, source: call_plan.CopySource) Error!void {
++        const owner = try self.unit(source.target.unit);
++        var origin: ?@import("../check/scheme_equations.zig").SourceFailure = null;
++        source_proof.checkedInterfaceBodyCached(self.proof_cache, owner, source.target.binding, self.validation_budget, &origin, null) catch |err| {
++            if (err == error.OutOfMemory) return error.OutOfMemory;
++            return self.fail(owner, source.root, .storage_unsupported, "The caller-owned copy lacks complete source type/effect evidence");
++        };
++        for (source.dependencies[0..source.dependency_count]) |target| {
++            const dependency = try self.unit(target.unit);
++            source_proof.checkedInterfaceBodyCached(self.proof_cache, dependency, target.binding, self.validation_budget, &origin, null) catch |err| {
++                if (err == error.OutOfMemory) return error.OutOfMemory;
++                return self.fail(dependency, dependency.body(target.binding).?.root, .storage_unsupported, "The caller-owned copy callee lacks complete source type/effect evidence");
++            };
++        }
++    }
++    fn copyWriteSummary(self: *Generator, m: *const core.Module, id: core.Id, destination: Value, element: Value) Error!void {
++        if (self.frozen(destination)) return self.fail(m, id, .storage_borrow_conflict, "This array's growth capability was consumed by freeze");
++        for (self.roots.items, 0..) |*owner, index| if (hasRoot(destination, index)) {
++            try self.storedShape(m, id, &owner.element, element, owner.depth);
++            owner.element_initialized = true;
++            owner.known_empty = false;
++        };
++        try self.writerEvent(m, id, destination, .write);
++    }
++    fn copyTailSummary(self: *Generator, m: *const core.Module, id: core.Id, row: Value, path: storage_plan.CallPath, vectors: Value) Error!Value {
++        var result = try self.cloneShape(row);
++        const view = copyPathValue(&result, path) orelse return error.Declined;
++        if (view.root == null) return error.Declined;
++        const read_frame = try self.beginReadFrame();
++        defer self.read_frames.shrinkRetainingCapacity(read_frame);
++        try self.registerShapeRead(view.*);
++        try self.writerEvent(m, id, view.*, .read);
++        if (!self.emptyUninitialized(view.*)) try self.copyWriteSummary(m, id, vectors, try self.copyElement(m, id, view.*));
++        try self.checkReadFrame(m, id, read_frame);
++        view.* = .{ .tag = .view, .word = vectors.word, .token = vectors.token, .epoch_low = vectors.epoch_low, .epoch_high = vectors.epoch_high, .root = vectors.root, .other_roots = vectors.other_roots, .depth = vectors.depth, .name = view.name, .type_evidence = view.type_evidence };
++        return result;
++    }
++    fn copyReplay(self: *Generator, m: *const core.Module, plan: storage_plan.OwnedCopy, arguments: []const Value) Error!Value {
++        switch (plan.operation) {
++            .copy_tail => |step| return self.copyTailSummary(m, plan.root, arguments[step.row], step.view, arguments[step.vectors]),
++            .append_rows => |step| {
++                const source = arguments[step.rows];
++                var output = arguments[step.output];
++                const destination = (copyPathValue(&output, step.output_path) orelse return error.Declined).*;
++                const read_frame = try self.beginReadFrame();
++                defer self.read_frames.shrinkRetainingCapacity(read_frame);
++                try self.registerShapeRead(source);
++                try self.writerEvent(m, plan.root, source, .read);
++                if (!self.emptyUninitialized(source)) {
++                    var row = try self.copyElement(m, plan.root, source);
++                    if (step.vectors) |index| row = try self.copyTailSummary(m, plan.root, row, step.view, arguments[index]);
++                    try self.copyWriteSummary(m, plan.root, destination, row);
++                }
++                try self.checkReadFrame(m, plan.root, read_frame);
++                return .{ .word = .{ .id = 0 } };
++            },
++        }
++    }
++    fn copyCanonical(self: *Generator, original: Value) Error!Value {
++        var result = try self.cloneShape(original);
++        result.literal = null;
++        result.variant_index = null;
++        result.variant_possible = &.{};
++        result.type_evidence = null;
++        result.root = null;
++        result.other_roots = &.{};
++        for (result.fields, original.fields) |*field, source| field.* = try self.copyCanonical(source);
++        return result;
++    }
++    fn copyFormalRoot(self: *Generator, element: Value) Error!usize {
++        const index = self.roots.items.len;
++        try self.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = 0, .element = element, .dedicated = false });
++        return index;
++    }
++    fn emitCopyTail(self: *Generator, m: *const core.Module, plan: storage_plan.OwnedCopy, vector_schema: Value) Error!void {
++        const plain = try self.copyCanonical(vector_schema);
++        var vectors: Value = .{ .tag = .array, .word = .{ .id = 0 }, .mode = .resize };
++        vectors.root = try self.copyFormalRoot(plain);
++        vectors = try self.loadReaderResult(.{ .id = 0 }, 0, vectors);
++        var template: Value = .{ .tag = .view, .word = .{ .id = 0 } };
++        template.root = try self.copyFormalRoot(plain);
++        const source = try self.loadReaderResult(.{ .id = 1 }, 0, template);
++        const start = try self.length(m, plan.root, vectors);
++        const count = try self.length(m, plan.root, source);
++        const index = (try self.constant(0)).word;
++        try self.c.loop(.{ .i32_lt_u, index, count });
++        const row = try self.readElement(m, plan.root, source, try self.elementIndex(m, plan.root, source, index));
++        try self.writeElement(m, plan.root, vectors, null, row);
++        try self.c.next(index);
++        try self.c.again();
++        const end = try self.length(m, plan.root, vectors);
++        const result: Value = .{ .tag = .view, .word = vectors.word, .token = vectors.token, .epoch_low = vectors.epoch_low, .epoch_high = vectors.epoch_high, .root = vectors.root, .other_roots = vectors.other_roots, .depth = vectors.depth, .index = start, .length = try self.c.temp() };
++        try self.c.set(result.length, .{ .i32_sub, end, start });
++        try self.storeReaderResult(.{ .id = 1 }, 0, result);
++        try self.c.value(0);
++    }
++    fn emitCopyAppend(self: *Generator, m: *const core.Module, plan: storage_plan.OwnedCopy, original_row: Value, plain_schema: Value, source_template: Value) Error!void {
++        const step = plan.operation.append_rows;
++        var row_schema = try self.copyCanonical(original_row);
++        const plain = try self.copyCanonical(plain_schema);
++        if (step.copy_function != null) {
++            const view = copyPathValue(&row_schema, step.view) orelse return error.Declined;
++            view.root = try self.copyFormalRoot(plain);
++        }
++        var source = source_template;
++        source.root = try self.copyFormalRoot(row_schema);
++        source.other_roots = &.{};
++        const vector_bytes: u32 = 0;
++        var source_bytes: u32 = 0;
++        if (step.vectors != null) source_bytes = 16;
++        source = try self.loadReaderResult(.{ .id = 0 }, source_bytes, source);
++        var destination_schema = try self.copyCanonical(row_schema);
++        if (step.copy_function != null) (copyPathValue(&destination_schema, step.view) orelse return error.Declined).root = try self.copyFormalRoot(plain);
++        var destination: Value = .{ .tag = .array, .word = .{ .id = 0 }, .mode = .resize };
++        destination.root = try self.copyFormalRoot(destination_schema);
++        destination = try self.loadReaderResult(.{ .id = 0 }, source_bytes + step.source_words * 4, destination);
++        var view_pointer: ?Local = null;
++        if (step.copy_function != null) {
++            view_pointer = try self.c.temp();
++            try self.c.set(view_pointer.?, .{ .i32_add, Local{ .id = 0 }, (plan.context_words - 6) * 4 });
++        }
++        const count = try self.length(m, plan.root, source);
++        const index = (try self.constant(0)).word;
++        try self.c.loop(.{ .i32_lt_u, index, count });
++        var row = try self.readElement(m, plan.root, source, try self.elementIndex(m, plan.root, source, index));
++        if (step.copy_function) |function| {
++            const view = copyPathValue(&row, step.view) orelse return error.Declined;
++            try self.storeReaderResult(view_pointer.?, 0, view.*);
++            try self.c.value(.{ .i32_add, Local{ .id = 0 }, vector_bytes });
++            try self.c.value(view_pointer.?);
++            try self.c.op(.call, function);
++            try self.c.op(.drop, 0);
++            const name = view.name;
++            view.* = try self.loadReaderResult(view_pointer.?, 0, view.*);
++            view.name = name;
++            // Runtime provenance is supplied by the returned descriptor; this
++            // formal shape describes only the already-proved output role.
++            view.root = (copyPathValue(&destination_schema, step.view) orelse return error.Declined).root;
++        }
++        if (step.copy_function != null) {
++            try self.writeElement(m, plan.root, destination, null, row);
++        } else {
++            // The completed append summary already substituted every actual
++            // nested borrow root and checked its lifetime. The physical helper
++            // copies opaque descriptor bits; it never fabricates a root/token
++            // for, or dereferences, that nested view.
++            const address = try self.c.temp();
++            try self.c.set(address, .{ .call, self.runtime.functions.append_space, destination.token, destination.epoch_low, destination.epoch_high, destination.word });
++            try self.storeValue(address, 0, row);
++        }
++        try self.c.next(index);
++        try self.c.again();
++        try self.c.value(0);
++    }
++    const CopyProjectionContext = struct { generator: *Generator, arguments: []const Value, failure: ?Error = null };
++    fn copySelectProjection(pointer: *anyopaque, m: *const core.Module, id: core.Id, place: call_plan.CopySource.Place, nested: bool) ?core.BindingRef {
++        const context: *CopyProjectionContext = @ptrCast(@alignCast(pointer));
++        const self = context.generator;
++        const types_before = self.type_arguments.items.len;
++        defer self.type_arguments.shrinkRetainingCapacity(types_before);
++        const diagnostic_before = self.diagnostic;
++        defer self.diagnostic = diagnostic_before;
++        const projection = m.projection(m.node(id).b);
++        const receiver = self.resolveType(.{ .unit = m.unit, .ty = projection.source_type }, 0) catch |err| {
++            if (err == error.OutOfMemory) context.failure = err;
++            return null;
++        };
++        const receiver_owner = self.unit(receiver.unit) catch return null;
++        const receiver_type = receiver_owner.types.node(receiver.ty);
++        // A nested source walk has callee-local ordinals. Until actual values
++        // are rebound by ensureOwnedCopy, use only its declared receiver type.
++        // Structural data fields always precede associated getter selection.
++        if (receiver_type.tag == .record) if (m.fieldSpelling(projection.field)) |name| {
++            for (0..receiver_type.b) |index| {
++                const field = receiver_owner.types.recordField(receiver_type, index);
++                if (std.mem.eql(u8, name, receiver_owner.fieldSpelling(field.name) orelse continue)) return null;
++            }
++        };
++        if (nested and T.receiverIdentity(receiver_type) == null) return null;
++        var value: Value = .{ .word = .{ .id = 0 } };
++        if (!nested and place.argument < context.arguments.len) value = context.arguments[place.argument];
++        if (!nested and place.path.len != 0) {
++            const path = self.copyResolvePath(value, place.path) catch |err| {
++                if (err == error.OutOfMemory) context.failure = err;
++                return null;
++            };
++            if (path) |resolved| {
++                value = (copyPathValue(&value, resolved) orelse return null).*;
++            } else return null;
++        }
++        if (m.fieldSpelling(projection.field)) |name| if (dataField(value, name) != null) return null;
++        const selection = self.selectedGetter(m, id, value) catch |err| {
++            if (err == error.OutOfMemory) context.failure = err;
++            return null;
++        };
++        if (selection) |selected| return selected.target;
++        return null;
++    }
++    fn copySource(self: *Generator, target: core.BindingRef, arguments: []const Value, remaining: *usize) Error!?call_plan.CopySource {
++        var context: CopyProjectionContext = .{ .generator = self, .arguments = arguments };
++        const before = remaining.*;
++        const result = call_plan.ownedCopySourceResolved(self.units, target, remaining, .{ .context = &context, .select = copySelectProjection });
++        self.emission_work.scoped_owned_copy_source_nodes +|= before - remaining.*;
++        if (context.failure) |err| return err;
++        return result;
++    }
++    fn copyOnlySelectedView(value: *Value, selected: *Value) bool {
++        if (value == selected) return value.tag == .view;
++        if (value.tag == .scalar) return value.host == null and value.demand == null;
++        if (value.tag != .aggregate or value.host != null or value.demand != null) return false;
++        for (value.fields) |*field| if (!copyOnlySelectedView(field, selected)) return false;
++        return true;
++    }
++    fn copySingleView(value: *Value, selected: *?*Value, conditional: bool) bool {
++        if (value.tag == .view) {
++            if (conditional or selected.* != null) return false;
++            selected.* = value;
++            return true;
++        }
++        if (value.tag == .scalar) return value.host == null and value.demand == null;
++        if (value.tag != .aggregate or value.host != null or value.demand != null) return false;
++        for (value.fields) |*field| if (!copySingleView(field, selected, conditional or value.variant_tags.len != 0)) return false;
++        return true;
++    }
++    fn completeOwnedCopy(self: *Generator, source: call_plan.CopySource, arguments: []const Value) Error!?storage_plan.OwnedCopy {
++        const m = try self.unit(source.target.unit);
++        var plan: storage_plan.OwnedCopy = .{ .unit = m.unit, .binding = source.target.binding, .root = source.root, .context_words = 0, .operation = undefined };
++        switch (source.operation) {
++            .copy_tail => |step| {
++                if (arguments.len != 2 or step.row == step.vectors) return null;
++                const body = m.body(source.target.binding).?;
++                const binding = m.binding(source.target.binding);
++                if (body.scheme.variables.len != 0 or binding.scheme.variables.len != 0 or binding.public_variables.len != 0) return null;
++                var row = try self.cloneShape(arguments[step.row]);
++                const vectors = arguments[step.vectors];
++                if (vectors.tag != .array or vectors.mode == .fixed or vectors.sequence or vectors.root == null) return null;
++                const path = try self.copyResolvePath(row, step.field) orelse return null;
++                const view = copyPathValue(&row, path) orelse return null;
++                if (!copyOnlySelectedView(&row, view) or view.sequence) return null;
++                const element = try self.copyElement(m, source.root, vectors);
++                if (!stableDescriptorShape(element)) return null;
++                if (view.root != null and !plainReaderResultABI(try self.copyElement(m, source.root, view.*), element)) return null;
++                plan.context_words = 10;
++                plan.operation = .{ .copy_tail = .{ .row = step.row, .vectors = step.vectors, .view = path } };
++            },
++            .append_rows => |step| {
++                if (step.copy != null) {
++                    if (arguments.len != 3 or step.vectors == null) return null;
++                } else if (arguments.len != 2 or step.vectors != null) return null;
++                const source_rows = arguments[step.rows];
++                if ((source_rows.tag != .array and source_rows.tag != .view) or source_rows.sequence or source_rows.root == null) return null;
++                var output = arguments[step.output.argument];
++                const output_path = try self.copyResolvePath(output, step.output.path) orelse return null;
++                const destination = copyPathValue(&output, output_path) orelse return null;
++                if (destination.tag != .array or destination.mode == .fixed or destination.sequence or destination.root == null) return null;
++                var row = try self.copyElement(m, source.root, source_rows);
++                var view_path: storage_plan.CallPath = .{};
++                if (step.copy != null) {
++                    view_path = try self.copyResolvePath(row, step.copy_field) orelse return null;
++                    const view = copyPathValue(&row, view_path) orelse return null;
++                    if (!copyOnlySelectedView(&row, view)) return null;
++                    const vectors = arguments[step.vectors.?];
++                    if (vectors.tag != .array or vectors.mode == .fixed or vectors.root == null or vectors.sequence) return null;
++                    const plain = try self.copyElement(m, source.root, vectors);
++                    if (!stableDescriptorShape(plain)) return null;
++                    if (view.root != null and !plainReaderResultABI(try self.copyElement(m, source.root, view.*), plain)) return null;
++                } else {
++                    var selected: ?*Value = null;
++                    if (!copySingleView(&row, &selected, false) or selected == null) return null;
++                    if (!copyFindPath(&row, selected.?, &view_path)) return null;
++                }
++                const output_schema = try self.copyElement(m, source.root, destination.*);
++                if (try width(row) != try width(output_schema) or !std.meta.eql(row.nominal, output_schema.nominal)) return null;
++                plan.context_words = @as(u32, @intCast(readerWords(source_rows))) + 4;
++                if (step.copy != null) plan.context_words += 4 + 6;
++                plan.operation = .{ .append_rows = .{ .rows = step.rows, .output = step.output.argument, .output_path = output_path, .vectors = step.vectors, .view = view_path, .source_words = @intCast(readerWords(source_rows)) } };
++            },
++        }
++        try self.copyProveSource(source);
++        return plan;
++    }
++    fn ensureOwnedCopy(self: *Generator, target: core.BindingRef, arguments: []const Value) Error!?usize {
++        const m = try self.unit(target.unit);
++        var evidence: std.ArrayList(u32) = .empty;
++        defer evidence.deinit(self.allocator);
++        // Existing call entries own completed source/ABI decisions. A hit never
++        // re-enters the callee's field equations, source walk or body emitter.
++        for (self.descriptor_calls.calls.entries.items, 0..) |entry, index| {
++            const plan = entry.owned_copy orelse continue;
++            if (plan.unit != m.unit or plan.binding != target.binding or entry.key.context != self.invocationContext()) continue;
++            evidence.clearRetainingCapacity();
++            const diagnostic_before = self.diagnostic;
++            self.copyKey(m, plan.*, arguments, &evidence) catch |err| {
++                if (err == error.OutOfMemory) return err;
++                self.diagnostic = diagnostic_before;
++                continue;
++            };
++            const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
++            if (entry.key.eql(key)) {
++                if (entry.building) return self.fail(m, plan.root, .storage_unsupported, "Recursive caller-owned copies are not admitted");
++                self.emission_work.scoped_owned_copy_hits +|= 1;
++                return index;
++            }
++        }
++        if (self.emission_work.scoped_owned_copy_definitions >= 4096) return self.fail(m, m.body(target.binding).?.root, .storage_unsupported, "Caller-owned copy plans exceeded their checked specialization bound");
++        var remaining: usize = 512;
++        const source = try self.copySource(target, arguments, &remaining) orelse return null;
++        const diagnostic_before = self.diagnostic;
++        var plan = self.completeOwnedCopy(source, arguments) catch |err| {
++            if (err == error.OutOfMemory) return err;
++            self.diagnostic = diagnostic_before;
++            return null;
++        } orelse return null;
++        evidence.clearRetainingCapacity();
++        self.copyKey(m, plan, arguments, &evidence) catch |err| {
++            if (err == error.OutOfMemory) return err;
++            self.diagnostic = diagnostic_before;
++            return null;
++        };
++        if (plan.operation == .append_rows and plan.operation.append_rows.vectors != null) {
++            const step = source.operation.append_rows;
++            const child_target = step.copy.?;
++            var child_arguments: [2]Value = undefined;
++            child_arguments[step.copy_row] = try self.copyElement(m, plan.root, arguments[step.rows]);
++            child_arguments[step.copy_vectors] = arguments[step.vectors.?];
++            const child_owner = try self.unit(child_target.unit);
++            const child_body = child_owner.body(child_target.binding).?;
++            for (&child_arguments, child_owner.bodyParameters(child_body)) |*argument, parameter| {
++                argument.type_evidence = .{ .root = .{ .unit = child_owner.unit, .ty = parameter.ty }, .arguments = try self.captureTypes() };
++            }
++            const child_index = try self.ensureOwnedCopy(child_target, &child_arguments) orelse return null;
++            plan.operation.append_rows.copy_function = self.descriptor_calls.calls.entries.items[child_index].function;
++        }
++        const owned = try self.allocator.create(storage_plan.OwnedCopy);
++        var transferred = false;
++        errdefer if (!transferred) self.allocator.destroy(owned);
++        owned.* = plan;
++        var signature: []const wasm.ValueType = &.{.i32};
++        if (plan.operation == .copy_tail) signature = &.{ .i32, .i32 };
++        const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
++            error.OutOfMemory => return error.OutOfMemory,
++            else => return self.unsupported(m, plan.root),
++        };
++        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
++        const index = try self.descriptor_calls.calls.insert(key, function, false);
++        self.descriptor_calls.calls.entries.items[index].owned_copy = owned;
++        transferred = true;
++        var child: Generator = .{
++            .allocator = self.allocator,
++            .arena = std.heap.ArenaAllocator.init(self.allocator),
++            .calls = .{ .allocator = self.allocator },
++            .shared_calls = self.shared_calls,
++            .descriptor_calls = self.descriptor_calls,
++            .field_recipes = self.field_recipes,
++            .scalar_admission = self.scalar_admission,
++            .active_calls = self.active_calls,
++            .specialize = false,
++            .work_limits = self.work_limits,
++            .emission_work = self.emission_work,
++            .outlining = self.outlining,
++            .units = self.units,
++            .unit_views = self.unit_views,
++            .proof_cache = self.proof_cache,
++            .dispatches = self.dispatches,
++            .capacity_requests = self.capacity_requests,
++            .validation_budget = self.validation_budget,
++            .entry_unit = self.entry_unit,
++            .specialization_origin = self.specialization_origin,
++            .methods = self.methods,
++            .module = self.module,
++            .runtime = self.runtime,
++            .fixed_region = self.fixed_region,
++            .c = .{ .module = self.module, .function = function },
++        };
++        defer child.deinit();
++        switch (plan.operation) {
++            .copy_tail => |step| try child.emitCopyTail(m, plan, try self.copyElement(m, plan.root, arguments[step.vectors])),
++            .append_rows => |step| {
++                var plain: Value = .{ .word = .{ .id = 0 } };
++                if (step.vectors) |vectors| plain = try self.copyElement(m, plan.root, arguments[vectors]);
++                try child.emitCopyAppend(m, plan, try self.copyElement(m, plan.root, arguments[step.rows]), plain, arguments[step.rows]);
++            },
++        }
++        self.descriptor_calls.calls.entries.items[index].building = false;
++        self.emission_work.scoped_owned_copy_definitions +|= 1;
++        @import("../phase_profile.zig").detail("owned-copy.definition", m.unit, m.span(plan.root).start, m.span(plan.root).end, function);
++        return index;
++    }
++    fn reusableOwnedCopy(self: *Generator, target: core.BindingRef, arguments: []const Value) Error!?Value {
++        if (self.destination != null or !self.copyCandidate(arguments)) return null;
++        const index = try self.ensureOwnedCopy(target, arguments) orelse return null;
++        const entry = self.descriptor_calls.calls.entries.items[index];
++        const plan = entry.owned_copy.?.*;
++        const m = try self.unit(plan.unit);
++        var result = try self.copyReplay(m, plan, arguments);
++        const first_root = self.roots.items.len;
++        const mark = try self.frameMark();
++        const slot = try self.arrayWithShape(m, plan.root, (try self.constant(plan.context_words)).word, .fixed, .{ .word = .{ .id = 0 } });
++        const address = try self.c.temp();
++        try self.c.set(address, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
++        switch (plan.operation) {
++            .copy_tail => |step| {
++                try self.storeReaderResult(address, 0, arguments[step.vectors]);
++                var original = arguments[step.row];
++                const view = copyPathValue(&original, step.view) orelse return error.Declined;
++                try self.storeReaderResult(address, 16, view.*);
++                const pointer = try self.c.temp();
++                try self.c.set(pointer, .{ .i32_add, address, 16 });
++                try self.c.value(address);
++                try self.c.value(pointer);
++                try self.c.op(.call, entry.function);
++                try self.c.op(.drop, 0);
++                const replacement = copyPathValue(&result, step.view) orelse return error.Declined;
++                replacement.* = try self.loadReaderResult(address, 16, replacement.*);
++            },
++            .append_rows => |step| {
++                var offset: u32 = 0;
++                if (step.vectors) |vectors| {
++                    try self.storeReaderResult(address, offset, arguments[vectors]);
++                    offset += 16;
++                }
++                try self.storeReaderResult(address, offset, arguments[step.rows]);
++                offset += step.source_words * 4;
++                var output = arguments[step.output];
++                try self.storeReaderResult(address, offset, (copyPathValue(&output, step.output_path) orelse return error.Declined).*);
++                try self.c.value(address);
++                try self.c.op(.call, entry.function);
++                try self.c.op(.drop, 0);
++                result.word = (try self.constant(0)).word;
++            },
++        }
++        try self.release(first_root, null);
++        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark });
++        self.emission_work.scoped_owned_copy_summary_steps +|= 1;
++        return result;
++    }
+     fn invoke(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
++        if (try self.reusableOwnedCopy(target, arguments)) |result| return result;
+         return self.invokeBody(target, arguments, depth, true);
+     }
+     // Definitions bypass their own registry entry. Reached calls still share
+diff --git a/zig-native/src/backend/storage_calls.zig b/zig-native/src/backend/storage_calls.zig
+--- a/zig-native/src/backend/storage_calls.zig
++++ b/zig-native/src/backend/storage_calls.zig
+@@ -14,7 +14,7 @@
+         return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
+     }
+ };
+-pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true };
++pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, owned_copy: ?*@import("storage_plan.zig").OwnedCopy = null };
+ /// Selected source calls, not source references or partial applications. Keys
+ /// contain only bounded static callback choices; runtime data is never a key.
+ pub const ActiveCalls = struct {
+@@ -53,7 +53,10 @@
+     entries: std.ArrayList(Entry) = .empty,
+     plans: std.ArrayList(Plan) = .empty,
+     pub fn deinit(self: *Cache) void {
+-        for (self.entries.items) |entry| self.allocator.free(entry.key.evidence);
++        for (self.entries.items) |entry| {
++            self.allocator.free(entry.key.evidence);
++            if (entry.owned_copy) |plan| self.allocator.destroy(plan);
++        }
+         self.entries.deinit(self.allocator);
+         for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
+         self.plans.deinit(self.allocator);
+@@ -591,3 +594,406 @@
+     }
+     return true;
+ }
++
++/// A bounded whole-body proof for the two caller-owned copy operations. It
++/// recognizes checked operations and SSA provenance, never declaration names.
++pub const CopySource = struct {
++    pub const Field = struct {
++        unit: u32,
++        projection: u32,
++        name: u32,
++        nominal: T.NominalIdentity,
++        variants: u8,
++        tag: u32 = 0,
++        field: u32 = 0,
++        fn from(m: *const core.Module, id: u32) ?Field {
++            const projection = m.projection(id);
++            const variants = m.projectionVariants(id);
++            if (variants.len > 1) return null;
++            var result: Field = .{ .unit = m.unit, .projection = id, .name = projection.field, .nominal = projection.nominal, .variants = @intCast(variants.len) };
++            if (variants.len == 1) {
++                result.tag = variants[0].tag;
++                result.field = variants[0].field;
++            }
++            return result;
++        }
++        fn eql(a: Field, b: Field) bool {
++            return a.unit == b.unit and a.name == b.name and std.meta.eql(a.nominal, b.nominal) and a.variants == b.variants and a.tag == b.tag and a.field == b.field;
++        }
++    };
++    pub const Path = struct {
++        fields: [8]Field = undefined,
++        len: u8 = 0,
++        fn eql(a: Path, b: Path) bool {
++            if (a.len != b.len) return false;
++            for (a.fields[0..a.len], b.fields[0..b.len]) |left, right| if (!left.eql(right)) return false;
++            return true;
++        }
++    };
++    pub const Place = struct {
++        argument: u8 = 0,
++        path: Path = .{},
++        fn eql(a: Place, b: Place) bool {
++            return a.argument == b.argument and a.path.eql(b.path);
++        }
++    };
++    target: core.BindingRef,
++    root: core.Id,
++    operation: union(enum) {
++        copy_tail: struct { row: u8, vectors: u8, field: Path },
++        append_rows: struct { rows: u8, output: Place, vectors: ?u8 = null, copy: ?core.BindingRef = null, copy_row: u8 = 0, copy_vectors: u8 = 1, copy_field: Path = .{} },
++    },
++    dependencies: [16]core.BindingRef = undefined,
++    dependency_count: u8 = 0,
++    visits: usize = 0,
++};
++pub const CopyResolver = struct {
++    context: *anyopaque,
++    select: *const fn (*anyopaque, *const core.Module, core.Id, CopySource.Place, bool) ?core.BindingRef,
++};
++const CopyAnalyzer = struct {
++    const Symbol = struct {
++        kind: enum { argument, length, zero, iterator, item, row, copied_row, tail, method, unit },
++        place: CopySource.Place = .{},
++        after_copy: bool = false,
++        copy: ?core.BindingRef = null,
++        vectors: ?u8 = null,
++        copy_row: u8 = 0,
++        copy_vectors: u8 = 1,
++        copy_field: CopySource.Path = .{},
++    };
++    const Binding = struct { unit: u32, binding: core.BindingId, value: Symbol };
++    units: []const core.Module,
++    resolver: ?CopyResolver,
++    remaining: *usize,
++    active: *[8]core.BindingRef,
++    depth: usize,
++    bindings: [128]Binding = undefined,
++    used: usize = 0,
++    dependencies: [16]core.BindingRef = undefined,
++    dependency_count: u8 = 0,
++    loop_source: ?Symbol = null,
++    loop_kind: ?core.LoopKind = null,
++    push_destination: ?CopySource.Place = null,
++    push_value: ?Symbol = null,
++    loop_count: u8 = 0,
++    pushes: u8 = 0,
++    copied: bool = false,
++    in_loop: bool = false,
++    update_row: ?u8 = null,
++    update_field: CopySource.Path = .{},
++    update_vectors: ?u8 = null,
++    lengths: [4]Symbol = undefined,
++    length_count: u8 = 0,
++    reads: u8 = 0,
++    views: u8 = 0,
++    copies: u8 = 0,
++    pending_return: ?struct { unit: u32, id: core.Id } = null,
++
++    fn step(self: *CopyAnalyzer) bool {
++        if (self.remaining.* == 0) return false;
++        self.remaining.* -= 1;
++        return true;
++    }
++    fn dependency(self: *CopyAnalyzer, target: core.BindingRef) bool {
++        for (self.dependencies[0..self.dependency_count]) |prior| if (std.meta.eql(prior, target)) return true;
++        if (self.dependency_count == self.dependencies.len) return false;
++        self.dependencies[self.dependency_count] = target;
++        self.dependency_count += 1;
++        return true;
++    }
++    fn bind(self: *CopyAnalyzer, unit: u32, binding: core.BindingId, value: Symbol) bool {
++        if (self.used == self.bindings.len) return false;
++        self.bindings[self.used] = .{ .unit = unit, .binding = binding, .value = value };
++        self.used += 1;
++        return true;
++    }
++    fn pattern(self: *CopyAnalyzer, m: *const core.Module, id: core.PatternId, value: Symbol) bool {
++        const p = m.pattern(id);
++        if (p.tag == .wildcard) return true;
++        return p.tag == .bind and self.bind(m.unit, p.a, value);
++    }
++    fn lookup(self: *CopyAnalyzer, m: *const core.Module, id: core.Id) ?Symbol {
++        const ref = m.reference(id);
++        if (ref.unit != 0 and ref.unit != m.unit) return null;
++        var at = self.used;
++        while (at != 0) {
++            at -= 1;
++            const binding = self.bindings[at];
++            if (binding.unit == m.unit and binding.binding == ref.binding) return binding.value;
++        }
++        return null;
++    }
++    fn length(self: *CopyAnalyzer, value: Symbol) ?Symbol {
++        if (value.kind != .argument or self.length_count == self.lengths.len) return null;
++        const result: Symbol = .{ .kind = .length, .place = value.place, .after_copy = self.copied };
++        self.lengths[self.length_count] = result;
++        self.length_count += 1;
++        return result;
++    }
++    fn forward(self: *CopyAnalyzer, target: core.BindingRef, values: []const Symbol, nesting: usize) ?Symbol {
++        if (target.unit == 0 or target.unit > self.units.len or !self.dependency(target)) return null;
++        const owner = &self.units[target.unit - 1];
++        const body = owner.body(target.binding) orelse return null;
++        const parameters = owner.bodyParameters(body);
++        if (parameters.len != values.len) return null;
++        const saved = self.used;
++        const in_loop = self.in_loop;
++        const pushes = self.pushes;
++        const loops = self.loop_count;
++        const copies = self.copies;
++        const update = self.update_row;
++        const pending = self.pending_return;
++        defer {
++            self.used = saved;
++            self.in_loop = in_loop;
++        }
++        for (parameters, values) |parameter, value| if (!self.bind(owner.unit, parameter.binding, value)) return null;
++        self.in_loop = false;
++        const result = self.expression(owner, body.root, nesting + 1) orelse return null;
++        if (self.pushes != pushes or self.loop_count != loops or self.copies != copies or self.update_row != update or !std.meta.eql(self.pending_return, pending)) return null;
++        return result;
++    }
++    fn subscript(self: *CopyAnalyzer, source: Symbol, index: Symbol) ?Symbol {
++        if (self.loop_kind != .range or source.kind != .argument or source.place.path.len != 0 or index.kind != .iterator) return null;
++        const loop = self.loop_source orelse return null;
++        if (!source.place.eql(loop.place)) return null;
++        self.reads += 1;
++        return .{ .kind = .row, .place = source.place };
++    }
++    fn expression(self: *CopyAnalyzer, m: *const core.Module, id: core.Id, nesting: usize) ?Symbol {
++        if (id == 0) return .{ .kind = .unit };
++        if (nesting > 64 or !self.step()) return null;
++        const n = m.node(id);
++        switch (n.tag) {
++            .reference => return self.lookup(m, id),
++            .constant => {
++                if (n.ty == T.unit) return .{ .kind = .unit };
++                if (n.ty == T.u32_type and n.a == 0) return .{ .kind = .zero };
++                return null;
++            },
++            .block, .suite => {
++                var result: Symbol = .{ .kind = .unit };
++                const children = m.children(id);
++                for (children) |child| {
++                    result = self.expression(m, child, nesting + 1) orelse return null;
++                    if (self.pending_return != null) break;
++                }
++                if (self.pending_return) |target| if (target.unit == m.unit and target.id == id) {
++                    self.pending_return = null;
++                };
++                return result;
++            },
++            .return_ => {
++                if (self.in_loop) return null;
++                const result = self.expression(m, n.a, nesting + 1) orelse return null;
++                if (self.pending_return == null) self.pending_return = .{ .unit = m.unit, .id = n.b };
++                return result;
++            },
++            .bind => {
++                const value = self.expression(m, n.b, nesting + 1) orelse return null;
++                if (!self.bind(m.unit, n.a, value)) return null;
++                return .{ .kind = .unit };
++            },
++            .project => {
++                var value = self.expression(m, n.a, nesting + 1) orelse return null;
++                if (value.kind != .argument or value.place.path.len == value.place.path.fields.len) return null;
++                if (m.projection(n.b).variants.len == 0) if (self.resolver) |resolver| if (resolver.select(resolver.context, m, id, value.place, self.depth != 0)) |target| {
++                    const owner = &self.units[target.unit - 1];
++                    const body = owner.body(target.binding) orelse return null;
++                    const parameters = owner.bodyParameters(body);
++                    if (!self.dependency(target)) return null;
++                    if (parameters.len == 1) return self.forward(target, &.{value}, nesting + 1);
++                    if (parameters.len != 2) return null;
++                    return .{ .kind = .method, .place = value.place, .copy = target };
++                };
++                value.place.path.fields[value.place.path.len] = CopySource.Field.from(m, n.b) orelse return null;
++                value.place.path.len += 1;
++                return value;
++            },
++            .array_op => {
++                const args = m.children(id);
++                const op = m.arrayOperation(id);
++                if (op == .length and args.len == 1) {
++                    const value = self.expression(m, args[0], nesting + 1) orelse return null;
++                    return self.length(value);
++                }
++                if (op == .get and args.len == 2) {
++                    const source = self.expression(m, args[0], nesting + 1) orelse return null;
++                    const index = self.expression(m, args[1], nesting + 1) orelse return null;
++                    return self.subscript(source, index);
++                }
++                return null;
++            },
++            .storage => {
++                const op: @import("../check/storage_ops.zig").Op = @fromBackingInt(@intCast(n.c));
++                const args = m.children(id);
++                if (op == .length and args.len == 1) {
++                    const value = self.expression(m, args[0], nesting + 1) orelse return null;
++                    return self.length(value);
++                }
++                if (op == .read and args.len == 2) {
++                    const source = self.expression(m, args[0], nesting + 1) orelse return null;
++                    const index = self.expression(m, args[1], nesting + 1) orelse return null;
++                    return self.subscript(source, index);
++                }
++                if (op == .view and args.len == 3) {
++                    const source = self.expression(m, args[0], nesting + 1) orelse return null;
++                    const start = self.expression(m, args[1], nesting + 1) orelse return null;
++                    const end = self.expression(m, args[2], nesting + 1) orelse return null;
++                    if (!self.copied or source.kind != .argument or source.place.path.len != 0 or start.kind != .length or end.kind != .length or start.after_copy or !end.after_copy) return null;
++                    if (!source.place.eql(start.place) or !source.place.eql(end.place) or !source.place.eql(self.push_destination orelse return null)) return null;
++                    self.views += 1;
++                    return .{ .kind = .tail, .place = source.place };
++                }
++                if (op == .push and args.len == 2 and self.loop_source != null and self.pushes == 0) {
++                    const destination = self.expression(m, args[0], nesting + 1) orelse return null;
++                    const value = self.expression(m, args[1], nesting + 1) orelse return null;
++                    if (destination.kind != .argument) return null;
++                    if (value.kind != .item and value.kind != .row and value.kind != .copied_row) return null;
++                    self.pushes += 1;
++                    self.push_destination = destination.place;
++                    self.push_value = value;
++                    return .{ .kind = .unit };
++                }
++                return null;
++            },
++            .loop => {
++                if (self.loop_count != 0 or self.loop_source != null or m.loopCarries(id).len != 0) return null;
++                const info = m.loopInfo(id);
++                if (info.can_exit or (info.kind != .array and info.kind != .range)) return null;
++                const first = self.expression(m, info.first, nesting + 1) orelse return null;
++                var source = first;
++                if (info.kind == .array) {
++                    if (first.kind != .argument or first.place.path.len == 0) return null;
++                } else {
++                    const end = self.expression(m, info.end, nesting + 1) orelse return null;
++                    if (first.kind != .zero or end.kind != .length or end.after_copy or end.place.path.len != 0) return null;
++                    source = .{ .kind = .argument, .place = end.place };
++                }
++                self.loop_source = source;
++                self.loop_kind = info.kind;
++                const before = self.used;
++                const kind: @FieldType(Symbol, "kind") = switch (info.kind) {
++                    .array => .item,
++                    .range => .iterator,
++                    else => unreachable,
++                };
++                if (!self.pattern(m, info.pattern, .{ .kind = kind, .place = source.place })) return null;
++                self.in_loop = true;
++                _ = self.expression(m, info.body, nesting + 1) orelse return null;
++                self.in_loop = false;
++                self.used = before;
++                self.loop_count += 1;
++                if (self.pushes != 1) return null;
++                self.copied = true;
++                return .{ .kind = .unit };
++            },
++            .update => {
++                const info = m.updateInfo(id);
++                const root = self.expression(m, info.root, nesting + 1) orelse return null;
++                if (root.kind != .argument or root.place.path.len != 0 or self.update_row != null) return null;
++                var path: CopySource.Path = .{};
++                const selectors = m.updateSelectors(id);
++                if (selectors.len != 0) {
++                    for (selectors) |selector| {
++                        if (selector.kind != .field or path.len == path.fields.len) return null;
++                        path.fields[path.len] = CopySource.Field.from(m, selector.projection) orelse return null;
++                        path.len += 1;
++                    }
++                } else for (m.updatePath(id)) |projection| {
++                    if (path.len == path.fields.len) return null;
++                    path.fields[path.len] = CopySource.Field.from(m, projection) orelse return null;
++                    path.len += 1;
++                }
++                const value = self.expression(m, info.value, nesting + 1) orelse return null;
++                const source = self.loop_source orelse return null;
++                if (value.kind != .tail or !source.place.eql(.{ .argument = root.place.argument, .path = path })) return null;
++                self.update_row = root.place.argument;
++                self.update_field = path;
++                self.update_vectors = value.place.argument;
++                return .{ .kind = .copied_row, .place = root.place, .vectors = value.place.argument };
++            },
++            .apply => {
++                const function = self.expression(m, n.a, nesting + 1) orelse return null;
++                const argument = self.expression(m, n.b, nesting + 1) orelse return null;
++                if (function.kind != .method) return null;
++                return self.forward(function.copy.?, &.{ .{ .kind = .argument, .place = function.place }, argument }, nesting + 1);
++            },
++            .call => {
++                var target = m.call(id).target;
++                if (target.unit == 0) target.unit = m.unit;
++                if (target.unit == 0 or target.unit > self.units.len or !self.dependency(target)) return null;
++                const owner = &self.units[target.unit - 1];
++                const body = owner.body(target.binding) orelse return null;
++                const arguments = m.call(id).arguments;
++                const parameters = owner.bodyParameters(body);
++                if (arguments.len != parameters.len or arguments.len > 8) return null;
++                var values: [8]Symbol = undefined;
++                for (arguments, 0..) |argument, index| values[index] = self.expression(m, argument, nesting + 1) orelse return null;
++                // Only a completed copy-tail callee can introduce writes here.
++                var has_row = false;
++                for (values[0..arguments.len]) |value| if (value.kind == .row) {
++                    has_row = true;
++                };
++                if (has_row) if (extractCopySource(self.units, target, self.remaining, self.active, self.depth + 1, self.resolver)) |callee| if (callee.operation == .copy_tail) {
++                    if (parameters.len != 2) return null;
++                    const operation = callee.operation.copy_tail;
++                    const row = values[operation.row];
++                    const vectors = values[operation.vectors];
++                    if (row.kind != .row or vectors.kind != .argument or vectors.place.path.len != 0) return null;
++                    for (callee.dependencies[0..callee.dependency_count]) |dependency_| if (!self.dependency(dependency_)) return null;
++                    self.copies += 1;
++                    return .{ .kind = .copied_row, .place = row.place, .vectors = vectors.place.argument, .copy = target, .copy_row = operation.row, .copy_vectors = operation.vectors, .copy_field = operation.field };
++                };
++                // Ordinary forwarding wrappers must reduce entirely to an
++                // existing selected primitive, with no side effects of their own.
++                return self.forward(target, values[0..arguments.len], nesting + 1);
++            },
++            else => return null,
++        }
++    }
++};
++fn extractCopySource(units: []const core.Module, target: core.BindingRef, remaining: *usize, active: *[8]core.BindingRef, depth: usize, resolver: ?CopyResolver) ?CopySource {
++    if (depth >= active.len or target.unit == 0 or target.unit > units.len) return null;
++    for (active[0..depth]) |prior| if (std.meta.eql(prior, target)) return null;
++    active[depth] = target;
++    const m = &units[target.unit - 1];
++    const body = m.body(target.binding) orelse return null;
++    const parameters = m.bodyParameters(body);
++    if (parameters.len == 0 or parameters.len > 8) return null;
++    const before = remaining.*;
++    var analyzer: CopyAnalyzer = .{ .units = units, .resolver = resolver, .remaining = remaining, .active = active, .depth = depth };
++    for (parameters, 0..) |parameter, index| if (!analyzer.bind(m.unit, parameter.binding, .{ .kind = .argument, .place = .{ .argument = @intCast(index) } })) return null;
++    const result = analyzer.expression(m, body.root, 0) orelse return null;
++    if (analyzer.loop_count != 1 or analyzer.pushes != 1) return null;
++    const source = analyzer.loop_source orelse return null;
++    const destination = analyzer.push_destination orelse return null;
++    const pushed = analyzer.push_value orelse return null;
++    var operation: @FieldType(CopySource, "operation") = undefined;
++    if (analyzer.loop_kind == .array) {
++        if (parameters.len != 2) return null;
++        if (result.kind != .copied_row or analyzer.update_row == null or analyzer.update_vectors == null or destination.path.len != 0 or pushed.kind != .item) return null;
++        if (source.place.argument != analyzer.update_row.? or destination.argument != analyzer.update_vectors.?) return null;
++        if (analyzer.length_count != 2 or analyzer.reads != 0 or analyzer.views != 1 or analyzer.copies != 0) return null;
++        if (!analyzer.lengths[0].place.eql(destination) or analyzer.lengths[0].after_copy or !analyzer.lengths[1].place.eql(destination) or !analyzer.lengths[1].after_copy) return null;
++        operation = .{ .copy_tail = .{ .row = analyzer.update_row.?, .vectors = analyzer.update_vectors.?, .field = analyzer.update_field } };
++    } else {
++        if (result.kind != .unit or analyzer.update_row != null or source.place.path.len != 0) return null;
++        if (analyzer.length_count != 1 or analyzer.reads != 1 or analyzer.views != 0) return null;
++        if (!analyzer.lengths[0].place.eql(source.place) or analyzer.lengths[0].after_copy) return null;
++        if (pushed.copy != null and analyzer.copies != 1) return null;
++        if (pushed.copy == null and analyzer.copies != 0) return null;
++        operation = .{ .append_rows = .{ .rows = source.place.argument, .output = destination, .vectors = pushed.vectors, .copy = pushed.copy, .copy_row = pushed.copy_row, .copy_vectors = pushed.copy_vectors, .copy_field = pushed.copy_field } };
++    }
++    return .{ .target = target, .root = body.root, .operation = operation, .dependencies = analyzer.dependencies, .dependency_count = analyzer.dependency_count, .visits = before - remaining.* };
++}
++pub fn ownedCopySource(units: []const core.Module, target: core.BindingRef, remaining: *usize) ?CopySource {
++    var active: [8]core.BindingRef = undefined;
++    return extractCopySource(units, target, remaining, &active, 0, null);
++}
++
++pub fn ownedCopySourceResolved(units: []const core.Module, target: core.BindingRef, remaining: *usize, resolver: CopyResolver) ?CopySource {
++    var active: [8]core.BindingRef = undefined;
++    return extractCopySource(units, target, remaining, &active, 0, resolver);
++}
+diff --git a/zig-native/src/backend/storage_plan.zig b/zig-native/src/backend/storage_plan.zig
+--- a/zig-native/src/backend/storage_plan.zig
++++ b/zig-native/src/backend/storage_plan.zig
+@@ -104,6 +104,35 @@
+     writes: bool = false,
+ };
+ 
++/// Resolved selections are paths through the checked physical schema. These
++/// records own numeric decisions only; no caller root, local or Core view.
++pub const CallPath = struct {
++    fields: [16]u16 = undefined,
++    len: u8 = 0,
++};
++pub const OwnedCopy = struct {
++    unit: u32,
++    binding: u32,
++    root: u32,
++    context_words: u32,
++    operation: union(enum) {
++        copy_tail: struct {
++            row: u8,
++            vectors: u8,
++            view: CallPath,
++        },
++        append_rows: struct {
++            rows: u8,
++            output: u8,
++            output_path: CallPath,
++            vectors: ?u8 = null,
++            copy_function: ?u32 = null,
++            view: CallPath = .{},
++            source_words: u32,
++        },
++    },
++};
++
+ /// Root identity follows every fixed field, including unselected ADT payload
+ /// alternatives. Physical selection never narrows conservative root evidence.
+ pub fn hasRoot(value: anytype, owner: usize) bool {
+diff --git a/zig-native/src/backend/storage_calls_tests.zig b/zig-native/src/backend/storage_calls_tests.zig
+--- a/zig-native/src/backend/storage_calls_tests.zig
++++ b/zig-native/src/backend/storage_calls_tests.zig
+@@ -1138,3 +1138,234 @@
+     defer module.deinit(a);
+     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateReader, .{@as([]const core.Module, &.{module})});
+ }
++
++const owned_copy_source =
++    \\type Choice is data = $First F32 | $Second
++    \\type Row is data = $Row {extra: &[U32], metadata: Choice}
++    \\type Access is data = $Access {draws: ResizeArray Row, ignored: U32 -> U32}
++    \\const store = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++    \\  let start = @storage.length vectors
++    \\  for value in row.extra:
++    \\    @storage.push vectors value
++    \\  row.extra := &vectors[start..@storage.length vectors]
++    \\  return row
++    \\const emit = func (rows: Array Row) -> (vectors: ResizeArray U32) -> (access: Access) => return do:
++    \\  let count = @storage.length rows
++    \\  for index in 0 .. count:
++    \\    @storage.push access.draws (store rows[index] vectors)
++    \\entry const answer = func (input: U32) => return do:
++    \\  let vectors: ResizeArray U32 = #[17]
++    \\  let draws: ResizeArray Row = #[]
++    \\  let access = $Access {draws, ignored: func value => return value}
++    \\  let first: Array U32 = #[input, 3]
++    \\  let second: Array U32 = #[7, 11]
++    \\  let left: Array Row = #[$Row {extra: &first[0..2], metadata: $First (@f32.neg 0.0)}]
++    \\  let right: Array Row = #[$Row {metadata: $Second, extra: &second[0..2]}]
++    \\  emit left vectors access
++    \\  emit right vectors access
++    \\  return @storage.length draws
++;
++
++fn publishOwnedCopies(allocator: std.mem.Allocator, modules: []const core.Module) !void {
++    var result = try scoped.compile(allocator, modules, 1);
++    defer result.deinit(allocator);
++    try std.testing.expect(result.diagnostic == null);
++    try std.testing.expect(result.counters.scoped_owned_copy_definitions >= 2);
++    try std.testing.expect(result.counters.scoped_owned_copy_hits >= 1);
++    try std.testing.expect(result.counters.scoped_owned_copy_summary_steps >= 2);
++}
++test "completed caller-owned copies retain nested views variants and unused callback fields" {
++    var module = try lower(a, owned_copy_source);
++    defer module.deinit(a);
++    try publishOwnedCopies(a, &.{module});
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishOwnedCopies, .{@as([]const core.Module, &.{module})});
++}
++test "whole-body copy extraction rejects extra writes early returns and recursive callees" {
++    var module = try lower(a,
++        \\type Row is data = $Row {extra: &[U32]}
++        \\const extra_write = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\    @storage.push vectors value
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\const early = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\    return row
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\const extra_parameter = func (unused: U32) -> (vectors: ResizeArray U32) -> (row: Row) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\const recursive = func (row: Row) -> (vectors: ResizeArray U32): Row => return recursive row vectors
++    );
++    defer module.deinit(a);
++    for (module.bodies) |body| {
++        var remaining: usize = 512;
++        try std.testing.expect(@import("storage_calls.zig").ownedCopySource(&.{module}, .{ .unit = 1, .binding = body.binding }, &remaining) == null);
++    }
++}
++test "completed copy results preserve the destination borrow escape boundary" {
++    var module = try lower(a,
++        \\type Row is data = $Row {extra: &[U32]}
++        \\const store = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\const escape = func (row: Row) => return do:
++        \\  let local: ResizeArray U32 = #[]
++        \\  return store row local
++        \\entry const answer = func (input: U32) => return do:
++        \\  let source: Array U32 = #[input]
++        \\  let result = escape ($Row {extra: &source[0..1]})
++        \\  return @storage.length result.extra
++    );
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_escape, result.diagnostic.?.code);
++}
++
++test "completed copy hits reject consumed vector growth capabilities" {
++    var module = try lower(a,
++        \\type Row is data = $Row {extra: &[U32]}
++        \\const store = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\entry const answer = func (input: U32) => return do:
++        \\  let source: Array U32 = #[input]
++        \\  let row = $Row {extra: &source[0..1]}
++        \\  let vectors: ResizeArray U32 = #[]
++        \\  let first = store row vectors
++        \\  let frozen = @storage.freeze vectors
++        \\  let second = store row vectors
++        \\  return @u32.add (@storage.length first.extra) (@u32.add (@storage.length second.extra) (@storage.length frozen))
++    );
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_borrow_conflict, result.diagnostic.?.code);
++    try std.testing.expect(result.counters.scoped_owned_copy_hits > 0);
++}
++
++test "completed append summaries reject destination borrows from shorter scopes" {
++    var module = try lower(a,
++        \\type Row is data = $Row {extra: &[U32]}
++        \\type Access is data = $Access {draws: ResizeArray Row}
++        \\const store = func (row: Row) -> (vectors: ResizeArray U32) => return do:
++        \\  let start = @storage.length vectors
++        \\  for value in row.extra:
++        \\    @storage.push vectors value
++        \\  row.extra := &vectors[start..@storage.length vectors]
++        \\  return row
++        \\const emit = func (rows: Array Row) -> (vectors: ResizeArray U32) -> (access: Access) => return do:
++        \\  let count = @storage.length rows
++        \\  for index in 0 .. count:
++        \\    @storage.push access.draws (store rows[index] vectors)
++        \\entry const answer = func (input: U32) => return do:
++        \\  let source: Array U32 = #[input]
++        \\  let rows: Array Row = #[$Row {extra: &source[0..1]}]
++        \\  let draws: ResizeArray Row = #[]
++        \\  let access = $Access {draws}
++        \\  let ignored = do:
++        \\    let local: ResizeArray U32 = #[]
++        \\    emit rows local access
++        \\    break ()
++        \\  return @storage.length draws
++    );
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_escape, result.diagnostic.?.code);
++}
++
++test "completed append hits reject consumed output growth capabilities" {
++    const source = try std.mem.replaceOwned(u8, a, owned_copy_source, "  emit right vectors access", "  let frozen = @storage.freeze draws\n  emit right vectors access\n  let observed = @storage.length frozen");
++    defer a.free(source);
++    var module = try lower(a, source);
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_borrow_conflict, result.diagnostic.?.code);
++    try std.testing.expect(result.counters.scoped_owned_copy_hits > 0);
++}
++
++const plain_copy_source =
++    \\type Metadata is data = $SomeData F32 | $NoData
++    \\type Row is data = $Row {extra: &[U32], metadata: Metadata}
++    \\type Access is data = $Access {draws: ResizeArray Row, ignored: U32 -> U32}
++    \\const emit = func (rows: Array Row) -> (access: Access) => return do:
++    \\  let count = @storage.length rows
++    \\  for index in 0 .. count:
++    \\    @storage.push access.draws rows[index]
++    \\entry const answer = func (input: U32) => return do:
++    \\  let first: Array U32 = #[input, 3]
++    \\  let second: Array U32 = #[7, 11]
++    \\  let left: Array Row = #[$Row {extra: &first[0..2], metadata: $SomeData (@f32.neg 0.0)}]
++    \\  let right: Array Row = #[$Row {metadata: $NoData, extra: &second[0..2]}]
++    \\  let draws: ResizeArray Row = #[]
++    \\  let access = $Access {draws, ignored: func value => return value}
++    \\  emit left access
++    \\  emit right access
++    \\  return @storage.length draws
++;
++
++test "completed plain appends substitute full nested roots across constructor states" {
++    var module = try lower(a, plain_copy_source);
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic == null);
++    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_owned_copy_definitions);
++    try std.testing.expect(result.counters.scoped_owned_copy_hits > 0);
++}
++test "completed plain append hits reject consumed output growth capabilities" {
++    const source = try std.mem.replaceOwned(u8, a, plain_copy_source, "  emit right access", "  let frozen = @storage.freeze draws\n  emit right access\n  let observed = @storage.length frozen");
++    defer a.free(source);
++    var module = try lower(a, source);
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_borrow_conflict, result.diagnostic.?.code);
++    try std.testing.expect(result.counters.scoped_owned_copy_hits > 0);
++}
++test "completed plain appends reject shorter-lived payload roots" {
++    var module = try lower(a,
++        \\type Row is data = $Row {extra: &[U32]}
++        \\type Access is data = $Access {draws: ResizeArray Row}
++        \\const emit = func (rows: Array Row) -> (access: Access) => return do:
++        \\  let count = @storage.length rows
++        \\  for index in 0 .. count:
++        \\    @storage.push access.draws rows[index]
++        \\entry const answer = func (input: U32) => return do:
++        \\  let draws: ResizeArray Row = #[]
++        \\  let access = $Access {draws}
++        \\  let ignored = do:
++        \\    let local: Array U32 = #[input]
++        \\    let rows: Array Row = #[$Row {extra: &local[0..1]}]
++        \\    emit rows access
++        \\    break ()
++        \\  return @storage.length draws
++    );
++    defer module.deinit(a);
++    var result = try scoped.compile(a, &.{module}, 1);
++    defer result.deinit(a);
++    try std.testing.expect(result.diagnostic != null);
++    try std.testing.expectEqual(.storage_escape, result.diagnostic.?.code);
++}
+diff --git a/zig-native/src/work_counters.zig b/zig-native/src/work_counters.zig
+--- a/zig-native/src/work_counters.zig
++++ b/zig-native/src/work_counters.zig
+@@ -116,6 +116,10 @@
+     scoped_reader_cache_hits: u64 = 0,
+     scoped_writer_definitions: u64 = 0,
+     scoped_writer_cache_hits: u64 = 0,
++    scoped_owned_copy_definitions: u64 = 0,
++    scoped_owned_copy_hits: u64 = 0,
++    scoped_owned_copy_source_nodes: u64 = 0,
++    scoped_owned_copy_summary_steps: u64 = 0,
+     scoped_descriptor_admissions: u64 = 0,
+     scoped_descriptor_admission_hits: u64 = 0,
+     scoped_concrete_admissions: u64 = 0,
+diff --git a/zig-native/tests/owned_render_copy_fixture.ts b/zig-native/tests/owned_render_copy_fixture.ts
+new file mode 100644
+--- /dev/null
++++ b/zig-native/tests/owned_render_copy_fixture.ts
+@@ -0,0 +1,193 @@
++// Original Ink operations. Expected streams below do not call compiler output.
++const frame = `  let settings: Array render.Settings = #[render.defaults]
++  let solids: ResizeArray render.Solid = #[]
++  let decals: ResizeArray render.Decal = #[]
++  let sprites: ResizeArray render.Sprite = #[]
++  let insets: ResizeArray render.Inset = #[]
++  let fields: ResizeArray render.Field = #[]
++  let poses: ResizeArray render.Pose = #[]
++  let emitters: ResizeArray render.Emitter = #[]
++  let extensions: ResizeArray render.Extension = #[]
++  let updates: ResizeArray render.Instance = #[]
++  let removed: ResizeArray U32 = #[]
++  let access = $render.FrameAccess {settings, draws, solids, decals, sprites, insets, fields, poses, emitters, extensions, updates, removed}
++`;
++const packing =
++  `const pack = func (vectors: ResizeArray math.Vec4) -> (draws: ResizeArray render.Draw) -> (prefix: &[math.Vec4]) => return do:
++  let output: GrowArray F32 = #[]
++  output.push (U32.to_f32 vectors.length)
++  for value in vectors:
++    output.push value.x
++    output.push value.y
++    output.push value.z
++    output.push value.w
++  output.push (U32.to_f32 draws.length)
++  for draw in draws:
++    output.push (U32.to_f32 draw.mesh)
++    output.push (U32.to_f32 draw.material)
++    for lane in math.Mat4.lanes draw.matrix:
++      output.push lane
++    case draw.parameters of
++      $Nothing => output.push 0.0
++      $Some value => do:
++        output.push 1.0
++        output.push value.x
++        output.push value.y
++        output.push value.z
++        output.push value.w
++    output.push (U32.to_f32 draw.extra.length)
++    for value in draw.extra:
++      output.push value.x
++      output.push value.y
++      output.push value.z
++      output.push value.w
++  for value in prefix:
++    output.push value.x
++    output.push value.y
++    output.push value.z
++    output.push value.w
++  return @storage.freeze output
++`;
++export function ownedRenderSource(
++  callers: number,
++  operation: "owned" | "emit" = "owned",
++): string {
++  let source = `import * as render from "ink/render"
++import * as math from "ink/math"
++${packing}
++entry const stream = func (input: U32) => return do:
++  let vectors: ResizeArray math.Vec4 = #[math.vec4 (-1.0) (-0.0) 10.0 11.0, math.vec4 (-2.0) 12.0 13.0 14.0]
++  let prefix = &vectors[0..2]
++  let draws: ResizeArray render.Draw = #[]
++${frame}`;
++  for (let at = 0; at < callers; at++) {
++    let parameters = "$Nothing";
++    if (at % 2 === 0) {
++      parameters = `$Some (math.vec4 (U32.to_f32 input) ${
++        at + 1
++      }.0 (-0.0) (-1.0))`;
++    }
++    let call = `render.emit_owned rows_${at} vectors access`;
++    if (operation === "emit") call = `render.emit rows_${at} access`;
++    source +=
++      `  let extra_${at}: Array math.Vec4 = #[math.vec4 (U32.to_f32 input) ${
++        at + 1
++      }.0 2.0 (-0.0), math.vec4 ${at + 3}.0 4.0 5.0 6.0]
++  let rows_${at}: Array render.Draw = #[$render.Draw {mesh: ${
++        at + 1
++      }, material: ${
++        at + 11
++      }, matrix: math.Mat4.identity, parameters: ${parameters}, extra: &extra_${at}[0..2]}]
++  ${call}
++`;
++  }
++  source += `  return pack vectors draws prefix
++entry const overlap = func (input: U32) => return do:
++  let vectors: ResizeArray math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0, math.vec4 7.0 8.0 9.0 10.0]
++  let prefix = &vectors[0..3]
++  let left = $render.Draw {mesh: 1, material: 2, matrix: math.Mat4.identity, parameters: $Some (math.vec4 (-0.0) 0.0 2.0 3.0), extra: &vectors[0..2]}
++  let right = $render.Draw {mesh: 3, material: 4, matrix: math.Mat4.identity, parameters: $Nothing, extra: &vectors[1..3]}
++  let first = render.store_draw left vectors
++  let second = render.store_draw right vectors
++  let copied = @array.generate first.extra.length (func index => return first.extra[index])
++  @storage.push vectors copied[0]
++  let draws: ResizeArray render.Draw = #[first, second]
++  return pack vectors draws prefix
++entry const self_rows = func (input: U32) => return do:
++  let vectors: ResizeArray math.Vec4 = #[math.vec4 (U32.to_f32 input) 1.0 2.0 (-0.0), math.vec4 3.0 4.0 5.0 6.0]
++  let prefix = &vectors[0..2]
++  let draws: ResizeArray render.Draw = #[$render.Draw {mesh: 5, material: 6, matrix: math.Mat4.identity, parameters: $Nothing, extra: prefix}]
++${frame}  render.emit_owned (&draws[0..1]) vectors access
++  render.emit_owned (&draws[0..2]) vectors access
++  return pack vectors draws prefix
++entry const empty_after_freeze = func (input: U32) => return do:
++  let vectors: ResizeArray math.Vec4 = #[]
++  let draws: ResizeArray render.Draw = #[]
++  let frozen_vectors = @storage.freeze vectors
++  let frozen_draws = @storage.freeze draws
++${frame}  let empty: Array render.Draw = #[]
++  render.emit_owned empty vectors access
++  return #[U32.to_f32 input, U32.to_f32 frozen_vectors.length, U32.to_f32 frozen_draws.length]
++`;
++  return source;
++}
++type Vector = readonly number[];
++type Draw = {
++  mesh: number;
++  material: number;
++  parameters?: Vector;
++  extra: Vector[];
++};
++function pack(
++  vectors: Vector[],
++  draws: Draw[],
++  prefix: Vector[],
++): Float32Array<ArrayBuffer> {
++  const result = [
++    vectors.length,
++    ...vectors.flatMap((value) => [...value]),
++    draws.length,
++  ];
++  for (const draw of draws) {
++    result.push(
++      draw.mesh,
++      draw.material,
++      1,
++      0,
++      0,
++      0,
++      0,
++      1,
++      0,
++      0,
++      0,
++      0,
++      1,
++      0,
++      0,
++      0,
++      0,
++      1,
++    );
++    if (draw.parameters) result.push(1, ...draw.parameters);
++    else result.push(0);
++    result.push(
++      draw.extra.length,
++      ...draw.extra.flatMap((value) => [...value]),
++    );
++  }
++  result.push(...prefix.flatMap((value) => [...value]));
++  return new Float32Array(result);
++}
++export function expectedRenderStream(
++  entry: string,
++  callers: number,
++  input: number,
++  operation: "owned" | "emit" = "owned",
++): Float32Array<ArrayBuffer> {
++  if (entry === "empty_after_freeze") return new Float32Array([input, 0, 0]);
++  const a = [input, 1, 2, -0];
++  const b = [3, 4, 5, 6];
++  if (entry === "overlap") {
++    const c = [7, 8, 9, 10];
++    return pack([a, b, c, a, b, b, c, a], [
++      { mesh: 1, material: 2, parameters: [-0, 0, 2, 3], extra: [a, b] },
++      { mesh: 3, material: 4, extra: [b, c] },
++    ], [a, b, c]);
++  }
++  if (entry === "self_rows") {
++    const draw: Draw = { mesh: 5, material: 6, extra: [a, b] };
++    return pack([a, b, a, b, a, b, a, b], [draw, draw, draw, draw], [a, b]);
++  }
++  const prefix = [[-1, -0, 10, 11], [-2, 12, 13, 14]];
++  const vectors: Vector[] = [...prefix];
++  const draws = [];
++  for (let at = 0; at < callers; at++) {
++    const extra = [[input, at + 1, 2, -0], [at + 3, 4, 5, 6]];
++    if (operation === "owned") vectors.push(...extra);
++    const draw: Draw = { mesh: at + 1, material: at + 11, extra };
++    if (at % 2 === 0) draw.parameters = [input, at + 1, -0, -1];
++    draws.push(draw);
++  }
++  return pack(vectors, draws, prefix);
++}
+diff --git a/zig-native/tests/owned_render_copy_execution.test.ts b/zig-native/tests/owned_render_copy_execution.test.ts
+new file mode 100644
+--- /dev/null
++++ b/zig-native/tests/owned_render_copy_execution.test.ts
+@@ -0,0 +1,85 @@
++import { strict as assert } from "node:assert";
++import { resolve } from "node:path";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++import {
++  expectedRenderStream,
++  ownedRenderSource,
++} from "./owned_render_copy_fixture.ts";
++
++for (const operation of ["owned", "emit"] as const) {
++  for (const tier of ["development", "optimized"] as const) {
++    Deno.test(`completed original Ink copies preserve full streams aliases and prefix borrows (${operation}/${tier})`, async () => {
++      const root = resolve(new URL("../..", import.meta.url).pathname);
++      const directory = await Deno.makeTempDir();
++      let compiler;
++      let guest;
++      try {
++        const entry = resolve(directory, "main.blot");
++        compiler = await createZigProjectCompiler({
++          executable: Deno.args[0],
++          entry,
++          imports: { "ink/": resolve(root, "../ink/lib") },
++          stdRoot: resolve(root, "std"),
++          prelude: resolve(root, "std/prelude.blot"),
++          cacheDirectory: false,
++          codegenTier: tier,
++          profileBackend: true,
++          startupTimeoutMs: 5000,
++        });
++        const result = await compiler.build({
++          sources: { [entry]: ownedRenderSource(4, operation) },
++          signal: AbortSignal.timeout(10000),
++        });
++        assert(result.success, JSON.stringify(result));
++        const counters = result.stats.workCounters as Record<string, number>;
++        assert(
++          counters.scoped_owned_copy_definitions >= 2,
++          JSON.stringify(counters),
++        );
++        assert(counters.scoped_owned_copy_hits >= 3, JSON.stringify(counters));
++        assert(
++          counters.scoped_owned_copy_summary_steps >= 9,
++          JSON.stringify(counters),
++        );
++        if (operation === "emit") {
++          assert(
++            counters.scoped_owned_copy_definitions >= 4,
++            JSON.stringify(counters),
++          );
++        }
++        for (const asynchronous of [false, true]) {
++          guest = await instantiateGuest(result.bytes, { asynchronous });
++          try {
++            for (const input of [0, 1, 17, 0]) {
++              for (
++                const name of [
++                  "stream",
++                  "overlap",
++                  "self_rows",
++                  "empty_after_freeze",
++                ]
++              ) {
++                let actual;
++                if (asynchronous) {
++                  actual = await guest.callAsync(name, input);
++                } else actual = guest.call(name, input);
++                assert.deepEqual(
++                  actual,
++                  expectedRenderStream(name, 4, input, operation),
++                );
++              }
++            }
++          } finally {
++            guest.dispose();
++            guest = undefined;
++          }
++        }
++      } finally {
++        guest?.dispose();
++        await compiler?.dispose();
++        await Deno.remove(directory, { recursive: true });
++      }
++    });
++  }
++}
+diff --git a/scripts/bench/owned_render_copies.ts b/scripts/bench/owned_render_copies.ts
+new file mode 100644
+--- /dev/null
++++ b/scripts/bench/owned_render_copies.ts
+@@ -0,0 +1,350 @@
++// Original Ink render.store_draw / emit_owned, fresh matched compilers, five-second caps.
++// deno run --no-config --no-lock -A scripts/bench/owned_render_copies.ts --compiler NEW --baseline OLD
++import { strict as assert } from "node:assert";
++import { resolve } from "node:path";
++import { parseArgs } from "node:util";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++import {
++  expectedRenderStream,
++  ownedRenderSource,
++} from "../../zig-native/tests/owned_render_copy_fixture.ts";
++
++const root = resolve(new URL("../..", import.meta.url).pathname);
++const { values } = parseArgs({
++  args: Deno.args,
++  options: {
++    compiler: {
++      type: "string",
++      default: "zig-native/zig-out-native-dev/bin/blotc",
++    },
++    baseline: { type: "string" },
++    operation: { type: "string", default: "owned" },
++    callers: { type: "string", default: "1,4,8" },
++    repetitions: { type: "string", default: "3" },
++    output: { type: "string", default: "build/bench/owned-render-copies" },
++    tier: { type: "string", default: "optimized" },
++  },
++});
++const repetitions = Number(values.repetitions);
++assert(Number.isInteger(repetitions) && repetitions >= 1 && repetitions <= 9);
++assert(values.tier === "optimized" || values.tier === "development");
++assert(values.operation === "owned" || values.operation === "emit");
++const selectedCallers = [...new Set(values.callers!.split(",").map(Number))];
++assert(
++  selectedCallers.length > 0 &&
++    selectedCallers.every((value) => Number.isInteger(value) && value > 0),
++);
++type CallSite = {
++  filename: string;
++  line: number;
++  operation: string;
++  source: string;
++};
++const callSites: CallSite[] = [];
++async function inventory(directory: string): Promise<void> {
++  for await (const file of Deno.readDir(directory)) {
++    const path = resolve(directory, file.name);
++    if (file.isDirectory) await inventory(path);
++    else if (file.name.endsWith(".blot")) {
++      const lines = (await Deno.readTextFile(path)).split("\n");
++      for (const [line, source] of lines.entries()) {
++        for (
++          const match of source.matchAll(
++            /\brender\.(emit_owned|emit|store_draw)\b/g,
++          )
++        ) {
++          callSites.push({
++            filename: path,
++            line: line + 1,
++            operation: match[1],
++            source: source.trim(),
++          });
++        }
++      }
++    }
++  }
++}
++await inventory(resolve(root, "../gdev/src"));
++const directCalls = { emit: 0, emit_owned: 0, store_draw: 0 };
++for (const site of callSites) {
++  directCalls[site.operation as keyof typeof directCalls]++;
++}
++let maximumCallers = 8; // Historical owned-family diagnostic cells stay comparable.
++if (values.operation === "emit") {
++  maximumCallers = Math.min(16, directCalls.emit);
++}
++assert(
++  selectedCallers.every((value) => value <= maximumCallers),
++  `--callers exceeds supported ${values.operation} scope (${maximumCallers}); 16 requires actual plain-emit inventory`,
++);
++
++const compilers = [{
++  label: "candidate",
++  path: resolve(root, values.compiler!),
++}];
++if (values.baseline) {
++  compilers.unshift({
++    label: "baseline",
++    path: resolve(root, values.baseline),
++  });
++}
++const directory = resolve(root, values.output!);
++await Deno.mkdir(directory, { recursive: true });
++const evidence = await Deno.makeTempDir({ dir: directory, prefix: "run-" });
++const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
++  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
++    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
++const compilerPins = Object.fromEntries(
++  await Promise.all(
++    compilers.map(async (
++      compiler,
++    ) => [compiler.label, await hash(await Deno.readFile(compiler.path))]),
++  ),
++);
++// Pin the full source inventories, including dirty edits and transitive imports.
++const sourceFiles: Record<string, string> = {};
++async function pinSources(directory: string): Promise<void> {
++  const pending = [];
++  for await (const file of Deno.readDir(directory)) {
++    const path = resolve(directory, file.name);
++    if (file.isDirectory) pending.push(pinSources(path));
++    else if (file.name.endsWith(".blot")) {
++      pending.push((async () => {
++        sourceFiles[path] = await hash(await Deno.readFile(path));
++      })());
++    }
++  }
++  await Promise.all(pending);
++}
++await Promise.all([
++  pinSources(resolve(root, "../ink/lib")),
++  pinSources(resolve(root, "std")),
++]);
++for (const filename of new Set(callSites.map((site) => site.filename))) {
++  sourceFiles[filename] = await hash(await Deno.readFile(filename));
++}
++
++type Sample = {
++  callers: number;
++  label: string;
++  repetition: number;
++  status: string;
++  buildMs?: number;
++  wasmBytes?: number;
++  definitions?: number;
++  [key: string]: unknown;
++};
++const samples: Sample[] = [];
++for (const callers of selectedCallers) {
++  const entry = resolve(evidence, `render-${callers}.blot`);
++  const source = ownedRenderSource(callers, values.operation);
++  await Deno.writeTextFile(entry, source);
++  for (let repetition = 0; repetition < repetitions; repetition++) {
++    let order = compilers;
++    if (repetition % 2 === 1) order = compilers.toReversed();
++    for (const executable of order) {
++      const started = performance.now();
++      let compiler;
++      let guest;
++      let sample: Sample = {
++        callers,
++        label: executable.label,
++        repetition,
++        status: "incomplete",
++      };
++      try {
++        compiler = await createZigProjectCompiler({
++          executable: executable.path,
++          entry,
++          imports: { "ink/": resolve(root, "../ink/lib") },
++          stdRoot: resolve(root, "std"),
++          prelude: resolve(root, "std/prelude.blot"),
++          cacheDirectory: false,
++          profileBackend: true,
++          codegenTier: values.tier,
++          codegenWorkers: 1,
++          startupTimeoutMs: 5000,
++        });
++        const buildStarted = performance.now();
++        const result = await compiler.build({
++          signal: AbortSignal.timeout(5000),
++        });
++        sample.buildMs = performance.now() - buildStarted;
++        if (!result.success) {
++          sample.status = "failed";
++          sample.diagnostics = result.diagnostics;
++        } else {
++          guest = await instantiateGuest(result.bytes);
++          const executions = [];
++          for (const input of [0, 1, 17, 0]) {
++            for (
++              const name of [
++                "stream",
++                "overlap",
++                "self_rows",
++                "empty_after_freeze",
++              ]
++            ) {
++              const actual: unknown = guest.call(name, input);
++              const expected = expectedRenderStream(
++                name,
++                callers,
++                input,
++                values.operation,
++              );
++              assert.deepEqual(actual, expected);
++              executions.push({
++                name,
++                input,
++                words: [...expected],
++                sha256: await hash(new Uint8Array(expected.buffer)),
++              });
++            }
++          }
++          const counters = result.stats.workCounters as Record<string, number>;
++          sample = {
++            ...sample,
++            status: "complete",
++            wasmBytes: result.bytes.length,
++            wasmSha256: await hash(result.bytes),
++            definitions: counters.scoped_owned_copy_definitions ?? 0,
++            planHits: counters.scoped_owned_copy_hits ?? 0,
++            sourceVisits: counters.scoped_owned_copy_source_nodes ?? 0,
++            summarySteps: counters.scoped_owned_copy_summary_steps ?? 0,
++            proofInstances: counters.scoped_source_proof_instances,
++            proofHits: counters.scoped_source_proof_hits,
++            admissionVisits: counters.scoped_call_admission_nodes,
++            emissionVisits: counters.scoped_emission_expressions,
++            stats: result.stats,
++            executions,
++          };
++          await Deno.writeFile(
++            resolve(
++              evidence,
++              `render-${callers}-${executable.label}-${repetition}.wasm`,
++            ),
++            result.bytes,
++          );
++        }
++      } catch (error) {
++        sample.status = "failed_or_timeout";
++        sample.error = String(error);
++      } finally {
++        guest?.dispose();
++        await compiler?.dispose();
++      }
++      sample.wallMs = performance.now() - started;
++      sample.sourceSha256 = await hash(new TextEncoder().encode(source));
++      samples.push(sample);
++      await Deno.writeTextFile(
++        resolve(
++          evidence,
++          `render-${callers}-${executable.label}-${repetition}.json`,
++        ),
++        `${JSON.stringify(sample, null, 2)}\n`,
++      );
++      const { stats: _stats, executions: _executions, ...summary } = sample;
++      console.log(JSON.stringify(summary));
++    }
++  }
++}
++function median(values: number[]): number {
++  const sorted = values.toSorted((a, b) => a - b);
++  const middle = Math.floor(sorted.length / 2);
++  if (sorted.length % 2 !== 0) return sorted[middle];
++  return (sorted[middle - 1] + sorted[middle]) / 2;
++}
++const summaries = selectedCallers.map((callers) => {
++  const medians: Record<string, Record<string, number>> = {};
++  for (const compiler of compilers) {
++    const selected = samples.filter((sample) =>
++      sample.callers === callers && sample.label === compiler.label &&
++      sample.status === "complete"
++    );
++    if (selected.length !== repetitions) continue;
++    medians[compiler.label] = {};
++    for (
++      const field of [
++        "buildMs",
++        "wasmBytes",
++        "definitions",
++        "planHits",
++        "sourceVisits",
++        "summarySteps",
++        "proofInstances",
++        "proofHits",
++        "admissionVisits",
++        "emissionVisits",
++      ]
++    ) {
++      medians[compiler.label][field] = median(
++        selected.map((sample) => Number(sample[field])),
++      );
++    }
++  }
++  let compileImprovement = null;
++  let byteImprovement = null;
++  let decision = "incomplete_or_unpaired";
++  if (medians.baseline && medians.candidate) {
++    compileImprovement = 1 -
++      medians.candidate.buildMs / medians.baseline.buildMs;
++    byteImprovement = 1 -
++      medians.candidate.wasmBytes / medians.baseline.wasmBytes;
++    decision = "rejected_missing_measured_win";
++    if (
++      medians.candidate.definitions > 0 &&
++      (compileImprovement >= 0.2 || byteImprovement >= 0.3)
++    ) decision = "win_pending_full_qualification";
++    if (medians.candidate.definitions === 0) {
++      decision = "rejected_no_owned_copy_activation";
++    }
++    if (medians.candidate.summarySteps < callers + 5) {
++      decision = "rejected_requested_operation_not_fully_planned";
++    }
++    if (
++      values.operation === "owned" &&
++      callers > directCalls.emit_owned + directCalls.store_draw
++    ) decision = "rejected_extrapolated_owned_caller_count";
++  }
++  return { callers, medians, compileImprovement, byteImprovement, decision };
++});
++for (const compiler of compilers) {
++  assert.equal(
++    await hash(await Deno.readFile(compiler.path)),
++    compilerPins[compiler.label],
++    "Compiler changed during measurements",
++  );
++}
++const report = {
++  workload: "original_ink_render_owned_copy_graph",
++  diagnosticOnly: true,
++  evidence,
++  compilers,
++  compilerPins,
++  sourceFiles,
++  tier: values.tier,
++  workers: 1,
++  repetitions,
++  operation: values.operation,
++  selectedCallers,
++  sourceInventory: {
++    directCalls,
++    sites: callSites,
++    meaning:
++      "Direct namespace-qualified production source sites; not a reachability or dynamic call count.",
++  },
++  deadlineMs: 5000,
++  acceptance:
++    "At least 20% lower median build latency or 30% fewer emitted bytes, complete matched samples, activated owned-copy definitions and independent runtime assertions.",
++  limitations:
++    "This bounded slice executes original imported render.store_draw and render.emit_owned. It does not establish a whole-game result or guarantee activation of branch/operator readers.",
++  summaries,
++  samples,
++};
++await Deno.writeTextFile(
++  resolve(evidence, "result.json"),
++  `${JSON.stringify(report, null, 2)}\n`,
++);
++console.log(JSON.stringify({ evidence, summaries }));
++if (samples.some((sample) => sample.status !== "complete")) Deno.exitCode = 1;

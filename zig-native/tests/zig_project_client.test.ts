@@ -184,7 +184,7 @@ async function trace(line: string) {
   await Deno.stderr.write(bytes.subarray(11));
 }
 async function record(value: Record<string, unknown>) {
-  await trace("BLOT_PROFILE " + JSON.stringify(value) + "\n");
+  await trace("BLOT_PROFILE " + JSON.stringify({ ...value, space: value.space ?? "source" }) + "\n");
 }
 async function rejectBuild(metadata: Record<string, any>) {
   await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.blot",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}],attemptStats:null});
@@ -215,9 +215,14 @@ while (true) {
       await rejectBuild(metadata);
     } else if (buildCount === 2) {
       await record({kind:"module",build:firstBuild,unit:99,filename:"late-old.blot",bytes:999});
-      await record({kind:"module",build:metadata.id,unit:2,filename:"build-two.blot",bytes:42});
+      await record({kind:"end",build:firstBuild,id:199,thread:1,stage:"check.module",unit:2,start:0,end:1,at_us:80,us:9000,cpu_us:9000,input_items:0,output_items:0});
+      await record({kind:"module",build:metadata.id,unit:1,filename:"build-two.blot",bytes:42});
+      await record({kind:"module",build:metadata.id,space:"core",unit:1,filename:"core-two.blot",bytes:0});
       await record({kind:"phases",build:metadata.id,active:"check",phase_us:Array(11).fill(7),at_us:90});
       await record({kind:"begin",build:metadata.id,id:200,thread:1,stage:"long",unit:2,start:0,end:1,at_us:91});
+      await record({kind:"end",build:metadata.id,id:202,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:92,us:7,cpu_us:4,input_items:0,output_items:0});
+      await record({kind:"end",build:metadata.id,id:203,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:93,us:11,cpu_us:5,input_items:0,output_items:0});
+      await record({kind:"end",build:metadata.id,space:"core",id:204,thread:1,stage:"check.module",unit:1,start:0,end:1,at_us:94,us:3,cpu_us:1,input_items:0,output_items:0});
       await trace('BLOT_PROFILE {broken json}\n');
       await trace("x".repeat(70000) + "\n");
       for (let index = 0; index < 300; index++) {
@@ -297,11 +302,13 @@ while (true) {
     equal(progress.events[0], {
       kind: "module",
       build: Number(buildId),
+      space: "source",
       unit: 3,
       filename: "cancelled.blot",
       bytes: 43,
     });
     equal(progress.modules, [{
+      space: "source",
       unit: 3,
       filename: "cancelled.blot",
       bytes: 43,
@@ -319,15 +326,36 @@ while (true) {
       equal(last.input_items, 345);
       equal(last.output_items, 123);
     }
-    equal(isolated.dropped, 48);
+    equal(isolated.dropped, 52);
     equal(isolated.modules, [{
-      unit: 2,
+      space: "source",
+      unit: 1,
       filename: "build-two.blot",
       bytes: 42,
+    }, {
+      space: "core",
+      unit: 1,
+      filename: "core-two.blot",
+      bytes: 0,
     }]);
     equal(isolated.phases?.phase_us, Array(11).fill(7));
     equal(isolated.activeRegions.map((region) => region.id), [200]);
-    equal(isolated.slowRegions.map((region) => region.us), [12]);
+    equal(isolated.slowRegions.map((region) => region.us), [12, 11, 7, 3]);
+    equal(isolated.moduleTimings, [{
+      space: "source",
+      unit: 1,
+      calls: 2,
+      us: 18,
+      cpuUs: 9,
+      cpuAvailable: true,
+    }, {
+      space: "core",
+      unit: 1,
+      calls: 1,
+      us: 3,
+      cpuUs: 1,
+      cpuAvailable: true,
+    }]);
   } finally {
     await item.cleanup();
   }

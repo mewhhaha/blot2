@@ -5792,6 +5792,7 @@ pub fn compile(allocator: std.mem.Allocator, units: []const core.Module, entry: 
     return compileWithOptions(allocator, units, entry, .{});
 }
 pub const CompileOptions = struct {
+    completed_core_validation: ?@import("../reuse/completed_core_validation.zig").Borrow = null,
     identity: ?@import("runtime_identity.zig").View = null,
     storage: storage_plan.Config = .{},
     work_limits: WorkLimits = .{},
@@ -5802,6 +5803,8 @@ pub const CompileOptions = struct {
     profile: bool = false,
 };
 pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, options: CompileOptions) std.mem.Allocator.Error!backend.Result {
+    const trace_space = @import("../phase_profile.zig").enterSpace(.core);
+    defer trace_space.restore();
     if (@import("../phase_profile.zig").currentTrace() != null) if (options.identity) |identity| {
         for (units) |*unit_| if (identity.owner(unit_.unit)) |path| {
             // Retained Core has canonical paths but no source byte inventory.
@@ -5815,18 +5818,25 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer allocator.free(views);
     for (units, 0..) |*unit_, index| views[index] = unit_;
     const validation = @import("../check/frozen_core_validation.zig");
+    var reused_core_validations: usize = 0;
     {
         const trace = @import("../phase_profile.zig").region("owned.validate-core", entry, 0, 0);
         defer trace.exit();
         for (units) |*unit_| validation.validateBounds(unit_, .{ .units = views }) catch {
             return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core bounds" } };
         };
-        for (units) |*unit_| validation.validate(allocator, unit_, .{ .units = views }) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidArtifact => {
-                return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core evidence" } };
-            },
-        };
+        const proved_prefix = if (options.completed_core_validation) |receipt| if (options.identity) |identity| receipt.prefix(units, entry, identity) else 0 else 0;
+        reused_core_validations = proved_prefix;
+        @import("../phase_profile.zig").detail("owned.validate.reused", entry, 0, 0, proved_prefix);
+        for (units, 0..) |*unit_, index| {
+            if (index < proved_prefix) continue;
+            validation.validate(allocator, unit_, .{ .units = views }) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.InvalidArtifact => {
+                    return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core evidence" } };
+                },
+            };
+        }
     }
     var module = wasm.Module.init(allocator);
     defer module.deinit();
@@ -5838,7 +5848,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
             else => unreachable,
         };
     };
-    var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
+    var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions, .scoped_core_validation_reused = reused_core_validations, .scoped_core_validation_fresh = units.len - reused_core_validations };
     var proof_cache = source_proof.SourceProofCache.initWithInventoryBudget(allocator, views) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidArtifact => return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid source proof context" } },

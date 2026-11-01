@@ -167,6 +167,7 @@ export type ZigProjectProfileEvent =
   | {
     kind: "begin";
     build: number;
+    space: ZigProjectProfileSpace;
     id: number;
     thread: number;
     stage: string;
@@ -178,6 +179,7 @@ export type ZigProjectProfileEvent =
   | {
     kind: "end";
     build: number;
+    space: ZigProjectProfileSpace;
     id: number;
     thread: number;
     stage: string;
@@ -193,6 +195,7 @@ export type ZigProjectProfileEvent =
   | {
     kind: "module";
     build: number;
+    space: ZigProjectProfileSpace;
     unit: number;
     filename: string;
     bytes: number;
@@ -200,6 +203,7 @@ export type ZigProjectProfileEvent =
   | {
     kind: "phases";
     build: number;
+    space: ZigProjectProfileSpace;
     active: string;
     phase_us: readonly number[];
     at_us: number;
@@ -207,6 +211,7 @@ export type ZigProjectProfileEvent =
   | {
     kind: "detail";
     build: number;
+    space: ZigProjectProfileSpace;
     thread: number;
     stage: string;
     unit: number;
@@ -218,6 +223,7 @@ export type ZigProjectProfileEvent =
 export interface ZigProjectProfileProgress {
   readonly events: readonly ZigProjectProfileEvent[];
   readonly modules: readonly {
+    space: ZigProjectProfileSpace;
     unit: number;
     filename: string;
     bytes: number;
@@ -231,9 +237,21 @@ export interface ZigProjectProfileProgress {
     ZigProjectProfileEvent,
     { kind: "end" }
   >[];
+  /** Inclusive completed check.module totals; parallel module spans may overlap. */
+  readonly moduleTimings: readonly ZigProjectModuleTiming[];
   readonly activeDropped: number;
   readonly dropped: number;
 }
+export interface ZigProjectModuleTiming {
+  readonly space: ZigProjectProfileSpace;
+  readonly unit: number;
+  readonly calls: number;
+  readonly us: number;
+  /** Null once any completed record lacked a thread CPU clock. */
+  readonly cpuUs: number | null;
+  readonly cpuAvailable: boolean;
+}
+export type ZigProjectProfileSpace = "source" | "core";
 export interface ZigProjectBuildOptions {
   signal?: AbortSignal;
   /** Complete overrides for this build. Missing keys read disk; null hides a file.
@@ -489,10 +507,16 @@ class ProjectProcess implements ZigProjectCompiler {
     Extract<ZigProjectProfileEvent, { kind: "begin" }>
   >();
   #profileSlow: Extract<ZigProjectProfileEvent, { kind: "end" }>[] = [];
+  #profileModuleTimings = new Map<string, ZigProjectModuleTiming>();
   #profileActiveDropped = 0;
   #profileModules = new Map<
-    number,
-    { unit: number; filename: string; bytes: number }
+    string,
+    {
+      space: ZigProjectProfileSpace;
+      unit: number;
+      filename: string;
+      bytes: number;
+    }
   >();
   #profilePhases: Extract<ZigProjectProfileEvent, { kind: "phases" }> | null =
     null;
@@ -572,6 +596,9 @@ class ProjectProcess implements ZigProjectCompiler {
         ...event,
       })),
       slowRegions: this.#profileSlow.map((event) => ({ ...event })),
+      moduleTimings: [...this.#profileModuleTimings.values()].map((item) => ({
+        ...item,
+      })),
       activeDropped: this.#profileActiveDropped,
       dropped: this.#profileDropped,
     };
@@ -590,7 +617,11 @@ class ProjectProcess implements ZigProjectCompiler {
       Number.isSafeInteger(item[key]) &&
       (item[key] as number) >= 0;
     const string = (key: string) => typeof item[key] === "string";
-    if (!integer("build") || item.build !== this.#profileBuildId) return;
+    if (
+      !integer("build") || item.build !== this.#profileBuildId ||
+      (item.space !== "source" && item.space !== "core")
+    ) return;
+    const space = item.space as ZigProjectProfileSpace;
     let event: ZigProjectProfileEvent | undefined;
     if (
       (item.kind === "begin" || item.kind === "end") && integer("id") &&
@@ -602,6 +633,7 @@ class ProjectProcess implements ZigProjectCompiler {
         event = {
           kind: "begin",
           build: item.build as number,
+          space,
           id: item.id as number,
           thread: item.thread as number,
           stage: item.stage as string,
@@ -617,6 +649,7 @@ class ProjectProcess implements ZigProjectCompiler {
         event = {
           kind: "end",
           build: item.build as number,
+          space,
           id: item.id as number,
           thread: item.thread as number,
           stage: item.stage as string,
@@ -636,15 +669,17 @@ class ProjectProcess implements ZigProjectCompiler {
       integer("bytes")
     ) {
       const module = {
+        space,
         unit: item.unit as number,
         filename: item.filename as string,
         bytes: item.bytes as number,
       };
-      const previous = this.#profileModules.get(module.unit);
+      const moduleKey = `${space}:${module.unit}`;
+      const previous = this.#profileModules.get(moduleKey);
       if (module.bytes === 0 && previous?.filename === module.filename) {
         module.bytes = previous.bytes;
       }
-      this.#profileModules.set(module.unit, module);
+      this.#profileModules.set(moduleKey, module);
       if (this.#profileModules.size > 4096) {
         const oldest = this.#profileModules.keys().next().value;
         if (oldest !== undefined) this.#profileModules.delete(oldest);
@@ -660,6 +695,7 @@ class ProjectProcess implements ZigProjectCompiler {
       event = {
         kind: "phases",
         build: item.build as number,
+        space,
         active: item.active as string,
         phase_us: [...item.phase_us] as number[],
         at_us: item.at_us as number,
@@ -674,6 +710,7 @@ class ProjectProcess implements ZigProjectCompiler {
       event = {
         kind: "detail",
         build: item.build as number,
+        space,
         thread: item.thread as number,
         stage: item.stage as string,
         unit: item.unit as number,
@@ -696,6 +733,35 @@ class ProjectProcess implements ZigProjectCompiler {
       this.#profileSlow.push(event);
       this.#profileSlow.sort((a, b) => b.us - a.us);
       if (this.#profileSlow.length > 32) this.#profileSlow.length = 32;
+      if (event.stage === "check.module") {
+        const moduleKey = `${event.space}:${event.unit}`;
+        const previous = this.#profileModuleTimings.get(moduleKey);
+        let cpuUs: number | null = event.cpu_us;
+        let cpuAvailable = event.cpu_us !== null;
+        if (previous) {
+          if (previous.cpuAvailable && event.cpu_us !== null) {
+            cpuUs = previous.cpuUs! + event.cpu_us;
+          } else {
+            cpuAvailable = false;
+            cpuUs = null;
+          }
+        }
+        this.#profileModuleTimings.set(moduleKey, {
+          space: event.space,
+          unit: event.unit,
+          calls: (previous?.calls ?? 0) + 1,
+          us: (previous?.us ?? 0) + event.us,
+          cpuUs,
+          cpuAvailable,
+        });
+        if (this.#profileModuleTimings.size > 4096) {
+          const oldest = this.#profileModuleTimings.keys().next().value;
+          if (oldest !== undefined) {
+            this.#profileModuleTimings.delete(oldest);
+            this.#profileDropped++;
+          }
+        }
+      }
     }
     this.#profileEvents.push(event);
     if (this.#profileEvents.length > 256) {
@@ -1075,6 +1141,7 @@ class ProjectProcess implements ZigProjectCompiler {
       this.#profilePhases = null;
       this.#profileActive.clear();
       this.#profileSlow = [];
+      this.#profileModuleTimings.clear();
       this.#profileActiveDropped = 0;
       this.#profileDropped = 0;
       this.#profileBuildId = id;

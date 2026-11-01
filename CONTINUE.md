@@ -6,6 +6,46 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+The completed-Core validation receipt now reuses immutable producer validation
+without removing the backend bounds barrier or fresh-entry checks. On three
+matched fresh complete-world-producer pairs, total compilation improves **8.63
+to 7.78 seconds (9.9%)**, backend time **983 to 304 ms (69.1%)**, with identical
+**2,935-byte** identity output. It reuses 239 producer validations and fully
+validates the fresh entry. This is complete producer checking and tiny emission,
+not actual world initialization or whole-main performance. See
+[receipt evidence](zig-native/measurements/completed-core-validation-2026-11-01.json).
+
+Receipt authority belongs to the immutable Snapshot and exact owner/symbol
+prefix. The one complete producer pass uses a padded future-entry context;
+`forbidden_owner` excludes future references while retaining owner-loop budget
+charges. All context caches include that restriction. Unmatched/mixed inputs and
+entries activating global spawn/input-invocation checks keep ordinary
+validation. Source and Core trace IDs now have separate namespaces, with bounded
+per-module completed clocks; source ordinals must never be attributed using Core
+names.
+
+Compiler `56a163b9` compiles 2,781 native laws. All four new receipt laws pass
+with full allocation-failure mode, including the rich-scope/entry exclusion and
+workspace-cache restriction laws. All six affected guest tests pass; original
+Ink stream cases execute both tiers and sync/JSPI. Zig lint remains zero. The
+required full gate still stops at **48 passed/one baseline List/chunk
+storage_escape**; full qualification and release performance remain pending.
+
+The broader automatic copy/append planner is also **rejected and removed**.
+Original owned copies at eight sites shrink 26.5%, while production-scale plain
+emit at sixteen sites shrinks 17.6%; both miss the unchanged 20% latency/30%
+whole-module size gate. Their operation plans, native laws and actual stream
+results are archived in
+[copy-plan evidence](zig-native/measurements/rejected-owned-copy-plans-2026-11-01.json).
+The nominal World/host interface rewrite is likewise removed: three pairs
+regress total/checking latency. See
+[nominal evidence](zig-native/measurements/rejected-nominal-world-2026-11-01.json).
+
+The next source experiment is a small opaque draw-batch boundary: plain public
+headers, privately owned row/vector pools and real borrowed batch views. Public
+flat spans or owner stamps do not preserve truncate/regrow safety. No broad
+renderer migration or language safety cut has landed.
+
 The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
 cancellation with exclusive phase checkpoints, module names, balanced
 declaration regions, worker CPU/join intervals, backend stages and seven
@@ -29,8 +69,8 @@ writes and borrowed results, not another scalar leaf.
 The explicit-interface experiments are also rejected: direct matrix composition
 leaves checking flat; four render callback input annotations save about 4%,
 below the 20% threshold. No source annotations or language feature cuts landed.
-A larger nominal owner/access boundary is the next frontend experiment; it must
-cover the actual world base and callback captures, not only FrameAccess.
+The larger nominal owner/access boundary was subsequently measured and rejected
+as recorded above; no interface expansion remains installed.
 
 `kites.draw` now appends directly to the caller draw pool, removing its
 temporary owner/freeze/copy. Seven original production scenarios produce

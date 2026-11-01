@@ -1,0 +1,548 @@
+diff --git a/src/world_storage.blot b/src/world_storage.blot
+index d74ebe1..55c5e59 100644
+--- a/src/world_storage.blot
++++ b/src/world_storage.blot
+@@ -88,7 +88,7 @@ import * as math from "ink/math"
+ 
+ // The known continuation runs while every owner is alive. It supplies concrete
+ // static stage/schema policies and never returns this invocation access bundle.
+-const with_owners = func initial -> consume => return do:
++const with_owners = func initial -> (consume: OwnerAccess -> a ! {| e}) => return do:
+   let entities = ecs.entities ()
+   let entities_meta = ecs.metadata 1
+   let control = app.control ()
+@@ -337,7 +337,7 @@ const with_owners = func initial -> consume => return do:
+   let wake_free: ResizeArray U32 = #[]
+   let wake_by_entity: map.Map [U32, U32] = map.empty ()
+   let wake_buckets = map.buckets ()
+-  let base = {
++  let base = $OwnerBase {
+     appearance, appearance_meta, editor: editor_state, editor_clips, editor_drag_faces,
+     building_pictures: $buildings.PictureAccess {state: building_picture_state, groups: building_picture_groups, draws: building_picture_draws, equipment: building_picture_equipment, payload: building_picture_payload},
+     orbit: orbit_state,
+@@ -428,14 +428,63 @@ const with_owners = func initial -> consume => return do:
+     story: $tutorial.Access {state: story_state, supplies: story_supplies},
+     research: $progression.Access {state: research_state, order: research_order},
+   }
+-  // These known callbacks capture the owner-only record. Their arguments never
+-  // contain the callbacks themselves, so access has a finite structural type.
+-  consume (@record.merge base {
++  // Known callbacks capture the nominal owner bundle, never their own access.
++  let access = $OwnerAccess {
++    appearance: base.appearance, appearance_meta: base.appearance_meta, editor: base.editor,
++    editor_clips: base.editor_clips, editor_drag_faces: base.editor_drag_faces, building_pictures: base.building_pictures,
++    orbit: base.orbit, clock: base.clock, camera: base.camera,
++    camera_previous: base.camera_previous, lens: base.lens, orbit_settings: base.orbit_settings,
++    preferences: base.preferences, shader_style: base.shader_style, locale_state: base.locale_state,
++    locale_cache: base.locale_cache, locale_text: base.locale_text, response: base.response,
++    incoming: base.incoming, outgoing: base.outgoing, service_scratch: base.service_scratch,
++    ui_focus: base.ui_focus, services: base.services, platform: base.platform,
++    trails: base.trails, surface_epoch: base.surface_epoch, footsteps: base.footsteps,
++    clearings: base.clearings, trail_tiles: base.trail_tiles, crystals: base.crystals,
++    deposits: base.deposits, buildings: base.buildings, frogs: base.frogs,
++    brush_faces: base.brush_faces, pose3: base.pose3, pose3_meta: base.pose3_meta,
++    pose3_previous: base.pose3_previous, pose3_previous_meta: base.pose3_previous_meta, brushes: base.brushes,
++    brushes_meta: base.brushes_meta, charge: base.charge, charge_meta: base.charge_meta,
++    robot: base.robot, robot_meta: base.robot_meta, resident: base.resident,
++    resident_meta: base.resident_meta, location: base.location, location_meta: base.location_meta,
++    appetite: base.appetite, appetite_meta: base.appetite_meta, minor: base.minor,
++    minor_meta: base.minor_meta, villager: base.villager, villager_meta: base.villager_meta,
++    flyer: base.flyer, flyer_meta: base.flyer_meta, flyer_previous: base.flyer_previous,
++    flyer_previous_meta: base.flyer_previous_meta, state_sections: base.state_sections, state_payload: base.state_payload,
++    state_outcomes: base.state_outcomes, scene_sections: base.scene_sections, scene_payload: base.scene_payload,
++    scene_outcomes: base.scene_outcomes, scene_history_entries: base.scene_history_entries, scene_history_payload: base.scene_history_payload,
++    scene_history_meta: base.scene_history_meta, scene_history_scratch: base.scene_history_scratch, scene_stash: base.scene_stash,
++    world_ground: base.world_ground, earth: base.earth, output: base.output,
++    station_counts: base.station_counts, station_refusals: base.station_refusals, station_revealing_rows: base.station_revealing_rows,
++    station_title_ages: base.station_title_ages, station_seen: base.station_seen, station_hovered: base.station_hovered,
++    station_opened: base.station_opened, station_order: base.station_order, depot_layout: base.depot_layout,
++    salt: base.salt, salt_pictures: base.salt_pictures, hud_words: base.hud_words,
++    hud_text: base.hud_text, building_hover_light: base.building_hover_light, building_relocation: base.building_relocation,
++    cannons: base.cannons, gyros: base.gyros, cannon_smoke: base.cannon_smoke,
++    salt_picking: base.salt_picking, starting_stash: base.starting_stash, colony_paths: base.colony_paths,
++    pile_search: base.pile_search, robot_tidy: base.robot_tidy, staffing: base.staffing,
++    builders: base.builders, wakes: base.wakes, entities: base.entities,
++    entities_meta: base.entities_meta, control: base.control, wall: base.wall,
++    viewport: base.viewport, requests: base.requests, persist_requests: base.persist_requests,
++    tuning: base.tuning, input_pointer: base.input_pointer, input_held: base.input_held,
++    input_fresh: base.input_fresh, input_buttons: base.input_buttons, arena: base.arena,
++    elements: base.elements, lighting_look: base.lighting_look, hand: base.hand,
++    hand_gesture: base.hand_gesture, hover_state: base.hover_state, station_state: base.station_state,
++    station_close_focus: base.station_close_focus, station_ammo_switch: base.station_ammo_switch, title_state: base.title_state,
++    loading_state: base.loading_state, menu_state: base.menu_state, menu_feedback: base.menu_feedback,
++    menu_transition: base.menu_transition, goals: base.goals, legacy: base.legacy,
++    entrance: base.entrance, meter: base.meter, reports: base.reports,
++    achievements: base.achievements, actor_trace: base.actor_trace, cache_visible: base.cache_visible,
++    thimble_reveal: base.thimble_reveal, platform_access_state: base.platform_access_state, cursor_origin: base.cursor_origin,
++    building: base.building, kitchen: base.kitchen, construction_preview: base.construction_preview,
++    rock: base.rock, impact: base.impact, celebrations: base.celebrations,
++    wind: base.wind, speech: base.speech, story: base.story,
++    research: base.research,
+     despawn: func id => return despawn base id,
+     reset_salt: func () => return reset_starting_salt base,
+     stash_scene: func () => return stash_scene base,
+     restore_scene: func () => return restore_scene base,
+-  })
++  }
++  consume access
+   return ()
+ // The schema declares structural maintenance explicitly. Removed rows become
+ // absent before the entity membership bit is cleared; IDs are never recycled.
+@@ -782,8 +831,306 @@ const restore_scene = func access => return do:
+   scene_history.restore_stash restore_scene_history access access.scene_stash
+   return ()
+ // Invocation-local aliases over independently named owners and frame buffers.
+-// This structural contract allocates no payload and introduces no owner row.
+-type FrameAccess = {
++// Concrete boundaries keep aliases nominal; payload owners remain independent.
++type OwnerBase is data = $OwnerBase {
++  appearance: ecs.Pool render.Appearance,
++  appearance_meta: Array U32,
++  editor: Array editor.StoredEditor,
++  editor_clips: ResizeArray Vec3,
++  editor_drag_faces: ResizeArray render.Face,
++  building_pictures: buildings.PictureAccess,
++  orbit: Array orbit.Orbit,
++  clock: Array clock.Clock,
++  camera: Array view.Camera,
++  camera_previous: Array view.Camera,
++  lens: Array view.Lens,
++  orbit_settings: Array orbit.Settings,
++  preferences: Array preferences.Preferences,
++  shader_style: Array shader_styles.Style,
++  locale_state: Array locale.State,
++  locale_cache: ResizeArray locale.Slot,
++  locale_text: ResizeArray U32,
++  response: ResizeArray F32,
++  incoming: ResizeArray F32,
++  outgoing: ResizeArray F32,
++  service_scratch: ResizeArray F32,
++  ui_focus: tree.Focus,
++  services: services.Services,
++  platform: platform.Access,
++  trails: trails.Access,
++  surface_epoch: trails.SurfaceAccess,
++  footsteps: trails.StepAccess,
++  clearings: trails.ClearingAccess,
++  trail_tiles: trails.TileAccess,
++  crystals: crystals.Access,
++  deposits: deposits.Access,
++  buildings: buildings.Access,
++  frogs: village.Access,
++  brush_faces: ResizeArray render.Face,
++  pose3: ecs.Pool transform.Pose3,
++  pose3_meta: Array U32,
++  pose3_previous: ecs.Pool transform.Pose3,
++  pose3_previous_meta: Array U32,
++  brushes: ecs.Pool brush.Stored,
++  brushes_meta: Array U32,
++  charge: ecs.Pool electricity.Charge,
++  charge_meta: Array U32,
++  robot: ecs.Pool actor_state.Robot,
++  robot_meta: Array U32,
++  resident: ecs.Pool actor_state.Resident,
++  resident_meta: Array U32,
++  location: ecs.Pool presence.Location,
++  location_meta: Array U32,
++  appetite: ecs.Pool meals.Appetite,
++  appetite_meta: Array U32,
++  minor: ecs.Pool minors.Minor,
++  minor_meta: Array U32,
++  villager: ecs.Pool village.Villager,
++  villager_meta: Array U32,
++  flyer: ecs.Pool kites.Flyer,
++  flyer_meta: Array U32,
++  flyer_previous: ecs.Pool kites.Flyer,
++  flyer_previous_meta: Array U32,
++  state_sections: ResizeArray persist.Section,
++  state_payload: ResizeArray F32,
++  state_outcomes: ResizeArray persist.Outcome,
++  scene_sections: ResizeArray persist.Section,
++  scene_payload: ResizeArray F32,
++  scene_outcomes: ResizeArray persist.Outcome,
++  scene_history_entries: ResizeArray scene_history.Entry,
++  scene_history_payload: ResizeArray F32,
++  scene_history_meta: Array U32,
++  scene_history_scratch: ResizeArray F32,
++  scene_stash: ResizeArray F32,
++  world_ground: world_ground.Access,
++  earth: earth.Access,
++  output: output.Access,
++  station_counts: Array U32,
++  station_refusals: ResizeArray station.Refusal,
++  station_revealing_rows: ResizeArray station.RevealingRow,
++  station_title_ages: Array F32,
++  station_seen: Array U32,
++  station_hovered: Array U32,
++  station_opened: Array U32,
++  station_order: ResizeArray U32,
++  depot_layout: depot.LayoutAccess,
++  salt: salt.Access,
++  salt_pictures: salt_pictures.Access,
++  hud_words: Array hud.State,
++  hud_text: Array U32,
++  building_hover_light: Array build_bar.HoverLight,
++  building_relocation: Array build_bar.Relocation,
++  cannons: cannon.CannonAccess,
++  gyros: cannon.GyroAccess,
++  cannon_smoke: cannon.SmokeAccess,
++  salt_picking: salt.PickingAccess,
++  starting_stash: Array Vec3,
++  colony_paths: colony_paths.Access,
++  pile_search: pile_batch.SearchAccess,
++  robot_tidy: robots.TidyAccess,
++  staffing: robots.StaffingAccess,
++  builders: robots.BuilderAccess,
++  wakes: robot_wakes.Access,
++  entities: ecs.Entities,
++  entities_meta: Array U32,
++  control: app.Control,
++  wall: Array app.Wall,
++  viewport: Array window.Viewport,
++  requests: Array U32,
++  persist_requests: Array U32,
++  tuning: tune.Tuned,
++  input_pointer: Array input.Pointer,
++  input_held: ResizeArray U32,
++  input_fresh: ResizeArray U32,
++  input_buttons: ResizeArray U32,
++  arena: Array arena.Arena,
++  elements: Array elements.Elements,
++  lighting_look: Array lighting_look.Look,
++  hand: Array hand_geometry.Hand,
++  hand_gesture: Array hand.Gesture,
++  hover_state: Array hover.Hover,
++  station_state: Array station.Station,
++  station_close_focus: Array station.CloseFocus,
++  station_ammo_switch: Array station.AmmoSwitch,
++  title_state: Array title.Title,
++  loading_state: Array loading.Loading,
++  menu_state: Array menu.Menu,
++  menu_feedback: Array menu.Feedback,
++  menu_transition: Array menu.Flight,
++  goals: Array goals.Goals,
++  legacy: Array goals.Legacy,
++  entrance: Array goals.Entrance,
++  meter: Array goals.Meter,
++  reports: Array reports.Reports,
++  achievements: Array achievements.Told,
++  actor_trace: Array actor_trace.Trace,
++  cache_visible: Array Bool,
++  thimble_reveal: Array progression.ThimbleReveal,
++  platform_access_state: Array platform_access.Access,
++  cursor_origin: Array cursor.Origin,
++  building: Array build_bar.Building,
++  kitchen: Array meals.Kitchen,
++  construction_preview: Array construction_kit.Preview,
++  rock: rock.Access,
++  impact: impact.Access,
++  celebrations: celebrations.Access,
++  wind: wind.Access,
++  speech: speech.Access,
++  story: tutorial.Access,
++  research: progression.Access,
++}
++type OwnerAccess is data = $OwnerAccess {
++  appearance: ecs.Pool render.Appearance,
++  appearance_meta: Array U32,
++  editor: Array editor.StoredEditor,
++  editor_clips: ResizeArray Vec3,
++  editor_drag_faces: ResizeArray render.Face,
++  building_pictures: buildings.PictureAccess,
++  orbit: Array orbit.Orbit,
++  clock: Array clock.Clock,
++  camera: Array view.Camera,
++  camera_previous: Array view.Camera,
++  lens: Array view.Lens,
++  orbit_settings: Array orbit.Settings,
++  preferences: Array preferences.Preferences,
++  shader_style: Array shader_styles.Style,
++  locale_state: Array locale.State,
++  locale_cache: ResizeArray locale.Slot,
++  locale_text: ResizeArray U32,
++  response: ResizeArray F32,
++  incoming: ResizeArray F32,
++  outgoing: ResizeArray F32,
++  service_scratch: ResizeArray F32,
++  ui_focus: tree.Focus,
++  services: services.Services,
++  platform: platform.Access,
++  trails: trails.Access,
++  surface_epoch: trails.SurfaceAccess,
++  footsteps: trails.StepAccess,
++  clearings: trails.ClearingAccess,
++  trail_tiles: trails.TileAccess,
++  crystals: crystals.Access,
++  deposits: deposits.Access,
++  buildings: buildings.Access,
++  frogs: village.Access,
++  brush_faces: ResizeArray render.Face,
++  pose3: ecs.Pool transform.Pose3,
++  pose3_meta: Array U32,
++  pose3_previous: ecs.Pool transform.Pose3,
++  pose3_previous_meta: Array U32,
++  brushes: ecs.Pool brush.Stored,
++  brushes_meta: Array U32,
++  charge: ecs.Pool electricity.Charge,
++  charge_meta: Array U32,
++  robot: ecs.Pool actor_state.Robot,
++  robot_meta: Array U32,
++  resident: ecs.Pool actor_state.Resident,
++  resident_meta: Array U32,
++  location: ecs.Pool presence.Location,
++  location_meta: Array U32,
++  appetite: ecs.Pool meals.Appetite,
++  appetite_meta: Array U32,
++  minor: ecs.Pool minors.Minor,
++  minor_meta: Array U32,
++  villager: ecs.Pool village.Villager,
++  villager_meta: Array U32,
++  flyer: ecs.Pool kites.Flyer,
++  flyer_meta: Array U32,
++  flyer_previous: ecs.Pool kites.Flyer,
++  flyer_previous_meta: Array U32,
++  state_sections: ResizeArray persist.Section,
++  state_payload: ResizeArray F32,
++  state_outcomes: ResizeArray persist.Outcome,
++  scene_sections: ResizeArray persist.Section,
++  scene_payload: ResizeArray F32,
++  scene_outcomes: ResizeArray persist.Outcome,
++  scene_history_entries: ResizeArray scene_history.Entry,
++  scene_history_payload: ResizeArray F32,
++  scene_history_meta: Array U32,
++  scene_history_scratch: ResizeArray F32,
++  scene_stash: ResizeArray F32,
++  despawn: U32 -> Unit ! {},
++  world_ground: world_ground.Access,
++  earth: earth.Access,
++  output: output.Access,
++  station_counts: Array U32,
++  station_refusals: ResizeArray station.Refusal,
++  station_revealing_rows: ResizeArray station.RevealingRow,
++  station_title_ages: Array F32,
++  station_seen: Array U32,
++  station_hovered: Array U32,
++  station_opened: Array U32,
++  station_order: ResizeArray U32,
++  depot_layout: depot.LayoutAccess,
++  salt: salt.Access,
++  salt_pictures: salt_pictures.Access,
++  hud_words: Array hud.State,
++  hud_text: Array U32,
++  building_hover_light: Array build_bar.HoverLight,
++  building_relocation: Array build_bar.Relocation,
++  cannons: cannon.CannonAccess,
++  gyros: cannon.GyroAccess,
++  cannon_smoke: cannon.SmokeAccess,
++  salt_picking: salt.PickingAccess,
++  starting_stash: Array Vec3,
++  reset_salt: Unit -> Unit ! {},
++  stash_scene: Unit -> Unit ! {},
++  restore_scene: Unit -> Unit ! {},
++  colony_paths: colony_paths.Access,
++  pile_search: pile_batch.SearchAccess,
++  robot_tidy: robots.TidyAccess,
++  staffing: robots.StaffingAccess,
++  builders: robots.BuilderAccess,
++  wakes: robot_wakes.Access,
++  entities: ecs.Entities,
++  entities_meta: Array U32,
++  control: app.Control,
++  wall: Array app.Wall,
++  viewport: Array window.Viewport,
++  requests: Array U32,
++  persist_requests: Array U32,
++  tuning: tune.Tuned,
++  input_pointer: Array input.Pointer,
++  input_held: ResizeArray U32,
++  input_fresh: ResizeArray U32,
++  input_buttons: ResizeArray U32,
++  arena: Array arena.Arena,
++  elements: Array elements.Elements,
++  lighting_look: Array lighting_look.Look,
++  hand: Array hand_geometry.Hand,
++  hand_gesture: Array hand.Gesture,
++  hover_state: Array hover.Hover,
++  station_state: Array station.Station,
++  station_close_focus: Array station.CloseFocus,
++  station_ammo_switch: Array station.AmmoSwitch,
++  title_state: Array title.Title,
++  loading_state: Array loading.Loading,
++  menu_state: Array menu.Menu,
++  menu_feedback: Array menu.Feedback,
++  menu_transition: Array menu.Flight,
++  goals: Array goals.Goals,
++  legacy: Array goals.Legacy,
++  entrance: Array goals.Entrance,
++  meter: Array goals.Meter,
++  reports: Array reports.Reports,
++  achievements: Array achievements.Told,
++  actor_trace: Array actor_trace.Trace,
++  cache_visible: Array Bool,
++  thimble_reveal: Array progression.ThimbleReveal,
++  platform_access_state: Array platform_access.Access,
++  cursor_origin: Array cursor.Origin,
++  building: Array build_bar.Building,
++  kitchen: Array meals.Kitchen,
++  construction_preview: Array construction_kit.Preview,
++  rock: rock.Access,
++  impact: impact.Access,
++  celebrations: celebrations.Access,
++  wind: wind.Access,
++  speech: speech.Access,
++  story: tutorial.Access,
++  research: progression.Access,
++}
++type FrameAccess is data = $FrameAccess {
+   appearance: ecs.Pool render.Appearance,
+   appearance_meta: Array U32,
+   editor: Array editor.StoredEditor,
+@@ -1006,8 +1353,62 @@ const simulation_access = func (access: FrameAccess) => return {
+   story: access.story, research: access.research, audio: access.audio,
+ }
+ 
++// Nested frame invocations retain only the persistent aliases and callbacks.
++const owner_access = func (access: FrameAccess): OwnerAccess => return $OwnerAccess {
++  appearance: access.appearance, appearance_meta: access.appearance_meta, editor: access.editor,
++  editor_clips: access.editor_clips, editor_drag_faces: access.editor_drag_faces, building_pictures: access.building_pictures,
++  orbit: access.orbit, clock: access.clock, camera: access.camera,
++  camera_previous: access.camera_previous, lens: access.lens, orbit_settings: access.orbit_settings,
++  preferences: access.preferences, shader_style: access.shader_style, locale_state: access.locale_state,
++  locale_cache: access.locale_cache, locale_text: access.locale_text, response: access.response,
++  incoming: access.incoming, outgoing: access.outgoing, service_scratch: access.service_scratch,
++  ui_focus: access.ui_focus, services: access.services, platform: access.platform,
++  trails: access.trails, surface_epoch: access.surface_epoch, footsteps: access.footsteps,
++  clearings: access.clearings, trail_tiles: access.trail_tiles, crystals: access.crystals,
++  deposits: access.deposits, buildings: access.buildings, frogs: access.frogs,
++  brush_faces: access.brush_faces, pose3: access.pose3, pose3_meta: access.pose3_meta,
++  pose3_previous: access.pose3_previous, pose3_previous_meta: access.pose3_previous_meta, brushes: access.brushes,
++  brushes_meta: access.brushes_meta, charge: access.charge, charge_meta: access.charge_meta,
++  robot: access.robot, robot_meta: access.robot_meta, resident: access.resident,
++  resident_meta: access.resident_meta, location: access.location, location_meta: access.location_meta,
++  appetite: access.appetite, appetite_meta: access.appetite_meta, minor: access.minor,
++  minor_meta: access.minor_meta, villager: access.villager, villager_meta: access.villager_meta,
++  flyer: access.flyer, flyer_meta: access.flyer_meta, flyer_previous: access.flyer_previous,
++  flyer_previous_meta: access.flyer_previous_meta, state_sections: access.state_sections, state_payload: access.state_payload,
++  state_outcomes: access.state_outcomes, scene_sections: access.scene_sections, scene_payload: access.scene_payload,
++  scene_outcomes: access.scene_outcomes, scene_history_entries: access.scene_history_entries, scene_history_payload: access.scene_history_payload,
++  scene_history_meta: access.scene_history_meta, scene_history_scratch: access.scene_history_scratch, scene_stash: access.scene_stash,
++  despawn: access.despawn, world_ground: access.world_ground, earth: access.earth,
++  output: access.output, station_counts: access.station_counts, station_refusals: access.station_refusals,
++  station_revealing_rows: access.station_revealing_rows, station_title_ages: access.station_title_ages, station_seen: access.station_seen,
++  station_hovered: access.station_hovered, station_opened: access.station_opened, station_order: access.station_order,
++  depot_layout: access.depot_layout, salt: access.salt, salt_pictures: access.salt_pictures,
++  hud_words: access.hud_words, hud_text: access.hud_text, building_hover_light: access.building_hover_light,
++  building_relocation: access.building_relocation, cannons: access.cannons, gyros: access.gyros,
++  cannon_smoke: access.cannon_smoke, salt_picking: access.salt_picking, starting_stash: access.starting_stash,
++  reset_salt: access.reset_salt, stash_scene: access.stash_scene, restore_scene: access.restore_scene,
++  colony_paths: access.colony_paths, pile_search: access.pile_search, robot_tidy: access.robot_tidy,
++  staffing: access.staffing, builders: access.builders, wakes: access.wakes,
++  entities: access.entities, entities_meta: access.entities_meta, control: access.control,
++  wall: access.wall, viewport: access.viewport, requests: access.requests,
++  persist_requests: access.persist_requests, tuning: access.tuning, input_pointer: access.input_pointer,
++  input_held: access.input_held, input_fresh: access.input_fresh, input_buttons: access.input_buttons,
++  arena: access.arena, elements: access.elements, lighting_look: access.lighting_look,
++  hand: access.hand, hand_gesture: access.hand_gesture, hover_state: access.hover_state,
++  station_state: access.station_state, station_close_focus: access.station_close_focus, station_ammo_switch: access.station_ammo_switch,
++  title_state: access.title_state, loading_state: access.loading_state, menu_state: access.menu_state,
++  menu_feedback: access.menu_feedback, menu_transition: access.menu_transition, goals: access.goals,
++  legacy: access.legacy, entrance: access.entrance, meter: access.meter,
++  reports: access.reports, achievements: access.achievements, actor_trace: access.actor_trace,
++  cache_visible: access.cache_visible, thimble_reveal: access.thimble_reveal, platform_access_state: access.platform_access_state,
++  cursor_origin: access.cursor_origin, building: access.building, kitchen: access.kitchen,
++  construction_preview: access.construction_preview, rock: access.rock, impact: access.impact,
++  celebrations: access.celebrations, wind: access.wind, speech: access.speech,
++  story: access.story, research: access.research,
++}
++
+ // Frame aliases are invocation-local. The persistent base never stores them.
+-const bind_frame = func base -> frame: FrameAccess => return {
++const bind_frame = func (base: OwnerAccess) -> (frame: host_runtime.FrameBindings): FrameAccess => return $FrameAccess {
+   appearance: base.appearance,
+   appearance_meta: base.appearance_meta,
+   editor: base.editor,
+diff --git a/tests/minor_support/game.blot b/tests/minor_support/game.blot
+index fb43bff..66b8cca 100644
+--- a/tests/minor_support/game.blot
++++ b/tests/minor_support/game.blot
+@@ -13,4 +13,4 @@ const run = func consume => return do:
+         result.push value))
+   return @storage.freeze result
+ // Fresh output owners live only through the known diagnostic consumer.
+-const with_frame = func access -> consume => return owned.with_frame access world.bind_frame consume
++const with_frame = func (access: world.FrameAccess) -> consume => return owned.with_frame (world.owner_access access) world.bind_frame consume
+diff --git a/tests/minor_support/owned.blot b/tests/minor_support/owned.blot
+index 6f5dadd..1d835dd 100644
+--- a/tests/minor_support/owned.blot
++++ b/tests/minor_support/owned.blot
+@@ -1,3 +1,4 @@
++import * as host_runtime from "ink/pen/host"
+ import { Vec3 } from "std/vector"
+ import * as services from "ink/services"
+ import * as window from "ink/events"
+@@ -116,7 +117,7 @@ const with_frame = func base -> binder -> consume => return do:
+   let audio_access = $audio.Access {sounds, voices, buses}
+   let service_output: ResizeArray services.Request = #[]
+   let encoder_text: ResizeArray F32 = #[]
+-  let bindings = {frame, audio: audio_access, events, ui_nodes, ui_marked, ui_labels, ui_options,
++  let bindings = $host_runtime.FrameBindings {frame, audio: audio_access, events, ui_nodes, ui_marked, ui_labels, ui_options,
+     frame_vectors, frame_faces, frame_values, frame_floats, frame_inset_draws,
+     semantic_text, semantic_values, service_output, encoder_text}
+   // This known policy only aliases caller-owned inputs. It neither allocates
+diff --git a/tests/world_access.blot b/tests/world_access.blot
+new file mode 100644
+index 0000000..e657de4
+--- /dev/null
++++ b/tests/world_access.blot
+@@ -0,0 +1,51 @@
++import * as world from "game/world_storage"
++import * as library from "game/library"
++import * as host from "ink/pen/host"
++import * as owned from "./minor_support/owned"
++import * as ecs from "ink/ecs"
++import * as math from "ink/math"
++import * as view from "ink/view"
++import * as orbit from "ink/orbit"
++
++// Caller inputs vary; production with_owners still initializes every real pool.
++const initial = {
++  camera: $view.Camera {position: math.vec3 1.0 2.0 3.0, rotation: math.identity_quat},
++  orbit: $orbit.Settings {
++    start: $orbit.Orbit {focus: math.zero3, yaw: 0.0, pitch: 0.6, distance: 24.0},
++    nearest: 6.0, farthest: 120.0, lowest: 0.42, steepest: 1.45,
++    room: 100.0, overlook: true, bindings: library.orbit_bindings,
++  },
++  stash: math.vec3 4.0 0.0 5.0,
++}
++
++entry const exercise = func (read: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
++  let result = #[0]
++  use finished <- world.with_owners initial (func base => return do:
++    if base.clock[0].tick != 0 or base.entities.length != 0 or base.camera[0].position.x != 1.0:
++      return @panic "owner initialization changed"
++    base.reset_salt ()
++    if base.salt.state[0].stashes != 1 or base.salt.stashes[0].x != 4.0 or base.salt.stashes[0].z != 5.0:
++      return @panic "captured reset lost its owner"
++    let id = ecs.spawn base.entities base.entities_meta
++    host.with_frame {bind_frame: world.bind_frame} base (func framed => return do:
++      framed.clock[0].tick := 17
++      @storage.push framed.frame_values 1.5
++      let kept = &framed.frame_values[0..1]
++      let owners = world.owner_access framed
++      owned.with_frame owners world.bind_frame (func nested => return do:
++        if nested.frame_values.length != 0 or nested.clock[0].tick != 17:
++          return @panic "nested frame owner mismatch"
++        @storage.push nested.frame_values 3.5
++        nested.clock[0].tick := 19
++        return ())
++      if kept[0] != 1.5 or framed.frame_values.length != 1 or base.clock[0].tick != 19:
++        return @panic "frame aliases lost their roots"
++      return ())
++    base.despawn id
++    if ecs.live base.entities id:
++      return @panic "captured despawn lost its owner"
++    use observed <- read 41
++    result[0] := observed
++    return 17)
++  let finished_unit: Unit = finished
++  return result[0]

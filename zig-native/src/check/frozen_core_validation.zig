@@ -17,6 +17,8 @@ pub const Context = struct {
     symbol_count: ?usize = null,
     /// Only this module's source length; foreign qualification spans are not local.
     source_length: ?u32 = null,
+    /// Restricts owner mentions without shortening the charged owner context.
+    forbidden_owner: ?u32 = null,
 };
 
 /// The foreign-module facts observable by this validator. Keep owner lookup
@@ -76,6 +78,7 @@ pub const ContextImage = struct {
     reusable: bool,
     symbol_count: ?usize,
     source_length: ?u32,
+    forbidden_owner: ?u32,
 
     pub fn capture(a: std.mem.Allocator, context: Context, callers: []const *const core.Module) std.mem.Allocator.Error!ContextImage {
         const owners = try a.alloc(Owner, context.units.len);
@@ -90,7 +93,7 @@ pub const ContextImage = struct {
             for (module.nominals, nominal_facts[offset..][0..module.nominals.len]) |nominal, *fact| fact.* = .of(nominal);
             offset += @intCast(module.nominals.len);
         }
-        return .{ .owners = owners, .nominal_facts = nominal_facts, .reusable = reusableContext(context, callers), .symbol_count = context.symbol_count, .source_length = context.source_length };
+        return .{ .owners = owners, .nominal_facts = nominal_facts, .reusable = reusableContext(context, callers), .symbol_count = context.symbol_count, .source_length = context.source_length, .forbidden_owner = context.forbidden_owner };
     }
     pub fn deinit(self: *ContextImage, a: std.mem.Allocator) void {
         a.free(self.owners);
@@ -107,7 +110,7 @@ pub const ContextImage = struct {
                     for (self.nominal_facts[owner.nominals.start..][0..owner.nominals.len], module.nominals) |old, current| if (!std.meta.eql(old, NominalFact.of(current))) return false;
                 }
             },
-            .symbol_count, .source_length => if (!std.meta.eql(@field(self, name), @field(context, name))) return false,
+            .symbol_count, .source_length, .forbidden_owner => if (!std.meta.eql(@field(self, name), @field(context, name))) return false,
         };
         return true;
     }
@@ -132,7 +135,7 @@ pub fn equivalentContextFacts(before: Context, after: Context) bool {
                     for (old.nominals, current.nominals) |left, right| if (!std.meta.eql(NominalFact.of(left), NominalFact.of(right))) return false;
                 }
             },
-            .symbol_count, .source_length => if (!std.meta.eql(@field(before, name), @field(after, name))) return false,
+            .symbol_count, .source_length, .forbidden_owner => if (!std.meta.eql(@field(before, name), @field(after, name))) return false,
         }
     }
     return true;
@@ -178,7 +181,11 @@ const Bounds = struct {
         try require(self.scoped_work.* != 0);
         self.scoped_work.* -= 1;
     }
+    fn allowedOwner(self: Bounds, unit: u32) BoundsError!void {
+        if (self.context.forbidden_owner) |forbidden| try require(unit != forbidden);
+    }
     fn owner(self: Bounds, unit: u32) BoundsError!OwnerBounds {
+        try self.allowedOwner(unit);
         if (unit == 0 or unit == self.m.unit) return OwnerBounds.of(self.m);
         try require(unit != std.math.maxInt(u32));
         for (self.context.units) |candidate| if (candidate.unit == unit) return OwnerBounds.of(candidate);
@@ -302,6 +309,10 @@ const Bounds = struct {
     fn types(self: Bounds) BoundsError!void {
         try require(self.m.types.nodes.len >= 6);
         try @import("quantifier_goals.zig").validate(self.m.types.nodes, self.m.types.quantifier_goals, self.m.types.quantifier_obligations);
+        if (self.context.forbidden_owner != null) for (self.m.types.quantifier_obligations) |obligation| {
+            try self.allowedOwner(obligation.identity.unit);
+            try self.allowedOwner(obligation.qualification_unit);
+        };
         const builtins = [_]T.Tag{ .absent, .unit, .boolean, .u32, .f32, .never };
         for (self.m.types.nodes, 0..) |value, id| {
             try enumValue(T.Tag, value.tag);
@@ -334,6 +345,7 @@ const Bounds = struct {
                     _ = try self.owner(value.a);
                 },
                 .instance_selection => {
+                    try self.allowedOwner(value.a);
                     try require(value.a != 0 and value.b != 0);
                     try index(self.m.types.extra.len, value.c);
                     const count = self.m.types.extra[value.c];
@@ -706,6 +718,8 @@ const Bounds = struct {
             if (member.kind == .type_) try require(member.target.unit == 0 and member.target.binding == 0) else try self.bindingRef(.{ .unit = member.target.unit, .binding = member.target.binding }, false);
         }
         for (self.m.selected_proofs, 0..) |proof, ordinal| {
+            try self.allowedOwner(proof.predicate.identity.unit);
+            try self.allowedOwner(proof.predicate.qualification_unit);
             if (proof.predicate_target.binding != 0) try self.bindingRef(.{ .unit = proof.predicate_target.unit, .binding = proof.predicate_target.binding }, false) else try require(proof.predicate_target.unit == 0);
             if (proof.context != 0) _ = try self.owner(proof.context);
             try self.identity(proof.implementation, proof.kind == .predicate);
@@ -1266,6 +1280,7 @@ const Bounds = struct {
 /// No allocation and no recursive traversal. External producer references are
 /// checked using Context; complete cycle validation is a separate required pass.
 pub fn validateBounds(module: *const core.Module, context: Context) BoundsError!void {
+    if (context.forbidden_owner) |forbidden| try require(module.unit != forbidden);
     try require(module.proof_contracts.len <= 4096);
     try require(module.has_numeric_proofs or module.proof_contracts.len == 0);
     for (module.proof_contracts) |value| {

@@ -109,6 +109,91 @@ test "decoded owner validation allocation failures preserve the immutable payloa
     try std.testing.expectEqualSlices(u8, before, after);
 }
 
+fn completedSnapshot(a_: std.mem.Allocator, source: *const project.Project, checked: *const checker.CheckedProject) !void {
+    const owner = try closure.freezeDeferringEntrySnapshot(a_, source, checked);
+    defer owner.deinit();
+    try std.testing.expect(owner.validated and owner.core_validation != null);
+}
+
+test "completed Core receipt binds exact live owner tables and shallow borrowed module context" {
+    var f = try Fixture.init();
+    defer f.deinit();
+    var deferred = try checker.checkProjectDeferringEntryToFirstDiagnostic(a, &f.source, null);
+    defer deferred.deinit(a);
+    const owner = try closure.freezeDeferringEntrySnapshot(a, &f.source, &deferred);
+    defer owner.deinit();
+    const receipt = owner.core_validation.?;
+    const proof = receipt.borrow(&owner.value);
+    const count = owner.value.modules.len;
+    const units = try a.alloc(core.Module, count + 1);
+    defer a.free(units);
+    for (owner.value.modules, units[0..count]) |module, *unit| unit.* = module.core;
+    // The fresh entry has no receipt even when its descriptors happen to be
+    // copied from an admitted producer. Its unique ordinal does not prove it.
+    units[count] = units[0];
+    units[count].unit = @intCast(count + 1);
+    const entry: u32 = @intCast(units.len);
+    const RuntimeIdentity = @import("../backend/runtime_identity.zig");
+    const owners = try a.alloc(RuntimeIdentity.Owner, units.len);
+    defer a.free(owners);
+    for (owners[0..count], owner.value.modules, 1..) |*path, module, id| path.* = .{ .unit = @intCast(id), .path = module.identity.normalized_path };
+    owners[count] = .{ .unit = entry, .path = f.source.filename(f.source.entry) };
+    // Consumer-only entry names append to the admitted dictionary. They do
+    // not revoke the producer's exact prefix mapping.
+    _ = try f.source.symbols.intern(a, "new_entry_only_receipt_name");
+    var names = try RuntimeIdentity.Metadata.capture(a, &f.source.symbols, owners, units.len);
+    defer names.deinit(a);
+    const identity = names.view();
+    try std.testing.expectEqual(count, proof.prefix(units, entry, identity));
+    var truncated = identity;
+    truncated.symbols = truncated.symbols[0 .. owner.value.symbols.len - 1];
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, truncated));
+    const first_spelling = names.symbols[1].start;
+    names.bytes[first_spelling] ^= 1;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    names.bytes[first_spelling] ^= 1;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry - 1, identity));
+    std.mem.swap(core.Module, &units[0], &units[1]);
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    std.mem.swap(core.Module, &units[0], &units[1]);
+    units[1].body_lowerings += 1;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    units[1].body_lowerings -= 1;
+    const saved_types = units[1].types.nodes;
+    units[1].types.nodes = saved_types[0 .. saved_types.len - 1];
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    units[1].types.nodes = saved_types;
+    const wrong_owner = try closure.freezeDeferringEntrySnapshot(a, &f.source, &deferred);
+    defer wrong_owner.deinit();
+    try std.testing.expectEqual(@as(usize, 0), receipt.borrow(&wrong_owner.value).prefix(units, entry, identity));
+    // Replacing only a table also revokes the owner binding, even if every
+    // borrowed Core descriptor still names the original live slices.
+    var different = owner.value;
+    different.modules = try a.dupe(D.Module, owner.value.modules);
+    defer a.free(different.modules);
+    try std.testing.expectEqual(@as(usize, 0), receipt.borrow(&different).prefix(units, entry, identity));
+    owner.value.modules[0].identity.source_bytes += 1;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    owner.value.modules[0].identity.source_bytes -= 1;
+    try std.testing.expectEqual(count, proof.prefix(units, entry, identity));
+    const bindings = try a.dupe(core.Binding, units[count].bindings);
+    defer a.free(bindings);
+    units[count].bindings = bindings;
+    bindings[0].capability_flow = .spawn_task;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+    bindings[0].capability_flow = .unknown;
+    bindings[0].capability_parameters.kind = .invoke_inputs;
+    try std.testing.expectEqual(@as(usize, 0), proof.prefix(units, entry, identity));
+}
+
+test "completed Core receipt freeze cleans every allocation failure before publishing owner authority" {
+    var f = try Fixture.init();
+    defer f.deinit();
+    var deferred = try checker.checkProjectDeferringEntryToFirstDiagnostic(a, &f.source, null);
+    defer deferred.deinit(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, completedSnapshot, .{ &f.source, &deferred });
+}
+
 fn relocationFail(allocator: std.mem.Allocator, wire: []const u8) !void {
     var value = try format.decode(D.FrozenDependency, allocator, wire, .{ .compiler = compiler, .settings = settings, .source = compiler, .dependencies = settings });
     defer format.deinit(allocator, &value);

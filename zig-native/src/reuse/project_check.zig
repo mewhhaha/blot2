@@ -316,6 +316,7 @@ const Engine = struct {
     };
     const ParallelWork = struct {
         trace: ?*@import("../phase_profile.zig").Trace = null,
+        trace_space: @import("../phase_profile.zig").Space = .source,
         parent: *Engine,
         allocator: Allocator,
         units: []const u32,
@@ -323,6 +324,8 @@ const Engine = struct {
         next: std.atomic.Value(usize) = .init(0),
 
         fn execute(self: *ParallelWork) void {
+            const space_scope = @import("../phase_profile.zig").enterSpace(self.trace_space);
+            defer space_scope.restore();
             const trace_installation = @import("../phase_profile.zig").installTrace(self.trace);
             defer trace_installation.restore();
             while (true) {
@@ -433,7 +436,7 @@ const Engine = struct {
                     return false;
                 }
             }
-            var work: ParallelWork = .{ .trace = @import("../phase_profile.zig").currentTrace(), .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
+            var work: ParallelWork = .{ .trace = @import("../phase_profile.zig").currentTrace(), .trace_space = @import("../phase_profile.zig").currentSpace(), .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
             {
                 var group: std.Io.Group = .init;
                 const protection = io.swapCancelProtection(.blocked);

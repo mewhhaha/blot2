@@ -743,7 +743,9 @@ pub const Session = struct {
             kept_check = try checker.checkProject(a, &source);
             counts.recheck_body_elaborations = kept_check.?.body_elaborations;
         } else counts.reused_check_body_elaborations = kept_check.?.body_elaborations;
-        const frozen = try closure.freezeFromCheckedCore(a, &source, &kept_check.?, &fresh.ready);
+        const owner = try closure.freezeFromCheckedCoreSnapshot(a, &source, &kept_check.?, &fresh.ready);
+        const frozen = owner.value;
+        candidate_seed.* = .{ .value = frozen, .snapshot = owner };
         // The seed owns Core; checked body offers keep their independent
         // owners across the entry-only preparation, without retaining Core.
         const body_caches = fresh.ready.body_caches;
@@ -760,10 +762,7 @@ pub const Session = struct {
         }
         fresh.deinit(a);
         fresh_alive = false;
-        candidate_seed.* = .{ .value = frozen };
-        const owner = try retained_dependency.Snapshot.adopt(a, frozen);
-        owner.validated = true;
-        candidate_seed.*.?.snapshot = owner;
+
         counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
         counts.frozen_modules = frozen.modules.len;
         for (frozen.modules) |module| counts.reused_core_bodies += module.core.body_lowerings;
@@ -862,16 +861,14 @@ pub const Session = struct {
         const a = self.allocator;
         if (checked.deferred_entry == null or checked.diagnostics.len != 0) return null;
         // A lowering diagnostic or limit is reported by the ordinary lane.
-        const frozen = closure.freezeDeferringEntry(a, source, checked) catch |err| {
+        const owner = closure.freezeDeferringEntrySnapshot(a, source, checked) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             return null;
         };
-        var seed: retained_dependency.Seed = .{ .value = frozen };
+        const frozen = owner.value;
+        var seed: retained_dependency.Seed = .{ .value = frozen, .snapshot = owner };
         var seed_alive = true;
         defer if (seed_alive) seed.deinit(a);
-        const owner = try retained_dependency.Snapshot.adopt(a, frozen);
-        owner.validated = true;
-        seed.snapshot = owner;
         var consumer = try partial.prepareReadOnlyWithBodies(a, io, entry_path, output_identity, snapshot.options, &seed.value, snapshot.provider(), body_offer);
         if (consumer == .rejected) {
             if (consumer.rejected.portable) {
@@ -1002,6 +999,7 @@ pub const Session = struct {
                         .query_previous = if (compatible) self.currentArtifacts() else null,
                         .principal_previous = if (rebuilt) self.currentArtifacts() else null,
                         .cached_units = prepared.cached,
+                        .completed_core_validation = if (candidate_seed) |*seed| if (seed.snapshot) |owner| if (owner.core_validation) |receipt| receipt.borrow(&seed.value) else null else null else if (self.seed_snapshot) |owner| if (owner.core_validation) |receipt| receipt.borrow(&self.seed) else null else null,
                     });
                 };
                 errdefer result.deinit(a);

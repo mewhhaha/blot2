@@ -8,14 +8,22 @@ import {
 import { instantiateGuest } from "../../compiler/guest.ts";
 const { values } = parseArgs({
   options: {
+    world: { type: "boolean", default: false },
+    repetitions: { type: "string", default: "3" },
+    "timeout-ms": { type: "string", default: "5000" },
+    "baseline-gdev": {
+      type: "string",
+      default: "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    },
+    "baseline-ink": {
+      type: "string",
+      default: "d520a903a13479455a4380680f64ce590e8d58c5",
+    },
     compiler: {
       type: "string",
       default: "zig-native/zig-out-native-dev/bin/blotc",
     },
-    baseline: {
-      type: "string",
-      default: "zig-native/zig-out-engine-baseline/bin/blotc",
-    },
+    baseline: { type: "string" },
     output: { type: "string", default: "build/bench/engine-stages" },
   },
 });
@@ -29,8 +37,14 @@ const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) =>
     b.toString(16).padStart(2, "0")
   ).join("");
-const versions = [
-  { name: "baseline", executable: resolve(values.baseline!), trace: false },
+let versions = [
+  {
+    name: "baseline",
+    executable: resolve(
+      values.baseline ?? "zig-native/zig-out-engine-baseline/bin/blotc",
+    ),
+    trace: false,
+  },
   { name: "candidate", executable: resolve(values.compiler!), trace: false },
   { name: "traced", executable: resolve(values.compiler!), trace: true },
 ];
@@ -62,7 +76,7 @@ lines.push(
   `  let result = ${previous} rows 0`,
   "  return result.xx",
 );
-const probes = [
+let probes = [
   {
     name: "matrix6",
     source: lines.join("\n") + "\n",
@@ -77,8 +91,68 @@ const probes = [
     expected: 41,
   },
 ];
+const repetitions = Number(values.repetitions);
+const timeoutMs = Number(values["timeout-ms"]);
+if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 9) {
+  throw new Error("--repetitions must be 1..9");
+}
+if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30000) {
+  throw new Error("--timeout-ms must be 100..30000");
+}
+const worldBaseline: Record<string, string> = {};
+const worldPins: Record<string, { baseline: string; candidate: string }> = {};
+if (values.world) {
+  versions = versions.slice(0, 2);
+  if (values.baseline === undefined) {
+    versions[0].executable = versions[1].executable;
+  }
+  probes = [{
+    name: "world-producer",
+    source:
+      'import * as world from "game/world_storage"\nentry const answer = func (input: U32): U32 => return do:\n  let marker: GrowArray U32 = #[input]\n  return marker[0]\n',
+    native: true,
+    expected: 41,
+  }];
+  for (
+    const [project, ref, paths] of [
+      ["gdev", values["baseline-gdev"]!, [
+        "src/world_storage.blot",
+        "tests/minor_support/owned.blot",
+        "tests/minor_support/game.blot",
+      ]],
+      ["ink", values["baseline-ink"]!, ["lib/pen/host.blot"]],
+    ] as const
+  ) {
+    for (const path of paths) {
+      const result = await new Deno.Command("git", {
+        cwd: resolve(repo, "../", project),
+        args: ["show", `${ref}:${path}`],
+        stdout: "piped",
+        stderr: "piped",
+      }).output();
+      if (!result.success) {
+        throw new Error(new TextDecoder().decode(result.stderr));
+      }
+      const absolute = resolve(repo, "../", project, path);
+      worldBaseline[absolute] = new TextDecoder().decode(result.stdout);
+      worldPins[`${project}/${path}`] = {
+        baseline: await hash(result.stdout),
+        candidate: await hash(await Deno.readFile(absolute)),
+      };
+    }
+  }
+}
+if (values.world && values.baseline !== undefined) {
+  for (const [path, pins] of Object.entries(worldPins)) {
+    if (pins.baseline !== pins.candidate) {
+      throw new Error(
+        `Compiler comparison requires unchanged world source: ${path}`,
+      );
+    }
+  }
+}
 const samples = [];
-for (let repetition = 0; repetition < 3; repetition++) {
+for (let repetition = 0; repetition < repetitions; repetition++) {
   for (const probe of probes) {
     const entry = resolve(output, `${probe.name}.blot`);
     await Deno.writeTextFile(entry, probe.source);
@@ -93,9 +167,9 @@ for (let repetition = 0; repetition < 3; repetition++) {
         profileBackend: true,
         cacheDirectory: false,
         codegenWorkers: 1,
-        startupTimeoutMs: 5000,
+        startupTimeoutMs: timeoutMs,
       };
-      if (version.trace) options.profileTrace = true;
+      if (version.trace || values.world) options.profileTrace = true;
       if (probe.native) {
         options.imports = Object.fromEntries(
           Object.entries(settings.imports).map((
@@ -121,8 +195,13 @@ for (let repetition = 0; repetition < 3; repetition++) {
       let sample;
       try {
         const start = performance.now();
+        let sources: Record<string, string> | undefined;
+        if (values.world && version.name === "baseline") {
+          sources = worldBaseline;
+        }
         const result = await compiler.build({
-          signal: AbortSignal.timeout(5000),
+          sources,
+          signal: AbortSignal.timeout(timeoutMs),
         });
         const buildMs = performance.now() - start;
         if (!result.success) {
@@ -153,6 +232,14 @@ for (let repetition = 0; repetition < 3; repetition++) {
       }
       sample.progress = compiler.profileProgress;
       samples.push(sample);
+      await Deno.writeTextFile(
+        resolve(output, "partial.json"),
+        JSON.stringify(
+          { worldPins, repetitions, timeoutMs, samples },
+          null,
+          2,
+        ) + "\n",
+      );
       console.log(
         JSON.stringify({
           probe: sample.probe,
@@ -169,7 +256,11 @@ await Deno.writeTextFile(
   JSON.stringify(
     {
       toolchain:
-        "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; three rotated repetitions",
+        "Zig 0.17.0 safe/noLLVM; fresh sessions; cache disabled; rotated repetitions",
+      worldPins,
+      repetitions,
+      timeoutMs,
+      producerExecutionQualified: !values.world,
       samples,
     },
     null,

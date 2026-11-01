@@ -98,6 +98,8 @@ pub const SchemeMembership = struct {
     indexed_items: u64 = 0,
 };
 pub const Counters = struct {
+    scoped_core_validation_reused: u64 = 0,
+    scoped_core_validation_fresh: u64 = 0,
     scoped_source_proof_instances: u64 = 0,
     scoped_source_proof_hits: u64 = 0,
     scoped_emission_expressions: u64 = 0,

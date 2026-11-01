@@ -1,0 +1,40 @@
+diff --git a/lib/pen/host.blot b/lib/pen/host.blot
+index f8dd36d..ed61396 100644
+--- a/lib/pen/host.blot
++++ b/lib/pen/host.blot
+@@ -20,6 +20,26 @@ import * as frame_defaults from "pen/frame"
+ import { Vec3 } from "std/vector"
+ 
+ 
++// Invocation-local aliases; each output and payload pool has a separate owner.
++type FrameBindings is data = $FrameBindings {
++  frame: render.FrameAccess,
++  audio: audio.Access,
++  events: ResizeArray window.Event,
++  ui_nodes: ResizeArray tree.Node,
++  ui_marked: ResizeArray tree.Node,
++  ui_labels: ResizeArray U32,
++  ui_options: ResizeArray (&[U32]),
++  frame_vectors: ResizeArray math.Vec4,
++  frame_faces: ResizeArray render.Face,
++  frame_values: ResizeArray F32,
++  frame_floats: ResizeArray F32,
++  frame_inset_draws: ResizeArray render.Draw,
++  semantic_text: ResizeArray U32,
++  semantic_values: ResizeArray F32,
++  service_output: ResizeArray services.Request,
++  encoder_text: ResizeArray F32,
++}
++
+ // Input events occupy a separately named owner; this local result is scalar.
+ type FrameInput is data = $FrameInput {elapsed: F32, width: F32, height: F32}
+ const decode_frame = func (packet: Array F32) -> (packet_events: ResizeArray protocol.Event) -> (received: ResizeArray window.Event) => return do:
+@@ -298,7 +318,7 @@ const with_frame = func application -> base -> consume => return do:
+   let audio_access = $audio.Access {sounds, voices, buses}
+   let service_output: ResizeArray services.Request = #[]
+   let encoder_text: ResizeArray F32 = #[]
+-  let bindings = {frame, audio: audio_access, events, ui_nodes, ui_marked, ui_labels, ui_options,
++  let bindings = $FrameBindings {frame, audio: audio_access, events, ui_nodes, ui_marked, ui_labels, ui_options,
+     frame_vectors, frame_faces, frame_values, frame_floats, frame_inset_draws,
+     semantic_text, semantic_values, service_output, encoder_text}
+   // This known policy only aliases caller-owned inputs. It neither allocates
