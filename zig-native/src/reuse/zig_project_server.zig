@@ -35,6 +35,7 @@ const Request = struct {
     imports: []const project.Alias = &.{},
     dependencies: ?[]const u8 = null,
     profileBackend: bool = false,
+    profileTrace: bool = false,
     explainDemands: bool = false,
     explainAllocations: bool = false,
     codegenTier: @import("../compilation_tier.zig").Tier = .optimized,
@@ -107,6 +108,7 @@ fn validateOpen(request: Request) !project.Options {
 }
 
 const OpenProject = struct {
+    profile_trace: bool = false,
     allocator: Allocator,
     entry: []u8,
     options_owner: inputs.Snapshot,
@@ -178,7 +180,7 @@ const OpenProject = struct {
             checkpoint_pending = true;
         }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .seed_pending = checkpoint_pending and request.dependencies == null, .last_write = last_write };
+        return .{ .profile_trace = request.profileTrace, .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .seed_pending = checkpoint_pending and request.dependencies == null, .last_write = last_write };
     }
     /// A seed that fails to decode for this compiler and these settings, or
     /// fails validation, is ignored.
@@ -360,6 +362,10 @@ const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
 
 fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
     // Profiled sessions clock this build until its stats are published.
+    var diagnostic_trace: ?phase_profile.Trace = if (opened.profile_trace) .init(io, id) else null;
+    const trace_installation = phase_profile.installTrace(if (diagnostic_trace) |*owner| owner else null);
+    defer trace_installation.restore();
+    defer if (diagnostic_trace) |*owner| owner.flushPasses();
     var profile: ?phase_profile.Profile = if (opened.session.profile_backend) .init(io) else null;
     const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
     defer if (installation) |installed| installed.restore();
@@ -642,7 +648,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
             .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.explainDemands or request.explainAllocations or request.codegenTier != .optimized or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
+                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainDemands or request.explainAllocations or request.codegenTier != .optimized or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;

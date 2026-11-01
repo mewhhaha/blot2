@@ -1,0 +1,183 @@
+{
+  "workload": "original_kites_draw_complete_stream",
+  "status": "complete",
+  "deadline_ms": 10000,
+  "execution": "V8",
+  "codegen_tier": "optimized",
+  "codegen_workers": 1,
+  "baseline_ref": "fcebd8a7adc8d3e7fed7db85a314a892d15a2411",
+  "pins": {
+    "compiler_sha256": "9b0f6b05e66e2ca46bb1ebd363f9bfc511969587f29345d95d8961ab00133554",
+    "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+    "baseline_producer_sha256": "76989b7a1d28a284e093c47a5cec9120bb85861a5929f3ce848829a632b29e65",
+    "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+    "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+  },
+  "comparisons": [
+    {
+      "scenario": 0,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 1,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 2,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 4,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 8,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 16,
+      "equal": true,
+      "first_difference": -1
+    },
+    {
+      "scenario": 31,
+      "equal": true,
+      "first_difference": -1
+    }
+  ],
+  "builds": [
+    {
+      "name": "baseline",
+      "build_ms": 6830.980237,
+      "status": "complete",
+      "wasm_bytes": 262967,
+      "wasm_sha256": "621d1819bbcd79e1852470fbc00b02c110ffa8be726c6c77f2b75cbbbca558d4",
+      "runs": [
+        {
+          "scenario": 0,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+        },
+        {
+          "scenario": 1,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+        },
+        {
+          "scenario": 2,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+        },
+        {
+          "scenario": 4,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+        },
+        {
+          "scenario": 8,
+          "draw_count": 57,
+          "vector_count": 1,
+          "lane_count": 1254,
+          "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+        },
+        {
+          "scenario": 16,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+        },
+        {
+          "scenario": 31,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+        }
+      ]
+    },
+    {
+      "name": "candidate",
+      "build_ms": 6388.98851,
+      "status": "complete",
+      "wasm_bytes": 261953,
+      "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+      "runs": [
+        {
+          "scenario": 0,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+        },
+        {
+          "scenario": 1,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+        },
+        {
+          "scenario": 2,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+        },
+        {
+          "scenario": 4,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+        },
+        {
+          "scenario": 8,
+          "draw_count": 57,
+          "vector_count": 1,
+          "lane_count": 1254,
+          "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+        },
+        {
+          "scenario": 16,
+          "draw_count": 64,
+          "vector_count": 92,
+          "lane_count": 1786,
+          "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+        },
+        {
+          "scenario": 31,
+          "draw_count": 34,
+          "vector_count": 1,
+          "lane_count": 702,
+          "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+        }
+      ]
+    }
+  ],
+  "source_patch": {
+    "removed": "GrowArray additions, freeze, render.emit copy",
+    "replacement": "append the same rows directly to frame.draws",
+    "order": "unchanged; sentinel draw and vector prefixes retained"
+  },
+  "reproduce": "deno run --no-config --no-lock -A scripts/bench/kites_stream.ts --compiler zig-native/zig-out-native-dev/bin/blotc --timeout-ms 10000 --trace",
+  "limits": [
+    "One traced pair, not a latency benchmark. Seven complete original-production streams executed with bitwise equality.",
+    "Diagnostic defaults remain five seconds; only this original-source integration was allowed ten.",
+    "No fresh whole-main Wasm or PNG; saved framing 26, ABI 8 and session 2 unchanged.",
+    "Installed Pen codegen --check reports nine unchanged generated bindings stale."
+  ]
+}

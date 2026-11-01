@@ -315,6 +315,7 @@ const Engine = struct {
         associated_used: usize = 0,
     };
     const ParallelWork = struct {
+        trace: ?*@import("../phase_profile.zig").Trace = null,
         parent: *Engine,
         allocator: Allocator,
         units: []const u32,
@@ -322,6 +323,8 @@ const Engine = struct {
         next: std.atomic.Value(usize) = .init(0),
 
         fn execute(self: *ParallelWork) void {
+            const trace_installation = @import("../phase_profile.zig").installTrace(self.trace);
+            defer trace_installation.restore();
             while (true) {
                 const at = self.next.fetchAdd(1, .monotonic);
                 if (at >= self.units.len) return;
@@ -430,7 +433,7 @@ const Engine = struct {
                     return false;
                 }
             }
-            var work: ParallelWork = .{ .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
+            var work: ParallelWork = .{ .trace = @import("../phase_profile.zig").currentTrace(), .parent = self, .allocator = locked.allocator(), .units = ready.items, .jobs = jobs };
             {
                 var group: std.Io.Group = .init;
                 const protection = io.swapCancelProtection(.blocked);
@@ -439,7 +442,9 @@ const Engine = struct {
                 const count = @min(@as(usize, requested), @min(ready.items.len, 16));
                 for (1..count) |_| group.concurrent(io, ParallelWork.execute, .{&work}) catch break;
                 work.execute();
+                const wait_region = @import("../phase_profile.zig").region("check.worker-join", 0, 0, 0);
                 group.await(io) catch unreachable;
+                wait_region.exit();
             }
             // Store allocators must not retain the temporary lock adapter.
             for (ready.items) |unit| if (self.result.modules[unit - 1]) |*module_| {
@@ -674,6 +679,10 @@ const Engine = struct {
     fn checkModule(self: *Engine, unit: project.UnitId) !void {
         const diagnostics_before = self.diagnostics.items.len;
         const source = self.source.unit(unit);
+        const telemetry = @import("../phase_profile.zig");
+        telemetry.traceModule(unit, self.source.symbols.get(source.filename), source.source.len);
+        const region = telemetry.region("check.module", unit, 0, @intCast(source.source.len));
+        defer region.exit();
         const tree = &source.tree;
         var occupied: std.AutoHashMapUnmanaged(symbols.Symbol, void) = .empty;
         defer occupied.deinit(self.allocator);

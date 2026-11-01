@@ -2118,7 +2118,10 @@ const Generator = struct {
                 self.diagnostic = diagnostic_before;
                 return null;
             };
-            if (!plainInlineValue(schema) or !stableDescriptorShape(schema)) return null;
+            if (!plainInlineValue(schema) or !stableDescriptorShape(schema)) {
+                self.traceDescriptorBarrier(m, body.root, schema, "descriptor.admission.result", true);
+                return null;
+            }
             result_schema = schema;
         }
         var evidence: std.ArrayList(u32) = .empty;
@@ -2136,7 +2139,10 @@ const Generator = struct {
                 if (std.mem.findScalar(usize, owners.items, first) == null) try owners.append(self.allocator, first);
                 for (value.other_roots) |other| if (std.mem.findScalar(usize, owners.items, other) == null) try owners.append(self.allocator, other);
             }
-            for (owners.items) |owner_id| if (!stableDescriptorShape(self.roots.items[owner_id].element)) return null;
+            for (owners.items) |owner_id| if (!stableDescriptorShape(self.roots.items[owner_id].element)) {
+                self.traceDescriptorBarrier(m, body.root, self.roots.items[owner_id].element, "descriptor.admission.writer-row", true);
+                return null;
+            };
             if (!try self.optionalWriterEvidence(m, body, values, descriptors.items, owners.items, &evidence)) return null;
         } else if (!try self.optionalReaderEvidence(m, body, values, &evidence)) return null;
         if (!try self.sharedDescriptorEvidence(m, body, values, &evidence, result_schema)) return null;
@@ -2849,23 +2855,82 @@ const Generator = struct {
             else => unreachable,
         };
     }
+    // Failed admission alone requests a diagnostic path. The optional walk
+    // never changes evidence, work limits, cache keys or the admission result.
+    fn traceDescriptorBarrier(self: *Generator, m: ?*const core.Module, id: core.Id, value: Value, stage: []const u8, stable: bool) void {
+        const profile = @import("../phase_profile.zig");
+        if (profile.currentTrace() == null) return;
+        var location: evaluation.SourceLocation = self.specialization_origin orelse .{ .unit = self.entry_unit, .span = .{ .start = 0, .end = 0 } };
+        if (m) |owner| location = .{ .unit = owner.unit, .span = owner.span(id) };
+        profile.detail(stage, location.unit, location.span.start, location.span.end, @backingInt(value.tag));
+        var current = value;
+        for (0..128) |_| {
+            if (current.type_evidence) |known| profile.detail("descriptor.type", known.root.unit, 0, 0, known.root.ty);
+            if (current.tag == .callable) {
+                profile.detail("descriptor.callback", location.unit, location.span.start, location.span.end, 0);
+                return;
+            }
+            if (current.tag != .scalar and current.tag != .aggregate) {
+                profile.detail("descriptor.nested-descriptor", location.unit, location.span.start, location.span.end, @backingInt(current.tag));
+                return;
+            }
+            if (stable and current.variant_tags.len != 0) {
+                profile.detail("descriptor.variant", location.unit, location.span.start, location.span.end, current.variant_tags.len);
+                return;
+            }
+            var found = false;
+            for (current.fields, 0..) |field, index| {
+                var admitted = plainShape(field);
+                if (stable) admitted = stableDescriptorShape(field);
+                if (admitted) continue;
+                profile.detail("descriptor.field-index", location.unit, location.span.start, location.span.end, index);
+                current = field;
+                found = true;
+                break;
+            }
+            if (!found) return;
+        }
+    }
     fn readerArgument(self: *Generator, value: Value, descriptor: *bool, remaining: *usize) bool {
-        if (remaining.* == 0 or value.host != null or value.demand != null) return false;
+        if (remaining.* == 0) {
+            self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.work-limit", false);
+            return false;
+        }
+        if (value.host != null) {
+            self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.host-callback", false);
+            return false;
+        }
+        if (value.demand != null) {
+            self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.demand", false);
+            return false;
+        }
         remaining.* -= 1;
         switch (value.tag) {
             .scalar => return true,
             .aggregate, .callable => {
                 if (value.tag == .callable) {
-                    if (value.callable == null) return false;
+                    if (value.callable == null) {
+                        self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.callback-missing", false);
+                        return false;
+                    }
                     descriptor.* = true;
                 }
                 for (value.fields) |field| if (!self.readerArgument(field, descriptor, remaining)) return false;
                 return true;
             },
             .array, .ref, .link, .view => {
-                const owner_root = value.root orelse return false;
-                if (!plainShape(self.roots.items[owner_root].element)) return false;
-                for (value.other_roots) |other| if (!plainShape(self.roots.items[other].element)) return false;
+                const owner_root = value.root orelse {
+                    self.traceDescriptorBarrier(null, 0, value, "descriptor.reader.owner-missing", false);
+                    return false;
+                };
+                if (!plainShape(self.roots.items[owner_root].element)) {
+                    self.traceDescriptorBarrier(null, 0, self.roots.items[owner_root].element, "descriptor.reader.plain-row", false);
+                    return false;
+                }
+                for (value.other_roots) |other| if (!plainShape(self.roots.items[other].element)) {
+                    self.traceDescriptorBarrier(null, 0, self.roots.items[other].element, "descriptor.reader.alternative-row", false);
+                    return false;
+                };
                 descriptor.* = true;
                 return true;
             },
@@ -3184,8 +3249,14 @@ const Generator = struct {
         if (value.callable) |callable| {
             const owner = try self.unit(callable.unit);
             if (callable.target == 0) {
-                if (callable.node == 0 or owner.node(callable.node).tag != .closure or callable.goals.len != 0) return error.Declined;
-                if (owner.closures[owner.node(callable.node).a].qualifier != 0) return error.Declined;
+                if (callable.node == 0 or owner.node(callable.node).tag != .closure or callable.goals.len != 0) {
+                    self.traceDescriptorBarrier(m, id, value, "descriptor.shared.callback-evidence", false);
+                    return error.Declined;
+                }
+                if (owner.closures[owner.node(callable.node).a].qualifier != 0) {
+                    self.traceDescriptorBarrier(m, id, value, "descriptor.shared.callback-qualifier", false);
+                    return error.Declined;
+                }
             }
             const signature = if (callable.target != 0) owner.binding(callable.target).ty else owner.typeOf(callable.node);
             try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = signature, .environment = callable.types }, evidence, keys, remaining);
@@ -3214,12 +3285,16 @@ const Generator = struct {
             if (err == error.OutOfMemory) return err;
             evidence.shrinkRetainingCapacity(before);
             self.diagnostic = diagnostic_before;
+            @import("../phase_profile.zig").detail("descriptor.shared.evidence", m.unit, m.span(body.root).start, m.span(body.root).end, body.binding);
             return false;
         };
         return true;
     }
     fn descriptorEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, evidence: *std.ArrayList(u32), result_schema: ?Value) Error!void {
-        if (result_schema) |result| if (!plainInlineValue(result) or !stableDescriptorShape(result)) return error.Declined;
+        if (result_schema) |result| if (!plainInlineValue(result) or !stableDescriptorShape(result)) {
+            self.traceDescriptorBarrier(m, body.root, result, "descriptor.shared.result", true);
+            return error.Declined;
+        };
         var remaining: usize = 4096;
         var work: usize = 4096;
         var keys = selected_types.Builder.init(self.allocator, &work, .{});
@@ -3314,7 +3389,10 @@ const Generator = struct {
         var evidence: std.ArrayList(u32) = .empty;
         defer evidence.deinit(self.allocator);
         if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
-        if (aggregate_result and self.destination != null) return null;
+        if (aggregate_result and self.destination != null) {
+            self.traceDescriptorBarrier(m, body.root, result_shape, "descriptor.reader.pending-destination", false);
+            return null;
+        }
         var result_schema: ?Value = null;
         if (aggregate_result) result_schema = result_shape;
         var shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
@@ -3508,7 +3586,10 @@ const Generator = struct {
         if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
         var stable = true;
         for (owners.items) |owner_id| {
-            if (!stableDescriptorShape(self.roots.items[owner_id].element)) stable = false;
+            if (!stableDescriptorShape(self.roots.items[owner_id].element)) {
+                self.traceDescriptorBarrier(m, body.root, self.roots.items[owner_id].element, "descriptor.writer.stable-row", true);
+                stable = false;
+            }
         }
         var shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null);
         if (!self.specialize and !shared) return null;
@@ -5711,6 +5792,7 @@ pub fn compile(allocator: std.mem.Allocator, units: []const core.Module, entry: 
     return compileWithOptions(allocator, units, entry, .{});
 }
 pub const CompileOptions = struct {
+    identity: ?@import("runtime_identity.zig").View = null,
     storage: storage_plan.Config = .{},
     work_limits: WorkLimits = .{},
     tier: @import("../compilation_tier.zig").Tier = .optimized,
@@ -5720,6 +5802,12 @@ pub const CompileOptions = struct {
     profile: bool = false,
 };
 pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Module, entry: u32, options: CompileOptions) std.mem.Allocator.Error!backend.Result {
+    if (@import("../phase_profile.zig").currentTrace() != null) if (options.identity) |identity| {
+        for (units) |*unit_| if (identity.owner(unit_.unit)) |path| {
+            // Retained Core has canonical paths but no source byte inventory.
+            @import("../phase_profile.zig").traceModule(unit_.unit, path, 0);
+        };
+    };
     const config = options.storage;
     const limits = options.work_limits;
     if (limits.expressions == 0) return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped emission requires a positive expression allowance" } };
@@ -5727,20 +5815,28 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer allocator.free(views);
     for (units, 0..) |*unit_, index| views[index] = unit_;
     const validation = @import("../check/frozen_core_validation.zig");
-    for (units) |*unit_| validation.validateBounds(unit_, .{ .units = views }) catch {
-        return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core bounds" } };
-    };
-    for (units) |*unit_| validation.validate(allocator, unit_, .{ .units = views }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidArtifact => {
-            return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core evidence" } };
-        },
-    };
+    {
+        const trace = @import("../phase_profile.zig").region("owned.validate-core", entry, 0, 0);
+        defer trace.exit();
+        for (units) |*unit_| validation.validateBounds(unit_, .{ .units = views }) catch {
+            return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core bounds" } };
+        };
+        for (units) |*unit_| validation.validate(allocator, unit_, .{ .units = views }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidArtifact => {
+                return .{ .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid scoped-storage Core evidence" } };
+            },
+        };
+    }
     var module = wasm.Module.init(allocator);
     defer module.deinit();
-    const runtime = storage.emit(&module) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => unreachable,
+    const runtime = runtime_block: {
+        const trace = @import("../phase_profile.zig").region("owned.runtime-generation", entry, 0, 0);
+        defer trace.exit();
+        break :runtime_block storage.emit(&module) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => unreachable,
+        };
     };
     var emission_work: @import("../work_counters.zig").Counters = .{ .max_scoped_emission_limit = limits.expressions };
     var proof_cache = source_proof.SourceProofCache.initWithInventoryBudget(allocator, views) catch |err| switch (err) {
@@ -5770,48 +5866,64 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer methods.deinit();
     var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
-    g.emit(entry) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.Declined => return .{ .counters = emission_work, .diagnostic = g.diagnostic orelse .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported } },
-    };
-    const capacities = try allocator.alloc(u32, g.max_stacks);
-    defer allocator.free(capacities);
-    if (config.persistent_lanes.len != 0 and config.persistent_lanes.len != g.globals.items.len) return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Persistent storage budgets must match the named pool inventory" } };
-    @memset(capacities, config.grower_bytes);
-    capacities[g.fixed_region] = config.temporary_bytes;
-    for (g.globals.items, 0..) |global, index| {
-        const configured = if (config.persistent_lanes.len == 0) config.persistent_bytes else config.persistent_lanes[index];
-        // Inferred extents only reduce reservation; they never enlarge an
-        // application's explicit per-pool budget.
-        capacities[index] = @min(configured, global.literal_bytes orelse configured);
+    {
+        const trace = @import("../phase_profile.zig").region("owned.emit", entry, 0, 0);
+        defer trace.exit();
+        g.emit(entry) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.Declined => return .{ .counters = emission_work, .diagnostic = g.diagnostic orelse .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported } },
+        };
     }
-    if (g.transport_region) |region| capacities[region] = config.transport_bytes;
-    try capacity_requests.apply(capacities);
-    const memory_plan: storage.Plan = .{ .region_capacities = capacities, .owner_capacity = config.owner_capacity };
-    storage.finishPlan(&module, runtime, memory_plan) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Owned storage memory plan exceeds Wasm32 capacity" } },
-    };
-    if (g.transport) |transport| packets.configure(&module, transport, storage.regionBase(memory_plan, g.transport_region.?) catch unreachable, capacities[g.transport_region.?]) catch {
-        return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid copied transport memory plan" } };
-    };
-    const outlined = outlining.finalize() catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped helpers exceeded their checked machine-state or engine limits" } },
+    {
+        const trace = @import("../phase_profile.zig").region("owned.memory-plan", entry, 0, 0);
+        defer trace.exit();
+        const capacities = try allocator.alloc(u32, g.max_stacks);
+        defer allocator.free(capacities);
+        if (config.persistent_lanes.len != 0 and config.persistent_lanes.len != g.globals.items.len) return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Persistent storage budgets must match the named pool inventory" } };
+        @memset(capacities, config.grower_bytes);
+        capacities[g.fixed_region] = config.temporary_bytes;
+        for (g.globals.items, 0..) |global, index| {
+            const configured = if (config.persistent_lanes.len == 0) config.persistent_bytes else config.persistent_lanes[index];
+            // Inferred extents only reduce reservation; they never enlarge an
+            // application's explicit per-pool budget.
+            capacities[index] = @min(configured, global.literal_bytes orelse configured);
+        }
+        if (g.transport_region) |region| capacities[region] = config.transport_bytes;
+        try capacity_requests.apply(capacities);
+        const memory_plan: storage.Plan = .{ .region_capacities = capacities, .owner_capacity = config.owner_capacity };
+        storage.finishPlan(&module, runtime, memory_plan) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Owned storage memory plan exceeds Wasm32 capacity" } },
+        };
+        if (g.transport) |transport| packets.configure(&module, transport, storage.regionBase(memory_plan, g.transport_region.?) catch unreachable, capacities[g.transport_region.?]) catch {
+            return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Invalid copied transport memory plan" } };
+        };
+    }
+    const outlined = outline_block: {
+        const trace = @import("../phase_profile.zig").region("owned.outline", entry, 0, 0);
+        defer trace.exit();
+        break :outline_block outlining.finalize() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped helpers exceeded their checked machine-state or engine limits" } },
+        };
     };
     emission_work.scoped_outlined_regions = outlined.regions;
     emission_work.scoped_outlined_globals = outlined.globals;
     var runtime_optimization: @import("optimized_bodies.zig").Stats = .{ .tier = options.tier };
-    const bytes = module.assembleWithOptions(.{
-        .tier = options.tier,
-        .workers = options.workers,
-        .share_machine_code = options.share_machine_code,
-        .io = options.io,
-        .profile = options.profile,
-        .stats = &runtime_optimization,
-    }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => return .{ .runtime_optimization = runtime_optimization, .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
+    const bytes = assembly_block: {
+        const trace = @import("../phase_profile.zig").region("owned.assemble", entry, 0, 0);
+        defer trace.exit();
+        break :assembly_block module.assembleWithOptions(.{
+            .tier = options.tier,
+            .workers = options.workers,
+            .share_machine_code = options.share_machine_code,
+            .io = options.io,
+            .profile = options.profile,
+            .stats = &runtime_optimization,
+        }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .runtime_optimization = runtime_optimization, .counters = emission_work, .diagnostic = .{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Scoped storage emission failed Wasm validation" } },
+        };
     };
     return .{ .runtime_optimization = runtime_optimization, .bytes = bytes, .emitted_functions = module.functions.items.len - runtime_optimization.shared, .whole_module_only = true, .counters = emission_work };
 }

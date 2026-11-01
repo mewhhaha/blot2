@@ -115,6 +115,8 @@ export interface ZigProjectCompilerOptions {
   dependencies?: string | URL | null;
   /** Collect detailed backend phase and slow inference-region timings. */
   profileBackend?: boolean;
+  /** Stream bounded phase, module and region progress records over stderr. */
+  profileTrace?: boolean;
   /** Collect bounded source-site demand lowering decisions. */
   explainDemands?: boolean;
   /** Collect bounded allocation sites and array ownership decisions. */
@@ -150,6 +152,8 @@ export interface ZigProjectCompilerOptions {
 export interface ZigProjectCompiler {
   readonly pid: number;
   readonly compilerIdentity: string;
+  /** Bounded diagnostic progress; remains available after dispose/cancellation. */
+  readonly profileProgress?: ZigProjectProfileProgress;
   build(options?: ZigProjectBuildOptions): Promise<ZigProjectBuildResult>;
   complete(
     options: ZigProjectCompletionOptions,
@@ -158,6 +162,77 @@ export interface ZigProjectCompiler {
   exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>>;
   close(): Promise<void>;
   dispose(): Promise<void>;
+}
+export type ZigProjectProfileEvent =
+  | {
+    kind: "begin";
+    build: number;
+    id: number;
+    thread: number;
+    stage: string;
+    unit: number;
+    start: number;
+    end: number;
+    at_us: number;
+  }
+  | {
+    kind: "end";
+    build: number;
+    id: number;
+    thread: number;
+    stage: string;
+    unit: number;
+    start: number;
+    end: number;
+    at_us: number;
+    us: number;
+    cpu_us: number | null;
+    input_items: number;
+    output_items: number;
+  }
+  | {
+    kind: "module";
+    build: number;
+    unit: number;
+    filename: string;
+    bytes: number;
+  }
+  | {
+    kind: "phases";
+    build: number;
+    active: string;
+    phase_us: readonly number[];
+    at_us: number;
+  }
+  | {
+    kind: "detail";
+    build: number;
+    thread: number;
+    stage: string;
+    unit: number;
+    start: number;
+    end: number;
+    items: number;
+    at_us: number;
+  };
+export interface ZigProjectProfileProgress {
+  readonly events: readonly ZigProjectProfileEvent[];
+  readonly modules: readonly {
+    unit: number;
+    filename: string;
+    bytes: number;
+  }[];
+  readonly phases: Extract<ZigProjectProfileEvent, { kind: "phases" }> | null;
+  readonly activeRegions: readonly Extract<
+    ZigProjectProfileEvent,
+    { kind: "begin" }
+  >[];
+  readonly slowRegions: readonly Extract<
+    ZigProjectProfileEvent,
+    { kind: "end" }
+  >[];
+  readonly activeDropped: number;
+  readonly dropped: number;
 }
 export interface ZigProjectBuildOptions {
   signal?: AbortSignal;
@@ -405,6 +480,23 @@ class ProjectProcess implements ZigProjectCompiler {
   readonly #stderrDone: Promise<void>;
   readonly #jobs = new Set<Job>();
   #stderr = "";
+  #profilePartial = "";
+  #profileDiscarding = false;
+  #profileEvents: ZigProjectProfileEvent[] = [];
+  #profileBuildId: number | null = null;
+  #profileActive = new Map<
+    number,
+    Extract<ZigProjectProfileEvent, { kind: "begin" }>
+  >();
+  #profileSlow: Extract<ZigProjectProfileEvent, { kind: "end" }>[] = [];
+  #profileActiveDropped = 0;
+  #profileModules = new Map<
+    number,
+    { unit: number; filename: string; bytes: number }
+  >();
+  #profilePhases: Extract<ZigProjectProfileEvent, { kind: "phases" }> | null =
+    null;
+  #profileDropped = 0;
   #buffer = new Uint8Array(0);
   #position = 0;
   #queue: Promise<void> = Promise.resolve();
@@ -462,15 +554,201 @@ class ProjectProcess implements ZigProjectCompiler {
   get compilerIdentity() {
     return this.#identity;
   }
+  get profileProgress(): ZigProjectProfileProgress {
+    return {
+      events: this.#profileEvents.map((event) =>
+        event.kind === "phases"
+          ? { ...event, phase_us: [...event.phase_us] }
+          : { ...event }
+      ),
+      modules: [...this.#profileModules.values()].map((module) => ({
+        ...module,
+      })),
+      phases: this.#profilePhases && {
+        ...this.#profilePhases,
+        phase_us: [...this.#profilePhases.phase_us],
+      },
+      activeRegions: [...this.#profileActive.values()].map((event) => ({
+        ...event,
+      })),
+      slowRegions: this.#profileSlow.map((event) => ({ ...event })),
+      activeDropped: this.#profileActiveDropped,
+      dropped: this.#profileDropped,
+    };
+  }
+  #profileLine(line: string) {
+    if (!line.startsWith("BLOT_PROFILE ")) return;
+    let value: unknown;
+    try {
+      value = JSON.parse(line.slice("BLOT_PROFILE ".length));
+    } catch {
+      return;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    const item = value as Record<string, unknown>;
+    const integer = (key: string) =>
+      Number.isSafeInteger(item[key]) &&
+      (item[key] as number) >= 0;
+    const string = (key: string) => typeof item[key] === "string";
+    if (!integer("build") || item.build !== this.#profileBuildId) return;
+    let event: ZigProjectProfileEvent | undefined;
+    if (
+      (item.kind === "begin" || item.kind === "end") && integer("id") &&
+      integer("thread") && string("stage") &&
+      (item.stage as string).length <= 128 && integer("unit") &&
+      integer("start") && integer("end") && integer("at_us")
+    ) {
+      if (item.kind === "begin") {
+        event = {
+          kind: "begin",
+          build: item.build as number,
+          id: item.id as number,
+          thread: item.thread as number,
+          stage: item.stage as string,
+          unit: item.unit as number,
+          start: item.start as number,
+          end: item.end as number,
+          at_us: item.at_us as number,
+        };
+      } else if (
+        integer("us") && integer("input_items") && integer("output_items") &&
+        (item.cpu_us === null || integer("cpu_us"))
+      ) {
+        event = {
+          kind: "end",
+          build: item.build as number,
+          id: item.id as number,
+          thread: item.thread as number,
+          stage: item.stage as string,
+          unit: item.unit as number,
+          start: item.start as number,
+          end: item.end as number,
+          at_us: item.at_us as number,
+          us: item.us as number,
+          cpu_us: item.cpu_us as number | null,
+          input_items: item.input_items as number,
+          output_items: item.output_items as number,
+        };
+      }
+    } else if (
+      item.kind === "module" && integer("unit") && string("filename") &&
+      (item.filename as string).length <= 4096 &&
+      integer("bytes")
+    ) {
+      const module = {
+        unit: item.unit as number,
+        filename: item.filename as string,
+        bytes: item.bytes as number,
+      };
+      const previous = this.#profileModules.get(module.unit);
+      if (module.bytes === 0 && previous?.filename === module.filename) {
+        module.bytes = previous.bytes;
+      }
+      this.#profileModules.set(module.unit, module);
+      if (this.#profileModules.size > 4096) {
+        const oldest = this.#profileModules.keys().next().value;
+        if (oldest !== undefined) this.#profileModules.delete(oldest);
+        this.#profileDropped++;
+      }
+      event = { kind: "module", build: item.build as number, ...module };
+    } else if (
+      item.kind === "phases" && string("active") &&
+      (item.active as string).length <= 32 && integer("at_us") &&
+      Array.isArray(item.phase_us) && item.phase_us.length === 11 &&
+      item.phase_us.every((entry) => Number.isSafeInteger(entry) && entry >= 0)
+    ) {
+      event = {
+        kind: "phases",
+        build: item.build as number,
+        active: item.active as string,
+        phase_us: [...item.phase_us] as number[],
+        at_us: item.at_us as number,
+      };
+      this.#profilePhases = event;
+    } else if (
+      item.kind === "detail" && integer("thread") && string("stage") &&
+      (item.stage as string).length <= 128 &&
+      integer("unit") && integer("start") && integer("end") &&
+      integer("items") && integer("at_us")
+    ) {
+      event = {
+        kind: "detail",
+        build: item.build as number,
+        thread: item.thread as number,
+        stage: item.stage as string,
+        unit: item.unit as number,
+        start: item.start as number,
+        end: item.end as number,
+        items: item.items as number,
+        at_us: item.at_us as number,
+      };
+    }
+    if (!event) return;
+    if (event.kind === "begin") {
+      this.#profileActive.set(event.id, event);
+      if (this.#profileActive.size > 256) {
+        const oldest = this.#profileActive.keys().next().value;
+        if (oldest !== undefined) this.#profileActive.delete(oldest);
+        this.#profileActiveDropped++;
+      }
+    } else if (event.kind === "end") {
+      this.#profileActive.delete(event.id);
+      this.#profileSlow.push(event);
+      this.#profileSlow.sort((a, b) => b.us - a.us);
+      if (this.#profileSlow.length > 32) this.#profileSlow.length = 32;
+    }
+    this.#profileEvents.push(event);
+    if (this.#profileEvents.length > 256) {
+      this.#profileEvents.shift();
+      this.#profileDropped++;
+    }
+  }
+  #consumeProfileText(text: string, final = false) {
+    let start = 0;
+    while (start < text.length) {
+      const newline = text.indexOf("\n", start);
+      const end = newline < 0 ? text.length : newline;
+      const fragment = text.slice(start, end);
+      if (!this.#profileDiscarding) {
+        if (this.#profilePartial.length + fragment.length > 65_536) {
+          if (
+            this.#profilePartial.startsWith("BLOT_PROFILE ") ||
+            (!this.#profilePartial && fragment.startsWith("BLOT_PROFILE "))
+          ) {
+            this.#profileDropped++;
+          }
+          this.#profilePartial = "";
+          this.#profileDiscarding = newline < 0;
+        } else {
+          this.#profilePartial += fragment;
+          if (newline >= 0) this.#profileLine(this.#profilePartial);
+        }
+      }
+      if (newline < 0) {
+        start = text.length;
+      } else {
+        this.#profilePartial = "";
+        this.#profileDiscarding = false;
+        start = newline + 1;
+      }
+    }
+    if (final && !this.#profileDiscarding && this.#profilePartial) {
+      this.#profileLine(this.#profilePartial);
+      this.#profilePartial = "";
+    }
+  }
   async #collectStderr() {
     const decoder = new TextDecoder();
     try {
       for await (const bytes of this.#child.stderr) {
-        this.#stderr = (this.#stderr + decoder.decode(bytes, { stream: true }))
-          .slice(-65_536);
+        const text = decoder.decode(bytes, { stream: true });
+        this.#consumeProfileText(text);
+        this.#stderr = (this.#stderr + text).slice(-65_536);
       }
     } finally {
-      this.#stderr = (this.#stderr + decoder.decode()).slice(-65_536);
+      const text = decoder.decode();
+      this.#consumeProfileText(text, true);
+      this.#stderr = (this.#stderr + text).slice(-65_536);
     }
   }
   #failure(error: unknown): Error {
@@ -791,10 +1069,19 @@ class ProjectProcess implements ZigProjectCompiler {
       return Promise.reject(error);
     }
     return this.#enqueue(options.signal, async (job) => {
+      const id = this.#id();
+      this.#profileEvents = [];
+      this.#profileModules.clear();
+      this.#profilePhases = null;
+      this.#profileActive.clear();
+      this.#profileSlow = [];
+      this.#profileActiveDropped = 0;
+      this.#profileDropped = 0;
+      this.#profileBuildId = id;
       // The acknowledged revision is read here, after all prior replies.
       const request: Record<string, unknown> = {
         kind: "build",
-        id: this.#id(),
+        id,
         epoch: this.#epoch,
         revision: this.#revision,
       };
@@ -1146,6 +1433,7 @@ export async function createZigProjectCompiler(
     "imports",
     "dependencies",
     "profileBackend",
+    "profileTrace",
     "explainDemands",
     "explainAllocations",
     "codegenTier",
@@ -1216,6 +1504,12 @@ export async function createZigProjectCompiler(
     typeof options.profileBackend !== "boolean"
   ) {
     throw new TypeError("profileBackend must be a boolean");
+  }
+  if (
+    options.profileTrace !== undefined &&
+    typeof options.profileTrace !== "boolean"
+  ) {
+    throw new TypeError("profileTrace must be a boolean");
   }
   if (
     options.explainAllocations !== undefined &&
@@ -1293,6 +1587,7 @@ export async function createZigProjectCompiler(
     dependencies: nullablePath(options.dependencies, "dependencies"),
     ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
+    ...(options.profileTrace ? { profileTrace: true } : {}),
     ...(options.explainDemands ? { explainDemands: true } : {}),
     ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),

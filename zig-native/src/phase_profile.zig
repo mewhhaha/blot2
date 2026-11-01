@@ -75,6 +75,7 @@ pub const Profile = struct {
     pub fn record(self: *Profile) Record {
         self.account();
         self.sampleRss(@backingInt(self.active));
+        if (trace) |owner| owner.flushPasses();
         var result: Record = .{ .profiled = true, .total_us = @intCast(@max(0, self.started.durationTo(self.previous).toMicroseconds())), .peak_rss_kib = self.peak_rss_kib };
         result.checking = self.checking;
         for (&result.phases, 0..) |*phase, index| phase.* = .{
@@ -135,6 +136,144 @@ pub const Record = struct {
 threadlocal var installed: ?*Profile = null;
 threadlocal var checking_capture: ?*@import("work_counters.zig").Frontend = null;
 
+/// Independent diagnostic stream. Records own no compiler data and never
+/// participate in artifact identity. The client retains a bounded tail plus
+/// the latest phase totals/module names, even when the process is killed.
+pub const OptimizationPass = enum { @"inline", scalar, vector, row_products, lifetime, reduce, rc };
+const PassTotals = struct { us: u64 = 0, cpu_us: u64 = 0, input: u64 = 0, output: u64 = 0, calls: u64 = 0 };
+
+pub const Trace = struct {
+    io: std.Io,
+    started: std.Io.Timestamp,
+    build: u32,
+    mutex: std.Io.Mutex = .init,
+    next: std.atomic.Value(u64) = .init(1),
+    passes: [7]PassTotals = @splat(.{}),
+
+    pub fn init(io: std.Io, build: u32) Trace {
+        return .{ .io = io, .build = build, .started = std.Io.Clock.awake.now(io) };
+    }
+    /// Pass clocks are accumulated across functions and workers, rather than
+    /// serializing every small pass. These sums overlap coordinator wall time.
+    pub fn flushPasses(self: *Trace) void {
+        inline for (@typeInfo(OptimizationPass).@"enum".field_names, 0..) |name, index| {
+            const totals = &self.passes[index];
+            const calls = @atomicLoad(u64, &totals.calls, .monotonic);
+            if (calls != 0) self.write(.{ .kind = "end", .id = 0, .thread = 0, .stage = "runtime-ir.total." ++ name, .unit = 0, .start = 0, .end = 0, .at_us = self.elapsed(), .us = @atomicLoad(u64, &totals.us, .monotonic), .cpu_us = @atomicLoad(u64, &totals.cpu_us, .monotonic), .input_items = @atomicLoad(u64, &totals.input, .monotonic), .output_items = @atomicLoad(u64, &totals.output, .monotonic), .calls = calls });
+        }
+    }
+    fn elapsed(self: *const Trace) u64 {
+        return @intCast(@max(0, self.started.durationTo(std.Io.Clock.awake.now(self.io)).toMicroseconds()));
+    }
+    fn write(self: *Trace, value: anytype) void {
+        var bytes: [4096]u8 = undefined;
+        var writer = std.Io.Writer.fixed(&bytes);
+        writer.writeAll("BLOT_PROFILE ") catch return;
+        const Envelope = struct {
+            build: u32,
+            event: @TypeOf(value),
+            pub fn jsonStringify(envelope: @This(), stream: *std.json.Stringify) std.Io.Writer.Error!void {
+                try stream.beginObject();
+                try stream.objectField("build");
+                try stream.write(envelope.build);
+                inline for (@typeInfo(@TypeOf(value)).@"struct".field_names) |field| {
+                    try stream.objectField(field);
+                    try stream.write(@field(envelope.event, field));
+                }
+                try stream.endObject();
+            }
+        };
+        std.json.Stringify.value(Envelope{ .build = self.build, .event = value }, .{}, &writer) catch return;
+        writer.writeByte('\n') catch return;
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
+        std.Io.File.stderr().writeStreamingAll(self.io, writer.buffered()) catch {};
+    }
+};
+
+threadlocal var trace: ?*Trace = null;
+pub const TraceInstallation = struct {
+    previous: ?*Trace,
+    pub fn restore(self: TraceInstallation) void {
+        trace = self.previous;
+    }
+};
+pub fn currentTrace() ?*Trace {
+    return trace;
+}
+pub fn installTrace(value: ?*Trace) TraceInstallation {
+    const previous = trace;
+    trace = value;
+    return .{ .previous = previous };
+}
+
+fn cpuNanos() ?u64 {
+    if (comptime builtin.os.tag != .linux) return null;
+    var stamp: std.os.linux.timespec = undefined;
+    if (std.os.linux.clock_gettime(.THREAD_CPUTIME_ID, &stamp) != 0) return null;
+    return @as(u64, @intCast(stamp.sec)) * std.time.ns_per_s + @as(u64, @intCast(stamp.nsec));
+}
+fn threadId() u32 {
+    if (comptime builtin.os.tag == .linux) return @intCast(std.os.linux.gettid());
+    return 0;
+}
+
+pub const Region = struct {
+    owner: ?*Trace = null,
+    id: u64 = 0,
+    stage: []const u8 = "",
+    unit: u32 = 0,
+    start: u32 = 0,
+    end: u32 = 0,
+    started: u64 = 0,
+    cpu: ?u64 = null,
+    pass: ?OptimizationPass = null,
+    pub fn exit(self: Region) void {
+        self.exitWithItems(0, 0);
+    }
+    pub fn exitWithItems(self: Region, input_items: usize, output_items: usize) void {
+        const owner = self.owner orelse return;
+        const now = owner.elapsed();
+        const cpu = cpuNanos();
+        if (self.pass) |pass| {
+            const totals = &owner.passes[@backingInt(pass)];
+            _ = @atomicRmw(u64, &totals.us, .Add, now -| self.started, .monotonic);
+            if (cpu != null and self.cpu != null) _ = @atomicRmw(u64, &totals.cpu_us, .Add, (cpu.? -| self.cpu.?) / std.time.ns_per_us, .monotonic);
+            _ = @atomicRmw(u64, &totals.input, .Add, input_items, .monotonic);
+            _ = @atomicRmw(u64, &totals.output, .Add, output_items, .monotonic);
+            _ = @atomicRmw(u64, &totals.calls, .Add, 1, .monotonic);
+            return;
+        }
+        owner.write(.{ .kind = "end", .id = self.id, .thread = threadId(), .stage = self.stage, .unit = self.unit, .start = self.start, .end = self.end, .at_us = now, .us = now -| self.started, .input_items = input_items, .output_items = output_items, .cpu_us = if (cpu != null and self.cpu != null) (cpu.? -| self.cpu.?) / std.time.ns_per_us else null });
+    }
+};
+/// Region wall/CPU clocks are inclusive and may overlap other regions. They
+/// must not be summed with exclusive phase clocks or across nested regions.
+pub fn region(stage: []const u8, unit: u32, start: u32, end: u32) Region {
+    const owner = trace orelse return .{};
+    const value: Region = .{ .owner = owner, .id = owner.next.fetchAdd(1, .monotonic), .stage = stage, .unit = unit, .start = start, .end = end, .started = owner.elapsed(), .cpu = cpuNanos() };
+    owner.write(.{ .kind = "begin", .id = value.id, .thread = threadId(), .stage = stage, .unit = unit, .start = start, .end = end, .at_us = value.started });
+    return value;
+}
+pub fn optimizationPass(pass: OptimizationPass) Region {
+    const owner = trace orelse return .{};
+    return .{ .owner = owner, .pass = pass, .started = owner.elapsed(), .cpu = cpuNanos() };
+}
+pub fn detail(stage: []const u8, unit: u32, start: u32, end: u32, items: u64) void {
+    const owner = trace orelse return;
+    owner.write(.{ .kind = "detail", .thread = threadId(), .stage = stage, .unit = unit, .start = start, .end = end, .items = items, .at_us = owner.elapsed() });
+}
+pub fn traceModule(unit: u32, filename: []const u8, bytes: usize) void {
+    const owner = trace orelse return;
+    owner.write(.{ .kind = "module", .unit = unit, .filename = filename, .bytes = bytes });
+}
+fn tracePhases(profile: *Profile) void {
+    const owner = trace orelse return;
+    var micros: [phase_count]u64 = undefined;
+    for (profile.nanos, &micros) |ns, *us| us.* = ns / std.time.ns_per_us;
+    owner.write(.{ .kind = "phases", .active = @tagName(profile.active), .phase_us = micros, .at_us = owner.elapsed() });
+}
+
 pub const CheckingCapture = struct {
     previous: ?*@import("work_counters.zig").Frontend,
     pub fn restore(self: CheckingCapture) void {
@@ -176,6 +315,7 @@ pub const Scope = struct {
         const profile = self.profile orelse return;
         profile.account();
         profile.activate(self.previous);
+        tracePhases(profile);
     }
 };
 /// Charges time until the matching `exit` to `phase`, pausing the active one.
@@ -184,6 +324,7 @@ pub fn enter(phase: Phase) Scope {
     profile.account();
     const previous = profile.active;
     profile.activate(phase);
+    tracePhases(profile);
     return .{ .profile = profile, .previous = previous };
 }
 
@@ -278,11 +419,11 @@ test "nested phases are exclusive and partition the profiled interval" {
     var growth: u64 = 0;
     for (result.phases) |phase| growth += phase.rss_growth_kib;
     try std.testing.expect(growth <= result.peak_rss_kib);
-    const detail = try std.json.Stringify.valueAlloc(allocator, result, .{});
-    defer allocator.free(detail);
-    try std.testing.expect(std.mem.find(u8, detail, "\"total_us\":") != null);
-    try std.testing.expect(std.mem.find(u8, detail, "\"validation\":{\"us\":") != null);
-    try std.testing.expect(std.mem.find(u8, detail, "\"requested_bytes\":") != null);
+    const encoded = try std.json.Stringify.valueAlloc(allocator, result, .{});
+    defer allocator.free(encoded);
+    try std.testing.expect(std.mem.find(u8, encoded, "\"total_us\":") != null);
+    try std.testing.expect(std.mem.find(u8, encoded, "\"validation\":{\"us\":") != null);
+    try std.testing.expect(std.mem.find(u8, encoded, "\"requested_bytes\":") != null);
 }
 
 test "project checking counters merge modules and exclude backend checker invocations" {
@@ -344,4 +485,26 @@ test "counting allocator charges nothing for a failed request" {
         try std.testing.expectEqual(@as(u64, 0), bytes);
         try std.testing.expectEqual(@as(u64, 0), count);
     }
+}
+
+test "optimizer trace aggregates instruction counts and restores thread installation" {
+    var owner: Trace = .init(std.testing.io, 17);
+    const installation = installTrace(&owner);
+    defer installation.restore();
+    const first = optimizationPass(.scalar);
+    first.exitWithItems(20, 12);
+    {
+        const hidden = installTrace(null);
+        defer hidden.restore();
+        const ignored = optimizationPass(.scalar);
+        ignored.exitWithItems(100, 90);
+    }
+    try std.testing.expect(currentTrace() == &owner);
+    const second = optimizationPass(.scalar);
+    second.exitWithItems(30, 11);
+    const totals = owner.passes[@backingInt(OptimizationPass.scalar)];
+    try std.testing.expectEqual(@as(u64, 2), totals.calls);
+    try std.testing.expectEqual(@as(u64, 50), totals.input);
+    try std.testing.expectEqual(@as(u64, 23), totals.output);
+    try std.testing.expectEqual(@as(u64, 0), owner.passes[@backingInt(OptimizationPass.vector)].calls);
 }

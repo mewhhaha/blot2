@@ -1,34 +1,46 @@
 # Owned-storage rewrite: active task index
 
-The active priority is subsecond Gdev compilation with bounded iteration. The
-scalar, concrete-field, nominal and descriptor-call batches have measured
+The active priority is subsecond Gdev compilation with bounded iteration.
+[Engine-boundary measurements](../zig-native/measurements/engine-boundary-experiments-2026-11-01.json)
+now retain incomplete profiles and distinguish checker jobs, backend stages and
+optimizer pass costs. Closed leaf-call plans and two small source-interface
+experiments missed their thresholds and were removed/rejected. Task 110 remains
+unfinished. A direct-destination original kite producer passes seven complete
+[stream comparisons](../zig-native/measurements/kites-destination-streams-2026-11-01.json),
+saving 1,014 Wasm bytes; whole-main compilation/frame qualification is pending.
+The scalar, concrete-field, nominal and descriptor-call batches have measured
 synthetic gains. Proof-instance reuse and shared type transformations remove two
 exponential source cliffs; whole-game compilation still exceeds the bounded
 diagnostics. See
 [the graph-sharing evidence](../zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
 and
 [exact receipt hashing](../zig-native/measurements/receipt-path-hashing-2026-11-01.json)
-and [closed array locals](../zig-native/measurements/closed-array-locals-2026-11-01.json)
-and [actual aggregate readers](../zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
+and
+[closed array locals](../zig-native/measurements/closed-array-locals-2026-11-01.json)
+and
+[actual aggregate readers](../zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
 Selected-address loads remove wide-row amplification in
 [actual render settings](../zig-native/measurements/selected-field-loads-2026-11-01.json).
 Owned assembly now honors tier, worker and sharing controls and reports
 [actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
 [Typed call sharing](../zig-native/measurements/typed-call-sharing-2026-11-01.json)
-now covers literal closures across shared parents and canonical plain input keys.
-Real closure/easing probes shrink; whole-game completion remains pending.
-The [LLVM release attempt](../zig-native/measurements/typed-call-release-attempt-2026-11-01.json)
-is incomplete; [native-fast diagnostics](../zig-native/measurements/native-fast-diagnostic-2026-11-01.json)
-remain separate from full qualification.
-A [bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
+now covers literal closures across shared parents and canonical plain input
+keys. Real closure/easing probes shrink; whole-game completion remains pending.
+The
+[LLVM release attempt](../zig-native/measurements/typed-call-release-attempt-2026-11-01.json)
+is incomplete;
+[native-fast diagnostics](../zig-native/measurements/native-fast-diagnostic-2026-11-01.json)
+remain separate from full qualification. A
+[bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
 observes source type instantiation before assembly; it is not a completed build.
-The [type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
+The
+[type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
 rejects ineffective substitution copying changes and attributes actual producer
-work. The new counters do not establish a frontend speedup.
-The [corrected lazy demand inventory](../zig-native/measurements/lazy-declaration-demand-2026-11-01.json)
+work. The new counters do not establish a frontend speedup. The
+[corrected lazy demand inventory](../zig-native/measurements/lazy-declaration-demand-2026-11-01.json)
 is diagnostic only; source checking remains exhaustive. Unused-heavy entry
-points expose large body-demand reductions; main still retains most body bytes. Read
-[CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
+points expose large body-demand reductions; main still retains most body bytes.
+Read [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

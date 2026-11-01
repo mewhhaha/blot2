@@ -1,0 +1,645 @@
+diff --git a/zig-native/src/backend/scoped_backend.zig b/zig-native/src/backend/scoped_backend.zig
+--- a/zig-native/src/backend/scoped_backend.zig
++++ b/zig-native/src/backend/scoped_backend.zig
+@@ -178,6 +178,7 @@
+     allocator: std.mem.Allocator,
+     arena: std.heap.ArenaAllocator,
+     uses: []const u32 = &.{},
++    planned_uses: ?[]const storage_plan.BindingUse = null,
+     active_goals: []const core.Obligation = &.{},
+     entry_unit: u32,
+     specialization_origin: ?evaluation.SourceLocation = null,
+@@ -295,7 +296,18 @@
+     }
+     fn bind(self: *Generator, m: *const core.Module, id: core.BindingId, original: Value) Error!void {
+         const value = try self.snapshot(original);
+-        try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = id, .value = value, .remaining = if (id < self.uses.len) self.uses[id] else 0 });
++        var remaining: u32 = 0;
++        if (self.planned_uses) |uses| {
++            // Sorted by binding ID during completed construction.
++            var low: usize = 0;
++            var high = uses.len;
++            while (low < high) {
++                const middle = low + (high - low) / 2;
++                if (uses[middle].binding < id) low = middle + 1 else high = middle;
++            }
++            if (low < uses.len and uses[low].binding == id) remaining = uses[low].count;
++        } else if (id < self.uses.len) remaining = self.uses[id];
++        try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = id, .value = value, .remaining = remaining });
+     }
+     fn knownLiteral(self: *Generator, value: Value) ?u32 {
+         if (self.invalid_literals.contains(value.word.id)) return null;
+@@ -3291,7 +3303,47 @@
+         }
+         try self.finishSelectedTypes(m, body.root, evidence, &type_key);
+     }
+-    fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
++    fn readonlyPlanArguments(arguments: []const Value) bool {
++        for (arguments) |argument| {
++            if (argument.tag == .callable) return false;
++            if (!readonlyPlanArguments(argument.fields)) return false;
++        }
++        return true;
++    }
++    fn traceReaderDecline(self: *Generator, m: *const core.Module, reason: call_plan.ReaderDecline) void {
++        _ = self;
++        const span = m.spans[reason.node];
++        const stage = switch (reason.reason) {
++            .work_limit => "owned-call.decline.work-limit",
++            .type_layout => "owned-call.decline.type-layout",
++            .external_reference => "owned-call.decline.external-reference",
++            .getter => "owned-call.decline.getter",
++            .selected_call => "owned-call.decline.selected-call",
++            .operation => "owned-call.decline.operation",
++        };
++        @import("../phase_profile.zig").detail(stage, m.unit, span.start, span.end, reason.ty);
++        if (reason.field != 0) @import("../phase_profile.zig").detail("owned-call.decline.field", m.unit, span.start, span.end, reason.field);
++    }
++    fn emitReaderDefinition(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, plan: ?storage_plan.ReadonlyCall) Error!Value {
++        const completed = plan orelse return self.invokeBody(target, arguments, 0, false);
++        std.debug.assert(completed.unit == m.unit and completed.binding == target.binding);
++        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = m.unit, .id = completed.binding, .kind = .named, .context = self.invocationContext() };
++        if (!try self.active_calls.enter(selected_target, completed.selected)) return self.fail(m, completed.root, .storage_unsupported, "Recursive completed readers are not admitted");
++        defer self.active_calls.leave();
++        // Type/field evidence was completed by the caller and copied into this
++        // definition. This leaf owns no storage and needs no invocation mark,
++        // root scan, result escape transfer or scratch rewind.
++        const body = m.body(target.binding).?;
++        self.planned_uses = completed.uses;
++        self.active_goals = m.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len];
++        self.depth = 1;
++        for (m.bodyParameters(body), arguments) |parameter, argument| try self.bind(m, parameter.binding, argument);
++        const span = m.spans[completed.root];
++        const trace = @import("../phase_profile.zig").region("owned-call.emit-completed", m.unit, span.start, span.end);
++        defer trace.exit();
++        return self.expression(m, completed.root, 0);
++    }
++    fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, selected: []const u32) Error!?Value {
+         const body = m.body(target.binding) orelse return null;
+         const result_type = m.typeOf(body.root);
+         var remaining: usize = 100_000;
+@@ -3324,29 +3376,67 @@
+         var key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
+         var existing: ?usize = null;
+         if (shared) existing = cache.find(key);
++        var completed: ?storage_plan.ReadonlyCall = null;
++        defer if (completed) |*plan| plan.deinit(self.allocator);
+         if (existing == null) {
+-            if (!call_plan.readerBody(m, body.root, &remaining, 0)) {
+-                var active: [128]core.BindingRef = undefined;
+-                active[0] = target;
+-                const before = self.bindings.items.len;
+-                defer self.bindings.shrinkRetainingCapacity(before);
+-                for (m.bodyParameters(body), arguments) |parameter, value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = parameter.binding, .value = value, .remaining = 0 });
+-                if (!try self.numericExpression(m, body.root, &remaining, &active, 1, true, 0)) return null;
+-            }
+-            evidence.clearRetainingCapacity();
+-            if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
+-            shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
+-            if (!self.specialize and !shared) return null;
+-            cache = &self.calls;
+-            if (shared) cache = &self.descriptor_calls.calls;
+-            key.evidence = evidence.items;
+-            existing = cache.find(key);
+-        }
+-        // Replay reads in the enclosing loop and writer summary on hits too.
+-        for (arguments) |argument| try self.readerReads(m, body.root, argument);
+-        if (existing != null) self.emission_work.scoped_reader_cache_hits +|= 1;
++            var attempted_completion = false;
++            // Construct one complete closed leaf plan before publishing Wasm.
++            // Wider selected/callback bodies keep the existing numeric family.
++            if (shared and plainInlineValue(result_shape) and stableDescriptorShape(result_shape) and readonlyPlanArguments(arguments)) {
++                attempted_completion = true;
++                if (self.emission_work.scoped_completed_call_plans >= 65_536) return self.fail(m, body.root, .storage_unsupported, "Completed readonly call plans exceeded their checked bound");
++                const span = m.spans[body.root];
++                const trace = @import("../phase_profile.zig").region("owned-call.complete", m.unit, span.start, span.end);
++                defer trace.exit();
++                const outcome = try call_plan.completeReader(self.allocator, m, target.binding, selected, @intCast(parameter_words), @intCast(readerWords(result_shape)), aggregate_result, result_shape.floating, descriptors.items.len, &remaining, &self.emission_work.scoped_completed_call_body_visits);
++                switch (outcome) {
++                    .completed => |plan| {
++                        completed = plan;
++                        @import("../phase_profile.zig").detail("owned-call.identity", m.unit, span.start, span.end, target.binding);
++                        @import("../phase_profile.zig").detail("owned-call.body-visits", m.unit, span.start, span.end, plan.body_visits);
++                    },
++                    .declined => |reason| {
++                        self.emission_work.scoped_completed_call_declines +|= 1;
++                        self.traceReaderDecline(m, reason);
++                    },
++                }
++            }
++            if (completed == null) {
++                // The completed constructor replaces leaf admission for its
++                // family. Do not rescan that leaf with readerBody on decline.
++                if (attempted_completion or !call_plan.readerBody(m, body.root, &remaining, 0)) {
++                    var active: [128]core.BindingRef = undefined;
++                    active[0] = target;
++                    const before = self.bindings.items.len;
++                    defer self.bindings.shrinkRetainingCapacity(before);
++                    for (m.bodyParameters(body), arguments) |parameter, value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = parameter.binding, .value = value, .remaining = 0 });
++                    if (!try self.numericExpression(m, body.root, &remaining, &active, 1, true, 0)) return null;
++                }
++                evidence.clearRetainingCapacity();
++                if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
++                shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
++                if (!self.specialize and !shared) return null;
++                cache = &self.calls;
++                if (shared) cache = &self.descriptor_calls.calls;
++                key.evidence = evidence.items;
++                existing = cache.find(key);
++            }
++        }
++        // The completed summary substitutes descriptor ordinals with this
++        // invocation's owners, including hits in a different enclosing loop.
++        var read_plan = completed;
++        if (existing) |found| read_plan = cache.entries.items[found].readonly;
++        if (read_plan) |plan| {
++            for (plan.read_descriptors) |ordinal| try self.readerReads(m, body.root, descriptors.items[ordinal]);
++        } else for (arguments) |argument| try self.readerReads(m, body.root, argument);
++        if (existing) |found| {
++            self.emission_work.scoped_reader_cache_hits +|= 1;
++            if (cache.entries.items[found].readonly != null) self.emission_work.scoped_completed_call_plan_hits +|= 1;
++        }
+         const index = if (existing) |found| found else blk: {
+-            const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
++            var abi_words = parameter_words;
++            if (completed) |plan| abi_words = plan.parameter_words;
++            const signature = try self.allocator.alloc(wasm.ValueType, abi_words);
+             defer self.allocator.free(signature);
+             @memset(signature, .i32);
+             const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
+@@ -3354,6 +3444,11 @@
+                 else => return self.unsupported(m, body.root),
+             };
+             const inserted = try cache.insert(key, function, result_shape.floating);
++            if (completed) |plan| {
++                cache.entries.items[inserted].readonly = plan;
++                completed = null;
++                self.emission_work.scoped_completed_call_plans +|= 1;
++            }
+             var child: Generator = .{
+                 .allocator = self.allocator,
+                 .arena = std.heap.ArenaAllocator.init(self.allocator),
+@@ -3388,7 +3483,8 @@
+             for (inputs, arguments) |*input, argument| {
+                 try self.readerParameter(&child, input, argument, &next);
+             }
+-            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
++            const plan = cache.entries.items[inserted].readonly;
++            const output = child.emitReaderDefinition(m, target, inputs, plan) catch |err| {
+                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
+                 return err;
+             };
+@@ -3416,7 +3512,9 @@
+         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
+         var address: ?Local = null;
+         if (aggregate_result) {
+-            const count = std.math.cast(u32, @max(1, readerWords(result_template))) orelse return self.unsupported(m, body.root);
++            var result_words = readerWords(result_template);
++            if (entry.readonly) |plan| result_words = plan.result_words;
++            const count = std.math.cast(u32, @max(1, result_words)) orelse return self.unsupported(m, body.root);
+             const lane: Value = .{ .word = .{ .id = 0 } };
+             const slot = try self.arrayWithShape(m, body.root, (try self.constant(count)).word, .fixed, lane);
+             address = try self.c.temp();
+@@ -3883,7 +3981,7 @@
+         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
+         if (reuse) if (try self.reusableCall(m, target, arguments)) |value| return value;
+         if (reuse) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
+-        if (reuse) if (try self.reusableReaderCall(m, target, arguments)) |value| return value;
++        if (reuse) if (try self.reusableReaderCall(m, target, arguments, selected.items)) |value| return value;
+         if (reuse) if (try self.reusableUnitWriter(m, target, arguments)) |value| return value;
+         // A reusable definition's child enters while compiling its body. Do
+         // not enter twice merely because planning moved to another Generator.
+diff --git a/zig-native/src/backend/storage_calls.zig b/zig-native/src/backend/storage_calls.zig
+--- a/zig-native/src/backend/storage_calls.zig
++++ b/zig-native/src/backend/storage_calls.zig
+@@ -2,6 +2,7 @@
+ const std = @import("std");
+ const core = @import("../check/core.zig");
+ const T = @import("../check/types.zig");
++const storage_plan = @import("storage_plan.zig");
+ pub const Key = struct {
+     unit: u32,
+     binding: core.BindingId,
+@@ -14,7 +15,7 @@
+         return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
+     }
+ };
+-pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true };
++pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, readonly: ?storage_plan.ReadonlyCall = null };
+ /// Selected source calls, not source references or partial applications. Keys
+ /// contain only bounded static callback choices; runtime data is never a key.
+ pub const ActiveCalls = struct {
+@@ -53,7 +54,10 @@
+     entries: std.ArrayList(Entry) = .empty,
+     plans: std.ArrayList(Plan) = .empty,
+     pub fn deinit(self: *Cache) void {
+-        for (self.entries.items) |entry| self.allocator.free(entry.key.evidence);
++        for (self.entries.items) |*entry| {
++            self.allocator.free(entry.key.evidence);
++            if (entry.readonly) |*plan| plan.deinit(self.allocator);
++        }
+         self.entries.deinit(self.allocator);
+         for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
+         self.plans.deinit(self.allocator);
+@@ -462,14 +466,14 @@
+         self.active[self.len] = target;
+         self.len += 1;
+         defer self.len -= 1;
+-        return leafBody(m, source.root, remaining, depth + 1, false, self);
++        return leafBody(m, source.root, remaining, depth + 1, false, self, null);
+     }
+ };
+ pub fn inlineBody(units: []const core.Module, m: *const core.Module, binding: core.BindingId, remaining: *usize) bool {
+     const source = m.body(binding) orelse return false;
+     // Leaves already establish every physical type from their checked nodes;
+     // residual unused header variables do not add a call dependency.
+-    if (leafBody(m, source.root, remaining, 0, false, null)) return true;
++    if (leafBody(m, source.root, remaining, 0, false, null, null)) return true;
+     var calls: ClosedCalls = .{ .units = units };
+     return calls.body(m, binding, remaining, 0);
+ }
+@@ -507,36 +511,100 @@
+     }
+ }
+ 
+-/// Descriptor parameters preserve the caller's owner identity. This admission
+-/// walk permits reads only, and the initial ABI returns a scalar, so no callee
+-/// can resize an input or return a borrow with a manufactured lifetime.
++/// Descriptor parameters preserve the caller's owner identity. This shared
++/// leaf law permits reads only; call ABI construction checks result lifetimes.
+ pub fn readerBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usize) bool {
+-    return leafBody(m, root, remaining, depth, true, null);
+-}
+-
+-fn leafBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usize, readers: bool, calls: ?*ClosedCalls) bool {
++    return leafBody(m, root, remaining, depth, true, null, null);
++}
++
++pub const ReaderDecline = struct {
++    reason: enum { work_limit, type_layout, external_reference, getter, selected_call, operation },
++    node: core.Id,
++    ty: T.Id,
++    field: u32 = 0,
++};
++const ReaderConstruction = struct { uses: []u32, visits: u32 = 0, decline: ?ReaderDecline = null };
++fn readerDecline(construction: ?*ReaderConstruction, m: *const core.Module, id: core.Id, reason: @FieldType(ReaderDecline, "reason"), field: u32) bool {
++    if (construction) |state| if (state.decline == null) {
++        state.decline = .{ .reason = reason, .node = id, .ty = m.typeOf(id), .field = field };
++    };
++    return false;
++}
++pub const ReaderConstructionResult = union(enum) {
++    completed: storage_plan.ReadonlyCall,
++    declined: ReaderDecline,
++};
++/// Fuse closed leaf admission and invocation-local liveness into completed
++/// evidence. Failed or exhausted construction never publishes a function.
++pub fn completeReader(allocator: std.mem.Allocator, m: *const core.Module, binding: core.BindingId, selected: []const u32, parameter_words: u32, result_words: u32, destination: bool, floating: bool, descriptor_count: usize, remaining: *usize, visits: *u64) std.mem.Allocator.Error!ReaderConstructionResult {
++    const source = m.body(binding).?;
++    const uses = try allocator.alloc(u32, m.bindings.len);
++    defer allocator.free(uses);
++    @memset(uses, 0);
++    var construction: ReaderConstruction = .{ .uses = uses };
++    if (remaining.* == 0) return .{ .declined = .{ .reason = .work_limit, .node = source.root, .ty = m.typeOf(source.root) } };
++    const result_plain = inlineType(m, m.typeOf(source.root), remaining, 0);
++    var admitted = false;
++    if (result_plain) admitted = leafBody(m, source.root, remaining, 0, true, null, &construction) else {
++        _ = readerDecline(&construction, m, source.root, .type_layout, 0);
++    }
++    visits.* +|= construction.visits;
++    if (!admitted) {
++        return .{ .declined = construction.decline orelse .{ .reason = .operation, .node = source.root, .ty = m.typeOf(source.root) } };
++    }
++    // Retain only reached binding uses, not a module-sized table per plan.
++    var use_count: usize = 0;
++    for (uses) |use| if (use != 0) {
++        use_count += 1;
++    };
++    const owned_uses = try allocator.alloc(storage_plan.BindingUse, use_count);
++    errdefer allocator.free(owned_uses);
++    var next_use: usize = 0;
++    for (uses, 0..) |use, binding_id| if (use != 0) {
++        owned_uses[next_use] = .{ .binding = @intCast(binding_id), .count = use };
++        next_use += 1;
++    };
++    const selection = try allocator.dupe(u32, selected);
++    errdefer allocator.free(selection);
++    const reads = try allocator.alloc(u32, descriptor_count);
++    errdefer allocator.free(reads);
++    for (reads, 0..) |*read, index| read.* = @intCast(index);
++    var result_role: @FieldType(storage_plan.ReadonlyCall, "result") = .scalar;
++    if (destination) result_role = .caller_destination;
++    return .{ .completed = .{ .unit = m.unit, .binding = binding, .root = source.root, .parameter_words = parameter_words, .result_words = result_words, .result = result_role, .floating = floating, .selected = selection, .uses = owned_uses, .read_descriptors = reads, .body_visits = construction.visits } };
++}
++
++fn leafBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usize, readers: bool, calls: ?*ClosedCalls, construction: ?*ReaderConstruction) bool {
+     if (root == 0) return true;
+-    if (remaining.* == 0 or depth > 128) return false;
++    if (remaining.* == 0 or depth > 128) return readerDecline(construction, m, root, .work_limit, 0);
+     remaining.* -= 1;
+     const n = m.node(root);
++    if (construction) |state| state.visits += 1;
+     if (readers) {
+-        if (!readerType(m, n.ty, remaining, depth + 1)) return false;
++        if (!readerType(m, n.ty, remaining, depth + 1)) {
++            if (remaining.* == 0) return readerDecline(construction, m, root, .work_limit, 0);
++            return readerDecline(construction, m, root, .type_layout, 0);
++        }
+     } else if (!inlineType(m, n.ty, remaining, depth + 1)) return false;
+     switch (n.tag) {
+         .constant => {},
+         .reference => {
+             const ref = m.reference(root);
+-            if (ref.unit != 0 and ref.unit != m.unit) return false;
++            if (ref.unit != 0 and ref.unit != m.unit) return readerDecline(construction, m, root, .external_reference, 0);
+             const kind = m.binding(ref.binding).kind;
+-            if (kind != .local and kind != .parameter) return false;
++            if (kind != .local and kind != .parameter) return readerDecline(construction, m, root, .external_reference, 0);
++            if (construction) |state| state.uses[ref.binding] +|= 1;
+         },
+         .scalar, .logical => {
+-            if (n.tag == .scalar and (n.c != 0 or @import("simd_intrinsics.zig").literalLanes(n.op))) return false;
+-            if (!leafBody(m, n.a, remaining, depth + 1, readers, calls) or !leafBody(m, n.b, remaining, depth + 1, readers, calls)) return false;
+-        },
+-        .bind, .construct => return leafBody(m, n.b, remaining, depth + 1, readers, calls),
+-        .pattern_bind => return n.c == 0 and leafBody(m, n.b, remaining, depth + 1, readers, calls),
+-        .return_ => return leafBody(m, n.a, remaining, depth + 1, readers, calls),
++            if (n.tag == .scalar and (n.c != 0 or @import("simd_intrinsics.zig").literalLanes(n.op))) return readerDecline(construction, m, root, .operation, 0);
++            if (!leafBody(m, n.a, remaining, depth + 1, readers, calls, construction) or !leafBody(m, n.b, remaining, depth + 1, readers, calls, construction)) return false;
++        },
++        .bind, .construct => return leafBody(m, n.b, remaining, depth + 1, readers, calls, construction),
++        .pattern_bind => {
++            if (n.c != 0) return readerDecline(construction, m, root, .operation, 0);
++            return leafBody(m, n.b, remaining, depth + 1, readers, calls, construction);
++        },
++        .return_ => return leafBody(m, n.a, remaining, depth + 1, readers, calls, construction),
+         .project => {
+             const projection = m.projection(n.b);
+             if (projection.variants.len == 0) {
+@@ -547,18 +615,22 @@
+                 } else false;
+                 // A missing data field can invoke a user getter. Such a call
+                 // needs its own summary and is outside these leaf ABIs.
+-                if (!field) return false;
+-            }
+-            return leafBody(m, n.a, remaining, depth + 1, readers, calls);
++                if (!field) return readerDecline(construction, m, root, .getter, projection.field);
++            }
++            return leafBody(m, n.a, remaining, depth + 1, readers, calls, construction);
+         },
+         .if_value, .if_stmt => {
+-            if (!leafBody(m, n.a, remaining, depth + 1, readers, calls) or !leafBody(m, n.b, remaining, depth + 1, readers, calls) or !leafBody(m, n.c, remaining, depth + 1, readers, calls)) return false;
++            if (construction) |state| for (m.branchMerges(root)) |merge| {
++                state.uses[merge.then_binding] +|= 1;
++                state.uses[merge.else_binding] +|= 1;
++            };
++            if (!leafBody(m, n.a, remaining, depth + 1, readers, calls, construction) or !leafBody(m, n.b, remaining, depth + 1, readers, calls, construction) or !leafBody(m, n.c, remaining, depth + 1, readers, calls, construction)) return false;
+         },
+         .block, .suite, .product, .record => for (m.children(root)) |child| {
+-            if (!leafBody(m, child, remaining, depth + 1, readers, calls)) return false;
++            if (!leafBody(m, child, remaining, depth + 1, readers, calls, construction)) return false;
+         },
+         .call => {
+-            const graph = calls orelse return false;
++            const graph = calls orelse return readerDecline(construction, m, root, .selected_call, 0);
+             const call = m.call(root);
+             var target = call.target;
+             if (target.unit == 0) target.unit = m.unit;
+@@ -566,7 +638,7 @@
+             const owner = &graph.units[target.unit - 1];
+             const body = owner.body(target.binding) orelse return false;
+             if (call.arguments.len != owner.bodyParameters(body).len) return false;
+-            for (call.arguments) |argument| if (!leafBody(m, argument, remaining, depth + 1, false, calls)) return false;
++            for (call.arguments) |argument| if (!leafBody(m, argument, remaining, depth + 1, false, calls, construction)) return false;
+             if (!graph.body(owner, target.binding, remaining, depth + 1)) return false;
+         },
+         .storage => {
+@@ -574,20 +646,20 @@
+             const op: @import("../check/storage_ops.zig").Op = @fromBackingInt(@intCast(n.c));
+             switch (op) {
+                 .at, .link, .view, .load, .length, .read => {},
+-                else => return false,
+-            }
+-            for (m.children(root)) |child| if (!leafBody(m, child, remaining, depth + 1, readers, calls)) return false;
++                else => return readerDecline(construction, m, root, .operation, 0),
++            }
++            for (m.children(root)) |child| if (!leafBody(m, child, remaining, depth + 1, readers, calls, construction)) return false;
+         },
+         .array_op => {
+             if (!readers) return false;
+             const op: @import("collection_ops.zig").Op = @fromBackingInt(@intCast(n.c));
+             switch (op) {
+                 .length, .get, .identity, .cursor, .cursor_has, .cursor_value, .cursor_advance => {},
+-                else => return false,
+-            }
+-            for (m.children(root)) |child| if (!leafBody(m, child, remaining, depth + 1, readers, calls)) return false;
+-        },
+-        else => return false,
++                else => return readerDecline(construction, m, root, .operation, 0),
++            }
++            for (m.children(root)) |child| if (!leafBody(m, child, remaining, depth + 1, readers, calls, construction)) return false;
++        },
++        else => return readerDecline(construction, m, root, .operation, 0),
+     }
+     return true;
+ }
+diff --git a/zig-native/src/backend/storage_plan.zig b/zig-native/src/backend/storage_plan.zig
+--- a/zig-native/src/backend/storage_plan.zig
++++ b/zig-native/src/backend/storage_plan.zig
+@@ -104,6 +104,36 @@
+     writes: bool = false,
+ };
+ 
++pub const BindingUse = struct { binding: u32, count: u32 };
++/// Completed allocation-free readonly call. All identities are numeric and all
++/// slices are owned. Descriptor ordinals borrow invocation inputs; they never
++/// retain a caller owner, Core view, solver substitution or Wasm local.
++pub const ReadonlyCall = struct {
++    unit: u32,
++    binding: u32,
++    root: u32,
++    parameter_words: u32,
++    result_words: u32,
++    result: enum { scalar, caller_destination },
++    floating: bool,
++    selected: []const u32,
++    uses: []const BindingUse,
++    /// Conservative complete read set, also the borrowed lifetime inputs.
++    read_descriptors: []const u32,
++    body_visits: u32,
++    /// This family has no writes, fresh owners, transferred borrows or callee
++    /// scratch. Aggregate result storage belongs to the caller.
++    pub fn summary(self: ReadonlyCall) Summary {
++        return .{ .borrowed_parameters = self.read_descriptors, .destination_count = @intFromBool(self.result == .caller_destination) };
++    }
++    pub fn deinit(self: *ReadonlyCall, allocator: std.mem.Allocator) void {
++        allocator.free(self.selected);
++        allocator.free(self.uses);
++        allocator.free(self.read_descriptors);
++        self.* = undefined;
++    }
++};
++
+ /// Root identity follows every fixed field, including unselected ADT payload
+ /// alternatives. Physical selection never narrows conservative root evidence.
+ pub fn hasRoot(value: anytype, owner: usize) bool {
+diff --git a/zig-native/src/backend/storage_calls_tests.zig b/zig-native/src/backend/storage_calls_tests.zig
+--- a/zig-native/src/backend/storage_calls_tests.zig
++++ b/zig-native/src/backend/storage_calls_tests.zig
+@@ -701,6 +701,10 @@
+     try std.testing.expect(right.diagnostic == null);
+     try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
++    try std.testing.expectEqual(@as(u64, 1), left.counters.scoped_completed_call_plans);
++    try std.testing.expectEqual(left.counters.scoped_completed_call_plans, right.counters.scoped_completed_call_plans);
++    try std.testing.expectEqual(left.counters.scoped_completed_call_body_visits, right.counters.scoped_completed_call_body_visits);
++    try std.testing.expect(right.counters.scoped_completed_call_plan_hits > left.counters.scoped_completed_call_plan_hits);
+ }
+ 
+ test "closed owned calls reuse code across unrelated generic environments" {
+@@ -1138,3 +1142,83 @@
+     defer module.deinit(a);
+     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateReader, .{@as([]const core.Module, &.{module})});
+ }
++
++const planned_reader_source =
++    \\const read = func (rows: GrowArray U32) -> (flag: Bool) => return do:
++    \\  let before = rows[0]
++    \\  if flag:
++    \\    return {value: before, stamp: rows[1]}
++    \\  return {stamp: before, value: rows[1]}
++    \\const outer = func (rows: GrowArray U32) => return do:
++    \\  let first = read rows true
++    \\  let second = read rows false
++    \\  return {value: first.value, stamp: second.stamp}
++    \\entry const answer = func (input: U32) => return do:
++    \\  let left: GrowArray U32 = #[input, 7]
++    \\  let right: GrowArray U32 = #[11, 13]
++    \\  let first = outer left
++    \\  let second = outer right
++    \\  return @u32.add first.value second.stamp
++;
++
++test "completed readonly plans fuse leaf admission and lifetime uses with exact declines" {
++    const calls = @import("storage_calls.zig");
++    var module = try lower(a, planned_reader_source);
++    defer module.deinit(a);
++    var selection = [_]u32{ 5, 11 };
++    for (module.bodies) |body| {
++        const name = module.name(body.declaration_name);
++        if (!std.mem.eql(u8, name, "read") and !std.mem.eql(u8, name, "outer")) continue;
++        var remaining: usize = 100_000;
++        var visits: u64 = 0;
++        const result = try calls.completeReader(a, &module, body.binding, &selection, 6, 2, true, false, 1, &remaining, &visits);
++        if (std.mem.eql(u8, name, "outer")) {
++            try std.testing.expect(result == .declined);
++            try std.testing.expectEqual(.selected_call, result.declined.reason);
++            try std.testing.expectEqual(.call, module.node(result.declined.node).tag);
++            continue;
++        }
++        try std.testing.expect(result == .completed);
++        var plan = result.completed;
++        defer plan.deinit(a);
++        const uses = try @import("storage_liveness.zig").count(a, &module, body.root);
++        defer a.free(uses);
++        var next_use: usize = 0;
++        for (uses, 0..) |count, binding| if (count != 0) {
++            try std.testing.expectEqual(@as(u32, @intCast(binding)), plan.uses[next_use].binding);
++            try std.testing.expectEqual(count, plan.uses[next_use].count);
++            next_use += 1;
++        };
++        try std.testing.expectEqual(next_use, plan.uses.len);
++        try std.testing.expectEqualSlices(u32, &.{ 5, 11 }, plan.selected);
++        selection[0] = 99;
++        try std.testing.expectEqual(@as(u32, 5), plan.selected[0]);
++        try std.testing.expectEqual(@as(u32, 6), plan.parameter_words);
++        try std.testing.expectEqual(@as(u32, 2), plan.result_words);
++        try std.testing.expectEqualSlices(u32, &.{0}, plan.summary().borrowed_parameters);
++        try std.testing.expectEqual(@as(u32, 1), plan.summary().destination_count);
++        try std.testing.expect(!plan.summary().writes);
++        try std.testing.expect(visits > 0);
++        try std.testing.expectEqual(visits, plan.body_visits);
++        remaining = 0;
++        const exhausted = try calls.completeReader(a, &module, body.binding, &selection, 6, 2, true, false, 1, &remaining, &visits);
++        try std.testing.expect(exhausted == .declined);
++        try std.testing.expectEqual(.work_limit, exhausted.declined.reason);
++    }
++}
++
++fn publishCompletedReader(allocator: std.mem.Allocator, modules: []const core.Module) !void {
++    var result = try scoped.compile(allocator, modules, 1);
++    defer result.deinit(allocator);
++    try std.testing.expect(result.diagnostic == null);
++    try std.testing.expect(result.counters.scoped_completed_call_plans > 0);
++    try std.testing.expect(result.counters.scoped_completed_call_plan_hits > 0);
++    try std.testing.expect(result.counters.scoped_completed_call_body_visits > 0);
++}
++
++test "completed readonly descriptor plans share one fused walk across caller owners" {
++    var module = try lower(a, planned_reader_source);
++    defer module.deinit(a);
++    try publishCompletedReader(a, &.{module});
++    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishCompletedReader, .{@as([]const core.Module, &.{module})});
++}
+diff --git a/zig-native/src/work_counters.zig b/zig-native/src/work_counters.zig
+--- a/zig-native/src/work_counters.zig
++++ b/zig-native/src/work_counters.zig
+@@ -104,6 +104,10 @@
+     scoped_scalar_definitions: u64 = 0,
+     scoped_scalar_cache_hits: u64 = 0,
+     scoped_call_admission_nodes: u64 = 0,
++    scoped_completed_call_plans: u64 = 0,
++    scoped_completed_call_plan_hits: u64 = 0,
++    scoped_completed_call_body_visits: u64 = 0,
++    scoped_completed_call_declines: u64 = 0,
+     scoped_scalar_admission_nodes: u64 = 0,
+     scoped_scalar_admission_hits: u64 = 0,
+     scoped_inline_definitions: u64 = 0,
+diff --git a/zig-native/tests/scoped_aggregate_reader_execution.test.ts b/zig-native/tests/scoped_aggregate_reader_execution.test.ts
+--- a/zig-native/tests/scoped_aggregate_reader_execution.test.ts
++++ b/zig-native/tests/scoped_aggregate_reader_execution.test.ts
+@@ -45,6 +45,23 @@
+   let point = position_twice poses
+   let (left, right) = tuple_twice pairs
+   return #[point.x, point.y, point.z, left, right]
++const planned = func (rows: GrowArray U32) -> (early: Bool) => return do:
++  let first = rows[0]
++  if early:
++    return {value: first, stamp: rows[1]}
++  return {stamp: first, value: rows[1]}
++const planned_outer = func (rows: GrowArray U32) => return do:
++  let first = planned rows true
++  let second = planned rows false
++  return {value: first.value, stamp: second.stamp}
++entry const completed = func (input: U32) => return do:
++  let left: GrowArray U32 = #[input, 7]
++  let right: GrowArray U32 = #[@u32.add input 11, 13]
++  let first = planned_outer left
++  let second = planned_outer right
++  left[0] := @u32.add input 19
++  let third = planned_outer left
++  return #[first.value, second.stamp, third.value, right[1]]
+ type Choice is data = $Count U32 | $Empty
+ const choice_read = func (rows: GrowArray Choice): Choice => return rows[0]
+ const choice_twice = func rows => return do:
+@@ -93,6 +110,9 @@
+       assert(result.success, JSON.stringify(result));
+       const work = result.stats.workCounters as Record<string, number>;
+       assert(work.scoped_reader_cache_hits >= 4, JSON.stringify(work));
++      assert(work.scoped_completed_call_plans > 0, JSON.stringify(work));
++      assert(work.scoped_completed_call_plan_hits > 0, JSON.stringify(work));
++      assert(work.scoped_completed_call_body_visits > 0, JSON.stringify(work));
+       for (const asynchronous of [false, true]) {
+         const guest = await instantiateGuest(result.bytes, { asynchronous });
+         try {
+@@ -101,6 +121,10 @@
+             return guest.call(name, input);
+           };
+           for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
++            assert.deepEqual(
++              await call("completed", input),
++              new Uint32Array([input, input + 11, input + 19, 13]),
++            );
+             assert.deepEqual(
+               await call("variants", input),
+               new Uint32Array([input, 31, 31, input + 9]),

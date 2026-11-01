@@ -2369,6 +2369,7 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
     if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithOptions(allocator, units, entry, .{
+        .identity = options.identity,
         .storage = options.storage orelse options.policy.storage.config(),
         .tier = options.policy.codegen_tier,
         .workers = options.policy.codegen_workers,

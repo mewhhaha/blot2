@@ -151,6 +151,188 @@ function reaped(pid: number) {
   }
 }
 
+Deno.test("Zig project client streams bounded profile trace through disposal", async () => {
+  const item = await fixture("blot-zig-project-trace-");
+  const { directory } = item;
+  const entry = directory + "/main.blot";
+  const readyPath = directory + "/third-ready";
+  const peerSource = String.raw`
+const encoder = new TextEncoder();
+const readyPath = ${JSON.stringify(readyPath)};
+async function readExact(length: number) {
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  while (offset < length) {
+    const count = await Deno.stdin.read(bytes.subarray(offset));
+    if (count === null) Deno.exit();
+    offset += count;
+  }
+  return bytes;
+}
+async function writeFrame(metadata: unknown) {
+  const json = encoder.encode(JSON.stringify(metadata));
+  const bytes = new Uint8Array(8 + json.length);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, json.length, true);
+  bytes.set(json, 8);
+  let offset = 0;
+  while (offset < bytes.length) offset += await Deno.stdout.write(bytes.subarray(offset));
+}
+async function trace(line: string) {
+  const bytes = encoder.encode(line);
+  await Deno.stderr.write(bytes.subarray(0, 11));
+  await Deno.stderr.write(bytes.subarray(11));
+}
+async function record(value: Record<string, unknown>) {
+  await trace("BLOT_PROFILE " + JSON.stringify(value) + "\n");
+}
+async function rejectBuild(metadata: Record<string, any>) {
+  await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.blot",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}],attemptStats:null});
+}
+await writeFrame({
+  kind: "hello",
+  protocol: "blot-zig-project",
+  version: 1,
+  maxFrameBytes: 67108864,
+  compilerIdentity: "a".repeat(64),
+  capabilities: ["project-build", "utf8_bytes", "abort-disposes-process", "source-overlays"],
+});
+let buildCount = 0;
+let firstBuild = 0;
+while (true) {
+  const header = await readExact(8);
+  const view = new DataView(header.buffer);
+  const metadata = JSON.parse(new TextDecoder().decode(await readExact(view.getUint32(0, true))));
+  await readExact(view.getUint32(4, true));
+  if (metadata.kind === "open") {
+    if (metadata.profileTrace !== true || metadata.profileBackend !== true) Deno.exit(42);
+    await writeFrame({ kind: "open", id: metadata.id, epoch: "trace", revision: 0 });
+  } else if (metadata.kind === "build") {
+    buildCount++;
+    if (buildCount === 1) firstBuild = metadata.id;
+    if (buildCount === 1) {
+      await record({kind:"module",build:metadata.id,unit:1,filename:"build-one.blot",bytes:41});
+      await rejectBuild(metadata);
+    } else if (buildCount === 2) {
+      await record({kind:"module",build:firstBuild,unit:99,filename:"late-old.blot",bytes:999});
+      await record({kind:"module",build:metadata.id,unit:2,filename:"build-two.blot",bytes:42});
+      await record({kind:"phases",build:metadata.id,active:"check",phase_us:Array(11).fill(7),at_us:90});
+      await record({kind:"begin",build:metadata.id,id:200,thread:1,stage:"long",unit:2,start:0,end:1,at_us:91});
+      await trace('BLOT_PROFILE {broken json}\n');
+      await trace("x".repeat(70000) + "\n");
+      for (let index = 0; index < 300; index++) {
+        await record({kind:"detail",build:metadata.id,thread:1,stage:"body",unit:2,start:index,end:index+1,items:index,at_us:100+index});
+      }
+      await record({kind:"end",build:metadata.id,id:201,thread:1,stage:"lower",unit:2,start:0,end:1,at_us:500,us:12,cpu_us:null,input_items:345,output_items:123});
+      await rejectBuild(metadata);
+    } else {
+      await record({kind:"module",build:metadata.id,unit:3,filename:"cancelled.blot",bytes:43});
+      await Deno.writeTextFile(readyPath, String(metadata.id));
+      await readExact(8);
+    }
+  } else if (metadata.kind === "close") {
+    await writeFrame({ kind: "close", id: metadata.id, epoch: "trace", revision: 0 });
+    break;
+  }
+}
+`;
+  const peerScript = directory + "/peer.ts";
+  const executable = directory + "/peer";
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
+  await Deno.writeTextFile(peerScript, peerSource);
+  await Deno.writeTextFile(
+    executable,
+    `#!/bin/sh\nexec ${
+      quote(Deno.execPath())
+    } run --quiet --no-config --no-lock --allow-all ${
+      quote(peerScript)
+    } "$@"\n`,
+  );
+  await Deno.chmod(executable, 0o755);
+  await Deno.writeTextFile(entry, "entry const answer = 1\n");
+  try {
+    await rejects(
+      createZigProjectCompiler({
+        executable,
+        entry,
+        profileTrace: "yes" as never,
+      }),
+      /profileTrace must be a boolean/,
+    );
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude: null,
+      cacheDirectory: false,
+      profileBackend: true,
+      profileTrace: true,
+    });
+    const pid = compiler.pid;
+    const queued = await Promise.all([compiler.build(), compiler.build()]);
+    ok(queued.every((result) => !result.success));
+    const isolated = compiler.profileProgress;
+    ok(isolated);
+    const controller = new AbortController();
+    const cancelled = compiler.build({ signal: controller.signal });
+    let buildId: string | null = null;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try {
+        buildId = await Deno.readTextFile(readyPath);
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+    ok(buildId !== null, "third build did not reach the trace peer");
+    controller.abort();
+    await rejects(
+      cancelled,
+      (error) => error instanceof DOMException && error.name === "AbortError",
+    );
+    await compiler.dispose();
+    reaped(pid);
+    const progress = compiler.profileProgress;
+    ok(progress);
+    equal(progress.events.length, 1);
+    equal(progress.events[0], {
+      kind: "module",
+      build: Number(buildId),
+      unit: 3,
+      filename: "cancelled.blot",
+      bytes: 43,
+    });
+    equal(progress.modules, [{
+      unit: 3,
+      filename: "cancelled.blot",
+      bytes: 43,
+    }]);
+    equal(progress.phases, null);
+    equal(progress.activeRegions, []);
+    equal(progress.slowRegions, []);
+    equal(progress.dropped, 0);
+
+    equal(isolated.events.length, 256);
+    equal(isolated.events[0].kind, "detail");
+    const last = isolated.events.at(-1);
+    equal(last?.kind, "end");
+    if (last?.kind === "end") {
+      equal(last.input_items, 345);
+      equal(last.output_items, 123);
+    }
+    equal(isolated.dropped, 48);
+    equal(isolated.modules, [{
+      unit: 2,
+      filename: "build-two.blot",
+      bytes: 42,
+    }]);
+    equal(isolated.phases?.phase_us, Array(11).fill(7));
+    equal(isolated.activeRegions.map((region) => region.id), [200]);
+    equal(isolated.slowRegions.map((region) => region.us), [12]);
+  } finally {
+    await item.cleanup();
+  }
+});
+
 Deno.test("Zig project client queues revisions and preserves entry edit/error/missing/correction bytes", async () => {
   const item = await fixture("blot-zig-project-entry-");
   const { directory } = item;

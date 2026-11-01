@@ -6,6 +6,45 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
+The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
+cancellation with exclusive phase checkpoints, module names, balanced
+declaration regions, worker CPU/join intervals, backend stages and seven
+optimizer-pass instruction/timing sums. Build IDs isolate retained revisions;
+bounded active and slow-region lists survive tail eviction. Three rotated
+controls measure **0.97% trace overhead on Matrix6 and 2.85% on the render
+producer**, with byte-identical output. Profiling remains outside executable
+identity. Compiler `e4af8647` compiles 2,777 native laws, passes six profiler
+laws and both aggregate-reader guests. The required gate stops at 48 passed/one
+known List/chunk owner-escape failure; full qualification remains pending. See
+[engine evidence](zig-native/measurements/engine-boundary-experiments-2026-11-01.json).
+
+The attempted completed readonly leaf plan is **rejected and removed**. Original
+ECS readers activate three plans but save only 18 bytes, with effectively flat
+compilation. Matrix6 activates none. Existing sharing already supplies one
+reader definition; wrapping that work is not a general call/storage plan. The
+archived patch and executed witnesses retain the experiment. The next meaningful
+backend family is nested-descriptor `render.emit_owned/store_draw`, including
+writes and borrowed results, not another scalar leaf.
+
+The explicit-interface experiments are also rejected: direct matrix composition
+leaves checking flat; four render callback input annotations save about 4%,
+below the 20% threshold. No source annotations or language feature cuts landed.
+A larger nominal owner/access boundary is the next frontend experiment; it must
+cover the actual world base and callback captures, not only FrameAccess.
+
+`kites.draw` now appends directly to the caller draw pool, removing its
+temporary owner/freeze/copy. Seven original production scenarios produce
+bit-identical full draw/vector streams on `9b0f6b05`, including sentinel
+prefixes and borrowed extras. Output falls **262,967 to 261,953 bytes**. The one
+traced integration pair finishes in 6.83/6.39 seconds under an explicit
+ten-second cap; it is not a latency benchmark. Ordinary diagnostics stay at five
+seconds. Actual main still exceeds that cap, with no current whole-game Wasm or
+new PNG. See
+[stream evidence](zig-native/measurements/kites-destination-streams-2026-11-01.json).
+Installed Pen checks are not qualification: its config parser rejects the
+existing `tools` key and its code generator marks nine unchanged files stale;
+the matching checkout executable needs its Steam shared-library path.
+
 Completed ground callee prerequisites now share proofs within one equation
 inquiry. A nominal depth-ten/eight-call graph that exhausted the unchanged work
 budget now completes with **80 expansions and 80 hits**. Requested field
@@ -25,9 +64,10 @@ regression; the final invariant-leaf shortcut reduces that overhead.
 
 Whole Gdev remains unfinished. The current candidate exceeds five-second main
 diagnostics in both optimized and development modes with four optimizer workers;
-there is no current whole-game size or fresh frame. Roughly **1 MB** remains the owner's
-expectation. The historical frame-qualified main took 2,188 seconds and produced
-47.4 MB, mostly code. Release builds and release performance remain pending.
+there is no current whole-game size or fresh frame. Roughly **1 MB** remains the
+owner's expectation. The historical frame-qualified main took 2,188 seconds and
+produced 47.4 MB, mostly code. Release builds and release performance remain
+pending.
 
 The first type-structure architecture experiment is measured and **rejected**.
 Copy-on-change during nonempty substitution passed its semantic laws but reduced
@@ -37,10 +77,10 @@ Fourteen diagnostic counters now separate inclusive node growth and traversal
 entries for import, substitution, resolution and covariance. The real render
 producer creates 9,427 nodes under resolution versus 1,757 under substitution;
 these are counts, not CPU shares. Variable views equal new binders in all three
-producers, so historical-view canonicalization has no measured opportunity.
-Do not add that optimization or a fresh cache. A deeper type representation
-change needs to identify which changed children/rows force normalization copies.
-See [the rejected experiment and attribution](zig-native/measurements/type-structure-experiment-2026-11-01.json).
+producers, so historical-view canonicalization has no measured opportunity. Do
+not add that optimization or a fresh cache. A deeper type representation change
+needs to identify which changed children/rows force normalization copies. See
+[the rejected experiment and attribution](zig-native/measurements/type-structure-experiment-2026-11-01.json).
 
 Literal closures now share exact typed definitions across parent generators.
 Captures and arguments travel as ordinary parameters; plain aggregate results
@@ -55,23 +95,24 @@ Actual Ink easing over nine constructor states drops **10 to 2 definitions**,
 Descriptor-reader/writer ownership and initialization facts remain exact.
 Qualified/goaled closures and pending array destinations retain conservative
 fallbacks. Six prior Ink controls are byte-identical, and Gdev language entries
-execute unchanged. See [typed-call evidence](zig-native/measurements/typed-call-sharing-2026-11-01.json).
+execute unchanged. See
+[typed-call evidence](zig-native/measurements/typed-call-sharing-2026-11-01.json).
 
-Ink/Gdev source rewrites are authorized. The first concrete candidate is
-`kites.draw`: append directly to the caller frame pool instead of constructing,
-freezing and copying a temporary draw array. Its original integration fixture
-still exceeds five seconds, so no game source change is installed. Robot
-accessory and crystal draw arrays have the same pattern; preserve draw order
-and qualify an actual original stream before changing them.
+Ink/Gdev source rewrites are authorized. The checked direct-destination kite
+slice is recorded above. Robot accessory and crystal draw arrays have the same
+pattern; preserve draw order and qualify their actual original streams before
+changing them.
 
 A final LLVM/fast compiler build hit its **90-second cap** without installing a
-new binary; the previous release hash remains unchanged and was not used for
-new performance claims. See [the attempt](zig-native/measurements/typed-call-release-attempt-2026-11-01.json).
-A separate `fast`/noLLVM development build finishes in about **5 seconds**, passes
-six focused guests and executes all original language assertions with the same
-25,651-byte output. Main still exceeds five seconds. This alternate configuration
-has narrower coverage than the reviewed safe compiler and is not an LLVM release
-result. See [the native-fast diagnostic](zig-native/measurements/native-fast-diagnostic-2026-11-01.json).
+new binary; the previous release hash remains unchanged and was not used for new
+performance claims. See
+[the attempt](zig-native/measurements/typed-call-release-attempt-2026-11-01.json).
+A separate `fast`/noLLVM development build finishes in about **5 seconds**,
+passes six focused guests and executes all original language assertions with the
+same 25,651-byte output. Main still exceeds five seconds. This alternate
+configuration has narrower coverage than the reviewed safe compiler and is not
+an LLVM release result. See
+[the native-fast diagnostic](zig-native/measurements/native-fast-diagnostic-2026-11-01.json).
 Neither attempt changes Pen settings or publishes a running environment.
 
 Closed-row certificate paths now hash lazily, preserving exact receipt bytes,
@@ -85,14 +126,15 @@ method, explicit and generative paths. In the actual render-producer probe this
 removes 659 generalizations and reduces candidate scans from 359,768 to 50,653.
 Three matched pairs improve **882 to 642 ms**, with checking **509 to 258 ms**
 and identical tiny-entry output. This is producer checking, not whole-game
-emission. See the [array-local evidence](zig-native/measurements/closed-array-locals-2026-11-01.json).
+emission. See the
+[array-local evidence](zig-native/measurements/closed-array-locals-2026-11-01.json).
 
 Plain aggregate readers now share definitions and exact admission receipts.
-Actual Ink `transform.matrix` reader DAGs at depth six improve **669 to 375 ms**,
-**26,185 to 14,266 bytes**, and **96,094 to 4,140 admission visits**. Result keys
-bind semantic and physical layout; every caller owns its shape and scratch.
-Variant/borrow results keep their existing paths. The Gdev language control is
-roughly flat in latency but grows **273 bytes (1.07%)**. See
+Actual Ink `transform.matrix` reader DAGs at depth six improve **669 to 375
+ms**, **26,185 to 14,266 bytes**, and **96,094 to 4,140 admission visits**.
+Result keys bind semantic and physical layout; every caller owns its shape and
+scratch. Variant/borrow results keep their existing paths. The Gdev language
+control is roughly flat in latency but grows **273 bytes (1.07%)**. See
 [aggregate-reader evidence](zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
 
 Selected-address loads now avoid whole-row scalarization for plain, stable
@@ -118,7 +160,8 @@ A three-second debugger sample catches actual main in source checking:
 frontend workers wait. This is one observed phase, not a CPU percentage or full
 latency measurement. A short follow-up captures two root publications, too few
 to rank hot paths. Measure unchanged substitution copies on a completed producer
-before changing row opening; preserve fresh rows and exact callback requirements. See
+before changing row opening; preserve fresh rows and exact callback
+requirements. See
 [the bounded checking sample](zig-native/measurements/gdev-checking-sample-2026-11-01.json).
 
 Variant-bearing descriptor helpers remain a separate hypothesis. The real Robot
@@ -133,13 +176,14 @@ optimization around outlining without new evidence.
 The declaration-demand manifest is **diagnostic only**, with exhaustive source
 checking unchanged. It now follows existing lazy initializer semantics instead
 of seeding every non-function and attributed declaration. On identical sources,
-main demand falls **5,277 to 4,241 of 5,957 declarations**, but retains **82.6%**
-of original function-body bytes. Tiny-entry retention falls **77.2% to 2.1%**;
-actor falls **80.1% to 9.8%**. All three inventory pairs have zero fallbacks and
-matching module-source digests. Planning takes about 165/25/47 ms respectively
-in these single pairs, not compile-speed measurements. See
+main demand falls **5,277 to 4,241 of 5,957 declarations**, but retains
+**82.6%** of original function-body bytes. Tiny-entry retention falls **77.2% to
+2.1%**; actor falls **80.1% to 9.8%**. All three inventory pairs have zero
+fallbacks and matching module-source digests. Planning takes about 165/25/47 ms
+respectively in these single pairs, not compile-speed measurements. See
 [the corrected demand inventory](zig-native/measurements/lazy-declaration-demand-2026-11-01.json).
-The earlier [over-rooted inventory](zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
+The earlier
+[over-rooted inventory](zig-native/measurements/declaration-demand-inventory-2026-11-01.json)
 remains pinned historical evidence. Main still retains 98.5% of its previously
 selected original body bytes; blanket initializer roots do not explain its
 latency. Generated assets are included: 264 loaded modules on main. Unchecked
@@ -203,24 +247,27 @@ context-sensitive reusable calls. Original Gdev language tests and Ink
 custom-codec persistence, including all 260 truncated inputs, pass on the final
 candidate. Actual main now passes the recorded native frame on this binary.
 
-Astra xhigh reviewed the semantic and performance boundaries. The current
-compiler `fca4f6a1` compiles **2,776 native tests**. All five focused typed-call
-laws pass in full fault mode, including allocation failures; **434/435** broader
-sampled laws pass with the independently reproduced associated-partial baseline
-failure. All **68 affected guests** pass, including mixed aggregate/callback
-schemas, descriptor aliases, read replay, both tiers, sync/JSPI and retained
-edits. Original Gdev language entries pass six entries/11 assertions per mode;
-the same 25,651-byte output remains. Zig lint has zero findings across 572 files.
+Astra xhigh reviewed the semantic and performance boundaries. The earlier
+typed-call compiler `fca4f6a1` compiles **2,776 native tests**. All five focused
+typed-call laws pass in full fault mode, including allocation failures;
+**434/435** broader sampled laws pass with the independently reproduced
+associated-partial baseline failure. All **68 affected guests** pass, including
+mixed aggregate/callback schemas, descriptor aliases, read replay, both tiers,
+sync/JSPI and retained edits. Original Gdev language entries pass six entries/11
+assertions per mode; the same 25,651-byte output remains. Zig lint has zero
+findings across 572 files.
 
-Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs forwarded
-`HOME`, enabling disk-cache contamination between retained and supposedly fresh
-clients. The body-reuse harness now explicitly disables persistence. Those old
-figures were not compiler semantic regressions. The stale five-character `true`
-span assertion is also corrected; all 42 protocol tests pass.
+Body-reuse/text tests now pass **33/33**. Earlier 17/16 unrestricted runs
+forwarded `HOME`, enabling disk-cache contamination between retained and
+supposedly fresh clients. The body-reuse harness now explicitly disables
+persistence. Those old figures were not compiler semantic regressions. The stale
+five-character `true` span assertion is also corrected; all 42 protocol tests
+pass.
 
-The required full gate currently stops at **47 passed, one failed** in smoke. The remaining list/chunk loop owner-escape failure is
-independently reproduced on preserved `0faa0cbb`; it is not a passing gate.
-Release, full-native and broader integration qualification remain pending.
+The required full gate currently stops at **48 passed, one failed** in smoke.
+The remaining list/chunk loop owner-escape failure is independently reproduced
+on preserved `0faa0cbb`; it is not a passing gate. Release, full-native and
+broader integration qualification remain pending.
 
 ## Remaining execution work
 

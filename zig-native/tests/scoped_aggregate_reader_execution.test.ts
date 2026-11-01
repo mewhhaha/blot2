@@ -45,6 +45,23 @@ entry const projections = func (input: F32) => return do:
   let point = position_twice poses
   let (left, right) = tuple_twice pairs
   return #[point.x, point.y, point.z, left, right]
+const read_branch = func (rows: GrowArray U32) -> (early: Bool) => return do:
+  let first = rows[0]
+  if early:
+    return {value: first, stamp: rows[1]}
+  return {stamp: first, value: rows[1]}
+const read_branch_twice = func (rows: GrowArray U32) => return do:
+  let first = read_branch rows true
+  let second = read_branch rows false
+  return {value: first.value, stamp: second.stamp}
+entry const early_returns = func (input: U32) => return do:
+  let left: GrowArray U32 = #[input, 7]
+  let right: GrowArray U32 = #[@u32.add input 11, 13]
+  let first = read_branch_twice left
+  let second = read_branch_twice right
+  left[0] := @u32.add input 19
+  let third = read_branch_twice left
+  return #[first.value, second.stamp, third.value, right[1]]
 type Choice is data = $Count U32 | $Empty
 const choice_read = func (rows: GrowArray Choice): Choice => return rows[0]
 const choice_twice = func rows => return do:
@@ -101,6 +118,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
             return guest.call(name, input);
           };
           for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
+            assert.deepEqual(
+              await call("early_returns", input),
+              new Uint32Array([input, input + 11, input + 19, 13]),
+            );
             assert.deepEqual(
               await call("variants", input),
               new Uint32Array([input, 31, 31, input + 9]),

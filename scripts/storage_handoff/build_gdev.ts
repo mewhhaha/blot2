@@ -9,6 +9,7 @@ const { values, positionals } = parseArgs({
     entry: { type: "string" },
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
+    trace: { type: "boolean", default: false },
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },
   },
@@ -76,7 +77,8 @@ try {
     storage: settings.storage,
     cacheDirectory: false,
     startupTimeoutMs: timeoutMs,
-    profileBackend: values.profile,
+    profileBackend: values.profile || values.trace,
+    profileTrace: values.trace,
     codegenTier: values.tier,
     codegenWorkers: workers,
   });
@@ -136,7 +138,9 @@ const output = {
   codegenTier: values.tier,
   codegenWorkers: workers,
   buildMs,
-  profileBackend: values.profile,
+  profileBackend: values.profile || values.trace,
+  profileTrace: values.trace,
+  profileProgress: compiler?.profileProgress ?? null,
   ...report!,
 };
 await Deno.writeTextFile(

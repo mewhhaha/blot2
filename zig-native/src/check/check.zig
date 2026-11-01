@@ -10623,6 +10623,7 @@ const Engine = struct {
         }
     };
     const GlobalFrame = struct {
+        profile_region: @import("../phase_profile.zig").Region = .{},
         binding: BindingId,
         id: ast.Id,
         required: T.Id,
@@ -10738,9 +10739,12 @@ const Engine = struct {
         }
         self.body_elaborations += 1;
         self.traceGlobal(.begun, binding);
-        return .{ .binding = binding, .id = id, .required = required, .initializer_diagnostics = initializer_diagnostics, .operations_before = self.operation_uses.items.len, .context = context };
+        const profile_span = self.tree.span(id);
+        const profile_region = @import("../phase_profile.zig").region("check.declaration", self.unit, profile_span.start, profile_span.end);
+        return .{ .profile_region = profile_region, .binding = binding, .id = id, .required = required, .initializer_diagnostics = initializer_diagnostics, .operations_before = self.operation_uses.items.len, .context = context };
     }
     fn finishGlobal(self: *Engine, frame: *const GlobalFrame, value: T.Id) T.Error!void {
+        defer frame.profile_region.exit();
         const binding = frame.binding;
         const id = frame.id;
         const required = frame.required;

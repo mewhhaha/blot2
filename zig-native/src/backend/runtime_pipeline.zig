@@ -139,6 +139,18 @@ pub const Session = struct {
         return true;
     }
     pub fn optimize(self: *Session, source: *const ir.Function) A.Error!?ir.Body {
+        const telemetry = @import("../phase_profile.zig");
+        // For unit zero, the coordinates identify an IR function ordinal,
+        // not a source span. Unknown/copied functions use the sentinel.
+        var ordinal: u32 = std.math.maxInt(u32);
+        if (telemetry.currentTrace() != null) {
+            const address = @intFromPtr(source);
+            const base = @intFromPtr(self.module.functions.items.ptr);
+            if (address >= base and address - base < self.module.functions.items.len * @sizeOf(ir.Function) and (address - base) % @sizeOf(ir.Function) == 0) ordinal = @intCast((address - base) / @sizeOf(ir.Function));
+        }
+        var function_region: telemetry.Region = .{};
+        if (source.instructions.items.len >= 256) function_region = telemetry.region("runtime-ir.function", 0, ordinal, ordinal);
+        defer function_region.exit();
         var owned: ?ir.Body = null;
         errdefer if (owned) |*body| body.deinit(self.allocator);
         var view = source.*;
@@ -154,6 +166,9 @@ pub const Session = struct {
         var scan: lifetimes.SharedScan = .{};
         defer scan.deinit();
         inline for (.{ "inline", "scalar", "vector", "row_products", "lifetime", "reduce", "rc" }) |pass| {
+            const pass_region = telemetry.optimizationPass(@field(telemetry.OptimizationPass, pass));
+            const before = view.instructions.items.len;
+            defer pass_region.exitWithItems(before, view.instructions.items.len);
             const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime") and !std.mem.eql(u8, pass, "rc"))
                 null
             else if (comptime std.mem.eql(u8, pass, "inline"))
