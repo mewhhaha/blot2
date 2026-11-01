@@ -15277,10 +15277,12 @@ const Engine = struct {
         if (self.diagnostics.items.len == 0) for (self.cases.items) |id| try self.checkCoverage(id);
     }
     fn normalizeList(self: *Engine, list: T.List) T.Error!void {
-        if (list.len == 0) return;
-        const copy = try self.allocator.dupe(T.Id, self.types.list(list));
-        defer self.allocator.free(copy);
-        for (copy, 0..) |old, i| self.types.replaceListItem(list, i, try self.types.resolve(old, 0));
+        for (0..list.len) |i| {
+            // Resolution can move extra, but only appends to it. Reread each
+            // numeric slot instead of retaining a slice or copying the list.
+            const old = self.types.list(list)[i];
+            self.types.replaceListItem(list, i, try self.types.resolve(old, 0));
+        }
     }
     fn wildcard(self: *const Engine, id: ast.Id) bool {
         if (id == 0) return true;

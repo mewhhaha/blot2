@@ -578,12 +578,6 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     const timing = phase_profile.enter(.validation);
     defer timing.exit();
     try require(value.symbols.len != 0 and value.symbols[0].text.len == 0);
-    var paths: std.StringHashMapUnmanaged(void) = .empty;
-    defer paths.deinit(a);
-    var prelude_count: usize = 0;
-    const prelude_unit: u32 = for (value.modules, 1..) |m, id| {
-        if (m.identity.prelude) break @intCast(id);
-    } else 0;
     const view_count = std.math.add(usize, value.modules.len, @intFromBool(padded_entry)) catch return error.OutOfMemory;
     const views = try a.alloc(*const core.Module, view_count);
     defer a.free(views);
@@ -598,6 +592,21 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         try require(m.core.unit == id and m.interface.unit == id);
         view.* = &m.core;
     }
+    const Run = struct {
+        pub fn run(args: anytype, batch: *const core_validation.Batch) Error!usize {
+            return @call(.auto, validateModules, args ++ .{batch});
+        }
+    };
+    return core_validation.withBatch(.{ .units = views, .symbol_count = value.symbols.len, .forbidden_owner = if (padded_entry) entry.unit else null }, .{ a, value, current, previous, stats, views, padded_entry }, Run);
+}
+fn validateModules(a: std.mem.Allocator, value: *const D.FrozenDependency, current: ?*const retained.Snapshot, previous: ?*const retained.Snapshot, stats: *retained.Stats, views: []const *const core.Module, padded_entry: bool, batch: *const core_validation.Batch) Error!usize {
+    var paths: std.StringHashMapUnmanaged(void) = .empty;
+    defer paths.deinit(a);
+    var prelude_count: usize = 0;
+    const prelude_unit: u32 = for (value.modules, 1..) |m, id| {
+        if (m.identity.prelude) break @intCast(id);
+    } else 0;
+    const closure_views = views[0..value.modules.len];
     const saved = if (previous) |old| if (old.validated) old else null else null;
     const previous_views: []*const core.Module = if (saved) |old| try a.alloc(*const core.Module, old.value.modules.len) else &.{};
     defer a.free(previous_views);
@@ -629,7 +638,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             try principal_validation.validateGraphWithBudget(a, &m.interface, &associated_remaining);
             stats.interface_checked += 1;
         }
-        const context: core_validation.Context = .{ .units = views, .symbol_count = value.symbols.len, .source_length = m.identity.source_bytes, .forbidden_owner = if (padded_entry) entry.unit else null };
+        const context: core_validation.Context = .{ .units = views, .symbol_count = value.symbols.len, .source_length = m.identity.source_bytes, .forbidden_owner = if (padded_entry) @intCast(views.len) else null };
         const same_core_context = if (shared and !m.core.has_numeric_proofs) core_validation.equivalentContext(.{ .units = previous_views, .symbol_count = saved.?.value.symbols.len, .source_length = saved.?.value.modules[id].identity.source_bytes }, context, &.{&saved.?.value.modules[id].core}, &.{&m.core}) else false;
         var same_owned_context = false;
         if (shared and !same_core_context) {
@@ -642,7 +651,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         if (same_core_context or same_owned_context) {
             stats.core_reused += 1;
         } else {
-            try core_validation.validateWithBudget(a, &m.core, context, &associated_remaining);
+            try batch.validateWithBudget(a, &m.core, m.identity.source_bytes, &associated_remaining);
             for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
             stats.core_checked += 1;
         }

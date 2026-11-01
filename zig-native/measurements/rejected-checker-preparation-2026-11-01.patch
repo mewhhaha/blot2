@@ -1,0 +1,491 @@
+diff --git a/scripts/dev_check_areas.ts b/scripts/dev_check_areas.ts
+--- a/scripts/dev_check_areas.ts
++++ b/scripts/dev_check_areas.ts
+@@ -489,6 +489,10 @@
+     "description":
+       "Type identity, substitution, effect-row rollback and owned evidence.",
+     "native": [
++      "check.check_nominal_tests.test.ordinary curried calls preserve intrinsic divergence and named record diagnostics",
++      "check.check_nominal_tests.test.application normalization retains deep ordinary type rejection before publication",
++      "reuse.body_check_cache.test.body check cache module recipe sharing retains implementation reads and declines bound scopes",
++      "reuse.body_check_cache_tests.test.body check cache shares nominal preparation while retaining the first edit",
+       "check.frozen_core_validation_tests.test.Core validation batch preserves ordinary graph source bounds and forbidden owner checks through OOM",
+       "check.frozen_core_validation_tests.test.Core validation batch keeps spawn calls captures malformed wrappers and standalone fallback",
+       "check.frozen_core_validation_tests.test.Core task batch recomputes exact changed entry context instead of retaining absence",
+@@ -511,6 +515,7 @@
+       "zig-native/tests/type_identity_execution.test.ts",
+       "zig-native/tests/symbolic_effect_rows.test.ts",
+       "zig-native/tests/inference_budget_config.test.ts",
++      "zig-native/tests/checker_normalization_execution.test.ts",
+     ],
+     "guestFilters": {} as Record<string, string>,
+   },
+diff --git a/zig-native/src/check/check.zig b/zig-native/src/check/check.zig
+--- a/zig-native/src/check/check.zig
++++ b/zig-native/src/check/check.zig
+@@ -12581,15 +12581,20 @@
+             var supplied_source = node.b;
+             while (self.tree.node(supplied_source).tag == .group) supplied_source = self.tree.node(supplied_source).a;
+             const supplied = self.tree.node(supplied_source);
+-            const expected = self.types.node(try self.types.resolve(function.a, 0));
+-            if (supplied.tag == .record and supplied.a == 0 and expected.tag == .record) {
+-                for (self.tree.children(supplied_source)) |field_source| {
+-                    const name = self.tree.node(field_source).a;
+-                    for (0..expected.b) |field_index| {
+-                        if (self.types.recordField(expected, field_index).name == name) break;
+-                    } else {
+-                        try self.diagnostic(.unknown_field, field_source);
+-                        return try self.types.fresh();
++            const named_record = supplied.tag == .record and supplied.a == 0;
++            // Other arguments are checked by the whole invocation constraint.
++            // Keep observable work/error ordering for proof and bounded paths.
++            if (named_record or self.types.has_projections or self.types.has_proof_kinds or self.types.resolution_depth_limit != 1024) {
++                const expected = self.types.node(try self.types.resolve(function.a, 0));
++                if (named_record and expected.tag == .record) {
++                    for (self.tree.children(supplied_source)) |field_source| {
++                        const name = self.tree.node(field_source).a;
++                        for (0..expected.b) |field_index| {
++                            if (self.types.recordField(expected, field_index).name == name) break;
++                        } else {
++                            try self.diagnostic(.unknown_field, field_source);
++                            return try self.types.fresh();
++                        }
+                     }
+                 }
+             }
+@@ -12630,7 +12635,7 @@
+         }
+ 
+         if (self.has_tasks and pending_begin != self.pending.items.len) try self.solveFieldsFrom(pending_begin);
+-        return try self.applicationFlow(id, function_ty, argument, try self.freshFormalInvocation(id, result));
++        return try self.applicationFlow(id, leaf, function_ty, argument, try self.freshFormalInvocation(id, result));
+     }
+     // Only a demand parameter declared affine before instantiation may move
+     // its captures. A generic `~value` body may retry the suspension, so a
+@@ -12970,22 +12975,26 @@
+         }
+         return self.types.instanceVersion(.{ .unit = self.unit, .decl = point }, ordinal);
+     }
+-    fn applicationFlow(self: *Engine, id: ast.Id, callee: T.Id, argument: T.Id, result: T.Id) T.Error!T.Id {
+-        var head = id;
+-        var count: usize = 0;
+-        var diverges = false;
+-        while (self.tree.node(head).tag == .apply) {
+-            const node = self.tree.node(head);
+-            diverges = diverges or try self.types.resolve(self.expr_types[node.b], 0) == T.never;
+-            count += 1;
+-            head = node.a;
+-        }
+-        if (self.tree.node(head).tag == .intrinsic) {
++    fn applicationFlow(self: *Engine, id: ast.Id, leaf: ast.Id, callee: T.Id, argument: T.Id, result: T.Id) T.Error!T.Id {
++        var arity: ?usize = null;
++        if (self.tree.node(leaf).tag == .intrinsic) arity = intrinsicArity(self.pool.get(self.tree.node(leaf).a));
++        // Only syntactic intrinsics consume prefix divergence. Preserve the
++        // original normalization on paths with observable projection charges.
++        if (arity != null or self.types.has_projections or self.types.resolution_depth_limit != 1024) {
++            var head = id;
++            var count: usize = 0;
++            var diverges = false;
++            while (self.tree.node(head).tag == .apply) {
++                const node = self.tree.node(head);
++                diverges = diverges or try self.types.resolve(self.expr_types[node.b], 0) == T.never;
++                count += 1;
++                head = node.a;
++            }
+             // Source primitives lower as one operation. Keep each formal
+             // parameter available until every operand has been checked.
+-            if (intrinsicArity(self.pool.get(self.tree.node(head).a))) |arity| {
+-                if (count < arity) return result;
+-                if (count == arity) return if (diverges) T.never else result;
++            if (arity) |expected| {
++                if (count < expected) return result;
++                if (count == expected) return if (diverges) T.never else result;
+             }
+         }
+         const function = self.types.node(try self.types.resolve(callee, 0));
+diff --git a/zig-native/src/check/check_nominal_tests.zig b/zig-native/src/check/check_nominal_tests.zig
+--- a/zig-native/src/check/check_nominal_tests.zig
++++ b/zig-native/src/check/check_nominal_tests.zig
+@@ -34,6 +34,66 @@
+         try std.testing.expectEqual(@as(usize, 0), self.checked.diagnostics.len);
+     }
+ };
++test "ordinary curried calls preserve intrinsic divergence and named record diagnostics" {
++    const source =
++        \\const pick = func (left: U32) -> (right: U32) => return right
++        \\const named = func (values: {left: U32, right: U32}) => return @u32.add values.left values.right
++        \\const ordinary = func () => return pick (@panic "earlier") 7
++        \\const intrinsic = func () => return @u32.add (@panic "earlier") 7
++        \\entry const answer = func (input: U32) => return named {right: pick 1 2, left: input}
++    ;
++    var valid = try Fixture.init(source);
++    defer valid.deinit();
++    try valid.valid();
++    var never: usize = 0;
++    for (valid.tree.nodes.items, 0..) |node, id| {
++        if (node.tag != .apply) continue;
++        const span = valid.tree.span(@intCast(id));
++        const text = source[span.start..span.end];
++        if (!std.mem.eql(u8, text, "pick (@panic \"earlier\") 7") and !std.mem.eql(u8, text, "@u32.add (@panic \"earlier\") 7")) continue;
++        try std.testing.expectEqual(T.never, valid.checked.expr_types[id]);
++        never += 1;
++    }
++    try std.testing.expectEqual(@as(usize, 2), never);
++    const invalid = "const named = func (values: {left: U32, right: U32}) => return values.left\nentry const answer = named {left: 1, wrong: 2}\n";
++    var rejected = try Fixture.init(invalid);
++    defer rejected.deinit();
++    const start = std.mem.find(u8, invalid, "wrong").?;
++    try std.testing.expect(rejected.checked.diagnostics.len != 0);
++    try std.testing.expectEqual(check.Code.unknown_field, rejected.checked.diagnostics[0].code);
++    try std.testing.expectEqual(start, rejected.checked.diagnostics[0].span.start);
++}
++
++test "application normalization retains deep ordinary type rejection before publication" {
++    for ([_]usize{ 7, 10 }) |depth| {
++        var source: std.ArrayList(u8) = .empty;
++        defer source.deinit(a);
++        try source.appendSlice(a, "const layer_0 = func value => return #[value]\n");
++        for (1..depth + 1) |level| {
++            const line = try a.print("const layer_{d} = func value => return layer_{d} (layer_{d} value)\n", .{ level, level - 1, level - 1 });
++            defer a.free(line);
++            try source.appendSlice(a, line);
++        }
++        const entry = try a.print("entry const answer = func (input: U32) => return layer_{d} input\n", .{depth});
++        defer a.free(entry);
++        try source.appendSlice(a, entry);
++        if (depth == 10) {
++            if (Fixture.init(source.items)) |value| {
++                var rejected = value;
++                defer rejected.deinit();
++                var nesting = false;
++                for (rejected.checked.diagnostics) |diagnostic| {
++                    if (diagnostic.code == .nesting_limit) nesting = true;
++                }
++                try std.testing.expect(nesting);
++            } else |err| try std.testing.expectEqual(error.TypeLimit, err);
++        } else {
++            var valid = try Fixture.init(source.items);
++            defer valid.deinit();
++            try valid.valid();
++        }
++    }
++}
+ pub const records_source =
+     \\infixl 60 (+) = _fixity_add
+     \\type Vec2 is data = $Vec2 { x: F32, y: F32 }
+diff --git a/zig-native/src/reuse/body_check_cache.zig b/zig-native/src/reuse/body_check_cache.zig
+--- a/zig-native/src/reuse/body_check_cache.zig
++++ b/zig-native/src/reuse/body_check_cache.zig
+@@ -36,19 +36,19 @@
+         lookup: *const fn (*const anyopaque, check.BindingId) bool,
+     } = null,
+ };
+-/// One body's immutable recipe proofs. Depth and proof debit stay exact;
++/// One immutable capture's declaration proofs. Depth and proof debit stay exact;
+ /// entries never cross a checker mutation or persist in a receipt.
+ pub const RecipeMemo = struct {
+-    const Entry = struct { index: usize, depth: usize, cost: usize, digest: Digest };
++    const Entry = struct { index: usize, depth: usize, cost: usize, digest: Digest, implementation_read: bool };
+     entries: [64]Entry = undefined,
+     len: usize = 0,
+     fn lookup(self: *const RecipeMemo, index: usize, depth: usize) ?Entry {
+         for (self.entries[0..self.len]) |entry| if (entry.index == index and entry.depth == depth) return entry;
+         return null;
+     }
+-    fn save(self: *RecipeMemo, index: usize, depth: usize, cost: usize, digest: Digest) void {
++    fn save(self: *RecipeMemo, index: usize, depth: usize, cost: usize, digest: Digest, implementation_read: bool) void {
+         if (self.len == self.entries.len) return;
+-        self.entries[self.len] = .{ .index = index, .depth = depth, .cost = cost, .digest = digest };
++        self.entries[self.len] = .{ .index = index, .depth = depth, .cost = cost, .digest = digest, .implementation_read = implementation_read };
+         self.len += 1;
+     }
+ };
+@@ -292,10 +292,23 @@
+ }
+ fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usize, budget: *usize) ?Digest {
+     if (depth >= 128 or budget.* == 0) return null;
+-    if (catalog.recipes) |memo| if (memo.lookup(index, depth)) |entry| {
++    // A surrounding quantifier owns its bound leaves. Its temporary scope is
++    // not a module-wide declaration key, even at the same recipe depth.
++    var recipes: ?*RecipeMemo = null;
++    if (catalog.bound_scope == null) recipes = catalog.recipes;
++    if (recipes) |memo| if (memo.lookup(index, depth)) |entry| {
+         if (entry.cost > budget.*) return null;
+         budget.* -= entry.cost;
++        if (entry.implementation_read) if (catalog.implementation_read) |read| {
++            read.* = true;
++        };
+         return entry.digest;
++    };
++    var implementation_read = false;
++    var recipe_catalog = catalog;
++    recipe_catalog.implementation_read = &implementation_read;
++    defer if (implementation_read) {
++        if (catalog.implementation_read) |read| read.* = true;
+     };
+     const available = budget.*;
+     budget.* -= 1;
+@@ -322,9 +335,9 @@
+     hashWord(&hash, storage.selector);
+     hashWord(&hash, nominal.parameters.len);
+     for (source.list(nominal.parameters)) |parameter| {
+-        if (!typeHash(source, parameter, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, catalog)) return null;
+-    }
+-    if (!parameterHash(source, catalog, nominal, &hash, depth + 1, budget)) return null;
++        if (!typeHash(source, parameter, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, recipe_catalog)) return null;
++    }
++    if (!parameterHash(source, recipe_catalog, nominal, &hash, depth + 1, budget)) return null;
+     hashWord(&hash, nominal.constructors.len);
+     for (source.list(nominal.constructors)) |constructor_index| {
+         if (constructor_index >= catalog.constructors.len) return null;
+@@ -336,11 +349,11 @@
+         hashWord(&hash, constructor.tag);
+         hashWord(&hash, @intFromBool(constructor.private));
+         hashWord(&hash, @intFromBool(constructor.declared_record));
+-        if (!typeHash(source, constructor.payload, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, catalog)) return null;
++        if (!typeHash(source, constructor.payload, &hash, budget, depth + 1, false, source.list(nominal.variables), &.{}, recipe_catalog)) return null;
+     }
+     var digest: Digest = undefined;
+     hash.final(&digest);
+-    if (catalog.recipes) |memo| memo.save(index, depth, available - budget.*, digest);
++    if (recipes) |memo| memo.save(index, depth, available - budget.*, digest, implementation_read);
+     return digest;
+ }
+ fn parameterHash(source: F.Source, catalog: Catalog, nominal: check.Nominal, hash: *std.crypto.hash.Blake3, depth: usize, budget: *usize) bool {
+@@ -1939,6 +1952,7 @@
+         for (bodies.items) |*body| body.deinit(a);
+         bodies.deinit(a);
+     }
++    var recipes: RecipeMemo = .{};
+     for (tree.roots.items) |root| {
+         if (tree.node(root).tag != .value_decl or cache.find(pool.get(tree.valueDecl(root).name)) != null) continue;
+         const node_owner = tree.declarationNodes(root) orelse continue;
+@@ -1946,7 +1960,7 @@
+         const shape = try syntax(a, tree, pool, root) orelse continue;
+         defer a.free(shape.ids);
+         if (shape.ids.len < cache.minimum_nodes) continue;
+-        if (try captureBody(a, tree, pool, text, checked, root, shape, names, annotations)) |body| {
++        if (try captureBody(a, tree, pool, text, checked, root, shape, names, annotations, &recipes)) |body| {
+             var owned = body;
+             errdefer owned.deinit(a);
+             try bodies.append(a, body);
+@@ -2476,7 +2490,7 @@
+     }
+ };
+ 
+-fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup) !?Body {
++fn captureBody(a: A, tree: *const ast.Tree, pool: *const symbols.Pool, text: []const u8, checked: *const check.Checked, root: ast.Id, shape: Syntax, names: ?ExternalNames, annotations: ?AnnotationLookup, recipes: *RecipeMemo) !?Body {
+     if (unretainedFacts()) return null;
+     // The recipe does not yet retain a function's nonlocal exit boundary.
+     for (shape.ids) |id| if (tree.node(id).tag == .function_return_stmt) return null;
+@@ -2505,9 +2519,8 @@
+             effect_heads.set(head - source_nodes.start);
+         }
+     }
+-    var recipes: RecipeMemo = .{};
+     var implementation_selection = false;
+-    const catalog: Catalog = .{ .private = .{ .tree = tree, .checked = checked, .ids = shape.ids }, .implementation_read = &implementation_selection, .recipes = &recipes, .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .effect_families = checked.effect_families, .effect_templates = checked.effect_templates, .contracts = checked.contracts, .contract_members = checked.contract_members, .contract_predicates = checked.contract_predicates, .implementations = checked.implementations, .implementation_members = checked.implementation_members, .implementation_predicates = checked.implementation_predicates, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names, .annotations = annotations, .proof_contracts = checked.proof_contracts, .capability_contracts = checked.capability_contracts } };
++    const catalog: Catalog = .{ .private = .{ .tree = tree, .checked = checked, .ids = shape.ids }, .implementation_read = &implementation_selection, .recipes = recipes, .unit = checked.unit, .pool = pool, .nominals = checked.nominals, .constructors = checked.constructors, .effect_families = checked.effect_families, .effect_templates = checked.effect_templates, .contracts = checked.contracts, .contract_members = checked.contract_members, .contract_predicates = checked.contract_predicates, .implementations = checked.implementations, .implementation_members = checked.implementation_members, .implementation_predicates = checked.implementation_predicates, .patterns = .{ .store = &checked.parameter_patterns }, .values = .{ .bindings = checked.bindings, .tree = tree, .names = names, .annotations = annotations, .proof_contracts = checked.proof_contracts, .capability_contracts = checked.capability_contracts } };
+     const global = checked.resolved[root];
+     for (checked.member_templates) |template| if (template.binding == global) return null;
+     const span = tree.span(root);
+@@ -3346,6 +3359,64 @@
+     var overflow: usize = 4096;
+     try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, index, 64, &overflow).?);
+     try std.testing.expectEqual(memo.entries.len, memo.len);
++}
++
++test "body check cache module recipe sharing retains implementation reads and declines bound scopes" {
++    const allocator = std.testing.allocator;
++    var types = try T.Store.init(allocator);
++    defer types.deinit();
++    var pool: symbols.Pool = .{};
++    defer pool.deinit(allocator);
++    const box = try pool.intern(allocator, "Box");
++    const constraint = try pool.intern(allocator, "Constraint");
++    const member = try pool.intern(allocator, "Output");
++    const identity = T.NominalIdentity{ .unit = 1, .decl = 1 };
++    const projected = try types.projection(identity, member, &.{});
++    const constructors = [_]check.Constructor{.{ .identity = .{ .unit = 1, .decl = 3 }, .nominal = 0, .tag = 0, .name = box, .payload = projected }};
++    const nominals = [_]check.Nominal{.{ .identity = .{ .unit = 1, .decl = 2 }, .name = box, .parameters = .{}, .variables = .{}, .constructors = try types.saveList(&.{0}) }};
++    const contracts = [_]check.Contract{.{ .identity = identity, .name = constraint }};
++    var memo: RecipeMemo = .{};
++    var implementation_read = false;
++    var catalog: Catalog = .{ .unit = 1, .pool = &pool, .nominals = &nominals, .constructors = &constructors, .contracts = &contracts, .recipes = &memo, .implementation_read = &implementation_read };
++    const source = F.Source{ .store = &types };
++    var budget: usize = 4096;
++    const digest = nominalDigestAt(source, catalog, 0, 0, &budget).?;
++    try std.testing.expect(implementation_read);
++    try std.testing.expectEqual(@as(usize, 1), memo.len);
++    const cost = 4096 - budget;
++    // A different body's selection flag starts clear. The hit must publish
++    // the same dependency, while debiting the original recipe's full work.
++    implementation_read = false;
++    var exact = cost;
++    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, 0, 0, &exact).?);
++    try std.testing.expect(implementation_read);
++    try std.testing.expectEqual(@as(usize, 0), exact);
++    implementation_read = false;
++    var short = cost - 1;
++    try std.testing.expect(nominalDigestAt(source, catalog, 0, 0, &short) == null);
++    try std.testing.expect(!implementation_read);
++    catalog.recipes = null;
++    var plain: usize = 4096;
++    try std.testing.expectEqual(digest, nominalDigestAt(source, catalog, 0, 0, &plain).?);
++    try std.testing.expectEqual(budget, plain);
++
++    const bound = try types.boundType(0, 0);
++    const scoped_constructors = [_]check.Constructor{.{ .identity = constructors[0].identity, .nominal = 0, .tag = 0, .name = box, .payload = bound }};
++    const scope = BoundScope{ .ids = &.{bound}, .parent = null };
++    const unrelated = BoundScope{ .ids = &.{}, .parent = null };
++    var scoped_memo: RecipeMemo = .{};
++    catalog.recipes = &scoped_memo;
++    catalog.constructors = &scoped_constructors;
++    catalog.bound_scope = &scope;
++    var scoped: usize = 4096;
++    try std.testing.expect(nominalDigestAt(source, catalog, 0, 0, &scoped) != null);
++    try std.testing.expectEqual(@as(usize, 0), scoped_memo.len);
++    catalog.bound_scope = &unrelated;
++    var rejected: usize = 4096;
++    try std.testing.expect(nominalDigestAt(source, catalog, 0, 0, &rejected) == null);
++    catalog.bound_scope = null;
++    var escaped: usize = 4096;
++    try std.testing.expect(nominalDigestAt(source, catalog, 0, 0, &escaped) == null);
+ }
+ 
+ test "body check cache forwarded shared principals require an exact bounded transitive edge" {
+diff --git a/zig-native/src/reuse/body_check_cache_tests.zig b/zig-native/src/reuse/body_check_cache_tests.zig
+--- a/zig-native/src/reuse/body_check_cache_tests.zig
++++ b/zig-native/src/reuse/body_check_cache_tests.zig
+@@ -125,6 +125,27 @@
+     var result = try compile(a, &fresh);
+     defer result.deinit(a);
+     try compare(a, &before.bodies, changed, result.bytes, 2);
++}
++
++test "body check cache shares nominal preparation while retaining the first edit" {
++    const source =
++        \\type Token is data = $Token U32
++        \\const seed = 2
++        \\const first = func (value: Token): Token => return value
++        \\const second = func (value: Token): Token => return first value
++        \\entry const run = func (input: U32): U32 => return @u32.add input seed
++    ;
++    var before = try prepare(a, source, null);
++    defer before.deinit(a);
++    try std.testing.expect(before.bodies.find("first") != null);
++    try std.testing.expect(before.bodies.find("second") != null);
++    const changed = try std.mem.replaceOwned(u8, a, source, "const seed = 2", "const seed = 3");
++    defer a.free(changed);
++    var fresh = try prepare(a, changed, null);
++    defer fresh.deinit(a);
++    var result = try compile(a, &fresh);
++    defer result.deinit(a);
++    try compare(a, &before.bodies, changed, result.bytes, 1);
+ }
+ 
+ test "body check cache ownership survives all allocation failures" {
+diff --git a/zig-native/tests/checker_normalization_execution.test.ts b/zig-native/tests/checker_normalization_execution.test.ts
+new file mode 100644
+--- /dev/null
++++ b/zig-native/tests/checker_normalization_execution.test.ts
+@@ -0,0 +1,99 @@
++import { strict as assert } from "node:assert";
++import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
++import { instantiateGuest } from "../../compiler/guest.ts";
++
++const source = `const pick = func (first: U32) -> (second: U32) => return second
++const named = func (values: {left: U32, right: U32}) => return @u32.add values.left values.right
++const encode = func (first: U32) -> (second: U32) => return @u32.add (@u32.mul first 10) second
++const many = func (a: U32) -> (b: U32) -> (c: U32) -> (d: U32) -> (e: U32) -> (f: U32) -> (g: U32) -> (h: U32) => return
++  @u32.add a (@u32.add b (@u32.add c (@u32.add d (@u32.add e (@u32.add f (@u32.add g h))))))
++entry const answer = func (input: U32): U32 => return named {right: many 1 2 3 4 5 6 7 8, left: pick 0 input}
++entry const sequence = func (callback: U32 -> U32 ! {Foreign}) => return encode (callback 1) (callback 2)
++entry const ordinary_stop = func (input: U32): U32 => return do:
++  if @u32.eq input 0:
++    return pick (@panic "earlier ordinary") 7
++  return input
++entry const intrinsic_stop = func (input: U32): U32 => return do:
++  if @u32.eq input 0:
++    return @u32.add (@panic "earlier intrinsic") 7
++  return input
++`;
++
++for (const codegenTier of ["development", "optimized"] as const) {
++  Deno.test(`checker normalization preserves currying, effects and retained errors (${codegenTier})`, async () => {
++    const directory = await Deno.makeTempDir({
++      prefix: "blot-check-normalize-",
++    });
++    const entry = `${directory}/main.blot`;
++    const compiler = await createZigProjectCompiler({
++      executable: Deno.args[0],
++      entry,
++      prelude: null,
++      codegenTier,
++      cacheDirectory: false,
++      startupTimeoutMs: 5000,
++    });
++    try {
++      let original: Uint8Array<ArrayBuffer> | undefined;
++      for (const extra of [0, 1, 0]) {
++        const current = source.replace(
++          "many 1 2 3 4 5 6 7 8",
++          `many 1 2 3 4 5 6 7 ${8 + extra}`,
++        );
++        const built = await compiler.build({
++          sources: { [entry]: current },
++          signal: AbortSignal.timeout(5000),
++        });
++        assert(built.success, JSON.stringify(built));
++        if (extra === 0) {
++          if (original) assert.deepEqual(built.bytes, original);
++          else original = built.bytes.slice();
++        }
++        for (const asynchronous of [false, true]) {
++          const guest = await instantiateGuest(built.bytes, { asynchronous });
++          try {
++            const seen: number[] = [];
++            const capability = {
++              parameter: "U32" as const,
++              result: "U32" as const,
++              call(value: number) {
++                seen.push(value);
++                return value + 2;
++              },
++            };
++            const callback = guest.capability(capability);
++            const invoke = async (
++              name: string,
++              value: Parameters<typeof guest.call>[1],
++            ) => {
++              if (asynchronous) return await guest.callAsync(name, value);
++              return guest.call(name, value);
++            };
++            for (const input of [1, 7, 41]) {
++              assert.equal(await invoke("answer", input), input + 36 + extra);
++              assert.equal(await invoke("ordinary_stop", input), input);
++              assert.equal(await invoke("intrinsic_stop", input), input);
++            }
++            assert.equal(await invoke("sequence", callback), 34);
++            assert.deepEqual(seen, [1, 2]);
++            await assert.rejects(() => invoke("ordinary_stop", 0));
++            await assert.rejects(() => invoke("intrinsic_stop", 0));
++          } finally {
++            guest.dispose();
++          }
++        }
++        const bad = current.replace("right: many", "wrong: many");
++        const rejected = await compiler.build({
++          sources: { [entry]: bad },
++          signal: AbortSignal.timeout(5000),
++        });
++        assert(!rejected.success);
++        assert.equal(rejected.diagnostics[0].code, "unknown_field");
++        assert.equal(rejected.diagnostics[0].start, bad.indexOf("wrong: many"));
++      }
++    } finally {
++      await compiler.dispose();
++      await Deno.remove(directory, { recursive: true });
++    }
++  });
++}

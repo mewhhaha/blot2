@@ -411,12 +411,18 @@ pub fn validateContext(module: *const C.Module, units: []const *const C.Module) 
     return validateContextWorkspace(module, units, null);
 }
 pub fn validateContextWorkspace(module: *const C.Module, units: []const *const C.Module, workspace: ?*@import("scheme_equations.zig").Workspace) Error!void {
-    var remaining: usize = 65_536;
     const spawn_contracts = contracts: {
         for (module.bindings) |binding| if (binding.capability_flow == .spawn_task) break :contracts true;
         for (units) |unit| for (unit.bindings) |binding| if (binding.capability_flow == .spawn_task) break :contracts true;
         break :contracts false;
     };
+    return validateSpawnContextWorkspace(module, units, workspace, spawn_contracts);
+}
+pub fn validateBatchWorkspace(module: *const C.Module, batch: *const @import("frozen_core_validation.zig").Batch, workspace: ?*@import("scheme_equations.zig").Workspace) Error!void {
+    return validateSpawnContextWorkspace(module, batch.units(), workspace, batch.hasSpawnContracts(module));
+}
+fn validateSpawnContextWorkspace(module: *const C.Module, units: []const *const C.Module, workspace: ?*@import("scheme_equations.zig").Workspace, spawn_contracts: bool) Error!void {
+    var remaining: usize = 65_536;
     for (module.nodes, 0..) |node, id| {
         if (node.tag == .task) try validateOperationContextWorkspace(module, units, @intCast(id), &remaining, workspace);
         if (spawn_contracts and id != 0) try spawnUses(module, units, @intCast(id), &remaining, workspace);

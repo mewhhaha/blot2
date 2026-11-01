@@ -21,6 +21,47 @@ pub const Context = struct {
     forbidden_owner: ?u32 = null,
 };
 
+/// A synchronous immutable-context borrow. The handle cannot be constructed by
+/// callers or retained after withBatch returns. Context descriptors and their
+/// backing arrays must remain immutable throughout the callback; a changed
+/// context starts a new batch and recomputes its facts.
+pub const Batch = opaque {
+    fn state(self: *const Batch) *const BatchState {
+        return @ptrCast(@alignCast(self));
+    }
+    pub fn units(self: *const Batch) []const *const core.Module {
+        return self.state().context.units;
+    }
+    pub fn hasSpawnContracts(self: *const Batch, module: *const core.Module) bool {
+        if (self.state().spawn_contracts) return true;
+        // Standalone modules need not be members of the sibling context.
+        return moduleHasSpawnContracts(module);
+    }
+    pub fn validateWithBudget(self: *const Batch, allocator: std.mem.Allocator, module: *const core.Module, source_length: ?u32, remaining: *usize) Error!void {
+        var context = self.state().context;
+        context.source_length = source_length;
+        return validateBatchWithBudget(allocator, module, context, remaining, self);
+    }
+};
+const BatchState = struct {
+    context: Context,
+    spawn_contracts: bool,
+};
+fn moduleHasSpawnContracts(module: *const core.Module) bool {
+    for (module.bindings) |binding| if (binding.capability_flow == .spawn_task) return true;
+    return false;
+}
+/// All module validation during Callback.run borrows exactly this context.
+/// This adds no allocation and never publishes a persistent validation receipt.
+pub fn withBatch(context: Context, state: anytype, comptime Callback: type) @TypeOf(Callback.run(state, @as(*const Batch, undefined))) {
+    const spawn_contracts = found: {
+        for (context.units) |module| if (moduleHasSpawnContracts(module)) break :found true;
+        break :found false;
+    };
+    const batch: BatchState = .{ .context = context, .spawn_contracts = spawn_contracts };
+    return Callback.run(state, @as(*const Batch, @ptrCast(&batch)));
+}
+
 /// The foreign-module facts observable by this validator. Keep owner lookup
 /// behind this projection so context equality and validation read one domain.
 const OwnerBounds = struct {
@@ -2046,6 +2087,9 @@ pub fn validate(allocator: std.mem.Allocator, module: *const core.Module, contex
     return validateWithBudget(allocator, module, context, &remaining);
 }
 pub fn validateWithBudget(allocator: std.mem.Allocator, module: *const core.Module, context: Context, remaining: *usize) Error!void {
+    return validateBatchWithBudget(allocator, module, context, remaining, null);
+}
+fn validateBatchWithBudget(allocator: std.mem.Allocator, module: *const core.Module, context: Context, remaining: *usize, batch: ?*const Batch) Error!void {
     try validateBounds(module, context);
     const graph = try Graph.init(module);
     const needed = try scratchRequirements(module);
@@ -2057,7 +2101,14 @@ pub fn validateWithBudget(allocator: std.mem.Allocator, module: *const core.Modu
     try listRoles(module, colors[start..][0..module.types.extra.len], colors[start + module.types.extra.len ..][0..module.extra.len]);
     try cycles(graph, .{ .colors = colors, .path = path });
     var equations: @import("scheme_equations.zig").Workspace = .{ .allocator = allocator };
-    @import("task_core.zig").validateContextWorkspace(module, context.units, &equations) catch |err| {
+    const tasks = @import("task_core.zig");
+    var task_result: Error!void = undefined;
+    if (batch) |value| {
+        task_result = tasks.validateBatchWorkspace(module, value, &equations);
+    } else {
+        task_result = tasks.validateContextWorkspace(module, context.units, &equations);
+    }
+    task_result catch |err| {
         if (equations.oom) return error.OutOfMemory;
         return err;
     };

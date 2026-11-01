@@ -6,13 +6,21 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
-The completed-Core validation receipt now reuses immutable producer validation
-without removing the backend bounds barrier or fresh-entry checks. On three
-matched fresh complete-world-producer pairs, total compilation improves **8.63
-to 7.78 seconds (9.9%)**, backend time **983 to 304 ms (69.1%)**, with identical
-**2,935-byte** identity output. It reuses 239 producer validations and fully
-validates the fresh entry. This is complete producer checking and tiny emission,
-not actual world initialization or whole-main performance. See
+Closure validation now computes whole-context spawn-contract presence once per
+immutable batch. Three matched fresh World-producer pairs improve validation
+**883 to 693 ms (21.5%)** and total compilation **7.69 to 7.41 seconds (3.7%)**.
+Deleting temporary normalization-list copies saves **30,671 checker
+allocations**; checking improves only **4.19 to 4.13 seconds (1.5%)**. Output is
+the identical **2,935-byte** identity export. This checks all 240 producer
+modules, not actual world initialization or whole-main performance. Shared
+nominal preparation and application-normalization guards showed no meaningful
+checker gain and were removed; their patch and executed witnesses are archived.
+See [the matched controls and rejected work](zig-native/measurements/checker-validation-reduction-2026-11-01.json).
+
+The earlier completed-Core validation receipt independently removes repeated
+producer validation while preserving backend bounds and fresh-entry checks. Its
+separate matched controls improved 8.63 to 7.78 seconds; do not combine medians
+from different runs. See
 [receipt evidence](zig-native/measurements/completed-core-validation-2026-11-01.json).
 
 Receipt authority belongs to the immutable Snapshot and exact owner/symbol
@@ -24,12 +32,15 @@ validation. Source and Core trace IDs now have separate namespaces, with bounded
 per-module completed clocks; source ordinals must never be attributed using Core
 names.
 
-Compiler `56a163b9` compiles 2,781 native laws. All four new receipt laws pass
-with full allocation-failure mode, including the rich-scope/entry exclusion and
-workspace-cache restriction laws. All six affected guest tests pass; original
-Ink stream cases execute both tiers and sync/JSPI. Zig lint remains zero. The
-required full gate still stops at **48 passed/one baseline List/chunk
-storage_escape**; full qualification and release performance remain pending.
+Compiler `4c9635bb` compiles 2,785 native laws. The type-effects cycle passes 17
+selected native laws, nine guests and zero Zig lint findings in 22.13 seconds;
+the same 17 native laws pass full allocation-failure mode in 3.07 seconds. Seven
+original kite draw-stream scenarios pass, with both producer Wasm binaries and
+complete streams byte-identical to their pinned reference. The required full
+gate stops after 3.10 seconds at **48 passed/one baseline List/chunk
+storage_escape** at bytes 312..345, reproduced with the preserved baseline
+compiler. Full qualification, whole-main/frame and release measurements remain
+pending.
 
 The broader automatic copy/append planner is also **rejected and removed**.
 Original owned copies at eight sites shrink 26.5%, while production-scale plain
@@ -76,15 +87,16 @@ checking remains the first priority: normalization and fresh-build body cache
 capture are the largest identified costs. See
 [the checker/validation cost map](zig-native/measurements/checker-validation-costs-2026-11-01.json).
 
-The next discriminator audits actual historical observations before attempting
-mutable first-order monotypes with immutable publication and a rollback trail.
-Rebinding already creates successor bindings; removing that syntax would not
-remove solver chronology. No language feature cut is justified yet. Current
-compiler `c835cc58` retains only diagnostic counters: the type-effects cycle
-passes 13 native laws and nine guests in 7.66 seconds, with 2,781 native laws
-compiled and zero Zig lint findings. The required full gate remains 48 passed/
-one baseline List/chunk failure. Whole-main, release and frame qualification are
-still pending.
+Astra's next discriminator is cursor-aware ordinary-type reads across
+application checking and pending-use resolution. Keep the selected history
+cursor on child views, perform the same full depth validation, and materialize
+at unchanged solver/publication boundaries. Keep exact effects, rich-type
+fallbacks, rollback, diagnostic order and mandatory all-root finalization. Run
+three matched World-producer pairs; require **20% checking improvement** for
+this larger mechanism. If fewer rebuilt nodes leave time flat, reject it. If
+solver boundaries immediately force equivalent rebuilding, explicitly assess a
+view-aware solver instead of adding caches. The present evidence does not
+justify deleting history or language features.
 
 The engine-boundary batch adds opt-in `profileTrace` diagnostics, surviving
 cancellation with exclusive phase checkpoints, module names, balanced

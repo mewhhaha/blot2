@@ -1,0 +1,787 @@
+{
+  "date": "2026-11-01",
+  "parent_commit": "a87dc70e240865de605653a9173cc7a5bf1fd9bc",
+  "scope": "Three bounded experiments on repeated checker preparation and closure validation. Retain scoped task-contract scan and temporary-list allocation deletion; reject module-wide recipe sharing and application-normalization guards.",
+  "toolchain": "Zig 0.17.0 safe/noLLVM, Deno 2.9.8; optimized guest tier; one codegen worker; source workers use the existing dependency-ready scheduler.",
+  "workload": {
+    "description": "Actual world_storage source and complete import graph, tiny identity entry returns41; not actual world initialization, main, frame or whole-game size.",
+    "modules": 240,
+    "source_bytes": 2371542,
+    "fresh_sessions": true,
+    "disk_cache": false,
+    "profile_backend": true,
+    "profile_trace": true,
+    "source_pins": {
+      "gdev/src/world_storage.blot": {
+        "baseline": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797",
+        "candidate": "463f83656d5473a7d813b2ca946cf895bc4eca9da4e1b39df134fbb12f1d1797"
+      },
+      "gdev/tests/minor_support/owned.blot": {
+        "baseline": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2",
+        "candidate": "510786704755a3f9fbe8b7219a9a20079ff9c8c990db3e1f1c475dee5215b4d2"
+      },
+      "gdev/tests/minor_support/game.blot": {
+        "baseline": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940",
+        "candidate": "4053dee7e6164f6821adfb0906e030feadee32c2a2782fee5362e025bc6a3940"
+      },
+      "ink/lib/pen/host.blot": {
+        "baseline": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df",
+        "candidate": "46341932f2c80190c72de56689abba40b3f1ee9f40e3a6ce984fcead0ef394df"
+      }
+    },
+    "gdev_commit": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+    "ink_commit": "d520a903a13479455a4380680f64ce590e8d58c5"
+  },
+  "final_source_pins": {
+    "scripts/dev_check_areas.ts": "4051dd267807b8011b6985cf11f583e3f32284a0f8fd59821dff03831c2c9836",
+    "zig-native/src/check/check.zig": "fe90804ef7f439f1b8965e75781c9a65c51a7a5cc8e604f8fd1ba159211b4062",
+    "zig-native/src/check/frozen_core_validation.zig": "0d7b5ffabf531c55d6ac71e0cb8511cafbf172956fcd29671a8ba40065210a34",
+    "zig-native/src/check/frozen_core_validation_tests.zig": "f0fa5cc48bfe5dd62730b283b63db56cbc2b13bc102fce6f47028b80d0eb4b65",
+    "zig-native/src/check/task_core.zig": "316918baafb901d730411537930d2076fedb22320956537a824425e5df69e294",
+    "zig-native/src/reuse/dependency_closure.zig": "0356720c12fe4ab3f43920402e285706d95e27491f37a1e7a09f8d14cc24f15b",
+    "zig-native/src/reuse/dependency_closure_tests.zig": "a4be0fb83626d576beafb2c0a3df7262dac8fe7995eb70b618a6b45d302103d8"
+  },
+  "final_comparison": {
+    "raw": {
+      "path": "build/bench/checker-costs/final-world-pairs/result.json",
+      "sha256": "50849e557135eb35ffd8007b8200ae6471e9aff4bd5d68a5a72cc3afc27f87b9"
+    },
+    "repetitions": 3,
+    "deadline_ms": 10000,
+    "versions": {
+      "baseline": {
+        "compiler_sha256": "c835cc58f070021b1b1261eba7d5bdcb5f38fbf8f23b82608c7bb167e4ca2f83",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7693.960454999997,
+        "median_phase_us": {
+          "other": 32395,
+          "assets": 274154,
+          "inputs": 1144,
+          "load": 42240,
+          "lex": 394950,
+          "parse": 251597,
+          "check": 4190466,
+          "lower": 951601,
+          "freeze": 347061,
+          "validation": 882565,
+          "backend": 304224
+        },
+        "checking_allocations": 1261956,
+        "checking_requested_bytes": 585430693,
+        "checking_work": {
+          "parallel_batches": 25,
+          "parallel_jobs": 239,
+          "parallel_retries": 0,
+          "modules": 240,
+          "scheme_calls": 11722,
+          "closed_array_locals": 2569,
+          "candidate_scans": 3295990,
+          "candidates": 58982,
+          "candidate_parts": 148338,
+          "candidate_variables": 83978,
+          "candidate_rows": 18814,
+          "dependency_hits": 49159,
+          "dependency_recomputations": 9823,
+          "import_requests": 424062,
+          "imported_schemes": 41277,
+          "imported_summary_reuses": 3626,
+          "imported_read": 8927,
+          "type_nodes": 1256344,
+          "normalization": {
+            "substitute_nodes_added": 126825,
+            "substitute_depth_entries": 307967,
+            "substitute_memo_hits": 428,
+            "substitute_unchanged": 0,
+            "resolve_nodes_added": 378993,
+            "resolve_depth_entries": 3855578,
+            "unify_pairs": 402078,
+            "unify_projected_pairs": 0,
+            "unify_resolve_calls": 804156,
+            "unify_resolve_entries": 900992,
+            "unify_resolve_nodes": 23912,
+            "open_nodes_added": 64701,
+            "open_depth_entries": 359424,
+            "close_nodes_added": 15035,
+            "close_depth_entries": 35459,
+            "import_nodes_added": 292131,
+            "import_depth_entries": 726984,
+            "variable_views_created": 207932,
+            "type_binders_created": 207932,
+            "row_requests": 1208013,
+            "closed_row_hits": 1538,
+            "epoch_row_hits": 0,
+            "epoch_row_probes": 983,
+            "epoch_row_collisions": 909,
+            "epoch_row_stale": 2,
+            "epoch_row_context_misses": 0,
+            "epoch_row_publications": 983,
+            "composite_probes": 986679,
+            "composite_hits": 392,
+            "composite_collisions": 511697,
+            "composite_stale_dependencies": 76,
+            "composite_future_clock_misses": 0,
+            "composite_frontier_declines": 1573,
+            "composite_publications": 11096,
+            "free_type_queries": 30697,
+            "free_type_visits": 139760,
+            "free_row_queries": 145675,
+            "free_row_visits": 609222,
+            "argument_rows": 983,
+            "labels": 983,
+            "arguments": 0,
+            "changed_rows": 0,
+            "closed_row_evictions": 1910,
+            "interner_requests": 2,
+            "interner_candidates": 2,
+            "interner_arguments": 0,
+            "interner_linked": 2,
+            "interner_rebuilds": 2,
+            "closed_operation_hits": 977,
+            "argument_height_checks": 0
+          }
+        },
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7714.851489999999,
+            "check_us": 4190466,
+            "validation_us": 882565
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7621.6528849999995,
+            "check_us": 4151834,
+            "validation_us": 882290
+          },
+          {
+            "repetition": 2,
+            "build_ms": 7693.960454999997,
+            "check_us": 4202836,
+            "validation_us": 888551
+          }
+        ]
+      },
+      "candidate": {
+        "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7405.968781999996,
+        "median_phase_us": {
+          "other": 32042,
+          "assets": 274295,
+          "inputs": 1066,
+          "load": 42915,
+          "lex": 398903,
+          "parse": 252593,
+          "check": 4128277,
+          "lower": 945476,
+          "freeze": 342318,
+          "validation": 692994,
+          "backend": 300965
+        },
+        "checking_allocations": 1231285,
+        "checking_requested_bytes": 585193205,
+        "checking_work": {
+          "parallel_batches": 25,
+          "parallel_jobs": 239,
+          "parallel_retries": 0,
+          "modules": 240,
+          "scheme_calls": 11722,
+          "closed_array_locals": 2569,
+          "candidate_scans": 3295990,
+          "candidates": 58982,
+          "candidate_parts": 148338,
+          "candidate_variables": 83978,
+          "candidate_rows": 18814,
+          "dependency_hits": 49159,
+          "dependency_recomputations": 9823,
+          "import_requests": 424062,
+          "imported_schemes": 41277,
+          "imported_summary_reuses": 3626,
+          "imported_read": 8927,
+          "type_nodes": 1256344,
+          "normalization": {
+            "substitute_nodes_added": 126825,
+            "substitute_depth_entries": 307967,
+            "substitute_memo_hits": 428,
+            "substitute_unchanged": 0,
+            "resolve_nodes_added": 378993,
+            "resolve_depth_entries": 3855578,
+            "unify_pairs": 402078,
+            "unify_projected_pairs": 0,
+            "unify_resolve_calls": 804156,
+            "unify_resolve_entries": 900992,
+            "unify_resolve_nodes": 23912,
+            "open_nodes_added": 64701,
+            "open_depth_entries": 359424,
+            "close_nodes_added": 15035,
+            "close_depth_entries": 35459,
+            "import_nodes_added": 292131,
+            "import_depth_entries": 726984,
+            "variable_views_created": 207932,
+            "type_binders_created": 207932,
+            "row_requests": 1208013,
+            "closed_row_hits": 1538,
+            "epoch_row_hits": 0,
+            "epoch_row_probes": 983,
+            "epoch_row_collisions": 909,
+            "epoch_row_stale": 2,
+            "epoch_row_context_misses": 0,
+            "epoch_row_publications": 983,
+            "composite_probes": 986679,
+            "composite_hits": 392,
+            "composite_collisions": 511697,
+            "composite_stale_dependencies": 76,
+            "composite_future_clock_misses": 0,
+            "composite_frontier_declines": 1573,
+            "composite_publications": 11096,
+            "free_type_queries": 30697,
+            "free_type_visits": 139760,
+            "free_row_queries": 145675,
+            "free_row_visits": 609222,
+            "argument_rows": 983,
+            "labels": 983,
+            "arguments": 0,
+            "changed_rows": 0,
+            "closed_row_evictions": 1910,
+            "interner_requests": 2,
+            "interner_candidates": 2,
+            "interner_arguments": 0,
+            "interner_linked": 2,
+            "interner_rebuilds": 2,
+            "closed_operation_hits": 977,
+            "argument_height_checks": 0
+          }
+        },
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7425.046607,
+            "check_us": 4128277,
+            "validation_us": 693195
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7392.892270999999,
+            "check_us": 4107255,
+            "validation_us": 692994
+          },
+          {
+            "repetition": 2,
+            "build_ms": 7405.968781999996,
+            "check_us": 4130414,
+            "validation_us": 685735
+          }
+        ]
+      }
+    },
+    "percent_improvement": {
+      "total": 3.743087512398713,
+      "check": 1.4840592907805483,
+      "validation": 21.47955108122348
+    }
+  },
+  "rejected_combined_comparison": {
+    "raw": {
+      "path": "build/bench/checker-costs/world-pairs/result.json",
+      "sha256": "bcb626b566916fe1b3b08ae4de44cdae3821ecfd35edf00488f03acccc4cec1c"
+    },
+    "repetitions": 3,
+    "deadline_ms": 10000,
+    "versions": {
+      "baseline": {
+        "compiler_sha256": "c835cc58f070021b1b1261eba7d5bdcb5f38fbf8f23b82608c7bb167e4ca2f83",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7718.600294999997,
+        "median_phase_us": {
+          "other": 32238,
+          "assets": 279743,
+          "inputs": 1161,
+          "load": 42984,
+          "lex": 403773,
+          "parse": 256120,
+          "check": 4167869,
+          "lower": 950516,
+          "freeze": 350682,
+          "validation": 900215,
+          "backend": 305865
+        },
+        "checking_allocations": 1261956,
+        "checking_requested_bytes": 585430693,
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7736.943711,
+            "check_us": 4178875,
+            "validation_us": 900215
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7664.756814,
+            "check_us": 4167440,
+            "validation_us": 874837
+          },
+          {
+            "repetition": 2,
+            "build_ms": 7718.600294999997,
+            "check_us": 4167869,
+            "validation_us": 911147
+          }
+        ],
+        "normalization_work": {
+          "resolve_nodes_added": 378993,
+          "resolve_depth_entries": 3855578,
+          "unify_pairs": 402078,
+          "unify_resolve_entries": 900992
+        }
+      },
+      "candidate": {
+        "compiler_sha256": "1ff01ee9ccad7685876c31503558fee5efc5df1396ec3677c8d0be1a6e6f3c5d",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7554.592554999999,
+        "median_phase_us": {
+          "other": 32721,
+          "assets": 278727,
+          "inputs": 1080,
+          "load": 42945,
+          "lex": 401869,
+          "parse": 256025,
+          "check": 4221087,
+          "lower": 940519,
+          "freeze": 344140,
+          "validation": 692569,
+          "backend": 302466
+        },
+        "checking_allocations": 1230898,
+        "checking_requested_bytes": 585127617,
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7512.684818999999,
+            "check_us": 4221087,
+            "validation_us": 688737
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7554.592554999999,
+            "check_us": 4258633,
+            "validation_us": 692569
+          },
+          {
+            "repetition": 2,
+            "build_ms": 7564.110436000003,
+            "check_us": 4179405,
+            "validation_us": 718903
+          }
+        ],
+        "normalization_work": {
+          "resolve_nodes_added": 377658,
+          "resolve_depth_entries": 3841479,
+          "unify_pairs": 402078,
+          "unify_resolve_entries": 902383
+        }
+      }
+    },
+    "percent_improvement": {
+      "total": 2.1248378427658587,
+      "check": -1.2768635482545143,
+      "validation": 23.06626750276323
+    }
+  },
+  "rejected_memo_isolation": {
+    "labels": "baseline is full combined candidate; candidate removes the module recipe memo, retaining application changes and validation. Two rotated pairs; not compared directly with other cohorts.",
+    "raw": {
+      "path": "build/bench/checker-costs/no-body-memo-pairs/result.json",
+      "sha256": "1a8e58dda642748fdd3d38c6ed07638221d986af2b1a41c74312a9a73c6abc5e"
+    },
+    "repetitions": 2,
+    "deadline_ms": 10000,
+    "versions": {
+      "baseline": {
+        "compiler_sha256": "1ff01ee9ccad7685876c31503558fee5efc5df1396ec3677c8d0be1a6e6f3c5d",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7518.0501294999995,
+        "median_phase_us": {
+          "other": 35605.5,
+          "assets": 281923.0,
+          "inputs": 1178.5,
+          "load": 42625.5,
+          "lex": 398371.5,
+          "parse": 254696.0,
+          "check": 4201834.0,
+          "lower": 946642.0,
+          "freeze": 344221.0,
+          "validation": 689119.0,
+          "backend": 317598.5
+        },
+        "checking_allocations": 1230898,
+        "checking_requested_bytes": 585127617,
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7522.223895,
+            "check_us": 4187061,
+            "validation_us": 690478
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7513.876364,
+            "check_us": 4216607,
+            "validation_us": 687760
+          }
+        ],
+        "normalization_work": {
+          "resolve_nodes_added": 377658,
+          "resolve_depth_entries": 3841479,
+          "unify_pairs": 402078,
+          "unify_resolve_entries": 902383
+        }
+      },
+      "candidate": {
+        "compiler_sha256": "93474c21b6f68519ccc2648027b2888db9509e16825409ccb4984522cf3a7cc8",
+        "source_sha256": "b611cc0b4b455b57e1a5f1ff203301f5661b1ff76cd81e67e1266cafd40d3505",
+        "wasm_bytes": 2935,
+        "wasm_sha256": "3cc99c5a386b9c7f924c3b04024368df70689975dfebe0b9daab5bab78c6bc5c",
+        "median_build_ms": 7519.491913999998,
+        "median_phase_us": {
+          "other": 37135.5,
+          "assets": 283545.5,
+          "inputs": 1095.5,
+          "load": 42693.0,
+          "lex": 401561.0,
+          "parse": 254534.5,
+          "check": 4198301.0,
+          "lower": 950959.5,
+          "freeze": 343843.5,
+          "validation": 695037.5,
+          "backend": 307412.0
+        },
+        "checking_allocations": 1230898,
+        "checking_requested_bytes": 585127617,
+        "trials": [
+          {
+            "repetition": 0,
+            "build_ms": 7532.974988999999,
+            "check_us": 4205980,
+            "validation_us": 689887
+          },
+          {
+            "repetition": 1,
+            "build_ms": 7506.008838999998,
+            "check_us": 4190622,
+            "validation_us": 700188
+          }
+        ],
+        "normalization_work": {
+          "resolve_nodes_added": 377658,
+          "resolve_depth_entries": 3841479,
+          "unify_pairs": 402078,
+          "unify_resolve_entries": 902383
+        }
+      }
+    },
+    "percent_improvement": {
+      "total": -0.01917763881809087,
+      "check": 0.08408233166755652,
+      "validation": -0.8588502130981723
+    }
+  },
+  "decisions": {
+    "validation": "Keep: exact whole-context spawn-contract scan occurs once in synchronous opaque immutable-context batch. All bounds, source/symbol, forbidden owner, task/spawn, principal-interface, cycle and budget checks remain. Context stays four fields and no persistent authority is added.",
+    "list_normalization": "Keep: delete temporary allocator.dupe/free and reread numeric list slots after append-only resolution. Preserve every original resolve/write and epoch order. Saves30671 checking allocations (2.43%). Modest observed checking latency difference is not a20% architectural win.",
+    "module_recipe_memo": "Removed: existing64entry memo moved from per-body to per-module immutable capture, with exact work/depth replay, implementation-read propagation and quantified-scope fallback. Controls show no measurable checker benefit.",
+    "application_guards": "Removed: avoiding unused prefix/record diagnostic normalization removes only0.4% resolver visits; combined checking regresses1.3% in its matched controls. Do not retain branch/proof complexity without time savings.",
+    "rejected_patch": {
+      "path": "zig-native/measurements/rejected-checker-preparation-2026-11-01.patch",
+      "sha256": "4828153085f728e5d1639ea52da71b2e1ffa686cd9f8959495c8de5a3aec987e"
+    },
+    "rejected_patch_applies_to": "Final retained source; git apply --check succeeds. Includes native depth/diagnostic, implementation-read/budget/bound-scope and first-edit laws, plus both-tier sync/JSPI callback/divergence/retained-error witnesses."
+  },
+  "qualification": {
+    "development": {
+      "raw": {
+        "path": "build/bench/checker-costs/final-dev-fixed/run-8c346d776e2a3c10/results.json",
+        "sha256": "ef0dd9e5b5519d7d3a635174d2fa2a088934fef692f21abaad383f04a51ea1f1"
+      },
+      "success": true,
+      "wall_seconds": 22.129771462,
+      "compiled_native_tests": 2785,
+      "selected_native_tests": 17,
+      "guest_tests": 9,
+      "zig_lint_findings": 0,
+      "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+      "native_binary_sha256": "ef31df89cad981351b30fcc0e252892bd9313d508e9c8bdd652fb9930ef876d3"
+    },
+    "selected_full_allocation_failures": {
+      "raw": {
+        "path": "build/bench/checker-costs/final-native-full.json",
+        "sha256": "9dae2bba5e712e3aadb88ae9bbdd6f78b8390a98c7f5c63167f5070ec4d27030"
+      },
+      "wall_seconds": 3.0692337090004003,
+      "selected": 17,
+      "passed": 17,
+      "complete": true,
+      "allocation_failures": "full"
+    },
+    "actual_kite_streams": {
+      "raw": {
+        "path": "build/bench/checker-costs/final-kites-stream/pair-c1db37c98f6bd381/result.json",
+        "sha256": "4efeab4aa5047a91ddd2dccc7516c82b6ef92e01cf36ea6d882e0d5d82ba92c7"
+      },
+      "pins": {
+        "compiler_sha256": "4c9635bbab35aa5f41832fae90ab4bb6dd064e83c2aad3c3fb97da61d5b8d5e4",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "76989b7a1d28a284e093c47a5cec9120bb85861a5929f3ce848829a632b29e65",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ],
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 5513.3810969999995,
+          "wasm_bytes": 262967,
+          "wasm_sha256": "621d1819bbcd79e1852470fbc00b02c110ffa8be726c6c77f2b75cbbbca558d4",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_previous": true,
+          "streams_match_pinned_previous": true
+        },
+        {
+          "name": "candidate",
+          "build_ms": 5485.795129,
+          "wasm_bytes": 261953,
+          "wasm_sha256": "f8fee1c020f162177887a6c11891068e7c37005a42db3b39e12f57a176b87e98",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ],
+          "wasm_matches_pinned_previous": true,
+          "streams_match_pinned_previous": true
+        }
+      ],
+      "timing_note": "Single integration pair; source versions differ, not a compiler latency comparison."
+    },
+    "full_gate": {
+      "raw": {
+        "path": "build/bench/checker-costs/final-full-gate/timings.json",
+        "sha256": "57df78cef821d00e85cfa2d97339fde5c75f4e29d26218602f6d3b723166d154"
+      },
+      "log": {
+        "path": "build/bench/checker-costs/final-full-gate.log",
+        "sha256": "190383a3092161aab55547a2688ce5f1a9fbfce3872c5ccddbee444292dc633c"
+      },
+      "success": false,
+      "wall_seconds": 3.102465846,
+      "passed": 48,
+      "failed": 1,
+      "failure": "chunk runtime and static chains survive dependency bundles and retained entry edits; emit storage_escape bytes312..345",
+      "reproduced_with_preserved_baseline": {
+        "path": "build/bench/checker-costs/baseline-list-failure.log",
+        "sha256": "4608f851479f92e2c003aab272096f22dd3dd65c513015f63c5a5270080f4ebf"
+      },
+      "qualification": "Full native execution and whole suite/release remain pending; no full pass claim."
+    },
+    "rejected_candidate_witnesses": {
+      "development": {
+        "path": "build/bench/checker-costs/dev-final/run-777b3bf378c0cd9b/results.json",
+        "sha256": "b292e0739a8db99e95b21df6863f70913833084b00b3f524d1d71ce1c1914817"
+      },
+      "native_full": {
+        "path": "build/bench/checker-costs/native-full.json",
+        "sha256": "0751d13ae4998007df6ed7a8caa4138d7dce8db9feca9f6104b1d476933fe1ed"
+      },
+      "native_selected": 21,
+      "guests": 11,
+      "baseline_guest_log": {
+        "path": "/tmp/blot-checker-baseline-guests.log",
+        "sha256": "1151bde778fef496ee64117ac0194b4a74f18ab1eeb590effef0c9a410f49b5d"
+      }
+    },
+    "intermediate_failures": [
+      {
+        "raw": {
+          "path": "build/bench/checker-costs/dev/run-6137c3b5e1e4f997/results.json",
+          "sha256": "657f64d65ff09d379523c6d3e5c64bc9a72c4a756651e1b002a9cb47e244a3e1"
+        },
+        "reason": "New test expectations used function principal instead of exact Never expression and expected a thrown deep-type error rather than diagnostic; fixed test cleanup and assertions."
+      },
+      {
+        "raw": {
+          "path": "build/bench/checker-costs/dev-fixed/run-9b03ec2c5f434e82/results.json",
+          "sha256": "5dcd6c216da9668d1e384825d48ef1a76f44fb5a5c6705807270bb2464a90734"
+        },
+        "reason": "Native and guest tests passed; lint found two deprecated test-only allocator calls; changed to Allocator.print."
+      },
+      {
+        "raw": {
+          "path": "build/bench/checker-costs/final-dev/run-bf3dd642e49fc0e5/results.json",
+          "sha256": "5e31941f66f5819bd84c97398f7860c46097443263748085cf6989f587b19691"
+        },
+        "reason": "Imperative style cleanup named task_core private Error alias; corrected to local validator Error before final build and controls."
+      }
+    ]
+  },
+  "astra_review": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "decision": "Keep trimmed batch; removed memo and application guards did not justify complexity.",
+    "next_discriminator": "Cursor-aware ordinary-constructor reads spanning ordinaryApplication, applicationFlow/demandCallee and resolveUse closed-key traversal, without intermediate rebuilt type IDs. Children inherit selected historical cursor. Preserve full depth traversal, exact effects, rich/rank/projection per-graph fallback, OOM/rollback, diagnostics and warm/custom limits. Keep unchanged solver and final all-root publication normalization initially. No new persistent cache.",
+    "gate": "Three matched pinned World-producer pairs; require >=20% checking improvement. Report resolver-created nodes/depth visits, check/total time and retained bytes. If nodes drop while time is flat, reject. If solver boundaries immediately rematerialize everything, stop and explicitly assess a view-aware solver. No history/feature deletion is justified."
+  },
+  "commands": {
+    "development": "deno task check:dev --area type-effects --budget-seconds 150 --timings-dir build/bench/checker-costs/final-dev-fixed",
+    "pairs": "deno run --no-config --no-lock -A scripts/bench/engine_stages.ts --world --repetitions 3 --timeout-ms 10000 --compiler zig-native/zig-out-dev/bin/blotc --baseline zig-native/zig-out-checker-cost-baseline/bin/blotc --output build/bench/checker-costs/final-world-pairs",
+    "native_full": "zig-native/zig-out-native-dev/bin/blot-tests --allocation-failures=full plus the17 exact --test names in the development report",
+    "integration": "deno run --no-config --no-lock -A scripts/bench/kites_stream.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 10000 --output build/bench/checker-costs/final-kites-stream",
+    "full_gate": "deno task test:compiler --budget-seconds 45 --phase-seconds 30 --timings-dir build/bench/checker-costs/final-full-gate"
+  },
+  "limits": [
+    "Each timed producer/integration build has an explicit10second cap; normal diagnostics remain5seconds.",
+    "Separate rotated cohorts must not be mixed. No GDB CPU sampling during latency trials; sampled CPU shares from earlier reports overlap and do not become exact phase savings.",
+    "Same-build frozen producer handoff is not warm source-cache reuse; all240source modules were checked in every fresh trial.",
+    "No whole-main build, whole-game size, new PNG/frame or LLVM release measurement this batch; subsecond target remains open.",
+    "Rejected work remains archived, not installed. ABI8, session protocol2 and Gdev saved schema26 unchanged; sibling source/assets are clean."
+  ]
+}

@@ -80,6 +80,13 @@ retain slot names beside their values; every projection matches names rather
 than assuming an annotation's field order. Merge results intern their ordered
 name spans, so repeated updates do not grow shape metadata.
 
+Closure validation computes spawn-contract presence once in a synchronous,
+immutable-context batch. Its opaque handle borrows the exact module views and
+cannot outlive the callback. Changed contexts start new batches; standalone
+modules also inspect their own bindings. Source/symbol bounds, forbidden-owner
+checks, per-module task budgets and actual spawn validation remain unchanged.
+The batch allocates nothing and grants no retained validation authority.
+
 Specialization diagnostic provenance consists of owned unit IDs and byte spans,
 scoped to the current requesting use. It never participates in semantic or
 executable cache keys. Secondary filenames are copied before a project
@@ -147,6 +154,9 @@ not establish a CPU share or reusable inference result.
 Recursive normalization receipts retain the cursor, depth and exact type/row
 epochs; changing the depth limit invalidates them. Closing receipts also retain
 the complete protected-row context and their invocation's recorded decisions.
+Final list normalization rereads numeric slots after each resolution instead of
+copying the list: resolution may grow its backing array, but only appends to it.
+Each item still resolves and publishes in the original order.
 
 Requirement dependency caches are local to one checker and pending ordinal. They
 preserve ordered variable discovery and invalidate on type/effect writes,

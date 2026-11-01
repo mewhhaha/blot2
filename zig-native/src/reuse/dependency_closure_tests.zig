@@ -73,6 +73,40 @@ test "whole diamond closure retains producers, aliases, rows and ordered imports
     try closure.validateSources(&decoded, &f.source);
 }
 
+test "closure task context absence never survives a changed binding or module descriptor" {
+    var f = try Fixture.init();
+    defer f.deinit();
+    var value = try closure.freeze(a, &f.source, &f.checked);
+    defer format.deinit(a, &value);
+    try closure.validate(a, &value);
+    var changed = false;
+    for (value.modules) |*module| {
+        for (module.core.bindings, 0..) |*binding, index| {
+            if (binding.kind != .global or binding.body_id == 0 or binding.capability_flow != .unknown) continue;
+            const saved = binding.capability_flow;
+            defer binding.capability_flow = saved;
+            binding.capability_flow = .spawn_task;
+            // Ordinary producer bodies cannot become spawn wrappers by a bit.
+            try std.testing.expectError(error.InvalidArtifact, closure.validate(a, &value));
+            binding.capability_flow = saved;
+            try closure.validate(a, &value);
+            const saved_bindings = module.core.bindings;
+            const replacement = try a.dupe(core.Binding, saved_bindings);
+            defer a.free(replacement);
+            replacement[index].capability_flow = .spawn_task;
+            module.core.bindings = replacement;
+            defer module.core.bindings = saved_bindings;
+            try std.testing.expectError(error.InvalidArtifact, closure.validate(a, &value));
+            module.core.bindings = saved_bindings;
+            try closure.validate(a, &value);
+            changed = true;
+            break;
+        }
+        if (changed) break;
+    }
+    try std.testing.expect(changed);
+}
+
 fn freezeFail(allocator: std.mem.Allocator, source: *const project.Project, checked: *const checker.CheckedProject) !void {
     var value = try closure.freeze(allocator, source, checked);
     defer format.deinit(allocator, &value);

@@ -489,6 +489,10 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "check.frozen_core_validation_tests.test.Core validation batch preserves ordinary graph source bounds and forbidden owner checks through OOM",
+      "check.frozen_core_validation_tests.test.Core validation batch keeps spawn calls captures malformed wrappers and standalone fallback",
+      "check.frozen_core_validation_tests.test.Core task batch recomputes exact changed entry context instead of retaining absence",
+      "reuse.dependency_closure_tests.test.closure task context absence never survives a changed binding or module descriptor",
       "check.types_tests.test.principal scheme substitution creates independent uses",
       "check.types_tests.test.occurs and mismatch rollback preserve prior constraints",
       "check.types_tests.test.rejected function effect rows roll back type and row writes and shared chronology",

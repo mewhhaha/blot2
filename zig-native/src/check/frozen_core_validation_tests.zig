@@ -76,6 +76,103 @@ test "forbidden Core owner restricts bounds, captured contexts and equation work
     try std.testing.expectError(error.InvalidArtifact, equations.bounds(&workspace, &module, restricted));
 }
 
+fn batchValidate(allocator: std.mem.Allocator, modules: []const *const core.Module, context: V.Context) !void {
+    const Run = struct {
+        pub fn run(args: anytype, batch: *const V.Batch) !void {
+            var remaining: usize = 1_000_000;
+            for (args.modules) |module| try batch.validateWithBudget(args.allocator, module, args.source_length, &remaining);
+        }
+    };
+    return V.withBatch(context, .{ .allocator = allocator, .modules = modules, .source_length = context.source_length }, Run);
+}
+
+test "Core validation batch preserves ordinary graph source bounds and forbidden owner checks through OOM" {
+    var first = try lower(a, "const identity = func value => return value\n");
+    defer first.deinit(a);
+    var second = try lower(a, "const answer = 42\n");
+    defer second.deinit(a);
+    second.unit = 2;
+    const modules = &[_]*const core.Module{ &first, &second };
+    const context: V.Context = .{ .units = modules };
+    try batchValidate(a, modules, context);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, batchValidate, .{ modules, context });
+    try std.testing.expectError(error.InvalidArtifact, batchValidate(a, modules, .{ .units = modules, .source_length = 0 }));
+    try std.testing.expectError(error.InvalidArtifact, batchValidate(a, modules, .{ .units = modules, .forbidden_owner = 2 }));
+}
+
+test "Core validation batch keeps spawn calls captures malformed wrappers and standalone fallback" {
+    var module = try lower(a,
+        \\const launch = func group => return func action => return @task.spawn group action
+        \\const alias = launch
+        \\entry const answer = func (owner: unique U32) => return @task.scope (func group => return do:
+        \\  let here = alias group
+        \\  let renamed = here
+        \\  let pending = renamed (func () => return owner)
+        \\  let result = |pending|
+        \\  break @usage.borrow result (func loan => return @usage.read loan))
+    );
+    defer module.deinit(a);
+    const modules = &[_]*const core.Module{&module};
+    const context: V.Context = .{ .units = modules };
+    try batchValidate(a, modules, context);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, batchValidate, .{ modules, context });
+    // A local module outside the sibling context must still activate checking.
+    try batchValidate(a, modules, .{});
+    try V.validate(a, &module, .{});
+    var wrappers: usize = 0;
+    for (module.bindings) |binding| {
+        if (binding.capability_flow != .spawn_task) continue;
+        const body = module.bodies[binding.body_id];
+        if (!body.is_function) continue;
+        wrappers += 1;
+        const saved = module.nodes[body.root];
+        module.nodes[body.root].c = @backingInt(@import("task_types.zig").Op.join);
+        try std.testing.expectError(error.InvalidArtifact, batchValidate(a, modules, context));
+        try std.testing.expectError(error.InvalidArtifact, batchValidate(a, modules, .{}));
+        try std.testing.expectError(error.InvalidArtifact, V.validate(a, &module, .{}));
+        module.nodes[body.root] = saved;
+    }
+    try std.testing.expect(wrappers != 0);
+    try batchValidate(a, modules, context);
+}
+
+test "Core task batch recomputes exact changed entry context instead of retaining absence" {
+    const task = @import("task_core.zig");
+    var producer = try lower(a, "const answer = 42\n");
+    defer producer.deinit(a);
+    var entry = try lower(a, "const ordinary = 42\n");
+    defer entry.deinit(a);
+    entry.unit = 2;
+    // The producer refers to a fresh entry binding. Only task validation is
+    // under test here: activation must inspect that binding's actual wrapper.
+    var references = [_]core.BindingRef{.{ .unit = 2, .binding = 1 }};
+    const previous_references = producer.references;
+    producer.references = &references;
+    defer producer.references = previous_references;
+    const root = producer.bodies[producer.bindings[1].body_id].root;
+    const original_node = producer.nodes[root];
+    defer producer.nodes[root] = original_node;
+    producer.nodes[root] = .{ .tag = .reference, .ty = original_node.ty };
+    var units = [_]*const core.Module{&producer};
+    const Run = struct {
+        pub fn run(module: *const core.Module, batch: *const V.Batch) !void {
+            return task.validateBatchWorkspace(module, batch, null);
+        }
+    };
+    try V.withBatch(.{ .units = &units }, &producer, Run);
+    entry.bindings[1].capability_flow = .spawn_task;
+    // Replacing one slot of the same context slice must recompute, even with
+    // unchanged slice identity and length. The ordinary body is no wrapper.
+    units[0] = &entry;
+    try std.testing.expectError(error.InvalidArtifact, V.withBatch(.{ .units = &units }, &producer, Run));
+    try std.testing.expectError(error.InvalidArtifact, task.validateContext(&producer, &units));
+    entry.bindings[1].capability_flow = .unknown;
+    try V.withBatch(.{ .units = &units }, &producer, Run);
+    // An in-place binding edit also recomputes at the next coherent batch.
+    entry.bindings[1].capability_flow = .spawn_task;
+    try std.testing.expectError(error.InvalidArtifact, V.withBatch(.{ .units = &units }, &producer, Run));
+}
+
 fn digest(module: *const core.Module) u64 {
     var h = std.hash.Wyhash.init(0);
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
