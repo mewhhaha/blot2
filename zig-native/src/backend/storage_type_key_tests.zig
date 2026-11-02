@@ -144,3 +144,70 @@ test "selected structural key construction and table publication are atomic thro
     try atomicScenario(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, atomicScenario, .{});
 }
+
+fn visitScratch(builder: *K.Builder, terms: []const Term, ordinal: usize, depth: usize) K.Error!K.Result {
+    const term = terms[ordinal];
+    if (try builder.enter(term.reference, depth)) |result| return result;
+    const start = builder.beginDescriptor();
+    defer builder.endDescriptor(start);
+    try builder.descriptorWords(start, term.head);
+    var height: usize = 0;
+    for (term.children) |child| {
+        const result = try visitScratch(builder, terms, child, depth + 1);
+        height = @max(height, result.height + 1);
+        try builder.descriptorWord(start, result.id);
+    }
+    try builder.descriptorWords(start, term.tail);
+    return builder.completeDescriptor(term.reference, start, height);
+}
+fn scratchScenario(allocator: std.mem.Allocator) !void {
+    const names: [129]u32 = @splat(0x12345678);
+    const terms = [_]Term{
+        .{ .reference = .{ .unit = 1, .ty = 1 }, .head = &names },
+        .{ .reference = .{ .unit = 1, .ty = 2 }, .head = &names, .children = &.{ 0, 0 }, .tail = &.{ 7, 8 } },
+        .{ .reference = .{ .unit = 2, .ty = 3, .environment = 42, .captured = true }, .head = &names, .children = &.{ 1, 0, 1 } },
+    };
+    for ([_]K.Options{ .{}, .{ .hash_mask = 0 }, .{ .encoded_words = 400 }, .{ .word_work = 800 } }) |options| {
+        var old_work: usize = 4096;
+        var new_work: usize = old_work;
+        var old = K.Builder.init(allocator, &old_work, options);
+        defer old.deinit();
+        var new = K.Builder.init(allocator, &new_work, options);
+        defer new.deinit();
+        var expected: std.ArrayList(u32) = .empty;
+        defer expected.deinit(allocator);
+        var actual: std.ArrayList(u32) = .empty;
+        defer actual.deinit(allocator);
+        for ([_]usize{ 2, 1, 2, 0 }) |root| {
+            const before = visit(&old, &terms, root, 0) catch |err| {
+                if (err == error.OutOfMemory) return err;
+                if (visitScratch(&new, &terms, root, 0)) |_| {
+                    return error.TestExpectedError;
+                } else |actual_error| {
+                    if (actual_error == error.OutOfMemory) return actual_error;
+                    try std.testing.expectEqual(err, actual_error);
+                }
+                try std.testing.expectEqual(@as(usize, 0), new.scratch.items.len);
+                try std.testing.expect(new.poisoned);
+                try std.testing.expectEqual(old_work, new_work);
+                try std.testing.expectEqual(old.word_work, new.word_work);
+                break;
+            };
+            const after = try visitScratch(&new, &terms, root, 0);
+            try std.testing.expectEqual(before, after);
+            try std.testing.expectEqual(@as(usize, 0), new.scratch.items.len);
+            try old.root(&expected, before);
+            try new.root(&actual, after);
+        }
+        if (old.poisoned) continue;
+        try old.finish(&expected);
+        try new.finish(&actual);
+        try std.testing.expectEqualSlices(u32, expected.items, actual.items);
+        try std.testing.expectEqual(old_work, new_work);
+        try std.testing.expectEqual(old.word_work, new.word_work);
+    }
+}
+test "selected structural scratch descriptors preserve nested growth exact keys budgets and unwind through OOM" {
+    try scratchScenario(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, scratchScenario, .{});
+}

@@ -4632,9 +4632,9 @@ const Generator = struct {
     fn finishSelectedTypes(self: *Generator, m: *const core.Module, id: core.Id, selection: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
         keys.finish(selection) catch |err| return self.selectedKeyError(m, id, err);
     }
-    fn selectedTypeChild(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, descriptor: *std.ArrayList(u32), keys: *selected_types.Builder, depth: usize, height: *usize) (Error || selected_types.Error)!void {
+    fn selectedTypeChild(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, descriptor: usize, keys: *selected_types.Builder, depth: usize, height: *usize) (Error || selected_types.Error)!void {
         const child = try self.selectedTypeNode(m, id, input, keys, depth + 1);
-        try keys.addWord(descriptor, child.id);
+        try keys.descriptorWord(descriptor, child.id);
         height.* = @max(height.*, child.height + 1);
     }
     fn selectedTypeNode(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, keys: *selected_types.Builder, depth: usize) (Error || selected_types.Error)!selected_types.Result {
@@ -4650,49 +4650,49 @@ const Generator = struct {
         if (try keys.enter(reference, depth)) |completed| return completed;
         const owner = try self.unit(actual.unit);
         const node = owner.types.node(actual.ty);
-        var descriptor: std.ArrayList(u32) = .empty;
-        defer descriptor.deinit(self.allocator);
+        const descriptor = keys.beginDescriptor();
+        defer keys.endDescriptor(descriptor);
         var height: usize = 0;
-        try keys.addWord(&descriptor, @backingInt(node.tag));
+        try keys.descriptorWord(descriptor, @backingInt(node.tag));
         switch (node.tag) {
-            .array, .list, .cursor, .demand, .resolver, .provider => try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height),
+            .array, .list, .cursor, .demand, .resolver, .provider => try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height),
             .usage => {
-                try keys.addWord(&descriptor, node.b);
-                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height);
-                try keys.addWord(&descriptor, @intFromBool(node.c != 0));
-                if (node.c != 0) try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.c, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                try keys.descriptorWord(descriptor, node.b);
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height);
+                try keys.descriptorWord(descriptor, @intFromBool(node.c != 0));
+                if (node.c != 0) try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.c, .environment = actual.environment }, descriptor, keys, depth, &height);
             },
             .function => {
-                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, &descriptor, keys, depth, &height);
-                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.b, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.a, .environment = actual.environment }, descriptor, keys, depth, &height);
+                try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = node.b, .environment = actual.environment }, descriptor, keys, depth, &height);
                 // Retain the existing exact checked row-carrier identity.
-                try keys.addWords(&descriptor, &.{ if (node.c == 0) 0 else actual.unit, node.c });
+                try keys.descriptorWords(descriptor, &.{ if (node.c == 0) 0 else actual.unit, node.c });
             },
             .product, .nominal => {
-                if (node.tag == .nominal) try keys.addWords(&descriptor, &.{ node.a, node.b });
+                if (node.tag == .nominal) try keys.descriptorWords(descriptor, &.{ node.a, node.b });
                 const children = if (node.tag == .product) owner.types.list(.{ .start = node.a, .len = node.b }) else owner.types.nominalArguments(node);
-                try keys.addWord(&descriptor, @intCast(children.len));
-                for (children) |child| try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = child, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                try keys.descriptorWord(descriptor, @intCast(children.len));
+                for (children) |child| try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = child, .environment = actual.environment }, descriptor, keys, depth, &height);
             },
             .record => {
                 // Keys follow semantic field order, just as inline words do.
                 // Bound both ordinal count and name bytes before sorting.
                 if (node.b > keys.remaining.*) return error.Limit;
                 const metadata = try self.descriptor_calls.record_metadata.get(owner, actual.ty, node, keys.options.encoded_words, keys.word_work);
-                try keys.addWord(&descriptor, node.b);
+                try keys.descriptorWord(descriptor, node.b);
                 for (metadata.fields) |field| {
                     if (field.spelling) |name| {
-                        try keys.addWord(&descriptor, @intCast(name.len));
-                        for (name) |byte| try keys.addWord(&descriptor, byte);
-                    } else try keys.addWords(&descriptor, &.{ std.math.maxInt(u32), actual.unit, field.symbol });
-                    try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = field.ty, .environment = actual.environment }, &descriptor, keys, depth, &height);
+                        try keys.descriptorWord(descriptor, @intCast(name.len));
+                        for (name) |byte| try keys.descriptorWord(descriptor, byte);
+                    } else try keys.descriptorWords(descriptor, &.{ std.math.maxInt(u32), actual.unit, field.symbol });
+                    try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = field.ty, .environment = actual.environment }, descriptor, keys, depth, &height);
                 }
             },
             .unit, .boolean, .u32, .f32, .never => {},
             // Abstract roles keep their source identity and correlation.
-            else => try keys.addWords(&descriptor, &.{ actual.unit, actual.ty }),
+            else => try keys.descriptorWords(descriptor, &.{ actual.unit, actual.ty }),
         }
-        return keys.complete(reference, descriptor.items, height);
+        return keys.completeDescriptor(reference, descriptor, height);
     }
     fn invocationContext(self: *const Generator) u32 {
         return if (self.specialization_origin) |origin| origin.unit else 0;

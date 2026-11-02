@@ -1,0 +1,66 @@
+{
+  "base_source": "6155af2d662a5740d1af7d0481c20648386d3911",
+  "change": "One offset-based nested scratch stack per structural-key Builder replaces one temporary allocation per reached type node; postorder exact descriptors, key bytes, limits and work charges unchanged. No cross-builder sharing.",
+  "qualification": {
+    "check_dev": "build/bench/type-key-scratch-checked-dev/run-f0ca1b00de2d35f5/results.json",
+    "compiled_native": 2843,
+    "selected_exhaustive_faults": 91,
+    "faults": "build/bench/type-key-scratch-checked-dev/run-f0ca1b00de2d35f5/full-faults.log",
+    "guests": 61,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/type-key-scratch-full-gate/run-e9f8e48f5b975ed7/timings.json",
+    "full_gate_outcome": "same48/1 baselineList/chunkstorage_escape312..345;fullqualificationpending"
+  },
+  "renderer": {
+    "evidence": "build/bench/type-key-scratch-kites/pair-81eb8ba5656f21d1/result.json",
+    "pins": {
+      "compiler_sha256": "ddfe6529cb136e67cd6bdee81e44a821b8d843e064c00138675e73bd950eb07e",
+      "baseline_compiler_sha256": "78c080c8bf491f5e9150cf8c5d3de1b758063881c58159349c78959bcf346949",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "all_seven_streams_equal": true,
+    "builds": [
+      {
+        "name": "baseline",
+        "build_ms": 3923.309542,
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+        "backend": {
+          "us": 577993,
+          "requested_bytes": 59038444,
+          "allocations": 95585,
+          "rss_growth_kib": 0
+        }
+      },
+      {
+        "name": "candidate",
+        "build_ms": 4076.17337,
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+        "backend": {
+          "us": 581714,
+          "requested_bytes": 57195304,
+          "allocations": 81620,
+          "rss_growth_kib": 0
+        }
+      }
+    ]
+  },
+  "scope": "Allocation reduction only:95,585->81,620;latency inconclusive in one nativeFastpair;optimized actual main pending, avoid another LLVM build until a material combined batch.",
+  "held_experiments": [
+    {
+      "name": "binaryrecordlookup",
+      "patch_sha256": "af07121f52f22aa526dc1a34f3c5561851ca1d610e6dc581ae9eee1dce84e8bf",
+      "outcome": "SameWasmandstreams,backend0.5%changeonepair,allocationsunchanged;unprovenwin,notlanded."
+    },
+    {
+      "name": "conservativesnapshotwords",
+      "evidence": "/tmp/blot-snapshot-word-evidence/summary.json",
+      "patch_sha256": "b85f9219fda3c711c1f2ef556b09238848aab80284d14c95861bd6458ebf57d4",
+      "outcome": "369wordsavoided,0.92%rendererWasmreduction,inconclusivelatency;heldwithoutlivechanges."
+    }
+  ]
+}

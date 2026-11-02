@@ -7,22 +7,22 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest completed actual main takes **11.81 seconds** and produces
-**31,654,251 bytes of Wasm**, cache disabled. Compiler source is
-`d8ae21718919bf5c5b5809fc4d372f14df687fef`, Zig 0.17 fast/LLVM; Gdev/Ink remain
-`7733add6`/`d520a903`. Same-workload predecessors took
-15.15s/32.72MB,17.45s/38.82MB, 19.74s/43.06MB and 24.55s/45.98MB. These are
-single completions, not distributions. See
-[latest full-main evidence](zig-native/measurements/gdev-after-aggregate-transport-2026-11-02.json)
-and
-[previous completion](zig-native/measurements/gdev-after-completed-functions-2026-11-02.json).
+The latest completed actual main takes **10.75 seconds** and produces
+**29,211,724 bytes of Wasm**, cache disabled. Compiler source is
+`6155af2d662a5740d1af7d0481c20648386d3911`, Zig 0.17 fast/LLVM; unchanged
+Gdev/Ink code remains `7733add6`/`d520a903`. Same-workload predecessors took
+11.81s/31.65MB, 15.15s/32.72MB and 17.45s/38.82MB. These are single completions,
+not distributions. See
+[latest full-main evidence](zig-native/measurements/gdev-after-owner-word-calls-2026-11-02.json).
 
-The latest separate profile attributes 11.70s to the backend; emitted
-expressions fall to938,465 and shadow admission visits to1,508,488. Backend
-requested allocations fall to10.30GB. Child inheritance keeps3.23M of13.53M
-substitutions. Completed actual functions, immutable metadata and proven
-context-independent sharing reduce expansion. The five-second gate remains
-unmet.
+The separate profile attributes 10.27s to the backend and 9.25GB requested
+allocations. Word calls avoid 196,780 argument-buffer words across 17,519 calls;
+primitive resolution avoids 221M impossible environment comparisons. The
+five-second gate remains unmet. The configured Gdev launcher now uses the
+installed optimized compiler at `zig-native/zig-out/bin/blotc`; the default
+handoff runner follows that configured path. That path completes the unchanged
+main in 10.57s with the exact same Wasm. Gdev config-only evidence follows its
+new source checkpoint separately.
 
 The checked batch removes proven invariant whole-record transport through
 branches/loops, completes zero-owner plain functions with the direct word ABI,
@@ -76,6 +76,13 @@ is clean. Seven actual renderer streams match; Wasm falls 224,349->211,471B. The
 required full gate retains the same 48/1 baseline failure. Optimized actual main
 measurement is pending; the latest completed figure remains 11.81s. See
 [checked batch evidence](zig-native/measurements/owned-word-calls-and-cold-metadata-2026-11-02.json).
+
+The next allocation-only cut reuses a nested descriptor scratch stack within
+each key builder. Exact key/budget/OOM laws pass; all 2,843 native laws compile,
+91 selected laws pass exhaustive faults and 61 guests pass. Renderer Wasm and
+all seven streams remain identical, with backend allocations 95,585->81,620.
+Latency is inconclusive; bundle a larger change before another LLVM build. See
+[scratch evidence](zig-native/measurements/type-key-scratch-2026-11-02.json).
 
 ## Checked compiler fixes
 

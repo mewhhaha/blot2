@@ -45,10 +45,11 @@ const parent = resolve(parentArg);
 await Deno.mkdir(parent, { recursive: true });
 const evidence = await Deno.makeTempDir({ dir: parent, prefix: "main-" });
 const root = resolve("../gdev");
-const settings =
-  JSON.parse(await Deno.readTextFile(`${root}/pen.json`)).compiler.settings;
+const project = JSON.parse(await Deno.readTextFile(`${root}/pen.json`));
+const settings = project.compiler.settings;
 const compilerPath = resolve(
-  values.compiler ?? "zig-native/zig-out-dev/bin/blotc",
+  values.compiler ??
+    resolve(root, project.plugins[project.compiler.plugin].run.blotc),
 );
 const entryPath = resolve(root, values.entry ?? "src/main.blot");
 const entryBytes = await Deno.readFile(entryPath);

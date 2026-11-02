@@ -24,6 +24,7 @@ pub const Builder = struct {
     options: Options,
     word_work: usize,
     words: std.ArrayList(u32) = .empty,
+    scratch: std.ArrayList(u32) = .empty,
     nodes: std.ArrayList(Node) = .empty,
     buckets: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     memo: std.AutoHashMapUnmanaged(Reference, Memo) = .empty,
@@ -38,6 +39,7 @@ pub const Builder = struct {
         self.buckets.deinit(self.allocator);
         self.nodes.deinit(self.allocator);
         self.words.deinit(self.allocator);
+        self.scratch.deinit(self.allocator);
     }
     fn charge(self: *Builder) Error!void {
         if (self.poisoned or self.finished or self.remaining.* == 0) return error.Limit;
@@ -76,6 +78,35 @@ pub const Builder = struct {
         if (descriptor.items.len > self.options.encoded_words or words.len > self.options.encoded_words - descriptor.items.len) return error.Limit;
         try self.wordWork(words.len);
         try descriptor.appendSlice(self.allocator, words);
+    }
+    // Nested descriptors use offsets, never pointers into this growable stack.
+    // A child is copied into the completed table before its suffix is popped.
+    pub fn beginDescriptor(self: *const Builder) usize {
+        return self.scratch.items.len;
+    }
+    pub fn endDescriptor(self: *Builder, start: usize) void {
+        self.scratch.shrinkRetainingCapacity(start);
+    }
+    pub fn descriptorWord(self: *Builder, start: usize, word: u32) Error!void {
+        errdefer self.poisoned = true;
+        if (start > self.scratch.items.len or self.scratch.items.len - start >= self.options.encoded_words) return error.Limit;
+        try self.wordWork(1);
+        try self.scratch.append(self.allocator, word);
+    }
+    pub fn descriptorWords(self: *Builder, start: usize, words: []const u32) Error!void {
+        errdefer self.poisoned = true;
+        if (start > self.scratch.items.len) return error.Limit;
+        const len = self.scratch.items.len - start;
+        if (len > self.options.encoded_words or words.len > self.options.encoded_words - len) return error.Limit;
+        try self.wordWork(words.len);
+        try self.scratch.appendSlice(self.allocator, words);
+    }
+    pub fn completeDescriptor(self: *Builder, reference: Reference, start: usize, height: usize) Error!Result {
+        if (start > self.scratch.items.len) {
+            self.poisoned = true;
+            return error.Limit;
+        }
+        return self.complete(reference, self.scratch.items[start..], height);
     }
     fn equal(self: *Builder, stored: []const u32, candidate: []const u32) Error!bool {
         if (stored.len != candidate.len) return false;

@@ -2,14 +2,14 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-aggregate-transport-2026-11-02.json)
-now completes in **11.81 seconds**, producing **31.65 MB Wasm**, cache disabled.
-The same-workload predecessor took15.15 seconds/32.72MB. The checked
-[transport batch](../zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json)
-qualifies 80 full-fault native laws, 56 guests and seven matching renderer streams;
-its optimized full-main result is linked above. The five-second gate remains
-unmet. Full qualification retains the baseline List/chunk failure, and a fresh
-full-game frame still needs a matching ABI 8 Pen binary.
+[Actual full main](../zig-native/measurements/gdev-after-owner-word-calls-2026-11-02.json)
+now completes in **10.75 seconds**, producing **29.21 MB Wasm**, cache disabled.
+The same-workload predecessor took 11.81 seconds/31.65MB. The checked
+[word-call batch](../zig-native/measurements/owned-word-calls-and-cold-metadata-2026-11-02.json)
+qualifies 90 full-fault native laws, 61 guests and seven matching renderer
+streams. The five-second gate remains unmet. Full qualification retains the
+baseline List/chunk failure, and a fresh full-game frame still needs a matching
+ABI 8 Pen binary.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source
