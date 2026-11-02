@@ -5,12 +5,13 @@ pub const Stats = struct { lookups: u64 = 0, synchronized: u64 = 0, captures: u6
 
 /// Lexical substitutions with exact rollback and immutable captured snapshots.
 /// Captures keep the latest entry, including identities; resolution skips
-/// identities. Every logical mutation invalidates only the cached snapshot.
+/// identities. Appends save each captured prefix; rollback restores it exactly.
 pub fn Stack(comptime Argument: type) type {
     return struct {
         const Self = @This();
         const Positions = struct { any: ?usize = null, nonidentity: ?usize = null };
-        const Undo = struct { positions: Positions, snapshot: ?[]const Argument };
+        const absent = std.math.maxInt(usize);
+        const Undo = struct { positions: Positions, snapshot: ?[]const Argument, previous: usize, next: usize = absent };
         const Context = struct {
             pub fn hash(_: @This(), value: u64) u64 {
                 return std.hash.int(value);
@@ -25,6 +26,8 @@ pub fn Stack(comptime Argument: type) type {
         undo: std.ArrayList(Undo) = .empty,
         positions: std.HashMapUnmanaged(u64, Positions, Context, 80) = .empty,
         active_count: usize = 0,
+        first_active: usize = absent,
+        last_active: usize = absent,
         snapshot: ?[]const Argument = null,
         stats: Stats = .{},
 
@@ -45,12 +48,24 @@ pub fn Stack(comptime Argument: type) type {
             const extra = std.math.cast(u32, count) orelse return error.OutOfMemory;
             try self.positions.ensureUnusedCapacity(allocator, extra);
         }
+        fn unlink(self: *Self, index: usize) void {
+            const links = self.undo.items[index];
+            if (links.previous == absent) self.first_active = links.next else self.undo.items[links.previous].next = links.next;
+            if (links.next == absent) self.last_active = links.previous else self.undo.items[links.next].previous = links.previous;
+        }
+        fn link(self: *Self, index: usize) void {
+            const links = self.undo.items[index];
+            if (links.previous == absent) self.first_active = index else self.undo.items[links.previous].next = index;
+            if (links.next == absent) self.last_active = index else self.undo.items[links.next].previous = index;
+        }
         fn appendAssumeCapacity(self: *Self, argument: Argument) void {
             const slot = self.positions.getOrPutAssumeCapacity(key(argument.unit, argument.parameter));
             if (!slot.found_existing) slot.value_ptr.* = .{};
             if (slot.value_ptr.any == null) self.active_count += 1;
-            self.undo.appendAssumeCapacity(.{ .positions = slot.value_ptr.*, .snapshot = self.snapshot });
+            if (slot.value_ptr.any) |previous| self.unlink(previous);
+            self.undo.appendAssumeCapacity(.{ .positions = slot.value_ptr.*, .snapshot = self.snapshot, .previous = self.last_active });
             const position = self.arguments.items.len;
+            self.link(position);
             self.arguments.appendAssumeCapacity(argument);
             self.items = self.arguments.items;
             slot.value_ptr.any = position;
@@ -78,7 +93,8 @@ pub fn Stack(comptime Argument: type) type {
                 const argument = self.items[at];
                 const original = self.undo.items[at];
                 const slot = key(argument.unit, argument.parameter);
-                if (original.positions.any == null) self.active_count -= 1;
+                self.unlink(at);
+                if (original.positions.any) |previous| self.link(previous) else self.active_count -= 1;
                 // Retain inactive keys: removing ephemeral substitutions fills
                 // the table with tombstones while its live load stays tiny.
                 // Misses would then scan the entire table on every lookup.
@@ -95,6 +111,8 @@ pub fn Stack(comptime Argument: type) type {
             self.undo.clearRetainingCapacity();
             self.positions.clearRetainingCapacity();
             self.active_count = 0;
+            self.first_active = absent;
+            self.last_active = absent;
             self.items = self.arguments.items;
             self.snapshot = null;
         }
@@ -117,9 +135,9 @@ pub fn Stack(comptime Argument: type) type {
             }
             const result = try arena.alloc(Argument, self.active_count);
             var count: usize = 0;
-            for (self.items, 0..) |argument, index| {
-                if (self.positions.get(key(argument.unit, argument.parameter)).?.any != index) continue;
-                result[count] = argument;
+            var index = self.first_active;
+            while (index != absent) : (index = self.undo.items[index].next) {
+                result[count] = self.items[index];
                 count += 1;
             }
             std.debug.assert(count == result.len);

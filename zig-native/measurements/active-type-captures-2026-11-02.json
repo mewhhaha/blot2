@@ -1,0 +1,407 @@
+{
+  "date": "2026-11-02",
+  "parent_commit": "72f9ca3360c04cae0d54a41f7970bb4914e508d8",
+  "scope": "Remove capture history scans, indexed shape substitution, and ambient inheritance only for positively admitted closed scalar DAGs. Full-game target remains pending.",
+  "changes": [
+    "Intrusive latest-any active positions retain exact lexical order and parent snapshot rollback; capture walks only active_count.",
+    "shape uses the existing exact latest-nonidentity index instead of scanning all historical entries.",
+    "New non-array scalar definitions omit ambient substitutions only after ScalarAdmission proves closed primitive domains/result, pure rows and closed direct callees; generic and destination bodies retain full inheritance."
+  ],
+  "isolated_capture": {
+    "scope": "Isolated long-history Stack captures; not actual Gdev timing",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "llvm": false,
+    "sha256": {
+      "old.zig": "03f9a95509fec6397be316a741b32de1d31657e3c04b88d657f2bca60aa0c7c5",
+      "new.zig": "9ad4a98c4b48045b90549c41cfd2c8b29ca0f56f36c9faee6d954ccf7ca6cfa4",
+      "bench.zig": "c13675bfae835bf6824f72b3fa5a4573c8f788c81e764968d9f85efa86ccae25",
+      "storage_type_arguments_tests.zig": "ee734c68d612d52f6f3342989dcb4340c30ce4bfac9b402ef43874498198ab97",
+      "run.py": "be6c4f5fc698d09b22207f51ab6dd55d8b9a11988f45ae1ebfbc28d6ff0f9857",
+      "bench": "2309bea248254b71658deb3272323c71da7d3287e74d1ea3b02bda35ee0d3814"
+    },
+    "workload": {
+      "active_bindings": 64,
+      "shadow_history": [
+        512,
+        4096
+      ],
+      "captured_nested_rounds": 2000,
+      "observed_gdev_bindings": {
+        "median": 501,
+        "first": 4482
+      },
+      "timeout_seconds": 10
+    },
+    "commands": {
+      "build": [
+        "/home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/zig",
+        "build-exe",
+        "/tmp/blot-active-captures/run/bench.zig",
+        "-O",
+        "ReleaseSafe",
+        "-fno-llvm",
+        "-femit-bin=/tmp/blot-active-captures/run/bench"
+      ],
+      "run": [
+        "python3",
+        "/tmp/blot-active-captures/run/run.py"
+      ]
+    },
+    "runs": [
+      {
+        "history": 512,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 145.664,
+        "wall_ms": 146.57409299979918,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 512,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 4.136000000000023,
+        "wall_ms": 4.309543990530074,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 512,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 4.459999999999992,
+        "wall_ms": 4.674527997849509,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 512,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 121.77399999999997,
+        "wall_ms": 122.41302400070708,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 512,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 146.20899999999995,
+        "wall_ms": 146.95858499908354,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 512,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 4.654999999999994,
+        "wall_ms": 4.890379001153633,
+        "work": {
+          "bindings": 576,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 24895000
+        },
+        "stderr": "{\"bindings\":576,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":24895000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 796.329,
+        "wall_ms": 798.5617090016603,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 5.4709999999999415,
+        "wall_ms": 5.772275006165728,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 5.812000000000251,
+        "wall_ms": 6.065022011171095,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 805.5559999999997,
+        "wall_ms": 807.7342699980363,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 799.1419999999996,
+        "wall_ms": 801.6980520042125,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      },
+      {
+        "history": 4096,
+        "variant": "new",
+        "success": true,
+        "cpu_ms": 10.046000000000266,
+        "wall_ms": 10.351311997510493,
+        "work": {
+          "bindings": 4160,
+          "active": 64,
+          "captures": 2001,
+          "hits": 2000,
+          "copied_entries": 128064,
+          "checksum": 32063000
+        },
+        "stderr": "{\"bindings\":4160,\"active\":64,\"captures\":2001,\"hits\":2000,\"copied_entries\":128064,\"checksum\":32063000}\n"
+      }
+    ],
+    "median_cpu_ms": {
+      "512": {
+        "old": 145.664,
+        "new": 4.459999999999992,
+        "speedup": 32.66008968609871,
+        "reduction_percent": 96.9381590509666
+      },
+      "4096": {
+        "old": 799.1419999999996,
+        "new": 5.812000000000251,
+        "speedup": 137.4986235375026,
+        "reduction_percent": 99.2727199921916
+      }
+    },
+    "draft_core_changed_lines": 32,
+    "standalone_property": {
+      "status": "passed",
+      "scope": "128 mixed append/rollback operations, latest-any/nonidentity order, exact parent snapshot pointer restoration; no full native fault sweep yet",
+      "command": [
+        "/tmp/blot-active-captures/run/property"
+      ],
+      "source_sha256": "23fca24bee429d66d9710725851e7c1e8d76e50f8a92bdbb71f6aff13b6cba55"
+    },
+    "tracked_source_modified": false
+  },
+  "qualification": {
+    "evidence": "build/bench/active-captures-check-dev/run-e958197e44144438/results.json",
+    "compiled_inventory": 2818,
+    "selected_native": 59,
+    "guest_tests": 34,
+    "compiler_sha256": "5a59003dd114c4d3946ad8aaf16c4966005bb530a98f22ebd892d14db531f8cb",
+    "native_sha256": "33f2d58afdaac6e7720bcc5fd0e12296b5d544bcfbe04f66f62f88491681f956",
+    "input_digest": "4b4116cf9baee7c294987528be6704a08d3d85d1f76c5921f1d7b870610d2586",
+    "zig_lint_findings": 0,
+    "full_faults": {
+      "evidence": "build/bench/active-captures-check-dev/full-faults.log",
+      "passed": 59,
+      "leaks": 0
+    },
+    "full_gate": "Known baseline List/chunk failure retained; see build/bench/active-captures-full-gate."
+  },
+  "actual_renderer": {
+    "evidence": "build/bench/active-captures-kites/pair-eaba66ae121277c7/result.json",
+    "pins": {
+      "compiler_sha256": "7f8378150e8020106a2d81cd467d2da510b1bed30bc83d504f8495c78b7f7974",
+      "baseline_compiler_sha256": "3e406537d997e3e149e455511d7f8de89f5a3ef5e43cb2c6369744edc6d076fd",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "builds": [
+      {
+        "name": "baseline",
+        "wasm_bytes": 254036,
+        "wasm_sha256": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+      },
+      {
+        "name": "candidate",
+        "wasm_bytes": 254036,
+        "wasm_sha256": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+      }
+    ],
+    "comparisons": [
+      {
+        "scenario": 0,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 1,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 2,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 4,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 8,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 16,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 31,
+        "equal": true,
+        "first_difference": -1
+      }
+    ],
+    "note": "All seven complete streams and Wasm bytes identical. Not a timing distribution."
+  },
+  "native_actual_main": {
+    "evidence": "build/bench/gdev-active-captures-progress/main-4ebea17f0c076ab3/result.json",
+    "status": "30-second cap; incomplete",
+    "sample": "build/bench/gdev-active-captures-progress/main-4ebea17f0c076ab3/cpu-report.json",
+    "cpu_window": "Six seconds after five emission seconds; not a full-build clock",
+    "top_exclusive": [
+      {
+        "name": "backend.storage_type_key.Builder.complete",
+        "cpu_ms": 756.004908,
+        "sampled_cpu_percent": 12.46238906512165
+      },
+      {
+        "name": "backend.wasm_scope_outline.Proof.scan",
+        "cpu_ms": 737.896358,
+        "sampled_cpu_percent": 12.163878046056668
+      },
+      {
+        "name": "backend.scoped_backend.Generator.planValue",
+        "cpu_ms": 471.414114,
+        "sampled_cpu_percent": 7.771042274050437
+      },
+      {
+        "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).latestNonidentity",
+        "cpu_ms": 303.804723,
+        "sampled_cpu_percent": 5.008079468509895
+      },
+      {
+        "name": "check.core.Module.fieldSpelling__struct_3619.compare",
+        "cpu_ms": 273.304269,
+        "sampled_cpu_percent": 4.505293679173662
+      },
+      {
+        "name": "backend.scoped_backend.Generator.selectedDataType",
+        "cpu_ms": 228.993839,
+        "sampled_cpu_percent": 3.7748568626142145
+      },
+      {
+        "name": "backend.storage_type_key.Builder.enter",
+        "cpu_ms": 220.40165,
+        "sampled_cpu_percent": 3.63321862573777
+      },
+      {
+        "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).appendAssumeCapacity",
+        "cpu_ms": 177.527539,
+        "sampled_cpu_percent": 2.9264588594331684
+      },
+      {
+        "name": "backend.wasm_scope_outline.prepareBody",
+        "cpu_ms": 175.491937,
+        "sampled_cpu_percent": 2.8929029078285
+      },
+      {
+        "name": "backend.scoped_backend.Generator.plainShape",
+        "cpu_ms": 154.700627,
+        "sampled_cpu_percent": 2.5501678387149616
+      }
+    ],
+    "note": "Capture is removed from the top list. Progress 62474 to107316 expressions/1469 to2732 functions; not a total-time speedup ratio."
+  },
+  "next": "Evaluate compile-scoped structural type IDs against this frozen native baseline; no environment pointer memoization or source authority change."
+}

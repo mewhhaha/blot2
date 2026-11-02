@@ -224,3 +224,62 @@ test "refinement indexes restore exact captured parent prefixes across nested ro
     try parentSnapshotLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, parentSnapshotLaw, .{});
 }
+
+fn verifyCapturedPrefix(stack: *Stack(Argument), arena: std.mem.Allocator) ![]const Argument {
+    const captured = try stack.capture(arena);
+    var at: usize = 0;
+    for (stack.items, 0..) |argument, index| {
+        if (original(stack.items, argument.unit, argument.parameter, false) != index) continue;
+        try std.testing.expect(at < captured.len);
+        try std.testing.expect(std.meta.eql(argument, captured[at]));
+        at += 1;
+    }
+    try std.testing.expectEqual(at, captured.len);
+    try verify(stack);
+    return captured;
+}
+fn activeCaptureLaw(allocator: std.mem.Allocator) !void {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var stack: Stack(Argument) = .empty;
+    defer stack.deinit(allocator);
+    var prefixes: std.ArrayList([]const Argument) = .empty;
+    defer prefixes.deinit(allocator);
+    try prefixes.append(allocator, try verifyCapturedPrefix(&stack, arena.allocator()));
+    const left_environment = [_]u32{ 11, 19 };
+    const right_environment = [_]u32{ 11, 19 };
+    for (0..128) |step| {
+        if (step % 5 == 4 and stack.items.len != 0) {
+            const length = stack.items.len * 3 / 5;
+            stack.shrinkRetainingCapacity(length);
+            prefixes.shrinkRetainingCapacity(length + 1);
+            const captured = try verifyCapturedPrefix(&stack, arena.allocator());
+            try std.testing.expectEqual(prefixes.items[length].ptr, captured.ptr);
+        } else {
+            const unit: u32 = @intCast(step % 3 + 1);
+            const parameter: u32 = @intCast(step % 7);
+            var argument: Argument = .{ .unit = unit, .parameter = parameter, .argument = @intCast(step + 40), .argument_unit = 4, .environment = &left_environment };
+            if (step % 4 == 0) {
+                argument.argument = parameter;
+                argument.argument_unit = unit;
+                argument.environment = &right_environment;
+            }
+            try stack.append(allocator, argument);
+            try prefixes.append(allocator, try verifyCapturedPrefix(&stack, arena.allocator()));
+        }
+    }
+    while (stack.items.len != 0) {
+        const length = stack.items.len - 1;
+        stack.shrinkRetainingCapacity(length);
+        prefixes.shrinkRetainingCapacity(length + 1);
+        const captured = try verifyCapturedPrefix(&stack, arena.allocator());
+        try std.testing.expectEqual(prefixes.items[length].ptr, captured.ptr);
+    }
+    stack.clearRetainingCapacity();
+    try std.testing.expectEqual(@as(usize, 0), (try verifyCapturedPrefix(&stack, arena.allocator())).len);
+}
+
+test "refinement active captures match linear order and exact prefixes after every mutation through OOM" {
+    try activeCaptureLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, activeCaptureLaw, .{});
+}

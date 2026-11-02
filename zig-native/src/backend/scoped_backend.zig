@@ -414,16 +414,12 @@ const Generator = struct {
     }
     fn shape(self: *Generator, m: *const core.Module, id: core.Id, ty: T.Id, depth: usize) Error!Value {
         if (depth > 128) return self.fail(m, id, .storage_unsupported, "Storage layout exceeded its nesting bound");
-        var argument_index = self.type_arguments.items.len;
-        while (argument_index != 0) {
-            argument_index -= 1;
+        if (self.type_arguments.latestNonidentity(m.unit, ty)) |argument_index| {
             const argument = self.type_arguments.items[argument_index];
-            if (argument.unit == m.unit and argument.parameter == ty and (argument.argument != ty or argument.argument_unit != m.unit)) {
-                const before = self.type_arguments.items.len;
-                defer self.type_arguments.shrinkRetainingCapacity(before);
-                if (argument.environment) |environment| try self.restoreTypes(environment);
-                return self.shape(try self.unit(argument.argument_unit), 0, argument.argument, depth + 1);
-            }
+            const before = self.type_arguments.items.len;
+            defer self.type_arguments.shrinkRetainingCapacity(before);
+            if (argument.environment) |environment| try self.restoreTypes(environment);
+            return self.shape(try self.unit(argument.argument_unit), 0, argument.argument, depth + 1);
         }
         const key = (@as(u64, m.unit) << 32) | ty;
         if (self.plain_layouts.get(key)) |template| return self.cloneLayout(template);
@@ -2689,7 +2685,10 @@ const Generator = struct {
                 .c = .{ .module = self.module, .function = function },
             };
             defer child.deinit();
-            try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            // A closed primitive DAG cannot observe ambient substitutions.
+            // Generic and destination bodies retain the complete caller frame.
+            const isolated = !owned_result and try self.closedScalarBody(m, target.binding);
+            if (!isolated) try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
             const inputs = try self.allocator.alloc(Value, arguments.len);
             defer self.allocator.free(inputs);
             for (inputs, arguments, 0..) |*input, argument, parameter| input.* = .{

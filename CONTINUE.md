@@ -31,9 +31,14 @@ simple bindings also retain planned values. Do not qualify the failed release.
 
 The corrected fast/noLLVM main still exceeds 30 seconds. Its bounded sample
 confirms physical field narrowing is active (21,953 omitted fields); the next
-measured costs are active-capture history scanning (18%) and per-call type-key
-construction (21%). Active-position capture and structural type-ID experiments
-are outside-tree drafts. Do not repeat long game builds or six-minute LLVM
+measured costs were active-capture history scanning (18%) and per-call type-key
+construction (21%). Active-position capture now removes the history scan;
+layout lookup uses the existing index and proven closed scalar definitions omit
+ambient substitutions. The checkpoint compiles 2,818 laws, passes 59 full-fault
+laws/34 guests/zero Zig lint, and keeps seven renderer streams and Wasm bytes
+identical. Its native main still exceeds 30 seconds. See
+[active-capture evidence](zig-native/measurements/active-type-captures-2026-11-02.json).
+Structural type-ID experiments remain outside-tree drafts. Do not repeat long game builds or six-minute LLVM
 compiler builds until enough work has been removed. Full release qualification
 and a fresh frame remain pending; available Pen binaries predate ABI 8.
 The full gate retains its baseline List/chunk failure.

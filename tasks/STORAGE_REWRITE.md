@@ -1,6 +1,10 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Active type captures](../zig-native/measurements/active-type-captures-2026-11-02.json)
+remove history scanning from the sampled hot list; all 59 selected laws pass full
+faults, 34 guests pass, and real renderer bytes/streams remain identical. The
+native main still exceeds 30 seconds. Shared structural type IDs are next.
 [Owner-graph and physical-parameter checkpoint](../zig-native/measurements/owner-graph-and-parameter-copies-2026-11-02.json)
 compiles 2,817 laws, passes 58 selected laws with full faults/34 guests/zero Zig
 lint, and preserves seven actual renderer streams with smaller Wasm. Its first
