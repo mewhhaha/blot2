@@ -241,7 +241,19 @@ fn hasCoordinates(module: *const wasm.Module, function: u32) bool {
     return false;
 }
 const Use = struct { references: usize = 0, writes: usize = 0 };
-const Set = std.AutoHashMapUnmanaged(u32, void);
+const IntegerContext = struct {
+    pub fn hash(_: @This(), key: u32) u64 {
+        return std.hash.int(@as(u64, key));
+    }
+    pub fn eql(_: @This(), left: u32, right: u32) bool {
+        return left == right;
+    }
+};
+fn IntegerMap(comptime Value: type) type {
+    return std.HashMapUnmanaged(u32, Value, IntegerContext, 80);
+}
+const Set = IntegerMap(void);
+const Initialized = IntegerMap(bool);
 const Frame = struct {
     op: ir.Op,
     height: usize,
@@ -258,25 +270,25 @@ fn pop(stack: *std.ArrayList(ir.ValueType), floor: usize, poly: bool, wanted: ir
     const actual = stack.pop().?;
     return wanted == .none or actual == wanted;
 }
-fn restore(initialized: *Set, journal: *std.ArrayList(u32), mark: usize) void {
-    for (journal.items[mark..]) |id| _ = initialized.remove(id);
+fn restore(initialized: *Initialized, journal: *std.ArrayList(u32), mark: usize) void {
+    for (journal.items[mark..]) |id| initialized.getPtr(id).?.* = false;
     journal.shrinkRetainingCapacity(mark);
 }
-fn mergeExit(a: A, frame: *Frame, initialized: *const Set, inputs: *const Set, journal: []const u32) A.Error!void {
+fn mergeExit(a: A, frame: *Frame, initialized: *const Initialized, inputs: *const Set, journal: []const u32) A.Error!void {
     if (!frame.has_exit) {
         try frame.exits.appendSlice(a, journal[frame.mark..]);
         frame.has_exit = true;
         return;
     }
     var kept: usize = 0;
-    for (frame.exits.items) |id| if (initialized.contains(id) or inputs.contains(id)) {
+    for (frame.exits.items) |id| if ((initialized.get(id) orelse false) or inputs.contains(id)) {
         frame.exits.items[kept] = id;
         kept += 1;
     };
     frame.exits.shrinkRetainingCapacity(kept);
 }
 const Proof = struct {
-    uses: std.AutoHashMapUnmanaged(u32, Use) = .empty,
+    uses: IntegerMap(Use) = .empty,
     read_before_def: Set = .empty,
     fn deinit(self: *Proof, a: A) void {
         self.uses.deinit(a);
@@ -299,7 +311,7 @@ const Proof = struct {
             for (frames.items) |*frame| frame.exits.deinit(a);
             frames.deinit(a);
         }
-        var initialized: Set = .empty;
+        var initialized: Initialized = .empty;
         defer initialized.deinit(a);
         var journal: std.ArrayList(u32) = .empty;
         defer journal.deinit(a);
@@ -316,9 +328,9 @@ const Proof = struct {
                 if (inst.op != .local_get) entry.value_ptr.writes += 1;
                 if (flow) {
                     if (inst.op == .local_get) {
-                        if (!initialized.contains(inst.operand)) try self.read_before_def.put(a, inst.operand, {});
-                    } else if (!initialized.contains(inst.operand) and !self.read_before_def.contains(inst.operand)) {
-                        try initialized.put(a, inst.operand, {});
+                        if (!(initialized.get(inst.operand) orelse false)) try self.read_before_def.put(a, inst.operand, {});
+                    } else if (!(initialized.get(inst.operand) orelse false) and !self.read_before_def.contains(inst.operand)) {
+                        try initialized.put(a, inst.operand, true);
                         try journal.append(a, inst.operand);
                     }
                 }
@@ -353,8 +365,8 @@ const Proof = struct {
                     }
                     restore(&initialized, &journal, frame.mark);
                     flow = frame.has_exit;
-                    if (flow) for (frame.exits.items) |id| if (!initialized.contains(id) and !self.read_before_def.contains(id)) {
-                        try initialized.put(a, id, {});
+                    if (flow) for (frame.exits.items) |id| if (!(initialized.get(id) orelse false) and !self.read_before_def.contains(id)) {
+                        try initialized.put(a, id, true);
                         try journal.append(a, id);
                     };
                     stack.shrinkRetainingCapacity(frame.height);

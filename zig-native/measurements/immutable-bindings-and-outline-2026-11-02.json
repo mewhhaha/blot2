@@ -1,0 +1,233 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "d0deecbb722ee53dc693555ccebe112fb48fd675",
+  "scope": "No-address scalar binding transport and field-only plain record updates; retain descriptor/capture/control copies. Outline initialized membership retains inactive keys and uses integer hashes.",
+  "qualification": {
+    "check_dev": "build/bench/immutable-bindings-check-dev-passing/run-a86d61202f56758d/results.json",
+    "compiled_native": 2820,
+    "selected_native": 61,
+    "full_fault_evidence": "build/bench/immutable-bindings-check-dev/run-2b9c9ba5f8d394b0/full-faults.log",
+    "selected_full_faults": "61 passed, zero leaks/errors",
+    "guests": 36,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/immutable-bindings-full-gate/run-f3fd70ec0df5d92b;48passed/1baselineListChunk storage_escape",
+    "broader_guest_control": "associated function results retain selected latent effect rows fails on preserved active-captures baseline too; new laws execute via parameter_copy_execution.test.ts",
+    "scope": "Selected development family, not whole release/native qualification"
+  },
+  "renderer": {
+    "evidence": "build/bench/immutable-bindings-kites/pair-bba4e962a76fa92/result.json",
+    "same_source": true,
+    "all_seven_complete_streams_equal": true,
+    "builds": [
+      {
+        "variant": "baseline",
+        "build_ms": 3991.2588370000003,
+        "owned_emit_ms": 531.461,
+        "wasm_bytes": 254036,
+        "wasm_sha256": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4",
+        "sharing": {
+          "scoped_parameter_words_shared": 1968
+        }
+      },
+      {
+        "variant": "candidate",
+        "build_ms": 3878.729869,
+        "owned_emit_ms": 492.757,
+        "wasm_bytes": 235873,
+        "wasm_sha256": "9782faf57935fc08c9e4a4a0f5f53dd886e9bd7230ff47194f90122ce1dfb3c9",
+        "sharing": {
+          "scoped_parameter_words_shared": 1968,
+          "scoped_local_words_shared": 2258,
+          "scoped_record_updates_shared": 62
+        }
+      }
+    ],
+    "warning": "One traced native-fast pair, not a median or whole-main latency claim"
+  },
+  "native_main": {
+    "evidence": "build/bench/gdev-immutable-bindings-native/main-695de704d9bc5b37/result.json",
+    "status": "30-second cap; incomplete"
+  },
+  "full_main": "Replacement optimized compiler timing pending",
+  "outline": {
+    "scope": "Real copied Proof.scan on structured branch churn; no whole-main timing claim",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "llvm": false,
+    "sha256": {
+      "old.zig": "6b5efc08fd2e5e0dfed4225e5e11cb1ef015f976ae1501dd5fcfcbdad673da20",
+      "retained.zig": "1bc57c0657a91ceb16068eea093f9c00373de5c2852add09d2bf85e9b3641598",
+      "fast.zig": "8bb090504a675dccdec8e430f186f1931ec0870ac4d9b905b66543130dd0dbb5",
+      "proof_bench.zig": "b1f76544f2d946a0dbfee025ca5052eb3b6a37ea103d9a98b64ee7640f4e435f",
+      "run.py": "412dc12d0b5eccf67a58076cf5257360a6a08381c3ff29800a57a7ad9e7f2380",
+      "proof-bench": "7c5806f6450c5dd56d10dc6e08edb2a102f068b1dc02a016731f3bb4534d43ad"
+    },
+    "median_cpu_ms": {
+      "old": 33.26599999999996,
+      "retained": 22.191999999999933,
+      "fast": 13.373999999999942
+    },
+    "old_to_fast_speedup": 2.48736354119935,
+    "old_to_retained_speedup": 1.4990086517664052,
+    "runs": [
+      {
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 33.036999999999985,
+        "wall_ms": 33.409651994588785,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "retained",
+        "success": true,
+        "cpu_ms": 22.191999999999933,
+        "wall_ms": 22.49949199904222,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "fast",
+        "success": true,
+        "cpu_ms": 13.582000000000038,
+        "wall_ms": 13.847684997017495,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "fast",
+        "success": true,
+        "cpu_ms": 13.185999999999975,
+        "wall_ms": 13.419598995824344,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "retained",
+        "success": true,
+        "cpu_ms": 22.426000000000002,
+        "wall_ms": 22.709112003212795,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 33.619999999999926,
+        "wall_ms": 33.92080499907024,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "retained",
+        "success": true,
+        "cpu_ms": 22.178999999999892,
+        "wall_ms": 22.43608199933078,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "old",
+        "success": true,
+        "cpu_ms": 33.26599999999996,
+        "wall_ms": 33.553114990354516,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      },
+      {
+        "variant": "fast",
+        "success": true,
+        "cpu_ms": 13.373999999999942,
+        "wall_ms": 13.610743000754155,
+        "proof": {
+          "instructions": 25101,
+          "locals": 4353,
+          "read_before_def": 2048,
+          "uses": 4353
+        },
+        "stderr": "{\"instructions\":25101,\"locals\":4353,\"read_before_def\":2048,\"uses\":4353}\n"
+      }
+    ],
+    "workload": {
+      "anchors": 8,
+      "initial_branch_keys": 248,
+      "unique_branch_pairs": 2048,
+      "shared_both_arm_definition": true,
+      "exact_per_local_RBD_and_read_write_counts_checked": true
+    },
+    "commands": {
+      "build": [
+        "/home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/zig",
+        "build-exe",
+        "/tmp/blot-outline-membership/src/proof_bench.zig",
+        "-O",
+        "ReleaseSafe",
+        "-fno-llvm",
+        "-femit-bin=/tmp/blot-outline-membership/proof-bench"
+      ],
+      "run": [
+        "python3",
+        "/tmp/blot-outline-membership/run.py"
+      ]
+    },
+    "allocator": "ArenaAllocator over page_allocator; matching pooled scratch control",
+    "page_allocator_control": "page-allocator/result.json",
+    "tracked_source_modified": true,
+    "native_oom_law": "Nine outline laws pass fullfaults; new law also in61selectedfullfaults",
+    "proof_imports": "real wasm/runtime_ir modules through a read-only /tmp source mirror; only private Proof/analyze/deinit visibility exposed in benchmark copies",
+    "cpu_reduction_percent": 59.79678951482006,
+    "source_ref": "82a00d1e4fda0fccb6234c1152a29e6386c7efbd",
+    "proof_property": {
+      "status": "passed",
+      "scope": "real Context extraction/finalization with branch churn, exact RBD and global bank checks",
+      "command": [
+        "/tmp/blot-outline-membership/proof-property"
+      ],
+      "sha256": "bd25f081d691bf235f9371f00018ad33363109e023c98bc835abc0f141f1fc15"
+    },
+    "import_sha256": {
+      "wasm.zig": "e06d0887825a6b820fb3c3810e3499186bc6e2b39bd9b24593f4dbd4bc824339",
+      "runtime_ir.zig": "c27ab0adb5987415bee149ac23d4740f6464d03ed43a9343f790fd6802177aca"
+    }
+  }
+}

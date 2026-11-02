@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-02",
+  "status": "rejected_and_reverted",
+  "compiler_sha256": "1ce334106887bdf65d74d37f8b7dcdbfca3dedf457318103feeda9b156518376",
+  "compiler_source": "82a00d1e4fda0fccb6234c1152a29e6386c7efbd",
+  "baseline_gdev": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+  "baseline_ink": "d520a903a13479455a4380680f64ce590e8d58c5",
+  "experiments": [
+    {
+      "change": "Replace seven-value global Array with literal-match function and bounded range loop",
+      "evidence": "build/bench/gdev-lookup-free-navigation-release/main-c3e4bc81dd5d049/result.json",
+      "build_ms": 17867.807652,
+      "profile": true,
+      "cache": false,
+      "wasm_bytes": 42964895,
+      "patch": "zig-native/measurements/experiments/lookup-free-navigation-2026-11-02.patch",
+      "patch_sha256": "69bbe6ed18f49f0d52195811d41fa63d6f6a3bba0c2da3d3904d46724b413108",
+      "work": {
+        "scoped_emission_expressions": 1294047,
+        "scoped_call_admission_nodes": 3683246,
+        "scoped_owner_graph_definitions": 1953
+      },
+      "warning": "Single source controls; do not compare profiled timing with GDB sampled run as a matched latency ratio."
+    },
+    {
+      "change": "Additionally replace four owner-base closures with named partials and three Unit adapters",
+      "evidence": "build/bench/gdev-named-owner-callbacks-release/main-7a8295404dce6877/result.json",
+      "build_ms": 18052.997182,
+      "profile": true,
+      "cache": false,
+      "wasm_bytes": 42977461,
+      "patch": "zig-native/measurements/experiments/named-owner-callbacks-2026-11-02.patch",
+      "patch_sha256": "7818fcb7749142e5bfac2849a0cb3af4bb74e0db1c12459cb3549a679b5028d8",
+      "work": {
+        "scoped_emission_expressions": 1294330,
+        "scoped_call_admission_nodes": 3684418,
+        "scoped_owner_graph_definitions": 1991
+      },
+      "warning": "Single source controls; do not compare profiled timing with GDB sampled run as a matched latency ratio."
+    }
+  ],
+  "decision": "Neither representation change removed material full-main expansion. Remove both rather than broaden their API changes. Keep actual detours global as a witness for a completed-function plan to handle explicit global inputs."
+}

@@ -1,0 +1,29 @@
+diff --git a/src/world_storage.blot b/src/world_storage.blot
+index d74ebe1..edcbb9e 100644
+--- a/src/world_storage.blot
++++ b/src/world_storage.blot
+@@ -431,10 +431,10 @@ const with_owners = func initial -> consume => return do:
+   // These known callbacks capture the owner-only record. Their arguments never
+   // contain the callbacks themselves, so access has a finite structural type.
+   consume (@record.merge base {
+-    despawn: func id => return despawn base id,
+-    reset_salt: func () => return reset_starting_salt base,
+-    stash_scene: func () => return stash_scene base,
+-    restore_scene: func () => return restore_scene base,
++    despawn: despawn base,
++    reset_salt: reset_salt_callback base,
++    stash_scene: stash_scene_callback base,
++    restore_scene: restore_scene_callback base,
+   })
+   return ()
+ // The schema declares structural maintenance explicitly. Removed rows become
+@@ -781,6 +781,9 @@ const stash_scene = func access => return scene_history.stash encode_scene acces
+ const restore_scene = func access => return do:
+   scene_history.restore_stash restore_scene_history access access.scene_stash
+   return ()
++const reset_salt_callback = func access -> () => return reset_starting_salt access
++const stash_scene_callback = func access -> () => return stash_scene access
++const restore_scene_callback = func access -> () => return restore_scene access
+ // Invocation-local aliases over independently named owners and frame buffers.
+ // This structural contract allocates no payload and introduces no owner row.
+ type FrameAccess = {

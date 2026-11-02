@@ -1206,3 +1206,88 @@ test "untagged nested records retain fields through loop joins tagged wrappers a
     try publishSmallModule(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }
+
+const immutable_bindings_source =
+    \\type Inner is data = $Inner {left: U32, right: U32}
+    \\type Box is data = $Box {inner: Inner, kept: U32}
+    \\const plus = func (saved: U32) -> (amount: U32): U32 => return @u32.add saved amount
+    \\const make = func (saved: U32) => return func (amount: U32): U32 => return @u32.add saved amount
+    \\const loop_closure = func (input: U32) => return do:
+    \\  let current = input
+    \\  for index in 0 .. 3:
+    \\    let captured = make current
+    \\    current := @u32.add current 1
+    \\    if @u32.eq index 1:
+    \\      return captured
+    \\  return make current
+    \\const loop_partial = func (input: U32) => return do:
+    \\  let current = input
+    \\  for index in 0 .. 3:
+    \\    let captured = plus current
+    \\    current := @u32.add current 1
+    \\    if @u32.eq index 1:
+    \\      return captured
+    \\  return plus current
+    \\entry const rotate = func (input: U32): Array U32 => return do:
+    \\  let trace: ResizeArray U32 = #[]
+    \\  let left = input
+    \\  let middle = @u32.add input 1
+    \\  let right = @u32.add input 2
+    \\  for index in 0 .. 6:
+    \\    let before_left = left
+    \\    let before_middle = middle
+    \\    left := middle
+    \\    middle := right
+    \\    right := before_left
+    \\    @storage.push trace before_left
+    \\    @storage.push trace before_middle
+    \\    if @u32.eq index 1:
+    \\      continue
+    \\    if @u32.eq index 3:
+    \\      break
+    \\    @storage.push trace right
+    \\  @storage.push trace left
+    \\  @storage.push trace middle
+    \\  @storage.push trace right
+    \\  return @storage.freeze trace
+    \\entry const captured = func (input: U32): Array U32 => return do:
+    \\  let marker: ResizeArray U32 = #[input]
+    \\  return #[(loop_closure marker[0]) 10, (loop_partial marker[0]) 20]
+    \\entry const updated = func (input: U32): Array U32 => return do:
+    \\  let original = $Box {inner: $Inner {left: input, right: @u32.add input 1}, kept: 7}
+    \\  let changed = original
+    \\  changed.inner.left := changed.inner.right
+    \\  changed.inner.right := @u32.add self 10
+    \\  let saved = changed
+    \\  changed.inner := $Inner {left: 0, right: 99}
+    \\  return #[original.inner.left, original.inner.right, saved.inner.left, saved.inner.right, changed.inner.left, changed.inner.right, original.kept, saved.kept]
+;
+
+fn publishImmutableBindings(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_local_words_shared > 0);
+    try std.testing.expect(result.counters.scoped_record_updates_shared > 0);
+}
+test "immutable local bindings preserve parallel loops captures and functional record aliases through OOM" {
+    var module = try lower(a, immutable_bindings_source);
+    defer module.deinit(a);
+    try publishImmutableBindings(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishImmutableBindings, .{@as([]const core.Module, &.{module})});
+    // Even an unreachable local address disables the complete inventory proof.
+    var addressed = try lower(a,
+        \\const unused = func (): U32 => return do:
+        \\  let value = 1
+        \\  return @storage.load (&value)
+        \\
+    ++ immutable_bindings_source);
+    defer addressed.deinit(a);
+    var fallback = try scoped.compile(a, &.{addressed}, 1);
+    defer fallback.deinit(a);
+    try std.testing.expect(fallback.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_parameter_words_shared);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_local_words_shared);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_record_updates_shared);
+}

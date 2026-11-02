@@ -1,0 +1,51 @@
+diff --git a/lib/navigation/ground.blot b/lib/navigation/ground.blot
+index 3aca2c6..274db40 100644
+--- a/lib/navigation/ground.blot
++++ b/lib/navigation/ground.blot
+@@ -458,11 +458,20 @@ const reachable = func (ground: Read) => return func (point: Vec3) => return do:
+ type Step is data = $Step { x: F32, z: F32, yaw: F32, moved: F32 }
+ 
+ // The ways an agent swerves to get round something, tried in turn.
+-const detours = #[0.0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1]
++const detour_count = 7
++const detour = func (index: U32): F32 => return case index of
++  0 => 0.0
++  1 => 0.7
++  2 => -0.7
++  3 => 1.4
++  4 => -1.4
++  5 => 2.1
++  6 => -2.1
++  _ => @panic "invalid ground detour"
+ 
+ // One step of an agent at (x, z) heading `yaw` toward `target`: it turns at
+ // most `turn` radians toward it and goes at most `stride` (no further than
+-// the target), swerving by the first of `detours` that keeps it clear. When
++// the target), swerving by the first detour that keeps it clear. When
+ // something has come to stand where it is, it walks out of that first.
+ // Nothing when every way is blocked.
+ const step = func (ground: Read) => return func (x: F32) => return func (z: F32) => return func (yaw: F32) => return func (target: Vec3) => return func (turn: F32) => return func (stride: F32) => return do:
+@@ -485,8 +494,8 @@ const step = func (ground: Read) => return func (x: F32) => return func (z: F32)
+   // Facing away turns in place; aligned travel keeps its full stride.
+   let forward = max 0.0 (cos (difference - clamp (-turn) turn difference))
+   let going = min stride (distance * forward * forward)
+-  for detour in detours:
+-    let way = wrap tau (heading + detour)
++  for index in 0 .. detour_count:
++    let way = wrap tau (heading + detour index)
+     let (sine, cosine) = sin_cos way
+     let next_x = x + sine * going
+     let next_z = z + cosine * going
+diff --git a/tests/navigation_ground.blot b/tests/navigation_ground.blot
+index 80e2213..fdd4402 100644
+--- a/tests/navigation_ground.blot
++++ b/tests/navigation_ground.blot
+@@ -137,7 +137,7 @@ const step = func (g: ground.Read) => return func (x: F32) => return func (z: F3
+   // Facing away turns in place; aligned travel keeps its full stride.
+   let forward = max 0.0 (cos (difference - clamp (-turn) turn difference))
+   let going = min stride (distance * forward * forward)
+-  for detour in ground.detours:
++  for detour in #[0.0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1]:
+     let way = wrap tau (heading + detour)
+     let (sine, cosine) = sin_cos way
+     let next_x = x + sine * going

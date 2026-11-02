@@ -35,6 +35,19 @@ actual renderer streams match, with identical 254,036-byte Wasm. See
 and
 [active captures](zig-native/measurements/active-type-captures-2026-11-02.json).
 
+The next checked batch reuses scalar lanes at local bindings under the same
+whole-inventory no-local-address proof, retaining descriptor, capture and
+control copies. Field-only plain updates clone metadata. Outlining retains exact
+inactive initialization membership instead of hash deletions. All 2,820 laws
+compile; 61 selected laws pass full faults, 36 guests pass, and Zig lint is
+clean. Seven actual renderer streams remain identical; Wasm shrinks 254,036 to
+235,873 bytes. Full-main optimized timing is pending. See
+[copy and outline evidence](zig-native/measurements/immutable-bindings-and-outline-2026-11-02.json).
+Two source-only call-shape experiments are rejected and reverted: removing the
+navigation lookup owner and naming World callbacks barely reduces expansion.
+[Their patches and full-main controls](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
+remain evidence, not landed improvements.
+
 The structural type-ID prototype is **rejected and removed**: three alternating
 actual renderer pairs regress emission 5.3%, despite much smaller keys. Its
 patch and exact controls are preserved in

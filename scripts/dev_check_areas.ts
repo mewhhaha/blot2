@@ -152,6 +152,7 @@ export const devCheckAreas = {
       "backend.wasm_scope_outline_tests.test.scoped final encoding counts parameters with declared locals at the existing engine bound",
       "backend.wasm_scope_outline_tests.test.scoped machine helpers require closed typed controls and use complete call signatures",
       "backend.wasm_scope_outline_tests.test.scoped machine helpers keep written lanes when one branch leaves them unchanged",
+      "backend.wasm_scope_outline_tests.test.scoped helper initialization retains exact branch intersections through churn and OOM",
       "backend.wasm_scope_outline_tests.test.scoped machine helper banks reject internal cycles unknown dispatch and global overflow",
       "backend.storage_calls_tests.test.selected pure calls follow exact reference aliases without expanding callers",
       "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
@@ -498,6 +499,8 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "backend.wasm_scope_outline_tests.test.scoped helper initialization retains exact branch intersections through churn and OOM",
+      "backend.storage_calls_tests.test.immutable local bindings preserve parallel loops captures and functional record aliases through OOM",
       "backend.storage_type_arguments_tests.test.refinement active captures match linear order and exact prefixes after every mutation through OOM",
       "backend.storage_parameter_fields_tests.test.direct anonymous parameter fields retain complete escape fallback",
       "backend.storage_parameter_fields_tests.test.projected anonymous parameters share owners despite unused goal-bearing callbacks",

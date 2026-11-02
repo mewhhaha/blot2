@@ -305,20 +305,25 @@ const Generator = struct {
     }
     fn bind(self: *Generator, m: *const core.Module, id: core.BindingId, original: Value) Error!void {
         var value: Value = undefined;
-        if (m.binding(id).kind == .parameter and !self.scalar_admission.hasScalarReferences()) {
-            value = try self.parameterValue(original);
+        // Core bindings are single-assignment. Without any local address in
+        // the inventory, a scalar lane cannot be mutated through an alias.
+        // Control carriers and capture/backedge snapshots remain independent.
+        if (!self.scalar_admission.hasScalarReferences()) {
+            value = try self.immutableBindingValue(original, m.binding(id).kind == .parameter);
         } else value = try self.snapshot(original);
         try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = id, .value = value, .remaining = if (id < self.uses.len) self.uses[id] else 0 });
     }
-    fn parameterValue(self: *Generator, original: Value) Error!Value {
+    fn immutableBindingValue(self: *Generator, original: Value, parameter: bool) Error!Value {
         var value = original;
         if (value.tag == .scalar) {
             value.literal = self.knownLiteral(original);
             value.depth = self.depth;
-            self.emission_work.scoped_parameter_words_shared +|= 1;
+            if (parameter) {
+                self.emission_work.scoped_parameter_words_shared +|= 1;
+            } else self.emission_work.scoped_local_words_shared +|= 1;
         } else if (value.tag == .aggregate) {
             value.fields = try self.arena.allocator().alloc(Value, original.fields.len);
-            for (value.fields, original.fields) |*field, input| field.* = try self.parameterValue(input);
+            for (value.fields, original.fields) |*field, input| field.* = try self.immutableBindingValue(input, parameter);
         } else value = try self.snapshot(original);
         return value;
     }
@@ -5759,7 +5764,17 @@ const Generator = struct {
                 const info = m.updateInfo(id);
                 const evaluated = try self.expression(m, info.root, depth + 1);
                 if (evaluated.terminated) return evaluated;
-                const root_value = try self.snapshot(evaluated);
+                var root_value: Value = undefined;
+                var field_only = true;
+                for (m.updateSelectors(id)) |selector| {
+                    if (selector.kind == .index) field_only = false;
+                }
+                if (field_only and plainInlineValue(evaluated) and !self.scalar_admission.hasScalarReferences()) {
+                    // Functional updates replace fields; they never overwrite
+                    // the original scalar lanes. Keep independent metadata.
+                    root_value = try self.cloneShape(evaluated);
+                    self.emission_work.scoped_record_updates_shared +|= 1;
+                } else root_value = try self.snapshot(evaluated);
                 return self.updateValue(m, id, root_value, 0, depth + 1);
             },
             .loop => return self.emitLoop(m, id, depth),

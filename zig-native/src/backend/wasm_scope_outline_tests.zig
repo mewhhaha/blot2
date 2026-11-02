@@ -235,3 +235,54 @@ test "scoped machine helper banks reject internal cycles unknown dispatch and gl
         try std.testing.expectEqual(@as(usize, 0), module.globals.items.len);
     }
 }
+
+fn branchMembershipChurn(allocator: A) !void {
+    const rounds = 24;
+    const locals: [33 + 2 * rounds]ir.ValueType = @splat(.i32);
+    var module = try moduleWithRoot(allocator, &.{}, .none, &locals);
+    defer module.deinit();
+    var context = outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+    defer context.deinit();
+    try context.registerRoot(0);
+    const ticket = context.begin(0, .{ .expressions = 0, .layouts = 0 }).?;
+    for (0..8) |id| try emit(&module, 0, &.{ .{ .op = .i32_const }, .{ .op = .local_set, .operand = @intCast(id) } });
+    // These writes are not definite after the implicit false arm. Rollback
+    // leaves inactive entries; later reads must not treat presence as true.
+    try emit(&module, 0, &.{ .{ .op = .i32_const }, .{ .op = .if_ } });
+    for (8..32) |id| try emit(&module, 0, &.{ .{ .op = .i32_const }, .{ .op = .local_set, .operand = @intCast(id) } });
+    try emit(&module, 0, &.{.{ .op = .end }});
+    for (0..rounds) |round| {
+        const id: u32 = @intCast(32 + 2 * round);
+        try emit(&module, 0, &.{
+            .{ .op = .i32_const },                    .{ .op = .if_ },
+            .{ .op = .i32_const },                    .{ .op = .local_set, .operand = id },
+            .{ .op = .else_ },                        .{ .op = .i32_const },
+            .{ .op = .local_set, .operand = id + 1 }, .{ .op = .end },
+            .{ .op = .local_get, .operand = id },     .{ .op = .drop },
+            .{ .op = .local_get },                    .{ .op = .drop },
+        });
+    }
+    const common = 32 + 2 * rounds;
+    try emit(&module, 0, &.{
+        .{ .op = .i32_const },                    .{ .op = .if_ },
+        .{ .op = .i32_const },                    .{ .op = .local_set, .operand = common },
+        .{ .op = .else_ },                        .{ .op = .i32_const },
+        .{ .op = .local_set, .operand = common }, .{ .op = .end },
+        .{ .op = .local_get, .operand = common }, .{ .op = .drop },
+    });
+    try std.testing.expect((try context.tryExtract(ticket, .{ .expressions = 100, .layouts = 0 })) != null);
+    const inputs = context.helpers.items[0].read_before_def;
+    try std.testing.expectEqual(@as(usize, rounds), inputs.len);
+    for (0..common + 1) |index| {
+        var expected = false;
+        if (index >= 32 and index < common and (index - 32) % 2 == 0) expected = true;
+        try std.testing.expectEqual(expected, std.mem.findScalar(u32, inputs, @intCast(index)) != null);
+    }
+    const stats = try context.finalize();
+    try std.testing.expectEqual(@as(u64, rounds), stats.globals);
+}
+
+test "scoped helper initialization retains exact branch intersections through churn and OOM" {
+    try branchMembershipChurn(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, branchMembershipChurn, .{});
+}
