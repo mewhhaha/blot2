@@ -160,7 +160,7 @@ test "scoped final encoding counts parameters with declared locals at the existi
         } else {
             const bytes = try module.assembleWithOptions(.{});
             defer a.free(bytes);
-            try std.testing.expect(bytes.len > count);
+            try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 1, 0, 0, 0 }, bytes[0..8]);
         }
     }
 }

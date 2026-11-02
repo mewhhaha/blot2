@@ -7,23 +7,36 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest fresh actual main takes **9.19 seconds total**, producing
-**22,375,878 bytes of Wasm**, cache disabled. The preceding release took
-9.23s/24.12MB. These are individual completions, not distributions. The
-five-second gate remains unmet. Exact source hashes and the Zig 0.17 Fast/LLVM
-compiler are pinned in
-[latest full-main evidence](zig-native/measurements/gdev-after-argument-transport-2026-11-02.json).
-Its source snapshot is `11054d49` plus patch `66a61351f973`. Workload source
-remains Gdev `b60f8c76` and Ink `7085c97e`; current heads `24d77076`/`9943bd0e`
-add documentation only.
+The latest fresh actual main takes **about 8.9 seconds total**, producing
+**22,375,878 bytes of Wasm**, cache disabled. Frozen-path and configured-path
+completions take 8.94s and 8.87s; the preceding release took 9.19s/22.38MB.
+These are individual completions, not distributions. The five-second gate
+remains unmet. Exact source, workload and binary hashes are pinned in
+[latest full-main evidence](zig-native/measurements/gdev-after-inline-memo-2026-11-02.json).
+The snapshot is `c669999b` plus patch `a4c2646528d1`. Gdev/Ink source and ABI
+contracts are unchanged, and the complete Wasm hash matches the predecessor.
 
-A separate profile puts 8.12s in the backend, requesting 7.58GB through 6.40M
-allocations. Physical argument projection omits 7.55M argument words from 1,552
-owned calls; 8,254 small aggregate calls avoid result owners. These reduce code
-size substantially but barely move full-main CPU. A fresh weighted CPU sample
-identifies structural type-key construction, repeated shape/borrow queries and
-call preparation as the next frontier. Astra is reviewing one larger semantic
-instantiation/representation change; do not assume another generic cache helps.
+Five exact primitive type-key references now use fixed memo slots. Arbitrary
+descriptor contents, captured/environment distinctions, collisions, cycle/depth
+checks and per-entry budget charges remain. A separate profile puts 7.92s in
+the backend, requesting 7.27GB through 5.93M allocations, down from
+8.12s/7.58GB/6.40M. All 2,860 native laws compile; 109 selected laws pass
+exhaustive faults, 82 guests pass and Zig lint is clean. The final optimized
+release passes seven world/editor checks in sync/JSPI. See
+[primitive memo evidence](zig-native/measurements/primitive-inline-memo-2026-11-02.json).
+
+The launcher selects the exact new release; its fresh configured-path build
+verifies compiler identity and identical complete Wasm bytes. The existing
+engine-bound test still admits 49,999 locals plus one parameter and rejects
+50,000 locals plus that parameter; its obsolete ungrouped byte-size assertion
+is replaced with an artifact-header check.
+
+The next private experiment caches immutable closed-type descriptor recipes and
+replays them into the existing key Builder. It keeps original key bytes and
+bounds while avoiding repeated Core/environment traversal. A measured callsite
+BodyInstance layer is held: exact repeats cover little preparation work.
+Early scalar-key skipping and paged outliner facts are also held after neutral
+or worse CPU pairs. Do not copy those patches into production.
 
 ## Latest checked transport batch
 

@@ -1,0 +1,175 @@
+{
+  "date": "2026-11-02",
+  "source": {
+    "base_commit": "c669999ba00c329a146c3d0fbbf182505b1abf5b",
+    "patch_sha256": "a4c2646528d1b00c68cf58293a5a266f91469b2630c1a37169d9185fb6b16594",
+    "source_files_sha256": {
+      "scripts/dev_check_areas.ts": "04fe632d97f41946a221442684d55ab2f5e2f7b94b2d2483d411daf46a6f6e60",
+      "zig-native/src/backend/scoped_backend.zig": "d95c668be9ffa9724fef1850a2f353b1d0b54c39c5908aa77b5dc25cfcdf94b2",
+      "zig-native/src/backend/storage_type_key.zig": "f9de5152cedc65872eb16ff0947a7660d26a934ff60c93401239f1f778a978c6",
+      "zig-native/src/backend/storage_type_key_tests.zig": "60ca03015e5fa879f5dfb1e43c556080034e16c7405beb92c67eca289e48a64f",
+      "zig-native/src/backend/wasm_scope_outline_tests.zig": "87696a17c0a2ace106f89c7e2ad52805e0a360ff947a8c029985ea59954ee919"
+    },
+    "frozen_manifest": "build/bench/frozen-inline-memo-a4c2646528d1/source-manifest.json"
+  },
+  "changes": [
+    "Five exact common Reference tuples use fixed memo slots instead of hashing; all other references retain the existing map. Canonical descriptor contents, depth/height, collisions, cycles, poison and per-entry work accounting are unchanged.",
+    "The existing primitive memo regression checks identical encoded atoms and reduced work independent of the memo storage representation.",
+    "The engine-bound encoding law retains49,999-local admission/50,000-local rejection and checks the successful Wasm header; grouped local declarations invalidate its earlier byte-length assumption."
+  ],
+  "qualification": {
+    "central_dev": "build/bench/inline-memo-central-check/run-86562244ec9128b4/results.json",
+    "compiled_native": 2860,
+    "selected_native": 109,
+    "executed_guests": 82,
+    "zig_lint": "zero findings",
+    "full_faults": "build/bench/inline-memo-central-check/run-86562244ec9128b4/full-faults.log",
+    "full_gate": "build/bench/inline-memo-full-gate",
+    "release": "Actual main and world/editor runtime checked on final Fast/LLVM compiler; full qualification retains known baseline failure",
+    "astra_review": "final source review green",
+    "selected_exhaustive_fault_laws": 109,
+    "full_gate_outcome": "48 passed / one baseline List/chunk storage_escape at bytes312..345; full qualification pending"
+  },
+  "matched_private_witnesses": {
+    "base": "c669999ba00c329a146c3d0fbbf182505b1abf5b",
+    "patch_sha256": "81d6a62312676b2c84d4d7bc9b8d55c0653e3439ea90640bb3cc5873bc0c9904",
+    "source_files_sha256": {
+      "zig-native/src/backend/storage_type_key.zig": "f9de5152cedc65872eb16ff0947a7660d26a934ff60c93401239f1f778a978c6",
+      "zig-native/src/backend/storage_type_key_tests.zig": "60ca03015e5fa879f5dfb1e43c556080034e16c7405beb92c67eca289e48a64f"
+    },
+    "toolchain": "Zig0.17.0 Fast/noLLVM matched compilers; Safe/noLLVM native inventory",
+    "renderer": {
+      "evidence": "build/bench/private-prototypes/key-inline-memo/kites/pair-ff316a5e60eccaaa/result.json",
+      "byte_identical": true,
+      "seven_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 118677,
+          "wasm_sha256": "cf9fe29bd25cac120256f6bcc778db1dac5a572cfa9982f32bae562a3c7002a6",
+          "backend": {
+            "us": 472889,
+            "requested_bytes": 43107286,
+            "allocations": 80005,
+            "rss_growth_kib": 0
+          }
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 118677,
+          "wasm_sha256": "cf9fe29bd25cac120256f6bcc778db1dac5a572cfa9982f32bae562a3c7002a6",
+          "backend": {
+            "us": 450045,
+            "requested_bytes": 39443710,
+            "allocations": 72440,
+            "rss_growth_kib": 0
+          }
+        }
+      ]
+    },
+    "world": {
+      "evidence": "world-result.json",
+      "same_size": true,
+      "wasm_bytes": 711173,
+      "builds": [
+        {
+          "name": "baseline",
+          "total_ms": 9772.267275,
+          "backend": {
+            "us": 3385392,
+            "requested_bytes": 381596951,
+            "allocations": 268597,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "runtimeMs": 56.97839500000009,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "runtimeMs": 21.626460000001316,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "total_ms": 9840.740985,
+          "backend": {
+            "us": 3196616,
+            "requested_bytes": 370011443,
+            "allocations": 250674,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "runtimeMs": 54.25381699999889,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "runtimeMs": 25.29028599999947,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "limits": "Single pairs, not distributions. Native Fast total world time is neutral; only focused backend CPU improvement observed. Full main release timing not measured."
+  },
+  "held_probes": {
+    "body_instance": "Exact callsite repetition covers0% measured renderer preparation and11.58% world mapping lookups/12.41% goals. Does not justify the proposed layer.",
+    "early_completed_hit": "Fewer allocations but neutral backend CPU on matched real witnesses; held.",
+    "outliner_local_facts": "Byte parity, world CPU neutral and renderer slower; held.",
+    "machine_sharing": "Existing sharing saves549,657B actual main with unchanged latency; further callee canonicalization offers267,047 code bytes only. Held.",
+    "closed_replay": "Corrected diagnostic opportunity only: repeated complex fragments cover49.73% renderer and39.36% world selectedTypeNode construction words, excluding primitive roots/local-memo hits. A private replay prototype is in progress; no CPU improvement claim."
+  },
+  "full_main": "gdev-after-inline-memo-2026-11-02.json",
+  "world_editor_release": {
+    "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+    "compiler": "/home/jacobt/src/blot2/build/bench/frozen-inline-memo-a4c2646528d1/zig-native/zig-out/bin/blotc",
+    "buildMs": 1342.560064,
+    "wasmBytes": 711173,
+    "calls": [
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": false,
+        "runtimeMs": 70.2537890000001,
+        "row": [
+          7,
+          0
+        ]
+      },
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": true,
+        "runtimeMs": 23.234276000000136,
+        "row": [
+          7,
+          0
+        ]
+      }
+    ],
+    "abi": 8,
+    "success": true
+  }
+}

@@ -2,11 +2,11 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-argument-transport-2026-11-02.json)
-now completes in **9.19 seconds total**, producing **22.38 MB Wasm**, cache
-disabled. The preceding checkpoint took 9.23 seconds/24.12MB. The checked
-[argument/return transport batch](../zig-native/measurements/prepared-arguments-and-inline-returns-2026-11-02.json)
-compiles 2,858 native laws, passes 106 full-fault laws, 82 guests, seven
+[Actual full main](../zig-native/measurements/gdev-after-inline-memo-2026-11-02.json)
+now completes in **about 8.9 seconds total**, producing **22.38 MB Wasm**, cache
+disabled and byte-identical to the preceding 9.19-second checkpoint. The checked
+[primitive memo batch](../zig-native/measurements/primitive-inline-memo-2026-11-02.json)
+compiles 2,860 native laws, passes 109 full-fault laws, 82 guests, seven
 matching renderer streams and seven world/editor checks in sync/JSPI on the
 final optimized release. The five-second gate remains unmet. Full qualification
 retains the baseline List/chunk failure, and a fresh full-game frame still needs

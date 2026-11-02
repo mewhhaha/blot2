@@ -28,6 +28,9 @@ pub const Builder = struct {
     nodes: std.ArrayList(Node) = .empty,
     buckets: std.AutoHashMapUnmanaged(u64, u32) = .empty,
     memo: std.AutoHashMapUnmanaged(Reference, Memo) = .empty,
+    // These exact references occur at every canonical primitive leaf. The
+    // slots change lookup storage only; descriptor contents remain unrestricted.
+    inline_memo: [5]?Memo = @splat(null),
     poisoned: bool = false,
     finished: bool = false,
 
@@ -53,17 +56,29 @@ pub const Builder = struct {
         const count = std.math.add(usize, self.words.items.len, self.nodes.items.len) catch return error.Limit;
         return std.math.add(usize, count, 4) catch error.Limit;
     }
+    fn inlineIndex(reference: Reference) ?usize {
+        if (reference.unit != 0 or reference.ty < 1 or reference.ty > 5 or reference.environment != 0 or reference.environment_len != 0 or reference.captured) return null;
+        return reference.ty - 1;
+    }
+    fn completedAtDepth(entry: Memo, depth: usize) Error!?Result {
+        return switch (entry) {
+            .active => error.Cycle,
+            .complete => |result| blk: {
+                if (result.height > 128 - depth) return error.Limit;
+                break :blk result;
+            },
+        };
+    }
     pub fn enter(self: *Builder, reference: Reference, depth: usize) Error!?Result {
         errdefer self.poisoned = true;
         try self.charge();
         if (depth > 128) return error.Limit;
-        if (self.memo.get(reference)) |entry| switch (entry) {
-            .active => return error.Cycle,
-            .complete => |result| {
-                if (result.height > 128 - depth) return error.Limit;
-                return result;
-            },
-        };
+        if (inlineIndex(reference)) |index| {
+            if (self.inline_memo[index]) |entry| return completedAtDepth(entry, depth);
+            self.inline_memo[index] = .{ .active = depth };
+            return null;
+        }
+        if (self.memo.get(reference)) |entry| return completedAtDepth(entry, depth);
         try self.memo.put(self.allocator, reference, .{ .active = depth });
         return null;
     }
@@ -119,7 +134,10 @@ pub const Builder = struct {
     pub fn complete(self: *Builder, reference: Reference, descriptor: []const u32, height: usize) Error!Result {
         errdefer self.poisoned = true;
         if (self.poisoned or self.finished or height > 128) return error.Limit;
-        const pending = self.memo.getPtr(reference) orelse return error.Cycle;
+        const pending = if (inlineIndex(reference)) |index| blk: {
+            if (self.inline_memo[index]) |*entry| break :blk entry;
+            return error.Cycle;
+        } else self.memo.getPtr(reference) orelse return error.Cycle;
         if (pending.* != .active) return error.Cycle;
         if (height > 128 - pending.active) return error.Limit;
         try self.wordWork(descriptor.len);
@@ -166,6 +184,10 @@ pub const Builder = struct {
     pub fn finish(self: *Builder, output: *std.ArrayList(u32)) Error!void {
         errdefer self.poisoned = true;
         if (self.poisoned or self.finished) return error.Limit;
+        for (self.inline_memo) |maybe| if (maybe) |entry| {
+            try self.charge();
+            if (entry == .active) return error.Cycle;
+        };
         var entries = self.memo.iterator();
         while (entries.next()) |entry| {
             try self.charge();

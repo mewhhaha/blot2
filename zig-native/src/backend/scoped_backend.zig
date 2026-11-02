@@ -7629,7 +7629,8 @@ fn primitiveKeyMemo(allocator: std.mem.Allocator) !void {
     try old.finish(&expected);
     try new.finish(&actual);
     try std.testing.expectEqualSlices(u32, expected.items, actual.items);
-    try std.testing.expectEqual(@as(usize, 5), new.memo.count());
+    try std.testing.expectEqual(@as(usize, 5), new.nodes.items.len);
+    try std.testing.expect(new_work > old_work);
     var tiny_work: usize = 1;
     var tiny = selected_types.Builder.init(allocator, &tiny_work, .{});
     defer tiny.deinit();

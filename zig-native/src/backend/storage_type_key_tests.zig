@@ -35,6 +35,72 @@ fn expanded(allocator: std.mem.Allocator, terms: []const Term, root: usize, outp
     try output.appendSlice(allocator, terms[root].tail);
 }
 
+fn inlineMemoScenario(allocator: std.mem.Allocator) !void {
+    const terms = [_]Term{
+        .{ .reference = .{ .unit = 0, .ty = 1 }, .head = &.{4} },
+        .{ .reference = .{ .unit = 0, .ty = 2 }, .head = &.{ 9, 2 }, .children = &.{ 0, 0 } },
+        .{ .reference = .{ .unit = 9, .ty = 2 }, .head = &.{ 9, 2 }, .children = &.{ 0, 0 } },
+        .{ .reference = .{ .unit = 0, .ty = 2, .environment = 7, .captured = true }, .head = &.{ 9, 2 }, .children = &.{ 0, 0 } },
+        .{ .reference = .{ .unit = 0, .ty = 3, .captured = true }, .head = &.{ 9, 1 }, .children = &.{0} },
+        .{ .reference = .{ .unit = 0, .ty = 5 }, .head = &.{ 9, 2 }, .children = &.{ 1, 2 } },
+        .{ .reference = .{ .unit = 0, .ty = 6 }, .head = &.{4} },
+    };
+    var ordinary = terms;
+    for (&ordinary) |*term| term.reference.unit += 100;
+    const roots = [_]usize{ 5, 3, 4, 6, 5 };
+    const direct = try key(allocator, &terms, &roots, .{ .hash_mask = 0 });
+    defer allocator.free(direct);
+    const hashed = try key(allocator, &ordinary, &roots, .{ .hash_mask = 0 });
+    defer allocator.free(hashed);
+    try std.testing.expectEqualSlices(u32, hashed, direct);
+}
+
+test "selected structural inline memo preserves arbitrary descriptors captured references collisions and OOM" {
+    try inlineMemoScenario(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, inlineMemoScenario, .{});
+}
+
+test "selected structural inline memo retains active depth completion and work bounds" {
+    const reference: K.Reference = .{ .unit = 0, .ty = 3 };
+    var work: usize = 2;
+    var builder = K.Builder.init(a, &work, .{});
+    defer builder.deinit();
+    try std.testing.expectEqual(@as(?K.Result, null), try builder.enter(reference, 0));
+    const result = try builder.complete(reference, &.{4}, 0);
+    try std.testing.expectEqual(@as(usize, 0), builder.memo.count());
+    var output: std.ArrayList(u32) = .empty;
+    defer output.deinit(a);
+    try builder.root(&output, result);
+    try builder.finish(&output);
+    try std.testing.expectEqual(@as(usize, 0), work);
+
+    var active_work: usize = 8;
+    var active = K.Builder.init(a, &active_work, .{});
+    defer active.deinit();
+    _ = try active.enter(reference, 0);
+    try std.testing.expectError(error.Cycle, active.enter(reference, 0));
+    try std.testing.expectError(error.Limit, active.finish(&output));
+
+    var depth_work: usize = 8;
+    var depth = K.Builder.init(a, &depth_work, .{});
+    defer depth.deinit();
+    _ = try depth.enter(reference, 128);
+    try std.testing.expectError(error.Limit, depth.complete(reference, &.{4}, 1));
+
+    var pending_work: usize = 8;
+    var pending = K.Builder.init(a, &pending_work, .{});
+    defer pending.deinit();
+    _ = try pending.enter(reference, 0);
+    try std.testing.expectError(error.Cycle, pending.finish(&output));
+
+    var exhausted_work: usize = 1;
+    var exhausted = K.Builder.init(a, &exhausted_work, .{});
+    defer exhausted.deinit();
+    _ = try exhausted.enter(reference, 0);
+    _ = try exhausted.complete(reference, &.{4}, 0);
+    try std.testing.expectError(error.Limit, exhausted.finish(&output));
+}
+
 test "selected structural keys preserve tree equality independently of sharing and source ids" {
     const shared = [_]Term{
         .{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} },
