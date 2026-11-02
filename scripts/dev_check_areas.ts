@@ -533,6 +533,7 @@ export const devCheckAreas = {
       "backend.scoped_backend.test.record metadata snapshots raw fields and missing spellings through full OOM",
       "backend.scoped_backend.test.scalar completed hits preserve unresolved numeric admission and distinct return instantiations through OOM",
       "backend.scoped_backend.test.primitive resolution preserves captured witnesses variable chains and depth boundaries through OOM",
+      "backend.scoped_backend.test.primitive key memo shares only encoded atoms across units captured frames and depth through OOM",
       "backend.scoped_backend.test.boxed type witnesses preserve primitive units environments and retained arena ownership through OOM",
       "backend.storage_calls_tests.test.SSA aggregate transport proves every loop exit and preserves physical fallback through OOM",
       "backend.storage_parameter_fields_tests.test.projected anonymous parameters retain whole-record forwarding",

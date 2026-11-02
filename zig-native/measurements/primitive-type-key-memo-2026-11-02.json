@@ -1,0 +1,52 @@
+{
+  "base_commit": "a314a72d20fa92942a6a88a080f301457ffced17",
+  "change": "Canonicalize only private Builder memo references for fixed primitive type IDs1..5; actual semantic TypeRef unit and captured environments remain exact. ID0/nonprimitive references unchanged; normal enter depth/work guards retained.",
+  "qualification": {
+    "development": "build/bench/primitive-key-memo-checked-dev/run-20a7ce9227c02562/results.json",
+    "inventory": 2844,
+    "selected_exhaustive_faults": 92,
+    "guests": 61,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/primitive-key-memo-full-gate",
+    "outcome": "same48/1baselineList/chunk;fullqualificationpending"
+  },
+  "renderer": {
+    "evidence": "build/bench/primitive-key-memo-kites/pair-d454d613bcaf3b5d/result.json",
+    "pins": {
+      "compiler_sha256": "2dd8e31b89692cdd10605ec1b75813e03dc7b46ba434e414ffe49622727d161a",
+      "baseline_compiler_sha256": "ddfe6529cb136e67cd6bdee81e44a821b8d843e064c00138675e73bd950eb07e",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+    },
+    "all_seven_streams_equal": true,
+    "builds": [
+      {
+        "name": "baseline",
+        "build_ms": 3886.4417089999997,
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+        "backend": {
+          "us": 575763,
+          "requested_bytes": 57195304,
+          "allocations": 81620,
+          "rss_growth_kib": 0
+        }
+      },
+      {
+        "name": "candidate",
+        "build_ms": 3813.0063689999997,
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+        "backend": {
+          "us": 562537,
+          "requested_bytes": 57086416,
+          "allocations": 81529,
+          "rss_growth_kib": 0
+        }
+      }
+    ]
+  },
+  "limits": "Single nativeFast control;nooptimizedwholegameclaim;bundlewithlargerbatchbeforeLLVM."
+}

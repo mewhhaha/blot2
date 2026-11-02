@@ -4640,13 +4640,16 @@ const Generator = struct {
     fn selectedTypeNode(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, keys: *selected_types.Builder, depth: usize) (Error || selected_types.Error)!selected_types.Result {
         if (keys.remaining.* == 0 or depth > 128) return error.Limit;
         const actual = try self.resolveType(input, 0);
-        const reference: selected_types.Reference = .{
+        var reference: selected_types.Reference = .{
             .unit = actual.unit,
             .ty = actual.ty,
             .environment = if (actual.environment) |environment| @intFromPtr(environment.ptr) else 0,
             .environment_len = if (actual.environment) |environment| environment.len else 0,
             .captured = actual.environment != null,
         };
+        // Only the private builder memo is canonicalized. Primitive descriptor
+        // bytes have no unit/environment; semantic witnesses keep both.
+        if (actual.ty >= T.unit and actual.ty <= T.never) reference = .{ .unit = 0, .ty = actual.ty };
         if (try keys.enter(reference, depth)) |completed| return completed;
         const owner = try self.unit(actual.unit);
         const node = owner.types.node(actual.ty);
@@ -7242,9 +7245,9 @@ test "primitive resolution preserves captured witnesses variable chains and dept
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, primitiveEnvironments, .{});
 }
 
-fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
-    const blank: core.Module = .{
-        .unit = 1,
+fn metadataTestModule(unit_id: u32) core.Module {
+    return .{
+        .unit = unit_id,
         .types = .{ .nodes = &.{}, .extra = &.{} },
         .nodes = &.{},
         .spans = &.{},
@@ -7261,6 +7264,10 @@ fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
         .diagnostics = &.{},
         .body_lowerings = 0,
     };
+}
+
+fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
+    const blank = metadataTestModule(1);
     var units = [_]core.Module{ blank, blank };
     units[1].unit = 2;
     var summaries: DescriptorCalls = .{ .allocator = allocator, .arena = .init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
@@ -7306,4 +7313,62 @@ fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
 test "boxed type witnesses preserve primitive units environments and retained arena ownership through OOM" {
     try typeEvidenceBoxLifetimes(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, typeEvidenceBoxLifetimes, .{});
+}
+
+fn primitiveKeyMemo(allocator: std.mem.Allocator) !void {
+    var nodes = [_]T.Node{ .{ .tag = .absent }, .{ .tag = .unit }, .{ .tag = .boolean }, .{ .tag = .u32 }, .{ .tag = .f32 }, .{ .tag = .never } };
+    var units = [_]core.Module{ metadataTestModule(1), metadataTestModule(2) };
+    for (&units) |*unit_| unit_.types = .{ .nodes = &nodes, .extra = &.{} };
+    var g: Generator = undefined;
+    g.allocator = allocator;
+    g.units = &units;
+    g.type_arguments = .empty;
+    defer g.type_arguments.deinit(allocator);
+    var work: @import("../work_counters.zig").Counters = .{};
+    g.emission_work = &work;
+    const first = [_]TypeArgument{.{ .unit = 1, .parameter = 6, .argument_unit = 1, .argument = T.u32_type }};
+    const second = [_]TypeArgument{.{ .unit = 2, .parameter = 7, .argument_unit = 2, .argument = T.f32_type }};
+    var old_work: usize = 4096;
+    var new_work: usize = old_work;
+    var old = selected_types.Builder.init(allocator, &old_work, .{ .hash_mask = 0 });
+    defer old.deinit();
+    var new = selected_types.Builder.init(allocator, &new_work, .{ .hash_mask = 0 });
+    defer new.deinit();
+    var expected: std.ArrayList(u32) = .empty;
+    defer expected.deinit(allocator);
+    var actual: std.ArrayList(u32) = .empty;
+    defer actual.deinit(allocator);
+    for ([_]?[]const TypeArgument{ null, &first, &second, &.{}, &first }) |environment| {
+        for (T.unit..T.never + 1) |primitive| {
+            const input: TypeRef = .{ .unit = 1 + @as(u32, @intCast(primitive % 2)), .ty = @intCast(primitive), .environment = environment };
+            const resolved = try g.resolveType(input, 0);
+            const reference: selected_types.Reference = .{ .unit = resolved.unit, .ty = resolved.ty, .environment = if (resolved.environment) |frame| @intFromPtr(frame.ptr) else 0, .environment_len = if (resolved.environment) |frame| frame.len else 0, .captured = resolved.environment != null };
+            const prior = (try old.enter(reference, 0)) orelse done: {
+                var descriptor: std.ArrayList(u32) = .empty;
+                defer descriptor.deinit(allocator);
+                try old.addWord(&descriptor, @backingInt(nodes[primitive].tag));
+                break :done try old.complete(reference, descriptor.items, 0);
+            };
+            try old.root(&expected, prior);
+            try new.root(&actual, try g.selectedTypeNode(&units[0], 0, input, &new, 0));
+        }
+    }
+    try old.finish(&expected);
+    try new.finish(&actual);
+    try std.testing.expectEqualSlices(u32, expected.items, actual.items);
+    try std.testing.expectEqual(@as(usize, 5), new.memo.count());
+    var tiny_work: usize = 1;
+    var tiny = selected_types.Builder.init(allocator, &tiny_work, .{});
+    defer tiny.deinit();
+    _ = try g.selectedTypeNode(&units[0], 0, .{ .unit = 1, .ty = T.u32_type }, &tiny, 128);
+    try std.testing.expectError(error.Limit, g.selectedTypeNode(&units[0], 0, .{ .unit = 2, .ty = T.u32_type }, &tiny, 128));
+    var depth_work: usize = 100;
+    var depth = selected_types.Builder.init(allocator, &depth_work, .{});
+    defer depth.deinit();
+    _ = try g.selectedTypeNode(&units[0], 0, .{ .unit = 1, .ty = T.u32_type }, &depth, 128);
+    try std.testing.expectError(error.Limit, g.selectedTypeNode(&units[0], 0, .{ .unit = 2, .ty = T.u32_type }, &depth, 129));
+}
+test "primitive key memo shares only encoded atoms across units captured frames and depth through OOM" {
+    try primitiveKeyMemo(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, primitiveKeyMemo, .{});
 }
