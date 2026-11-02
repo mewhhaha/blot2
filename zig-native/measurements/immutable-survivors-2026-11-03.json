@@ -1,0 +1,572 @@
+{
+  "date": "2026-11-03",
+  "scope": "Retain immutable Binding metadata for single-pattern-row statement-match arms; only a sole continuing arm publishes it. Explicit merges, multi-row and scalar-address carriers remain.",
+  "release_source_pin": {
+    "base": "6d853b5124bd691ffe30134c1ba0df84c8aeb1d2",
+    "patch_sha256": "e108f3d4ccef4693c645424a232357a854fa6c26f531a290d0282ec3c18d1fb1",
+    "files": {
+      "scripts/dev_check_areas.ts": "c300155fa675eb2623c3395cb225bc6ffd9c0d0519805e28f25388768c6baef8",
+      "zig-native/src/backend/scoped_backend.zig": "a45a496563fd1bb2703e7d13b639f492b398a707a9a1e1d94bf6b00a286b88bb",
+      "zig-native/src/backend/storage_calls_tests.zig": "e6ecf62b187bb5d69521b1bbb50d49f5b2a5de36a7e5be6af15e86c492b0632f",
+      "zig-native/src/work_counters.zig": "0f1d3e696a8c4392cba3f0e85ed3b6c6555904fb389a1b4a0b81698a4b44dff8",
+      "zig-native/src/backend/storage_immutable_survivor_tests.zig": "60120817a03b07da514e2636ea9d7110456640be7183bb7fe434a540c7ff37ba",
+      "zig-native/fixtures/immutable_survivor.blot": "5dd6d793ffa91e1193fe489221dc0fb3944618e725cc29b42a1906771fb1426b",
+      "zig-native/tests/immutable_survivor_execution.test.ts": "3c6101bb1bd74392d0cb5032ed44e4b4f8deaac7f50d5bdfd653a5c75b8225b6"
+    }
+  },
+  "production_source_unchanged_after_freeze": true,
+  "guest_test_followup": {
+    "path": "zig-native/tests/immutable_survivor_execution.test.ts",
+    "sha256": "ffcda9a09879d8f99dec3d9bf1f4c011dc9c80b27cedc76a2ef799989816ba84",
+    "note": "Test-only follow-up after release freeze combines the otherwise eligible match fixture with active scalar-address code, and executes all three exports under fallback. No compiler implementation or Blot fixture changed.",
+    "assertions": 120,
+    "tests": 2,
+    "log": "build/bench/private-prototypes/lazy-control-evidence/release-survivor-fallback.log"
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "development_llvm": false,
+    "native_test_optimize": "safe",
+    "native_test_llvm": false,
+    "release_optimize": "fast",
+    "release_llvm": true,
+    "abi": 8,
+    "session_protocol": 2,
+    "saved_schema": 26
+  },
+  "workload_heads": {
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d",
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07"
+  },
+  "main": {
+    "baseline": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/main-baseline-pair/main-217eed639d37970d/result.json",
+      "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+      "identity": "e99447c7ad66827267b6a71aee1bcad6c8594c60cccc895eb527474a627aa914",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 6125.991497,
+      "session_open_ms": 10.807118999999972,
+      "total_compile_ms": 6136.801682,
+      "wasm_bytes": 16677822,
+      "wasm_sha256": "3f3620adea0080bc94c058e83fd3e9ae9ef1ea5f63b5eab8a2f09635c4d21607",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "candidate": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/main-release/main-d80d7cdfd2750aac/result.json",
+      "compiler_sha256": "688f82d56f09ef15247bf975a1bb5d840ed316aee2322a83111a07933e13f789",
+      "identity": "470fc1dc9284139ac4c944b804eb126489fb863363a4afc3073c485d15155a46",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 5966.2090800000005,
+      "session_open_ms": 8.654005000000012,
+      "total_compile_ms": 5974.865079,
+      "wasm_bytes": 16392014,
+      "wasm_sha256": "93a1d482a092f6e1de1b767c5b6a85cac758a97a0893db88248e26061d99b253",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "configured_path": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/main-configured/main-46634dd01b5866af/result.json",
+      "compiler_sha256": "688f82d56f09ef15247bf975a1bb5d840ed316aee2322a83111a07933e13f789",
+      "identity": "470fc1dc9284139ac4c944b804eb126489fb863363a4afc3073c485d15155a46",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 5635.2558930000005,
+      "session_open_ms": 10.261832000000012,
+      "total_compile_ms": 5645.519569,
+      "wasm_bytes": 16392014,
+      "wasm_sha256": "93a1d482a092f6e1de1b767c5b6a85cac758a97a0893db88248e26061d99b253",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "bytes_removed": 285808,
+    "size_reduction_percent": 1.7137009856562857,
+    "timing_limit": "Individual cache-disabled completions under shared-host load; not a timing distribution. Both sub-five-second and subsecond targets remain unmet.",
+    "shared_binding_copies_avoided": 3488,
+    "counter_scope": "Counts eliminated binding copies, including arms later discarded; not only published survivors.",
+    "engine_validation": {
+      "valid": true,
+      "imports": 1,
+      "exports": 4
+    }
+  },
+  "profile": {
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/main-release-profile/main-4afdd84c4f8e309f/result.json",
+    "build_ms": 5678.738855,
+    "total_us": 5621330,
+    "peak_rss_kib": 1235820,
+    "phases": {
+      "other": {
+        "us": 15556,
+        "requested_bytes": 18090916,
+        "allocations": 652,
+        "rss_growth_kib": 720
+      },
+      "assets": {
+        "us": 22658,
+        "requested_bytes": 28714381,
+        "allocations": 517,
+        "rss_growth_kib": 3660
+      },
+      "inputs": {
+        "us": 445,
+        "requested_bytes": 206080,
+        "allocations": 444,
+        "rss_growth_kib": 0
+      },
+      "load": {
+        "us": 9880,
+        "requested_bytes": 10919780,
+        "allocations": 21056,
+        "rss_growth_kib": 2588
+      },
+      "lex": {
+        "us": 46057,
+        "requested_bytes": 28518784,
+        "allocations": 4750,
+        "rss_growth_kib": 13916
+      },
+      "parse": {
+        "us": 27752,
+        "requested_bytes": 43645564,
+        "allocations": 137698,
+        "rss_growth_kib": 3572
+      },
+      "check": {
+        "us": 511031,
+        "requested_bytes": 676080848,
+        "allocations": 1417424,
+        "rss_growth_kib": 189400
+      },
+      "lower": {
+        "us": 120884,
+        "requested_bytes": 161025716,
+        "allocations": 168173,
+        "rss_growth_kib": 61440
+      },
+      "freeze": {
+        "us": 54534,
+        "requested_bytes": 103608101,
+        "allocations": 346990,
+        "rss_growth_kib": 18548
+      },
+      "validation": {
+        "us": 101076,
+        "requested_bytes": 40018973,
+        "allocations": 40789,
+        "rss_growth_kib": 4452
+      },
+      "backend": {
+        "us": 4711453,
+        "requested_bytes": 4959385537,
+        "allocations": 3401420,
+        "rss_growth_kib": 935304
+      }
+    }
+  },
+  "byte_census": {
+    "wasm_bytes": 16392014,
+    "wasm_sha256": "93a1d482a092f6e1de1b767c5b6a85cac758a97a0893db88248e26061d99b253",
+    "functions": 8005,
+    "instruction_bytes": 15948245,
+    "instruction_count": 5994194,
+    "declared_locals": 454492,
+    "categories": [
+      {
+        "name": "locals",
+        "count": 3340095,
+        "bytes": 9313300
+      },
+      {
+        "name": "globals",
+        "count": 607328,
+        "bytes": 2100466
+      },
+      {
+        "name": "constants",
+        "count": 748667,
+        "bytes": 1727512
+      },
+      {
+        "name": "calls",
+        "count": 389511,
+        "bytes": 883923
+      },
+      {
+        "name": "loads",
+        "count": 264769,
+        "bytes": 831441
+      },
+      {
+        "name": "control",
+        "count": 382386,
+        "bytes": 568089
+      },
+      {
+        "name": "stores",
+        "count": 121074,
+        "bytes": 381588
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 139952,
+        "bytes": 140283
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643
+      }
+    ],
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 68686
+    }
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2872,
+      "selected_count": 67,
+      "completed_count": 67,
+      "elapsed_seconds": 31.232083140988834,
+      "exit_code": 0,
+      "statuses": {
+        "passed": 67,
+        "failed": 0,
+        "skipped": 0
+      },
+      "full_sweeps": 31,
+      "allocation_modes": [
+        "full"
+      ],
+      "leaks": 0,
+      "logged_errors": 0,
+      "failed": [],
+      "binary_sha256": "1b1d16cc700868d0f3f11dca04069d03a43e5f2e10b6a53df071aea0e2cf3df3",
+      "inventory_sha256": "3d84d92f033b83256745939dc0a22da019a4a1e30a5fc6679aebca2229f0513f",
+      "selection_sha256": "fbf5f32f1c686569166d36472322457fe027281260a27726f2c75342f57ef70d",
+      "log_sha256": "bdc021b7c1a270758bf87c10234071cb4a5e27d29449ea47d6ecedc50036ef07"
+    },
+    "native_source_evidence": "build/bench/private-prototypes/immutable-survivor-prototype/survivor-source-pin.json",
+    "guest_family": {
+      "tests": 94,
+      "passed": 94,
+      "release_compiler": true,
+      "log": "build/bench/private-prototypes/lazy-control-evidence/release-guests.log"
+    },
+    "broader": {
+      "passed": 187,
+      "failed": 15,
+      "known_baseline_failures": [
+        "finite nominal source proofs admit depth 10 width 1 (development)",
+        "finite nominal source proofs admit depth 10 width 1 (optimized)",
+        "finite nominal source proofs admit depth 10 width 8 (development)",
+        "finite nominal source proofs admit depth 10 width 8 (optimized)",
+        "finite nominal source proofs admit depth 6 width 1 (development)",
+        "finite nominal source proofs admit depth 6 width 1 (optimized)",
+        "finite nominal source proofs admit depth 6 width 8 (development)",
+        "finite nominal source proofs admit depth 6 width 8 (optimized)",
+        "finite nominal source proofs admit depth 8 width 1 (development)",
+        "finite nominal source proofs admit depth 8 width 1 (optimized)",
+        "finite nominal source proofs admit depth 8 width 8 (development)",
+        "finite nominal source proofs admit depth 8 width 8 (optimized)",
+        "principal inputs survive summary jobs drained inside the recorded region",
+        "wide field refinements use scoped binding indexes (development)",
+        "wide field refinements use scoped binding indexes (optimized)"
+      ],
+      "status": "Complete selected family executed after correcting two missing private runtime fixtures and using the configured import map for storage_surface. Same15 failure names as preceding release; not a full pass.",
+      "initial_missing_runtime_fixtures": 11,
+      "raw": [
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/survivor-broad.log",
+          "sha256": "0588a2465bf177dc0a444ef34082a6862c493b384b1711d3c30d7f2efe4806e9"
+        },
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/survivor-fixture-guests.log",
+          "sha256": "09ae6bbcf2eb84585a67ba18e3af44270e7559bca0182a10c2409d5884990d7f"
+        },
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/survivor-storage-surface-configured.log",
+          "sha256": "bd0f8a6225f6206064b36bcd7235318cfd98a5c2fd696cf38a13bded8210d56c"
+        }
+      ]
+    },
+    "required_full_gate": {
+      "passed": 48,
+      "failed": 1,
+      "baseline": true,
+      "phase": "smoke",
+      "diagnostic": "List/chunk storage_escape at312..345",
+      "log": "build/bench/private-prototypes/lazy-control-evidence/full-gate.log",
+      "status": "Attempted; full qualification remains pending."
+    },
+    "zig_lint": {
+      "findings": 0,
+      "log": "build/bench/private-prototypes/lazy-control-evidence/zig-lint.log"
+    },
+    "release_world": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-immutable-survivors-e108f3d4ccef/zig-native/zig-out/bin/blotc",
+      "buildMs": 1313.922135,
+      "wasmBytes": 654117,
+      "wasmSha256": "f7dd5660a6f14d4399e38623dc9a5606e7dfae158db43c875ed666f9448d2ac2",
+      "calls": [
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": false,
+          "runtimeMs": 75.52429400000005,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": true,
+          "runtimeMs": 24.342155000000048,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_hand": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-immutable-survivors-e108f3d4ccef/zig-native/zig-out/bin/blotc",
+      "buildMs": 1016.8512049999999,
+      "wasmBytes": 227033,
+      "wasmSha256": "aec4abb8b3203cc9e227cfe7fe97a8a049a63d19f07ccf401ae7f3e1c1264592",
+      "calls": [
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": false,
+          "runtimeMs": 39.26840599999991,
+          "row": [
+            160,
+            0
+          ]
+        },
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": true,
+          "runtimeMs": 18.74372900000003,
+          "row": [
+            160,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_renderer": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/release-kites/pair-7c60b415c6b8df60/result.json",
+      "status": "complete",
+      "pins": {
+        "compiler_sha256": "688f82d56f09ef15247bf975a1bb5d840ed316aee2322a83111a07933e13f789",
+        "baseline_compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    },
+    "release_pen": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/release-pen/result.json",
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "93a1d482a092f6e1de1b767c5b6a85cac758a97a0893db88248e26061d99b253",
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "success": false,
+      "status": "Installed host rejects ABI8 before rendering; no new frame/PNG qualified."
+    }
+  },
+  "held_tail_return_pilot": {
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/held.json",
+    "world_bytes_removed": 969,
+    "menu_bytes_removed": 110,
+    "decision": "Held: no material component improvement; narrow tail marker misses real returns within synthetic completion operands."
+  },
+  "copy_site_diagnostic": {
+    "evidence": "build/bench/private-prototypes/copy-site-probe/copy-site-evidence.json",
+    "note": "Diagnostic instrumentation is private; operation counts are attempted emission including rolled-back trials. Main runs are incomplete30-second prefixes, not full output or CPU decomposition.",
+    "coarse_checkpoint": 407440,
+    "call_site_overflow": 0,
+    "largest_coarse_sites": [
+      {
+        "label": "callee packed argument loads",
+        "instructions": 91254,
+        "locals": 30420
+      },
+      {
+        "label": "direct word argument pushes",
+        "instructions": 74971
+      },
+      {
+        "label": "match continuation binding assignments",
+        "instructions": 56446
+      },
+      {
+        "label": "caller packed result loads",
+        "instructions": 42765
+      },
+      {
+        "label": "Control.result assignments",
+        "instructions": 23780
+      },
+      {
+        "label": "caller packed argument stores",
+        "instructions": 23520
+      }
+    ]
+  },
+  "next_private_pilot": {
+    "status": "In progress, not landed.",
+    "boundary": "Demanded packed function input words from completed checked helper IR; retain full semantic Values and stable packet/result offsets.",
+    "why": "Source field footprints conservatively retain a whole argument when forwarded to a helper or captured by a closure. Finished helper IR can compose actual physical demands across checked calls."
+  },
+  "raw_evidence": [
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/host-load.json",
+      "sha256": "7e8b9fd57cb91d2d39d945688299ca03aaf475c5f7f62331a84ceb594888d99d"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-build.log",
+      "sha256": "5a8632a5ade57e1031fa1c8fc1b4d54f393ce257d6b4f3169b42435820284fc3"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/size-summary.json",
+      "sha256": "3b107179f25415c433b9ea833fefba498251372dde5a4f6062234284471dcfcc"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/held.json",
+      "sha256": "1282971bedd2a6ad49c73a78dacc3a5b4a7105137fdfbf5fe050c0b3ccccc686"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/survivor-guests.log",
+      "sha256": "b2e2831018fb35edbe1ece917ee423eb2b13d959d4931d4ce81032f7f38f15fa"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-guests.log",
+      "sha256": "3ca1b5a0a288d83757c67deb5ee0602b457a17b8bbcce122c8724448cfcb63b2"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-survivor-fallback.log",
+      "sha256": "aa4ed820897b09f64adf139988db59a0528aa188bc4315cad4ec7839c7b2f584"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/survivor-broad-result.json",
+      "sha256": "7385dd4b1a163553ac27448969ad0dc896d2a98f7247249e74b976ed602de4fb"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/full-gate.log",
+      "sha256": "52730c320dfef58537d846bd50cfaacb10655f45c8847bf7d148aac3a8753496"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/zig-lint.log",
+      "sha256": "b8466b8d95ad106892455f94b2df8f3e5058857a9b7afe506599bfeb4e3dc902"
+    },
+    {
+      "path": "build/bench/private-prototypes/immutable-survivor-prototype/survivor-source-pin.json",
+      "sha256": "cafcbe7f66c22b62bd4066b211d590efb8b58b8595974d7575d4b3ab902ae457"
+    },
+    {
+      "path": "build/bench/private-prototypes/immutable-survivor-prototype/survivor-native-full-result.json",
+      "sha256": "67741dc2e45da3b5bcd862bc2da50b6e72b2af44f5d178a923d5df8dd1962804"
+    },
+    {
+      "path": "build/bench/private-prototypes/copy-site-probe/copy-site-evidence.json",
+      "sha256": "29eb30215cd75841f1fb063c74f85922a7661e1c5982316ac4f66a21fc621d29"
+    },
+    {
+      "path": "build/bench/private-prototypes/copy-site-probe/copy-site-coarse.patch",
+      "sha256": "24dd5f4865c840820a9810433e147665726efdf21b07890f9300d5a16c2885d0"
+    },
+    {
+      "path": "build/bench/private-prototypes/copy-site-probe/evidence/main-coarse/copy-sites-summary.json",
+      "sha256": "ddc8d8e6fa0a8cbe3a32efc9e2450c9cd17093412dec00f506369dfe093a04a3"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-world/hand.json",
+      "sha256": "d2b1ea6f0c7ed47d4b9b685152faea322a24d0c0986c671e98b9c20614fbe94b"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-world/frame-edit-policy.json",
+      "sha256": "51010a4ef581df34324cebf8ee9f6923b9ff016d942c6e8dda9cc7e42b701277"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-kites/pair-7c60b415c6b8df60/result.json",
+      "sha256": "d4d2e1823ac6b12ebba5b6d82fc5f7a4e2e9804c354ca789a02499c088f62d47"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/release-pen/result.json",
+      "sha256": "cae54ab0572f2f4aef23bac1d843df68d2bc69da105c834a1357c83f619aa080"
+    }
+  ]
+}

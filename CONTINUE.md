@@ -14,15 +14,21 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest fresh actual main takes **5.56 seconds**, producing **16,677,822
-bytes of Wasm**, down from 21,576,480 bytes (22.7% smaller). The configured
-launcher takes **6.06s** with the identical compiler identity and whole-module
-hash. The preceding release took 5.91s explicitly and 6.06s through the
-launcher; these are individual completions, cache disabled, not a repeated
-timing distribution. The five-second and subsecond targets remain unmet. Exact
-source, toolchain, binary, workload and configured-launcher pins are in
-[the current evidence](zig-native/measurements/identity-joins-2026-11-02.json).
-Release source is `0d9ab244` plus patch `d14a168e9fb2`.
+The latest release produces **16,392,014 bytes of Wasm**, down from 16,677,822
+(285,808B / 1.7% smaller). A matched fresh pair takes **6.13s → 5.97s**; the
+configured launcher takes **5.64s** with identical compiler identity and full
+Wasm hash. These are individual cache-disabled completions under shared-host
+load, not a timing distribution. The five-second and subsecond targets remain
+unmet. Exact pins and qualification are in
+[the current evidence](zig-native/measurements/immutable-survivors-2026-11-03.json).
+Release source is `6d853b51` plus patch `e108f3d4ccef`.
+
+Statement-match arms with a single pattern row now retain immutable Binding
+metadata instead of copying every introduced value into a carrier. Only a sole
+continuing arm publishes it. Explicit SSA merges, multi-row arms and scalar
+addresses keep their existing paths. Main avoids 3,488 binding copies, including
+copies from arms whose bindings would later be discarded. No new value graph,
+instruction relocation or semantic proof cache was added.
 
 One completed named-function plan replaces the scalar/inline/Reader/writer probe
 cascade. Full source/type witnesses precede physical projection; plans retain
@@ -33,16 +39,15 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,870 native laws compile; all 62 affected laws pass full allocation faults
-(29 sweeps), 86 type/effect guests and two new guests (96 assertions) pass, and
-Zig lint is clean. The broader storage/static family has 187 passes and 15
-failures reproduced with the old compiler. The required full gate retains 48
-passes/one baseline List/chunk failure. The final LLVM compiler passes seven
-original world/editor checks, 160 hand checks in sync/JSPI, seven real-menu
-checks in both modes and all seven identical renderer streams. Installed Pen
-still rejects ABI 8 before rendering the new artifact; no new frame/PNG is
-qualified. The launcher selects the final release at
-`zig-native/zig-out/bin/blotc`.
+All 2,872 native laws compile; all 67 affected laws pass full allocation faults
+(31 sweeps), 94 guest tests pass with the final LLVM compiler, and Zig lint is
+clean. A strengthened fallback rerun executes 120 assertions, combining an
+otherwise eligible match with active scalar-address code. The broader family
+retains 187 passes and the same 15 failure names after generating two missing
+private runtime fixtures. The required full gate retains 48 passes/one baseline
+List/chunk failure. Final LLVM passes seven world/editor, 160 hand and seven
+identical renderer checks. Installed Pen still rejects ABI 8; no new frame/PNG
+is qualified. The configured launcher selects `zig-native/zig-out/bin/blotc`.
 
 The preceding size census found 16.31MB (75.6% of the module) in local/global
 instruction traffic. A tiny real-menu conditional copied roughly 10k unchanged
@@ -54,29 +59,37 @@ owner, read, type and variant checks remain. Mutable spill globals fall from
 full-game capture is 2,076,028B (1.98MiB), with different source/config/memory
 model. Exact duplicate bodies account for only 427kB. See
 [size diagnosis](zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json).
-The new artifact still spends 11.70MB (70.1%) on local/global traffic. Private
-branch masks add no benefit on the real menu: identical 148,196B output and
-20,292 avoided words. Complete type admission declines the intended synthetic
-partial joins; those positive laws fail, so the prototype is held. Explicitly
-narrowing two Gdev callback captures saves only 116,427B (0.7%) in main and is
-also held. See
-[follow-up probes](zig-native/measurements/control-result-probes-2026-11-02.json).
-No neutral or failed prototype was promoted.
+The current artifact still has 11.41MB of local/global instructions, 68,686
+mutable spill globals and 454,492 declared locals. Private field masks remain
+held after neutral real-menu results; explicit callback capture narrowing saved
+only 116kB. The direct-tail-return pilot saves 969B in World and 110B in menu,
+and remains held. Ordinary statement returns can sit inside a synthetic
+completion operand, beyond that narrow tail marker.
 
-The next structural slice replaces eager `Control.result` carriers for if/match
-and function returns with immutable, field-addressable values. Record creation,
-projection and updates remain metadata; only consumed scalar leaves acquire phi
-copies and locals at body completion. Keep ownership/effect checks independent
-and leave loops on their current path for the first pilot. Measure one traced
-large Access function before extending scope; the traffic census alone does not
-prove how much is removable. Replace temporary/snapshot/assignment routes rather
-than add another mask or proof cache.
+A bounded copy-site diagnostic counts actual emitted transfer operations, with
+argument pushes separate from copies and buffer traffic. World completes with
+identical baseline Wasm. Main prefixes stop at 30 seconds and include discarded
+planning trials; they are not full-output or CPU attribution. The exact coarse
+407,440-instruction prefix has 91,254 callee packed argument-load instructions,
+56,446 continuation assignments and 23,780 Control.result assignments. The
+per-source table saturates; the coarse call-site totals do not. Raw pins and
+limits are preserved in the current evidence. Do not repeat unchanged capped
+runs.
 
-A separate profile takes 5.65s: backend 4.71s, checking 0.48s, validation 0.10s.
-Backend traffic is 4.96GB/3.41M allocations. Plans emit 138,596 calls with zero
-post-plan type queries, but preparation/key construction still costs work. 2,107
-rolled-back trials discard 188,790 of 1,017,503 counted expressions; this is a
-work ratio, not a measured CPU share.
+The next private pilot makes packed function inputs lazy at the completed-plan
+boundary. Reserve logical input locals using the existing Value layout; inspect
+the fully checked helper IR after result serialization/cleanup; load only
+demanded input words at entry and omit their unused caller stores. Keep complete
+semantic arguments, owner/read/effect checks, evaluation order, packet offsets
+and result serialization. Direct-word calls remain unchanged. This composes
+physical demand through calls without another source-footprint cache. It is not
+implemented in the installed release. Remaining-use counts are not a
+dead-binding proof: the current traversal misses alternative-row multiplicity
+and some pattern/fallback reads.
+
+A separate new profile takes 5.68s: backend 4.71s, checking 0.51s, validation
+0.10s. Backend type/key preparation remains a major unresolved latency cost;
+static traffic proportions and rolled-back expression counts are not CPU shares.
 
 The reachable primitive benchmark compiles 50,025 lines in 16 modules in
 0.480–0.491s, plus 0.026s generation, producing 973,511B Wasm with all three

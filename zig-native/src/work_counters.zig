@@ -183,6 +183,7 @@ pub const Counters = struct {
     scoped_record_updates_shared: u64 = 0,
     scoped_indexed_update_roots_shared: u64 = 0,
     scoped_transport_words_avoided: u64 = 0,
+    scoped_immutable_survivor_bindings: u64 = 0,
     scoped_literal_record_projections: u64 = 0,
     scoped_literal_projection_fields_skipped: u64 = 0,
     scoped_literal_projection_preflight_nodes: u64 = 0,

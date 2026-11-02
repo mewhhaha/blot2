@@ -77,6 +77,14 @@ Indexed heap writes preserve descriptor identity. Changed fields, callbacks or
 capture roots retain ordinary transport, and assignment still checks types,
 owners, reads and variants. Equal shapes or scalar bits never prove identity.
 
+A statement-match arm with one pattern row may retain its introduced Binding
+metadata directly when the compilation has no scalar addresses, matching the
+existing `if` survivor rule. Only a sole continuing arm publishes those bindings.
+Explicit SSA merges remain independent; multi-row arms retain checked physical
+carriers. The rule does not use remaining-use counts as a dead-value proof:
+their current traversal is not complete for alternative rows, value patterns or
+refutable-binding fallbacks.
+
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
 ordered immutable unit context. Receipt allocation failure propagates before

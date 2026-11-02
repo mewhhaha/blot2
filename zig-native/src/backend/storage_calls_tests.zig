@@ -16,6 +16,7 @@ test {
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");
     _ = @import("storage_typed_closure_tests.zig");
+    _ = @import("storage_immutable_survivor_tests.zig");
 }
 
 const identity_join_small_source =

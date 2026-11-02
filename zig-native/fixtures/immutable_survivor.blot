@@ -1,0 +1,23 @@
+type Choice a is data = $Some a | $Nothing
+const capture = func (saved: U32) => return func (amount: U32): U32 => return @u32.add saved amount
+entry const single = func (input: U32): Array U32 => return do:
+  let rows: Array U32 = #[input]
+  let payload = {rows: rows, cold: {left: input, right: @u32.add input 1}, hook: capture input}
+  let selected = payload
+  let candidate = if @u32.eq input 0 then $Nothing else $Some input
+  if let $Some amount = candidate:
+    let alias = selected
+    selected.cold.left := amount
+    selected.rows[0] := @u32.add self 2
+    alias.rows[0] := @u32.add self 1
+  else:
+    return #[99]
+  return #[selected.rows[0], selected.cold.left, selected.hook 7]
+type Pick is data = $Left U32 | $Right U32 | $Empty
+entry const rowed = func (input: U32): Array U32 => return do:
+  let observations: GrowArray U32 = #[]
+  let candidate = if @u32.eq (@u32.rem input 2) 0 then $Left input else $Right input
+  case candidate of
+    $Left value | $Right value => @storage.push observations value
+    $Empty => ()
+  return @storage.freeze observations
