@@ -38,6 +38,14 @@ failure. The final LLVM compiler passes seven original world/editor checks,
 Pen still rejects ABI 8 before rendering the new artifact; no new frame/PNG is
 qualified. The launcher selects the final release at `zig-native/zig-out/bin/blotc`.
 
+The size census finds 16.31MB (75.6% of the module) in local/global instruction
+traffic, including 110,266 mutable spill globals. An older full-game capture is
+2,076,028B (1.98MiB), with different source/config/memory model. Exact duplicate
+bodies account for only 427kB. See [size diagnosis](zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json).
+The active size lever is avoiding whole-aggregate control-carrier materialization;
+private copy cleanup and field/match probes remain held without material World
+CPU gains. A targeted exact-identity join fix is being qualified separately.
+
 A separate profile takes 6.08s: backend 5.10s, checking 0.52s, validation 0.10s.
 Backend traffic is 5.26GB/3.42M allocations. Plans emit 138,596 calls with zero
 post-plan type queries, but preparation/key construction still costs work.

@@ -1,0 +1,622 @@
+{
+  "date": "2026-11-02",
+  "source_head": "dfca64f22f5eaa8912781ce1a01de7688b1ef003",
+  "current": {
+    "wasm_bytes": 21576480,
+    "wasm_sha256": "d8ec77bc757bd16a36c7b369622bac893eb98309139dba5b82a0942c04005edf",
+    "functions": 8058,
+    "instruction_bytes": 20924385,
+    "instruction_count": 7597794,
+    "declared_locals": 778621,
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 110266
+    },
+    "categories": [
+      {
+        "name": "locals",
+        "count": 4054706,
+        "bytes": 11436633
+      },
+      {
+        "name": "globals",
+        "count": 1454631,
+        "bytes": 4869901
+      },
+      {
+        "name": "constants",
+        "count": 790247,
+        "bytes": 1810672
+      },
+      {
+        "name": "calls",
+        "count": 389564,
+        "bytes": 884082
+      },
+      {
+        "name": "loads",
+        "count": 264769,
+        "bytes": 831441
+      },
+      {
+        "name": "control",
+        "count": 382439,
+        "bytes": 568142
+      },
+      {
+        "name": "stores",
+        "count": 121074,
+        "bytes": 381588
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 139952,
+        "bytes": 140283
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643
+      }
+    ],
+    "adjacent_patterns": [
+      {
+        "name": "global.get -> local.set",
+        "count": 781113,
+        "bytes": 4770992
+      },
+      {
+        "name": "local.get -> local.set",
+        "count": 394238,
+        "bytes": 2208214
+      },
+      {
+        "name": "i32.const 0 -> global.set",
+        "count": 119620,
+        "bytes": 700018
+      },
+      {
+        "name": "global.get -> global.set",
+        "count": 77366,
+        "bytes": 563078
+      },
+      {
+        "name": "local.get -> global.set",
+        "count": 43521,
+        "bytes": 292093
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": 1,
+      "offset": 8,
+      "payload_offset": 11,
+      "payload_bytes": 5849,
+      "bytes": 5852
+    },
+    {
+      "id": 2,
+      "offset": 5860,
+      "payload_offset": 5862,
+      "payload_bytes": 40,
+      "bytes": 42
+    },
+    {
+      "id": 3,
+      "offset": 5902,
+      "payload_offset": 5905,
+      "payload_bytes": 8060,
+      "bytes": 8063
+    },
+    {
+      "id": 5,
+      "offset": 13965,
+      "payload_offset": 13967,
+      "payload_bytes": 6,
+      "bytes": 8
+    },
+    {
+      "id": 6,
+      "offset": 13973,
+      "payload_offset": 13977,
+      "payload_bytes": 551379,
+      "bytes": 551383
+    },
+    {
+      "id": 7,
+      "offset": 565356,
+      "payload_offset": 565358,
+      "payload_bytes": 51,
+      "bytes": 53
+    },
+    {
+      "id": 10,
+      "offset": 565409,
+      "payload_offset": 565414,
+      "payload_bytes": 20960328,
+      "bytes": 20960333
+    },
+    {
+      "id": 11,
+      "offset": 21525742,
+      "payload_offset": 21525746,
+      "payload_bytes": 49684,
+      "bytes": 49688
+    },
+    {
+      "id": 0,
+      "offset": 21575430,
+      "payload_offset": 21575433,
+      "payload_bytes": 1024,
+      "bytes": 1027,
+      "name": "blot:collector-contract"
+    },
+    {
+      "id": 0,
+      "offset": 21576457,
+      "payload_offset": 21576459,
+      "payload_bytes": 21,
+      "bytes": 23,
+      "name": "blot:abi"
+    }
+  ],
+  "exact_duplicate_ceiling": {
+    "groups": 521,
+    "redundant_bodies": 4032,
+    "redundant_body_bytes": 427072
+  },
+  "copy_instruction_module_percent": 75.57550629203651,
+  "top_global_traffic_bodies": [
+    {
+      "index": 26,
+      "body_bytes": 1203255,
+      "local_count": 11947,
+      "categories": {
+        "constants": 286957,
+        "globals": 480684,
+        "calls": 35331,
+        "arithmetic_simd": 4372,
+        "control": 17526,
+        "locals": 335253,
+        "memory_table_reference": 624,
+        "stores": 14626,
+        "loads": 27868
+      },
+      "global_get_count": 15419,
+      "global_set_count": 113576,
+      "adjacent_patterns": [
+        {
+          "name": "i32.const 0 -> global.set",
+          "count": 110754,
+          "bytes": 647626
+        },
+        {
+          "name": "local.get -> local.set",
+          "count": 9000,
+          "bytes": 54000
+        },
+        {
+          "name": "global.get -> local.set",
+          "count": 1769,
+          "bytes": 9746
+        },
+        {
+          "name": "global.get -> global.set",
+          "count": 741,
+          "bytes": 4265
+        },
+        {
+          "name": "local.get -> global.set",
+          "count": 231,
+          "bytes": 1509
+        }
+      ]
+    },
+    {
+      "index": 2614,
+      "body_bytes": 221804,
+      "local_count": 5044,
+      "categories": {
+        "constants": 222,
+        "calls": 99,
+        "locals": 60792,
+        "control": 116,
+        "globals": 160356,
+        "loads": 120,
+        "arithmetic_simd": 26,
+        "stores": 69
+      },
+      "global_get_count": 30089,
+      "global_set_count": 10001,
+      "adjacent_patterns": [
+        {
+          "name": "global.get -> local.set",
+          "count": 20007,
+          "bytes": 139848
+        },
+        {
+          "name": "global.get -> global.set",
+          "count": 10000,
+          "bytes": 80000
+        },
+        {
+          "name": "local.get -> local.set",
+          "count": 13,
+          "bytes": 68
+        },
+        {
+          "name": "i32.const 0 -> global.set",
+          "count": 1,
+          "bytes": 6
+        }
+      ]
+    },
+    {
+      "index": 2548,
+      "body_bytes": 196736,
+      "local_count": 5044,
+      "categories": {
+        "constants": 222,
+        "calls": 99,
+        "locals": 60792,
+        "control": 116,
+        "globals": 135288,
+        "loads": 120,
+        "arithmetic_simd": 26,
+        "stores": 69
+      },
+      "global_get_count": 30089,
+      "global_set_count": 10001,
+      "adjacent_patterns": [
+        {
+          "name": "global.get -> local.set",
+          "count": 20007,
+          "bytes": 124848
+        },
+        {
+          "name": "global.get -> global.set",
+          "count": 10000,
+          "bytes": 70000
+        },
+        {
+          "name": "local.get -> local.set",
+          "count": 13,
+          "bytes": 68
+        },
+        {
+          "name": "i32.const 0 -> global.set",
+          "count": 1,
+          "bytes": 6
+        }
+      ]
+    },
+    {
+      "index": 2600,
+      "body_bytes": 196736,
+      "local_count": 5044,
+      "categories": {
+        "constants": 222,
+        "calls": 99,
+        "locals": 60792,
+        "control": 116,
+        "globals": 135288,
+        "loads": 120,
+        "arithmetic_simd": 26,
+        "stores": 69
+      },
+      "global_get_count": 30089,
+      "global_set_count": 10001,
+      "adjacent_patterns": [
+        {
+          "name": "global.get -> local.set",
+          "count": 20007,
+          "bytes": 124848
+        },
+        {
+          "name": "global.get -> global.set",
+          "count": 10000,
+          "bytes": 70000
+        },
+        {
+          "name": "local.get -> local.set",
+          "count": 13,
+          "bytes": 68
+        },
+        {
+          "name": "i32.const 0 -> global.set",
+          "count": 1,
+          "bytes": 6
+        }
+      ]
+    }
+  ],
+  "historical": {
+    "evidence": "build/bench/current-gdev-20261018T101948Z/summary.json",
+    "compiler_build": {
+      "source_release_sha256": "5b58c87b1cf46e3e8957f8354d32e2a0f03a4706e80fa5a8300c4797df894121",
+      "packaged_sha256": "3b8fc58edb91cb7e79bcc864711134028f94091865a3e695e301a066d145b0d9",
+      "identical": false,
+      "zig": "0.17.0",
+      "optimization": "fast",
+      "backend": "LLVM",
+      "build_elapsed_report": "5m",
+      "build_peak_rss_report": "4G",
+      "command": "TMPDIR=/var/tmp deno task build:compiler --fixtures= --jobs=2"
+    },
+    "workload": "game",
+    "wasm_bytes": 2076028,
+    "wasm_sha256": "bc6a86fe51d4af82ff2e34dee4660c976a499c3437cbd4c8df4efccdad6a1afa",
+    "source_bytes": 1265243,
+    "successful_fresh_runs": 3,
+    "compiler_commit": "67f10684d09717f5f14a87c8c81a26ee85d963a0",
+    "source_pins": "build/bench/current-gdev-20261018T101948Z/input-pins.json",
+    "comparison": "Genuine full-game 1.98MiB predecessor. Entry/source/config/memory model differ; not a controlled compiler-only regression comparison."
+  },
+  "validation": {
+    "wasm_engine_validate": true,
+    "independent_decode_checks": 8,
+    "malformed_encoding_rejections": 4,
+    "exact_body_accounting": true
+  },
+  "analysis": {
+    "script": "scripts/bench/wasm_size.py",
+    "script_sha256": "625687c7f59d4d0af9e899a576d9508a134ad5264696c9fa48f0d145124825c8",
+    "summary": "build/bench/wasm-size-current/summary.json",
+    "summary_sha256": "da5b63d16abcae3a6777d0900e50ec351835391c7c7631c40d5e5aa8e161bd9e",
+    "interpretation": "Static byte accounting, not removable-byte or CPU savings. Adjacent patterns can overlap; exact duplicate body ceiling excludes index remapping."
+  },
+  "attribution": {
+    "evidence": "build/bench/private-prototypes/size-origin-probe/origin.log",
+    "diagnostic": "Private noLLVM Source sidecar only; one 30s run timed out after function prefix6022, no completed instrumented artifact. No repeat.",
+    "source": "gdev/src/ui/menu.blot close/press",
+    "detail": "Outlined helper count equals Wasm function index here: new zero-based index=count-1 and exactly1 imported function. Stable captured helpers2548/2600/2614 trace to menu.close; current artifact IDs retain separate successful-build authority.",
+    "hypothesis": "Whole-access branch copies despite exact SSA identity because fixedCarry rejects embedded static callbacks."
+  },
+  "held_probes": [
+    {
+      "name": "Avoid match-input snapshots under no scalar refs",
+      "evidence": "build/bench/private-prototypes/match-value-prototype/world-pair/result.json",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "3b778bafe8c21538ce8dcf4d9ae96e281cfdb9a333ca848b240b4ecd70c5d84b",
+          "wasm_bytes": 659365,
+          "backend": {
+            "us": 2106539,
+            "requested_bytes": 282971970,
+            "allocations": 144321,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "c6b16093732468c3ea865c395dcf805b547f201a95434fc6219b62e67af3edc1",
+          "wasm_bytes": 649872,
+          "backend": {
+            "us": 2172972,
+            "requested_bytes": 271939949,
+            "allocations": 144288,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "decision": "Held: no material World CPU gain; no production compiler changes."
+    },
+    {
+      "name": "Raw local-copy forwarding before bank legalization",
+      "evidence": "build/bench/private-prototypes/copy-transport-prototype/world-pair/result.json",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "3b778bafe8c21538ce8dcf4d9ae96e281cfdb9a333ca848b240b4ecd70c5d84b",
+          "wasm_bytes": 659365,
+          "backend": {
+            "us": 2220541,
+            "requested_bytes": 282971970,
+            "allocations": 144321,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "19ea8a759631a9de631a993542fecf689b93b250b4f4539969c4e0160bc0897d",
+          "wasm_bytes": 636173,
+          "backend": {
+            "us": 2217513,
+            "requested_bytes": 287498681,
+            "allocations": 146858,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "decision": "Held: no material World CPU gain; no production compiler changes."
+    },
+    {
+      "name": "Share descriptor-bearing field-only updates",
+      "evidence": "build/bench/private-prototypes/field-update-prototype/world-pair/result.json",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "3b778bafe8c21538ce8dcf4d9ae96e281cfdb9a333ca848b240b4ecd70c5d84b",
+          "wasm_bytes": 659365,
+          "backend": {
+            "us": 2105616,
+            "requested_bytes": 282478138,
+            "allocations": 144320,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "3c71ef792c7df311c3cc130d66605068921c6022bcc6ca9ba7b673fd814932ad",
+          "wasm_bytes": 649275,
+          "backend": {
+            "us": 2148305,
+            "requested_bytes": 270717709,
+            "allocations": 144056,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "decision": "Held: no material World CPU gain; no production compiler changes."
+    },
+    {
+      "name": "Per-field loop carry paths",
+      "evidence": "build/bench/private-prototypes/field-carrier-prototype/world-pair/result.json",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "3b778bafe8c21538ce8dcf4d9ae96e281cfdb9a333ca848b240b4ecd70c5d84b",
+          "wasm_bytes": 659365,
+          "backend": {
+            "us": 2278308,
+            "requested_bytes": 282971970,
+            "allocations": 144321,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "0e170faf4c2c7a93ef8f1a4855c8f93fe626ad3d218cd16caf273e4984e9a878",
+          "wasm_bytes": 659365,
+          "backend": {
+            "us": 2271903,
+            "requested_bytes": 282962844,
+            "allocations": 144321,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ],
+      "decision": "Held: no material World CPU gain; no production compiler changes."
+    }
+  ]
+}
