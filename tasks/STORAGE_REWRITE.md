@@ -3,7 +3,7 @@
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
 [Actual full main](../zig-native/measurements/gdev-after-literal-constants-2026-11-02.json)
-now completes in **9.23 seconds total**, producing **24.12 MB Wasm**, cache
+now completes in **about 9.3 seconds total**, producing **24.12 MB Wasm**, cache
 disabled. The preceding checkpoint took 9.87 seconds/29.00MB. The checked
 [literal data/projection batch](../zig-native/measurements/literal-data-and-record-projection-2026-11-02.json)
 compiles 2,853 native laws, passes 101 full-fault laws, 76 guests, seven

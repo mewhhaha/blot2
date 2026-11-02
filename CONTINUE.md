@@ -53,10 +53,11 @@ does not qualify a full game frame. See
 and the preceding
 [local encoding evidence](zig-native/measurements/local-declaration-groups-2026-11-02.json).
 
-The launcher selects `zig-native/zig-out/bin/blotc`. Install the exact new
-optimized snapshot and verify the configured path before claiming delivery. Keep
-token/epoch, alias, initialization, freeze, ordering, lifetime and escape checks
-strict. Physical optimizations retain complete source/type evidence.
+The launcher selects the exact new optimized binary at
+`zig-native/zig-out/bin/blotc`. A fresh configured-path build verifies its
+compiler identity and identical complete Wasm hash. Keep token/epoch, alias,
+initialization, freeze, ordering, lifetime and escape checks strict. Physical
+optimizations retain complete source/type evidence.
 
 Earlier checked requirements and exact candidates remain in
 [callback bundles](zig-native/measurements/nominal-callback-bundles-2026-11-02.json),

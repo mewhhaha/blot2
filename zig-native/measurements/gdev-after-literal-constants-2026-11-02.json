@@ -33,7 +33,8 @@
       "zig-native/tests/scoped_literal_data_execution.test.ts": "52ccc90f2bf6bc7e68a302a772c2886dae59bf257aa65df857cc83b1c062f04d",
       "zig-native/tests/storage_literal_projection_execution.test.ts": "24898229294e6cd8fb1862b2660b1464a34f0fbd2348c1e9a422921b1aeced9f"
     },
-    "frozen_manifest": "build/bench/frozen-literal-batch-68e6574553da/source-manifest.json"
+    "frozen_manifest": "build/bench/frozen-literal-batch-68e6574553da/source-manifest.json",
+    "landed_commit": "d904ddcce6c193cb1572809b1fac0ceed35ed76a"
   },
   "toolchain": "Zig 0.17.0 Fast/LLVM baseline CPU",
   "workload": {
@@ -299,5 +300,22 @@
     "total_change_percent": -6.483573948571419,
     "wasm_change_percent": -16.828848198727453,
     "five_second_gate": "unmet"
-  }
+  },
+  "configured_path": {
+    "evidence": "/home/jacobt/src/blot2/build/bench/gdev-literal-batch-configured-path/main-86426cb57401e873",
+    "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+    "compilerSha256": "51ad85519b0614f42ed407db4c3a29657b8f04b5295aeb93cd042ac245857981",
+    "identity": "92447d437aab496ff8adb8cd12484d22bd3062074c9b8d49122f5c562c41b882",
+    "success": true,
+    "totalCompileMs": 9299.092043,
+    "buildMs": 9288.471798,
+    "sessionOpenMs": 10.618291999999997,
+    "wasmBytes": 24116654,
+    "wasm_sha256": "35d41fcf7980b15204b56050d2d22155fc253eb86a31de95a130eae5e40c7469"
+  },
+  "quiet_fresh_completions_ms": [
+    9226.924114,
+    9299.092043
+  ],
+  "interpretation": "About 9.3 seconds total from two quiet fresh completions. The earlier 9.71s run observed other-project CPU load. No broad latency distribution or sub-five-second result."
 }

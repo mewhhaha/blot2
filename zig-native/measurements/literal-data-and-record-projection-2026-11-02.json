@@ -15,7 +15,8 @@
       "zig-native/tests/scoped_literal_data_execution.test.ts": "52ccc90f2bf6bc7e68a302a772c2886dae59bf257aa65df857cc83b1c062f04d",
       "zig-native/tests/storage_literal_projection_execution.test.ts": "24898229294e6cd8fb1862b2660b1464a34f0fbd2348c1e9a422921b1aeced9f"
     },
-    "frozen_manifest": "build/bench/frozen-literal-batch-68e6574553da/source-manifest.json"
+    "frozen_manifest": "build/bench/frozen-literal-batch-68e6574553da/source-manifest.json",
+    "landed_commit": "d904ddcce6c193cb1572809b1fac0ceed35ed76a"
   },
   "changes": [
     "Fresh intrinsic scalar literal arrays retain normal owner creation and copy immutable bytes from a data segment beyond all owner/transport regions. Exact literal global initializers use ordinary checked invocation without the destination-helper detour.",
@@ -225,5 +226,6 @@
     }
   },
   "release_actual_main": "gdev-after-literal-constants-2026-11-02.json",
-  "status": "Central development and selected exhaustive faults pass; optimized actual main accepts existing limits. Full qualification and fresh game frame remain pending."
+  "status": "Central development and selected exhaustive faults pass; optimized actual main accepts existing limits. Full qualification and fresh game frame remain pending.",
+  "delivery": "Optimized binary installed at the configured zig-native/zig-out/bin/blotc path; fresh delivery-path check matches compiler identity and complete Wasm SHA-256."
 }
