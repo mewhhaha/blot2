@@ -7,36 +7,42 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest fresh actual main takes **about 8.9 seconds total**, producing
-**22,375,878 bytes of Wasm**, cache disabled. Frozen-path and configured-path
-completions take 8.94s and 8.87s; the preceding release took 9.19s/22.38MB.
-These are individual completions, not distributions. The five-second gate
-remains unmet. Exact source, workload and binary hashes are pinned in
-[latest full-main evidence](zig-native/measurements/gdev-after-inline-memo-2026-11-02.json).
-The snapshot is `c669999b` plus patch `a4c2646528d1`. Gdev/Ink source and ABI
-contracts are unchanged, and the complete Wasm hash matches the predecessor.
+The latest fresh actual main takes **about 8.3 seconds total**, producing
+**22,346,701 bytes of Wasm**, cache disabled. Frozen/configured completions take
+8.36s/8.30s; the preceding structural-access release took 8.87s/22.38MB. These
+are individual completions, not distributions. The five-second gate remains
+unmet. Exact compiler and sibling source patches/hashes are pinned in
+[latest main evidence](zig-native/measurements/gdev-after-nominal-frame-2026-11-02.json).
+Compiler snapshot is `b8182c33` plus patch `f3309955c887`.
 
-Five exact primitive type-key references now use fixed memo slots. Arbitrary
-descriptor contents, captured/environment distinctions, collisions, cycle/depth
-checks and per-entry budget charges remain. A separate profile puts 7.92s in
-the backend, requesting 7.27GB through 5.93M allocations, down from
-8.12s/7.58GB/6.40M. All 2,860 native laws compile; 109 selected laws pass
-exhaustive faults, 82 guests pass and Zig lint is clean. The final optimized
-release passes seven world/editor checks in sync/JSPI. See
-[primitive memo evidence](zig-native/measurements/primitive-inline-memo-2026-11-02.json).
+Gdev FrameAccess is now fixed zero-argument single-constructor data. The compiler
+keeps its wrapper/full source/type witnesses while passing only payload fields
+proved observable by the complete existing footprint. Getter, missing-field,
+whole-use and rich nominal cases retain full fallback. Hand transactions keep
+the same resource scopes and generic consumer; ordered same-type field updates
+replace their structural merge. A nominal-only source control lost most field
+slicing and took 11.29s; the combined design restores that slicing.
 
-The launcher selects the exact new release; its fresh configured-path build
-verifies compiler identity and identical complete Wasm bytes. The existing
-engine-bound test still admits 49,999 locals plus one parameter and rejects
-50,000 locals plus that parameter; its obsolete ungrouped byte-size assertion
-is replaced with an artifact-header check.
+A separate profile puts 7.41s in the backend, requesting 6.17GB through 5.74M
+allocations, versus 7.92s/7.27GB/5.93M before. All 2,863 native laws compile;
+112 selected laws pass exhaustive faults, 84 guests pass and Zig lint is clean.
+The final optimized release passes seven original world/editor checks and 160
+new hand isolation/commit checks in sync and JSPI. See
+[batch evidence](zig-native/measurements/nominal-frame-and-payload-slicing-2026-11-02.json).
+Original elements_game retains its three assertions but hits the same baseline
+emit-layout gap under both source forms; the new witness does not replace it.
 
-The next private experiment caches immutable closed-type descriptor recipes and
-replays them into the existing key Builder. It keeps original key bytes and
-bounds while avoiding repeated Core/environment traversal. A measured callsite
-BodyInstance layer is held: exact repeats cover little preparation work.
-Early scalar-key skipping and paged outliner facts are also held after neutral
-or worse CPU pairs. Do not copy those patches into production.
+The launcher selects the exact release and a fresh configured-path run verifies
+its identity and identical complete Wasm hash. The tracked native frame runner
+loads that artifact without recompiling, but installed Pen rejects ABI 8 before
+rendering; no new frame/PNG is qualified. Its config parser/generator are also
+older than the checkpointed inputs. Preserve generated bindings.
+
+Closed-fragment replay, early scalar-key skipping and paged outliner facts are
+held after neutral or worse CPU pairs. The callsite BodyInstance cache also
+stays held after low measured preparation coverage. A later typed-body/type-node
+representation must remove repeated resolution and Builder work rather than
+wrap it in another cache; its design remains unimplemented.
 
 ## Latest checked transport batch
 
@@ -263,7 +269,7 @@ settle. Keep large outputs ignored and commit concise portable evidence.
   remain invocation-local; copy retained history and host/worker packets.
   Preserve callback effects and explicit checkpoint/restore. Renderer rejection
   is not rollback. Language tasks are retired; copied-packet workers remain.
-- Gdev FrameAccess has 165 fields and four explicitly pure storage callbacks.
+- Gdev nominal FrameAccess has 165 fields and the concrete pure hooks bundle.
   Preserve exact generic field types and real latent callback effects.
 
 Continuously commit coherent checked batches to each `main` and verify remote

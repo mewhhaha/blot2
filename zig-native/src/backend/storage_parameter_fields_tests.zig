@@ -228,29 +228,29 @@ fn collectorLaw(allocator: std.mem.Allocator) !void {
     m.closures = &closures;
     var updates = [_]core.UpdateInfo{.{ .root = 2, .path = .{}, .value = 3, .self_binding = 80 }};
     m.updates = &updates;
-    var selected = try fields.collect(allocator, &m, 4, 42);
+    var selected = try fields.collect(allocator, &m, 4, 42, null);
     defer selected.deinit(allocator);
     try std.testing.expect(!selected.whole);
     try std.testing.expectEqualSlices(u32, &.{ 101, 102 }, selected.names.items);
     // Whole return, capture, rooted update and whole forwarding all decline.
     for ([_]u32{ 5, 6, 7, 8, 10, 11, 17, 18, 19 }) |root| {
-        var whole = try fields.collect(allocator, &m, root, 42);
+        var whole = try fields.collect(allocator, &m, root, 42, null);
         defer whole.deinit(allocator);
         try std.testing.expect(whole.whole);
     }
     for ([_]u32{ 15, 16 }, [_]u32{ 101, 102 }) |root, expected| {
-        var plain_pattern = try fields.collect(allocator, &m, root, 42);
+        var plain_pattern = try fields.collect(allocator, &m, root, 42, null);
         defer plain_pattern.deinit(allocator);
         try std.testing.expect(!plain_pattern.whole);
         try std.testing.expectEqualSlices(u32, &.{expected}, plain_pattern.names.items);
     }
-    var selected_callback = try fields.collect(allocator, &m, 9, 42);
+    var selected_callback = try fields.collect(allocator, &m, 9, 42, null);
     defer selected_callback.deinit(allocator);
     try std.testing.expectEqualSlices(u32, &.{103}, selected_callback.names.items);
-    var nested = try fields.collect(allocator, &m, 12, 42);
+    var nested = try fields.collect(allocator, &m, 12, 42, null);
     defer nested.deinit(allocator);
     try std.testing.expectEqualSlices(u32, &.{101}, nested.names.items);
-    var foreign = try fields.collect(allocator, &m, 14, 42);
+    var foreign = try fields.collect(allocator, &m, 14, 42, null);
     defer foreign.deinit(allocator);
     try std.testing.expect(!foreign.whole);
     try std.testing.expectEqual(@as(usize, 0), foreign.names.items.len);
@@ -262,7 +262,7 @@ fn collectorLaw(allocator: std.mem.Allocator) !void {
     m.projection_variants = &projection_variants;
     projections[0].source_type = 1;
     projections[0].variants = .{ .start = 0, .len = 1 };
-    var checked_record = try fields.collect(allocator, &m, 2, 42);
+    var checked_record = try fields.collect(allocator, &m, 2, 42, null);
     defer checked_record.deinit(allocator);
     try std.testing.expect(!checked_record.whole);
     try std.testing.expectEqualSlices(u32, &.{101}, checked_record.names.items);
@@ -274,7 +274,7 @@ fn collectorLaw(allocator: std.mem.Allocator) !void {
     declined[4].variants = .{ .start = 2, .len = 1 };
     for (declined) |projection| {
         projections[0] = projection;
-        var whole = try fields.collect(allocator, &m, 2, 42);
+        var whole = try fields.collect(allocator, &m, 2, 42, null);
         defer whole.deinit(allocator);
         try std.testing.expect(whole.whole);
     }
@@ -328,4 +328,91 @@ test "prepared reader arguments preserve descriptor ordinals through swapped and
     defer module.deinit(a);
     try publishPreparedReaders(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPreparedReaders, .{@as([]const core.Module, &.{module})});
+}
+
+const nominal_access =
+    \\type Access is data = $Access {editor: Ref U32, editor_clips: Ref U32, tick: U32 -> U32 ! {}, draw: U32 -> U32 ! {}, save: U32 -> U32 ! {}, close: U32 -> U32 ! {}}
+;
+const nominal_owners =
+    \\entry const answer = func (input: U32): U32 => return do:
+    \\  let first: Array U32 = #[input]
+    \\  let second: Array U32 = #[10]
+    \\  let left = $Access {editor: @storage.at first 0, editor_clips: @storage.at second 0, tick: make_callback {value: input}, draw: make_callback {value: 3}, save: make_callback {value: 5}, close: make_callback {value: 7}}
+    \\  let right = $Access {editor: @storage.at second 0, editor_clips: @storage.at first 0, tick: make_callback {value: 11}, draw: make_callback {value: 13}, save: make_callback {value: 17}, close: make_callback {value: 19}}
+    \\  return @u32.add (read_state left) (read_state right)
+;
+fn publishNominal(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    if (result.diagnostic) |diagnostic| std.debug.print("nominal projection backend: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_owner_graph_definitions);
+    try std.testing.expect(result.counters.scoped_owner_graph_hits >= 1);
+    try std.testing.expect(result.counters.scoped_projected_parameter_fields >= 8);
+}
+test "projected nominal record parameters retain wrappers and share generic data fields through OOM" {
+    var module = try lower(nominal_access ++ "\n" ++ callback ++
+        \\const read_state = func access => return do:
+        \\  let editor: Ref U32 = access.editor
+        \\  let clips: Ref U32 = access.editor_clips
+        \\  return @u32.add (@storage.load editor) (@storage.load clips)
+        \\
+    ++ nominal_owners);
+    defer module.deinit(a);
+    try publishNominal(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishNominal, .{@as([]const core.Module, &.{module})});
+}
+test "projected nominal record parameters prove direct constructor field catalogs through OOM" {
+    var module = try lower(nominal_access ++ "\n" ++ callback ++
+        \\const read_state = func (access: Access): U32 => return @u32.add (@storage.load access.editor) (@storage.load access.editor_clips)
+        \\
+    ++ nominal_owners);
+    defer module.deinit(a);
+    try publishNominal(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishNominal, .{@as([]const core.Module, &.{module})});
+}
+
+test "projected nominal field footprints reject wrong identities tags ordinals and rich declarations" {
+    var module = try lower(nominal_access ++ "\n" ++ callback ++
+        \\const read_state = func (access: Access): U32 => return @storage.load access.editor
+        \\
+    ++ nominal_owners);
+    defer module.deinit(a);
+    const body = for (module.bodies) |*candidate| {
+        if (std.mem.eql(u8, module.name(candidate.declaration_name), "read_state")) break candidate;
+    } else return error.TestUnexpectedResult;
+    const parameter = module.bodyParameters(body)[0];
+    var policy_work: usize = 100_000;
+    const policy = fields.nominalRecord(&module, parameter.ty, &policy_work).?;
+    const index = for (module.nodes) |node| {
+        if (node.tag == .project and module.projection(node.b).nominal.decl != 0) break node.b;
+    } else return error.TestUnexpectedResult;
+    const original = module.projections[index];
+    const variant_index = original.variants.start;
+    const variant = module.projection_variants[variant_index];
+    try std.testing.expect(policy.projection(&module, index, &policy_work));
+    module.projections[index].nominal.decl +|= 1;
+    try std.testing.expect(!policy.projection(&module, index, &policy_work));
+    module.projections[index] = original;
+    module.projection_variants[variant_index].tag +|= 1;
+    try std.testing.expect(!policy.projection(&module, index, &policy_work));
+    module.projection_variants[variant_index] = variant;
+    module.projection_variants[variant_index].field = std.math.maxInt(u32);
+    try std.testing.expect(!policy.projection(&module, index, &policy_work));
+    module.projection_variants[variant_index] = variant;
+    const nominal_index = for (module.nominals, 0..) |declaration, ordinal| {
+        if (std.meta.eql(declaration.identity, policy.identity)) break ordinal;
+    } else return error.TestUnexpectedResult;
+    for ([_]u8{ 0, 1, 2, 3, 4 }) |flag| {
+        const declaration = module.nominals[nominal_index];
+        defer module.nominals[nominal_index] = declaration;
+        switch (flag) {
+            0 => module.nominals[nominal_index].is_opaque = true,
+            1 => module.nominals[nominal_index].affine = true,
+            2 => module.nominals[nominal_index].parameters.len = 1,
+            3 => module.nominals[nominal_index].variables.len = 1,
+            else => module.nominals[nominal_index].has_usage = true,
+        }
+        try std.testing.expect(fields.nominalRecord(&module, parameter.ty, &policy_work) == null);
+    }
 }

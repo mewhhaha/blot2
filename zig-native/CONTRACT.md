@@ -156,6 +156,9 @@ word into fresh locals. Other shapes retain caller-owned scratch. Physical
 argument projection follows complete original source/type checking, uses one
 consistent descriptor ordinal space, and never narrows Reader history or formal
 type admission. Expanded fallback always binds the original arguments.
+Zero-argument, nonopaque single-constructor data may narrow its named-record
+payload under the same complete footprint. The nominal wrapper and full semantic
+witness remain intact; getters and whole-value uses retain the full argument.
 
 Normalization work counters record recursive entries and inclusive node growth
 under import, substitution, resolution and covariance operations. Nested counts

@@ -14,8 +14,7 @@ pub const Fields = struct {
     }
 };
 
-// Checked anonymous record projections retain one tag-zero catalog entry;
-// nominal/ADT entries do not describe a field that can be removed by name.
+// Checked anonymous record projections retain one tag-zero catalog entry.
 pub fn namedRecordProjection(module: *const core.Module, index: u32) bool {
     const projection = module.projection(index);
     if (projection.nominal.unit != 0 or projection.nominal.decl != 0 or projection.variants.len != 1) return false;
@@ -25,8 +24,50 @@ pub fn namedRecordProjection(module: *const core.Module, index: u32) bool {
     return variant.tag == 0 and variant.field < record.b and module.types.recordField(record, variant.field).name == projection.field;
 }
 
-pub fn collect(allocator: A, module: *const core.Module, root: core.Id, parameter: core.BindingId) A.Error!Fields {
-    var walk: Walk = .{ .allocator = allocator, .module = module, .parameter = parameter };
+pub const NominalRecord = struct {
+    identity: @import("../check/types.zig").NominalIdentity,
+    tag: u32,
+
+    // Catalog eligibility only; actual payload names are checked before
+    // publishing the projected parameter marker.
+    pub fn projection(self: NominalRecord, module: *const core.Module, index: u32, remaining: *usize) bool {
+        const selected = module.projection(index);
+        const name = module.fieldSpelling(selected.field) orelse return false;
+        const variants = module.projectionVariants(index);
+        if (variants.len == 0) return selected.nominal.unit == 0 and selected.nominal.decl == 0;
+        if (!std.meta.eql(selected.nominal, self.identity) or variants.len != 1 or variants[0].tag != self.tag) return false;
+        for (module.constructors) |constructor| {
+            if (remaining.* == 0) return false;
+            remaining.* -= 1;
+            if (!std.meta.eql(module.nominal(constructor.nominal).identity, self.identity) or constructor.tag != self.tag) continue;
+            const record = module.types.node(constructor.payload);
+            if (record.tag != .record or variants[0].field >= record.b) return false;
+            const field_name = module.fieldSpelling(module.types.recordField(record, variants[0].field).name) orelse return false;
+            return std.mem.eql(u8, name, field_name);
+        }
+        return false;
+    }
+};
+
+pub fn nominalRecord(module: *const core.Module, ty: u32, remaining: *usize) ?NominalRecord {
+    const node = module.types.node(ty);
+    if (node.tag != .nominal or module.types.nominalArguments(node).len != 0) return null;
+    for (module.nominals, 0..) |nominal, ordinal| {
+        if (remaining.* == 0) return null;
+        remaining.* -= 1;
+        if (nominal.identity.unit != node.a or nominal.identity.decl != node.b) continue;
+        if (nominal.is_opaque or nominal.affine or nominal.has_usage or nominal.parameters.len != 0 or nominal.variables.len != 0) return null;
+        const constructors = module.nominalConstructors(@intCast(ordinal));
+        if (constructors.len != 1) return null;
+        const constructor = module.constructor(constructors[0]);
+        if (module.types.node(constructor.payload).tag != .record) return null;
+        return .{ .identity = nominal.identity, .tag = constructor.tag };
+    }
+    return null;
+}
+
+pub fn collect(allocator: A, module: *const core.Module, root: core.Id, parameter: core.BindingId, nominal: ?NominalRecord) A.Error!Fields {
+    var walk: Walk = .{ .allocator = allocator, .module = module, .parameter = parameter, .nominal = nominal };
     errdefer walk.fields.deinit(allocator);
     walk.visit(root, 0) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -39,6 +80,7 @@ const Walk = struct {
     allocator: A,
     module: *const core.Module,
     parameter: core.BindingId,
+    nominal: ?NominalRecord,
     fields: Fields = .{},
     remaining: usize = 100_000,
 
@@ -61,7 +103,11 @@ const Walk = struct {
             },
             .project => if (node.a != 0 and m.node(node.a).tag == .reference and self.target(m.reference(node.a))) {
                 const projection = m.projection(node.b);
-                if ((projection.variants.len != 0 and !namedRecordProjection(m, node.b)) or m.fieldSpelling(projection.field) == null) {
+                var admitted = false;
+                if (self.nominal) |nominal| {
+                    admitted = nominal.projection(m, node.b, &self.remaining);
+                } else admitted = (projection.variants.len == 0 or namedRecordProjection(m, node.b)) and m.fieldSpelling(projection.field) != null;
+                if (!admitted) {
                     self.fields.whole = true;
                     return;
                 }

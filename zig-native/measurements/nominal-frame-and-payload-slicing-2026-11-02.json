@@ -1,0 +1,127 @@
+{
+  "date": "2026-11-02",
+  "source": {
+    "base_commit": "b8182c3303eb22b88ce1c5cdbbb717eb252d8f15",
+    "patch_sha256": "f3309955c887d7cfd6783339a494a9efa920453f985e7c48d67e1eac68b33e10",
+    "source_files_sha256": {
+      "scripts/dev_check_areas.ts": "d733d3128206b1d1b19454590a96a29b43219080a699566a91e6e8ec7cd3a9c4",
+      "zig-native/src/backend/scoped_backend.zig": "7f688974bedc6c674314f12b75b0fd14c0b90766ea5e6b94c0360a3a3e6d241f",
+      "zig-native/src/backend/storage_parameter_fields.zig": "b442f93a475738caf6dedf4c3dd2c23c081b71c2580c212fcdde972775487929",
+      "zig-native/src/backend/storage_parameter_fields_tests.zig": "6f3142ccd8d4a209290ab3836767ecb39d8d688b6b7d75c59d2b9cb6ad35715a",
+      "zig-native/tests/storage_nominal_parameter_fields_execution.test.ts": "18a48afa440f1f839ede38d7aa963dafebd97c72ee4d0c6f473ec720d561fa31"
+    },
+    "frozen_manifest": "build/bench/frozen-nominal-slicing-f3309955c887/source-manifest.json"
+  },
+  "gdev_source": {
+    "base_commit": "24d77076926dd96dd98e3f082bbc7a965b8865ad",
+    "patch_sha256": "f2a1fd817660dacb3df29cba4bd0ee451bc790811321499f6829926638e1cbab",
+    "source_files_sha256": {
+      "src/player/hand.blot": "4c8607651efa09e05d4c0e68b665628f4cc216ed126739c52d751821351b4489",
+      "src/world_storage.blot": "0cddab282ae1c44950659054f3329f65ccb051b202348dda001e804df779c069",
+      "tests/frame_edit_policy.blot": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+      "tests/world_hooks.blot": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac"
+    }
+  },
+  "changes": [
+    "FrameAccess becomes fixed zero-argument single-constructor data. Existing fields/owner aliases/effects remain; bind_frame wraps the existing record.",
+    "Physical call slicing retains the nominal wrapper, complete original source/type evidence, reads and owner checks while passing only proved payload fields. Missing/getter/whole/variant/opaque/rich cases retain full fallback; catalog walks are bounded.",
+    "Hand edit copies use ten same-type functional field replacements in original order instead of structural merge. The resource scopes, generic consumer and commit block are unchanged."
+  ],
+  "qualification": {
+    "central_dev": "build/bench/nominal-slicing-central-check/run-8d7bead5d727262c/results.json",
+    "compiled_native": 2863,
+    "selected_exhaustive_fault_laws": 112,
+    "executed_guests": 84,
+    "full_faults": "build/bench/nominal-slicing-central-check/run-8d7bead5d727262c/full-faults.log",
+    "zig_lint": "zero findings",
+    "astra_review": "final bounded patch green",
+    "full_gate": "build/bench/nominal-slicing-full-gate",
+    "full_gate_outcome": "48 passed / one known baseline List/chunk storage_escape at bytes312..345; full qualification pending"
+  },
+  "final_release_witnesses": {
+    "world_hooks": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-nominal-slicing-f3309955c887/zig-native/zig-out/bin/blotc",
+      "buildMs": 1316.630785,
+      "wasmBytes": 711109,
+      "wasmSha256": "0d470ec0f4d8da99c8ba6bc0b8181de829fb7b8fb0a8213c0ab64176a1b01807",
+      "calls": [
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": false,
+          "runtimeMs": 83.55766200000016,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": true,
+          "runtimeMs": 21.50668799999994,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "frame_edit_policy": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-nominal-slicing-f3309955c887/zig-native/zig-out/bin/blotc",
+      "buildMs": 1011.9856659999999,
+      "wasmBytes": 305185,
+      "wasmSha256": "692e1d2fdef608dc150afd617bbf7fd9bc6b6d10ac7bc95648459b071c934ceb",
+      "calls": [
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": false,
+          "runtimeMs": 69.51095900000018,
+          "row": [
+            160,
+            0
+          ]
+        },
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": true,
+          "runtimeMs": 16.43105300000002,
+          "row": [
+            160,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    }
+  },
+  "comparison": {
+    "structural_b818_main_ms": 8871.726557,
+    "structural_wasm_bytes": 22375878,
+    "nominal_source_only_b818_main_ms": 11292,
+    "nominal_source_only_wasm_bytes": 23039613,
+    "nominal_with_slicing_main_ms": 8361.799268,
+    "nominal_with_slicing_wasm_bytes": 22346701,
+    "scope": "Individual completions. The source-only control loses88.64% of previous omitted words. Complete current baseline/candidate source identities are pinned in the linked main records."
+  },
+  "private_evidence": {
+    "source": "build/bench/private-prototypes/nominal-frame-access/README.md",
+    "compiler": "build/bench/private-prototypes/nominal-parameter-fields-evidence/summary.json",
+    "old_source_control": "build/bench/nominal-slicing-old-source-control"
+  },
+  "coverage_gaps": {
+    "original_elements_game": "Both original structural and nominal Source on b818 LLVM hit the same preexisting emit storage_unsupported at line31/bytes1675..1753. Three original assertions/export unchanged; no runtime pass.",
+    "pen_check": "Configured installed Pen rejects unchanged pen.json protocol field.",
+    "pen_codegen_check": "Installed generator reports existing generated protocol files stale; generated inputs preserved.",
+    "full_game_frame": "Actual compiled main was loaded without recompilation by tracked runner; installed Pen SHA662b7f6e rejects unsupported ABI version8. No frame/PNG. Evidencebuild/bench/nominal-slicing-pen-frame/result.json."
+  },
+  "held_followups": {
+    "closed_fragment_replay": "Regresses matched native backend6.4% renderer/2% world; not integrated.",
+    "body_instance_callsite_cache": "Measured exact repetitions cover too little preparation; not integrated.",
+    "next_review": "Canonical typed-body/type-node representation that removes repeated Builder/env work; design only, no implementation or performance claim."
+  },
+  "full_main": "gdev-after-nominal-frame-2026-11-02.json"
+}

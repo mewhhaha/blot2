@@ -2614,7 +2614,23 @@ const Generator = struct {
             .project => {
                 var projected_receiver = false;
                 const projection = m.projection(n.b);
-                if (projection.variants.len == 0 or @import("storage_parameter_fields.zig").namedRecordProjection(m, n.b)) {
+                if (readers and m.node(n.a).tag == .reference) {
+                    if (try self.planValue(m, n.a, remaining, depth + 1)) |value| {
+                        if (value.projected_parameter_fields and value.nominal != null) {
+                            const actual = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(n.a) }, 0);
+                            const owner = try self.unit(actual.unit);
+                            if (@import("storage_parameter_fields.zig").nominalRecord(owner, actual.ty, remaining)) |nominal| {
+                                if (std.meta.eql(value.nominal.?, nominal.identity) and nominal.projection(m, n.b, remaining)) {
+                                    const name = m.fieldSpelling(projection.field) orelse return false;
+                                    const field = dataField(value, name) orelse return false;
+                                    try self.mapValueTypes(.{ .unit = m.unit, .ty = n.ty }, field, 0);
+                                    projected_receiver = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!projected_receiver and (projection.variants.len == 0 or @import("storage_parameter_fields.zig").namedRecordProjection(m, n.b))) {
                     const receiver = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(n.a) }, 0);
                     const owner = try self.unit(receiver.unit);
                     const record = owner.types.node(receiver.ty);
@@ -4170,23 +4186,36 @@ const Generator = struct {
         var prepared: PreparedArguments = .{ .values = original };
         var word_work: usize = 4096;
         for (m.bodyParameters(body), original, 0..) |parameter, argument, index| {
-            if (argument.tag != .aggregate or argument.nominal != null or argument.variant_tags.len != 0 or argument.host != null or argument.demand != null or argument.root != null) continue;
+            if (argument.tag != .aggregate or argument.variant_tags.len != 0 or argument.host != null or argument.demand != null or argument.root != null) continue;
+            const fields = @import("storage_parameter_fields.zig");
+            var nominal: ?fields.NominalRecord = null;
+            var record = &argument;
+            if (argument.nominal != null) {
+                if (argument.fields.len != 1 or argument.other_roots.len != 0 or argument.callable != null or argument.pool_borrow or argument.sequence) continue;
+                record = &argument.fields[0];
+                if (record.tag != .aggregate or record.nominal != null or record.variant_tags.len != 0 or record.host != null or record.demand != null or record.root != null or record.other_roots.len != 0 or record.callable != null or record.pool_borrow or record.sequence) continue;
+            }
             // Callback presence selects work, never authority. Large plain
             // records use the same complete footprint and physical-root guards.
             var callback_work: usize = 4096;
-            if (!containsCallback(argument, &callback_work, 0) and argument.fields.len < 8) continue;
+            if (!containsCallback(record.*, &callback_work, 0) and record.fields.len < 8) continue;
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = parameter.ty }, 0);
-            if ((try self.unit(actual.unit)).types.node(actual.ty).tag != .record) continue;
-            var footprint = try @import("storage_parameter_fields.zig").collect(self.allocator, m, body.root, parameter.binding);
+            const owner = try self.unit(actual.unit);
+            if (argument.nominal) |identity| {
+                var policy_work: usize = 100_000;
+                nominal = fields.nominalRecord(owner, actual.ty, &policy_work) orelse continue;
+                if (!std.meta.eql(nominal.?.identity, identity)) continue;
+            } else if (owner.types.node(actual.ty).tag != .record) continue;
+            var footprint = try fields.collect(self.allocator, m, body.root, parameter.binding, nominal);
             defer footprint.deinit(self.allocator);
-            if (footprint.whole or footprint.names.items.len >= argument.fields.len) continue;
+            if (footprint.whole or footprint.names.items.len >= record.fields.len) continue;
             // Resolve every requested spelling before dropping any physical
             // fields. Ambiguous or absent layout evidence keeps the full ABI.
             var selected: std.ArrayList(Value) = .empty;
             defer selected.deinit(self.allocator);
             var omitted_words: usize = 0;
             var words_complete = true;
-            for (argument.fields) |*field| {
+            for (record.fields) |*field| {
                 var retained = false;
                 for (footprint.names.items) |name| {
                     const spelling = m.fieldSpelling(name) orelse break;
@@ -4207,13 +4236,17 @@ const Generator = struct {
             }
             if (selected.items.len != footprint.names.items.len) continue;
             if (result == null) result = try self.arena.allocator().dupe(Value, original);
-            result.?[index].fields = try self.arena.allocator().dupe(Value, selected.items);
+            if (nominal != null) {
+                const wrapper = try self.arena.allocator().dupe(Value, argument.fields);
+                wrapper[0].fields = try self.arena.allocator().dupe(Value, selected.items);
+                result.?[index].fields = wrapper;
+            } else result.?[index].fields = try self.arena.allocator().dupe(Value, selected.items);
             result.?[index].projected_parameter_fields = true;
-            prepared.fields_omitted +|= argument.fields.len - selected.items.len;
+            prepared.fields_omitted +|= record.fields.len - selected.items.len;
             prepared.words_omitted +|= omitted_words;
             prepared.words_complete = prepared.words_complete and words_complete;
-            self.emission_work.scoped_projected_parameter_fields +|= argument.fields.len - selected.items.len;
-            @import("../phase_profile.zig").detail("descriptor.parameter.projected", m.unit, m.span(body.root).start, m.span(body.root).end, argument.fields.len - selected.items.len);
+            self.emission_work.scoped_projected_parameter_fields +|= record.fields.len - selected.items.len;
+            @import("../phase_profile.zig").detail("descriptor.parameter.projected", m.unit, m.span(body.root).start, m.span(body.root).end, record.fields.len - selected.items.len);
         }
         if (prepared.fields_omitted != 0) self.emission_work.scoped_argument_projection_preparations +|= 1;
         self.emission_work.scoped_projection_word_count_nodes +|= 4096 - word_work;
