@@ -61,7 +61,10 @@ def emission_frame(frame, name, tid, metadata):
             metadata["expressions"] = int(counters["scoped_emission_expressions"])
             work = {}
             for key in ("scoped_source_completed_bodies", "scoped_type_environment_captures",
-                        "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings"):
+                        "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings",
+                        "scoped_owner_graph_definitions", "scoped_owner_graph_hits",
+                        "scoped_owner_graph_inputs", "scoped_parameter_words_shared",
+                        "scoped_projected_parameter_fields"):
                 try:
                     work[key] = int(counters[key])
                 except Exception:

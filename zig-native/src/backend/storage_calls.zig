@@ -14,7 +14,7 @@ pub const Key = struct {
         return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
     }
 };
-pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true };
+pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, next: ?usize = null };
 /// Selected source calls, not source references or partial applications. Keys
 /// contain only bounded static callback choices; runtime data is never a key.
 pub const ActiveCalls = struct {
@@ -47,58 +47,89 @@ pub const ActiveCalls = struct {
         self.selections.shrinkRetainingCapacity(frame.start);
     }
 };
-pub const Cache = struct {
-    const Plan = struct { key: Key, height: usize };
-    allocator: std.mem.Allocator,
-    entries: std.ArrayList(Entry) = .empty,
-    plans: std.ArrayList(Plan) = .empty,
-    pub fn deinit(self: *Cache) void {
-        for (self.entries.items) |entry| self.allocator.free(entry.key.evidence);
-        self.entries.deinit(self.allocator);
-        for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
-        self.plans.deinit(self.allocator);
+const KeyContext = struct {
+    pub fn hash(_: @This(), key: Key) u64 {
+        const header = [_]u32{ key.unit, key.binding, key.context };
+        var state = std.hash.Wyhash.init(0);
+        state.update(std.mem.asBytes(&header));
+        state.update(std.mem.sliceAsBytes(key.evidence));
+        return state.final();
     }
-    /// Completed admission is separate from executable function publication.
-    pub fn admitted(self: *const Cache, key: Key) ?usize {
-        for (self.plans.items) |plan| {
-            if (plan.key.eql(key)) return plan.height;
-        }
-        return null;
-    }
-    /// Publish only successful complete walks. Keys own the same exact static
-    /// evidence as executable entries, without caller environments or values.
-    pub fn admit(self: *Cache, key: Key, height: usize) std.mem.Allocator.Error!void {
-        for (self.plans.items) |*plan| {
-            if (!plan.key.eql(key)) continue;
-            plan.height = @max(plan.height, height);
-            return;
-        }
-        // This is optional metadata; saturation leaves ordinary probing intact.
-        if (self.plans.items.len >= 65_536) return;
-        var owned_key = key;
-        owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
-        errdefer self.allocator.free(owned_key.evidence);
-        try self.plans.append(self.allocator, .{ .key = owned_key, .height = height });
-    }
-    pub fn find(self: *const Cache, key: Key) ?usize {
-        for (self.entries.items, 0..) |entry, index| {
-            if (entry.key.eql(key)) return index;
-        }
-        return null;
-    }
-    pub fn insert(self: *Cache, key: Key, function: u32, floating: bool) !usize {
-        var owned_key = key;
-        owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
-        errdefer self.allocator.free(owned_key.evidence);
-        const index = self.entries.items.len;
-        try self.entries.append(self.allocator, .{
-            .key = owned_key,
-            .function = function,
-            .floating = floating,
-        });
-        return index;
+    pub fn eql(_: @This(), left: Key, right: Key) bool {
+        return left.eql(right);
     }
 };
+pub const Cache = CacheWithContext(KeyContext);
+fn CacheWithContext(comptime Context: type) type {
+    return struct {
+        const Self = @This();
+        const Plan = struct { key: Key, height: usize };
+        const Positions = std.HashMapUnmanaged(Key, usize, Context, 80);
+        const Chain = struct { first: usize, last: usize };
+        allocator: std.mem.Allocator,
+        entries: std.ArrayList(Entry) = .empty,
+        plans: std.ArrayList(Plan) = .empty,
+        entry_positions: std.HashMapUnmanaged(Key, Chain, Context, 80) = .empty,
+        plan_positions: Positions = .empty,
+        pub fn deinit(self: *Self) void {
+            self.entry_positions.deinit(self.allocator);
+            self.plan_positions.deinit(self.allocator);
+            for (self.entries.items) |entry| self.allocator.free(entry.key.evidence);
+            self.entries.deinit(self.allocator);
+            for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
+            self.plans.deinit(self.allocator);
+        }
+        /// Completed admission is separate from executable function publication.
+        pub fn admitted(self: *const Self, key: Key) ?usize {
+            const index = self.plan_positions.get(key) orelse return null;
+            return self.plans.items[index].height;
+        }
+        /// Publish only successful complete walks. Keys own the same exact static
+        /// evidence as executable entries, without caller environments or values.
+        pub fn admit(self: *Self, key: Key, height: usize) std.mem.Allocator.Error!void {
+            if (self.plan_positions.get(key)) |index| {
+                const plan = &self.plans.items[index];
+                plan.height = @max(plan.height, height);
+                return;
+            }
+            // This is optional metadata; saturation leaves ordinary probing intact.
+            if (self.plans.items.len >= 65_536) return;
+            var owned_key = key;
+            owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
+            errdefer self.allocator.free(owned_key.evidence);
+            try self.plans.ensureUnusedCapacity(self.allocator, 1);
+            try self.plan_positions.ensureUnusedCapacity(self.allocator, 1);
+            // Every allocation precedes publication to either owner.
+            self.plan_positions.putAssumeCapacityNoClobber(owned_key, self.plans.items.len);
+            self.plans.appendAssumeCapacity(.{ .key = owned_key, .height = height });
+        }
+        pub fn find(self: *const Self, key: Key) ?usize {
+            const chain = self.entry_positions.get(key) orelse return null;
+            return chain.first;
+        }
+        pub fn insert(self: *Self, key: Key, function: u32, floating: bool) !usize {
+            var owned_key = key;
+            owned_key.evidence = try self.allocator.dupe(u32, key.evidence);
+            errdefer self.allocator.free(owned_key.evidence);
+            try self.entries.ensureUnusedCapacity(self.allocator, 1);
+            try self.entry_positions.ensureUnusedCapacity(self.allocator, 1);
+            const index = self.entries.items.len;
+            const position = self.entry_positions.getOrPutAssumeCapacity(owned_key);
+            // Equal schemas can need different scratch regions. Preserve their
+            // insertion order without making writer lookup scan unrelated keys.
+            if (position.found_existing) {
+                self.entries.items[position.value_ptr.last].next = index;
+                position.value_ptr.last = index;
+            } else position.value_ptr.* = .{ .first = index, .last = index };
+            self.entries.appendAssumeCapacity(.{
+                .key = owned_key,
+                .function = function,
+                .floating = floating,
+            });
+            return index;
+        }
+    };
+}
 
 test "completed call admission owns exact contextual keys and conservative heights" {
     var cache: Cache = .{ .allocator = std.testing.allocator };
@@ -124,6 +155,75 @@ test "completed call admission owns exact contextual keys and conservative heigh
     try std.testing.expectEqual(@as(?usize, 7), cache.admitted(original_first));
     try std.testing.expectEqual(@as(usize, 2), cache.plans.items.len);
     try std.testing.expectEqual(@as(usize, 0), cache.entries.items.len);
+}
+
+const CollidingKeys = struct {
+    pub fn hash(_: @This(), _: Key) u64 {
+        return 0;
+    }
+    pub fn eql(_: @This(), left: Key, right: Key) bool {
+        return left.eql(right);
+    }
+};
+fn cacheIndexLaw(allocator: std.mem.Allocator) !void {
+    var cache: CacheWithContext(CollidingKeys) = .{ .allocator = allocator };
+    defer cache.deinit();
+    const keys = [_]Key{
+        .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{ 17, 23, 31 } },
+        .{ .unit = 2, .binding = 2, .context = 3, .evidence = &.{ 17, 23, 31 } },
+        .{ .unit = 1, .binding = 3, .context = 3, .evidence = &.{ 17, 23, 31 } },
+        .{ .unit = 1, .binding = 2, .context = 4, .evidence = &.{ 17, 23, 31 } },
+        .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{ 17, 23, 32 } },
+        .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{ 17, 23 } },
+        .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{} },
+    };
+    for (keys, 0..) |key, index| {
+        const before = cache.entries.items.len;
+        const inserted = cache.insert(key, @intCast(index + 10), false) catch |err| {
+            try std.testing.expectEqual(before, cache.entries.items.len);
+            try std.testing.expectEqual(before, cache.entry_positions.count());
+            return err;
+        };
+        try std.testing.expectEqual(index, inserted);
+        try std.testing.expect(cache.admitted(key) == null);
+        const plans_before = cache.plans.items.len;
+        cache.admit(key, index + 1) catch |err| {
+            try std.testing.expectEqual(plans_before, cache.plans.items.len);
+            try std.testing.expectEqual(plans_before, cache.plan_positions.count());
+            try std.testing.expect(cache.admitted(key) == null);
+            return err;
+        };
+        // All entries share exactly the same hash, across growth and ownership.
+        for (keys[0 .. index + 1], 0..) |prior, ordinal| {
+            try std.testing.expectEqual(@as(?usize, ordinal), cache.find(prior));
+            try std.testing.expectEqual(@as(?usize, ordinal + 1), cache.admitted(prior));
+        }
+    }
+    var duplicate = [_]u32{ 17, 23, 31 };
+    var key = keys[0];
+    key.evidence = &duplicate;
+    try std.testing.expectEqual(keys.len, try cache.insert(key, 99, true));
+    try std.testing.expectEqual(@as(?usize, 0), cache.find(key));
+    try std.testing.expectEqual(@as(?usize, keys.len), cache.entries.items[0].next);
+    try std.testing.expectEqual(@as(?usize, null), cache.entries.items[keys.len].next);
+    try std.testing.expectEqual(@as(?usize, null), cache.entries.items[1].next);
+    try std.testing.expectEqual(keys.len + 1, try cache.insert(key, 100, false));
+    try std.testing.expectEqual(@as(?usize, keys.len + 1), cache.entries.items[keys.len].next);
+    try std.testing.expectEqual(@as(?usize, null), cache.entries.items[keys.len + 1].next);
+    try std.testing.expectEqual(@as(u32, 10), cache.entries.items[cache.find(key).?].function);
+    try cache.admit(key, 9);
+    try cache.admit(key, 2);
+    try std.testing.expectEqual(@as(?usize, 9), cache.admitted(key));
+    try std.testing.expectEqual(keys.len, cache.plans.items.len);
+    duplicate[0] = 99;
+    try std.testing.expect(cache.find(key) == null);
+    try std.testing.expect(cache.admitted(key) == null);
+    try std.testing.expectEqual(@as(?usize, 0), cache.find(keys[0]));
+    try std.testing.expectEqual(@as(?usize, 9), cache.admitted(keys[0]));
+}
+test "owned call hash indexes retain exact colliding keys first entries heights and atomic OOM" {
+    try cacheIndexLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, cacheIndexLaw, .{});
 }
 
 /// Only scalar computations can use the first reusable ABI. Storage,
@@ -166,6 +266,7 @@ pub fn scalarBody(m: *const core.Module, root: core.Id, remaining: *usize, depth
 pub const ScalarAdmission = struct {
     allocator: std.mem.Allocator,
     units: []const core.Module,
+    scalar_references: ?bool = null,
     nodes: u64 = 0,
     hits: u64 = 0,
     completed: std.AutoHashMapUnmanaged(core.BindingRef, usize) = .empty,
@@ -174,6 +275,22 @@ pub const ScalarAdmission = struct {
 
     pub fn deinit(self: *ScalarAdmission) void {
         self.completed.deinit(self.allocator);
+    }
+    /// The immutable inventory is shared by every generator. Without a local
+    /// address operation, no callee or callback can write an incoming scalar
+    /// word through an alias. Rebinding, captures and loop carries still copy.
+    pub fn hasScalarReferences(self: *ScalarAdmission) bool {
+        if (self.scalar_references) |present| return present;
+        for (self.units) |m| for (m.nodes) |node| {
+            if (node.tag != .storage) continue;
+            const op: @import("../check/storage_ops.zig").Op = @fromBackingInt(@intCast(node.c));
+            if (op == .ref) {
+                self.scalar_references = true;
+                return true;
+            }
+        };
+        self.scalar_references = false;
+        return false;
     }
     pub fn admit(self: *ScalarAdmission, m: *const core.Module, binding: core.BindingId, remaining: *usize) std.mem.Allocator.Error!bool {
         return (try self.body(m, binding, remaining, 0)) != null;

@@ -7,7 +7,10 @@ const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
 test {
+    _ = @import("storage_calls.zig");
     _ = @import("scoped_opaque_tests.zig");
+    _ = @import("storage_owner_graph_tests.zig");
+    _ = @import("storage_parameter_fields_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");
     _ = @import("storage_typed_closure_tests.zig");
@@ -17,6 +20,43 @@ fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
+}
+fn publishSharedParameters(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_parameter_words_shared > 0);
+}
+test "plain parameter words share only without local addresses in the complete inventory through OOM" {
+    var plain = try lower(a,
+        \\type Pair is data = $Pair {left: U32, right: U32}
+        \\const total = func (pair: Pair): U32 => return @u32.add pair.left pair.right
+        \\entry const answer = func (input: U32): U32 => return total ($Pair {left: input, right: 1})
+    );
+    defer plain.deinit(a);
+    try publishSharedParameters(a, &.{plain});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSharedParameters, .{@as([]const core.Module, &.{plain})});
+    var addressed = try lower(a,
+        \\const unused = func (): U32 => return do:
+        \\  let value = 1
+        \\  let address = &value
+        \\  return @storage.load address
+        \\entry const answer = func (input: U32): U32 => return input
+    );
+    defer addressed.deinit(a);
+    const calls = @import("storage_calls.zig");
+    var ordinary: calls.ScalarAdmission = .{ .allocator = a, .units = &.{plain} };
+    defer ordinary.deinit();
+    try std.testing.expect(!ordinary.hasScalarReferences());
+    try std.testing.expect(!ordinary.hasScalarReferences());
+    var mixed: calls.ScalarAdmission = .{ .allocator = a, .units = &.{ plain, addressed } };
+    defer mixed.deinit();
+    try std.testing.expect(mixed.hasScalarReferences());
+    try std.testing.expect(mixed.hasScalarReferences());
+    var refused = try scoped.compile(a, &.{addressed}, 1);
+    defer refused.deinit(a);
+    try std.testing.expect(refused.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 0), refused.counters.scoped_parameter_words_shared);
 }
 fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
@@ -1137,4 +1177,32 @@ test "shared aggregate reader publication survives allocation failures" {
     var module = try aggregateReaderDag(a, 1);
     defer module.deinit(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateReader, .{@as([]const core.Module, &.{module})});
+}
+
+test "untagged nested records retain fields through loop joins tagged wrappers and OOM" {
+    var module = try lower(a,
+        \\type Box is data = $Box {inner: {n: U32, left: U32, right: U32}, stamp: U32}
+        \\type Choice is data = $None | $Some Box
+        \\const wrap = func (n: U32) => return $Box {inner: {n: n, left: 2, right: 3}, stamp: 0}
+        \\const unpack = func (box: Box) => return case box of
+        \\  $Box {inner, stamp} => {inner, stamp}
+        \\const advance = func (state: {inner: {n: U32, left: U32, right: U32}, stamp: U32}) => return {inner: {n: @u32.add state.inner.n 1, left: state.inner.left, right: state.inner.right}, stamp: state.stamp}
+        \\entry const answer = func (count: U32): Array U32 => return do:
+        \\  let rows: GrowArray Box = #[wrap 1]
+        \\  let state = unpack rows[0]
+        \\  for index in 0 .. count:
+        \\    state := advance state
+        \\    rows[0] := $Box {inner: state.inner, stamp: state.stamp}
+        \\  let choice: Choice = if @u32.eq count 0 then $None else $Some rows[0]
+        \\  let result = case choice of
+        \\    $None => {payload: state, code: 7}
+        \\    $Some box => {payload: unpack box, code: 42}
+        \\  return #[result.payload.inner.n, result.payload.inner.left, result.payload.inner.right, result.code]
+        \\entry const scalar = func (): U32 => return do:
+        \\  let value = {nested: {answer: 42}}
+        \\  return value.nested.answer
+    );
+    defer module.deinit(a);
+    try publishSmallModule(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishSmallModule, .{@as([]const core.Module, &.{module})});
 }

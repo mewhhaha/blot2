@@ -10,6 +10,7 @@ pub fn Stack(comptime Argument: type) type {
     return struct {
         const Self = @This();
         const Positions = struct { any: ?usize = null, nonidentity: ?usize = null };
+        const Undo = struct { positions: Positions, snapshot: ?[]const Argument };
         const Context = struct {
             pub fn hash(_: @This(), value: u64) u64 {
                 return std.hash.int(value);
@@ -21,7 +22,7 @@ pub fn Stack(comptime Argument: type) type {
         pub const empty: Self = .{};
         items: []Argument = &.{},
         arguments: std.ArrayList(Argument) = .empty,
-        undo: std.ArrayList(Positions) = .empty,
+        undo: std.ArrayList(Undo) = .empty,
         positions: std.HashMapUnmanaged(u64, Positions, Context, 80) = .empty,
         active_count: usize = 0,
         snapshot: ?[]const Argument = null,
@@ -48,7 +49,7 @@ pub fn Stack(comptime Argument: type) type {
             const slot = self.positions.getOrPutAssumeCapacity(key(argument.unit, argument.parameter));
             if (!slot.found_existing) slot.value_ptr.* = .{};
             if (slot.value_ptr.any == null) self.active_count += 1;
-            self.undo.appendAssumeCapacity(slot.value_ptr.*);
+            self.undo.appendAssumeCapacity(.{ .positions = slot.value_ptr.*, .snapshot = self.snapshot });
             const position = self.arguments.items.len;
             self.arguments.appendAssumeCapacity(argument);
             self.items = self.arguments.items;
@@ -77,16 +78,16 @@ pub fn Stack(comptime Argument: type) type {
                 const argument = self.items[at];
                 const original = self.undo.items[at];
                 const slot = key(argument.unit, argument.parameter);
-                if (original.any == null) self.active_count -= 1;
+                if (original.positions.any == null) self.active_count -= 1;
                 // Retain inactive keys: removing ephemeral substitutions fills
                 // the table with tombstones while its live load stays tiny.
                 // Misses would then scan the entire table on every lookup.
-                self.positions.getPtr(slot).?.* = original;
+                self.positions.getPtr(slot).?.* = original.positions;
+                self.snapshot = original.snapshot;
             }
             self.arguments.shrinkRetainingCapacity(length);
             self.undo.shrinkRetainingCapacity(length);
             self.items = self.arguments.items;
-            self.snapshot = null;
         }
         pub fn clearRetainingCapacity(self: *Self) void {
             if (self.positions.count() == 0) return;
@@ -107,7 +108,8 @@ pub fn Stack(comptime Argument: type) type {
             const positions = self.positions.get(key(unit, parameter)) orelse return null;
             return positions.nonidentity;
         }
-        /// The caller's arena outlives every returned immutable environment.
+        /// Captures and saved prefixes borrow the caller's arena, which must
+        /// outlive this stack and every returned immutable environment.
         pub fn capture(self: *Self, arena: A) A.Error![]const Argument {
             if (self.snapshot) |snapshot| {
                 self.stats.capture_hits +|= 1;

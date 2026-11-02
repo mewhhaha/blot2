@@ -6,16 +6,37 @@ Compilation latency is the active priority: **subsecond Gdev compilation**. Do
 not repeat the recorded 36-minute main build. Diagnostics default to a
 five-second deadline and kill the compiler on timeout.
 
-After sparse owner traversal, the optimized compiler still exceeds 30 seconds on
-main. Its next late profile spends **46%** in substitution-map lookups: rollback
-fills deleted hash slots while live load stays small. Retaining inactive keys
-and counting active captures separately removes this exhaustion. Three rotated
-isolated controls improve lookup-churn CPU **240.44 to 21.80 ms (11.03x)**; this
-is not a whole-game latency claim. The candidate compiles 2,800 native laws,
-passes 40 selected laws with full faults, 11 guests and zero Zig lint findings.
-Next is optimized full-main timing. Source graph/copy-elision experiments remain
-outside-tree drafts. See
-[substitution-map evidence](zig-native/measurements/substitution-map-churn-2026-11-02.json).
+The last completed full Gdev main is **24.55 seconds**, producing
+**45,978,015 bytes of Wasm** with cache disabled. That is compiler `6352afbd`
+(Zig 0.17 fast/LLVM, source `9276d7b`), Gdev/Ink `7733add6`/`d520a903`.
+A separate trace places 20.29 seconds in emission, 0.93 in outlining and 0.46
+in assembly; frontend is about 1.3 seconds. Only 971 outlines exist; the earlier
+outline-cap explanation was wrong. See
+[completed-main evidence](zig-native/measurements/completed-gdev-main-2026-11-02.json).
+
+The new checked checkpoint shares input-owner graphs, narrows proven unused
+physical parameter fields, restores exact parent type snapshots, indexes call
+keys and removes dummy plain-record machine words. All **2,817 native laws
+compile; 58 selected laws pass full allocation faults, 34 guests pass, and Zig
+lint is clean**. Seven actual renderer streams match; its Wasm shrinks 261,953
+to 254,036 bytes. The narrower dummy-word control independently saves 4.3%.
+These are renderer results, not full-game latency. See
+[checkpoint evidence](zig-native/measurements/owner-graph-and-parameter-copies-2026-11-02.json).
+
+The first new LLVM candidate `a830c5c1` fails at `robots.travel` after 9.93
+seconds: optional planning bound field-update `self` to Pose3 instead of its
+Vec3 field. The source fix now follows both update encodings; a small reproducer
+fails on that retained compiler and passes the current native candidate. Typed
+simple bindings also retain planned values. Do not qualify the failed release.
+
+The corrected fast/noLLVM main still exceeds 30 seconds. Its bounded sample
+confirms physical field narrowing is active (21,953 omitted fields); the next
+measured costs are active-capture history scanning (18%) and per-call type-key
+construction (21%). Active-position capture and structural type-ID experiments
+are outside-tree drafts. Do not repeat long game builds or six-minute LLVM
+compiler builds until enough work has been removed. Full release qualification
+and a fresh frame remain pending; available Pen binaries predate ABI 8.
+The full gate retains its baseline List/chunk failure.
 
 The first current LLVM release compiler built successfully in five minutes (4
 GiB build RSS). Actual main still exceeds its 30-second cap, but its frontend

@@ -1,10 +1,20 @@
 # Owned-storage rewrite: active task index
 
 The active priority is subsecond Gdev compilation with bounded iteration.
+[Owner-graph and physical-parameter checkpoint](../zig-native/measurements/owner-graph-and-parameter-copies-2026-11-02.json)
+compiles 2,817 laws, passes 58 selected laws with full faults/34 guests/zero Zig
+lint, and preserves seven actual renderer streams with smaller Wasm. Its first
+LLVM candidate exposed a field-update planning regression, now covered/fixed;
+replacement full-game timing is pending. The corrected native candidate still
+exceeds 30 seconds. Active-capture scans and per-key structural tables are next.
+[Completed actual Gdev main](../zig-native/measurements/completed-gdev-main-2026-11-02.json)
+takes **24.55 seconds** and produces **45.98 MB Wasm** with the optimized
+LLVM compiler. Frontend is about 1.3 seconds; synchronous emission takes 20.29.
+The five-second target remains unmet. Focus on emitted work and copies. Current
+frame qualification is pending: available Pen hosts reject ABI 8.
 [Substitution-map churn](../zig-native/measurements/substitution-map-churn-2026-11-02.json)
 is the next optimized-compiler cliff: deleted slots make misses scan a whole
-table. Inactive-key retention improves isolated CPU 11.03x; whole-main timing is
-pending and the prior optimized candidate still exceeds 30 seconds.
+table. Inactive-key retention improves isolated CPU 11.03x; the completed optimized whole-main result is linked above.
 [Sparse owner traversal](../zig-native/measurements/sparse-owned-roots-2026-11-02.json)
 replaces the latest measured emission bottleneck. The current pre-candidate LLVM
 compiler finishes the frontend in 1.03 seconds but exceeds 30 seconds on main;

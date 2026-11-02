@@ -176,3 +176,51 @@ test "refinement indexes retain inactive keys across sustained lexical churn and
     try churnLaw(a, 16_384);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, churnLaw, .{@as(usize, 64)});
 }
+
+fn parentSnapshotLaw(allocator: std.mem.Allocator) !void {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    var stack: Stack(Argument) = .empty;
+    defer stack.deinit(allocator);
+    const first_environment = [_]u32{ 91, 92 };
+    const second_environment = [_]u32{ 91, 92 };
+    const base = [_]Argument{
+        .{ .unit = 1, .parameter = 7, .argument = 11, .argument_unit = 4, .environment = &first_environment },
+        .{ .unit = 2, .parameter = 8, .argument = 13, .argument_unit = 4, .environment = &second_environment },
+    };
+    try stack.appendSlice(allocator, &base);
+    const parent = try stack.capture(arena.allocator());
+    try stack.append(allocator, .{ .unit = 1, .parameter = 7, .argument = 7, .argument_unit = 1, .environment = &second_environment });
+    const child = try stack.capture(arena.allocator());
+    try std.testing.expectEqual(@as(?usize, 2), stack.latestAny(1, 7));
+    try std.testing.expectEqual(@as(?usize, 0), stack.latestNonidentity(1, 7));
+    try std.testing.expectEqual(second_environment[0..].ptr, child[1].environment.?.ptr);
+    try stack.append(allocator, .{ .unit = 3, .parameter = 9, .argument = 19, .argument_unit = 4, .environment = &first_environment });
+    const grandchild = try stack.capture(arena.allocator());
+    try stack.append(allocator, .{ .unit = 2, .parameter = 8, .argument = 23, .argument_unit = 4 });
+    // Pop a mutation with no capture, then two captured scopes. Every restored
+    // pointer belongs to that exact prefix, including identity/environment data.
+    stack.shrinkRetainingCapacity(4);
+    try std.testing.expectEqual(grandchild.ptr, (try stack.capture(arena.allocator())).ptr);
+    stack.shrinkRetainingCapacity(3);
+    try std.testing.expectEqual(child.ptr, (try stack.capture(arena.allocator())).ptr);
+    stack.shrinkRetainingCapacity(2);
+    try std.testing.expectEqual(parent.ptr, (try stack.capture(arena.allocator())).ptr);
+    try std.testing.expectEqual(@as(u64, 3), stack.stats.captures);
+    try std.testing.expectEqual(@as(u64, 3), stack.stats.capture_hits);
+    for (parent, base) |restored, original_| try std.testing.expect(std.meta.eql(restored, original_));
+    try std.testing.expectEqual(first_environment[0..].ptr, parent[0].environment.?.ptr);
+    // Reappend at the same length with different contents must not resurrect
+    // the old child snapshot; older returned environments stay immutable.
+    try stack.append(allocator, .{ .unit = 1, .parameter = 7, .argument = 29, .argument_unit = 4, .environment = &first_environment });
+    const replacement = try stack.capture(arena.allocator());
+    try std.testing.expectEqual(@as(u32, 29), replacement[1].argument);
+    try std.testing.expectEqual(@as(u32, 7), child[1].argument);
+    stack.shrinkRetainingCapacity(2);
+    try std.testing.expectEqual(parent.ptr, (try stack.capture(arena.allocator())).ptr);
+}
+
+test "refinement indexes restore exact captured parent prefixes across nested rollback and OOM" {
+    try parentSnapshotLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, parentSnapshotLaw, .{});
+}

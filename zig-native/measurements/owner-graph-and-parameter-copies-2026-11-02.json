@@ -1,0 +1,303 @@
+{
+  "date": "2026-11-02",
+  "parent_commit": "9276d7b8f04a6111e845a00ef592516d4b9a1efe",
+  "scope": "Checked owner-graph and physical-parameter checkpoint. Actual sub-five-second main remains unqualified.",
+  "changes": {
+    "call_index": "Hash complete contextual evidence with exact collision equality; insertion-ordered duplicate chains retain scratch-region alternatives.",
+    "captures": "Restore exact immutable parent snapshot alongside lexical undo.",
+    "owner_graph": "Canonicalize reachable input-owner topology including all nested fields and alias edges. Replay read/write lifetime checks; plain mutable results and readonly input borrows share the existing packed ABI. No fresh-owner returns, shrinking/freezing or unproved callback goals admitted.",
+    "parameter_words": "Share only plain scalar/aggregate parameter words when the complete immutable Core inventory has no scalar address operation; clone metadata, retain descriptor, capture, rebinding, return and carry copies.",
+    "projected_fields": "A bounded source-body footprint removes unused anonymous parameter fields only from the physical ABI after full semantic mapping. Canonical anonymous projections and simple typed binders retain source/field admission. Whole forwarding, captures, mutations and rich patterns keep the complete ABI; selected callback-goal barriers remain.",
+    "aggregate_words": "Remove unused untagged aggregate container locals/zeroes/copies. Keep all tagged variants, scalar-ref identity, host/callable and owner descriptor words.",
+    "planner_parity": "Field-only updates follow updatePath as emission does; simple typed binders install planned values. Failed optional probes restore state and decline, preserving OOM."
+  },
+  "baseline_main": "zig-native/measurements/completed-gdev-main-2026-11-02.json",
+  "qualification": {
+    "evidence": "build/bench/projected-fields-check-dev/run-5e0c289fc87d1424/results.json",
+    "compiler_safe_sha256": "f578e12bbde662f14234d4ba84b7cebddd5f14ab944f986b5304fe184f3016ed",
+    "native_sha256": "c04fad17d6430784b0300c3df81c51a6497dfeb2e417f940948abec6b7d6bec0",
+    "compiled_inventory": 2817,
+    "selected_native": 58,
+    "guests": 34,
+    "zig_lint_findings": 0,
+    "full_faults": {
+      "evidence": "build/bench/projected-fields-check-dev/full-faults.log",
+      "passed": 58,
+      "leaks": 0,
+      "summed_test_ms": 7637.776965
+    },
+    "broader_static": "172 native pass; 30 guests pass, one baseline ECS summary_job_principal_reuse storage_unsupported at1230..1320. build/bench/projected-fields-static-check/run-b88d6ccdb916d59e/results.json",
+    "required_full_gate": "48 pass; one baseline List/chunk storage_escape. build/bench/projected-fields-full-gate/run-d6a3f805aef80f58",
+    "runtime_frame": "Pending: existing Pen CLI binaries predate ABI8. One offline debug host build stopped at its 30-second cap without linking; no frame/PNG claim.",
+    "input_digest": "22f1043440158c332c03139baad12b94f141c33db9115d628a20c20f3d59600b"
+  },
+  "isolated_parent_capture": {
+    "scope": "Isolated Stack parent-snapshot reuse; not full Gdev timing",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "llvm": false,
+    "baseline_ref": "9276d7b8f04a6111e845a00ef592516d4b9a1efe",
+    "sha256": {
+      "old.zig": "92ef99a8756610496d0ce22ff4b8db4fc5480195e8bd9d9af760c37ad092391a",
+      "new.zig": "03f9a95509fec6397be316a741b32de1d31657e3c04b88d657f2bca60aa0c7c5",
+      "bench.zig": "f0f960adec5f0f9eac45f1b5abd5f651f0471fa0ad48ba5c2b975e046afd6dfb",
+      "storage_type_arguments_tests.zig": "65d10ef3859b559c0679a57b64afd6ad3afe6d2b29f167e102ea742130d49e9a",
+      "run.py": "233772f643fac1d36c848f3bc12fbd435c7182dd17ba40a87d33b143ee6943bc",
+      "bench": "5bad3f0d2620ce359c1b72b48c0764ba636ca7585ca0cf05a546ca47ece8ae79"
+    },
+    "workload": {
+      "parent_bindings": 128,
+      "nested_rounds": 10000,
+      "per_round": "append shadow; capture child; rollback; capture parent",
+      "timeout_seconds": 10
+    },
+    "cpu_accounting": "resource.RUSAGE_CHILDREN user+system delta per executable",
+    "commands": {
+      "build": [
+        "/home/jacobt/.local/opt/zig-x86_64-linux-0.17.0/zig",
+        "build-exe",
+        "/tmp/blot-parent-snapshot/bench.zig",
+        "-O",
+        "ReleaseSafe",
+        "-fno-llvm",
+        "-femit-bin=/tmp/blot-parent-snapshot/bench"
+      ],
+      "run": [
+        "python3",
+        "/tmp/blot-parent-snapshot/run.py"
+      ]
+    },
+    "runs": [
+      {
+        "variant": "old",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 339.97299999999996,
+        "wall_ms": 341.5125819883542,
+        "work": {
+          "captures": 20001,
+          "hits": 0,
+          "copied_entries": 2560128,
+          "copied_bytes": 81924096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":20001,\"hits\":0,\"copied_entries\":2560128,\"copied_bytes\":81924096,\"checksum\":70065000}\n"
+      },
+      {
+        "variant": "new",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 173.35799999999998,
+        "wall_ms": 174.34386000968516,
+        "work": {
+          "captures": 10001,
+          "hits": 10000,
+          "copied_entries": 1280128,
+          "copied_bytes": 40964096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":10001,\"hits\":10000,\"copied_entries\":1280128,\"copied_bytes\":40964096,\"checksum\":70065000}\n"
+      },
+      {
+        "variant": "new",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 166.47399999999996,
+        "wall_ms": 167.5595249980688,
+        "work": {
+          "captures": 10001,
+          "hits": 10000,
+          "copied_entries": 1280128,
+          "copied_bytes": 40964096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":10001,\"hits\":10000,\"copied_entries\":1280128,\"copied_bytes\":40964096,\"checksum\":70065000}\n"
+      },
+      {
+        "variant": "old",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 328.083,
+        "wall_ms": 329.8755170108052,
+        "work": {
+          "captures": 20001,
+          "hits": 0,
+          "copied_entries": 2560128,
+          "copied_bytes": 81924096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":20001,\"hits\":0,\"copied_entries\":2560128,\"copied_bytes\":81924096,\"checksum\":70065000}\n"
+      },
+      {
+        "variant": "old",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 311.52700000000016,
+        "wall_ms": 320.4568529909011,
+        "work": {
+          "captures": 20001,
+          "hits": 0,
+          "copied_entries": 2560128,
+          "copied_bytes": 81924096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":20001,\"hits\":0,\"copied_entries\":2560128,\"copied_bytes\":81924096,\"checksum\":70065000}\n"
+      },
+      {
+        "variant": "new",
+        "success": true,
+        "exit_code": 0,
+        "cpu_ms": 164.61900000000017,
+        "wall_ms": 166.09666300064418,
+        "work": {
+          "captures": 10001,
+          "hits": 10000,
+          "copied_entries": 1280128,
+          "copied_bytes": 40964096,
+          "checksum": 70065000
+        },
+        "stderr": "{\"captures\":10001,\"hits\":10000,\"copied_entries\":1280128,\"copied_bytes\":40964096,\"checksum\":70065000}\n"
+      }
+    ],
+    "median_cpu_ms": {
+      "old": 328.083,
+      "new": 166.47399999999996
+    },
+    "speedup": 1.9707762173072076,
+    "cpu_reduction_percent": 49.25857176385245
+  },
+  "actual_renderer": {
+    "evidence": "build/bench/projected-fields-kites/pair-e35030c122b52322/result.json",
+    "pins": {
+      "compiler_sha256": "3e406537d997e3e149e455511d7f8de89f5a3ef5e43cb2c6369744edc6d076fd",
+      "baseline_compiler_sha256": "f9c0e4a2af69474fbd8ffc5d2adadb79a23db4eaf921cec17e4573aab8237419",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "stream_comparisons": [
+      {
+        "scenario": 0,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 1,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 2,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 4,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 8,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 16,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 31,
+        "equal": true,
+        "first_difference": -1
+      }
+    ],
+    "wasm_bytes": {
+      "baseline": 261953,
+      "candidate": 254036
+    },
+    "note": "Current candidate 7917 bytes smaller than parent; seven complete streams equal. One pair is integration evidence, not a timing distribution."
+  },
+  "limits": [
+    "The actual main target is below five seconds and remains unqualified here.",
+    "No current one-megabyte Wasm claim.",
+    "Full native/guest release qualification is pending; baseline failures are retained.",
+    "No host publication or sibling source changes."
+  ],
+  "optimized_candidate": {
+    "sha256": "a830c5c140174e84d6b4da9797a0921eeba8c0599379b7a2c1085c5531d4800b",
+    "toolchain": "Zig0.17 fast LLVM; six-minute compiler build, not game build",
+    "evidence": "build/bench/gdev-parameter-graph-release-first/main-c6ac2262d4285b5a/result.json",
+    "status": "Rejected release retained; exact field-update-self regression is fixed and covered by new native and executed-Wasm laws. Replacement optimized full-main measurement pending.",
+    "build_ms": 9925.101422,
+    "failure": "storage_unsupported: robots.blot66162..66214. No artifact. Passing small laws is not actual-main qualification."
+  },
+  "wordless_renderer": {
+    "evidence": "build/bench/wordless-kites/pair-1b69c137f1069c17/result.json",
+    "pins": {
+      "compiler_sha256": "08c3f7aa26a12596b6bb64fbcc738989061e3da39ca3f7ffde8b2b6e1dcd9a63",
+      "baseline_compiler_sha256": "a1fe99896c353c80346a018bf8e862af5054baa3f21dfcdc09721a5eb0d1f1c4",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "wasm_bytes": {
+      "baseline": 265323,
+      "candidate": 254036
+    },
+    "stream_comparisons": [
+      {
+        "scenario": 0,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 1,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 2,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 4,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 8,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 16,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 31,
+        "equal": true,
+        "first_difference": -1
+      }
+    ],
+    "note": "Separate pair isolates dummy aggregate word removal: 265323 to254036 bytes (4.3%)."
+  },
+  "native_actual_main": {
+    "evidence": "build/bench/gdev-projected-fields-progress/main-25eb145465699f1d/result.json",
+    "compiler_sha256": "3e406537d997e3e149e455511d7f8de89f5a3ef5e43cb2c6369744edc6d076fd",
+    "configuration": "fast/noLLVM, fresh main,4/4 workers,30s cap",
+    "status": "timeout_incomplete",
+    "sample": "build/bench/gdev-projected-fields-progress/main-25eb145465699f1d/cpu-report.json",
+    "bounded_progress": "50451 to84906 expressions;64 to260 graph definitions,146 to613 graph hits,3239 to21953 fields omitted. These are window counts, not total-time speedups.",
+    "hot_exclusive_sample_percent": {
+      "capture": 18.03,
+      "type_key_complete": 10.46,
+      "type_key_enter": 10.22,
+      "outline_scan": 12.99
+    }
+  }
+}
