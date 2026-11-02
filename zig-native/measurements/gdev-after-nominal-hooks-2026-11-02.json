@@ -1,0 +1,374 @@
+{
+  "evidence": "/home/jacobt/src/blot2/build/bench/gdev-nominal-hooks-release-first/main-b8a86d40e91639d3",
+  "identity": "7f41e8ff6d527c532c75bf68a189012e24fdc8ee7cc8c2597cbf34505af6d593",
+  "compiler": "/home/jacobt/src/blot2/build/bench/frozen-release-46e4355/zig-native/zig-out/bin/blotc",
+  "compilerSha256": "49cd9f64832ebcd3f9570deed254360cc40d0ff6242539891d9abacd6f6ffefe",
+  "entry": "/home/jacobt/src/gdev/src/main.blot",
+  "sourceCheckpoint": {
+    "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+  },
+  "deadlineMs": 30000,
+  "codegenTier": "optimized",
+  "codegenWorkers": 4,
+  "frontendWorkers": 4,
+  "buildMs": 9856.019578,
+  "sessionOpenMs": 10.613388000000015,
+  "totalCompileMs": 9866.634669,
+  "profileBackend": false,
+  "success": true,
+  "compiled": true,
+  "wasmBytes": 28996417,
+  "compiler_source": "46e435504c69ed60e8813ec11d3cff1f84aa420b",
+  "toolchain": "Zig 0.17.0 Fast/LLVM baseline CPU",
+  "workload": {
+    "gdev": "b60f8c7616d5c63b5750f5eb9b81c13c7e838d2c",
+    "ink": "7085c97e3d7fc222dc1ba170db5c6d57cff4a840",
+    "cache": "disabled",
+    "abi": 8,
+    "session_protocol": 2,
+    "save_schema": 26
+  },
+  "wasm_sha256": "c10b72832235aeb4626420eeba848e1982ea293dc642f0b97d52978b2263d58a",
+  "workCounters": {
+    "scoped_core_validation_reused": 263,
+    "scoped_core_validation_fresh": 1,
+    "scoped_source_completed_bodies": 5973,
+    "scoped_emission_expressions": 931115,
+    "scoped_type_environment_captures": 225417,
+    "scoped_type_environment_capture_hits": 646383,
+    "scoped_type_environment_copied_bindings": 17870553,
+    "scoped_primitive_environment_entries_avoided": 218918400,
+    "scoped_type_environment_inherited_raw_bindings": 12563333,
+    "scoped_type_environment_inherited_bindings": 2756060,
+    "scoped_scalar_definitions": 2726,
+    "scoped_scalar_cache_hits": 104166,
+    "scoped_scalar_completed_hits": 93909,
+    "scoped_call_admission_nodes": 1508168,
+    "scoped_scalar_admission_nodes": 239015,
+    "scoped_scalar_admission_hits": 12784,
+    "scoped_inline_definitions": 1267,
+    "scoped_inline_cache_hits": 13344,
+    "scoped_closure_definitions": 54,
+    "scoped_closure_cache_hits": 156,
+    "scoped_reader_definitions": 844,
+    "scoped_reader_cache_hits": 17849,
+    "scoped_writer_definitions": 2034,
+    "scoped_writer_cache_hits": 15376,
+    "scoped_owner_graph_definitions": 1574,
+    "scoped_owner_graph_hits": 10969,
+    "scoped_owned_word_calls": 17472,
+    "scoped_owned_packed_calls": 65,
+    "scoped_owned_argument_words_avoided": 196321,
+    "scoped_owner_graph_inputs": 14437,
+    "scoped_completed_plan_attempts": 3017,
+    "scoped_context_sensitive_calls": 3981,
+    "scoped_context_free_calls": 155535,
+    "scoped_context_sensitive_definitions": 546,
+    "scoped_context_free_definitions": 6447,
+    "scoped_completed_plan_definitions": 1889,
+    "scoped_plain_plan_definitions": 315,
+    "scoped_plain_plan_hits": 2623,
+    "scoped_completed_plan_rollbacks": 934,
+    "scoped_completed_plan_discarded_expressions": 75752,
+    "scoped_parameter_words_shared": 28159,
+    "scoped_local_words_shared": 48229,
+    "scoped_record_updates_shared": 4335,
+    "scoped_indexed_update_roots_shared": 6196,
+    "scoped_transport_words_avoided": 45894,
+    "scoped_projected_parameter_fields": 503242,
+    "scoped_descriptor_admissions": 1150,
+    "scoped_descriptor_admission_hits": 11442,
+    "scoped_concrete_admissions": 7402,
+    "scoped_concrete_admission_hits": 41371,
+    "scoped_field_refinements": 406726,
+    "scoped_field_goal_visits": 1510238,
+    "scoped_field_recipe_hits": 624772,
+    "scoped_field_name_probes": 70147,
+    "scoped_outline_key_declines": 177,
+    "scoped_outlined_regions": 596,
+    "scoped_outlined_globals": 115327,
+    "scoped_refinement_lookups": 10108027,
+    "scoped_refinement_indexed_bindings": 611837,
+    "max_scoped_emission_body_steps": 34011,
+    "max_scoped_emission_limit": 500000
+  },
+  "profile": {
+    "evidence": "build/bench/gdev-nominal-hooks-release-profile/main-e83d67fe4bea1a92/result.json",
+    "total_compile_ms": 9836.782811,
+    "phase_profile": {
+      "total_us": 9744932,
+      "peak_rss_kib": 1684020,
+      "phases": {
+        "other": {
+          "us": 16508,
+          "requested_bytes": 30695047,
+          "allocations": 652,
+          "rss_growth_kib": 664
+        },
+        "assets": {
+          "us": 20395,
+          "requested_bytes": 28714381,
+          "allocations": 517,
+          "rss_growth_kib": 3896
+        },
+        "inputs": {
+          "us": 431,
+          "requested_bytes": 206080,
+          "allocations": 444,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 9757,
+          "requested_bytes": 10919595,
+          "allocations": 21056,
+          "rss_growth_kib": 1624
+        },
+        "lex": {
+          "us": 46144,
+          "requested_bytes": 28518784,
+          "allocations": 4750,
+          "rss_growth_kib": 16268
+        },
+        "parse": {
+          "us": 27352,
+          "requested_bytes": 43645872,
+          "allocations": 137698,
+          "rss_growth_kib": 3992
+        },
+        "check": {
+          "us": 518609,
+          "requested_bytes": 703496904,
+          "allocations": 1437900,
+          "rss_growth_kib": 191976
+        },
+        "lower": {
+          "us": 119667,
+          "requested_bytes": 161118557,
+          "allocations": 168189,
+          "rss_growth_kib": 58196
+        },
+        "freeze": {
+          "us": 54524,
+          "requested_bytes": 103882801,
+          "allocations": 348133,
+          "rss_growth_kib": 17964
+        },
+        "validation": {
+          "us": 100992,
+          "requested_bytes": 40058105,
+          "allocations": 40789,
+          "rss_growth_kib": 4580
+        },
+        "backend": {
+          "us": 8830548,
+          "requested_bytes": 8404024441,
+          "allocations": 6478594,
+          "rss_growth_kib": 1382532
+        }
+      },
+      "checking": {
+        "parallel_batches": 27,
+        "parallel_jobs": 263,
+        "parallel_retries": 0,
+        "parallel_prepare_us": 0,
+        "parallel_batch_us": 0,
+        "parallel_capacity_us": 0,
+        "parallel_worker_us": 0,
+        "parallel_worker_cpu_us": 0,
+        "parallel_worker_cpu_samples": 0,
+        "parallel_worker_slots": 0,
+        "parallel_worker_jobs": 0,
+        "modules": 264,
+        "scheme_calls": 12537,
+        "closed_array_locals": 2670,
+        "candidate_scans": 3474660,
+        "candidates": 67441,
+        "candidate_parts": 162233,
+        "candidate_variables": 93548,
+        "candidate_rows": 21087,
+        "dependency_hits": 54346,
+        "dependency_recomputations": 13095,
+        "import_requests": 514893,
+        "imported_schemes": 47498,
+        "imported_summary_reuses": 5329,
+        "imported_read": 10299,
+        "type_nodes": 1442210,
+        "normalization": {
+          "substitute_nodes_added": 160152,
+          "substitute_depth_entries": 369761,
+          "substitute_memo_hits": 523,
+          "substitute_unchanged": 0,
+          "resolve_nodes_added": 409783,
+          "resolve_depth_entries": 4169314,
+          "unify_pairs": 440643,
+          "unify_projected_pairs": 0,
+          "unify_resolve_calls": 881286,
+          "unify_resolve_entries": 972754,
+          "unify_resolve_nodes": 25958,
+          "open_nodes_added": 69606,
+          "open_depth_entries": 425638,
+          "close_nodes_added": 16027,
+          "close_depth_entries": 37558,
+          "import_nodes_added": 372868,
+          "import_depth_entries": 921960,
+          "variable_views_created": 230422,
+          "type_binders_created": 230422,
+          "row_requests": 1329638,
+          "closed_row_hits": 1925,
+          "epoch_row_hits": 0,
+          "epoch_row_probes": 990,
+          "epoch_row_collisions": 853,
+          "epoch_row_stale": 3,
+          "epoch_row_context_misses": 0,
+          "epoch_row_publications": 990,
+          "composite_probes": 1120136,
+          "composite_hits": 455,
+          "composite_collisions": 564517,
+          "composite_stale_dependencies": 100,
+          "composite_future_clock_misses": 0,
+          "composite_frontier_declines": 1704,
+          "composite_publications": 11937,
+          "free_type_queries": 37225,
+          "free_type_visits": 146581,
+          "free_row_queries": 163510,
+          "free_row_visits": 654444,
+          "argument_rows": 990,
+          "labels": 990,
+          "arguments": 0,
+          "changed_rows": 0,
+          "closed_row_evictions": 1973,
+          "interner_requests": 3,
+          "interner_candidates": 3,
+          "interner_arguments": 0,
+          "interner_linked": 3,
+          "interner_rebuilds": 3,
+          "closed_operation_hits": 983,
+          "argument_height_checks": 0
+        }
+      }
+    },
+    "interpretation": "Phase times are exclusive. Sampling has separate overhead; do not add overlapping backend subcounters."
+  },
+  "configured_path": {
+    "evidence": "/home/jacobt/src/blot2/build/bench/gdev-nominal-hooks-configured-path/main-4f0282daa2eba45f",
+    "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+    "compilerSha256": "49cd9f64832ebcd3f9570deed254360cc40d0ff6242539891d9abacd6f6ffefe",
+    "identity": "7f41e8ff6d527c532c75bf68a189012e24fdc8ee7cc8c2597cbf34505af6d593",
+    "success": true,
+    "wasmBytes": 28996417,
+    "totalCompileMs": 10071.560212,
+    "buildMs": 10060.951159,
+    "sessionOpenMs": 10.60739000000001,
+    "scope": "Delivery-path verification; may overlap sampling, not an isolated latency comparison."
+  },
+  "cpu_sampling": {
+    "evidence": "build/bench/gdev-nominal-hooks-release-sampling/main-9442f66f6d1bee45/cpu-report.json",
+    "complete_intervals": 79,
+    "coverage_ratio": 0.9838397208860759,
+    "truncated_stack_cpu_ms": 0.0,
+    "top_compiler_owner": [
+      {
+        "name": "backend.scoped_backend.Generator.plainShape",
+        "cpu_ms": 392.129211,
+        "sampled_cpu_percent": 6.306490774564064
+      },
+      {
+        "name": "backend.storage_type_key.Builder.enter",
+        "cpu_ms": 357.574396,
+        "sampled_cpu_percent": 5.7507565525240025
+      },
+      {
+        "name": "backend.wasm_scope_outline.Proof.scan",
+        "cpu_ms": 308.060657,
+        "sampled_cpu_percent": 4.9544426604235925
+      },
+      {
+        "name": "backend.scoped_backend.Generator.descriptorType",
+        "cpu_ms": 302.051969,
+        "sampled_cpu_percent": 4.857806821072074
+      },
+      {
+        "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).latestNonidentity",
+        "cpu_ms": 264.642205,
+        "sampled_cpu_percent": 4.256157352156026
+      },
+      {
+        "name": "backend.storage_plan.borrows__func_11056",
+        "cpu_ms": 258.865835,
+        "sampled_cpu_percent": 4.163257810133719
+      },
+      {
+        "name": "backend.storage_plan.hasRoot__func_10934",
+        "cpu_ms": 228.819026,
+        "sampled_cpu_percent": 3.6800244308086874
+      },
+      {
+        "name": "backend.scoped_backend.Generator.resolveType",
+        "cpu_ms": 223.085527,
+        "sampled_cpu_percent": 3.587814369596307
+      },
+      {
+        "name": "backend.scoped_backend.Generator.resolveActual",
+        "cpu_ms": 206.064186,
+        "sampled_cpu_percent": 3.314065495562006
+      },
+      {
+        "name": "backend.storage_type_key.Builder.complete",
+        "cpu_ms": 193.132135,
+        "sampled_cpu_percent": 3.1060833865023163
+      },
+      {
+        "name": "backend.storage_type_arguments.Stack(backend.scoped_backend.TypeArgument).capture",
+        "cpu_ms": 191.652701,
+        "sampled_cpu_percent": 3.0822901147672597
+      },
+      {
+        "name": "backend.scoped_backend.Generator.callLayoutEvidence",
+        "cpu_ms": 174.70066,
+        "sampled_cpu_percent": 2.809655770837876
+      }
+    ],
+    "top_self": [
+      {
+        "name": "compiler_rt.memcpy.copyBlocks",
+        "cpu_ms": 1076.876585,
+        "sampled_cpu_percent": 17.319067435265755
+      },
+      {
+        "name": "backend.scoped_backend.Generator.descriptorType",
+        "cpu_ms": 302.051969,
+        "sampled_cpu_percent": 4.857806821072074
+      },
+      {
+        "name": "array_list.Aligned(u32,null).append",
+        "cpu_ms": 228.689505,
+        "sampled_cpu_percent": 3.677941385300475
+      },
+      {
+        "name": "backend.scoped_backend.Generator.resolveType",
+        "cpu_ms": 223.085527,
+        "sampled_cpu_percent": 3.587814369596307
+      },
+      {
+        "name": "backend.scoped_backend.Generator.resolveActual",
+        "cpu_ms": 206.064186,
+        "sampled_cpu_percent": 3.314065495562006
+      }
+    ],
+    "scope": "CPU-weighted owned.emit sampling window; trace instrumentation changes execution cost; compiler-owner rows attribute library time to nearest compiler caller."
+  },
+  "comparison": {
+    "previous_same_source_baseline_ms": 10642.859876,
+    "previous_wasm_bytes": 29211724,
+    "latency_change_percent": -7.293389333729882,
+    "wasm_change_percent": -0.7370568063699401,
+    "scope": "Single fresh completions; nominal Hooks changes source shape. No distribution or sub-five-second claim."
+  },
+  "qualification": {
+    "world_editor_release": "7 assertions pass in sync and JSPI; ABI 8",
+    "renderer": "7 complete streams match; 211471-byte Wasm",
+    "full_gate": "48 passed / one independently reproduced baseline List/chunk storage_escape at bytes 312..345; full qualification pending",
+    "fresh_game_frame": "pending matching ABI 8 Pen host"
+  }
+}

@@ -7,102 +7,79 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest completed actual main takes **10.75 seconds** and produces
-**29,211,724 bytes of Wasm**, cache disabled. Compiler source is
-`6155af2d662a5740d1af7d0481c20648386d3911`, Zig 0.17 fast/LLVM; unchanged
-Gdev/Ink code remains `7733add6`/`d520a903`. Same-workload predecessors took
-11.81s/31.65MB, 15.15s/32.72MB and 17.45s/38.82MB. These are single completions,
-not distributions. See
-[latest full-main evidence](zig-native/measurements/gdev-after-owner-word-calls-2026-11-02.json).
+The latest completed actual main takes **9.87 seconds total**: 10.6ms session
+startup plus 9.86s build, producing **28,996,417 bytes of Wasm**, cache
+disabled. Compiler source is `46e435504c69ed60e8813ec11d3cff1f84aa420b`, Zig
+0.17 Fast/LLVM; workload pins are Gdev `b60f8c76` and Ink `7085c97e`. The
+preceding completed workload took 10.64s/29.21MB; earlier checkpoints took
+11.81s/31.65MB, 15.15s/32.72MB and 17.45s/38.82MB. These are single fresh
+completions, not distributions. See
+[latest full-main evidence](zig-native/measurements/gdev-after-nominal-hooks-2026-11-02.json).
 
-The separate profile attributes 10.27s to the backend and 9.25GB requested
-allocations. Word calls avoid 196,780 argument-buffer words across 17,519 calls;
-primitive resolution avoids 221M impossible environment comparisons. The
-five-second gate remains unmet. The configured Gdev launcher now uses the
-installed optimized compiler at `zig-native/zig-out/bin/blotc`; the default
-handoff runner follows that configured path. That path completes the unchanged
-main in 10.57s with the exact same Wasm. A separate end-to-end measurement takes
-10.64s: 10ms startup plus 10.63s build. Gdev config-only evidence follows its
-new source checkpoint separately.
+A separate phase profile puts 8.83s in the backend, 0.52s in checking, 0.12s in
+lowering and 0.10s in validation. Backend allocation requests total 8.40GB. CPU
+sampling attributes substantial work to copying 256-byte metadata values,
+recursive shape checks, structural keys and descriptor/type resolution. The next
+probe removes repeated recursive classification and by-value copies before
+introducing another cache or IR. The five-second gate remains unmet.
 
-The checked batch removes proven invariant whole-record transport through
-branches/loops, completes zero-owner plain functions with the direct word ABI,
-skips scalar shadow walks on completed strong keys, sparsifies loop read frames
-and reuses raw record-name ordering. Child type inheritance drops proven
-shadowed history only when at least75% can be removed. All 2,839 native laws
-compile; 80 selected laws pass exhaustive allocation faults, 56 guests pass and
-Zig lint is clean. Seven actual renderer streams match. Plain sharing reduces
-renderer expressions 7,919->7,056 and shadow visits 28,531->24,891, but
-increases Wasm 220,771->224,349B; record-name caching is byte-identical. A
-165-field control falls 30,138->17,810B with 2,061 copies avoided; the
-local-reference fallback stays byte-identical. The optimized main result above
-qualifies this batch. See
-[transport evidence](zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json).
+The configured Gdev launcher now uses this exact optimized release at
+`zig-native/zig-out/bin/blotc`; the handoff runner follows that path. Delivery
+verification produces identical Wasm. Its 10.07s timing may overlap sampling and
+is not an isolated performance comparison. Preserve token/epoch, alias,
+read/write ordering, frozen/init, lifetime and escape checks. Physical
+optimization does not weaken complete source or semantic proofs.
 
-Preserve token/epoch, alias, read/write ordering, frozen/init, lifetime and
-escape checks. Physical optimization does not weaken complete source/semantic
-proofs. Prior
-[completed-function](zig-native/measurements/completed-functions-and-immutable-metadata-2026-11-02.json)
-and
-[context sharing](zig-native/measurements/completed-context-aliases-2026-11-02.json)
-evidence pins their exact candidates. Structural global type IDs remain
-[rejected after a renderer regression](zig-native/measurements/rejected-global-type-ids-2026-11-02.json).
-The
-[same source rewrites retested on d8](zig-native/measurements/rejected-source-call-shapes-d8-2026-11-02.json)
-remain rejected: only3.1% fewer expressions and0.18% fewer bytes, no latency
-win. The two
-[source-call shape experiments](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
-are also rejected and reverted on their named old compiler.
+## Checked latency batches
 
-The required full gate still stops at **48 passed/one baseline List/chunk
-storage_escape**, bytes312..345. The broader static family has one separately
-reproduced ECS storage_unsupported baseline. Full release/native qualification
-remains pending. A fresh main frame is also pending: available Pen binaries
-predate ABI 8; renderer stream coverage does not qualify a full game frame.
-
-Release snapshots under `build/bench/frozen-release-COMMIT` use plain
-`git archive`, not worktrees, and pin source/toolchain/binary hashes. Start LLVM
-builds in the actual snapshot directory. Reserve the five-minute build for
-meaningful checked candidates; native/noLLVM iterations take seconds.
-
-## Next checked latency batch
-
-Direct word arguments now cover completed owner calls up to 512 parameters.
-Scalar/Unit calls avoid argument-buffer owners; aggregate/borrow returns use a
-result-only slot. Immutable callable and type witnesses are boxed in their
-owning arenas. Primitive resolution skips impossible substitution searches;
-structural-key completion removes a repeated hash lookup. All 2,842 native laws
-compile, 90 selected laws pass exhaustive faults, 61 guests pass, and Zig lint
-is clean. Seven actual renderer streams match; Wasm falls 224,349->211,471B. The
-required full gate retains the same 48/1 baseline failure. Optimized actual main
-measurement is pending; the latest completed figure remains 11.81s. See
-[checked batch evidence](zig-native/measurements/owned-word-calls-and-cold-metadata-2026-11-02.json).
-
-The next allocation-only cut reuses a nested descriptor scratch stack within
-each key builder. Exact key/budget/OOM laws pass; all 2,843 native laws compile,
-91 selected laws pass exhaustive faults and 61 guests pass. Renderer Wasm and
-all seven streams remain identical, with backend allocations 95,585->81,620.
-Latency is inconclusive; bundle a larger change before another LLVM build. See
-[scratch evidence](zig-native/measurements/type-key-scratch-2026-11-02.json).
-
-Primitive key memo atoms are now shared across source units and captured frames;
-semantic witnesses retain their exact units and environments. All 2,844 native
-laws compile, 92 selected laws pass exhaustive faults, and 61 guests pass.
-Renderer Wasm remains identical; native timing is inconclusive. See
-[primitive memo evidence](zig-native/measurements/primitive-type-key-memo-2026-11-02.json).
-
-## Candidate: concrete callback bundles
-
-Gdev now groups its four world callbacks in a concrete `Hooks` nominal with the
+Gdev groups its four world callbacks in one concrete `Hooks` nominal with the
 same closed effects, captures and forwarding. `FrameAccess` remains structural.
 The compiler finds nested callbacks within depth/work bounds and applies its
 existing physical field projection. Source/method/owner proofs and full semantic
 witnesses remain unchanged. All 2,846 native laws compile; 94 selected laws pass
 exhaustive faults, 63 guests pass and Zig lint is clean. All seven renderer
-streams match. The real world/editor witness passes seven checks in sync/JSPI.
-The required gate retains the 48/1 baseline. Optimized actual main is pending;
-source-only on the old compiler takes 10.72s/29.77MB. See
+streams match. The final optimized release passes the world/editor witness's
+seven checks in both sync and JSPI modes. See
 [bundle evidence](zig-native/measurements/nominal-callback-bundles-2026-11-02.json).
+
+The preceding batches complete direct word calls for owner arguments, box
+immutable witnesses, avoid impossible primitive substitution scans, reuse nested
+key scratch and canonicalize primitive key memo atoms. Exact semantic witnesses
+retain their units/environments. Allocation-only timing remains inconclusive.
+Their checked requirements and exact evidence remain in
+[word calls](zig-native/measurements/owned-word-calls-and-cold-metadata-2026-11-02.json),
+[key scratch](zig-native/measurements/type-key-scratch-2026-11-02.json) and
+[primitive memo](zig-native/measurements/primitive-type-key-memo-2026-11-02.json).
+Earlier
+[transport](zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json),
+[completed-function](zig-native/measurements/completed-functions-and-immutable-metadata-2026-11-02.json)
+and
+[context sharing](zig-native/measurements/completed-context-aliases-2026-11-02.json)
+records qualify their exact candidates.
+
+Structural global type IDs remain
+[rejected after a renderer regression](zig-native/measurements/rejected-global-type-ids-2026-11-02.json).
+The
+[source call-shape retests](zig-native/measurements/rejected-source-call-shapes-d8-2026-11-02.json)
+and earlier
+[source experiments](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
+remain rejected. Private pooling, eager-schema, primitive-environment and
+callback-path allocation probes did not establish CPU gains and are not landed.
+Direct ECS indexing also remains private: it loses the existing mixed fixed/
+resizable-array source contract. Tag-only match reads are a separate bounded
+probe; they do not yet qualify ECS `.at` calls or establish a speedup.
+
+The required full gate still stops at **48 passed/one baseline List/chunk
+storage_escape**, bytes312..345. The broader static family has one separately
+reproduced ECS storage_unsupported baseline. Full release/native qualification
+remains pending. A fresh main frame is also pending: available Pen binaries
+predate ABI 8; renderer streams and the world/editor witness do not qualify a
+full game frame.
+
+Release snapshots under `build/bench/frozen-release-COMMIT` use plain
+`git archive`, not worktrees, and pin source/toolchain/binary hashes. Start LLVM
+builds in the actual snapshot directory. Reserve the five-minute build for
+meaningful checked candidates; native/noLLVM iterations take seconds.
 
 ## Checked compiler fixes
 
