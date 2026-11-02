@@ -1,0 +1,780 @@
+--- a/zig-native/src/backend/storage_type_key.zig
++++ b/zig-native/src/backend/storage_type_key.zig
+@@ -1,43 +1,105 @@
+-//! Canonical structural DAGs for one selected-call key. No proof is cached.
+-//! Only completed descriptors are interned; source references accelerate this
+-//! construction but never appear in its encoding.
++//! Compile-local exact structural type IDs. Store descriptors contain no source
++//! environments or proof authority; lexical reference memoization is query-local.
+ const std = @import("std");
+-pub const Error = std.mem.Allocator.Error || error{ Limit, Cycle };
+-pub const Reference = struct {
+-    unit: u32,
+-    ty: u32,
+-    environment: usize = 0,
+-    environment_len: usize = 0,
+-    captured: bool = false,
++const A = std.mem.Allocator;
++pub const Error = A.Error || error{ Limit, Cycle };
++pub const Reference = struct { unit: u32, ty: u32, environment: usize = 0, environment_len: usize = 0, captured: bool = false };
++pub const Result = struct { id: u32, height: usize };
++pub const Options = struct { encoded_words: usize = 65_536, word_work: usize = 262_144 };
++pub const StoreOptions = struct {
++    hash_mask: u64 = std.math.maxInt(u64),
++    // Compilation-wide protection for global bucket probes and exact slot
++    // comparisons. It never spends any query's logical type/word allowance.
++    collision_work: usize = 268_435_456,
+ };
+-pub const Result = struct { id: u32, height: usize };
+-pub const Options = struct {
+-    encoded_words: usize = 65_536,
+-    word_work: usize = 262_144,
+-    hash_mask: u64 = std.math.maxInt(u64),
++// Tag child positions so scalar metadata can never alias an equally numbered
++// global type ID. All bits are initialized before exact hashing/comparison.
++pub const Word = packed struct(u64) { value: u32, is_child: bool = false, padding: u31 = 0 };
++pub const Descriptor = struct {
++    pub const empty: Descriptor = .{};
++    words: std.ArrayList(Word) = .empty,
++    height: usize = 0,
++    pub fn deinit(self: *Descriptor, allocator: A) void {
++        self.words.deinit(allocator);
++    }
++};
++pub const Store = struct {
++    const Node = struct { start: usize, len: usize, height: usize, next: ?u32 };
++    allocator: A,
++    options: StoreOptions,
++    remaining_collision_work: usize,
++    words: std.ArrayList(Word) = .empty,
++    nodes: std.ArrayList(Node) = .empty,
++    buckets: std.AutoHashMapUnmanaged(u64, u32) = .empty,
++
++    pub fn init(allocator: A, options: StoreOptions) Store {
++        return .{ .allocator = allocator, .options = options, .remaining_collision_work = options.collision_work };
++    }
++    pub fn deinit(self: *Store) void {
++        self.buckets.deinit(self.allocator);
++        self.nodes.deinit(self.allocator);
++        self.words.deinit(self.allocator);
++    }
++    fn collisionWork(self: *Store, count: usize) Error!void {
++        if (count > self.remaining_collision_work) return error.Limit;
++        self.remaining_collision_work -= count;
++    }
++    fn equal(self: *Store, stored: []const Word, candidate: []const Word) Error!bool {
++        if (stored.len != candidate.len) return false;
++        for (stored, candidate) |a, b| {
++            try self.collisionWork(1);
++            if (@as(u64, @bitCast(a)) != @as(u64, @bitCast(b))) return false;
++        }
++        return true;
++    }
++    fn intern(self: *Store, query: *Builder, descriptor: *const Descriptor, height: usize) Error!Result {
++        // Hashing and the logical descriptor-copy fee have the same query
++        // cost on hits and misses. Only the physical copy is miss-only.
++        try query.wordWork(descriptor.words.items.len);
++        try query.wordWork(descriptor.words.items.len);
++        const hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(descriptor.words.items)) & self.options.hash_mask;
++        var next = self.buckets.get(hash);
++        while (next) |id| {
++            try self.collisionWork(1);
++            const node = self.nodes.items[id];
++            if (try self.equal(self.words.items[node.start..][0..node.len], descriptor.words.items)) {
++                if (node.height != height) return error.Cycle;
++                return .{ .id = id, .height = height };
++            }
++            next = node.next;
++        }
++        const id = std.math.cast(u32, self.nodes.items.len) orelse return error.Limit;
++        // Reserve all publication capacity before changing any logical content.
++        try self.words.ensureUnusedCapacity(self.allocator, descriptor.words.items.len);
++        try self.nodes.ensureUnusedCapacity(self.allocator, 1);
++        try self.buckets.ensureUnusedCapacity(self.allocator, 1);
++        const start = self.words.items.len;
++        self.words.appendSliceAssumeCapacity(descriptor.words.items);
++        self.nodes.appendAssumeCapacity(.{ .start = start, .len = descriptor.words.items.len, .height = height, .next = self.buckets.get(hash) });
++        self.buckets.putAssumeCapacity(hash, id);
++        return .{ .id = id, .height = height };
++    }
+ };
+ pub const Builder = struct {
+-    const Node = struct { start: usize, len: usize, height: usize, next: ?u32 };
+     const Memo = union(enum) { active: usize, complete: Result };
+-    allocator: std.mem.Allocator,
++    allocator: A,
++    store: *Store,
+     remaining: *usize,
+     options: Options,
+     word_work: usize,
+-    words: std.ArrayList(u32) = .empty,
+-    nodes: std.ArrayList(Node) = .empty,
+-    buckets: std.AutoHashMapUnmanaged(u64, u32) = .empty,
+     memo: std.AutoHashMapUnmanaged(Reference, Memo) = .empty,
++    reached: std.AutoHashMapUnmanaged(u32, void) = .empty,
++    // Keep the former table's logical bound, independent of Store occupancy.
++    encoded: usize = 4,
+     poisoned: bool = false,
+     finished: bool = false,
+ 
+-    pub fn init(allocator: std.mem.Allocator, remaining: *usize, options: Options) Builder {
+-        return .{ .allocator = allocator, .remaining = remaining, .options = options, .word_work = options.word_work };
++    pub fn init(store: *Store, remaining: *usize, options: Options) Builder {
++        return .{ .allocator = store.allocator, .store = store, .remaining = remaining, .options = options, .word_work = options.word_work };
+     }
+     pub fn deinit(self: *Builder) void {
++        self.reached.deinit(self.allocator);
+         self.memo.deinit(self.allocator);
+-        self.buckets.deinit(self.allocator);
+-        self.nodes.deinit(self.allocator);
+-        self.words.deinit(self.allocator);
+     }
+     fn charge(self: *Builder) Error!void {
+         if (self.poisoned or self.finished or self.remaining.* == 0) return error.Limit;
+@@ -47,9 +109,17 @@
+         if (self.poisoned or self.finished or count > self.word_work) return error.Limit;
+         self.word_work -= count;
+     }
+-    fn encodedSize(self: *const Builder) Error!usize {
+-        const count = std.math.add(usize, self.words.items.len, self.nodes.items.len) catch return error.Limit;
+-        return std.math.add(usize, count, 4) catch error.Limit;
++    fn account(self: *Builder, id: u32) Error!void {
++        if (self.reached.contains(id)) return;
++        // Source traversal is charged by enter/finish. Charging again here
++        // would tighten that bound merely because a descriptor is distinct.
++        const node = self.store.nodes.items[id];
++        const growth = std.math.add(usize, node.len, 1) catch return error.Limit;
++        if (self.encoded > self.options.encoded_words or growth > self.options.encoded_words - self.encoded) return error.Limit;
++        try self.wordWork(node.len);
++        try self.reached.put(self.allocator, id, {});
++        self.encoded += growth;
++        for (self.store.words.items[node.start..][0..node.len]) |word| if (word.is_child) try self.account(word.value);
+     }
+     pub fn enter(self: *Builder, reference: Reference, depth: usize) Error!?Result {
+         errdefer self.poisoned = true;
+@@ -59,79 +129,56 @@
+             .active => return error.Cycle,
+             .complete => |result| {
+                 if (result.height > 128 - depth) return error.Limit;
++                try self.account(result.id);
+                 return result;
+             },
+         };
+         try self.memo.put(self.allocator, reference, .{ .active = depth });
+         return null;
+     }
+-    pub fn addWord(self: *Builder, descriptor: *std.ArrayList(u32), word: u32) Error!void {
++    pub fn addWord(self: *Builder, descriptor: *Descriptor, word: u32) Error!void {
+         errdefer self.poisoned = true;
+-        if (descriptor.items.len >= self.options.encoded_words) return error.Limit;
++        if (descriptor.words.items.len >= self.options.encoded_words) return error.Limit;
+         try self.wordWork(1);
+-        try descriptor.append(self.allocator, word);
++        try descriptor.words.append(self.allocator, .{ .value = word });
+     }
+-    pub fn addWords(self: *Builder, descriptor: *std.ArrayList(u32), words: []const u32) Error!void {
++    pub fn addWords(self: *Builder, descriptor: *Descriptor, words: []const u32) Error!void {
+         errdefer self.poisoned = true;
+-        if (descriptor.items.len > self.options.encoded_words or words.len > self.options.encoded_words - descriptor.items.len) return error.Limit;
++        if (descriptor.words.items.len > self.options.encoded_words or words.len > self.options.encoded_words - descriptor.words.items.len) return error.Limit;
+         try self.wordWork(words.len);
+-        try descriptor.appendSlice(self.allocator, words);
++        try descriptor.words.ensureUnusedCapacity(self.allocator, words.len);
++        for (words) |word| descriptor.words.appendAssumeCapacity(.{ .value = word });
+     }
+-    fn equal(self: *Builder, stored: []const u32, candidate: []const u32) Error!bool {
+-        if (stored.len != candidate.len) return false;
+-        for (stored, candidate) |a, b| {
+-            try self.wordWork(1);
+-            if (a != b) return false;
+-        }
+-        return true;
++    pub fn addChild(self: *Builder, descriptor: *Descriptor, result: Result) Error!void {
++        errdefer self.poisoned = true;
++        if (result.id >= self.store.nodes.items.len or self.store.nodes.items[result.id].height != result.height) return error.Limit;
++        if (descriptor.words.items.len >= self.options.encoded_words) return error.Limit;
++        try self.wordWork(1);
++        try descriptor.words.append(self.allocator, .{ .value = result.id, .is_child = true });
++        descriptor.height = @max(descriptor.height, result.height + 1);
+     }
+-    pub fn complete(self: *Builder, reference: Reference, descriptor: []const u32, height: usize) Error!Result {
++    pub fn complete(self: *Builder, reference: Reference, descriptor: *const Descriptor, height: usize) Error!Result {
+         errdefer self.poisoned = true;
+         if (self.poisoned or self.finished or height > 128) return error.Limit;
++        if (height != descriptor.height) return error.Cycle;
+         const pending = self.memo.get(reference) orelse return error.Cycle;
+         if (pending != .active) return error.Cycle;
+         if (height > 128 - pending.active) return error.Limit;
+-        try self.wordWork(descriptor.len);
+-        const hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(descriptor)) & self.options.hash_mask;
+-        var next = self.buckets.get(hash);
+-        while (next) |id| {
+-            try self.charge();
+-            const node = self.nodes.items[id];
+-            if (try self.equal(self.words.items[node.start..][0..node.len], descriptor)) {
+-                if (node.height != height) return error.Cycle;
+-                const result: Result = .{ .id = id, .height = height };
+-                self.memo.getPtr(reference).?.* = .{ .complete = result };
+-                return result;
+-            }
+-            next = node.next;
+-        }
+-        const growth = std.math.add(usize, descriptor.len, 1) catch return error.Limit;
+-        const encoded = try self.encodedSize();
+-        if (encoded > self.options.encoded_words or growth > self.options.encoded_words - encoded) return error.Limit;
+-        const id = std.math.cast(u32, self.nodes.items.len) orelse return error.Limit;
+-        // Reserve all publication capacity before installing a completed node.
+-        try self.wordWork(descriptor.len);
+-        try self.words.ensureUnusedCapacity(self.allocator, descriptor.len);
+-        try self.nodes.ensureUnusedCapacity(self.allocator, 1);
+-        try self.buckets.ensureUnusedCapacity(self.allocator, 1);
+-        const start = self.words.items.len;
+-        self.words.appendSliceAssumeCapacity(descriptor);
+-        self.nodes.appendAssumeCapacity(.{ .start = start, .len = descriptor.len, .height = height, .next = self.buckets.get(hash) });
+-        self.buckets.putAssumeCapacity(hash, id);
+-        const result: Result = .{ .id = id, .height = height };
++        const result = try self.store.intern(self, descriptor, height);
++        try self.account(result.id);
+         self.memo.getPtr(reference).?.* = .{ .complete = result };
+         return result;
+     }
+     pub fn root(self: *Builder, output: *std.ArrayList(u32), result: Result) Error!void {
+         errdefer self.poisoned = true;
+-        if (result.id >= self.nodes.items.len or self.nodes.items[result.id].height != result.height) return error.Limit;
+-        const table = try self.encodedSize();
+-        if (table >= self.options.encoded_words or output.items.len >= self.options.encoded_words - table) return error.Limit;
++        if (self.poisoned or self.finished or result.id >= self.store.nodes.items.len or self.store.nodes.items[result.id].height != result.height) return error.Limit;
++        try self.account(result.id);
++        if (self.encoded >= self.options.encoded_words or output.items.len >= self.options.encoded_words - self.encoded) return error.Limit;
+         try self.wordWork(1);
+         try output.append(self.allocator, result.id);
+     }
+-    /// Append one versioned, length-delimited table atomically. Root references
+-    /// and non-type evidence are already in the caller's unpublished buffer.
++    /// Global IDs are private to this compilation. No structural table is
++    /// serialized into each key; this marker separates the new private domain.
+     pub fn finish(self: *Builder, output: *std.ArrayList(u32)) Error!void {
+         errdefer self.poisoned = true;
+         if (self.poisoned or self.finished) return error.Limit;
+@@ -140,15 +187,10 @@
+             try self.charge();
+             if (entry.value_ptr.* == .active) return error.Cycle;
+         }
+-        const count = try self.encodedSize();
+-        if (count > self.options.encoded_words or output.items.len > self.options.encoded_words - count) return error.Limit;
+-        try self.wordWork(count);
+-        try output.ensureUnusedCapacity(self.allocator, count);
+-        output.appendSliceAssumeCapacity(&.{ 0x53444b31, 1, @intCast(self.nodes.items.len), @intCast(self.words.items.len) });
+-        for (self.nodes.items) |node| {
+-            output.appendAssumeCapacity(@intCast(node.len));
+-            output.appendSliceAssumeCapacity(self.words.items[node.start..][0..node.len]);
+-        }
++        if (self.encoded > self.options.encoded_words or output.items.len > self.options.encoded_words - self.encoded) return error.Limit;
++        try self.wordWork(2);
++        try output.ensureUnusedCapacity(self.allocator, 2);
++        output.appendSliceAssumeCapacity(&.{ 0x53444932, 2 });
+         self.finished = true;
+     }
+ };
+--- a/zig-native/src/backend/storage_type_key_tests.zig
++++ b/zig-native/src/backend/storage_type_key_tests.zig
+@@ -7,21 +7,22 @@
+ fn visit(builder: *K.Builder, terms: []const Term, ordinal: usize, depth: usize) K.Error!K.Result {
+     const term = terms[ordinal];
+     if (try builder.enter(term.reference, depth)) |result| return result;
+-    var words: std.ArrayList(u32) = .empty;
++    var words: K.Descriptor = .empty;
+     defer words.deinit(builder.allocator);
+     try builder.addWords(&words, term.head);
+     var height: usize = 0;
+     for (term.children) |child| {
+         const result = try visit(builder, terms, child, depth + 1);
+         height = @max(height, result.height + 1);
+-        try builder.addWord(&words, result.id);
++        try builder.addChild(&words, result);
+     }
+     try builder.addWords(&words, term.tail);
+-    return builder.complete(term.reference, words.items, height);
+-}
+-fn key(allocator: std.mem.Allocator, terms: []const Term, roots: []const usize, options: K.Options) ![]u32 {
++    return builder.complete(term.reference, &words, height);
++}
++fn key(store: *K.Store, terms: []const Term, roots: []const usize, options: K.Options) ![]u32 {
++    const allocator = store.allocator;
+     var work: usize = 4096;
+-    var builder = K.Builder.init(allocator, &work, options);
++    var builder = K.Builder.init(store, &work, options);
+     defer builder.deinit();
+     var output: std.ArrayList(u32) = .empty;
+     errdefer output.deinit(allocator);
+@@ -36,6 +37,8 @@
+ }
+ 
+ test "selected structural keys preserve tree equality independently of sharing and source ids" {
++    var store = K.Store.init(a, .{});
++    defer store.deinit();
+     const shared = [_]Term{
+         .{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} },
+         .{ .reference = .{ .unit = 1, .ty = 2 }, .head = &.{ 9, 2 }, .children = &.{ 0, 0 } },
+@@ -52,14 +55,18 @@
+     try expanded(a, &shared, 1, &left_tree);
+     try expanded(a, &copied, 2, &right_tree);
+     try std.testing.expectEqualSlices(u32, left_tree.items, right_tree.items);
+-    const left = try key(a, &shared, &.{ 1, 0, 1 }, .{});
++    const left = try key(&store, &shared, &.{ 1, 0, 1 }, .{});
+     defer a.free(left);
+-    const right = try key(a, &copied, &.{ 2, 1, 2 }, .{});
++    const right = try key(&store, &copied, &.{ 2, 1, 2 }, .{});
+     defer a.free(right);
+     try std.testing.expectEqualSlices(u32, left, right);
+-    const collisions = try key(a, &copied, &.{ 2, 1, 2 }, .{ .hash_mask = 0 });
++    var collision_store = K.Store.init(a, .{ .hash_mask = 0 });
++    defer collision_store.deinit();
++    const collision_left = try key(&collision_store, &shared, &.{ 1, 0, 1 }, .{});
++    defer a.free(collision_left);
++    const collisions = try key(&collision_store, &copied, &.{ 2, 1, 2 }, .{});
+     defer a.free(collisions);
+-    try std.testing.expectEqualSlices(u32, left, collisions);
++    try std.testing.expectEqualSlices(u32, collision_left, collisions);
+     var active: calls.ActiveCalls = .{ .allocator = a };
+     defer active.deinit();
+     const target: calls.ActiveCalls.Target = .{ .unit = 1, .id = 4, .kind = .named };
+@@ -69,37 +76,41 @@
+ }
+ 
+ test "selected structural keys retain ordered roles correlations and captured environments" {
++    var store = K.Store.init(a, .{ .hash_mask = 0 });
++    defer store.deinit();
+     var terms = [_]Term{
+         .{ .reference = .{ .unit = 1, .ty = 1, .environment = 100, .captured = true }, .head = &.{ 7, 1, 55 } },
+         .{ .reference = .{ .unit = 1, .ty = 1, .environment = 200, .captured = true }, .head = &.{ 7, 1, 56 } },
+         .{ .reference = .{ .unit = 1, .ty = 3 }, .head = &.{ 9, 2 }, .children = &.{ 0, 0 } },
+         .{ .reference = .{ .unit = 1, .ty = 4 }, .head = &.{ 9, 2 }, .children = &.{ 0, 1 } },
+     };
+-    const correlated = try key(a, &terms, &.{2}, .{});
++    const correlated = try key(&store, &terms, &.{2}, .{});
+     defer a.free(correlated);
+-    const independent = try key(a, &terms, &.{3}, .{});
++    const independent = try key(&store, &terms, &.{3}, .{});
+     defer a.free(independent);
+     try std.testing.expect(!std.mem.eql(u32, correlated, independent));
+     terms[1].head = terms[0].head;
+-    const equivalent = try key(a, &terms, &.{3}, .{});
++    const equivalent = try key(&store, &terms, &.{3}, .{});
+     defer a.free(equivalent);
+     try std.testing.expectEqualSlices(u32, correlated, equivalent);
+     // Different nominal/field/primitive/row/usage/abstract role words stay exact.
+     for ([_][]const u32{ &.{ 7, 2, 55 }, &.{ 7, 1, 54 }, &.{ 8, 1, 55 }, &.{ 7, 1, 55, 1 } }) |changed| {
+         terms[1].head = changed;
+-        const different = try key(a, &terms, &.{3}, .{ .hash_mask = 0 });
++        const different = try key(&store, &terms, &.{3}, .{});
+         defer a.free(different);
+         try std.testing.expect(!std.mem.eql(u32, correlated, different));
+     }
+     terms[1].head = &.{4};
+-    const forward = try key(a, &terms, &.{ 0, 1 }, .{});
++    const forward = try key(&store, &terms, &.{ 0, 1 }, .{});
+     defer a.free(forward);
+-    const backward = try key(a, &terms, &.{ 1, 0 }, .{});
++    const backward = try key(&store, &terms, &.{ 1, 0 }, .{});
+     defer a.free(backward);
+     try std.testing.expect(!std.mem.eql(u32, forward, backward));
+ }
+ 
+ test "selected structural keys bound broad forests cycles memo depth and output" {
++    var store = K.Store.init(a, .{});
++    defer store.deinit();
+     var fields: [166]usize = @splat(0);
+     const terms = [_]Term{
+         .{ .reference = .{ .unit = 1, .ty = 3 }, .head = &.{3} },
+@@ -107,32 +118,36 @@
+         .{ .reference = .{ .unit = 1, .ty = 7 }, .head = &.{12}, .children = &.{ 1, 1 }, .tail = &.{ 0, 0 } },
+     };
+     const roots: [13]usize = @splat(2);
+-    const broad = try key(a, &terms, &roots, .{});
++    const broad = try key(&store, &terms, &roots, .{});
+     defer a.free(broad);
+     try std.testing.expect(broad.len < 256);
+-    try std.testing.expectError(error.Limit, key(a, &terms, &roots, .{ .encoded_words = 32 }));
+-    try std.testing.expectError(error.Limit, key(a, &terms, &roots, .{ .word_work = 3 }));
++    try std.testing.expectError(error.Limit, key(&store, &terms, &roots, .{ .encoded_words = 32 }));
++    try std.testing.expectError(error.Limit, key(&store, &terms, &roots, .{ .word_work = 3 }));
+     const cycle = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{9}, .children = &.{0} }};
+-    try std.testing.expectError(error.Cycle, key(a, &cycle, &.{0}, .{}));
++    try std.testing.expectError(error.Cycle, key(&store, &cycle, &.{0}, .{}));
+     var work: usize = 4096;
+-    var builder = K.Builder.init(a, &work, .{});
++    var builder = K.Builder.init(&store, &work, .{});
+     defer builder.deinit();
+     _ = try visit(&builder, &terms, 2, 0);
+     try std.testing.expectError(error.Limit, visit(&builder, &terms, 2, 127));
+ }
+ 
+ fn atomicScenario(allocator: std.mem.Allocator) !void {
++    var store = K.Store.init(allocator, .{});
++    defer store.deinit();
+     const terms = [_]Term{
+         .{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} },
+         .{ .reference = .{ .unit = 1, .ty = 2 }, .head = &.{9}, .children = &.{ 0, 0 } },
+     };
+     var work: usize = 4096;
+-    var builder = K.Builder.init(allocator, &work, .{});
++    var builder = K.Builder.init(&store, &work, .{});
+     defer builder.deinit();
+     const result = try visit(&builder, &terms, 1, 0);
+     var output: std.ArrayList(u32) = .empty;
+     defer output.deinit(allocator);
+     try builder.root(&output, result);
++    // Force finish to grow the exact prefix so OOM tests cover atomic output.
++    output = .fromOwnedSlice(try output.toOwnedSlice(allocator));
+     const prefix_len = output.items.len;
+     builder.finish(&output) catch |err| {
+         try std.testing.expectEqual(prefix_len, output.items.len);
+@@ -140,7 +155,168 @@
+         return err;
+     };
+ }
+-test "selected structural key construction and table publication are atomic through allocation failure" {
++test "selected structural key construction and global publication are atomic through allocation failure" {
+     try atomicScenario(a);
+     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, atomicScenario, .{});
+ }
++
++test "selected structural global IDs stay exact across query order and local environments" {
++    var store = K.Store.init(a, .{ .hash_mask = 0 });
++    defer store.deinit();
++    const first = [_]Term{
++        .{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} },
++        .{ .reference = .{ .unit = 1, .ty = 2 }, .head = &.{4} },
++        .{ .reference = .{ .unit = 1, .ty = 3 }, .head = &.{9}, .children = &.{ 0, 1 } },
++    };
++    const reordered = [_]Term{
++        .{ .reference = .{ .unit = 8, .ty = 4, .environment = 123, .captured = true }, .head = &.{4} },
++        .{ .reference = .{ .unit = 8, .ty = 5, .environment = 456, .captured = true }, .head = &.{3} },
++        .{ .reference = .{ .unit = 8, .ty = 6 }, .head = &.{9}, .children = &.{ 1, 0 } },
++    };
++    const left = try key(&store, &first, &.{ 1, 0, 2 }, .{});
++    defer a.free(left);
++    const right = try key(&store, &reordered, &.{ 0, 1, 2 }, .{});
++    defer a.free(right);
++    try std.testing.expectEqualSlices(u32, left, right);
++    // Reusing a source/environment address in a later query is not a memo hit.
++    const changed = [_]Term{.{ .reference = first[0].reference, .head = &.{42} }};
++    const original = try key(&store, &first, &.{0}, .{});
++    defer a.free(original);
++    const different = try key(&store, &changed, &.{0}, .{});
++    defer a.free(different);
++    try std.testing.expect(!std.mem.eql(u32, original, different));
++    // Equal integer slots in different structural roles cannot collide.
++    const roles = [_]Term{
++        .{ .reference = .{ .unit = 9, .ty = 1 }, .head = &.{3} },
++        .{ .reference = .{ .unit = 9, .ty = 2 }, .head = &.{9}, .children = &.{0}, .tail = &.{0} },
++        .{ .reference = .{ .unit = 9, .ty = 3 }, .head = &.{ 9, 0 }, .children = &.{0} },
++    };
++    const child_then_scalar = try key(&store, &roles, &.{1}, .{});
++    defer a.free(child_then_scalar);
++    const scalar_then_child = try key(&store, &roles, &.{2}, .{});
++    defer a.free(scalar_then_child);
++    try std.testing.expect(!std.mem.eql(u32, child_then_scalar, scalar_then_child));
++}
++
++test "selected structural global hits retain independent logical query budgets" {
++    var store = K.Store.init(a, .{});
++    defer store.deinit();
++    // Grow the compilation Store beyond a later query's entire word budget.
++    for (0..64) |index| {
++        const head = [_]u32{@intCast(index)};
++        const term = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &head }};
++        const output = try key(&store, &term, &.{0}, .{});
++        a.free(output);
++    }
++    const small = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} }};
++    const output = try key(&store, &small, &.{0}, .{ .encoded_words = 8 });
++    defer a.free(output);
++    try std.testing.expectEqual(@as(usize, 3), output.len);
++    // A warmed root still accounts every distinct reachable node and word.
++    var many_fields: [40]usize = @splat(0);
++    const broad = [_]Term{
++        .{ .reference = .{ .unit = 2, .ty = 1 }, .head = &.{3} },
++        .{ .reference = .{ .unit = 2, .ty = 2 }, .head = &.{9}, .children = &many_fields },
++    };
++    var warm_work: usize = 4096;
++    var warm = K.Builder.init(&store, &warm_work, .{});
++    defer warm.deinit();
++    const root = try visit(&warm, &broad, 1, 0);
++    var limited_work: usize = 4096;
++    var limited = K.Builder.init(&store, &limited_work, .{ .encoded_words = 32 });
++    defer limited.deinit();
++    var prefix: std.ArrayList(u32) = .empty;
++    defer prefix.deinit(a);
++    try prefix.append(a, 123);
++    try std.testing.expectError(error.Limit, limited.root(&prefix, root));
++    try std.testing.expectEqualSlices(u32, &.{123}, prefix.items);
++    // Descriptor-word work is local even for direct global-root hits.
++    var empty_work: usize = 4096;
++    var exhausted = K.Builder.init(&store, &empty_work, .{ .word_work = 0 });
++    defer exhausted.deinit();
++    try std.testing.expectError(error.Limit, exhausted.root(&prefix, root));
++    var fresh_work: usize = 4096;
++    var fresh = K.Builder.init(&store, &fresh_work, .{});
++    defer fresh.deinit();
++    try fresh.root(&prefix, root);
++    try fresh.finish(&prefix);
++}
++
++test "selected structural global collision chains never spend query budgets" {
++    var warm_store = K.Store.init(a, .{ .hash_mask = 0 });
++    defer warm_store.deinit();
++    // More unrelated colliding nodes than a complete query's 4k work quota.
++    for (0..4098) |index| {
++        const head = [_]u32{@intCast(index)};
++        const term = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &head }};
++        const output = try key(&warm_store, &term, &.{0}, .{});
++        a.free(output);
++    }
++    const tiny = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} }};
++    const options: K.Options = .{ .encoded_words = 8, .word_work = 8 };
++    const warm = try key(&warm_store, &tiny, &.{0}, options);
++    defer a.free(warm);
++    var fresh_store = K.Store.init(a, .{ .hash_mask = 0 });
++    defer fresh_store.deinit();
++    const fresh = try key(&fresh_store, &tiny, &.{0}, options);
++    defer a.free(fresh);
++    // IDs are private to each Store; both queries must independently succeed.
++    try std.testing.expectEqual(@as(usize, 3), warm.len);
++    try std.testing.expectEqual(@as(usize, 3), fresh.len);
++    // Global collision protection remains finite and explicitly separate.
++    var exhausted_store = K.Store.init(a, .{ .hash_mask = 0, .collision_work = 0 });
++    defer exhausted_store.deinit();
++    const initial = try key(&exhausted_store, &tiny, &.{0}, options);
++    defer a.free(initial);
++    const unrelated = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{4} }};
++    try std.testing.expectError(error.Limit, key(&exhausted_store, &unrelated, &.{0}, options));
++}
++
++test "selected structural distinct nodes preserve the old source-work boundary" {
++    var store = K.Store.init(a, .{});
++    defer store.deinit();
++    var work: usize = 4096;
++    var builder = K.Builder.init(&store, &work, .{});
++    defer builder.deinit();
++    var output: std.ArrayList(u32) = .empty;
++    defer output.deinit(a);
++    // The old collision-free policy charges enter and finish once per source
++    // reference: 2,800 units. A separate per-global-node debit would use 4,200.
++    for (0..1400) |index| {
++        const reference: K.Reference = .{ .unit = 1, .ty = @intCast(index + 1) };
++        try std.testing.expect((try builder.enter(reference, 0)) == null);
++        var descriptor: K.Descriptor = .empty;
++        defer descriptor.deinit(a);
++        try builder.addWords(&descriptor, &.{ 3, @intCast(index) });
++        try builder.root(&output, try builder.complete(reference, &descriptor, 0));
++    }
++    try builder.finish(&output);
++    try std.testing.expectEqual(@as(usize, 4096 - 2800), work);
++    try std.testing.expectEqual(@as(usize, 1402), output.items.len);
++}
++
++test "selected structural cold and warm queries share the same word-work boundary" {
++    const tiny = [_]Term{.{ .reference = .{ .unit = 1, .ty = 1 }, .head = &.{3} }};
++    for ([_]usize{ 6, 7 }) |allowance| {
++        // Fresh stores in each iteration keep the rejecting cold query from
++        // warming the next boundary case through its completed descriptor.
++        var cold_store = K.Store.init(a, .{});
++        defer cold_store.deinit();
++        var warm_store = K.Store.init(a, .{});
++        defer warm_store.deinit();
++        const seed = try key(&warm_store, &tiny, &.{0}, .{});
++        defer a.free(seed);
++        const options: K.Options = .{ .word_work = allowance };
++        if (allowance == 6) {
++            try std.testing.expectError(error.Limit, key(&cold_store, &tiny, &.{0}, options));
++            try std.testing.expectError(error.Limit, key(&warm_store, &tiny, &.{0}, options));
++        } else {
++            const cold = try key(&cold_store, &tiny, &.{0}, options);
++            defer a.free(cold);
++            const warm = try key(&warm_store, &tiny, &.{0}, options);
++            defer a.free(warm);
++            try std.testing.expectEqual(@as(usize, 3), cold.len);
++            try std.testing.expectEqual(@as(usize, 3), warm.len);
++        }
++    }
++}
+--- a/zig-native/src/backend/scoped_backend.zig
++++ b/zig-native/src/backend/scoped_backend.zig
+@@ -141,10 +141,12 @@
+     allocator: std.mem.Allocator,
+     arena: std.heap.ArenaAllocator,
+     calls: call_plan.Cache,
++    type_keys: selected_types.Store,
+     facts: std.AutoHashMapUnmanaged(u32, []const WriterEvent) = .empty,
+     regions: std.AutoHashMapUnmanaged(u32, []const usize) = .empty,
+     results: std.AutoHashMapUnmanaged(u32, Value) = .empty,
+     fn deinit(self: *DescriptorCalls) void {
++        self.type_keys.deinit();
+         self.calls.deinit();
+         // Summary slices and shapes belong to the compilation arena.
+         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
+@@ -2048,7 +2050,7 @@
+         if (!plainInlineValue(result)) return null;
+         var remaining: usize = 4096;
+         var work: usize = 4096;
+-        var keys = selected_types.Builder.init(self.allocator, &work, .{});
++        var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &work, .{});
+         defer keys.deinit();
+         // Semantic type arguments alone do not determine a constructor-local
+         // payload ABI. Bind both physical inputs and the rebuilt result schema.
+@@ -2108,7 +2110,7 @@
+             try evidence.appendSlice(self.allocator, m.types.list(rows));
+         }
+         var type_work: usize = 4096;
+-        var keys = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer keys.deinit();
+         for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &keys, 0);
+         try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = m.typeOf(body.root) }, &evidence, &keys, 0);
+@@ -2635,7 +2637,7 @@
+         defer evidence.deinit(self.allocator);
+         try evidence.append(self.allocator, result_type);
+         var type_work: usize = 4096;
+-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer type_key.deinit();
+         for (m.bodyParameters(body), arguments) |parameter, arg| {
+             try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(arg.floating) });
+@@ -2814,7 +2816,7 @@
+         } else {
+             try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32), result_type });
+             var type_work: usize = 4096;
+-            var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++            var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+             defer type_key.deinit();
+             for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
+             try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
+@@ -3255,7 +3257,7 @@
+         const result_type = m.typeOf(body.root);
+         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 1, result_type });
+         var type_work: usize = 4096;
+-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer type_key.deinit();
+         for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, evidence, &type_key);
+         for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &type_key, 0);
+@@ -3370,7 +3372,7 @@
+         };
+         var remaining: usize = 4096;
+         var work: usize = 4096;
+-        var keys = selected_types.Builder.init(self.allocator, &work, .{});
++        var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &work, .{});
+         defer keys.deinit();
+         try evidence.append(self.allocator, std.math.maxInt(u32) - 4);
+         for (m.bodyParameters(body)) |parameter| try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &keys, &remaining);
+@@ -3424,7 +3426,7 @@
+     fn writerCallEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, descriptors: []const Value, owners: []const usize, evidence: *std.ArrayList(u32)) Error!void {
+         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 2, @intCast(owners.len) });
+         var type_work: usize = 4096;
+-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer type_key.deinit();
+         for (arguments) |argument| try self.readerLayoutEvidence(m, body.root, argument, evidence, &type_key);
+         for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &type_key, 0);
+@@ -3647,7 +3649,7 @@
+     fn graphWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error!void {
+         var remaining: usize = 100_000;
+         var type_work: usize = 100_000;
+-        var keys = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer keys.deinit();
+         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 8, @intCast(graph.owners.items.len) });
+         for (m.bodyParameters(body)) |parameter| try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &keys, &remaining);
+@@ -4121,9 +4123,9 @@
+     fn finishSelectedTypes(self: *Generator, m: *const core.Module, id: core.Id, selection: *std.ArrayList(u32), keys: *selected_types.Builder) Error!void {
+         keys.finish(selection) catch |err| return self.selectedKeyError(m, id, err);
+     }
+-    fn selectedTypeChild(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, descriptor: *std.ArrayList(u32), keys: *selected_types.Builder, depth: usize, height: *usize) (Error || selected_types.Error)!void {
++    fn selectedTypeChild(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, descriptor: *selected_types.Descriptor, keys: *selected_types.Builder, depth: usize, height: *usize) (Error || selected_types.Error)!void {
+         const child = try self.selectedTypeNode(m, id, input, keys, depth + 1);
+-        try keys.addWord(descriptor, child.id);
++        try keys.addChild(descriptor, child);
+         height.* = @max(height.*, child.height + 1);
+     }
+     fn selectedTypeNode(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, keys: *selected_types.Builder, depth: usize) (Error || selected_types.Error)!selected_types.Result {
+@@ -4139,7 +4141,7 @@
+         if (try keys.enter(reference, depth)) |completed| return completed;
+         const owner = try self.unit(actual.unit);
+         const node = owner.types.node(actual.ty);
+-        var descriptor: std.ArrayList(u32) = .empty;
++        var descriptor: selected_types.Descriptor = .empty;
+         defer descriptor.deinit(self.allocator);
+         var height: usize = 0;
+         try keys.addWord(&descriptor, @backingInt(node.tag));
+@@ -4209,7 +4211,7 @@
+             // Abstract roles keep their source identity and correlation.
+             else => try keys.addWords(&descriptor, &.{ actual.unit, actual.ty }),
+         }
+-        return keys.complete(reference, descriptor.items, height);
++        return keys.complete(reference, &descriptor, height);
+     }
+     fn invocationContext(self: *const Generator) u32 {
+         return if (self.specialization_origin) |origin| origin.unit else 0;
+@@ -4275,7 +4277,7 @@
+         const public = m.types.list(m.binding(target.binding).public_variables);
+         try selected.appendSlice(self.allocator, &.{ std.math.maxInt(u32), @intCast(public.len) });
+         var type_work: usize = 4096;
+-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer type_key.deinit();
+         for (public) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter }, &selected, &type_key, 0);
+         try self.finishSelectedTypes(m, body.root, &selected, &type_key);
+@@ -4340,7 +4342,7 @@
+         if (callable.goals.len != 0 or closure.qualifier != 0 or !plainInlineValue(result) or !stableDescriptorShape(result)) return error.Declined;
+         var remaining: usize = 4096;
+         var work: usize = 4096;
+-        var keys = selected_types.Builder.init(self.allocator, &work, .{});
++        var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &work, .{});
+         defer keys.deinit();
+         try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 7, callable.node, @intCast(function.fields.len) });
+         try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = closure.function_type }, evidence, &keys, &remaining);
+@@ -4391,7 +4393,7 @@
+             };
+             try evidence.appendSlice(self.allocator, &.{ callable.node, owner.typeOf(closure.body), @intFromBool(argument.floating) });
+             var work: usize = 4096;
+-            var keys = selected_types.Builder.init(self.allocator, &work, .{});
++            var keys = selected_types.Builder.init(&self.descriptor_calls.type_keys, &work, .{});
+             defer keys.deinit();
+             for (callable.captures, function.fields) |binding, capture| {
+                 try self.readerLayoutEvidence(m, id, capture, &evidence, &keys);
+@@ -4579,7 +4581,7 @@
+         try self.selectedArguments(m, id, function.fields, &.{argument}, &selected);
+         try selected.appendSlice(self.allocator, &.{ std.math.maxInt(u32), @intCast(callable.captures.len + 2) });
+         var type_work: usize = 4096;
+-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
++        var type_key = selected_types.Builder.init(&self.descriptor_calls.type_keys, &type_work, .{});
+         defer type_key.deinit();
+         for (callable.captures) |binding| try self.selectedType(m, id, .{ .unit = owner.unit, .ty = owner.binding(binding).ty }, &selected, &type_key, 0);
+         try self.selectedType(m, id, .{ .unit = owner.unit, .ty = closure.parameter.ty }, &selected, &type_key, 0);
+@@ -6192,7 +6194,7 @@
+     defer scalar_admission.deinit();
+     var field_recipes: field_plan.Cache = .{ .allocator = allocator };
+     defer field_recipes.deinit();
+-    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator } };
++    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .type_keys = selected_types.Store.init(allocator, .{}) };
+     defer descriptor_calls.deinit();
+     var shared_calls: call_plan.Cache = .{ .allocator = allocator };
+     defer shared_calls.deinit();
+--- a/scripts/dev_check_areas.ts
++++ b/scripts/dev_check_areas.ts
+@@ -59,7 +59,12 @@
+       "backend.storage_type_key_tests.test.selected structural keys preserve tree equality independently of sharing and source ids",
+       "backend.storage_type_key_tests.test.selected structural keys retain ordered roles correlations and captured environments",
+       "backend.storage_type_key_tests.test.selected structural keys bound broad forests cycles memo depth and output",
+-      "backend.storage_type_key_tests.test.selected structural key construction and table publication are atomic through allocation failure",
++      "backend.storage_type_key_tests.test.selected structural key construction and global publication are atomic through allocation failure",
++      "backend.storage_type_key_tests.test.selected structural global IDs stay exact across query order and local environments",
++      "backend.storage_type_key_tests.test.selected structural global hits retain independent logical query budgets",
++      "backend.storage_type_key_tests.test.selected structural global collision chains never spend query budgets",
++      "backend.storage_type_key_tests.test.selected structural distinct nodes preserve the old source-work boundary",
++      "backend.storage_type_key_tests.test.selected structural cold and warm queries share the same word-work boundary",
+       "backend.storage_calls_tests.test.selected application policies share wide callback type descriptions within the existing bound",
+       "backend.storage_calls_tests.test.nested scalar call definitions share diamonds across exports",
+       "backend.storage_calls_tests.test.nested scalar call publication survives allocation failures",

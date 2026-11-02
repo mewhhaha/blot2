@@ -1,112 +1,22 @@
 # Owned-storage rewrite: active task index
 
-The active priority is subsecond Gdev compilation with bounded iteration.
-[Active type captures](../zig-native/measurements/active-type-captures-2026-11-02.json)
-remove history scanning from the sampled hot list; all 59 selected laws pass full
-faults, 34 guests pass, and real renderer bytes/streams remain identical. The
-native main still exceeds 30 seconds. Shared structural type IDs are next.
-[Owner-graph and physical-parameter checkpoint](../zig-native/measurements/owner-graph-and-parameter-copies-2026-11-02.json)
-compiles 2,817 laws, passes 58 selected laws with full faults/34 guests/zero Zig
-lint, and preserves seven actual renderer streams with smaller Wasm. Its first
-LLVM candidate exposed a field-update planning regression, now covered/fixed;
-replacement full-game timing is pending. The corrected native candidate still
-exceeds 30 seconds. Active-capture scans and per-key structural tables are next.
-[Completed actual Gdev main](../zig-native/measurements/completed-gdev-main-2026-11-02.json)
-takes **24.55 seconds** and produces **45.98 MB Wasm** with the optimized
-LLVM compiler. Frontend is about 1.3 seconds; synchronous emission takes 20.29.
-The five-second target remains unmet. Focus on emitted work and copies. Current
-frame qualification is pending: available Pen hosts reject ABI 8.
-[Substitution-map churn](../zig-native/measurements/substitution-map-churn-2026-11-02.json)
-is the next optimized-compiler cliff: deleted slots make misses scan a whole
-table. Inactive-key retention improves isolated CPU 11.03x; the completed optimized whole-main result is linked above.
-[Sparse owner traversal](../zig-native/measurements/sparse-owned-roots-2026-11-02.json)
-replaces the latest measured emission bottleneck. The current pre-candidate LLVM
-compiler finishes the frontend in 1.03 seconds but exceeds 30 seconds on main;
-new optimized timing and whole-game output remain pending.
-[Closed source provenance and indexed type environments](../zig-native/measurements/source-completion-and-environments-2026-11-01.json)
-remove source-proof reconstruction from the late actual-main profile and replace
-repeated type-environment searches/copies. Main still exceeds 30 seconds with
-the safe/noLLVM compiler; optimized LLVM full-game timing is next. No current
-whole-game artifact or five-second qualification is established.
-[Actual-main CPU sampling](../zig-native/measurements/bounds-and-source-proof-2026-11-01.json)
-finds and removes the 128-module bounds-cache cutoff and avoids large witness
-initialization for unrelated goal headers. Actual main still exceeds 30 seconds;
-source-body proof reconstruction is the next measured target. No current full
-game output or five-second qualification is established.
-[Full-game timing](../zig-native/measurements/full-gdev-timing-2026-11-01.json)
-now establishes **main exceeds five minutes**: an unprofiled run stopped at
-300.07 seconds without an artifact. A separate trace completes frontend work
-around 9.02 seconds and remains in synchronous `owned.emit` at 30 seconds.
-Investigate full-game backend expansion/admission/outlining; producer timings do
-not establish whole-game latency. Exact completion time remains unknown.
-[Measured worker scaling and largest-first dispatch](../zig-native/measurements/concurrency-and-total-time-2026-11-01.json)
-improve matched unprofiled four-worker producer compilation 7.46 to 7.15
-seconds; the eight-worker candidate takes 6.89 seconds in separate pairs.
-Retained entry edits take about 0.50 seconds. Heap contention is small; no
-allocator caches were added. Actual Gdev main remains incomplete after the
-five-minute measurement, with whole-game total/size/frame qualification pending.
-[Scoped validation batches and list-copy deletion](../zig-native/measurements/checker-validation-reduction-2026-11-01.json)
-improve matched fresh World-producer validation 883 to 693 ms and total 7.69 to
-7.41 seconds. Checking improves only 1.5%; the ineffective nominal memo and
-application guards were removed and archived. The
-[cursor-view adapter](../zig-native/measurements/rejected-cursor-reads-2026-11-01.json)
-also fails its 20% checking gate: resolver-created nodes fall 28.4%, but extra
-admission/validation walks slow checking 6.8%. It is removed. A genuinely
-view-aware solver needs an explicit replacement for eager depth/work validation;
-that larger architecture experiment is not implemented.
-[Completed producer-validation receipts](../zig-native/measurements/completed-core-validation-2026-11-01.json)
-remove one repeated semantic traversal with exact Snapshot/context authority:
-world-producer medians improve 8.63 to 7.78 seconds with identical tiny output.
-Whole-main remains over five seconds. Larger automatic copy plans and nominal
-world interfaces missed their gates and were removed; their evidence is linked
-from CONTINUE.md. The
-[opaque draw-batch prototype](../zig-native/measurements/unqualified-draw-batches-2026-11-01.json)
-stopped at unsupported escape/control shapes before performance measurement.
-[The completed-child unification experiment](../zig-native/measurements/rejected-completed-unification-2026-11-01.json)
-missed its 20% checking gate and was removed. The
-[bounded CPU profile](../zig-native/measurements/normalization-cpu-attribution-2026-11-01.json)
-now places normalization across application/finish paths; audit actual
-historical observations before changing the shared inference representation.
-[Engine-boundary measurements](../zig-native/measurements/engine-boundary-experiments-2026-11-01.json)
-now retain incomplete profiles and distinguish checker jobs, backend stages and
-optimizer pass costs. Closed leaf-call plans and two small source-interface
-experiments missed their thresholds and were removed/rejected. Task 110 remains
-unfinished. A direct-destination original kite producer passes seven complete
-[stream comparisons](../zig-native/measurements/kites-destination-streams-2026-11-01.json),
-saving 1,014 Wasm bytes; whole-main compilation/frame qualification is pending.
-The scalar, concrete-field, nominal and descriptor-call batches have measured
-synthetic gains. Proof-instance reuse and shared type transformations remove two
-exponential source cliffs; whole-game compilation still exceeds the bounded
-diagnostics. See
-[the graph-sharing evidence](../zig-native/measurements/proof-and-type-sharing-2026-11-01.json)
-and
-[exact receipt hashing](../zig-native/measurements/receipt-path-hashing-2026-11-01.json)
-and
-[closed array locals](../zig-native/measurements/closed-array-locals-2026-11-01.json)
-and
-[actual aggregate readers](../zig-native/measurements/aggregate-reader-sharing-2026-11-01.json).
-Selected-address loads remove wide-row amplification in
-[actual render settings](../zig-native/measurements/selected-field-loads-2026-11-01.json).
-Owned assembly now honors tier, worker and sharing controls and reports
-[actual optimizer work](../zig-native/measurements/owned-assembly-options-2026-11-01.json).
-[Typed call sharing](../zig-native/measurements/typed-call-sharing-2026-11-01.json)
-now covers literal closures across shared parents and canonical plain input
-keys. Real closure/easing probes shrink; whole-game completion remains pending.
-The
-[LLVM release attempt](../zig-native/measurements/typed-call-release-attempt-2026-11-01.json)
-is incomplete;
-[native-fast diagnostics](../zig-native/measurements/native-fast-diagnostic-2026-11-01.json)
-remain separate from full qualification. A
-[bounded main stack sample](../zig-native/measurements/gdev-checking-sample-2026-11-01.json)
-observes source type instantiation before assembly; it is not a completed build.
-The
-[type-structure experiment](../zig-native/measurements/type-structure-experiment-2026-11-01.json)
-rejects ineffective substitution copying changes and attributes actual producer
-work. The new counters do not establish a frontend speedup. The
-[corrected lazy demand inventory](../zig-native/measurements/lazy-declaration-demand-2026-11-01.json)
-is diagnostic only; source checking remains exhaustive. Unused-heavy entry
-points expose large body-demand reductions; main still retains most body bytes.
-Read [CONTINUE.md](../CONTINUE.md). Do not repeat an unbounded main build.
+The active priority is subsecond Gdev compilation, with the next gate below five
+seconds.
+[Actual full main](../zig-native/measurements/gdev-after-active-captures-2026-11-02.json)
+now completes in **19.74 seconds**, producing **43.06 MB Wasm**, cache disabled.
+The previous matched-source completion was 24.55 seconds/45.98 MB. Neither meets
+the five-second gate. Emission still expands 1.3 million expressions and
+performs 3.85 million shadow admission visits; completed typed function plans
+and cheaper aggregate transport are the next architectural hill.
+
+[Active captures](../zig-native/measurements/active-type-captures-2026-11-02.json)
+qualify 59 selected native laws with full faults, 34 guests and seven unchanged
+actual renderer streams.
+[Structural type IDs](../zig-native/measurements/rejected-global-type-ids-2026-11-02.json)
+are rejected and removed after a 5.3% renderer emission regression. Full gate
+qualification retains the baseline List/chunk failure. A fresh full-game frame
+remains pending because available Pen binaries reject ABI 8. Use the pinned
+records and Git history for superseded checkpoint details.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

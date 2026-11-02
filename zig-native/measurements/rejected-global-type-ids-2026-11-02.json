@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-02",
+  "status": "rejected_and_removed",
+  "baseline_commit": "82a00d1e4fda0fccb6234c1152a29e6386c7efbd",
+  "scope": "Compile-scoped exact structural type IDs; no source/goal proof change. Did not meet the 20 percent emission gate.",
+  "patch_sha256": "90d12f8fec7441aeeab8d69b0e84ccaecee1b0a1b8764fcf097cf5b63457161c",
+  "patch_artifact": "build/bench/rejected-global-type-ids/experiment.patch",
+  "isolated": {
+    "kind": "isolated repeated-type-key allocation and key-size control, not compiler timing",
+    "zig": "0.17.0",
+    "backend": "native -fno-llvm",
+    "optimization": "ReleaseFast",
+    "queries": 1000,
+    "shape": "one 166-field record referencing one shared leaf; four field-label metadata words per field",
+    "old": {
+      "allocations": 10999,
+      "allocated_bytes": 17146876,
+      "key_words": 840000
+    },
+    "new": {
+      "allocations": 8004,
+      "allocated_bytes": 15845768,
+      "key_words": 3000
+    },
+    "changes_percent": {
+      "allocations": -27.229748158923538,
+      "allocated_bytes": -7.588017782364553,
+      "key_words": -99.64285714285714
+    },
+    "qualification": "nine structural-key laws pass, including exhaustive OOM, 4098 forced collisions, 1400-leaf source-work parity, and cold/warm word-work boundary parity",
+    "whole_main_owned_emit": "unmeasured, required acceptance gate >=20 percent improvement",
+    "files": {
+      "allocation_control.zig": "21ac85e328f50d7375fd0cca61ccbbfc0d5194ff775ec28a73d4cb1bcd154082",
+      "old_storage_type_key.zig": "5d043fb31f8868cb241a92047733a6c205c22d20c2569af282f1a6c111f2c1c2",
+      "storage_type_key.zig": "2a7903716a1a35e2826c72abe2c0082c0b845f576daf3a78d88fdd3f9b83afff",
+      "storage_type_key_tests.zig": "a3070c793f7cfc32601b0a9c5143a4247b52cbbbfe84dd42ff270913cdf3fcee",
+      "scoped_backend.zig": "1f938bfc10c7eeb03b29e7c895e30c577d2d4eb736fcf8f165158fd8a482c13d",
+      "global-type-ids.patch": "90d12f8fec7441aeeab8d69b0e84ccaecee1b0a1b8764fcf097cf5b63457161c",
+      "source_boundary_control.zig": "113d777c3a872c104dfd5d13a62af9265a61919bfaffc72b127bb455baa03695"
+    },
+    "store_collision_work_allowance": 268435456,
+    "store_collision_work_scope": "compilation lifetime, global bucket probes plus exact tagged-slot comparisons; never deducted from query budgets",
+    "source_work_boundary_control": {
+      "distinct_leaves": 1400,
+      "initial_budget": 4096,
+      "old_remaining": 1296,
+      "new_remaining": 1296,
+      "old_key_words": 5604,
+      "new_key_words": 1402
+    },
+    "base_commit": "82a00d1",
+    "cold_warm_word_work_boundary": {
+      "both_reject": 6,
+      "both_accept": 7
+    }
+  },
+  "renderer_pairs": [
+    {
+      "evidence": "build/bench/global-type-ids-pairs/pair-0/pair-b82d255fb359801b/result.json",
+      "builds": [
+        {
+          "variant": "old",
+          "build_ms": 5053.799512,
+          "emit_ms": 664.515,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        },
+        {
+          "variant": "new",
+          "build_ms": 4958.310981,
+          "emit_ms": 681.05,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        }
+      ],
+      "streams_equal": true
+    },
+    {
+      "evidence": "build/bench/global-type-ids-pairs/pair-1/pair-7f708a0c51998f77/result.json",
+      "builds": [
+        {
+          "variant": "new",
+          "build_ms": 5036.860248,
+          "emit_ms": 709.812,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        },
+        {
+          "variant": "old",
+          "build_ms": 5012.883707999999,
+          "emit_ms": 671.912,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        }
+      ],
+      "streams_equal": true
+    },
+    {
+      "evidence": "build/bench/global-type-ids-pairs/pair-2/pair-936499868305312e/result.json",
+      "builds": [
+        {
+          "variant": "old",
+          "build_ms": 5145.647098,
+          "emit_ms": 704.439,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        },
+        {
+          "variant": "new",
+          "build_ms": 5113.03463,
+          "emit_ms": 707.7,
+          "wasm_bytes": 254036,
+          "sha": "55069535ffce4953f10fa3826a6e4bf32d5cf889059e3fd2e615cbd1f37dfed4"
+        }
+      ],
+      "streams_equal": true
+    }
+  ],
+  "median_emit_ms": {
+    "old": 671.912,
+    "new": 707.7
+  },
+  "emission_change_percent": 5.326292728809734,
+  "source_workload": "Identical actual kites source/imports/assets, fast/noLLVM compilers, alternating three pairs, trace enabled. All seven streams and 254036-byte Wasm identical.",
+  "native_actual_main": {
+    "evidence": "build/bench/gdev-global-type-ids-progress/main-c59df57f415ca9d8/result.json",
+    "status": "30-second cap; incomplete",
+    "progress": "58856 to101026 expressions vs capture baseline62474 to107316; heterogeneous windows are not a full-build timing comparison.",
+    "sample": "build/bench/gdev-global-type-ids-progress/main-c59df57f415ca9d8/cpu-report.json"
+  },
+  "qualification": {
+    "evidence": "build/bench/global-type-ids-check-dev/run-b56eb97ce1498ab3/results.json",
+    "native_and_guests": "Selected native and34guests pass; final report fails one test-only defer/reassignment Zig lint finding.",
+    "budget_review": "Global collision work separated from query work; 4098-collision,1400-leaf and cold/warm word-work boundaries covered."
+  },
+  "decision": "Remove the prototype. Key compression alone adds query membership/global interning overhead without removing descriptor construction or duplicate whitelist traversal. Preserve it for a larger fused selection/type-analysis design, not as a claimed optimization.",
+  "tracked_patch": "zig-native/measurements/experiments/global-type-ids-2026-11-02.patch"
+}
