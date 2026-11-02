@@ -7,14 +7,16 @@ pub const Key = struct {
     binding: core.BindingId,
     /// Caller-visible implementations are part of semantic specialization.
     context: u32 = 0,
+    /// A checked context-independent alias is distinct from real origin zero.
+    context_free: bool = false,
     /// Complete checked type substitution, callback identity, and static region
     /// mapping are serialized here. Equality compares all bytes, not a hash.
     evidence: []const u32,
     pub fn eql(self: Key, other: Key) bool {
-        return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
+        return self.unit == other.unit and self.binding == other.binding and self.context == other.context and self.context_free == other.context_free and std.mem.eql(u32, self.evidence, other.evidence);
     }
 };
-pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, next: ?usize = null, previous: ?usize = null };
+pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, context_sensitive: bool = true, next: ?usize = null, previous: ?usize = null };
 /// Selected source calls, not source references or partial applications. Keys
 /// contain only bounded static callback choices; runtime data is never a key.
 pub const ActiveCalls = struct {
@@ -49,7 +51,7 @@ pub const ActiveCalls = struct {
 };
 pub const KeyContext = struct {
     pub fn hash(_: @This(), key: Key) u64 {
-        const header = [_]u32{ key.unit, key.binding, key.context };
+        const header = [_]u32{ key.unit, key.binding, key.context, @intFromBool(key.context_free) };
         var state = std.hash.Wyhash.init(0);
         state.update(std.mem.asBytes(&header));
         state.update(std.mem.sliceAsBytes(key.evidence));
@@ -138,9 +140,57 @@ fn CacheWithContext(comptime Context: type) type {
             self.plan_positions.putAssumeCapacityNoClobber(owned_key, self.plans.items.len);
             self.plans.appendAssumeCapacity(.{ .key = owned_key, .height = height });
         }
-        pub fn find(self: *const Self, key: Key) ?usize {
+        pub fn findExact(self: *const Self, key: Key) ?usize {
             const chain = self.entry_positions.get(key) orelse return null;
             return chain.first;
+        }
+        fn canonical(key: Key) Key {
+            var result = key;
+            result.context = 0;
+            result.context_free = true;
+            return result;
+        }
+        pub fn find(self: *const Self, key: Key) ?usize {
+            if (self.findExact(key)) |index| return index;
+            if (key.context_free) return null;
+            return self.findExact(canonical(key));
+        }
+        /// Exact scratch alternatives precede proven context-free alternatives.
+        /// The cache and the borrowed key evidence stay immutable while walking.
+        pub const Candidates = struct {
+            cache: *const Self,
+            current: ?usize,
+            fallback: ?Key,
+            pub fn next(self: *Candidates) ?usize {
+                if (self.current == null) {
+                    if (self.fallback) |key| {
+                        self.current = self.cache.findExact(key);
+                        self.fallback = null;
+                    }
+                }
+                const index = self.current orelse return null;
+                self.current = self.cache.entries.items[index].next;
+                return index;
+            }
+        };
+        pub fn candidates(self: *const Self, key: Key) Candidates {
+            var result: Candidates = .{ .cache = self, .current = self.findExact(key), .fallback = null };
+            if (!key.context_free) result.fallback = canonical(key);
+            return result;
+        }
+        /// Only a completed actual body may publish a context-free alias. Every
+        /// allocation precedes publication; failed completion stays conservative.
+        pub fn complete(self: *Self, index: usize, sensitive: bool) std.mem.Allocator.Error!void {
+            const entry = self.entries.items[index];
+            std.debug.assert(entry.building);
+            std.debug.assert(!entry.key.context_free or !sensitive);
+            if (!sensitive and !entry.key.context_free) {
+                const alias = try self.insert(canonical(entry.key), entry.function, entry.floating);
+                self.entries.items[alias].building = false;
+                self.entries.items[alias].context_sensitive = false;
+            }
+            self.entries.items[index].building = false;
+            self.entries.items[index].context_sensitive = sensitive;
         }
         pub fn insert(self: *Self, key: Key, function: u32, floating: bool) !usize {
             var owned_key = key;
@@ -796,4 +846,122 @@ fn cacheTailLaw(allocator: std.mem.Allocator) !void {
 test "owned call executable tail rollback preserves colliding duplicate chains and admission plans through OOM" {
     try cacheTailLaw(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, cacheTailLaw, .{});
+}
+fn expectCandidates(cache: *const CacheWithContext(CollidingKeys), key: Key, expected: []const usize) !void {
+    var candidates_ = cache.candidates(key);
+    for (expected) |index| try std.testing.expectEqual(@as(?usize, index), candidates_.next());
+    try std.testing.expect(candidates_.next() == null);
+    try std.testing.expect(candidates_.next() == null);
+}
+fn contextFreeCandidatesLaw(allocator: std.mem.Allocator) !void {
+    var cache: CacheWithContext(CollidingKeys) = .{ .allocator = allocator };
+    defer cache.deinit();
+    const zero: Key = .{ .unit = 1, .binding = 2, .evidence = &.{ 7, 11 } };
+    var free = zero;
+    free.context_free = true;
+    try std.testing.expect(!zero.eql(free));
+    try std.testing.expect(KeyContext.hash(.{}, zero) != KeyContext.hash(.{}, free));
+    const contextual = try cache.insert(zero, 10, false);
+    try std.testing.expect(cache.entries.items[contextual].context_sensitive);
+    try cache.complete(contextual, true);
+    try std.testing.expect(cache.findExact(free) == null);
+    var independent = zero;
+    independent.context = 7;
+    const first = try cache.insert(independent, 20, false);
+    try cache.complete(first, false);
+    const alias = cache.findExact(free).?;
+    try std.testing.expectEqual(@as(usize, 2), alias);
+    try std.testing.expectEqual(@as(u32, 20), cache.entries.items[alias].function);
+    try std.testing.expect(!cache.entries.items[alias].context_sensitive);
+    try std.testing.expect(!cache.entries.items[alias].building);
+    try std.testing.expect(cache.entries.items[first].key.evidence.ptr != cache.entries.items[alias].key.evidence.ptr);
+    const second = try cache.insert(independent, 21, true);
+    try cache.complete(second, false);
+    var sensitive = zero;
+    sensitive.context = 8;
+    const last = try cache.insert(sensitive, 30, false);
+    try cache.complete(last, true);
+    var foreign = zero;
+    foreign.context = 99;
+    try std.testing.expectEqual(@as(?usize, contextual), cache.find(zero));
+    try std.testing.expectEqual(@as(?usize, first), cache.find(independent));
+    try std.testing.expectEqual(@as(?usize, last), cache.find(sensitive));
+    try std.testing.expect(cache.findExact(foreign) == null);
+    try std.testing.expectEqual(@as(?usize, alias), cache.find(foreign));
+    try expectCandidates(&cache, independent, &.{ 1, 3, 2, 4 });
+    try expectCandidates(&cache, zero, &.{ 0, 2, 4 });
+    try expectCandidates(&cache, sensitive, &.{ 5, 2, 4 });
+    try expectCandidates(&cache, foreign, &.{ 2, 4 });
+    try expectCandidates(&cache, free, &.{ 2, 4 });
+    try std.testing.expect(cache.entries.items[4].floating);
+    try std.testing.expect(cache.entries.items[last].context_sensitive);
+    try cache.admit(independent, 3);
+    try std.testing.expect(cache.admitted(foreign) == null);
+    // An in-progress exact definition remains visible for recursion rejection.
+    const pending = try cache.insert(foreign, 40, false);
+    try std.testing.expectEqual(@as(?usize, pending), cache.find(foreign));
+    try std.testing.expect(cache.entries.items[pending].building);
+    try std.testing.expect(cache.entries.items[pending].context_sensitive);
+}
+test "completed call context free aliases separate origin zero and preserve exact first collision alternatives through OOM" {
+    try contextFreeCandidatesLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, contextFreeCandidatesLaw, .{});
+}
+fn contextFreeRollbackLaw(allocator: std.mem.Allocator) !void {
+    var cache: CacheWithContext(CollidingKeys) = .{ .allocator = allocator };
+    defer cache.deinit();
+    const key: Key = .{ .unit = 1, .binding = 2, .context = 7, .evidence = &.{ 7, 11 } };
+    var free = key;
+    free.context = 0;
+    free.context_free = true;
+    const prefix = try cache.insert(key, 10, false);
+    try cache.complete(prefix, false);
+    const alias = cache.findExact(free).?;
+    const mark = cache.checkpoint();
+    defer cache.rollbackEntries(mark);
+    const duplicate = try cache.insert(key, 20, true);
+    const before_completion = cache.checkpoint();
+    cache.complete(duplicate, false) catch |err| {
+        try std.testing.expectEqual(before_completion, cache.checkpoint());
+        try std.testing.expect(cache.entries.items[duplicate].building);
+        try std.testing.expect(cache.entries.items[duplicate].context_sensitive);
+        try std.testing.expect(cache.entries.items[alias].next == null);
+        return err;
+    };
+    var temporary = key;
+    temporary.binding = 3;
+    const appended = try cache.insert(temporary, 30, false);
+    try cache.complete(appended, false);
+    try cache.admit(temporary, 9);
+    var blocked = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+    cache.allocator = blocked.allocator();
+    cache.rollbackEntries(mark);
+    cache.allocator = allocator;
+    try std.testing.expect(!blocked.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), blocked.alloc_index);
+    try std.testing.expectEqual(mark, cache.checkpoint());
+    try std.testing.expectEqual(@as(?usize, prefix), cache.findExact(key));
+    try std.testing.expectEqual(@as(?usize, alias), cache.findExact(free));
+    try std.testing.expect(cache.find(temporary) == null);
+    try std.testing.expectEqual(@as(?usize, 9), cache.admitted(temporary));
+    try expectCandidates(&cache, key, &.{ 0, 1 });
+    try std.testing.expect(!cache.entries.items[prefix].building);
+    try std.testing.expect(!cache.entries.items[prefix].context_sensitive);
+    // Failing the first alias allocation leaves no usable independent claim.
+    const pending = try cache.insert(temporary, 40, false);
+    var failing = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+    cache.allocator = failing.allocator();
+    const completion = cache.complete(pending, false);
+    cache.allocator = allocator;
+    try std.testing.expectError(error.OutOfMemory, completion);
+    try std.testing.expect(cache.entries.items[pending].building);
+    try std.testing.expect(cache.entries.items[pending].context_sensitive);
+    var pending_alias = temporary;
+    pending_alias.context = 0;
+    pending_alias.context_free = true;
+    try std.testing.expect(cache.findExact(pending_alias) == null);
+}
+test "completed call context free aliases roll back owned duplicate tails and publish atomically through OOM" {
+    try contextFreeRollbackLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, contextFreeRollbackLaw, .{});
 }

@@ -502,6 +502,8 @@ export const devCheckAreas = {
       "backend.wasm.test.owned module tail rollback preserves exact prefixes scalar state and handles through OOM",
       "backend.wasm.test.owned module tail checkpoints decline recorded counted and arena views",
       "backend.storage_calls.test.owned call executable tail rollback preserves colliding duplicate chains and admission plans through OOM",
+      "backend.storage_calls.test.completed call context free aliases separate origin zero and preserve exact first collision alternatives through OOM",
+      "backend.storage_calls.test.completed call context free aliases roll back owned duplicate tails and publish atomically through OOM",
       "backend.storage_completed_function_tests.test.completed function rollback removes nested helpers before truncate reserve and freeze through OOM",
       "backend.storage_completed_function_tests.test.completed function read only borrowed results decline SIMD stores before inline fallback through OOM",
       "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
@@ -571,6 +573,7 @@ export const devCheckAreas = {
     ],
     "guests": [
       "zig-native/tests/completed_function_execution.test.ts",
+      "zig-native/tests/completed_context_execution.test.ts",
       "zig-native/tests/projected_parameter_execution.test.ts",
       "zig-native/tests/storage_wordless_aggregate_execution.test.ts",
       "zig-native/tests/parameter_copy_execution.test.ts",

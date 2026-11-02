@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "bed18d979e941b51a1ca88a7edf0f4d3d76c5693",
+  "change": "Publish exact context-free aliases only after actual completed bodies with a positive closed semantic frontier. Track actual trait queries and transitive cached callee sensitivity; preserve source/recursion origin. Strengthen generic scalar keys with full inline frontier evidence.",
+  "qualification": {
+    "check_dev": "build/bench/completed-context-check-dev/run-ec67048520e58d27/results.json",
+    "compiled_native": 2830,
+    "full_fault_selected": 71,
+    "full_faults": "build/bench/completed-context-check-dev/run-ec67048520e58d27/full-faults.log",
+    "guests": 48,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/completed-context-full-gate/run-2a1fbc9eb2cd1339;48passed/1reproducedbaseline List/chunk storage_escape",
+    "new_guests": "4 tests both tiers, each sync/async; U32/F32 exact bits, distinct nominals and cached transitive/callback contract queries. Positive inline12->6/read4->2; negatives retain10/12sensitive definitions and2actual traitqueries."
+  },
+  "renderer": {
+    "evidence": "build/bench/completed-context-kites/pair-7148c6c94b16685a/result.json",
+    "all_seven_streams_equal": true,
+    "builds": [
+      {
+        "variant": "baseline",
+        "build_ms": 4152.6397799999995,
+        "wasm_bytes": 227770,
+        "wasm_sha256": "8d461399b3198efe1333d1d4b99e7ae7a4f11619b91241ba265b5db06cf1d313",
+        "work": {
+          "scoped_emission_expressions": 8576,
+          "scoped_scalar_definitions": 220,
+          "scoped_inline_definitions": 114,
+          "scoped_reader_definitions": 15,
+          "scoped_writer_definitions": 53
+        }
+      },
+      {
+        "variant": "candidate",
+        "build_ms": 4007.29561,
+        "wasm_bytes": 220771,
+        "wasm_sha256": "d7cf98b177489ea8a5f402c9e288f41e07fa6b9c9ce9f5295e3e5c5789cbedaa",
+        "work": {
+          "scoped_emission_expressions": 7919,
+          "scoped_scalar_definitions": 212,
+          "scoped_inline_definitions": 93,
+          "scoped_reader_definitions": 13,
+          "scoped_writer_definitions": 51,
+          "scoped_context_sensitive_calls": 12,
+          "scoped_context_free_calls": 1476,
+          "scoped_context_sensitive_definitions": 4,
+          "scoped_context_free_definitions": 368,
+          "scoped_context_queries": 0
+        }
+      }
+    ],
+    "warning": "Single traced native-fast pair, not a distribution or whole-main latency claim."
+  },
+  "whole_main": "Pending LLVM measurement of this checked candidate. Previous verified main remains17.4476s,38,824,580B."
+}

@@ -69,6 +69,14 @@ See [completed function and metadata evidence](zig-native/measurements/completed
 The next structural hill removes proven invariant whole-record transport through
 branches and loops after indexed heap writes, preserving checked Core semantics.
 
+Completed function summaries now share context-independent code across caller
+modules only when the entire semantic frontier is closed. Actual trait queries
+and transitive cached callee sensitivity keep dependent methods contextual.
+All 2,830 laws compile; 71 full-fault laws, 48 guests and clean Zig lint qualify
+the selected family. Seven renderer streams match; Wasm falls 227,770 to
+220,771 bytes. See [context alias evidence](zig-native/measurements/completed-context-aliases-2026-11-02.json).
+Optimized full-main timing remains pending; the verified latest main is above.
+
 The structural type-ID prototype is **rejected and removed**: three alternating
 actual renderer pairs regress emission 5.3%, despite much smaller keys. Its
 patch and exact controls are preserved in

@@ -201,6 +201,7 @@ const Generator = struct {
     active_goals: []const core.Obligation = &.{},
     entry_unit: u32,
     specialization_origin: ?evaluation.SourceLocation = null,
+    context_sensitive: bool = false,
     methods: *MethodSelector,
     calls: call_plan.Cache,
     shared_calls: *call_plan.Cache,
@@ -2620,6 +2621,20 @@ const Generator = struct {
         }
         return self.selectedInlineType(.{ .unit = m.unit, .ty = n.ty }, remaining);
     }
+    fn noteCalleeContext(self: *Generator, entry: call_plan.Entry) void {
+        if (entry.context_sensitive) {
+            self.context_sensitive = true;
+            self.emission_work.scoped_context_sensitive_calls +|= 1;
+        } else self.emission_work.scoped_context_free_calls +|= 1;
+    }
+    fn completeCall(self: *Generator, cache: *call_plan.Cache, index: usize, child_sensitive: bool, closed_frontier: bool) Error!void {
+        var sensitive = true;
+        if (closed_frontier) sensitive = child_sensitive;
+        try cache.complete(index, sensitive);
+        if (sensitive) {
+            self.emission_work.scoped_context_sensitive_definitions +|= 1;
+        } else self.emission_work.scoped_context_free_definitions +|= 1;
+    }
     fn closedScalarBody(self: *Generator, m: *const core.Module, target: core.BindingId) Error!bool {
         const nodes_before = self.scalar_admission.nodes;
         const hits_before = self.scalar_admission.hits;
@@ -2681,11 +2696,21 @@ const Generator = struct {
             try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         }
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
+        var closed_frontier = isolated;
+        if (!owned_result and !isolated) {
+            const result_schema: Value = .{ .word = .{ .id = 0 }, .floating = result_type == T.f32_type };
+            if (try self.inlineCallEvidence(m, body, arguments, result_schema)) |complete| {
+                defer self.allocator.free(complete);
+                try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 9, @intCast(complete.len) });
+                try evidence.appendSlice(self.allocator, complete);
+                closed_frontier = true;
+            }
+        }
         var context = self.invocationContext();
         // The complete primitive DAG proof excludes every operation which can
         // select a caller-visible method, dictionary, global or effect.
         if (isolated) context = 0;
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = context, .evidence = evidence.items };
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = context, .context_free = isolated, .evidence = evidence.items };
         var cache = self.shared_calls;
         if (owned_result) cache = &self.calls;
         const existing = cache.find(key);
@@ -2758,12 +2783,13 @@ const Generator = struct {
                 return err;
             };
             try child.c.value(if (owned_result) output.word else try child.scalar(m, body.root, output));
-            cache.entries.items[inserted].building = false;
+            try self.completeCall(cache, inserted, child.context_sensitive, closed_frontier);
             if (!owned_result) self.emission_work.scoped_scalar_definitions +|= 1;
             break :blk inserted;
         };
         const entry = cache.entries.items[index];
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive storage specializations are not admitted");
+        self.noteCalleeContext(entry);
         for (arguments) |argument| try self.c.value(argument.word);
         if (destination) |owner| {
             try self.c.value(owner.token);
@@ -2917,11 +2943,12 @@ const Generator = struct {
                 try child.storeValue(.{ .id = @intCast(words) }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, body.root, output));
-            cache.entries.items[inserted].building = false;
+            try self.completeCall(cache, inserted, child.context_sensitive, concrete != null);
             if (concrete != null) self.emission_work.scoped_inline_definitions +|= 1;
             break :blk inserted;
         };
         const entry = cache.entries.items[index];
+        self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive inline specializations are not admitted");
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
@@ -3601,11 +3628,12 @@ const Generator = struct {
                 try child.storeReaderResult(.{ .id = next }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, body.root, output));
-            cache.entries.items[inserted].building = false;
+            try self.completeCall(cache, inserted, child.context_sensitive, shared);
             self.emission_work.scoped_reader_definitions +|= 1;
             break :blk inserted;
         };
         const entry = cache.entries.items[index];
+        self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive reader specializations are not admitted");
         var result_template = result_shape;
         if (aggregate_result and !shared) result_template = try self.readerResult(self.reader_results.get(entry.function) orelse return self.unsupported(m, body.root), descriptors.items);
@@ -3642,8 +3670,8 @@ const Generator = struct {
             cache = &self.descriptor_calls.calls;
             regions_by_function = &self.descriptor_calls.regions;
         }
-        var candidate = cache.find(key);
-        while (candidate) |index| : (candidate = cache.entries.items[index].next) {
+        var candidates = cache.candidates(key);
+        while (candidates.next()) |index| {
             const entry = cache.entries.items[index];
             if (entry.building) return index;
             const regions = regions_by_function.get(entry.function) orelse return self.unsupported(m, id);
@@ -3822,7 +3850,7 @@ const Generator = struct {
         }
         return result orelse original;
     }
-    const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions" };
+    const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -3834,12 +3862,13 @@ const Generator = struct {
         active_calls: usize,
         types: usize,
         diagnostic: ?backend.Diagnostic,
+        context_sensitive: bool,
         publications: [published_fields.len]u64,
         fn begin(g: *Generator) ?FunctionMark {
             const module = g.module.tailCheckpoint() orelse return null;
             var publications: [published_fields.len]u64 = undefined;
             inline for (published_fields, 0..) |field, index| publications[index] = @field(g.emission_work.*, field);
-            return .{ .module = module, .local_calls = g.calls.checkpoint(), .shared_calls = g.shared_calls.checkpoint(), .descriptor_calls = g.descriptor_calls.calls.checkpoint(), .capacities = g.capacity_requests.items.items.len, .validation_budget = g.validation_budget.*, .max_stacks = g.max_stacks, .active_calls = g.active_calls.frames.items.len, .types = g.type_arguments.items.len, .diagnostic = g.diagnostic, .publications = publications };
+            return .{ .module = module, .local_calls = g.calls.checkpoint(), .shared_calls = g.shared_calls.checkpoint(), .descriptor_calls = g.descriptor_calls.calls.checkpoint(), .capacities = g.capacity_requests.items.items.len, .validation_budget = g.validation_budget.*, .max_stacks = g.max_stacks, .active_calls = g.active_calls.frames.items.len, .types = g.type_arguments.items.len, .diagnostic = g.diagnostic, .context_sensitive = g.context_sensitive, .publications = publications };
         }
         fn rollback(self: FunctionMark, g: *Generator) void {
             const last = g.module.functions.items.len;
@@ -3861,6 +3890,7 @@ const Generator = struct {
             std.debug.assert(g.active_calls.frames.items.len == self.active_calls);
             g.type_arguments.shrinkRetainingCapacity(self.types);
             g.diagnostic = self.diagnostic;
+            g.context_sensitive = self.context_sensitive;
             inline for (published_fields, 0..) |field, index| @field(g.emission_work.*, field) = self.publications[index];
             g.module.rollbackTail(self.module);
         }
@@ -4010,7 +4040,7 @@ const Generator = struct {
         }
         try facts_by_function.put(self.allocator, function, facts);
         try regions_by_function.put(self.allocator, function, try summary_arena.dupe(usize, regions.items));
-        cache.entries.items[inserted].building = false;
+        try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
         self.emission_work.scoped_writer_definitions +|= 1;
         if (graph_mode) {
             self.emission_work.scoped_owner_graph_definitions +|= 1;
@@ -4177,6 +4207,7 @@ const Generator = struct {
         }
         const entry = cache.entries.items[index.?];
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive writer specializations are not admitted");
+        self.noteCalleeContext(entry);
         // Replay the actual compiler access order even on cache hits. Caller
         // loop scopes see the same row shapes as expanded selected bodies.
         for (facts_by_function.get(entry.function) orelse return self.unsupported(m, body.root)) |event| {
@@ -4643,11 +4674,12 @@ const Generator = struct {
                 try child.storeValue(.{ .id = next }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, id, output));
-            cache.entries.items[inserted].building = false;
+            try self.completeCall(cache, inserted, child.context_sensitive, false);
             self.emission_work.scoped_closure_definitions +|= 1;
             break :blk inserted;
         };
         const entry = cache.entries.items[index];
+        self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, id, .storage_unsupported, "Recursive callback specialization is not admitted");
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
@@ -5183,6 +5215,8 @@ const Generator = struct {
     }
 
     fn contractMethod(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
+        self.context_sensitive = true;
+        self.emission_work.scoped_context_queries +|= 1;
         const node = m.node(id);
         const template = m.member_templates[node.a];
         const before = self.type_arguments.items.len;
