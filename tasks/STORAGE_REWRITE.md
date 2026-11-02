@@ -2,12 +2,13 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-active-captures-2026-11-02.json)
-now completes in **19.74 seconds**, producing **43.06 MB Wasm**, cache disabled.
-The previous matched-source completion was 24.55 seconds/45.98 MB. Neither meets
-the five-second gate. Emission still expands 1.3 million expressions and
-performs 3.85 million shadow admission visits; completed typed function plans
-and cheaper aggregate transport are the next architectural hill.
+[Actual full main](../zig-native/measurements/gdev-after-indexed-access-2026-11-02.json)
+now completes in **17.45 seconds**, producing **38.82 MB Wasm**, cache disabled.
+The preceding matched-source completions were19.74 seconds/43.06 MB and24.55
+seconds/45.98 MB. Neither meets the five-second gate. Emission still expands 1.3
+million expressions and performs 3.85 million shadow admission visits; completed
+typed function plans and cheaper aggregate transport are the next architectural
+hill.
 
 [Active captures](../zig-native/measurements/active-type-captures-2026-11-02.json)
 qualify 59 selected native laws with full faults, 34 guests and seven unchanged

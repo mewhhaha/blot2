@@ -7,18 +7,18 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest completed actual main takes **19.74 seconds** and produces
-**43,058,313 bytes of Wasm**, cache disabled. Exact compiler source is
-`82a00d1e4fda0fccb6234c1152a29e6386c7efbd`, Zig 0.17 fast/LLVM; Gdev/Ink remain
-`7733add6`/`d520a903`. A separate completed trace takes 22.16 seconds: 19.45 in
-emission, 0.82 in outlining and 0.42 in assembly. Frontend is about 1.1 seconds.
-The previous matched-source completion was 24.55 seconds/45.98 MB; these are
-single completions, not a distribution. See
-[latest full-main evidence](zig-native/measurements/gdev-after-active-captures-2026-11-02.json)
+The latest completed actual main takes **17.45 seconds** and produces
+**38,824,580 bytes of Wasm**, cache disabled. Exact compiler source is
+`a151a17aec8136876ffe28731cd4ec6987013d28`, Zig 0.17 fast/LLVM; Gdev/Ink remain
+`7733add6`/`d520a903`. The preceding unchanged-source runs took 19.74 seconds
+(43.06 MB, source82a00d1) and 24.55 seconds (45.98 MB, source9276d7b). These are
+single completions, not distributions. See
+[latest full-main evidence](zig-native/measurements/gdev-after-indexed-access-2026-11-02.json),
+[prior completion](zig-native/measurements/gdev-after-active-captures-2026-11-02.json)
 and
-[previous completion](zig-native/measurements/completed-gdev-main-2026-11-02.json).
+[earlier completion](zig-native/measurements/completed-gdev-main-2026-11-02.json).
 
-Backend work remains excessive: 1,302,518 emitted expressions, 3,848,149 shadow
+Backend work remains excessive: 1,296,622 emitted expressions, 3,848,149 shadow
 call-admission visits, 14,239 physical functions and 187,280 outline globals.
 The profile requests about 20 GB of backend allocations. Astra recommends
 completed typed function plans with resolved layouts/callees/dictionaries and
@@ -54,8 +54,8 @@ Source origin, active recursion, local-address fallback, whole-root borrow
 protection, leaf mutation checks and nesting limits remain. The 2,820-law
 inventory compiles; 61 full-fault laws, 38 selected guests and 18 extra record
 laws pass; Zig lint is clean. Seven renderer streams match with 233,488-byte
-Wasm. Native main still exceeds 30 seconds; the optimized full-main measurement
-is next. See
+Wasm. Native main still exceeds 30 seconds; the completed optimized full-main
+result is linked above. See
 [exact evidence](zig-native/measurements/indexed-access-and-closed-context-2026-11-02.json).
 
 The structural type-ID prototype is **rejected and removed**: three alternating
