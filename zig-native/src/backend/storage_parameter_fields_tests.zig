@@ -283,3 +283,21 @@ test "direct anonymous parameter fields retain complete escape fallback" {
     try collectorLaw(std.testing.allocator);
     try std.testing.checkAllAllocationFailures(std.testing.allocator, collectorLaw, .{});
 }
+
+test "projected anonymous parameters discover nominal callback bundles without changing owner graphs through OOM" {
+    var module = try lower(
+        \\type Hooks is data = $Hooks {tick: U32 -> U32 ! {}, spare: U32 -> U32 ! {}}
+        \\const plus = func (value: U32): U32 => return @u32.add value 1
+        \\const read_state = func (access: {picked: Ref U32, other: Ref U32, unused: Ref U32, hooks: Hooks}): U32 => return @u32.add (access.hooks.tick (@storage.load access.picked)) (@storage.load access.other)
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let first: Array U32 = #[input]
+        \\  let second: Array U32 = #[10]
+        \\  let hooks = $Hooks {tick: plus, spare: plus}
+        \\  let left = {picked: @storage.at first 0, other: @storage.at second 0, unused: @storage.at second 0, hooks}
+        \\  let right = {picked: @storage.at second 0, other: @storage.at first 0, unused: @storage.at first 0, hooks}
+        \\  return @u32.add (read_state left) (read_state right)
+    );
+    defer module.deinit(a);
+    try publish(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
+}

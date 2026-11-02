@@ -527,6 +527,8 @@ export const devCheckAreas = {
       "backend.storage_parameter_fields_tests.test.direct anonymous parameter fields retain complete escape fallback",
       "backend.storage_parameter_fields_tests.test.projected anonymous parameters share owners despite unused goal-bearing callbacks",
       "backend.storage_parameter_fields_tests.test.projected anonymous parameters complete selected named callback source proof before sharing",
+      "backend.storage_parameter_fields_tests.test.projected anonymous parameters discover nominal callback bundles without changing owner graphs through OOM",
+      "backend.scoped_backend.test.callback discovery bounds shared trees depth and owner boundaries",
       "backend.storage_parameter_fields_tests.test.projected anonymous parameters reject selected literal callbacks with captured goals",
       "backend.scoped_backend.test.immutable metadata preserves read writer and loop snapshots through allocation failures",
       "backend.scoped_backend.test.sparse loop read frames preserve sorted first snapshots nested backedges and lazy persistent owners through OOM",

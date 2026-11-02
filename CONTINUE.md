@@ -91,6 +91,19 @@ laws compile, 92 selected laws pass exhaustive faults, and 61 guests pass.
 Renderer Wasm remains identical; native timing is inconclusive. See
 [primitive memo evidence](zig-native/measurements/primitive-type-key-memo-2026-11-02.json).
 
+## Candidate: concrete callback bundles
+
+Gdev now groups its four world callbacks in a concrete `Hooks` nominal with the
+same closed effects, captures and forwarding. `FrameAccess` remains structural.
+The compiler finds nested callbacks within depth/work bounds and applies its
+existing physical field projection. Source/method/owner proofs and full semantic
+witnesses remain unchanged. All 2,846 native laws compile; 94 selected laws pass
+exhaustive faults, 63 guests pass and Zig lint is clean. All seven renderer
+streams match. The real world/editor witness passes seven checks in sync/JSPI.
+The required gate retains the 48/1 baseline. Optimized actual main is pending;
+source-only on the old compiler takes 10.72s/29.77MB. See
+[bundle evidence](zig-native/measurements/nominal-callback-bundles-2026-11-02.json).
+
 ## Checked compiler fixes
 
 The last frame-qualified compiler is the reviewed contract-method candidate, SHA

@@ -4066,14 +4066,8 @@ const Generator = struct {
             if (argument.tag != .aggregate or argument.nominal != null or argument.variant_tags.len != 0 or argument.host != null or argument.demand != null or argument.root != null) continue;
             // Target callback-bearing access records. Plain records retain
             // their existing path without another source-body traversal.
-            var has_callback = false;
-            for (argument.fields) |field| {
-                if (field.tag == .callable) {
-                    has_callback = true;
-                    break;
-                }
-            }
-            if (!has_callback) continue;
+            var callback_work: usize = 4096;
+            if (!containsCallback(argument, &callback_work, 0)) continue;
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = parameter.ty }, 0);
             if ((try self.unit(actual.unit)).types.node(actual.ty).tag != .record) continue;
             var footprint = try @import("storage_parameter_fields.zig").collect(self.allocator, m, body.root, parameter.binding);
@@ -4100,6 +4094,19 @@ const Generator = struct {
             @import("../phase_profile.zig").detail("descriptor.parameter.projected", m.unit, m.span(body.root).start, m.span(body.root).end, argument.fields.len - selected.items.len);
         }
         return result orelse original;
+    }
+    fn containsCallback(value: Value, remaining: *usize, depth: usize) bool {
+        if (remaining.* == 0 or depth > 128) return false;
+        remaining.* -= 1;
+        if (value.tag == .callable) return true;
+        if (value.tag != .aggregate) return false;
+        if (depth == 128) return false;
+        if (value.fields.len > remaining.*) return false;
+        remaining.* -= value.fields.len;
+        // Keep the ordinary flat-record scan cheap; only aggregates recurse.
+        for (value.fields) |field| if (field.tag == .callable) return true;
+        for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
+        return false;
     }
     const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions" };
     const FunctionMark = struct {
@@ -7371,4 +7378,35 @@ fn primitiveKeyMemo(allocator: std.mem.Allocator) !void {
 test "primitive key memo shares only encoded atoms across units captured frames and depth through OOM" {
     try primitiveKeyMemo(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, primitiveKeyMemo, .{});
+}
+
+test "callback discovery bounds shared trees depth and owner boundaries" {
+    const callback: Callable = .{ .unit = 1, .target = 2 };
+    const leaf: Value = .{ .tag = .callable, .word = .{ .id = 0 }, .callable = &callback };
+    const payload = [_]Value{leaf};
+    const nominal: Value = .{ .tag = .aggregate, .word = .{ .id = 0 }, .nominal = .{ .unit = 1, .decl = 1 }, .fields = &payload };
+    const outer = [_]Value{nominal};
+    var work: usize = 4;
+    try std.testing.expect(Generator.containsCallback(.{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &outer }, &work, 0));
+    try std.testing.expectEqual(@as(usize, 0), work);
+    work = 3;
+    try std.testing.expect(!Generator.containsCallback(.{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &outer }, &work, 0));
+    work = 2;
+    try std.testing.expect(!Generator.containsCallback(.{ .tag = .array, .word = .{ .id = 0 }, .fields = &payload }, &work, 0));
+    work = 1;
+    try std.testing.expect(Generator.containsCallback(leaf, &work, 128));
+    work = 1;
+    try std.testing.expect(!Generator.containsCallback(leaf, &work, 129));
+    work = 100;
+    try std.testing.expect(!Generator.containsCallback(nominal, &work, 128));
+    var levels: [20][2]Value = undefined;
+    levels[19] = @splat(.{ .word = .{ .id = 0 } });
+    var index: usize = 19;
+    while (index != 0) {
+        index -= 1;
+        levels[index] = @splat(.{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &levels[index + 1] });
+    }
+    work = 4096;
+    try std.testing.expect(!Generator.containsCallback(levels[0][0], &work, 0));
+    try std.testing.expectEqual(@as(usize, 0), work);
 }
