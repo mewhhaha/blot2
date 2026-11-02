@@ -2,15 +2,16 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-nominal-frame-2026-11-02.json)
-now completes in **about 8.3 seconds total**, producing **22.35 MB Wasm**, cache
-disabled. The preceding checkpoint took 8.87 seconds/22.38MB. The checked
-[nominal frame/payload batch](../zig-native/measurements/nominal-frame-and-payload-slicing-2026-11-02.json)
-compiles 2,863 native laws, passes 112 full-fault laws, 84 guests, seven
-world/editor checks and 160 focused hand checks in sync/JSPI on the final
-optimized release. The five-second gate remains unmet. Full qualification
-retains the baseline List/chunk failure; installed Pen rejects ABI 8, so no fresh
-full-game frame/PNG is qualified.
+[Actual full main](../zig-native/measurements/gdev-after-walks-and-bounds-2026-11-02.json)
+now completes in **7.26–7.42 seconds total**, producing **22.35 MB Wasm**, cache
+disabled, versus 8.30s at the preceding checkpoint. Compile-scoped getter bounds
+receipts and borrowed shape/width walks retain the identical complete Wasm hash.
+All 2,864 native laws compile; 113 selected laws pass full faults and 84 guests
+pass. The [nominal frame/payload batch](../zig-native/measurements/nominal-frame-and-payload-slicing-2026-11-02.json)
+retains seven world/editor and 160 focused hand checks in sync/JSPI. The
+five-second gate remains unmet. Full qualification retains the baseline
+List/chunk failure; installed Pen rejects ABI 8, so no fresh full-game frame/PNG
+is qualified.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

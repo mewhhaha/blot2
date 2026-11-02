@@ -223,8 +223,11 @@ const MethodSelector = struct {
     units: []const core.Module,
     entry: u32,
     session: ?evaluation.Session = null,
+    // Getter selection borrows one immutable context for this compilation.
+    bounds: @import("../check/scheme_equations.zig").Workspace,
     fn deinit(self: *MethodSelector) void {
         if (self.session) |*session| session.deinit();
+        self.bounds.deinit();
     }
     fn get(self: *MethodSelector) std.mem.Allocator.Error!*evaluation.Session {
         if (self.session == null) {
@@ -1282,8 +1285,11 @@ const Generator = struct {
         return result;
     }
     fn plainShape(value: Value) bool {
+        return plainShapePointer(&value);
+    }
+    fn plainShapePointer(value: *const Value) bool {
         if (value.tag != .scalar and value.tag != .aggregate) return false;
-        for (value.fields) |field| if (!plainShape(field)) return false;
+        for (value.fields) |*field| if (!plainShapePointer(field)) return false;
         return true;
     }
     fn globalArray(self: *Generator, m: *const core.Module, id: core.Id, target: core.BindingRef) Error!Value {
@@ -3312,9 +3318,12 @@ const Generator = struct {
         return result;
     }
     fn readerWords(value: Value) usize {
+        return readerWordsPointer(&value);
+    }
+    fn readerWordsPointer(value: *const Value) usize {
         if (value.tag == .aggregate or value.tag == .callable) {
             var count: usize = @intFromBool(value.variant_tags.len != 0);
-            for (value.fields) |field| count += readerWords(field);
+            for (value.fields) |*field| count += readerWordsPointer(field);
             return count;
         }
         return switch (value.tag) {
@@ -3849,8 +3858,11 @@ const Generator = struct {
         return true;
     }
     fn stableDescriptorShape(value: Value) bool {
-        if (!plainShape(value) or value.variant_tags.len != 0) return false;
-        for (value.fields) |field| if (!stableDescriptorShape(field)) return false;
+        return stableDescriptorShapePointer(&value);
+    }
+    fn stableDescriptorShapePointer(value: *const Value) bool {
+        if ((value.tag != .scalar and value.tag != .aggregate) or value.variant_tags.len != 0) return false;
+        for (value.fields) |*field| if (!stableDescriptorShapePointer(field)) return false;
         return true;
     }
     fn optionalWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, descriptors: []const Value, owners: []const usize, evidence: *std.ArrayList(u32)) Error!bool {
@@ -5674,7 +5686,8 @@ const Generator = struct {
     fn fieldTarget(self: *Generator, m: *const core.Module, identity: T.NominalIdentity, member: u32) Error!?core.BindingRef {
         const key: DispatchKey = .{ .unit = m.unit, .identity = identity, .member = member, .operator = .none, .field = true };
         if (self.dispatches.get(key)) |cached| return cached;
-        const target = @import("../check/resolver_core.zig").method(m, self.unit_views, identity, member, self.validation_budget) catch {
+        const target = @import("../check/resolver_core.zig").methodWorkspace(m, self.unit_views, identity, member, self.validation_budget, &self.methods.bounds) catch {
+            if (self.methods.bounds.oom) return error.OutOfMemory;
             if (self.validation_budget.* == 0) return error.Declined;
             try self.dispatches.put(self.allocator, key, null);
             return null;
@@ -7074,7 +7087,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer shared_calls.deinit();
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
-    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry };
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = entry, .bounds = .{ .allocator = allocator } };
     defer methods.deinit();
     var g: Generator = .{ .entry_unit = entry, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .work_limits = limits, .emission_work = &emission_work, .outlining = &outlining };
     defer g.deinit();
@@ -7441,7 +7454,7 @@ fn scalarAdmissionRefinement(allocator: std.mem.Allocator, units: []const core.M
     defer shared_calls.deinit();
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
     defer outlining.deinit();
-    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = m.unit };
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = m.unit, .bounds = .{ .allocator = allocator } };
     defer methods.deinit();
     var g: Generator = .{ .entry_unit = m.unit, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = &views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .emission_work = &emission_work, .outlining = &outlining, .c = .{ .module = &module, .function = function } };
     defer g.deinit();

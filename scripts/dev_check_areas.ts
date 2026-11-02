@@ -141,6 +141,7 @@ export const devCheckAreas = {
       "backend.storage_calls_tests.test.plain Unit writers reuse checked row mutation and growth helpers",
       "backend.storage_calls_tests.test.Unit writer helpers admit plain local scratch arrays with checked cleanup",
       "backend.storage_calls_tests.test.plain getters preserve exact dispatch through selected inline helpers",
+      "backend.storage_calls_tests.test.foreign getter bounds receipts preserve private members and catalog budgets through OOM",
       "backend.storage_calls_tests.test.writer outlining leaves implicit global pool reads with their owning generator",
       "backend.storage_calls_tests.test.unit writers plan fixed scratch generators without expanding repeated calls",
       "backend.storage_calls_tests.test.scratch generator writer admission declines borrowed and owning row layouts",
@@ -517,6 +518,7 @@ export const devCheckAreas = {
     "description":
       "Type identity, effect rollback, owned data and physical encoding.",
     "native": [
+      "backend.storage_calls_tests.test.foreign getter bounds receipts preserve private members and catalog budgets through OOM",
       "backend.wasm.test.local declaration groups preserve mixed slots and LEB run boundaries",
       "backend.wasm.test.owned module tail rollback preserves exact prefixes scalar state and handles through OOM",
       "backend.wasm.test.owned module tail checkpoints decline recorded counted and arena views",

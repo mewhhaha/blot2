@@ -7,13 +7,23 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest fresh actual main takes **about 8.3 seconds total**, producing
-**22,346,701 bytes of Wasm**, cache disabled. Frozen/configured completions take
-8.36s/8.30s; the preceding structural-access release took 8.87s/22.38MB. These
-are individual completions, not distributions. The five-second gate remains
-unmet. Exact compiler and sibling source patches/hashes are pinned in
-[latest main evidence](zig-native/measurements/gdev-after-nominal-frame-2026-11-02.json).
-Compiler snapshot is `b8182c33` plus patch `f3309955c887`.
+The latest fresh actual main takes **7.26–7.42 seconds total**, producing
+**22,346,701 bytes of Wasm**, cache disabled. A separate profile takes 7.35s;
+the configured-path run takes 7.42s with the same compiler identity and complete
+Wasm hash. The preceding nominal-access release took 8.30s. These are individual
+completions, not distributions. The five-second gate remains unmet. Exact
+compiler/source identities are pinned in
+[latest main evidence](zig-native/measurements/gdev-after-walks-and-bounds-2026-11-02.json).
+Compiler snapshot is `a87c33c9` plus patch `9adda4ca4438`.
+
+Getter selection now reuses the existing successful bounds receipts inside one
+compile's immutable unit context. Exact method catalog, budget and privacy
+checks still run. Plain/stable shape and Reader-width queries borrow child
+metadata during recursion; stable shape checking uses one walk. This changes
+no emitted Wasm bytes: the complete main hash matches the preceding release.
+Backend time falls 7.41s->6.36s, with requested bytes/allocations essentially
+unchanged at 6.17GB/5.74M. All 2,864 native laws compile; 113 selected laws pass
+full allocation faults, 84 guests pass and Zig lint is clean.
 
 Gdev FrameAccess is now fixed zero-argument single-constructor data. The compiler
 keeps its wrapper/full source/type witnesses while passing only payload fields
@@ -23,9 +33,9 @@ the same resource scopes and generic consumer; ordered same-type field updates
 replace their structural merge. A nominal-only source control lost most field
 slicing and took 11.29s; the combined design restores that slicing.
 
-A separate profile puts 7.41s in the backend, requesting 6.17GB through 5.74M
-allocations, versus 7.92s/7.27GB/5.93M before. All 2,863 native laws compile;
-112 selected laws pass exhaustive faults, 84 guests pass and Zig lint is clean.
+The preceding nominal-frame profile put 7.41s in the backend, requesting
+6.17GB through 5.74M allocations. That batch compiled 2,863 native laws and
+passed 112 selected full-fault laws, 84 guests and Zig lint.
 The final optimized release passes seven original world/editor checks and 160
 new hand isolation/commit checks in sync and JSPI. See
 [batch evidence](zig-native/measurements/nominal-frame-and-payload-slicing-2026-11-02.json).
@@ -42,7 +52,8 @@ Closed-fragment replay, early scalar-key skipping and paged outliner facts are
 held after neutral or worse CPU pairs. The callsite BodyInstance cache also
 stays held after low measured preparation coverage. A later typed-body/type-node
 representation must remove repeated resolution and Builder work rather than
-wrap it in another cache; its design remains unimplemented.
+wrap it in another cache. The private canonical type-store replacement now
+builds; its differential laws and CPU pairs remain pending.
 
 ## Latest checked transport batch
 

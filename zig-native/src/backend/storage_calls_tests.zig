@@ -1572,3 +1572,62 @@ test "inline return registers keep eager bank IDs and committed counters across 
     try publishInlineRegisterRollback(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishInlineRegisterRollback, .{@as([]const core.Module, &.{module})});
 }
+
+fn foreignGetterBounds(allocator: std.mem.Allocator, producer: *const core.Module, caller: *const core.Module, members: [3]u32) !void {
+    const resolver = @import("../check/resolver_core.zig");
+    var workspace: @import("../check/scheme_equations.zig").Workspace = .{ .allocator = allocator };
+    defer workspace.deinit();
+    const units = [_]*const core.Module{ producer, caller };
+    var identity = producer.associated[0].identity;
+    if (identity.unit == 0) identity.unit = producer.unit;
+    for (members[0..2]) |member| {
+        var original_budget: usize = 1000;
+        const expected = try resolver.method(caller, &units, identity, member, &original_budget);
+        var cached_budget: usize = 1000;
+        const actual = resolver.methodWorkspace(caller, &units, identity, member, &cached_budget, &workspace) catch |err| {
+            if (workspace.oom) return error.OutOfMemory;
+            return err;
+        };
+        try std.testing.expectEqualDeep(expected, actual);
+        try std.testing.expectEqual(original_budget, cached_budget);
+        try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
+    }
+    for ([_]u32{ members[2], std.math.maxInt(u32) }) |member| {
+        var original_budget: usize = 1000;
+        try std.testing.expectError(error.InvalidArtifact, resolver.method(caller, &units, identity, member, &original_budget));
+        var cached_budget: usize = 1000;
+        try std.testing.expectError(error.InvalidArtifact, resolver.methodWorkspace(caller, &units, identity, member, &cached_budget, &workspace));
+        try std.testing.expectEqual(original_budget, cached_budget);
+        try std.testing.expectEqual(@as(usize, 1), workspace.bounds_receipts.items.len);
+    }
+    try std.testing.expect(!workspace.proved(producer));
+}
+
+test "foreign getter bounds receipts preserve private members and catalog budgets through OOM" {
+    var producer = try lower(a,
+        \\type Number is data = $Number U32
+        \\const Number.left = func ($Number value): U32 => return value
+        \\const Number.right = func ($Number value): U32 => return @u32.add value 1
+        \\const Number.hidden = func ($Number value): U32 => return @u32.add value 2
+    );
+    defer producer.deinit(a);
+    var members: [3]u32 = undefined;
+    var found: usize = 0;
+    for ([_][]const u8{ "Number.left", "Number.right", "Number.hidden" }, 0..) |name, index| {
+        for (producer.associated) |entry| {
+            if (!std.mem.eql(u8, producer.name((producer.body(entry.target.binding) orelse continue).declaration_name), name)) continue;
+            members[index] = entry.member;
+            producer.bindings[entry.target.binding].private = index == 2;
+            found += 1;
+            break;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 3), found);
+    // The caller has no local catalog; every selected method comes from the
+    // immutable foreign owner. Its copied tables remain borrowed from producer.
+    var caller = producer;
+    caller.unit = 2;
+    caller.associated = &.{};
+    try foreignGetterBounds(a, &producer, &caller, members);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, foreignGetterBounds, .{ &producer, &caller, members });
+}

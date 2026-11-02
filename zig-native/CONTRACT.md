@@ -69,6 +69,12 @@ owners without walking their contents. This path is not yet the default for
 ordinary programs; the migration document lists the required remaining work.
 These guest rules do not change the host compiler allocation contracts below.
 
+Backend getter selection shares the existing bounds-only equation workspace
+across generators in one compilation. Its successful receipts retain the exact
+ordered immutable unit context. Receipt allocation failure propagates before
+negative dispatch publication. Catalog selection, privacy and per-method work
+charges remain independent of bounds reuse.
+
 Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
 `symbols.Symbol = u32`; zero is absent. `symbols.Pool` owns one byte buffer with
 offset/length entries and stable numeric IDs. Hashes locate candidates; exact

@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-02",
+  "source": {
+    "base": "a87c33c9eadd51f24ba2732590434e91ff3ae88d",
+    "patchSha256": "9adda4ca4438eb77bd0b795620d5f4b6b0831aba9c9286c6a6c6d026f9396aa9",
+    "files": [
+      {
+        "path": "/home/jacobt/src/blot2/zig-native/src/backend/scoped_backend.zig",
+        "sha256": "c29bf992f189c4ee84063e0434534be90a9078050b8967c6fc36ae4a60240083"
+      },
+      {
+        "path": "/home/jacobt/src/blot2/zig-native/src/backend/storage_calls_tests.zig",
+        "sha256": "16d7ecfc16c19fb182f5460bae5cada0167851236fae9f4d3720ffed21815530"
+      },
+      {
+        "path": "/home/jacobt/src/blot2/scripts/dev_check_areas.ts",
+        "sha256": "b2eef66effa5740cc4c9a39a1f368c12f13981fce5395342e36fed2fee4b42d2"
+      },
+      {
+        "path": "/home/jacobt/src/gdev/src/world_storage.blot",
+        "sha256": "0cddab282ae1c44950659054f3329f65ccb051b202348dda001e804df779c069"
+      },
+      {
+        "path": "/home/jacobt/src/gdev/src/player/hand.blot",
+        "sha256": "4c8607651efa09e05d4c0e68b665628f4cc216ed126739c52d751821351b4489"
+      },
+      {
+        "path": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+        "sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac"
+      },
+      {
+        "path": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+        "sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7"
+      }
+    ],
+    "gdevHead": "bf9bf828ace1bc715df0269d0b208540f2bb5b61",
+    "inkHead": "91b3e0e7651c2aefbbb2a2fc59be32e18aa3435b"
+  },
+  "changes": [
+    "Share existing successful bounds-only Workspace receipts in the compile-owned MethodSelector, propagate receipt OOM before negative dispatch cache publication; retain catalog traversal, privacy and per-method work charges.",
+    "Borrow immutable children during plainShape and readerWords recursion; fuse recursively stable shape checking into one equivalent walk."
+  ],
+  "qualification": {
+    "centralEvidence": "build/bench/walk-bounds-central-check/run-91fe6fce46e5ad1e/results.json",
+    "compiledNativeInventory": 2864,
+    "selectedNativeLaws": 113,
+    "guests": 84,
+    "zigLintFindings": 0,
+    "fullAllocationFaults": {
+      "laws": 113,
+      "pass": true,
+      "evidence": "build/bench/walk-bounds-full-faults.log"
+    },
+    "fullGate": {
+      "evidence": "build/bench/walk-bounds-full-gate/run-17f2a1c750acfadc",
+      "passed": 48,
+      "failed": 1,
+      "baselineFailure": "List/chunk storage_escape bytes312..345",
+      "fullQualification": "pending"
+    }
+  },
+  "comparison": {
+    "previousFreshMainMs": 8304.976128,
+    "currentFreshMainMs": 7263.024167,
+    "previousProfileBackendUs": 7406048,
+    "currentProfileBackendUs": 6361470,
+    "wasmBytes": 22346701,
+    "wasmSha256": "c5ec7c6444051d463d7197e468044fa9deea2157a62b90d4546a667083dae87d",
+    "identicalCompleteWasmToPreviousCandidate": true,
+    "fastNativeWorldBackendUs": {
+      "baseline": 2957856,
+      "boundsOnly": 2781740,
+      "walksAndBounds": 2750887
+    },
+    "singleComparisonsOnly": true,
+    "previousEvidence": "zig-native/measurements/gdev-after-nominal-frame-2026-11-02.json",
+    "previousCompilerSha256": "335e03a2d35827752eca46c267eb02994a111d70aa1cc5f26ca998e31c1b8e67",
+    "configuredFreshMainMs": 7416.820839999999
+  },
+  "privateEvidence": {
+    "boundsWorld": "build/bench/private-prototypes/current-bounds-receipts",
+    "combinedWorld": "build/bench/private-prototypes/current-walk-and-bounds",
+    "renderer": "build/bench/private-prototypes/current-bounds-receipts/kites-pair/pair-2fef8617256152a0/result.json"
+  },
+  "scope": "Compiler implementation only. No Gdev/Ink library, source, assets, ABI or protocol changes. No matching ABI8 installed Pen host; fresh full-game frame qualification remains blocked. Canonical type-store rewrite and additional pointer queries are private, unlanded experiments.",
+  "final_release_witnesses": [
+    {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "evidence": "build/bench/walk-bounds-world_hooks-release.log",
+      "wasmBytes": 711109,
+      "wasmSha256": "0d470ec0f4d8da99c8ba6bc0b8181de829fb7b8fb0a8213c0ab64176a1b01807",
+      "calls": [
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": false,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": true,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "evidence": "build/bench/walk-bounds-frame_edit_policy-release.log",
+      "wasmBytes": 305185,
+      "wasmSha256": "692e1d2fdef608dc150afd617bbf7fd9bc6b6d10ac7bc95648459b071c934ceb",
+      "calls": [
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": false,
+          "row": [
+            160,
+            0
+          ]
+        },
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": true,
+          "row": [
+            160,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}
