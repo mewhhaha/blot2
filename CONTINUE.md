@@ -3,7 +3,13 @@
 ## Current frontier
 
 Compilation latency is the active priority: **subsecond Gdev compilation**, with
-the next gate below five seconds. Game diagnostics default to five seconds and
+the next gate below five seconds. The throughput target is a fresh, reachable
+50k source lines in 0.5 seconds (100k lines/second), then one million lines/second.
+Use `deno run -A scripts/bench/compiler_throughput.ts --compiler PATH --lines 50000`;
+it reports exact lines, bytes, estimated tokens, emitted work, Wasm size and
+executed checks. Generation and cold compilation remain visible; `--profile`
+is a separate diagnostic run. The target is not yet qualified.
+Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
