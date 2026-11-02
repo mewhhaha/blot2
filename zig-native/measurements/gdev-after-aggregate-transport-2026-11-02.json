@@ -1,0 +1,214 @@
+{
+  "date": "2026-11-02",
+  "compiler_source": "d8ae21718919bf5c5b5809fc4d372f14df687fef",
+  "compiler_sha256": "18ba711d4c3d2e1953952cc17e2fb0ef2d08661902ed86ae9ffd05f5b554d8a4",
+  "compiler_identity": "ba0e7afb58feb3bac144d7d313c575a5d0027e68d0385111a6b41a618c181e95",
+  "toolchain": "Zig0.17 fast/LLVM built from exact git archive source snapshot",
+  "gdev_revision": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+  "ink_revision": "d520a903a13479455a4380680f64ce590e8d58c5",
+  "source_checkpoint": {
+    "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+  },
+  "entry": "src/main.blot",
+  "cache": false,
+  "profile": false,
+  "workers": 4,
+  "frontend_workers": 4,
+  "build_ms": 11806.990086,
+  "wasm_bytes": 31654251,
+  "wasm_sha256": "ad772d2b3bbd91bb877bf51df6f84177413b285c883ca64177253df64328065b",
+  "evidence": "build/bench/gdev-aggregate-inheritance-release-first/main-fad20c2163ce6b03/result.json",
+  "work": {
+    "scoped_core_validation_reused": 263,
+    "scoped_core_validation_fresh": 1,
+    "scoped_source_proof_instances": 0,
+    "scoped_source_proof_hits": 0,
+    "scoped_source_completed_bodies": 5973,
+    "scoped_emission_expressions": 938465,
+    "scoped_type_environment_captures": 225812,
+    "scoped_type_environment_capture_hits": 646751,
+    "scoped_type_environment_copied_bindings": 17866038,
+    "scoped_type_environment_inherited_raw_bindings": 13526989,
+    "scoped_type_environment_inherited_bindings": 3230576,
+    "scoped_scalar_definitions": 2726,
+    "scoped_scalar_cache_hits": 104264,
+    "scoped_scalar_completed_hits": 93995,
+    "scoped_call_admission_nodes": 1508488,
+    "scoped_scalar_admission_nodes": 239163,
+    "scoped_scalar_admission_hits": 12796,
+    "scoped_inline_definitions": 1267,
+    "scoped_inline_cache_hits": 13385,
+    "scoped_closure_definitions": 54,
+    "scoped_closure_cache_hits": 156,
+    "scoped_reader_definitions": 844,
+    "scoped_reader_cache_hits": 17914,
+    "scoped_writer_definitions": 2296,
+    "scoped_writer_cache_hits": 15164,
+    "scoped_owner_graph_definitions": 1837,
+    "scoped_owner_graph_hits": 10752,
+    "scoped_owner_graph_inputs": 15109,
+    "scoped_completed_plan_attempts": 3282,
+    "scoped_context_sensitive_calls": 3986,
+    "scoped_context_free_calls": 155784,
+    "scoped_context_sensitive_definitions": 549,
+    "scoped_context_free_definitions": 6706,
+    "scoped_context_queries": 0,
+    "scoped_completed_plan_definitions": 2148,
+    "scoped_plain_plan_definitions": 311,
+    "scoped_plain_plan_hits": 2627,
+    "scoped_completed_plan_rollbacks": 940,
+    "scoped_completed_plan_discarded_expressions": 75997,
+    "scoped_parameter_words_shared": 28212,
+    "scoped_local_words_shared": 48331,
+    "scoped_record_updates_shared": 4366,
+    "scoped_indexed_update_roots_shared": 6214,
+    "scoped_transport_words_avoided": 46022,
+    "scoped_projected_parameter_fields": 512773,
+    "scoped_descriptor_admissions": 1150,
+    "scoped_descriptor_admission_hits": 11445,
+    "scoped_concrete_admissions": 7402,
+    "scoped_concrete_admission_hits": 41382,
+    "scoped_field_refinements": 407300,
+    "scoped_field_goal_visits": 1510668,
+    "scoped_field_recipe_hits": 624306,
+    "scoped_field_name_probes": 136347,
+    "scoped_outline_key_declines": 177,
+    "scoped_outlined_regions": 640,
+    "scoped_outlined_globals": 117777,
+    "scoped_refinement_lookups": 11862921,
+    "scoped_refinement_indexed_bindings": 612009,
+    "scoped_refinement_linear_bindings": 0,
+    "scoped_refinement_index_declines": 0
+  },
+  "separate_profile": {
+    "evidence": "build/bench/gdev-aggregate-inheritance-release-profile/main-eae2df39427391c6/result.json",
+    "build_ms": 12779.310260999999,
+    "phases": {
+      "other": {
+        "us": 19796,
+        "requested_bytes": 33352859,
+        "allocations": 652,
+        "rss_growth_kib": 788
+      },
+      "assets": {
+        "us": 26231,
+        "requested_bytes": 28714381,
+        "allocations": 517,
+        "rss_growth_kib": 3856
+      },
+      "inputs": {
+        "us": 471,
+        "requested_bytes": 206080,
+        "allocations": 444,
+        "rss_growth_kib": 0
+      },
+      "load": {
+        "us": 11071,
+        "requested_bytes": 11090545,
+        "allocations": 21058,
+        "rss_growth_kib": 2544
+      },
+      "lex": {
+        "us": 47779,
+        "requested_bytes": 28518784,
+        "allocations": 4750,
+        "rss_growth_kib": 14684
+      },
+      "parse": {
+        "us": 28686,
+        "requested_bytes": 43475493,
+        "allocations": 137697,
+        "rss_growth_kib": 4492
+      },
+      "check": {
+        "us": 591711,
+        "requested_bytes": 722227072,
+        "allocations": 1465849,
+        "rss_growth_kib": 191192
+      },
+      "lower": {
+        "us": 126131,
+        "requested_bytes": 163346907,
+        "allocations": 169607,
+        "rss_growth_kib": 60188
+      },
+      "freeze": {
+        "us": 57599,
+        "requested_bytes": 103998189,
+        "allocations": 348166,
+        "rss_growth_kib": 19464
+      },
+      "validation": {
+        "us": 105005,
+        "requested_bytes": 40290932,
+        "allocations": 40789,
+        "rss_growth_kib": 4580
+      },
+      "backend": {
+        "us": 11701282,
+        "requested_bytes": 10296374950,
+        "allocations": 10964201,
+        "rss_growth_kib": 1724420
+      }
+    },
+    "peak_rss_kib": 2028332,
+    "regions": [
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6491,
+        "thread": 2907971,
+        "stage": "owned.emit",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 11832091,
+        "us": 10778697,
+        "cpu_us": 10724840,
+        "input_items": 0,
+        "output_items": 0
+      },
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6493,
+        "thread": 2907971,
+        "stage": "owned.outline",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 12340630,
+        "us": 508489,
+        "cpu_us": 506349,
+        "input_items": 0,
+        "output_items": 0
+      },
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6494,
+        "thread": 2907971,
+        "stage": "owned.assemble",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 12651047,
+        "us": 310403,
+        "cpu_us": 307525,
+        "input_items": 0,
+        "output_items": 0
+      }
+    ]
+  },
+  "previous": {
+    "compiler_source": "b4547ddd2066e94a9846dfe8f5308a695f467a20",
+    "build_ms": 15145.427721,
+    "wasm_bytes": 32724450,
+    "same_game_library_sources": true
+  },
+  "warning": "Single completion per candidate, not a latency distribution; five-second gate remains unmet."
+}

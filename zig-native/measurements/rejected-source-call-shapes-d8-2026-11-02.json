@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-02",
+  "status": "rejected_no_source_files_modified",
+  "compiler_source": "d8ae21718919bf5c5b5809fc4d372f14df687fef",
+  "compiler_sha256": "18ba711d4c3d2e1953952cc17e2fb0ef2d08661902ed86ae9ffd05f5b554d8a4",
+  "baseline_evidence": "build/bench/gdev-aggregate-inheritance-release-first/main-fad20c2163ce6b03/result.json",
+  "overlay_evidence": "build/bench/gdev-d8-source-call-shapes/main-5d69e779aac4852b/result.json",
+  "overlay_sha256": "20981733ad100e8e002536ec39ccb1b96277fc1ae95de5cc35f123d2ac4040b8",
+  "sources": {
+    "/home/jacobt/src/ink/lib/navigation/ground.blot": "6ad09c802c37d022add67234f6c7e0521df1120eb2822bf14c5e560c54581794",
+    "/home/jacobt/src/gdev/src/world_storage.blot": "c25d74dd1be91ce0e74aafae288a55033a678cc6e86fe09f81f6707e7886eade"
+  },
+  "changes": "Combined preserved lookup-free navigation and named World callback patches, submitted as source overlays only. Entry/pen hashes alone do not fingerprint these overlays.",
+  "build_ms": 12410.456149,
+  "wasm_bytes": 31597452,
+  "work": {
+    "scoped_emission_expressions": 909150,
+    "scoped_call_admission_nodes": 1411085,
+    "scoped_owner_graph_definitions": 1870,
+    "scoped_completed_plan_discarded_expressions": 63527
+  },
+  "decision": "Only3.1% fewer expressions and0.18% fewer bytes, no demonstrated latency gain. Keep original game/library sources; pursue compiler transport/semantic representation."
+}

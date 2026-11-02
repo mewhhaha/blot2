@@ -7,21 +7,21 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest completed actual main takes **15.15 seconds** and produces
-**32,724,450 bytes of Wasm**, cache disabled. Compiler source is
-`b4547ddd2066e94a9846dfe8f5308a695f467a20`, Zig 0.17 fast/LLVM; Gdev/Ink remain
-`7733add6`/`d520a903`. Same-workload predecessors took 17.45s/38.82MB,
+The latest completed actual main takes **11.81 seconds** and produces
+**31,654,251 bytes of Wasm**, cache disabled. Compiler source is
+`d8ae21718919bf5c5b5809fc4d372f14df687fef`, Zig 0.17 fast/LLVM; Gdev/Ink remain
+`7733add6`/`d520a903`. Same-workload predecessors took 15.15s/32.72MB,17.45s/38.82MB,
 19.74s/43.06MB and 24.55s/45.98MB. These are single completions, not distributions.
-See [latest full-main evidence](zig-native/measurements/gdev-after-completed-functions-2026-11-02.json)
-and [previous completion](zig-native/measurements/gdev-after-indexed-access-2026-11-02.json).
+See [latest full-main evidence](zig-native/measurements/gdev-after-aggregate-transport-2026-11-02.json)
+and [previous completion](zig-native/measurements/gdev-after-completed-functions-2026-11-02.json).
 
-The latest separate profile attributes 14.1s to the backend, 0.57s to checking and
-0.11s to validation. Backend emission still expands 1,004,801 expressions and
-performs 1,976,145 shadow admission visits; requested allocations total 16.8GB.
+The latest separate profile attributes 11.70s to the backend; emitted expressions
+fall to938,465 and shadow admission visits to1,508,488. Backend requested
+allocations fall to10.30GB. Child inheritance keeps3.23M of13.53M substitutions.
 Completed actual functions, immutable metadata and proven context-independent
 sharing reduce expansion. The five-second gate remains unmet.
 
-The next checked batch removes proven invariant whole-record transport through
+The checked batch removes proven invariant whole-record transport through
 branches/loops, completes zero-owner plain functions with the direct word ABI,
 skips scalar shadow walks on completed strong keys, sparsifies loop read frames
 and reuses raw record-name ordering. Child type inheritance drops proven shadowed
@@ -31,7 +31,7 @@ Seven actual renderer streams match. Plain sharing reduces renderer expressions
 7,919->7,056 and shadow visits 28,531->24,891, but increases Wasm 220,771->224,349B;
 record-name caching is byte-identical. A 165-field control falls 30,138->17,810B
 with 2,061 copies avoided; the local-reference fallback stays byte-identical.
-**Optimized full-main timing for this batch is pending.** See
+The optimized main result above qualifies this batch. See
 [transport evidence](zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json).
 
 Preserve token/epoch, alias, read/write ordering, frozen/init, lifetime and escape
@@ -40,6 +40,8 @@ Prior [completed-function](zig-native/measurements/completed-functions-and-immut
 and [context sharing](zig-native/measurements/completed-context-aliases-2026-11-02.json)
 evidence pins their exact candidates. Structural global type IDs remain
 [rejected after a renderer regression](zig-native/measurements/rejected-global-type-ids-2026-11-02.json).
+The [same source rewrites retested on d8](zig-native/measurements/rejected-source-call-shapes-d8-2026-11-02.json)
+remain rejected: only3.1% fewer expressions and0.18% fewer bytes, no latency win.
 The two [source-call shape experiments](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
 are also rejected and reverted on their named old compiler.
 
