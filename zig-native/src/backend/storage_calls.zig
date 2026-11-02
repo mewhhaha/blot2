@@ -14,7 +14,7 @@ pub const Key = struct {
         return self.unit == other.unit and self.binding == other.binding and self.context == other.context and std.mem.eql(u32, self.evidence, other.evidence);
     }
 };
-pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, next: ?usize = null };
+pub const Entry = struct { key: Key, function: u32, floating: bool, building: bool = true, next: ?usize = null, previous: ?usize = null };
 /// Selected source calls, not source references or partial applications. Keys
 /// contain only bounded static callback choices; runtime data is never a key.
 pub const ActiveCalls = struct {
@@ -47,7 +47,7 @@ pub const ActiveCalls = struct {
         self.selections.shrinkRetainingCapacity(frame.start);
     }
 };
-const KeyContext = struct {
+pub const KeyContext = struct {
     pub fn hash(_: @This(), key: Key) u64 {
         const header = [_]u32{ key.unit, key.binding, key.context };
         var state = std.hash.Wyhash.init(0);
@@ -71,6 +71,7 @@ fn CacheWithContext(comptime Context: type) type {
         plans: std.ArrayList(Plan) = .empty,
         entry_positions: std.HashMapUnmanaged(Key, Chain, Context, 80) = .empty,
         plan_positions: Positions = .empty,
+        removed_keys: usize = 0,
         pub fn deinit(self: *Self) void {
             self.entry_positions.deinit(self.allocator);
             self.plan_positions.deinit(self.allocator);
@@ -78,6 +79,40 @@ fn CacheWithContext(comptime Context: type) type {
             self.entries.deinit(self.allocator);
             for (self.plans.items) |plan| self.allocator.free(plan.key.evidence);
             self.plans.deinit(self.allocator);
+        }
+        pub fn checkpoint(self: *const Self) usize {
+            return self.entries.items.len;
+        }
+        /// Completed admission plans remain valid; only executable suffixes go.
+        pub fn rollbackEntries(self: *Self, mark: usize) void {
+            std.debug.assert(mark <= self.entries.items.len);
+            var at = self.entries.items.len;
+            while (at > mark) {
+                at -= 1;
+                const entry = self.entries.items[at];
+                const chain = self.entry_positions.getPtr(entry.key).?;
+                std.debug.assert(chain.last == at and entry.next == null);
+                if (entry.previous) |previous| {
+                    self.entries.items[previous].next = null;
+                    chain.last = previous;
+                } else {
+                    std.debug.assert(chain.first == at);
+                    const removed = self.entry_positions.remove(entry.key);
+                    std.debug.assert(removed);
+                    self.removed_keys += 1;
+                }
+                self.allocator.free(entry.key.evidence);
+            }
+            self.entries.shrinkRetainingCapacity(mark);
+            // Amortize allocation-free tombstone cleanup across removed keys,
+            // rather than scanning the completed inventory on every decline.
+            if (self.entry_positions.count() == 0) {
+                self.entry_positions.clearRetainingCapacity();
+                self.removed_keys = 0;
+            } else if (self.removed_keys >= self.entry_positions.capacity() / 8) {
+                self.entry_positions.rehash(Context{});
+                self.removed_keys = 0;
+            }
         }
         /// Completed admission is separate from executable function publication.
         pub fn admitted(self: *const Self, key: Key) ?usize {
@@ -117,7 +152,9 @@ fn CacheWithContext(comptime Context: type) type {
             const position = self.entry_positions.getOrPutAssumeCapacity(owned_key);
             // Equal schemas can need different scratch regions. Preserve their
             // insertion order without making writer lookup scan unrelated keys.
+            var previous: ?usize = null;
             if (position.found_existing) {
+                previous = position.value_ptr.last;
                 self.entries.items[position.value_ptr.last].next = index;
                 position.value_ptr.last = index;
             } else position.value_ptr.* = .{ .first = index, .last = index };
@@ -125,6 +162,7 @@ fn CacheWithContext(comptime Context: type) type {
                 .key = owned_key,
                 .function = function,
                 .floating = floating,
+                .previous = previous,
             });
             return index;
         }
@@ -707,4 +745,55 @@ fn leafBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usiz
         else => return false,
     }
     return true;
+}
+
+fn cacheTailLaw(allocator: std.mem.Allocator) !void {
+    var cache: CacheWithContext(CollidingKeys) = .{ .allocator = allocator };
+    defer cache.deinit();
+    const first: Key = .{ .unit = 1, .binding = 2, .context = 3, .evidence = &.{7} };
+    const second: Key = .{ .unit = 1, .binding = 2, .context = 4, .evidence = &.{7} };
+    const temporary: Key = .{ .unit = 2, .binding = 3, .context = 5, .evidence = &.{9} };
+    _ = try cache.insert(first, 10, false);
+    _ = try cache.insert(second, 20, false);
+    _ = try cache.insert(first, 11, true);
+    const mark = cache.checkpoint();
+    defer cache.rollbackEntries(mark);
+    _ = try cache.insert(first, 12, false);
+    _ = try cache.insert(temporary, 30, false);
+    _ = try cache.insert(second, 21, false);
+    _ = try cache.insert(temporary, 31, true);
+    try cache.admit(temporary, 7);
+    var blocked = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+    cache.allocator = blocked.allocator();
+    cache.rollbackEntries(mark);
+    cache.allocator = allocator;
+    try std.testing.expect(!blocked.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), blocked.alloc_index);
+    try std.testing.expectEqual(mark, cache.entries.items.len);
+    try std.testing.expectEqual(@as(?usize, 0), cache.find(first));
+    try std.testing.expectEqual(@as(?usize, 1), cache.find(second));
+    try std.testing.expect(cache.find(temporary) == null);
+    try std.testing.expectEqual(@as(?usize, 7), cache.admitted(temporary));
+    try std.testing.expectEqual(@as(?usize, 2), cache.entries.items[0].next);
+    try std.testing.expectEqual(@as(?usize, 0), cache.entries.items[2].previous);
+    try std.testing.expect(cache.entries.items[1].next == null);
+    try std.testing.expect(cache.entries.items[2].next == null);
+    // New colliding schemas churn without retaining dead evidence or leaving
+    // broken duplicate tails; periodic in-place rehash needs no allocation.
+    for (0..64) |ordinal| {
+        const evidence = [_]u32{ 99, @intCast(ordinal) };
+        const key: Key = .{ .unit = 3, .binding = 4, .evidence = &evidence };
+        _ = try cache.insert(key, 40, false);
+        _ = try cache.insert(first, 13, false);
+        _ = try cache.insert(key, 41, false);
+        cache.rollbackEntries(mark);
+        try std.testing.expect(cache.find(key) == null);
+        try std.testing.expectEqual(@as(?usize, 0), cache.find(first));
+        try std.testing.expectEqual(@as(?usize, 2), cache.entries.items[0].next);
+        try std.testing.expect(cache.entries.items[2].next == null);
+    }
+}
+test "owned call executable tail rollback preserves colliding duplicate chains and admission plans through OOM" {
+    try cacheTailLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, cacheTailLaw, .{});
 }

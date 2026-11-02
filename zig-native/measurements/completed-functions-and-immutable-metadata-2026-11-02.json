@@ -1,0 +1,132 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "a151a17aec8136876ffe28731cd4ec6987013d28",
+  "changes": [
+    "Compile graph-owner calls once using actual checked child emission, with exact failed-key memo and allocation-safe tail rollback; retain all source, owner, lifetime and effect checks.",
+    "Share immutable arena metadata across local bindings; detach vectors at writes, retain physical snapshots at control/capture boundaries."
+  ],
+  "qualification": {
+    "check_dev": "build/bench/completed-cow-checked/run-2e92546c9e260c16/results.json",
+    "compiled_native": 2828,
+    "full_fault_laws": 69,
+    "full_fault_evidence": "build/bench/completed-functions-cow-check-dev/run-f40d8796c549e5e0/full-faults.log",
+    "guests": 44,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/completed-cow-full-gate/run-e26e00837eb7defa;48passed/1reproducedbaseline List/chunk storage_escape",
+    "scope": "Selected affected family, full qualification pending"
+  },
+  "renderer_controls": [
+    {
+      "scope": "actual_completed_graph_functions",
+      "evidence": "build/bench/completed-functions-kites/pair-9aecdc9227c1272a/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 3909.5402000000004,
+          "wasm_bytes": 233488,
+          "sha256": "031f5d063f0ecf2a900e951b4b6047a8b50877f43227bf08bdc0b6e5981036e5",
+          "work": {
+            "scoped_emission_expressions": 8354,
+            "scoped_call_admission_nodes": 34270
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 3930.705916,
+          "wasm_bytes": 231170,
+          "sha256": "470c08eed83f60ca4edba8bc0174289d276cb6ab271ef8b72794318939bcaa60",
+          "work": {
+            "scoped_emission_expressions": 8576,
+            "scoped_call_admission_nodes": 29181,
+            "scoped_completed_plan_attempts": 54,
+            "scoped_completed_plan_definitions": 53,
+            "scoped_completed_plan_rollbacks": 1,
+            "scoped_completed_plan_discarded_expressions": 346
+          }
+        }
+      ],
+      "warning": "Single native-fast traced renderer pair, no demonstrated renderer CPU gain and no whole-main latency claim."
+    },
+    {
+      "scope": "immutable_metadata",
+      "evidence": "build/bench/completed-cow-kites/pair-291c20a06ab6f374/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 4115.279914,
+          "wasm_bytes": 231170,
+          "sha256": "470c08eed83f60ca4edba8bc0174289d276cb6ab271ef8b72794318939bcaa60",
+          "work": {
+            "scoped_emission_expressions": 8576,
+            "scoped_call_admission_nodes": 29181,
+            "scoped_completed_plan_attempts": 54,
+            "scoped_completed_plan_definitions": 53,
+            "scoped_completed_plan_rollbacks": 1,
+            "scoped_completed_plan_discarded_expressions": 346
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 4118.1642999999995,
+          "wasm_bytes": 227770,
+          "sha256": "8d461399b3198efe1333d1d4b99e7ae7a4f11619b91241ba265b5db06cf1d313",
+          "work": {
+            "scoped_emission_expressions": 8576,
+            "scoped_call_admission_nodes": 29181,
+            "scoped_completed_plan_attempts": 54,
+            "scoped_completed_plan_definitions": 53,
+            "scoped_completed_plan_rollbacks": 1,
+            "scoped_completed_plan_discarded_expressions": 346
+          }
+        }
+      ],
+      "warning": "Single native-fast traced renderer pair, no demonstrated renderer CPU gain and no whole-main latency claim."
+    }
+  ],
+  "full_main": "Latest completed actual main remains17.4476s/38,824,580B on a151; this batch has no optimized full-main result yet.",
+  "isolated_metadata_control": {
+    "base": "frozen-release-a151a17",
+    "scope": "const child metadata and shallow detach, same-arena sharing only; arena retention and physical snapshots preserved",
+    "files": {
+      "production.zig": "73450cb058e9f10f6f71e0500e5a2fc997b875cab0d034fd6d1295d293348833",
+      "immutable-fields.patch": "abc8cac53574411a629955a4721c5b2175b6eb7cbfe0da1755c38a892f7346a5",
+      "execute.ts": "3a3d80d5f90775a638d8259cb6ac3fd12fabb4cd71eb7924e9980070e5a80daa",
+      "immutable.wasm": "f69f298e7fc341c6213bfe7ccd3e96b7e5031d909fc5522bc589661e0dcfdd15",
+      "addressed.wasm": "809b75f223f04662749bbb2265fb05fc51607ec5ceaff1001d7dbcca31accf05"
+    },
+    "actual_generator_control": {
+      "value_bytes": 320,
+      "binds": 1000,
+      "fields": 165,
+      "cases": [
+        "scalar",
+        "array"
+      ],
+      "old_logical_field_bytes": 52800000,
+      "old_arena_capacity_bytes": 59315464,
+      "new_field_array_bytes": 0,
+      "new_arena_capacity_bytes": 0
+    },
+    "native_semantics": {
+      "existing_laws_passed": 8,
+      "exhaustive_oom_laws": 5,
+      "leaks": 0,
+      "logged_errors": 0
+    },
+    "wasm_semantics": {
+      "artifacts": 2,
+      "guest_calls": 80,
+      "sync": true,
+      "async": true,
+      "u32_wrap": true,
+      "address_fallback": true,
+      "loop_captures": true,
+      "indexed_aliases": true,
+      "early_return": true
+    },
+    "whole_Gdev": "unmeasured; mutation-heavy workloads may move allocation into shallow detach sites and require matched timing/peak-memory measurement",
+    "counter_note": "Composite binds no longer walk scalar descendants just to update scalar-lane share counters; those existing counters now observe direct scalar binding calls only."
+  }
+}

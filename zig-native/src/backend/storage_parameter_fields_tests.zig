@@ -65,7 +65,7 @@ test "projected anonymous parameters share owners despite unused goal-bearing ca
     try publish(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
-test "projected anonymous parameters retain selected callback proof rejection" {
+test "projected anonymous parameters complete selected named callback source proof before sharing" {
     var module = try lower(callback ++
         \\const read_state = func (access: {editor: Ref U32, editor_clips: Ref U32, tick: U32 -> U32, draw: U32 -> U32, save: U32 -> U32, close: U32 -> U32}) => return do:
         \\  let editor: Ref U32 = access.editor
@@ -75,10 +75,50 @@ test "projected anonymous parameters retain selected callback proof rejection" {
         \\  return @u32.add (read_state left) (read_state right)
     );
     defer module.deinit(a);
+    var found = false;
+    for (module.bodies) |body| if (std.mem.eql(u8, module.name(body.declaration_name), "make_callback")) {
+        // Curried lowering makes this a named partial application. Its source
+        // obligation is checked on actual saturated emission in the child.
+        found = true;
+        try std.testing.expectEqual(@as(u32, 2), body.parameters.len);
+        try std.testing.expect(body.scheme.obligations.len != 0);
+    };
+    try std.testing.expect(found);
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
     try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_owner_graph_definitions);
+    try std.testing.expect(result.counters.scoped_owner_graph_hits >= 1);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_definitions);
+}
+test "projected anonymous parameters reject selected literal callbacks with captured goals" {
+    var module = try lower(
+        \\const make_callback = func state => return do:
+        \\  let captured = state
+        \\  return func (argument: U32): U32 => return @u32.add captured.value argument
+        \\const read_state = func (access: {editor: Ref U32, editor_clips: Ref U32, tick: U32 -> U32, draw: U32 -> U32, save: U32 -> U32, close: U32 -> U32}) => return do:
+        \\  let editor: Ref U32 = access.editor
+        \\  return @u32.add (@storage.load editor) (access.tick 1)
+        \\
+    ++ owners ++
+        \\  return @u32.add (read_state left) (read_state right)
+    );
+    defer module.deinit(a);
+    var found = false;
+    for (module.bodies) |body| if (std.mem.eql(u8, module.name(body.declaration_name), "make_callback")) {
+        // The block prevents flattening; the returned literal captures this
+        // source field goal and must stay outside the shared callback ABI.
+        found = true;
+        try std.testing.expectEqual(@as(u32, 1), body.parameters.len);
+        try std.testing.expect(body.scheme.obligations.len != 0);
+    };
+    try std.testing.expect(found);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_definitions);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_attempts);
 }
 test "projected anonymous parameters retain whole-record forwarding" {
     var module = try lower(callback ++

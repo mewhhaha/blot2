@@ -58,6 +58,17 @@ Wasm. Native main still exceeds 30 seconds; the completed optimized full-main
 result is linked above. See
 [exact evidence](zig-native/measurements/indexed-access-and-closed-context-2026-11-02.json).
 
+The next checked batch compiles graph-owner functions from their actual checked
+bodies, rolling back all tentative functions, cache entries and obligations on a
+failed plan. Immutable local metadata shares arena vectors and detaches at
+writes; physical capture/control snapshots remain. All 2,828 laws compile; 69
+selected laws pass exhaustive faults, 44 guests pass and Zig lint is clean.
+Seven actual renderer streams match; Wasm shrinks 233,488 to 227,770 bytes,
+without a demonstrated renderer CPU gain. Optimized full-main timing is pending.
+See [completed function and metadata evidence](zig-native/measurements/completed-functions-and-immutable-metadata-2026-11-02.json).
+The next structural hill removes proven invariant whole-record transport through
+branches and loops after indexed heap writes, preserving checked Core semantics.
+
 The structural type-ID prototype is **rejected and removed**: three alternating
 actual renderer pairs regress emission 5.3%, despite much smaller keys. Its
 patch and exact controls are preserved in

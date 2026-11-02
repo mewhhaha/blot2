@@ -68,3 +68,89 @@ for (const codegenTier of ["development", "optimized"] as const) {
     }
   });
 }
+
+const selectedCallbackBody = `
+const read_state = func (access: {editor: Ref U32, editor_clips: Ref U32, tick: U32 -> U32, draw: U32 -> U32, save: U32 -> U32, close: U32 -> U32}) => return do:
+  let editor: Ref U32 = access.editor
+  return @u32.add (@storage.load editor) (access.tick 1)
+
+entry const answer = func (input: U32): U32 => return do:
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[10]
+  let left = {editor: @storage.at first 0, editor_clips: @storage.at second 0, tick: make_callback {value: input}, draw: make_callback {value: 3}, save: make_callback {value: 5}, close: make_callback {value: 7}}
+  let right = {editor: @storage.at second 0, editor_clips: @storage.at first 0, tick: make_callback {value: 11}, draw: make_callback {value: 13}, save: make_callback {value: 17}, close: make_callback {value: 19}}
+
+  return @u32.add (read_state left) (read_state right)
+`;
+
+const selectedCallbacks = [
+  {
+    name: "named source-checked partial",
+    factory:
+      "const make_callback = func state => return func (argument: U32): U32 => return @u32.add state.value argument",
+    shared: true,
+  },
+  {
+    name: "literal with captured source goals",
+    factory: `const make_callback = func state => return do:
+  let captured = state
+  return func (argument: U32): U32 => return @u32.add captured.value argument`,
+    shared: false,
+  },
+];
+for (const codegenTier of ["development", "optimized"] as const) {
+  for (const fixture of selectedCallbacks) {
+    Deno.test(`projected selected callback ${fixture.name} preserves source proof (${codegenTier})`, async () => {
+      const directory = await Deno.makeTempDir({
+        prefix: "blot-selected-callback-",
+      });
+      const entry = `${directory}/main.blot`;
+      const compiler = await createZigProjectCompiler({
+        executable: Deno.args[0],
+        entry,
+        prelude: null,
+        cacheDirectory: false,
+        codegenTier,
+        profileTrace: true,
+      });
+      try {
+        const built = await compiler.build({
+          sources: { [entry]: `${fixture.factory}\n${selectedCallbackBody}` },
+        });
+        assert(built.success, JSON.stringify(built));
+        assert(WebAssembly.validate(built.bytes));
+        const work = built.stats.workCounters as Record<string, number>;
+        if (fixture.shared) {
+          assert.equal(work.scoped_owner_graph_definitions, 1);
+          assert.equal(work.scoped_completed_plan_definitions, 1);
+          assert(work.scoped_owner_graph_hits >= 1);
+        } else {
+          assert.equal(work.scoped_owner_graph_definitions, 0);
+          assert.equal(work.scoped_completed_plan_attempts, 0);
+          assert(
+            compiler.profileProgress?.events.some((event) =>
+              event.kind === "detail" &&
+              event.stage === "descriptor.shared.callback-evidence"
+            ),
+          );
+        }
+        for (const asynchronous of [false, true]) {
+          const guest = await instantiateGuest(built.bytes, { asynchronous });
+          try {
+            for (const input of [0, 7, 42, 0xffffffff, 0]) {
+              let actual;
+              if (asynchronous) actual = await guest.callAsync("answer", input);
+              else actual = guest.call("answer", input);
+              assert.equal(actual, (input * 2 + 23) >>> 0);
+            }
+          } finally {
+            guest.dispose();
+          }
+        }
+      } finally {
+        await compiler.dispose();
+        await Deno.remove(directory, { recursive: true });
+      }
+    });
+  }
+}

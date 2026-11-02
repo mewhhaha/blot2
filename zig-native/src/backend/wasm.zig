@@ -194,6 +194,85 @@ pub const Module = struct {
     pub fn init(allocator: Allocator) Module {
         return .{ .allocator = allocator };
     }
+    /// Append-only owned-emission mark. Existing functions, globals and data
+    /// bytes must remain immutable. Recorder/arena/late-view lanes cannot mark.
+    pub const TailCheckpoint = struct {
+        owner: *const Module,
+        functions: usize,
+        signatures: usize,
+        imports: usize,
+        globals: usize,
+        exports: usize,
+        data: usize,
+        static_fields: usize,
+        table_functions: usize,
+        table_origins: usize,
+        semantic_sites: usize,
+        fixed_memory_bytes: u32,
+        array_transport: @FieldType(Module, "array_transport"),
+        fixture_helpers: ?[3]u32,
+        host_references: ?HostReferences,
+        public_arena: bool,
+        cleanup_data: []u8,
+        defer_cycles: bool,
+        mutable_static: bool,
+        indirect: bool,
+        start: ?u32,
+    };
+    pub fn tailCheckpoint(self: *const Module) ?TailCheckpoint {
+        comptime {
+            if (@typeInfo(Module).@"struct".field_names.len != 27) @compileError("Classify every Module field in tail rollback");
+        }
+        if (self.memory_model != .data_stacks or self.fixed_memory_bytes == 0 or self.artifacts != null or self.arena != null or self.lists != null or self.cohorts != null or self.regions != null) return null;
+        return .{
+            .owner = self,
+            .functions = self.functions.items.len,
+            .signatures = self.signatures.items.len,
+            .imports = self.imports.items.len,
+            .globals = self.globals.items.len,
+            .exports = self.exports.items.len,
+            .data = self.data.items.len,
+            .static_fields = self.static_fields.items.len,
+            .table_functions = self.table_functions.items.len,
+            .table_origins = self.table_origins.items.len,
+            .semantic_sites = self.semantic_sites.items.len,
+            .fixed_memory_bytes = self.fixed_memory_bytes,
+            .array_transport = self.array_transport,
+            .fixture_helpers = self.fixture_helpers,
+            .host_references = self.host_references,
+            .public_arena = self.public_arena,
+            .cleanup_data = self.cleanup_data,
+            .defer_cycles = self.defer_cycles,
+            .mutable_static = self.mutable_static,
+            .indirect = self.indirect,
+            .start = self.start,
+        };
+    }
+    /// Destroys only appended resources; retained buffer capacity is reusable.
+    /// No operation here allocates or changes the immutable resource prefix.
+    pub fn rollbackTail(self: *Module, mark: TailCheckpoint) void {
+        std.debug.assert(mark.owner == self and self.tailCheckpoint() != null);
+        inline for (.{ "functions", "signatures", "imports", "globals", "exports", "data", "static_fields", "table_functions", "table_origins", "semantic_sites" }) |field| {
+            std.debug.assert(@field(self.*, field).items.len >= @field(mark, field));
+        }
+        for (self.functions.items[mark.functions..]) |*function| function.deinit(self.allocator);
+        for (self.signatures.items[mark.signatures..]) |signature| self.allocator.free(signature.parameters);
+        for (self.imports.items[mark.imports..]) |item| {
+            self.allocator.free(item.module);
+            self.allocator.free(item.name);
+        }
+        for (self.exports.items[mark.exports..]) |item| self.allocator.free(item.name);
+        inline for (.{ "functions", "signatures", "imports", "globals", "exports", "data", "static_fields", "table_functions", "table_origins", "semantic_sites" }) |field| {
+            @field(self.*, field).shrinkRetainingCapacity(@field(mark, field));
+        }
+        if (self.cleanup_data.ptr != mark.cleanup_data.ptr or self.cleanup_data.len != mark.cleanup_data.len) {
+            std.debug.assert(mark.cleanup_data.len == 0);
+            self.allocator.free(self.cleanup_data);
+        }
+        inline for (.{ "fixed_memory_bytes", "array_transport", "fixture_helpers", "host_references", "public_arena", "cleanup_data", "defer_cycles", "mutable_static", "indirect", "start" }) |field| {
+            @field(self.*, field) = @field(mark, field);
+        }
+    }
     pub fn deinit(self: *Module) void {
         for (self.functions.items) |*function| function.deinit(self.allocator);
         for (self.signatures.items) |signature| self.allocator.free(signature.parameters);
@@ -1958,4 +2037,91 @@ test "import signature conflicts and stale references are rejected" {
     const function = try module.addFunction(&.{.i32}, .i32);
     try module.emit(function, .{ .op = .call_import, .operand = 100 });
     try std.testing.expectError(error.InvalidFunctionReference, module.assemble());
+}
+
+fn appendTailFixture(module: *Module) !void {
+    const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    const local = try module.addLocal(function, .i32);
+    try module.emitSlice(function, &.{ .{ .op = .i32_const, .operand = 7 }, .{ .op = .local_set, .operand = local }, .{ .op = .local_get, .operand = local } });
+    _ = try module.importFunction("tail", "write", &.{ .i32, .i32 }, .none);
+    const global = try module.addGlobal(.u32, 19, true);
+    try module.exportFunction(function, "tail_function", .u32, .u32);
+    try module.exportGlobal(global, "tail_global");
+    try module.data.appendSlice(module.allocator, &.{ 5, 6, 7, 8 });
+    try module.staticField(4, .scalar);
+    try module.recordTableReference(.callable_function, function, function, 0);
+    try module.recordSemanticSite(.{ .function = function, .place = 0, .unit = 1, .node = 1, .root = 1, .mappings = 0, .rows = 0, .kind = .call });
+    _ = try module.ensureHostReferences();
+    try module.setCleanupDataMetadata("tail");
+    module.array_transport = .{ .allocate = function, .reset = 0 };
+    module.fixture_helpers = .{ function, function, function };
+    module.public_arena = true;
+    module.defer_cycles = true;
+    module.mutable_static = true;
+    module.indirect = true;
+    module.start = function;
+}
+fn moduleTailLaw(allocator: Allocator) !void {
+    var module = Module.init(allocator);
+    defer module.deinit();
+    module.memory_model = .data_stacks;
+    module.fixed_memory_bytes = 65_536;
+    const prefix = try module.addFunction(&.{}, .none);
+    try module.emitSlice(prefix, &.{ .{ .op = .i32_const }, .{ .op = .drop } });
+    _ = try module.importFunction("prefix", "read", &.{}, .none);
+    const global = try module.addGlobal(.u32, 41, true);
+    try module.exportGlobal(global, "prefix_global");
+    try module.data.appendSlice(allocator, &.{ 1, 2, 3, 4 });
+    const mark = module.tailCheckpoint().?;
+    const original = module.functions.items[prefix];
+    {
+        // Failed allocation at any later append must destroy exactly that tail.
+        errdefer module.rollbackTail(mark);
+        try appendTailFixture(&module);
+    }
+    var blocked = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
+    module.allocator = blocked.allocator();
+    module.rollbackTail(mark);
+    module.allocator = allocator;
+    try std.testing.expect(!blocked.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), blocked.alloc_index);
+    try std.testing.expect(std.meta.eql(mark, module.tailCheckpoint().?));
+    try std.testing.expect(std.meta.eql(original, module.functions.items[prefix]));
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3, 4 }, module.data.items);
+    try std.testing.expectEqual(@as(u32, 41), module.globals.items[global].bits);
+    try std.testing.expectEqualSlices(u8, "prefix", module.imports.items[0].module);
+    try std.testing.expectEqualSlices(u8, "read", module.imports.items[0].name);
+    try std.testing.expectEqualSlices(u8, "prefix_global", module.exports.items[0].name);
+    // Rolled-back handles are reusable and no interning/table metadata survives.
+    const retry = try module.addFunction(&.{.i32}, .i32);
+    try std.testing.expectEqual(@as(u32, @intCast(mark.functions)), retry);
+    try std.testing.expectEqual(@as(usize, mark.signatures + 1), module.signatures.items.len);
+    module.rollbackTail(mark);
+    try module.setCleanupDataMetadata("prefix");
+    const metadata = module.tailCheckpoint().?;
+    _ = try module.addFunction(&.{.i32}, .none);
+    module.rollbackTail(metadata);
+    try std.testing.expectEqualSlices(u8, "prefix", module.cleanup_data);
+    try std.testing.expect(std.meta.eql(metadata, module.tailCheckpoint().?));
+}
+test "owned module tail rollback preserves exact prefixes scalar state and handles through OOM" {
+    try moduleTailLaw(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, moduleTailLaw, .{});
+}
+test "owned module tail checkpoints decline recorded counted and arena views" {
+    var module = Module.init(std.testing.allocator);
+    defer module.deinit();
+    try std.testing.expect(module.tailCheckpoint() == null);
+    module.memory_model = .data_stacks;
+    try std.testing.expect(module.tailCheckpoint() == null);
+    module.fixed_memory_bytes = 65_536;
+    try std.testing.expect(module.tailCheckpoint() != null);
+    var recorder = artifact.Recorder.init(std.testing.allocator);
+    defer recorder.deinit();
+    module.artifacts = &recorder;
+    try std.testing.expect(module.tailCheckpoint() == null);
+    module.artifacts = null;
+    module.arena = std.mem.zeroes(Arena);
+    try std.testing.expect(module.tailCheckpoint() == null);
+    module.arena = null;
 }

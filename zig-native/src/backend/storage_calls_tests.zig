@@ -7,9 +7,11 @@ const core = @import("../check/core.zig");
 const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
 test {
+    _ = @import("scoped_backend.zig");
     _ = @import("storage_calls.zig");
     _ = @import("scoped_opaque_tests.zig");
     _ = @import("storage_owner_graph_tests.zig");
+    _ = @import("storage_completed_function_tests.zig");
     _ = @import("storage_parameter_fields_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");
