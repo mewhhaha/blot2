@@ -1,0 +1,217 @@
+{
+  "date": "2026-11-02",
+  "landed_checkpoint": "12bb147a7115557a78e5bbfcf679267673cafa46",
+  "scope": "Bounded follow-up probes after exact-identity join fix. Neither experiment is promoted.",
+  "branch_field_masks": {
+    "decision": "held",
+    "archive_base": "dfca64f22f5eaa8912781ce1a01de7688b1ef003",
+    "diff_base": "12bb147a7115557a78e5bbfcf679267673cafa46",
+    "held_parent_patch": {
+      "path": "../field-carrier-prototype/field-private.patch",
+      "sha256": "9abdea8e157fe8d75d5a30383502cf096ccc08751e41aaf2bbfef3f50a2ede96"
+    },
+    "source_hashes": {
+      "zig-native/src/backend/storage_transport.zig": "c80f49b7d23ee6748b23b78689013aaaaaae1fbc4625956823a1023e8ee34abd",
+      "zig-native/src/backend/scoped_backend.zig": "ee62f8350f586539548a44cc78690b5c2d567bacfa42cb3f8b45a23cf734fb8d",
+      "zig-native/src/backend/storage_field_carrier_tests.zig": "eec0345acf84ad16bc8c8f5075cd49f06e2de6cd6700af1fe6aeb95c54ef1ba3",
+      "zig-native/src/field_carrier_tests.zig": "29f7cc3a197935420203fafed7cab8c1dd37dcfd817e959b373dcb792451a8c1"
+    },
+    "patch": {
+      "path": "field-branch-held.patch",
+      "sha256": "9a94fed10daeb6c11ba93ad2748031dd2a492bc665c0ba40af759d5167ed3216",
+      "line_delta": {
+        "zig-native/src/backend/storage_transport.zig": {
+          "added_lines": 124,
+          "removed_lines": 0
+        },
+        "zig-native/src/backend/scoped_backend.zig": {
+          "added_lines": 159,
+          "removed_lines": 43
+        },
+        "zig-native/src/backend/storage_field_carrier_tests.zig": {
+          "added_lines": 254,
+          "removed_lines": 0
+        },
+        "zig-native/src/field_carrier_tests.zig": {
+          "added_lines": 4,
+          "removed_lines": 0
+        }
+      }
+    },
+    "source_manifest": {
+      "path": "field-branch-source-manifest.json",
+      "sha256": "5bd583d019003c0fc269a59d19579e68a6e485a259f0cf31eb8c8ff1d35c3cec",
+      "files": 1466
+    },
+    "fair_menu": {
+      "result": "menu-pair/result.json",
+      "entry": "/home/jacobt/src/gdev/tests/__compiler_menu_close.blot",
+      "entry_sha256": "2b51211d6d2a80f5b6418c9f4f3264eba56f8d4d6bb69f2219b99351083362ca",
+      "baseline_compiler_sha256": "0acf9b811648e77960577a3df729a25aa0027e2ec1ab32d1cd3abdb2c26295bf",
+      "candidate_compiler_sha256": "e1cbf956191eeaf09d7813e8e5af915d12edc8dfeb5403dfae91f759619a28b1",
+      "baseline_bytes": 148196,
+      "candidate_bytes": 148196,
+      "baseline_wasm_sha256": "a21acce782bf9ab843d6e087d57756ca1a1cdbb2adc20689ae6d0556ba620ce2",
+      "candidate_wasm_sha256": "a21acce782bf9ab843d6e087d57756ca1a1cdbb2adc20689ae6d0556ba620ce2",
+      "identical_wasm": true,
+      "baseline_backend": {
+        "us": 516501,
+        "requested_bytes": 30138343,
+        "allocations": 20120,
+        "rss_growth_kib": 0
+      },
+      "candidate_backend": {
+        "us": 533565,
+        "requested_bytes": 30145967,
+        "allocations": 20119,
+        "rss_growth_kib": 0
+      },
+      "baseline_avoided_words": 20292,
+      "candidate_avoided_words": 20292,
+      "calls": [
+        {
+          "asynchronous": false,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "asynchronous": true,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ]
+    },
+    "native_final": {
+      "optimization": "safe",
+      "llvm": false,
+      "log": "branch-native.log",
+      "passed": 5,
+      "failed": [
+        "backend.storage_field_carrier_tests.test.field branch carriers union changed paths under a dominating anchor through full OOM",
+        "backend.storage_field_carrier_tests.test.field branch carriers executed fixture preserves untouched aliases callbacks and match joins"
+      ],
+      "interpretation": "The two new positive laws fail expected optimization coverage (avoided_words > 0); source field-path proof and fixture compilation succeed. This is not a qualified candidate.",
+      "fast_final": "not repeated after Safe positive-law failure"
+    },
+    "known_admission_limits": [
+      "Changed copied subtrees require pure untagged inline values; callable/demand/descriptor/variant replacement falls back to first-live-arm whole transport.",
+      "Common anchor and merge result must have equal complete semantic type keys under a 4096-work bound.",
+      "Exact Core type IDs were insufficient for positive fixtures; the bounded semantic proof remains conservative and the positive optimization coverage is unmet."
+    ],
+    "reason": "Real menu.close mutates heap-indexed fields, preserving the complete FrameAccess SSA identity; the landed exact-identity route already handles those joins. Masks add no exercised coverage on this component and add substantial code/proof machinery.",
+    "next_boundary": "Lazy immutable control-result values with field-addressable phi demand for if/match/function returns; leave loops on the current route first.",
+    "not_run": [
+      "World repetition",
+      "wide synthetic size probe",
+      "actual full main",
+      "LLVM build"
+    ],
+    "preserved_regression": "changed-type-witness.blot retained; no final baseline classification claimed",
+    "other_evidence_note": "branch-focused.wasm and branch-executed.json are earlier pre-hardening artifacts, not final-candidate execution qualification."
+  },
+  "narrow_callback_captures": {
+    "decision": "Held: narrowing two callback environments adds an explicit 28-field record but removes only 116427B (0.70%) from the full game. No source/API changes promoted; no execution qualification claimed. Other two scene hooks still legitimately require broad persistence access.",
+    "source": {
+      "source": "/home/jacobt/src/gdev/src/world_storage.blot",
+      "original_sha256": "0cddab282ae1c44950659054f3329f65ccb051b202348dda001e804df779c069",
+      "overlay_sha256": "22114960c18bfc1ec98c78b85bca04d8a85f69866a0d0057b11dfe12dc596996",
+      "despawn_fields": [
+        "pose3",
+        "pose3_meta",
+        "pose3_previous",
+        "pose3_previous_meta",
+        "brushes",
+        "brushes_meta",
+        "charge",
+        "charge_meta",
+        "robot",
+        "robot_meta",
+        "resident",
+        "resident_meta",
+        "location",
+        "location_meta",
+        "appetite",
+        "appetite_meta",
+        "minor",
+        "minor_meta",
+        "villager",
+        "villager_meta",
+        "flyer",
+        "flyer_meta",
+        "flyer_previous",
+        "flyer_previous_meta",
+        "appearance",
+        "appearance_meta",
+        "entities",
+        "entities_meta"
+      ],
+      "other_capture_fields": [
+        "salt",
+        "starting_stash"
+      ]
+    },
+    "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+    "compiler_identity": "e99447c7ad66827267b6a71aee1bcad6c8594c60cccc895eb527474a627aa914",
+    "baseline_evidence": "zig-native/measurements/identity-joins-2026-11-02.json",
+    "baseline_wasm_bytes": 16677822,
+    "candidate_build_ms": 5479.419236,
+    "candidate_wasm_bytes": 16561395,
+    "candidate_wasm_sha256": "016e7d37911d2c256c9c5666d11e133d1da83c9d7d7efce5f0e34a539838c1d0",
+    "bytes_removed": 116427,
+    "timing_limit": "Individual cache-disabled completion only, no CPU improvement claim.",
+    "raw_evidence": "build/bench/private-prototypes/capture-slicing-prototype/main/main-2e708c7afbfd1887/result.json",
+    "raw_evidence_sha256": "d42a5604dba0fad82114221fc1b0938ed55ad29f39d23255f7e3b29ed49fc90f"
+  },
+  "next_structural_slice": {
+    "status": "Suggested; not implemented.",
+    "review": "Astra xhigh",
+    "boundary": "Control.result, if/match results and function returns.",
+    "representation": "Immutable field-addressable values. Record construction, projection and updates remain metadata; only demanded scalar leaves acquire phi copies and physical locals at body completion.",
+    "replacement": "Replace eager temporary/snapshot/assign routes and masks instead of adding another proof cache.",
+    "initial_scope": "One traced large Access function; loops retain their current path.",
+    "checks": "Keep ownership/effect and semantic checks independent. Verify changed callback/variant/borrow metadata, type-changing rebinding, aliases, parallel copies and executed results. Measure emitted words, globals, locals, bytes and CPU before full main.",
+    "limit": "The opcode census is a static size breakdown, not proof that all traffic is removable."
+  },
+  "raw_evidence": [
+    {
+      "path": "build/bench/private-prototypes/field-branch-prototype/field-branch-held.json",
+      "sha256": "7212c16fce395eff16fd9cedaac8d0cfcc9e7e273d13c28e23b1498b29f96cbf"
+    },
+    {
+      "path": "build/bench/private-prototypes/field-branch-prototype/field-branch-held.patch",
+      "sha256": "9a94fed10daeb6c11ba93ad2748031dd2a492bc665c0ba40af759d5167ed3216"
+    },
+    {
+      "path": "build/bench/private-prototypes/field-branch-prototype/field-branch-source-manifest.json",
+      "sha256": "5bd583d019003c0fc269a59d19579e68a6e485a259f0cf31eb8c8ff1d35c3cec"
+    },
+    {
+      "path": "build/bench/private-prototypes/field-branch-prototype/menu-pair/result.json",
+      "sha256": "602b5289cdf81428460c778ed1413f8e8085bd153da16e3fa57fcb7cbff7e11f"
+    },
+    {
+      "path": "build/bench/private-prototypes/field-branch-prototype/branch-native.log",
+      "sha256": "7c3a8115a7310e59345543cee62e46dd3e54968e2f945d0213a89402b46e61ee"
+    },
+    {
+      "path": "build/bench/private-prototypes/capture-slicing-prototype/qualification.json",
+      "sha256": "0d25dd7d8945e979419e70c33009e156395cbbdfb4e02ce142d15e6114a7fe32"
+    },
+    {
+      "path": "build/bench/private-prototypes/capture-slicing-prototype/source-pin.json",
+      "sha256": "38254f235fb1c65a64afdb54e595c2435f60f622f95392b1ea3bbab38afe7930"
+    },
+    {
+      "path": "build/bench/private-prototypes/capture-slicing-prototype/world_storage.blot",
+      "sha256": "22114960c18bfc1ec98c78b85bca04d8a85f69866a0d0057b11dfe12dc596996"
+    },
+    {
+      "path": "build/bench/private-prototypes/capture-slicing-prototype/build-overlay.ts",
+      "sha256": "c03c1025fb3444ea49b263cbaaf50a5d3c24b35aa85f52e235cec3c2e6b5f989"
+    }
+  ]
+}

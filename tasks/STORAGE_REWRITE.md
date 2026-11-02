@@ -14,9 +14,10 @@ affected laws pass full faults, 88 affected guests pass and Zig lint is clean.
 Final LLVM retains seven world/editor, 160 hand, seven real-menu and seven
 renderer checks. The five-second target remains unmet. Full qualification
 retains the baseline List/chunk failure; installed Pen rejects ABI 8, so no
-fresh full-game frame/PNG is qualified. The next slice is field-wise branch/loop
-transport and an ownership/layout function IR before Wasm emission; ordinary
-`#run` build functions are a separate, unimplemented language simplification.
+fresh full-game frame/PNG is qualified. The next slice is lazy field-wise
+control results before Wasm emission; the mask prototype is held after neutral
+real-menu measurements. Ordinary `#run` build functions are a separate,
+unimplemented language simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

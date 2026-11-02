@@ -54,19 +54,29 @@ owner, read, type and variant checks remain. Mutable spill globals fall from
 full-game capture is 2,076,028B (1.98MiB), with different source/config/memory
 model. Exact duplicate bodies account for only 427kB. See
 [size diagnosis](zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json).
-The new artifact still spends 11.70MB (70.1%) on local/global traffic. The next
-size lever is field-wise control merges: retain unchanged aggregate fields and
-materialize only changed paths. A private branch/loop mask prototype is pending;
-copy cleanup and field/match probes remain held without material World CPU
-gains.
+The new artifact still spends 11.70MB (70.1%) on local/global traffic. Private
+branch masks add no benefit on the real menu: identical 148,196B output and
+20,292 avoided words. Complete type admission declines the intended synthetic
+partial joins; those positive laws fail, so the prototype is held. Explicitly
+narrowing two Gdev callback captures saves only 116,427B (0.7%) in main and is
+also held. See
+[follow-up probes](zig-native/measurements/control-result-probes-2026-11-02.json).
+No neutral or failed prototype was promoted.
+
+The next structural slice replaces eager `Control.result` carriers for if/match
+and function returns with immutable, field-addressable values. Record creation,
+projection and updates remain metadata; only consumed scalar leaves acquire phi
+copies and locals at body completion. Keep ownership/effect checks independent
+and leave loops on their current path for the first pilot. Measure one traced
+large Access function before extending scope; the traffic census alone does not
+prove how much is removable. Replace temporary/snapshot/assignment routes rather
+than add another mask or proof cache.
 
 A separate profile takes 5.65s: backend 4.71s, checking 0.48s, validation 0.10s.
 Backend traffic is 4.96GB/3.41M allocations. Plans emit 138,596 calls with zero
 post-plan type queries, but preparation/key construction still costs work. 2,107
 rolled-back trials discard 188,790 of 1,017,503 counted expressions; this is a
-work ratio, not a measured CPU share. The next structural slice should resolve
-operations/layouts/callees and symbolic owner obligations before physical
-emission, replacing the corresponding Generator walks.
+work ratio, not a measured CPU share.
 
 The reachable primitive benchmark compiles 50,025 lines in 16 modules in
 0.480–0.491s, plus 0.026s generation, producing 973,511B Wasm with all three
