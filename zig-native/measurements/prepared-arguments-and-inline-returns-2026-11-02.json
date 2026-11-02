@@ -1,0 +1,111 @@
+{
+  "date": "2026-11-02",
+  "source": {
+    "base_commit": "11054d49b5e99ba77b9ead7eb86ae35cf3b8fdd2",
+    "patch_sha256": "66a61351f973d7b321a893a0d48f03793448aa70dcca383a08c20d440943e6af",
+    "source_files_sha256": {
+      "scripts/dev_check_areas.ts": "5a6a8cf58c787d996344cc604977f1fdd3f992bcaacab0ea56e315a5a1b00d10",
+      "zig-native/src/backend/scoped_backend.zig": "0bbdbf7eb3fb85a15cdbaa2db8625c8218477238488dba294ee45334304204fe",
+      "zig-native/src/backend/storage_calls_tests.zig": "a53230e81fbd6c9788497afc37f965a3653e6dd1b5e30885da406b981213595f",
+      "zig-native/src/backend/storage_parameter_fields_tests.zig": "522b735e6979599b1601502056e50497d2a855a804c95aace3edb2733c86eccc",
+      "zig-native/src/runtime/data_stacks.zig": "8167f991b45f8271ff77818e6daeebf8c824632065688db4a2a02070affdeda4",
+      "zig-native/src/work_counters.zig": "fdad5d64ec5c479e9c0c468226a47f3bd5d52aa5078429f8f26852ae1960e7d5",
+      "zig-native/tests/prepared_reader_arguments_execution.test.ts": "d85842986430e67b08ca26b566c9de1acef10c027fae3337fa9999b6a97fb8ae",
+      "zig-native/tests/storage_inline_registers_execution.test.ts": "91d4df13c1c78e2a4d77abd18e5669542e725e2e203405f5c74f814e29a8016a"
+    },
+    "frozen_manifest": "build/bench/frozen-transport-batch-66a61351f973/source-manifest.json"
+  },
+  "changes": [
+    "Prepare physical arguments once after full original source proof, mapping, goal refinement, callback selection and scalar/inline probes. Share the physical slice across owned/reader attempts; expanded fallback and Reader history retain originals. Callback-free anonymous records with at least eight fields use the unchanged complete source footprint and root guards.",
+    "Return plain stable one-to-four-word inline aggregate results through three eager instance-private globals plus the ordinary i32 return. Publish after nested execution/cleanup; immediately copy all bank words to fresh caller locals. Other shapes and pending destinations retain existing buffer behavior."
+  ],
+  "contracts": [
+    "Guest ABI 8, session protocol 2 and save schema 26 unchanged.",
+    "No weaker semantic sharing key, source proof or owner/alias/lifetime authority. Reader admission retains the full formal type; all physical ordinals share one projected argument slice.",
+    "Diagnostic omitted-word counting is independently bounded at 4096 nodes/depth128; committed counters roll back with speculative functions.",
+    "Only recursively plain stable inline results enter the register path. Arrays, borrows, callbacks, variants, zero-width and wider results retain buffers. Nested calls cannot run between return publication and caller capture."
+  ],
+  "qualification": {
+    "check_dev": "build/bench/transport-batch-central-check/run-6a0b7e4330e4c572/results.json",
+    "compiled_native": 2858,
+    "selected_exhaustive_fault_laws": 106,
+    "full_faults": "build/bench/transport-batch-central-check/run-6a0b7e4330e4c572/full-faults.log",
+    "executed_guests": 82,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/transport-batch-full-gate",
+    "full_gate_outcome": "48 passed / one independently reproduced baseline List/chunk storage_escape at bytes 312..345; full qualification pending",
+    "full_game_frame": "pending matching ABI 8 Pen host",
+    "astra_review": "Both private slices reviewed; green for integration. Source-reachable plain Reader history is saturated; no blanket read replay is added to owned calls."
+  },
+  "world_editor_release": {
+    "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+    "compiler": "/home/jacobt/src/blot2/build/bench/frozen-transport-batch-66a61351f973/zig-native/zig-out/bin/blotc",
+    "buildMs": 1351.9867160000001,
+    "wasmBytes": 711173,
+    "calls": [
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": false,
+        "runtimeMs": 68.78273200000012,
+        "row": [
+          7,
+          0
+        ]
+      },
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": true,
+        "runtimeMs": 23.461225000000013,
+        "row": [
+          7,
+          0
+        ]
+      }
+    ],
+    "abi": 8,
+    "success": true
+  },
+  "renderer": {
+    "evidence": "build/bench/transport-batch-kites/pair-80fe16b44e8abda5/result.json",
+    "streams_equal": true,
+    "pins": {
+      "compiler_sha256": "875e0713c485705773be8158c39cc84cd17793be4c4e29e832c28f803ef6b264",
+      "baseline_compiler_sha256": "0889fcc5591d9dc2ef9a153ef64472fea19bfd7a3d161530440b16f3f2240fbf",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+    },
+    "builds": [
+      {
+        "name": "baseline",
+        "wasm_bytes": 136886,
+        "wasm_sha256": "1f96229a272bd12721f618d2e04820840d92722ef52b4c044bf723d0b69a3fe0",
+        "backend": {
+          "us": 470695,
+          "requested_bytes": 43310181,
+          "allocations": 80103,
+          "rss_growth_kib": 0
+        }
+      },
+      {
+        "name": "candidate",
+        "wasm_bytes": 118677,
+        "wasm_sha256": "cf9fe29bd25cac120256f6bcc778db1dac5a572cfa9982f32bae562a3c7002a6",
+        "backend": {
+          "us": 463682,
+          "requested_bytes": 43107286,
+          "allocations": 80005,
+          "rss_growth_kib": 0
+        }
+      }
+    ],
+    "timing_scope": "Single matched Fast/noLLVM pair; CPU difference is small and is not a distribution."
+  },
+  "isolated_prototypes": {
+    "prepared_arguments": "build/bench/private-prototypes/prepared-call-arguments/evidence-summary.json",
+    "register_returns": "build/bench/private-prototypes/inline-result-registers-evidence/summary.json",
+    "tradeoff": "Individual kites prototypes increased requested allocation bytes 2.1%/2.4%; the integrated pair requests 43.11MB vs 43.31MB baseline. No isolated CPU win claimed."
+  },
+  "full_main": "gdev-after-argument-transport-2026-11-02.json"
+}

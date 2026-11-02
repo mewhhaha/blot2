@@ -149,6 +149,14 @@ checked scalar leaf fallback; pending array destinations still decline aggregate
 scratch calls. Plain inline keys omit only variant refinements erased by their
 parameter ABI; descriptor ownership/initialization evidence remains exact.
 
+Reusable plain inline aggregates with one to four scalar words may return through
+an eager instance-private word bank and the ordinary scalar return. Callees
+publish only after nested calls and cleanup; callers immediately drain every
+word into fresh locals. Other shapes retain caller-owned scratch. Physical
+argument projection follows complete original source/type checking, uses one
+consistent descriptor ordinal space, and never narrows Reader history or formal
+type admission. Expanded fallback always binds the original arguments.
+
 Normalization work counters record recursive entries and inclusive node growth
 under import, substitution, resolution and covariance operations. Nested counts
 can overlap and are not exclusive CPU timings. View and binder counters include

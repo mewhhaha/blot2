@@ -83,6 +83,8 @@ pub const Runtime = struct {
     initialize: u32,
     initialized: u32,
     literal_base: u32,
+    // Private scalar return bank, allocated before every speculative tail mark.
+    inline_returns: [3]u32,
 };
 fn function(module: *wasm.Module, comptime count: usize, result: wasm.ValueType) !u32 {
     return module.addTypedFunction(&@as([count]wasm.ValueType, @splat(.i32)), result, .scalar);
@@ -163,6 +165,11 @@ pub fn emit(module: *wasm.Module) !Runtime {
         .initialize = try function(module, 0, .none),
         .initialized = try module.addGlobal(.u32, 0, true),
         .literal_base = try module.addGlobal(.u32, 0, false),
+        .inline_returns = .{
+            try module.addGlobal(.u32, 0, true),
+            try module.addGlobal(.u32, 0, true),
+            try module.addGlobal(.u32, 0, true),
+        },
     };
     {
         const c = code(module, r.region);

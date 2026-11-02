@@ -7,24 +7,43 @@ the next gate below five seconds. Game diagnostics default to five seconds and
 have a hard 30-second iteration cap. Never repeat the recorded 36-minute build
 or an unchanged five-minute diagnostic.
 
-The latest quiet fresh actual main takes **9.23 seconds total**: 8.8ms session
-startup plus 9.22s build, producing **24,116,654 bytes of Wasm**, cache
-disabled. An earlier completion under other-project CPU activity took 9.71s and
-produced identical bytes. The previous checked release took 9.87s/29.00MB. These
-are individual completions, not distributions. Compiler snapshot is `91b5680c`
-plus patch `68e6574553da`; exact source hashes and the Zig 0.17 Fast/LLVM
-baseline-CPU binary are pinned in
-[latest full-main evidence](zig-native/measurements/gdev-after-literal-constants-2026-11-02.json).
-Workload source remains Gdev `b60f8c76` and Ink `7085c97e`; their current heads
-`1175f299`/`7ac4d528` add documentation only. The five-second gate remains
-unmet.
+The latest fresh actual main takes **9.19 seconds total**, producing
+**22,375,878 bytes of Wasm**, cache disabled. The preceding release took
+9.23s/24.12MB. These are individual completions, not distributions. The
+five-second gate remains unmet. Exact source hashes and the Zig 0.17 Fast/LLVM
+compiler are pinned in
+[latest full-main evidence](zig-native/measurements/gdev-after-argument-transport-2026-11-02.json).
+Its source snapshot is `11054d49` plus patch `66a61351f973`. Workload source
+remains Gdev `b60f8c76` and Ink `7085c97e`; current heads `24d77076`/`9943bd0e`
+add documentation only.
 
-A separate profile puts 8.34s in the backend, 0.51s in checking, 0.12s in
-lowering and 0.10s in validation. Backend requests fall 8.40->7.73GB; frontend
-cost is almost unchanged. This batch removes generated code, but metadata and
-call preparation still dominate compile time. The next private probe prepares
-physical arguments once for owned/reader call selection while retaining full
-original semantic arguments and conservative reader history.
+A separate profile puts 8.12s in the backend, requesting 7.58GB through 6.40M
+allocations. Physical argument projection omits 7.55M argument words from 1,552
+owned calls; 8,254 small aggregate calls avoid result owners. These reduce code
+size substantially but barely move full-main CPU. A fresh weighted CPU sample
+identifies structural type-key construction, repeated shape/borrow queries and
+call preparation as the next frontier. Astra is reviewing one larger semantic
+instantiation/representation change; do not assume another generic cache helps.
+
+## Latest checked transport batch
+
+One physical argument preparation now feeds owned/Reader probes. Full original
+source proof, mapping, goals and callbacks precede projection; Reader history
+and expanded fallback retain originals. Wide callback-free anonymous records
+use the existing complete source-footprint and root guards. Small recursively
+plain, stable inline results return through eagerly allocated instance-private
+word registers, copied immediately into fresh caller locals after all callee
+cleanup. Other shapes retain the checked buffer path.
+
+All 2,858 native laws compile; 106 selected laws pass exhaustive faults, 82
+guests pass and Zig lint is clean. Seven renderer streams match, with Wasm
+136,886->118,677B. The final optimized release passes seven world/editor checks
+in sync and JSPI; that witness falls 997,699->711,173B. This does not qualify a
+full-game frame. See
+[transport evidence](zig-native/measurements/prepared-arguments-and-inline-returns-2026-11-02.json).
+The launcher selects the new release at `zig-native/zig-out/bin/blotc`. A fresh
+configured-path build takes 9.17s with matching compiler identity and identical
+complete Wasm hash.
 
 ## Checked latency batches
 

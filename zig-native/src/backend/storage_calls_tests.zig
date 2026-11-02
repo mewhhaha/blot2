@@ -1477,3 +1477,98 @@ test "literal record projections decline every nonliteral sibling and reject inv
     defer refused.deinit(a);
     try std.testing.expect(refused.diagnostic != null);
 }
+
+const inline_register_source =
+    \\type One is data = $One {x: U32}
+    \\type Four is data = $Four {one: One, y: U32, z: U32, w: U32}
+    \\const one = func (x: U32): One => return $One {x}
+    \\const four = func (input: U32): Four => return $Four {one: one input, y: 2, z: 3, w: 4}
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let marker: GrowArray U32 = #[input]
+    \\  let first = four marker[0]
+    \\  let second = four (@u32.add input 10)
+    \\  let third = one input
+    \\  return #[first.one.x, first.y, second.one.x, second.w, third.x]
+;
+fn publishInlineRegisters(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    const calls = result.counters.scoped_inline_register_calls;
+    try std.testing.expect(calls >= 4);
+    try std.testing.expectEqual(calls, result.counters.scoped_inline_result_owners_avoided);
+    try std.testing.expectEqual(calls, result.counters.scoped_inline_result_roots_avoided);
+    try std.testing.expect(result.counters.scoped_inline_result_bytes_avoided >= calls * 20);
+}
+test "inline return registers publish nested width one and four results through full allocation failures" {
+    var module = try lower(a, inline_register_source);
+    defer module.deinit(a);
+    try publishInlineRegisters(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishInlineRegisters, .{@as([]const core.Module, &.{module})});
+}
+test "inline return registers retain buffers for width five and runtime variants" {
+    const sources = [_][]const u8{
+        \\type Five is data = $Five {a: U32, b: U32, c: U32, d: U32, e: U32}
+        \\const five = func (input: U32): Five => return $Five {a: input, b: 2, c: 3, d: 4, e: 5}
+        \\entry const answer = func (input: U32): Array U32 => return do:
+        \\  let marker: GrowArray U32 = #[input]
+        \\  let first = five marker[0]
+        \\  let second = five 11
+        \\  return #[first.a, first.e, second.a, second.e]
+        ,
+        \\type Choice is data = $Left U32 | $Right U32
+        \\const choice = func (input: U32): Choice => return if @u32.eq input 0 then $Left input else $Right input
+        \\entry const answer = func (input: U32): Array U32 => return do:
+        \\  let marker: GrowArray U32 = #[input]
+        \\  let selected = choice marker[0]
+        \\  let word = case selected of
+        \\    $Left value => value
+        \\    $Right value => @u32.add value 1
+        \\  return #[word]
+        ,
+    };
+    for (sources) |source| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        var result = try scoped.compile(a, &.{module}, 1);
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        try std.testing.expect(result.counters.scoped_inline_definitions > 0);
+        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_inline_register_calls);
+    }
+}
+
+const inline_register_rollback_source =
+    \\type Pair is data = $Pair {x: U32, y: U32}
+    \\type Row is data = $Row {target: Ref U32}
+    \\const pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
+    \\const bump = func (rows: ResizeArray Row): Unit => return do:
+    \\  for row in rows:
+    \\    @storage.write row.target (@u32.add (@storage.load row.target) 1)
+    \\const change = func (rows: ResizeArray Row): U32 => return do:
+    \\  let held = pair (@storage.length rows)
+    \\  bump rows
+    \\  @storage.truncate rows 1
+    \\  let later = pair 9
+    \\  return @u32.add held.y later.y
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let left: Array U32 = #[input]
+    \\  let right: Array U32 = #[@u32.add input 10]
+    \\  let rows: ResizeArray Row = #[$Row {target: @storage.at left 0}, $Row {target: @storage.at right 0}]
+    \\  let count = change rows
+    \\  return #[left[0], right[0], count]
+;
+fn publishInlineRegisterRollback(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_inline_register_calls);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_inline_result_owners_avoided);
+}
+test "inline return registers keep eager bank IDs and committed counters across function rollback through OOM" {
+    var module = try lower(a, inline_register_rollback_source);
+    defer module.deinit(a);
+    try publishInlineRegisterRollback(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishInlineRegisterRollback, .{@as([]const core.Module, &.{module})});
+}

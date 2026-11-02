@@ -3063,6 +3063,51 @@ const Generator = struct {
         for (value.fields) |field| count = std.math.add(usize, count, try inlineWords(field)) catch return error.Declined;
         return count;
     }
+    fn inlineReturnRegisters(shape_: Value) Error!usize {
+        if (shape_.tag != .aggregate) return 0;
+        const words = try inlineWords(shape_);
+        if (words == 0 or words > 4) return 0;
+        if (!plainInlineValue(shape_) or !stableDescriptorShape(shape_)) return 0;
+        return words;
+    }
+    fn inlineReturnLeaves(value: Value, words: *[4]Local, next: *usize) Error!void {
+        if (value.tag == .scalar) {
+            if (next.* == words.len) return error.Declined;
+            words[next.*] = value.word;
+            next.* += 1;
+            return;
+        }
+        if (value.tag != .aggregate or value.variant_tags.len != 0) return error.Declined;
+        for (value.fields) |field| try inlineReturnLeaves(field, words, next);
+    }
+    fn publishInlineReturn(self: *Generator, output: Value, count: usize) Error!void {
+        // A trapping body never returns, so its ABI-zero carrier has no shape.
+        if (output.terminated) return self.c.value(0);
+        var words: [4]Local = undefined;
+        var next: usize = 0;
+        try inlineReturnLeaves(output, &words, &next);
+        if (next != count) return error.Declined;
+        // invokeBody already finished nested calls, cleanup and outlining.
+        // Publication contains only local/global operations, then word zero.
+        for (1..count) |index| {
+            try self.c.value(words[index]);
+            try self.c.op(.global_set, self.runtime.inline_returns[index - 1]);
+        }
+        try self.c.value(words[0]);
+    }
+    fn inlineReturnValue(self: *Generator, template: Value, words: []const Local, next: *usize) Error!Value {
+        var value = template;
+        value.literal = null;
+        if (value.tag == .scalar) {
+            value.word = words[next.*];
+            next.* += 1;
+            return value;
+        }
+        value.word = .{ .id = 0 };
+        const fields = initializeFields(&value, try self.arena.allocator().alloc(Value, template.fields.len));
+        for (fields, template.fields) |*field, original| field.* = try self.inlineReturnValue(original, words, next);
+        return value;
+    }
     fn inlineParameter(self: *Generator, original: Value, next: *u32) Error!Value {
         var value = original;
         value.literal = null;
@@ -3080,9 +3125,9 @@ const Generator = struct {
         if (value.tag == .scalar or value.variant_tags.len != 0) try self.c.value(value.word);
         for (value.fields) |field| try self.inlineArgument(field);
     }
-    /// Inline fields travel as ordinary word parameters. Aggregate results use
-    /// a caller-owned slot, loaded into locals and rewound immediately after
-    /// the call. The callee cannot retain this slot or manufacture an owner.
+    /// Inline fields travel as ordinary word parameters. Small plain results
+    /// return through an instance-private word bank, drained immediately into
+    /// locals; other aggregates use a caller-owned slot and immediate rewind.
     fn reusableInlineCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         var eligible = !self.planning_writer;
@@ -3119,7 +3164,9 @@ const Generator = struct {
         const aggregate_result = result_shape.tag == .aggregate;
         // A scratch result slot must never consume an array-return destination.
         if (aggregate_result and self.destination != null) return null;
-        const parameter_count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return self.unsupported(m, body.root);
+        const return_registers = try inlineReturnRegisters(result_shape);
+        const buffered_result = aggregate_result and return_registers == 0;
+        const parameter_count = std.math.add(usize, words, @intFromBool(buffered_result)) catch return self.unsupported(m, body.root);
         if (parameter_count > std.math.maxInt(u32)) return self.unsupported(m, body.root);
         var concrete: ?[]const u32 = null;
         if (eligible) concrete = try self.inlineCallEvidence(m, body, arguments, result_shape);
@@ -3191,7 +3238,9 @@ const Generator = struct {
                 if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
                 return err;
             };
-            if (aggregate_result) {
+            if (return_registers != 0) {
+                try child.publishInlineReturn(output, return_registers);
+            } else if (aggregate_result) {
                 try child.storeValue(.{ .id = @intCast(words) }, 0, output);
                 try child.c.value(0);
             } else try child.c.value(try child.scalar(m, body.root, output));
@@ -3202,9 +3251,28 @@ const Generator = struct {
         const entry = cache.entries.items[index];
         self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive inline specializations are not admitted");
-        return try self.callInlineFunction(m, body.root, entry, arguments, result_shape, result_type);
+        return try self.callInlineFunction(m, body.root, entry, arguments, result_shape, result_type, return_registers);
     }
-    fn callInlineFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, result_shape: Value, result_type: T.Id) Error!Value {
+    fn callInlineFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, result_shape: Value, result_type: T.Id, return_registers: usize) Error!Value {
+        if (return_registers != 0) {
+            for (arguments) |argument| try self.inlineArgument(argument);
+            try self.c.op(.call, entry.function);
+            var words: [4]Local = undefined;
+            for (words[0..return_registers]) |*word| word.* = try self.c.temp();
+            try self.c.op(.local_set, words[0].id);
+            // Drain every result word before any call, import or cleanup can
+            // overwrite this instance's bank. Retained results own fresh locals.
+            for (1..return_registers) |index| try self.c.set(words[index], .{ .global, self.runtime.inline_returns[index - 1] });
+            var next: usize = 0;
+            var result = try self.inlineReturnValue(result_shape, words[0..return_registers], &next);
+            std.debug.assert(next == return_registers);
+            result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
+            self.emission_work.scoped_inline_register_calls +|= 1;
+            self.emission_work.scoped_inline_result_owners_avoided +|= 1;
+            self.emission_work.scoped_inline_result_roots_avoided +|= 1;
+            self.emission_work.scoped_inline_result_bytes_avoided +|= storage.header_bytes + try width(result_shape);
+            return result;
+        }
         const aggregate_result = result_shape.tag == .aggregate;
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
@@ -3797,7 +3865,7 @@ const Generator = struct {
         }
         try self.finishSelectedTypes(m, body.root, evidence, &type_key);
     }
-    fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
+    fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, original_arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         const result_type = m.typeOf(body.root);
         var remaining: usize = 100_000;
@@ -3852,7 +3920,7 @@ const Generator = struct {
             existing = cache.find(key);
         }
         // Replay reads in the enclosing loop and writer summary on hits too.
-        for (arguments) |argument| try self.readerReads(m, body.root, argument);
+        for (original_arguments) |argument| try self.readerReads(m, body.root, argument);
         if (existing != null) self.emission_work.scoped_reader_cache_hits +|= 1;
         const index = if (existing) |found| found else blk: {
             const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
@@ -4095,14 +4163,18 @@ const Generator = struct {
         value.other_roots = others;
         for (try self.writableFields(value)) |*field| try self.graphCallerRoots(field, owners);
     }
-    fn projectedArguments(self: *Generator, m: *const core.Module, body: *const core.Body, original: []const Value) Error![]const Value {
+    const PreparedArguments = struct { values: []const Value, fields_omitted: usize = 0, words_omitted: usize = 0, words_complete: bool = true };
+    fn projectedArguments(self: *Generator, m: *const core.Module, body: *const core.Body, original: []const Value) Error!PreparedArguments {
+        self.emission_work.scoped_argument_preparations +|= 1;
         var result: ?[]Value = null;
+        var prepared: PreparedArguments = .{ .values = original };
+        var word_work: usize = 4096;
         for (m.bodyParameters(body), original, 0..) |parameter, argument, index| {
             if (argument.tag != .aggregate or argument.nominal != null or argument.variant_tags.len != 0 or argument.host != null or argument.demand != null or argument.root != null) continue;
-            // Target callback-bearing access records. Plain records retain
-            // their existing path without another source-body traversal.
+            // Callback presence selects work, never authority. Large plain
+            // records use the same complete footprint and physical-root guards.
             var callback_work: usize = 4096;
-            if (!containsCallback(argument, &callback_work, 0)) continue;
+            if (!containsCallback(argument, &callback_work, 0) and argument.fields.len < 8) continue;
             const actual = try self.resolveType(.{ .unit = m.unit, .ty = parameter.ty }, 0);
             if ((try self.unit(actual.unit)).types.node(actual.ty).tag != .record) continue;
             var footprint = try @import("storage_parameter_fields.zig").collect(self.allocator, m, body.root, parameter.binding);
@@ -4112,23 +4184,72 @@ const Generator = struct {
             // fields. Ambiguous or absent layout evidence keeps the full ABI.
             var selected: std.ArrayList(Value) = .empty;
             defer selected.deinit(self.allocator);
-            for (argument.fields) |field| {
+            var omitted_words: usize = 0;
+            var words_complete = true;
+            for (argument.fields) |*field| {
+                var retained = false;
                 for (footprint.names.items) |name| {
                     const spelling = m.fieldSpelling(name) orelse break;
                     if (std.mem.eql(u8, field.name, spelling)) {
-                        try selected.append(self.allocator, field);
+                        try selected.append(self.allocator, field.*);
+                        retained = true;
                         break;
                     }
+                }
+                // Diagnostic work only, bounded independently of admission.
+                // Count omitted subtrees here; committed calls do no extra walk.
+                if (!retained and words_complete) {
+                    omitted_words +|= boundedReaderWords(field, &word_work, 0) orelse {
+                        words_complete = false;
+                        continue;
+                    };
                 }
             }
             if (selected.items.len != footprint.names.items.len) continue;
             if (result == null) result = try self.arena.allocator().dupe(Value, original);
             result.?[index].fields = try self.arena.allocator().dupe(Value, selected.items);
             result.?[index].projected_parameter_fields = true;
+            prepared.fields_omitted +|= argument.fields.len - selected.items.len;
+            prepared.words_omitted +|= omitted_words;
+            prepared.words_complete = prepared.words_complete and words_complete;
             self.emission_work.scoped_projected_parameter_fields +|= argument.fields.len - selected.items.len;
             @import("../phase_profile.zig").detail("descriptor.parameter.projected", m.unit, m.span(body.root).start, m.span(body.root).end, argument.fields.len - selected.items.len);
         }
-        return result orelse original;
+        if (prepared.fields_omitted != 0) self.emission_work.scoped_argument_projection_preparations +|= 1;
+        self.emission_work.scoped_projection_word_count_nodes +|= 4096 - word_work;
+        prepared.values = result orelse original;
+        return prepared;
+    }
+    // Statistics never expand the checked ABI or grant admission. If the full
+    // original tree exceeds this separate budget, omit its word count.
+    fn boundedReaderWords(value: *const Value, remaining: *usize, depth: usize) ?usize {
+        if (remaining.* == 0 or depth > 128) return null;
+        remaining.* -= 1;
+        if (value.tag == .aggregate or value.tag == .callable) {
+            var count: usize = @intFromBool(value.variant_tags.len != 0);
+            for (value.fields) |*field| count = std.math.add(usize, count, boundedReaderWords(field, remaining, depth + 1) orelse return null) catch return null;
+            return count;
+        }
+        return switch (value.tag) {
+            .scalar => 1,
+            .array => 4,
+            .ref, .link => 5,
+            .view => 6,
+            else => unreachable,
+        };
+    }
+    fn commitPreparedArguments(self: *Generator, prepared: PreparedArguments, comptime kind: enum { reader, owned }) void {
+        if (prepared.fields_omitted == 0) return;
+        if (kind == .reader) {
+            self.emission_work.scoped_reader_projection_calls +|= 1;
+            self.emission_work.scoped_reader_argument_fields_omitted +|= prepared.fields_omitted;
+            if (prepared.words_complete) self.emission_work.scoped_reader_argument_words_omitted +|= prepared.words_omitted;
+        } else {
+            self.emission_work.scoped_owned_projection_calls +|= 1;
+            self.emission_work.scoped_owned_argument_fields_omitted +|= prepared.fields_omitted;
+            if (prepared.words_complete) self.emission_work.scoped_owned_argument_words_omitted +|= prepared.words_omitted;
+        }
+        if (!prepared.words_complete) self.emission_work.scoped_projection_word_counts_limited +|= 1;
     }
     fn containsCallback(value: Value, remaining: *usize, depth: usize) bool {
         if (remaining.* == 0 or depth > 128) return false;
@@ -4143,7 +4264,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions" };
+    const published_fields = .{ "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4184,7 +4305,12 @@ const Generator = struct {
             g.type_arguments.shrinkRetainingCapacity(self.types);
             g.diagnostic = self.diagnostic;
             g.context_sensitive = self.context_sensitive;
-            inline for (published_fields, 0..) |field, index| @field(g.emission_work.*, field) = self.publications[index];
+            inline for (published_fields, 0..) |field, index| {
+                if (comptime std.mem.eql(u8, field, "scoped_reader_projection_calls") or std.mem.eql(u8, field, "scoped_owned_projection_calls")) {
+                    g.emission_work.scoped_argument_projection_discards +|= @field(g.emission_work.*, field) -| self.publications[index];
+                }
+                @field(g.emission_work.*, field) = self.publications[index];
+            }
             g.module.rollbackTail(self.module);
         }
     };
@@ -4369,12 +4495,9 @@ const Generator = struct {
         }
         return inserted;
     }
-    fn reusableOwnedCall(self: *Generator, m: *const core.Module, target: core.BindingRef, original_arguments: []const Value, graph_only: bool) Error!?Value {
+    fn reusableOwnedCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, graph_only: bool) Error!?Value {
         if (self.destination != null) return null;
         const body = m.body(target.binding) orelse return null;
-        // invokeBody already mapped full semantic types, refined goals and
-        // selected original callbacks. Only this reusable physical ABI narrows.
-        const arguments = try self.projectedArguments(m, body, original_arguments);
         const result = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
         const unit_result = (try self.unit(result.unit)).types.node(result.ty).tag == .unit;
         var result_shape: Value = .{ .word = .{ .id = 0 } };
@@ -4814,9 +4937,25 @@ const Generator = struct {
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
         if (reuse) if (try self.reusableCall(m, target, arguments)) |value| return value;
         if (reuse) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
-        if (reuse) if (try self.reusableOwnedCall(m, target, arguments, true)) |value| return value;
-        if (reuse) if (try self.reusableReaderCall(m, target, arguments)) |value| return value;
-        if (reuse) if (try self.reusableOwnedCall(m, target, arguments, false)) |value| return value;
+        if (reuse) {
+            // Semantic mapping, goals, selected callbacks and the scalar/inline
+            // probes above consume the originals. Share one physical ABI only
+            // between owned/reader probes; expanded fallback also binds originals.
+            const prepared = try self.projectedArguments(m, body, arguments);
+            if (try self.reusableOwnedCall(m, target, prepared.values, true)) |value| {
+                self.commitPreparedArguments(prepared, .owned);
+                return value;
+            }
+            if (try self.reusableReaderCall(m, target, prepared.values, arguments)) |value| {
+                self.commitPreparedArguments(prepared, .reader);
+                return value;
+            }
+            if (try self.reusableOwnedCall(m, target, prepared.values, false)) |value| {
+                self.commitPreparedArguments(prepared, .owned);
+                return value;
+            }
+            if (prepared.fields_omitted != 0) self.emission_work.scoped_argument_projection_discards +|= 1;
+        }
         // A reusable definition's child enters while compiling its body. Do
         // not enter twice merely because planning moved to another Generator.
         if (!try self.active_calls.enter(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
@@ -7536,4 +7675,53 @@ test "callback discovery bounds shared trees depth and owner boundaries" {
     work = 4096;
     try std.testing.expect(!Generator.containsCallback(levels[0][0], &work, 0));
     try std.testing.expectEqual(@as(usize, 0), work);
+}
+
+fn preparedReaderHistory(allocator: std.mem.Allocator) !void {
+    // Metadata replay is independent of formal admission. In particular, no
+    // future admission can silently replace the original read set with its ABI.
+    var g: Generator = undefined;
+    g.allocator = allocator;
+    g.arena = .init(allocator);
+    defer g.arena.deinit();
+    g.roots = .empty;
+    defer g.roots.deinit(allocator);
+    g.read_frames = .empty;
+    defer g.read_frames.deinit(allocator);
+    g.writer_trace = null;
+    g.diagnostic = null;
+    var m = metadataTestModule(1);
+    var spans = [_]core.Span{.{ .start = 0, .end = 0 }};
+    m.spans = &spans;
+    const scalar: Value = .{ .word = .{ .id = 0 } };
+    const initial: Value = .{ .tag = .view, .word = .{ .id = 0 }, .root = 2 };
+    const widened: Value = .{ .tag = .view, .word = .{ .id = 0 }, .root = 2, .other_roots = &.{3} };
+    const owner: Root = .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = 0, .depth = 0, .element = scalar };
+    try g.roots.appendNTimes(allocator, owner, 4);
+    g.roots.items[0].element = initial;
+    const fields = [_]Value{
+        .{ .tag = .array, .word = .{ .id = 0 }, .root = 0, .name = "a_omitted" },
+        scalar,
+        scalar,
+        scalar,
+        scalar,
+        scalar,
+        scalar,
+        .{ .tag = .array, .word = .{ .id = 0 }, .root = 1, .name = "z_kept" },
+    };
+    const original: Value = .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &fields };
+    const physical: Value = .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = fields[7..] };
+    const frame = try g.beginReadFrame();
+    try g.readerReads(&m, 0, physical);
+    try std.testing.expectEqual(@as(usize, 1), g.read_frames.items[frame].first.items.len);
+    try g.readerReads(&m, 0, original);
+    try std.testing.expectEqual(@as(usize, 2), g.read_frames.items[frame].first.items.len);
+    try std.testing.expectEqual(@as(usize, 0), g.read_frames.items[frame].first.items[0].owner);
+    g.roots.items[0].element = widened;
+    try std.testing.expectError(error.Declined, g.checkReadFrame(&m, 0, frame));
+    try std.testing.expectEqual(backend.Code.storage_escape, g.diagnostic.?.code);
+}
+test "prepared reader original read replay retains omitted owner loop history through OOM" {
+    try preparedReaderHistory(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, preparedReaderHistory, .{});
 }

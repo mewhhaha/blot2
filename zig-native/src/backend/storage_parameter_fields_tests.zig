@@ -301,3 +301,31 @@ test "projected anonymous parameters discover nominal callback bundles without c
     try publish(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
+
+const prepared_reader_source =
+    \\const choose = func access => return access.z_kept
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let first: ResizeArray U32 = #[input]
+    \\  let second: ResizeArray U32 = #[@u32.add input 10]
+    \\  let left = choose {a_omitted: first,b0: 0,b1: 1,b2: 2,b3: 3,b4: 4,b5: 5,z_kept: second}
+    \\  let right = choose {a_omitted: second,b0: 0,b1: 1,b2: 2,b3: 3,b4: 4,b5: 5,z_kept: first}
+    \\  let alias = choose {a_omitted: second,b0: 0,b1: 1,b2: 2,b3: 3,b4: 4,b5: 5,z_kept: second}
+    \\  second[0] := @u32.add input 20
+    \\  return #[left[0],right[0],alias[0]]
+;
+fn publishPreparedReaders(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_reader_definitions > 0);
+    try std.testing.expect(result.counters.scoped_reader_projection_calls >= 3);
+    try std.testing.expect(result.counters.scoped_reader_argument_fields_omitted >= 21);
+    try std.testing.expect(result.counters.scoped_reader_argument_words_omitted >= 30);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_projection_word_counts_limited);
+}
+test "prepared reader arguments preserve descriptor ordinals through swapped and aliased owners and OOM" {
+    var module = try lower(prepared_reader_source);
+    defer module.deinit(a);
+    try publishPreparedReaders(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPreparedReaders, .{@as([]const core.Module, &.{module})});
+}
