@@ -1263,6 +1263,39 @@ const immutable_bindings_source =
     \\  return #[original.inner.left, original.inner.right, saved.inner.left, saved.inner.right, changed.inner.left, changed.inner.right, original.kept, saved.kept]
 ;
 
+const indexed_access_source =
+    \\type IndexedRow is data = $IndexedRow {left: U32, right: U32}
+    \\type IndexedBank is data = $IndexedBank {rows: ResizeArray IndexedRow, other: ResizeArray U32}
+    \\type IndexedWorld is data = $IndexedWorld {bank: IndexedBank, stamp: U32}
+    \\const indexed_slot = func (counts: Array U32): U32 => return do:
+    \\  let slot = counts[0]
+    \\  counts[0] := @u32.add slot 1
+    \\  return slot
+    \\entry const indexed = func (input: U32): Array U32 => return do:
+    \\  let rows: ResizeArray IndexedRow = #[$IndexedRow {left: input, right: 7}, $IndexedRow {left: @u32.add input 1, right: 11}]
+    \\  let other: ResizeArray U32 = #[3, 4]
+    \\  let counts: Array U32 = #[0]
+    \\  let access = {extra: input, world: $IndexedWorld {bank: $IndexedBank {rows, other}, stamp: 23}, counts, borrowed: &other[0..2]}
+    \\  let alias = access
+    \\  access.world.bank.rows[indexed_slot access.counts].left := do:
+    \\    rows[0] := $IndexedRow {left: @u32.add input 100, right: 88}
+    \\    rows[1].right := 66
+    \\    other[0] := counts[0]
+    \\    other[1] := 44
+    \\    break @u32.add self 10
+    \\  return #[counts[0], rows[0].left, rows[0].right, rows[1].left, rows[1].right, other[0], other[1], alias.world.bank.rows[0].left, alias.world.bank.rows[0].right, alias.borrowed[0], alias.borrowed[1], alias.world.stamp, alias.extra]
+    \\entry const indexed_early = func (input: U32): Array U32 => return do:
+    \\  let rows: ResizeArray IndexedRow = #[$IndexedRow {left: input, right: 7}]
+    \\  let other: ResizeArray U32 = #[3]
+    \\  let counts: Array U32 = #[0]
+    \\  let access = {world: $IndexedWorld {bank: $IndexedBank {rows, other}, stamp: 23}, counts}
+    \\  access.world.bank.rows[indexed_slot access.counts].left := do:
+    \\    if @u32.eq input 0:
+    \\      return #[11, counts[0], rows[0].left]
+    \\    break 7
+    \\  return #[rows[0].left, counts[0], 99]
+;
+
 fn publishImmutableBindings(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
     defer result.deinit(allocator);
@@ -1270,9 +1303,10 @@ fn publishImmutableBindings(allocator: std.mem.Allocator, modules: []const core.
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expect(result.counters.scoped_local_words_shared > 0);
     try std.testing.expect(result.counters.scoped_record_updates_shared > 0);
+    try std.testing.expect(result.counters.scoped_indexed_update_roots_shared > 0);
 }
 test "immutable local bindings preserve parallel loops captures and functional record aliases through OOM" {
-    var module = try lower(a, immutable_bindings_source);
+    var module = try lower(a, immutable_bindings_source ++ "\n" ++ indexed_access_source);
     defer module.deinit(a);
     try publishImmutableBindings(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishImmutableBindings, .{@as([]const core.Module, &.{module})});
@@ -1282,7 +1316,7 @@ test "immutable local bindings preserve parallel loops captures and functional r
         \\  let value = 1
         \\  return @storage.load (&value)
         \\
-    ++ immutable_bindings_source);
+    ++ immutable_bindings_source ++ "\n" ++ indexed_access_source);
     defer addressed.deinit(a);
     var fallback = try scoped.compile(a, &.{addressed}, 1);
     defer fallback.deinit(a);
@@ -1290,4 +1324,5 @@ test "immutable local bindings preserve parallel loops captures and functional r
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_parameter_words_shared);
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_local_words_shared);
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_record_updates_shared);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_indexed_update_roots_shared);
 }

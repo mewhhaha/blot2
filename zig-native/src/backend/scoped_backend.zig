@@ -2612,10 +2612,11 @@ const Generator = struct {
         var result_type = raw_result_type;
         for (arguments) |arg| if (arg.tag != .scalar or arg.demand != null) return null;
         var remaining: usize = 100_000;
+        const isolated = !owned_result and try self.closedScalarBody(m, target.binding);
         if (owned_result) {
             var arrays: usize = 0;
             if (!call_plan.destinationBody(m, body.root, &arrays, &remaining, 0) or arrays != 1) return null;
-        } else if (!call_plan.scalarBody(m, body.root, &remaining, 0) and !try self.closedScalarBody(m, target.binding)) {
+        } else if (!isolated and !call_plan.scalarBody(m, body.root, &remaining, 0)) {
             var active: [128]core.BindingRef = undefined;
             active[0] = target;
             if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
@@ -2647,7 +2648,11 @@ const Generator = struct {
             try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
         }
         try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
+        var context = self.invocationContext();
+        // The complete primitive DAG proof excludes every operation which can
+        // select a caller-visible method, dictionary, global or effect.
+        if (isolated) context = 0;
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = context, .evidence = evidence.items };
         var cache = self.shared_calls;
         if (owned_result) cache = &self.calls;
         const existing = cache.find(key);
@@ -2692,7 +2697,6 @@ const Generator = struct {
             defer child.deinit();
             // A closed primitive DAG cannot observe ambient substitutions.
             // Generic and destination bodies retain the complete caller frame.
-            const isolated = !owned_result and try self.closedScalarBody(m, target.binding);
             if (!isolated) try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
             const inputs = try self.allocator.alloc(Value, arguments.len);
             defer self.allocator.free(inputs);
@@ -5467,6 +5471,26 @@ const Generator = struct {
         }
         return value;
     }
+    fn indexedUpdate(self: *Generator, m: *const core.Module, id: core.Id, original: Value, depth: usize) Error!?Value {
+        const selectors = m.updateSelectors(id);
+        const first = for (selectors, 0..) |selector, index| {
+            if (selector.kind == .index) break index;
+        } else return null;
+        if (self.scalar_admission.hasScalarReferences()) return null;
+        if (depth + 1 + first > 128) return self.unsupported(m, id);
+        const protected_before = self.protected.items.len;
+        defer self.protected.shrinkRetainingCapacity(protected_before);
+        try self.protected.append(self.allocator, original);
+        var receiver = original;
+        for (selectors[0..first]) |selector| receiver = (try self.projected(m, id, &receiver, selector.projection)).*;
+        // The indexed branch writes the selected owner and preserves its
+        // descriptor. Its enclosing access record therefore remains identical;
+        // no scalar address can mutate an unchanged lane during the RHS.
+        const updated = try self.updateValue(m, id, receiver, first, depth + 1 + first);
+        if (updated.terminated) return updated;
+        self.emission_work.scoped_indexed_update_roots_shared +|= 1;
+        return original;
+    }
     fn emitLoop(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
         const info = m.loopInfo(id);
         const collection_value: ?Value = if (info.kind == .array) try self.expression(m, info.first, depth + 1) else null;
@@ -5764,6 +5788,7 @@ const Generator = struct {
                 const info = m.updateInfo(id);
                 const evaluated = try self.expression(m, info.root, depth + 1);
                 if (evaluated.terminated) return evaluated;
+                if (try self.indexedUpdate(m, id, evaluated, depth)) |updated| return updated;
                 var root_value: Value = undefined;
                 var field_only = true;
                 for (m.updateSelectors(id)) |selector| {

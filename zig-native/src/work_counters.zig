@@ -143,6 +143,7 @@ pub const Counters = struct {
     scoped_parameter_words_shared: u64 = 0,
     scoped_local_words_shared: u64 = 0,
     scoped_record_updates_shared: u64 = 0,
+    scoped_indexed_update_roots_shared: u64 = 0,
     scoped_projected_parameter_fields: u64 = 0,
     scoped_descriptor_admissions: u64 = 0,
     scoped_descriptor_admission_hits: u64 = 0,

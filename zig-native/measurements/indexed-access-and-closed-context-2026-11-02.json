@@ -1,0 +1,95 @@
+{
+  "date": "2026-11-02",
+  "baseline_commit": "c8cf39a501f5d01434ea3c2c1675bcf9c5caeba3",
+  "changes": {
+    "closed_scalar_context": "Use canonical context0 only after the full closed primitive DAG proof; the same proof omits ambient substitutions. Keep source origin, ActiveCalls context and all other semantic key evidence.",
+    "indexed_access": "Under the whole-inventory no-local-address proof, select the first index through read-only metadata and keep the complete root protected. Existing indexed write performs all checks and leaf writes; unchanged ancestor records need no snapshots. Preserve depth+1+firstIndex and termination."
+  },
+  "qualification": {
+    "check_dev": "build/bench/indexed-access-context-check-dev/run-a4dcbd8f624a9816/results.json",
+    "compiled_native": 2820,
+    "selected_full_faults_evidence": "build/bench/indexed-access-context-check-dev/run-a4dcbd8f624a9816/full-faults.log",
+    "native_full_faults": "61passed, zero leaks/loggederrors",
+    "full_gate": "build/bench/indexed-access-context-full-gate/run-b71b69f56f7d99ad;48passed/1reproducedbaseline List/chunk storage_escape",
+    "extra_guests": "All18storage_records_execution laws pass",
+    "tests": "Cross-unit diamond definitions16->12 with wrapping U32/exact F32 bits and distinct nominal dispatch;165-field nested indexed access verifies RHS sibling/other-row/other-pool writes, index ordering, whole-root sibling-view protection, early return and scalarRef fallback. Native OOM witness includes indexed roots.",
+    "guests": 38
+  },
+  "renderer_controls": [
+    {
+      "scope": "closed_context",
+      "evidence": "build/bench/closed-context-kites/pair-36a128caf7ce4114/result.json",
+      "streams_equal": true,
+      "builds": [
+        {
+          "variant": "baseline",
+          "build_ms": 3876.712265,
+          "wasm_bytes": 235873,
+          "sha256": "9782faf57935fc08c9e4a4a0f5f53dd886e9bd7230ff47194f90122ce1dfb3c9",
+          "owned_emit_ms": 484.316,
+          "work": {
+            "scoped_emission_expressions": 8634,
+            "scoped_scalar_definitions": 313
+          }
+        },
+        {
+          "variant": "candidate",
+          "build_ms": 3834.4023970000003,
+          "wasm_bytes": 233488,
+          "sha256": "031f5d063f0ecf2a900e951b4b6047a8b50877f43227bf08bdc0b6e5981036e5",
+          "owned_emit_ms": 485.081,
+          "work": {
+            "scoped_emission_expressions": 8354,
+            "scoped_scalar_definitions": 220
+          }
+        }
+      ],
+      "warning": "One traced native-fast renderer pair; do not claim a latency improvement from this control."
+    },
+    {
+      "scope": "indexed_access",
+      "evidence": "build/bench/indexed-access-kites/pair-7245497840354f1e/result.json",
+      "streams_equal": true,
+      "builds": [
+        {
+          "variant": "baseline",
+          "build_ms": 3936.295141,
+          "wasm_bytes": 233488,
+          "sha256": "031f5d063f0ecf2a900e951b4b6047a8b50877f43227bf08bdc0b6e5981036e5",
+          "owned_emit_ms": 492.325,
+          "work": {
+            "scoped_emission_expressions": 8354,
+            "scoped_scalar_definitions": 220
+          }
+        },
+        {
+          "variant": "candidate",
+          "build_ms": 3927.9534549999994,
+          "wasm_bytes": 233488,
+          "sha256": "031f5d063f0ecf2a900e951b4b6047a8b50877f43227bf08bdc0b6e5981036e5",
+          "owned_emit_ms": 496.972,
+          "work": {
+            "scoped_emission_expressions": 8354,
+            "scoped_scalar_definitions": 220,
+            "scoped_indexed_update_roots_shared": 2
+          }
+        }
+      ],
+      "warning": "One traced native-fast renderer pair; do not claim a latency improvement from this control."
+    }
+  ],
+  "native_actual_main": {
+    "evidence": "build/bench/gdev-indexed-access-native-progress/main-bb1bb5aeeb81ae6d/result.json",
+    "status": "30-second cap; incomplete",
+    "sample_expressions": [
+      66201,
+      119709
+    ],
+    "sample_indexed_updates": [
+      316,
+      964
+    ],
+    "warning": "A separate bounded window, not a whole-build or matching-work latency ratio."
+  },
+  "optimized_main": "pending checked release candidate; five-second target remains unmet"
+}

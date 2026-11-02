@@ -64,6 +64,8 @@ def emission_frame(frame, name, tid, metadata):
                         "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings",
                         "scoped_owner_graph_definitions", "scoped_owner_graph_hits",
                         "scoped_owner_graph_inputs", "scoped_parameter_words_shared",
+                        "scoped_local_words_shared", "scoped_record_updates_shared",
+                        "scoped_indexed_update_roots_shared",
                         "scoped_projected_parameter_fields"):
                 try:
                     work[key] = int(counters[key])

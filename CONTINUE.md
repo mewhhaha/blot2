@@ -48,6 +48,16 @@ navigation lookup owner and naming World callbacks barely reduces expansion.
 [Their patches and full-main controls](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
 remain evidence, not landed improvements.
 
+The next checked batch shares proven closed scalar definitions across caller
+modules and avoids whole access-record snapshots for indexed storage writes.
+Source origin, active recursion, local-address fallback, whole-root borrow
+protection, leaf mutation checks and nesting limits remain. The 2,820-law
+inventory compiles; 61 full-fault laws, 38 selected guests and 18 extra record
+laws pass; Zig lint is clean. Seven renderer streams match with 233,488-byte
+Wasm. Native main still exceeds 30 seconds; the optimized full-main measurement
+is next. See
+[exact evidence](zig-native/measurements/indexed-access-and-closed-context-2026-11-02.json).
+
 The structural type-ID prototype is **rejected and removed**: three alternating
 actual renderer pairs regress emission 5.3%, despite much smaller keys. Its
 patch and exact controls are preserved in

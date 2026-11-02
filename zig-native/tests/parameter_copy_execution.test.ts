@@ -139,6 +139,60 @@ entry const updated = func (input: U32): Array U32 => return do:
   return #[original.inner.left, original.inner.right, saved.inner.left, saved.inner.right, changed.inner.left, changed.inner.right, original.kept, saved.kept]
 `;
 
+const indexedAccessFields = Array.from(
+  { length: 165 },
+  (_, index) => `p${index}: @u32.add input ${index}`,
+).join(", ");
+const indexedAccessReads = Array.from(
+  { length: 165 },
+  (_, index) => `alias.p${index}`,
+).join(", ");
+const indexedAccessSource =
+  (`type IndexedRow is data = $IndexedRow {left: U32, right: U32}
+type IndexedBank is data = $IndexedBank {rows: ResizeArray IndexedRow, other: ResizeArray U32}
+type IndexedWorld is data = $IndexedWorld {bank: IndexedBank, stamp: U32}
+const indexed_slot = func (counts: Array U32): U32 => return do:
+  let slot = counts[0]
+  counts[0] := @u32.add slot 1
+  return slot
+entry const indexed = func (input: U32): Array U32 => return do:
+  let rows: ResizeArray IndexedRow = #[$IndexedRow {left: input, right: 7}, $IndexedRow {left: @u32.add input 1, right: 11}]
+  let other: ResizeArray U32 = #[3, 4]
+  let counts: Array U32 = #[0]
+  let access = {extra: input, world: $IndexedWorld {bank: $IndexedBank {rows, other}, stamp: 23}, counts, borrowed: &other[0..2]}
+  let alias = access
+  access.world.bank.rows[indexed_slot access.counts].left := do:
+    rows[0] := $IndexedRow {left: @u32.add input 100, right: 88}
+    rows[1].right := 66
+    other[0] := counts[0]
+    other[1] := 44
+    break @u32.add self 10
+  return #[counts[0], rows[0].left, rows[0].right, rows[1].left, rows[1].right, other[0], other[1], alias.world.bank.rows[0].left, alias.world.bank.rows[0].right, alias.borrowed[0], alias.borrowed[1], alias.world.stamp, alias.extra]
+entry const indexed_early = func (input: U32): Array U32 => return do:
+  let rows: ResizeArray IndexedRow = #[$IndexedRow {left: input, right: 7}]
+  let other: ResizeArray U32 = #[3]
+  let counts: Array U32 = #[0]
+  let access = {world: $IndexedWorld {bank: $IndexedBank {rows, other}, stamp: 23}, counts}
+  access.world.bank.rows[indexed_slot access.counts].left := do:
+    if @u32.eq input 0:
+      return #[11, counts[0], rows[0].left]
+    break 7
+  return #[rows[0].left, counts[0], 99]
+`).replace("extra: input", indexedAccessFields).replace(
+    "alias.extra",
+    indexedAccessReads,
+  );
+const indexedShrinkSource =
+  `entry const indexed_shrink = func (input: U32): U32 => return do:
+  let rows: ResizeArray IndexedRow = #[$IndexedRow {left: input, right: 7}]
+  let other: ResizeArray U32 = #[3]
+  let access = {world: $IndexedWorld {bank: $IndexedBank {rows, other}, stamp: 23}, sibling: &other[0..1]}
+  access.world.bank.rows[0].left := do:
+    @storage.truncate other 0
+    break self
+  return access.sibling[0]
+`;
+
 const addressedBindingsSource =
   `type Pair is data = $Pair {left: U32, right: U32}
 const overwrite = func (reference: Ref U32): Unit => return @storage.write reference 42
@@ -171,27 +225,25 @@ for (const codegenTier of ["development", "optimized"] as const) {
         startupTimeoutMs: 5_000,
       });
       // Restore the no-address proof after an addressed retained edit too.
-      for (
-        const source of [
-          immutableBindingsSource,
-          addressedBindingsSource,
-          immutableBindingsSource,
-        ]
-      ) {
+      const positiveSource = immutableBindingsSource + indexedAccessSource;
+      const addressedSource = addressedBindingsSource + indexedAccessSource;
+      for (const source of [positiveSource, addressedSource, positiveSource]) {
         const built = await compiler.build({
           sources: { [entry]: source },
           signal: AbortSignal.timeout(5_000),
         });
         assert(built.success, JSON.stringify(built));
         const work = built.stats.workCounters as Record<string, number>;
-        const addressed = source === addressedBindingsSource;
+        const addressed = source === addressedSource;
         if (addressed) {
           assert.equal(work.scoped_parameter_words_shared, 0);
           assert.equal(work.scoped_local_words_shared, 0);
           assert.equal(work.scoped_record_updates_shared, 0);
+          assert.equal(work.scoped_indexed_update_roots_shared, 0);
         } else {
           assert(work.scoped_local_words_shared > 0);
           assert(work.scoped_record_updates_shared > 0);
+          assert(work.scoped_indexed_update_roots_shared > 0);
         }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
@@ -201,6 +253,30 @@ for (const codegenTier of ["development", "optimized"] as const) {
                 if (asynchronous) return await guest.callAsync(name, input);
                 return guest.call(name, input);
               };
+              assert.deepEqual(
+                await invoke("indexed"),
+                new Uint32Array([
+                  1,
+                  input + 10,
+                  88,
+                  input + 1,
+                  66,
+                  1,
+                  44,
+                  input + 10,
+                  88,
+                  1,
+                  44,
+                  23,
+                  ...Array.from({ length: 165 }, (_, index) => input + index),
+                ]),
+              );
+              let early = [7, 1, 99];
+              if (input === 0) early = [11, 1, 0];
+              assert.deepEqual(
+                await invoke("indexed_early"),
+                new Uint32Array(early),
+              );
               if (addressed) {
                 assert.deepEqual(
                   await invoke("fallback"),
@@ -246,6 +322,169 @@ for (const codegenTier of ["development", "optimized"] as const) {
           } finally {
             guest.dispose();
           }
+        }
+      }
+      const shrinking = await compiler.build({
+        sources: { [entry]: indexedAccessSource + indexedShrinkSource },
+        signal: AbortSignal.timeout(5_000),
+      });
+      assert(!shrinking.success, JSON.stringify(shrinking));
+      assert(
+        shrinking.diagnostics.some((diagnostic) =>
+          diagnostic.code === "storage_borrow_conflict"
+        ),
+        JSON.stringify(shrinking),
+      );
+    } finally {
+      await compiler?.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
+}
+
+const closedDiamondSource =
+  `const leaf = func (value: U32): U32 => return @u32.add value 1
+const left = func (value: U32): U32 => return leaf value
+const right = func (value: U32): U32 => return leaf value
+const diamond = func (value: U32): U32 => return @u32.add (left value) (right value)
+const flip = func (value: F32): F32 => return @f32.neg value
+const restored = func (value: F32): F32 => return flip (flip value)
+`;
+const closedDiamondCaller = `import * as closed from "trial/closed"
+const integer = func (value: U32): U32 => return closed.diamond value
+const floating = func (value: F32): F32 => return closed.restored value
+`;
+const closedDiamondEntry = `import * as first from "trial/first"
+import * as second from "trial/second"
+import * as third from "trial/third"
+entry const integer = func (input: U32): Array U32 => return do:
+  let rows: ResizeArray U32 = #[input]
+  return #[first.integer rows[0], second.integer rows[0], third.integer rows[0]]
+entry const floating = func (input: F32): Array F32 => return do:
+  let rows: ResizeArray F32 = #[input]
+  return #[first.floating rows[0], second.floating rows[0], third.floating rows[0]]
+`;
+const contextualDispatchEntry = `import * as first from "trial/first"
+import * as second from "trial/second"
+entry const dispatched = func (input: U32): Array U32 => return do:
+  let rows: ResizeArray U32 = #[input]
+  return #[first.integer rows[0], second.integer rows[0], first.integer rows[0], second.integer rows[0]]
+`;
+const contextualDispatchCaller = `import * as generic from "trial/generic"
+type Number is data = $Number U32
+const Number.add = func (left: Number) -> (right: U32): U32 => return do:
+  let $Number value = left
+  return @u32.add value right
+const integer = func (value: U32): U32 => return generic.combine ($Number value) 3
+`;
+
+for (const codegenTier of ["development", "optimized"] as const) {
+  Deno.test(`closed scalar diamonds share definitions across caller units without merging contextual dispatch (${codegenTier})`, async () => {
+    const directory = await Deno.makeTempDir({
+      prefix: "blot-closed-context-",
+    });
+    const entry = `${directory}/main.blot`;
+    let compiler:
+      | Awaited<ReturnType<typeof createZigProjectCompiler>>
+      | undefined;
+    try {
+      compiler = await createZigProjectCompiler({
+        executable: Deno.args[0],
+        entry,
+        imports: { "trial/": directory },
+        prelude: null,
+        cacheDirectory: false,
+        codegenTier,
+        startupTimeoutMs: 5_000,
+      });
+      const built = await compiler.build({
+        sources: {
+          [entry]: closedDiamondEntry,
+          [`${directory}/closed.blot`]: closedDiamondSource,
+          [`${directory}/first.blot`]: closedDiamondCaller,
+          [`${directory}/second.blot`]: closedDiamondCaller,
+          [`${directory}/third.blot`]: closedDiamondCaller,
+        },
+        signal: AbortSignal.timeout(5_000),
+      });
+      assert(built.success, JSON.stringify(built));
+      const work = built.stats.workCounters as Record<string, number>;
+      // Six library bodies and two wrapper bodies in each of three units.
+      assert.equal(work.scoped_scalar_definitions, 12, JSON.stringify(work));
+      assert(work.scoped_scalar_cache_hits > 0);
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(built.bytes, { asynchronous });
+        try {
+          for (
+            const input of [0, 1, 42, 0x7fffffff, 0xfffffffe, 0xffffffff, 0]
+          ) {
+            let actual;
+            if (asynchronous) actual = await guest.callAsync("integer", input);
+            else actual = guest.call("integer", input);
+            const expected = (input * 2 + 2) >>> 0;
+            assert.deepEqual(
+              actual,
+              new Uint32Array([expected, expected, expected]),
+            );
+          }
+          // Compare F32 transport bits, including both zero signs and infinities.
+          for (
+            const bits of [
+              0,
+              0x80000000,
+              0x3fc00000,
+              0xc0500000,
+              0x7f800000,
+              0xff800000,
+            ]
+          ) {
+            const input = new Float32Array(Uint32Array.of(bits).buffer)[0];
+            let actual;
+            if (asynchronous) actual = await guest.callAsync("floating", input);
+            else actual = guest.call("floating", input);
+            const values = actual as Float32Array;
+            assert.deepEqual(
+              new Uint32Array(values.buffer, values.byteOffset, values.length),
+              new Uint32Array([bits, bits, bits]),
+            );
+          }
+        } finally {
+          guest.dispose();
+        }
+      }
+      const dispatched = await compiler.build({
+        sources: {
+          [entry]: contextualDispatchEntry,
+          [`${directory}/generic.blot`]:
+            'const combine = func left -> right => return @type.call "add" left right\n',
+          [`${directory}/first.blot`]: contextualDispatchCaller,
+          [`${directory}/second.blot`]: contextualDispatchCaller.replace(
+            "@u32.add value right",
+            "@u32.sub value right",
+          ),
+        },
+        signal: AbortSignal.timeout(5_000),
+      });
+      assert(dispatched.success, JSON.stringify(dispatched));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(dispatched.bytes, {
+          asynchronous,
+        });
+        try {
+          for (const input of [0, 1, 42, 0xffffffff, 0]) {
+            let actual;
+            if (asynchronous) {
+              actual = await guest.callAsync("dispatched", input);
+            } else actual = guest.call("dispatched", input);
+            const added = (input + 3) >>> 0;
+            const subtracted = (input - 3) >>> 0;
+            assert.deepEqual(
+              actual,
+              new Uint32Array([added, subtracted, added, subtracted]),
+            );
+          }
+        } finally {
+          guest.dispose();
         }
       }
     } finally {
