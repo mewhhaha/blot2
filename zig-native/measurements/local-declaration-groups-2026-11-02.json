@@ -1,0 +1,102 @@
+{
+  "date": "2026-11-02",
+  "compiler_base": "ced7711af2d357283d32a89e3f98e6a131d2d2a5",
+  "change": "Encode consecutive Wasm local declarations of the same type as one run. Slot order, indices, types and observer suffix remain identical. No IR, ABI or semantic change.",
+  "source_sha256": {
+    "zig-native/src/backend/wasm.zig": "63786eab7994d7cd0a519bec78fbd54302eeff067e1ac9298e7ef8379fb6aaee",
+    "scripts/dev_check_areas.ts": "8829425c88d6aa39912dc6e03fb45d986f0e15052abe1dc541aaab0cb16a8525"
+  },
+  "qualification": {
+    "check_dev": "build/bench/local-declaration-groups-check-dev-fixed/run-71526c990f09fd5a/results.json",
+    "compiled_native": 2847,
+    "selected_exhaustive_faults": 95,
+    "full_faults": "build/bench/local-declaration-groups-check-dev-fixed/run-71526c990f09fd5a/full-faults.log",
+    "guests": 63,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/local-declaration-groups-full-gate/run-3a54c7d52ebd8502",
+    "full_gate_outcome": "48 passed / one independently reproduced baseline List/chunk storage_escape at bytes 312..345; full qualification pending",
+    "memory_profile_control": {
+      "scope": "Observer local suffix executes JSPI/reentry and scalar-only cases; two broader collection cases reject at source identically on matched baseline/candidate. This is missing coverage, not a full profile-family pass.",
+      "runs": [
+        {
+          "name": "baseline",
+          "log": "build/bench/local-declaration-groups-memory-profile-baseline.log",
+          "passed": 2,
+          "source_rejections": [
+            {
+              "stage": "emit",
+              "code": "storage_unsupported",
+              "start": 0,
+              "end": 0,
+              "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here"
+            },
+            {
+              "stage": "emit",
+              "code": "storage_unsupported",
+              "start": 0,
+              "end": 0,
+              "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here"
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "log": "build/bench/local-declaration-groups-memory-profile.log",
+          "passed": 2,
+          "source_rejections": [
+            {
+              "stage": "emit",
+              "code": "storage_unsupported",
+              "start": 0,
+              "end": 0,
+              "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here"
+            },
+            {
+              "stage": "emit",
+              "code": "storage_unsupported",
+              "start": 0,
+              "end": 0,
+              "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "renderer": {
+    "evidence": "build/bench/local-declaration-groups-kites/pair-821dc76764830d81/result.json",
+    "matched_streams": 7,
+    "builds": [
+      {
+        "name": "baseline",
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff"
+      },
+      {
+        "name": "candidate",
+        "wasm_bytes": 200300,
+        "wasm_sha256": "bfc90a45ecefa74d740c0af5018d52b569aa62c26670d571ddc8a5cff03cb9f5"
+      }
+    ],
+    "compiler_pins": {
+      "compiler_sha256": "29ef528b1ae446806424ceeff7721b377e0a81ee7271c1f402042c88c377bea6",
+      "baseline_compiler_sha256": "89d9eb83f241213cd2a68467c23143e8620718d20c5cbc8e3d142645b961655c",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+    },
+    "timing_scope": "Verification under other tool activity; no CPU performance claim."
+  },
+  "actual_main_encoding_counterfactual": {
+    "scope": "Encoding-size counterfactual on pinned existing release artifact, not a newly compiled main or latency measurement",
+    "input_wasm_bytes": 28996417,
+    "functions": 7615,
+    "old_declaration_bytes": 1656857,
+    "grouped_declaration_bytes": 23547,
+    "expected_wasm_bytes": 27363015,
+    "expected_saved_bytes": 1633402,
+    "expected_size_change_percent": -5.633116670932136
+  },
+  "release_actual_main": "Pending a larger checked candidate before rebuilding LLVM. Current delivered release46 remains 9.87s / 28996417B."
+}

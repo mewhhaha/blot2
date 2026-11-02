@@ -45,6 +45,7 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.wasm.test.local declaration groups preserve mixed slots and LEB run boundaries",
       "parse.parser_tests.test.boolean words are literal patterns and logical precedence is fixed",
       "check.frozen_core_validation_tests.test.frozen demanded diagnostic display ranges reject stale and overflowing names",
       "backend.native_asset_readers.test.native assets tunables round bounds preserve tiny steps and replace unsupported codepoints",
@@ -500,6 +501,7 @@ export const devCheckAreas = {
     "description":
       "Type identity, substitution, effect-row rollback and owned evidence.",
     "native": [
+      "backend.wasm.test.local declaration groups preserve mixed slots and LEB run boundaries",
       "backend.wasm.test.owned module tail rollback preserves exact prefixes scalar state and handles through OOM",
       "backend.wasm.test.owned module tail checkpoints decline recorded counted and arena views",
       "backend.storage_calls.test.owned call executable tail rollback preserves colliding duplicate chains and admission plans through OOM",

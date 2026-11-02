@@ -1446,13 +1446,8 @@ pub const Module = struct {
                 if (optimized) |owned| instructions = owned.instructions.items;
                 var lowered: @import("runtime_flags.zig").Iterator = .{ .facts = flags, .instructions = instructions };
                 const observer: ?@import("memory_profile.zig").Function = if (memory_profile) |profile| .init(profile, @intCast(id), function.parameters.len + locals.len) else null;
-                try body.uleb(@intCast(locals.len + (if (observer != null) @import("memory_profile.zig").Function.local_count else @as(usize, 0))));
-                for (locals) |local| {
-                    try body.byte(1);
-                    try body.byte(@backingInt(local));
-                }
+                try encodeLocals(&body, locals, if (observer != null) @import("memory_profile.zig").Function.local_count else 0);
                 if (observer) |profile| {
-                    for (0..@import("memory_profile.zig").Function.local_count) |_| try body.raw(&.{ 1, 0x7f });
                     try profile.enter(&body, function.entry);
                 }
                 const omit_collector = collector.certified and self.arena != null and (id == self.arena.?.cycle_safe or id == self.arena.?.cycle_collect);
@@ -1901,6 +1896,44 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, table_s
         .host_ref_null => try bytes.byte(0x6f),
         else => {},
     }
+}
+
+fn encodeLocals(bytes: *Bytes, locals: []const ValueType, observed: u32) Allocator.Error!void {
+    var groups: u32 = 0;
+    var previous: ?ValueType = null;
+    for (locals) |local| {
+        if (previous == null or previous.? != local) groups += 1;
+        previous = local;
+    }
+    if (observed != 0) groups += 1;
+    try bytes.uleb(groups);
+    var start: usize = 0;
+    while (start < locals.len) {
+        var end = start + 1;
+        while (end < locals.len and locals[end] == locals[start]) end += 1;
+        try bytes.uleb(@intCast(end - start));
+        try bytes.byte(@backingInt(locals[start]));
+        start = end;
+    }
+    if (observed != 0) {
+        try bytes.uleb(observed);
+        try bytes.byte(@backingInt(ValueType.i32));
+    }
+}
+
+test "local declaration groups preserve mixed slots and LEB run boundaries" {
+    var bytes = Bytes.init(std.testing.allocator);
+    defer bytes.deinit();
+    try encodeLocals(&bytes, &.{}, 0);
+    try std.testing.expectEqualSlices(u8, &.{0}, bytes.items());
+    bytes.clear();
+    try encodeLocals(&bytes, &.{}, 3);
+    try std.testing.expectEqualSlices(u8, &.{ 1, 3, 0x7f }, bytes.items());
+    bytes.clear();
+    var locals: [133]ValueType = @splat(.i32);
+    @memcpy(locals[128..], &[_]ValueType{ .f32, .f32, .i32, .v128, .externref });
+    try encodeLocals(&bytes, &locals, 2);
+    try std.testing.expectEqualSlices(u8, &.{ 6, 0x80, 1, 0x7f, 2, 0x7d, 1, 0x7f, 1, 0x7b, 1, 0x6f, 2, 0x7f }, bytes.items());
 }
 
 test "signed LEB preserves unsigned scalar bits and boundaries" {

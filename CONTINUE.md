@@ -19,9 +19,11 @@ completions, not distributions. See
 A separate phase profile puts 8.83s in the backend, 0.52s in checking, 0.12s in
 lowering and 0.10s in validation. Backend allocation requests total 8.40GB. CPU
 sampling attributes substantial work to copying 256-byte metadata values,
-recursive shape checks, structural keys and descriptor/type resolution. The next
-probe removes repeated recursive classification and by-value copies before
-introducing another cache or IR. The five-second gate remains unmet.
+recursive shape checks, structural keys and descriptor/type resolution.
+Pointer-based recursive queries did not establish a timing win and remain
+private. The active larger probes select literal catalog fields without
+materializing whole records and bulk-initialize scalar literal arrays from
+static data. The five-second gate remains unmet.
 
 The configured Gdev launcher now uses this exact optimized release at
 `zig-native/zig-out/bin/blotc`; the handoff runner follows that path. Delivery
@@ -31,6 +33,15 @@ read/write ordering, frozen/init, lifetime and escape checks. Physical
 optimization does not weaken complete source or semantic proofs.
 
 ## Checked latency batches
+
+The next checked encoding cut groups consecutive equal Wasm local declarations
+without changing slot order, types or indices. All 2,847 native laws compile; 95
+selected laws pass exhaustive faults, 63 guests pass and Zig lint is clean.
+Renderer Wasm falls 211,471->200,300B with all seven streams identical. On the
+existing full-main artifact, grouped headers would save 1,633,402B (5.63%); this
+is an encoding-size counterfactual, not a newly compiled release or a CPU win.
+The required gate retains the same 48/1 baseline. See
+[local declaration evidence](zig-native/measurements/local-declaration-groups-2026-11-02.json).
 
 Gdev groups its four world callbacks in one concrete `Hooks` nominal with the
 same closed effects, captures and forwarding. `FrameAccess` remains structural.
