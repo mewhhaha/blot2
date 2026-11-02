@@ -464,7 +464,7 @@ const Generator = struct {
                 cursor -= 1;
                 const binding = self.bindings.items[cursor];
                 if (binding.unit != m.unit or binding.id != left) continue;
-                if (binding.value.tag == .aggregate and @import("storage_control.zig").fixedCarry(binding.value)) {
+                if (binding.value.tag == .aggregate) {
                     value.* = binding.value;
                     reuse.* = true;
                 }

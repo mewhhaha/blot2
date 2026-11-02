@@ -618,5 +618,10 @@
       ],
       "decision": "Held: no material World CPU gain; no production compiler changes."
     }
-  ]
+  ],
+  "held_probe_evidence_note": "The forced-inline getter runner accidentally overwrote match-value-prototype/world-pair/result.json and candidate.wasm. The original per-run log and the exact numeric/source/binary records in this file remain; that old candidate Wasm hash is unavailable. The probe is held and is not used for landed claims. Getter artifacts were relocated to dev-inline-getters/world-pair.",
+  "held_dev_getter_probe": {
+    "evidence": "build/bench/private-prototypes/dev-inline-getters/world-pair/result.json",
+    "decision": "Held: 0.7% total-time difference, within noise; identical 659365B Wasm and full output hash, no useful frontend gain."
+  }
 }

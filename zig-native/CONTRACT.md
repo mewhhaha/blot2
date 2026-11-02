@@ -69,6 +69,14 @@ owners without walking their contents. This path is not yet the default for
 ordinary programs; the migration document lists the required remaining work.
 These guest rules do not change the host compiler allocation contracts below.
 
+A control-flow merge may retain a dominating aggregate's physical words when
+both incoming Core values canonicalize to that exact binding and the complete
+compilation has no scalar addresses. This identity proof includes unchanged
+callback captures; it does not require the broader `fixedCarry` shape admission.
+Indexed heap writes preserve descriptor identity. Changed fields, callbacks or
+capture roots retain ordinary transport, and assignment still checks types,
+owners, reads and variants. Equal shapes or scalar bits never prove identity.
+
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
 ordered immutable unit context. Receipt allocation failure propagates before

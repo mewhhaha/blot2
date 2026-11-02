@@ -1,0 +1,39 @@
+const joined_hook = func (saved: U32) => return func (argument: U32): U32 => return @u32.add saved argument
+const joined_reader = func (saved: &[U32]) => return func (argument: U32): U32 => return @u32.add saved[0] argument
+entry const joined = func (input: U32): Array U32 => return do:
+  let rows: Array U32 = #[input, 1]
+  let before = rows[0]
+  let view = &rows[0..2]
+  let access = {rows: rows, borrowed: view, hooks: {prior: joined_hook before, reader: joined_reader view}, stamp: 17}
+  let alias = access
+  if @u32.eq (@u32.rem input 2) 0:
+    access.rows[0] := @u32.add self 10
+  else:
+    access.rows[0] := @u32.add self 20
+  if @u32.lt 4 input:
+    if @u32.eq (@u32.rem input 2) 0:
+      access.rows[1] := @u32.add self 3
+    else:
+      access.rows[1] := @u32.add self 4
+  else:
+    access.rows[1] := @u32.add self 5
+  return #[before, rows[0], alias.rows[0], access.borrowed[0], rows[1], access.hooks.prior 7, access.hooks.reader 9, alias.stamp]
+entry const changed_capture = func (input: U32): Array U32 => return do:
+  let rows: Array U32 = #[input]
+  let access = {rows: rows, hook: joined_hook (@u32.add input 1)}
+  let before = access
+  if @u32.eq (@u32.rem input 2) 0:
+    access.hook := joined_hook (@u32.add input 100)
+  else:
+    access.rows[0] := @u32.add self 2
+  return #[access.hook 7, before.hook 7, rows[0]]
+entry const changed_reader = func (input: U32): Array U32 => return do:
+  let rows: Array U32 = #[input]
+  let other: Array U32 = #[@u32.add input 100]
+  let access = {rows: rows, hook: joined_reader (&rows[0..1])}
+  let before = access
+  if @u32.eq (@u32.rem input 2) 0:
+    access.hook := joined_reader (&other[0..1])
+  else:
+    access.rows[0] := @u32.add self 3
+  return #[access.hook 0, before.hook 0]

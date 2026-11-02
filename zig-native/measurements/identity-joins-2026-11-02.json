@@ -1,0 +1,717 @@
+{
+  "date": "2026-11-02",
+  "scope": "Exact same-identity aggregate joins retain unchanged callback captures; no scalar addresses; all ordinary transport ownership/type/read/variant checks remain.",
+  "release_source_pin": {
+    "base": "0d9ab2442492f988f164a705903b59770b141777",
+    "patch_sha256": "d14a168e9fb22b1a20a758db480530a066313b2471280ad14a6218245ed63d05",
+    "files": {
+      "scripts/dev_check_areas.ts": "9174dba23a022a2f6b8df1db281c2688754f2d022b2544e12978eba80f07e654",
+      "zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json": "5ab4cfbe9c3be101d4fbb5a67b448f042497f6fdb917398b08a1b88367d2dd2d",
+      "zig-native/src/backend/scoped_backend.zig": "d29c6936cf66019809954bccbae693b0cc0f579d44b4e88ae2afc0a1e93e3c91",
+      "zig-native/src/backend/storage_calls_tests.zig": "016bc9376aa57c624af5d19c9e7417a459f2ba94d90b00d30623ad7dd900bc34",
+      "zig-native/fixtures/identity_join.blot": "59c508b34ee6c9b00feced53c4b47cb8005ef802af8ff3d731c93f45c6e156da",
+      "zig-native/fixtures/identity_join_address.blot": "9cfa1606a0094d1976d091796349b396623dee810518f0f50ccec0d1bb5e03b5",
+      "zig-native/tests/identity_join_execution.test.ts": "be2801614cb44786f36a2d3f99f34b972576e0fdd4a24319fe7be2034b94e670"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "development_llvm": false,
+    "native_test_optimize": "safe",
+    "native_test_llvm": false,
+    "release_optimize": "fast",
+    "release_llvm": true,
+    "abi": 8,
+    "session_protocol": 2,
+    "saved_schema": 26
+  },
+  "workload_heads": {
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+  },
+  "main": {
+    "preceding_release": {
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/main-accepted/main-2d1744e0441ccd4c/result.json",
+      "success": true,
+      "compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+      "identity": "429cd6b9709ba7161c4cd66bd5dc4445c9285712d4a9b877e717773db2d009b5",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 5914.469023000001,
+      "total_compile_ms": 5920.651732,
+      "wasm_bytes": 21576480,
+      "wasm_sha256": "d8ec77bc757bd16a36c7b369622bac893eb98309139dba5b82a0942c04005edf",
+      "sections": {
+        "1": {
+          "bytes": 5849
+        },
+        "2": {
+          "bytes": 40
+        },
+        "3": {
+          "bytes": 8060
+        },
+        "5": {
+          "bytes": 6
+        },
+        "6": {
+          "bytes": 551379
+        },
+        "7": {
+          "bytes": 51
+        },
+        "10": {
+          "bytes": 20960328,
+          "functions": 8058
+        },
+        "11": {
+          "bytes": 49684
+        },
+        "0": {
+          "bytes": 21
+        }
+      }
+    },
+    "candidate": {
+      "evidence": "build/bench/private-prototypes/identity-join-prototype/main-release/main-f3ddac0cd4803df/result.json",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-identity-joins-d14a168e9fb2/zig-native/zig-out/bin/blotc",
+      "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+      "identity": "e99447c7ad66827267b6a71aee1bcad6c8594c60cccc895eb527474a627aa914",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "success": true,
+      "build_ms": 5563.459141,
+      "session_open_ms": 7.494595000000004,
+      "total_compile_ms": 5570.95561,
+      "wasm_bytes": 16677822,
+      "wasm_sha256": "3f3620adea0080bc94c058e83fd3e9ae9ef1ea5f63b5eab8a2f09635c4d21607",
+      "source_bytes": 2537167,
+      "codegen_workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "configured_path": {
+      "evidence": "build/bench/private-prototypes/identity-join-prototype/main-configured/main-6243ab923193c552/result.json",
+      "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+      "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+      "identity": "e99447c7ad66827267b6a71aee1bcad6c8594c60cccc895eb527474a627aa914",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "success": true,
+      "build_ms": 6055.011619,
+      "session_open_ms": 9.682242000000002,
+      "total_compile_ms": 6064.695965,
+      "wasm_bytes": 16677822,
+      "wasm_sha256": "3f3620adea0080bc94c058e83fd3e9ae9ef1ea5f63b5eab8a2f09635c4d21607",
+      "source_bytes": 2537167,
+      "codegen_workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "timing_limit": "Individual cache-disabled completions; no repeated timing distribution. Source identical; size reduction is exact, timing difference is indicative only.",
+    "bytes_removed": 4898658,
+    "size_reduction_percent": 22.703694022379928
+  },
+  "profile": {
+    "evidence": "build/bench/private-prototypes/identity-join-prototype/main-release-profile/main-bf33908f7f148db9/result.json",
+    "evidence_sha256": "9eb81fa9124ffc69a75a23de2b80108ac3db1e3bfa44362af0ba512a1d52f761",
+    "build_ms": 5653.089846,
+    "phase_profile": {
+      "total_us": 5611044,
+      "peak_rss_kib": 1250572,
+      "phases": {
+        "other": {
+          "us": 15728,
+          "requested_bytes": 18376716,
+          "allocations": 652,
+          "rss_growth_kib": 688
+        },
+        "assets": {
+          "us": 39045,
+          "requested_bytes": 28714381,
+          "allocations": 517,
+          "rss_growth_kib": 3772
+        },
+        "inputs": {
+          "us": 748,
+          "requested_bytes": 206080,
+          "allocations": 444,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 10088,
+          "requested_bytes": 10919780,
+          "allocations": 21056,
+          "rss_growth_kib": 2184
+        },
+        "lex": {
+          "us": 48064,
+          "requested_bytes": 28518784,
+          "allocations": 4750,
+          "rss_growth_kib": 15080
+        },
+        "parse": {
+          "us": 28634,
+          "requested_bytes": 43645564,
+          "allocations": 137698,
+          "rss_growth_kib": 2704
+        },
+        "check": {
+          "us": 484100,
+          "requested_bytes": 676080848,
+          "allocations": 1417424,
+          "rss_growth_kib": 189808
+        },
+        "lower": {
+          "us": 121868,
+          "requested_bytes": 161025716,
+          "allocations": 168173,
+          "rss_growth_kib": 61216
+        },
+        "freeze": {
+          "us": 54431,
+          "requested_bytes": 103608101,
+          "allocations": 346990,
+          "rss_growth_kib": 18796
+        },
+        "validation": {
+          "us": 100965,
+          "requested_bytes": 40018973,
+          "allocations": 40789,
+          "rss_growth_kib": 4452
+        },
+        "backend": {
+          "us": 4707368,
+          "requested_bytes": 4957954957,
+          "allocations": 3411383,
+          "rss_growth_kib": 949644
+        }
+      }
+    },
+    "work_counters": {
+      "scoped_function_plan_machine_declines": 0,
+      "scoped_function_plan_read_events": 6742,
+      "scoped_function_plan_write_events": 2608,
+      "scoped_function_plan_empty_owner_contracts": 1032,
+      "scoped_function_plan_closed_scalar_preparations": 11876,
+      "scoped_function_plan_callback_evidence_nodes": 7580,
+      "scoped_function_plan_preparations": 205922,
+      "scoped_function_plan_constructions": 18020,
+      "scoped_function_plan_definitions": 7458,
+      "scoped_function_plan_hits": 162732,
+      "scoped_function_plan_emissions": 138596,
+      "scoped_function_plan_register_calls": 10952,
+      "scoped_function_plan_post_type_queries": 0,
+      "scoped_emission_expressions": 1017503,
+      "scoped_completed_plan_rollbacks": 2107,
+      "scoped_completed_plan_discarded_expressions": 188790,
+      "scoped_transport_words_avoided": 751078
+    }
+  },
+  "byte_census": {
+    "wasm_bytes": 16677822,
+    "wasm_sha256": "3f3620adea0080bc94c058e83fd3e9ae9ef1ea5f63b5eab8a2f09635c4d21607",
+    "sections": [
+      {
+        "id": 1,
+        "offset": 8,
+        "payload_offset": 11,
+        "payload_bytes": 5849,
+        "bytes": 5852
+      },
+      {
+        "id": 2,
+        "offset": 5860,
+        "payload_offset": 5862,
+        "payload_bytes": 40,
+        "bytes": 42
+      },
+      {
+        "id": 3,
+        "offset": 5902,
+        "payload_offset": 5905,
+        "payload_bytes": 8013,
+        "bytes": 8016
+      },
+      {
+        "id": 5,
+        "offset": 13918,
+        "payload_offset": 13920,
+        "payload_bytes": 6,
+        "bytes": 8
+      },
+      {
+        "id": 6,
+        "offset": 13926,
+        "payload_offset": 13930,
+        "payload_bytes": 344444,
+        "bytes": 344448
+      },
+      {
+        "id": 7,
+        "offset": 358374,
+        "payload_offset": 358376,
+        "payload_bytes": 51,
+        "bytes": 53
+      },
+      {
+        "id": 10,
+        "offset": 358427,
+        "payload_offset": 358432,
+        "payload_bytes": 16268652,
+        "bytes": 16268657
+      },
+      {
+        "id": 11,
+        "offset": 16627084,
+        "payload_offset": 16627088,
+        "payload_bytes": 49684,
+        "bytes": 49688
+      },
+      {
+        "id": 0,
+        "offset": 16676772,
+        "payload_offset": 16676775,
+        "payload_bytes": 1024,
+        "bytes": 1027,
+        "name": "blot:collector-contract"
+      },
+      {
+        "id": 0,
+        "offset": 16677799,
+        "payload_offset": 16677801,
+        "payload_bytes": 21,
+        "bytes": 23,
+        "name": "blot:abi"
+      }
+    ],
+    "functions": 8011,
+    "instruction_bytes": 16233045,
+    "instruction_count": 6099750,
+    "declared_locals": 455933,
+    "categories": [
+      {
+        "name": "locals",
+        "count": 3408732,
+        "bytes": 9483866
+      },
+      {
+        "name": "globals",
+        "count": 644042,
+        "bytes": 2214290
+      },
+      {
+        "name": "constants",
+        "count": 748860,
+        "bytes": 1727898
+      },
+      {
+        "name": "calls",
+        "count": 389517,
+        "bytes": 883941
+      },
+      {
+        "name": "loads",
+        "count": 264769,
+        "bytes": 831441
+      },
+      {
+        "name": "control",
+        "count": 382392,
+        "bytes": 568095
+      },
+      {
+        "name": "stores",
+        "count": 121074,
+        "bytes": 381588
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 139952,
+        "bytes": 140283
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643
+      }
+    ],
+    "adjacent_patterns": [
+      {
+        "name": "local.get -> local.set",
+        "count": 394829,
+        "bytes": 2212024
+      },
+      {
+        "name": "global.get -> local.set",
+        "count": 135083,
+        "bytes": 796932
+      },
+      {
+        "name": "i32.const 0 -> global.set",
+        "count": 78147,
+        "bytes": 450020
+      },
+      {
+        "name": "local.get -> global.set",
+        "count": 42963,
+        "bytes": 284968
+      },
+      {
+        "name": "global.get -> global.set",
+        "count": 15775,
+        "bytes": 117083
+      }
+    ],
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 68879
+    }
+  },
+  "cause": {
+    "source": "gdev/src/ui/menu.blot:386-402 (close), plus press and callers",
+    "exact_proof": "Both branch values canonicalize to the same dominating binding. Indexed writes preserve its physical descriptor.",
+    "redundant_condition": "fixedCarry rejects all callable fields, even unchanged captures covered by exact identity.",
+    "prior_static_map": "zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json",
+    "remaining": "11,698,156 bytes of local/global instructions (70.1% of whole module); field-wise branch/loop transports are the next private prototype."
+  },
+  "qualification": {
+    "affected": {
+      "base": "dfca64f22f5eaa8912781ce1a01de7688b1ef003",
+      "frozen_source_paths": {
+        "zig-native/src/backend/scoped_backend.zig": "d29c6936cf66019809954bccbae693b0cc0f579d44b4e88ae2afc0a1e93e3c91",
+        "zig-native/src/backend/storage_calls_tests.zig": "016bc9376aa57c624af5d19c9e7417a459f2ba94d90b00d30623ad7dd900bc34",
+        "zig-native/fixtures/identity_join.blot": "59c508b34ee6c9b00feced53c4b47cb8005ef802af8ff3d731c93f45c6e156da",
+        "zig-native/fixtures/identity_join_address.blot": "9cfa1606a0094d1976d091796349b396623dee810518f0f50ccec0d1bb5e03b5",
+        "zig-native/tests/identity_join_execution.test.ts": "be2801614cb44786f36a2d3f99f34b972576e0fdd4a24319fe7be2034b94e670"
+      },
+      "source_manifest": {
+        "path": "identity-final-source-manifest.json",
+        "sha256": "24ecf15ec0a8a939005f048f5cc49dde8e6410533b7da97599fb420c719bbe04",
+        "files": 1467
+      },
+      "native": {
+        "inventory_count": 2870,
+        "selected_count": 62,
+        "completed_count": 62,
+        "elapsed_seconds": 29.62285608801176,
+        "exit_code": 0,
+        "statuses": {
+          "passed": 62,
+          "failed": 0,
+          "skipped": 0
+        },
+        "full_sweeps": 29,
+        "allocation_modes": [
+          "full"
+        ],
+        "leaks": 0,
+        "logged_errors": 0,
+        "failed": [],
+        "binary_sha256": "ed47ab953a3426da400e6bead062269e5c763dded613de091730302dd557b67c",
+        "inventory_sha256": "abf9c824d80e2e1a119c5f1e756f3f916503c2e4007807a6140b2f474f937fab",
+        "selection_sha256": "4193c30d1863cd940733dd5807a23461971c999644846658f24b8040f28062fc",
+        "log_sha256": "3ee62d527c2c183128673709321f732fc8e10bf8bb802cff6c51208ab192328f"
+      },
+      "guest": {
+        "test": "zig-native/tests/identity_join_execution.test.ts",
+        "development_tests": 1,
+        "optimized_tests": 1,
+        "passed_tests": 2,
+        "checks": 96,
+        "source_sharing": "Both native and guest load the exact same ordinary/addressed fixtures.",
+        "compiler_path": "build/bench/private-prototypes/identity-join-prototype/zig-native/zig-out-identity-fast/bin/blotc",
+        "compiler_sha256": "0acf9b811648e77960577a3df729a25aa0027e2ec1ab32d1cd3abdb2c26295bf",
+        "log": "identity-permanent-guest.log",
+        "log_sha256": "bd27adacc82afe431cce576093cbc366bd454041a0d0f121915176c594e4b39c"
+      },
+      "test_patch_sha256": "62e74fb32e16d7bd0e130ef4150c9d0576f5a4f7b0de6aa75f584e10b857f43b",
+      "source_scope": "Compiler algorithm remains the single same-identity aggregate join guard change. Final cleanup changes test layout only; no source edits after freeze."
+    },
+    "type_effect_guests": {
+      "passed": 86,
+      "log": "build/bench/private-prototypes/identity-join-prototype/guest-type-effects.log"
+    },
+    "broader_storage_static_guests": {
+      "passed": 187,
+      "failed": 15,
+      "baseline_failures": 15,
+      "log": "build/bench/private-prototypes/identity-join-prototype/guest-broad-final.log",
+      "status": "Known failures reproduced with preceding compiler; not a full pass."
+    },
+    "required_full_gate": {
+      "passed": 48,
+      "failed": 1,
+      "phase": "smoke",
+      "diagnostic": "List/chunk storage_escape at lists.blot:312-345",
+      "baseline": true,
+      "log": "build/bench/private-prototypes/identity-join-prototype/full-gate.log",
+      "status": "Attempted; full qualification pending. Same failure recorded by preceding release."
+    },
+    "zig_lint": {
+      "findings": 0,
+      "log": "build/bench/private-prototypes/identity-join-prototype/zig-lint.log"
+    },
+    "release_new_guests": {
+      "tests_passed": 2,
+      "assertions": 96,
+      "log": "build/bench/private-prototypes/identity-join-prototype/release-identity.log"
+    },
+    "release_world": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-identity-joins-d14a168e9fb2/zig-native/zig-out/bin/blotc",
+      "buildMs": 1364.070669,
+      "wasmBytes": 659365,
+      "wasmSha256": "7c32ebe7d61abb019b9fa721378adb47a13b80592ca55ab99392f08bf44cc5b5",
+      "calls": [
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": false,
+          "runtimeMs": 56.277001000000155,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": true,
+          "runtimeMs": 22.44424600000002,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_hand": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-identity-joins-d14a168e9fb2/zig-native/zig-out/bin/blotc",
+      "buildMs": 1182.528818,
+      "wasmBytes": 227033,
+      "wasmSha256": "aec4abb8b3203cc9e227cfe7fe97a8a049a63d19f07ccf401ae7f3e1c1264592",
+      "calls": [
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": false,
+          "runtimeMs": 39.48529700000017,
+          "row": [
+            160,
+            0
+          ]
+        },
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": true,
+          "runtimeMs": 21.263007000000016,
+          "row": [
+            160,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_real_menu": {
+      "entry": "/home/jacobt/src/gdev/tests/__compiler_menu_close.blot",
+      "entry_sha256": "2b51211d6d2a80f5b6418c9f4f3264eba56f8d4d6bb69f2219b99351083362ca",
+      "overlayPath": "none",
+      "overlay_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+          "build_ms": 1088.8425160000002,
+          "wasm_bytes": 277892,
+          "wasm_sha256": "bcc035f0f0ea41357fa16ac1ad0a24730212a91a960c49727fb88ab84e5f28ef",
+          "backend": {
+            "us": 82713,
+            "requested_bytes": 38962131,
+            "allocations": 20303,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+          "build_ms": 1043.402144,
+          "wasm_bytes": 148196,
+          "wasm_sha256": "a21acce782bf9ab843d6e087d57756ca1a1cdbb2adc20689ae6d0556ba620ce2",
+          "backend": {
+            "us": 74138,
+            "requested_bytes": 30085883,
+            "allocations": 20120,
+            "rss_growth_kib": 0
+          },
+          "calls": [
+            {
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "release_renderer": {
+      "evidence": "build/bench/private-prototypes/identity-join-prototype/release-kites/pair-3bab014ff39f1528/result.json",
+      "status": "complete",
+      "pins": {
+        "compiler_sha256": "13f13ed70ba78e4324cdf46562f516f2b5545b091e005f0be2caeb2170a8b3b1",
+        "baseline_compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    },
+    "release_pen": {
+      "evidence": "build/bench/private-prototypes/identity-join-prototype/release-pen-runtime/result.json",
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "3f3620adea0080bc94c058e83fd3e9ae9ef1ea5f63b5eab8a2f09635c4d21607",
+      "returncode": 1,
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "success": false,
+      "status": "Installed Pen rejects ABI 8 before rendering; no new frame or PNG qualified."
+    }
+  },
+  "held_experiments": "Field/match snapshot sharing, Wasm local-copy cleanup and loop field carriers remain private. See the preceding size diagnosis for measured results and limitations.",
+  "raw_evidence": [
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/size-summary.json",
+      "sha256": "1827f410db5c5d3e4879a0201beabaa01bf5c0ab841acf4bf1b198308a019165"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/size-functions.json",
+      "sha256": "db6edb4ea83df9605175dc3cbe6d87272c3221f758ff5b479b132288864dd4de"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/identity-landing-qualification.json",
+      "sha256": "639f545ab9c27d1f967ea27695fe799fc5da9b65b941f0ad3f84fea67de766a6"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/identity-native-final-result.json",
+      "sha256": "21a6bca22cbd41478ee337212aded899504971c7f778ef48884eaadbdf6fbc66"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/guest-type-effects.log",
+      "sha256": "f6b4e1a4e1a87dcb80cd738f82ff3c9150e2bcce5e3d4c7d9d357d376f72bf9a"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/guest-broad-final.log",
+      "sha256": "7b006254c0313308e333b98cc8712832f4edb04537a4fc0514afbb42465a581e"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/full-gate.log",
+      "sha256": "fac72d02683284f287708e173f20c27da6d0fc258fb1852d49b2d499e4bfca0d"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/zig-lint.log",
+      "sha256": "2b891baf89ab656772a72148b9978dc80fbfe1602844ab4e7e8d17b4807a5bbc"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-identity.log",
+      "sha256": "98611ae6e312b3e509d1378b4b88fff5f496cb6c0660fbf0c4e20817612b77f1"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-world.json",
+      "sha256": "fb0ff664d61bf0c424e3b31fe1ae3af18723557b22586ace684c115aab3f42d6"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-hand.json",
+      "sha256": "0568c665e400109d803f326645253524c18f1abdbaa182bef59add2afba1e9d2"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-menu-pair/result.json",
+      "sha256": "c001c08e1fff48cde931517e5ec8645dd813d40bbb616c882af67711ac0a85c5"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-kites/pair-3bab014ff39f1528/result.json",
+      "sha256": "0cb9399efadff5aaf916677fbea95d405dd6570999976416de55438c79b3c431"
+    },
+    {
+      "path": "build/bench/private-prototypes/identity-join-prototype/release-pen-runtime/result.json",
+      "sha256": "f42960d0ded0ea2fc61378e78a07071824e9dbe5bd2dae72ac73237c4b166d1e"
+    }
+  ]
+}

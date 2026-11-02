@@ -17,6 +17,82 @@ test {
     _ = @import("storage_assembly_options_tests.zig");
     _ = @import("storage_typed_closure_tests.zig");
 }
+
+const identity_join_small_source =
+    \\const joined_hook = func (saved: U32) => return func (argument: U32): U32 => return @u32.add saved argument
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let rows: Array U32 = #[input]
+    \\  let access = {rows: rows, hook: joined_hook input, stamp: 17}
+    \\  if @u32.eq input 0:
+    \\    access.rows[0] := @u32.add self 10
+    \\  else:
+    \\    access.rows[0] := @u32.add self 20
+    \\  return #[access.rows[0], access.hook 7, access.stamp]
+;
+
+const identity_join_fixture_source = @import("fixtures").source("identity_join.blot");
+
+const identity_join_address_source = @import("fixtures").source("identity_join_address.blot");
+
+fn publishIdentityJoin(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    if (result.diagnostic) |diagnostic| std.debug.print("identity join: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_transport_words_avoided > 0);
+}
+
+test "identity joins share exact callback aggregate identities through every allocation failure" {
+    var module = try lower(a, identity_join_small_source);
+    defer module.deinit(a);
+    try publishIdentityJoin(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishIdentityJoin, .{@as([]const core.Module, &.{module})});
+}
+
+test "identity joins retain scalar address fallback for callback aggregates" {
+    var module = try lower(a, identity_join_address_source);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_transport_words_avoided);
+}
+
+test "identity joins reject escaping borrowed callback captures" {
+    var module = try lower(a,
+        \\const capture = func (saved: &[U32]) => return func (argument: U32): U32 => return @u32.add saved[0] argument
+        \\const escape = func (input: U32) => return do:
+        \\  let rows: Array U32 = #[input]
+        \\  let access = {rows: rows, hook: capture (&rows[0..1])}
+        \\  if @u32.eq input 0:
+        \\    access.rows[0] := @u32.add self 10
+        \\  else:
+        \\    access.rows[0] := @u32.add self 20
+        \\  return access.hook
+        \\entry const answer = func (input: U32): U32 => return (escape input) 7
+    );
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic != null);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, result.diagnostic.?.code);
+}
+
+test "identity joins preserve aliases borrowed captures and changed callback captures" {
+    var module = try lower(a, identity_join_fixture_source);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("identity join fixture: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_transport_words_avoided > 0);
+    var addressed = try lower(a, identity_join_address_source);
+    defer addressed.deinit(a);
+    var fallback = try scoped.compile(a, &.{addressed}, 1);
+    defer fallback.deinit(a);
+    try std.testing.expect(fallback.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_transport_words_avoided);
+}
 fn publishSmallModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer result.deinit(allocator);

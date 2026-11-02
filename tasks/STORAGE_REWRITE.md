@@ -2,18 +2,21 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/unified-function-plans-2026-11-02.json)
-now completes in **5.91 seconds**, versus matched 7.33s, with **21.58 MB Wasm**.
-The configured path takes 6.06s with the identical complete hash. One immutable
-named-function contract replaces the probe cascade; actual ordered accesses,
-full type/source evidence and input-owner aliases remain checked. All 2,866
-native laws compile, 58 affected laws pass full faults, 86 type/effect guests
-pass and Zig lint is clean. Final LLVM retains seven world/editor, 160 hand and
-seven renderer checks. The five-second target remains unmet. Full qualification
-retains the baseline List/chunk failure; installed Pen rejects ABI 8, so no fresh
-full-game frame/PNG is qualified. The next slice is an ownership/layout function
-IR that completes before Wasm emission; ordinary `#run` build functions are a
-separate, unimplemented language simplification.
+[Actual full main](../zig-native/measurements/identity-joins-2026-11-02.json)
+now completes in **5.56 seconds**, with **16.68 MB Wasm**, down from 21.58 MB.
+The configured launcher takes 6.06s with identical output; timings are
+individual cache-disabled completions. Exact-identity aggregate joins retain
+unchanged callback captures, removing 4.90 MB of transport. Scalar-address
+fallback and ownership checks remain. One immutable named-function contract
+replaces the probe cascade; actual ordered accesses, full type/source evidence
+and input-owner aliases remain checked. All 2,870 native laws compile, 62
+affected laws pass full faults, 88 affected guests pass and Zig lint is clean.
+Final LLVM retains seven world/editor, 160 hand, seven real-menu and seven
+renderer checks. The five-second target remains unmet. Full qualification
+retains the baseline List/chunk failure; installed Pen rejects ABI 8, so no
+fresh full-game frame/PNG is qualified. The next slice is field-wise branch/loop
+transport and an ownership/layout function IR before Wasm emission; ordinary
+`#run` build functions are a separate, unimplemented language simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source
