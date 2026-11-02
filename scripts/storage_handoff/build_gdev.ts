@@ -13,7 +13,6 @@ const { values, positionals } = parseArgs({
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },
     "frontend-workers": { type: "string", default: "4" },
-    "measure-total": { type: "boolean", default: false },
   },
 });
 if (values.tier !== "development" && values.tier !== "optimized") {
@@ -35,10 +34,8 @@ if (positionals.length > 1) {
   throw new Error("Expected at most one output directory");
 }
 const timeoutMs = Number(values["timeout-ms"]);
-let maximumMs = 30_000;
-if (values["measure-total"]) maximumMs = 300_000;
-if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > maximumMs) {
-  throw new Error(`--timeout-ms must be an integer from 100 to ${maximumMs}`);
+if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
+  throw new Error("--timeout-ms must be an integer from 100 to 30000");
 }
 
 const parent = resolve(parentArg);
@@ -60,6 +57,9 @@ const sha256 = async (bytes: BufferSource) =>
 const compilerSha256 = await sha256(await Deno.readFile(compilerPath));
 let buildMs: number | null = null;
 let buildStarted: number | null = null;
+let sessionOpenMs: number | null = null;
+let totalCompileMs: number | null = null;
+const sessionStarted = performance.now();
 let compiler: Awaited<ReturnType<typeof createZigProjectCompiler>> | undefined;
 let report: Record<string, unknown>;
 try {
@@ -88,7 +88,7 @@ try {
     inferenceBudget: settings.inferenceBudget,
     storage: settings.storage,
     cacheDirectory: false,
-    startupTimeoutMs: timeoutMs,
+    startupTimeoutMs: Math.min(timeoutMs, 5000),
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,
     codegenTier: values.tier,
@@ -96,10 +96,13 @@ try {
     frontendWorkers,
   });
   buildStarted = performance.now();
+  sessionOpenMs = buildStarted - sessionStarted;
+  const remainingMs = Math.max(1, timeoutMs - sessionOpenMs);
   const result = await compiler.build({
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: AbortSignal.timeout(Math.ceil(remainingMs)),
   });
   buildMs = performance.now() - buildStarted;
+  totalCompileMs = performance.now() - sessionStarted;
   if (result.success) {
     report = {
       success: true,
@@ -119,6 +122,7 @@ try {
     Deno.exitCode = 1;
   }
 } catch (error) {
+  totalCompileMs = performance.now() - sessionStarted;
   const message = error instanceof Error ? error.message : String(error);
   const timedOut = /abort|timed out/i.test(message);
   let status = "failed";
@@ -148,11 +152,12 @@ const output = {
     penJsonSha256: await sha256(penBytes),
   },
   deadlineMs: timeoutMs,
-  fullTimingMeasurement: values["measure-total"],
   codegenTier: values.tier,
   codegenWorkers: workers,
   frontendWorkers,
   buildMs,
+  sessionOpenMs,
+  totalCompileMs,
   profileBackend: values.profile || values.trace,
   profileTrace: values.trace,
   profileProgress: compiler?.profileProgress ?? null,

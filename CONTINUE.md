@@ -21,7 +21,8 @@ primitive resolution avoids 221M impossible environment comparisons. The
 five-second gate remains unmet. The configured Gdev launcher now uses the
 installed optimized compiler at `zig-native/zig-out/bin/blotc`; the default
 handoff runner follows that configured path. That path completes the unchanged
-main in 10.57s with the exact same Wasm. Gdev config-only evidence follows its
+main in 10.57s with the exact same Wasm. A separate end-to-end measurement takes
+10.64s: 10ms startup plus 10.63s build. Gdev config-only evidence follows its
 new source checkpoint separately.
 
 The checked batch removes proven invariant whole-record transport through
@@ -83,6 +84,12 @@ each key builder. Exact key/budget/OOM laws pass; all 2,843 native laws compile,
 all seven streams remain identical, with backend allocations 95,585->81,620.
 Latency is inconclusive; bundle a larger change before another LLVM build. See
 [scratch evidence](zig-native/measurements/type-key-scratch-2026-11-02.json).
+
+Primitive key memo atoms are now shared across source units and captured frames;
+semantic witnesses retain their exact units and environments. All 2,844 native
+laws compile, 92 selected laws pass exhaustive faults, and 61 guests pass.
+Renderer Wasm remains identical; native timing is inconclusive. See
+[primitive memo evidence](zig-native/measurements/primitive-type-key-memo-2026-11-02.json).
 
 ## Checked compiler fixes
 
@@ -191,17 +198,17 @@ reusing an older artifact.
 Require every runner check and inspect the PNG. For a compile-only diagnosis:
 
 ```sh
-deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --compiler zig-native/zig-out-dev/bin/blotc --timeout-ms 5000 > /tmp/gdev-main.log 2>&1
+deno run --no-config --no-lock -A scripts/storage_handoff/build_gdev.ts --timeout-ms 5000 > /tmp/gdev-main.log 2>&1
 python3 scripts/storage_handoff/report.py /tmp/gdev-main.log
 ```
 
 Use `--entry tests/language_compatibility.blot` for the small real fixture and
-`--profile` for completed-build phase attribution. The diagnostic accepts at
-most 30 seconds. Only an explicitly requested full timing measurement may use
-`--measure-total --timeout-ms 300000`; the default remains five seconds, and
-timeouts remain incomplete. Do not use this long allowance for iteration. Defer
-the Pen frame driver's regular application pipeline until bounded compilation is
-fast enough. The older PNG does not qualify a later compiler.
+`--profile` for completed-build phase attribution. The diagnostic has a hard
+30-second session-plus-build cap; the default remains five seconds, and timeouts
+remain incomplete. It reports startup, build and total compile time separately.
+There is no multi-minute diagnostic override. Defer the Pen frame driver's
+regular application pipeline until bounded compilation is fast enough. The older
+PNG does not qualify a later compiler.
 
 The reusable frontend inventory checks unused declarations through overlays:
 

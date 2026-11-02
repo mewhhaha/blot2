@@ -137,5 +137,21 @@
     "wasmBytes": 29211724,
     "wasm_sha256": "9e0afd96e2a9f03d4a40d37056e77bc2e59a319783d8a812f81ba0e5afd97bff",
     "only_workload_change": "pen.json compiler executable path zig-out-dev->zig-out; Blot game/library sources unchanged"
+  },
+  "configured_total_control": {
+    "evidence": "/home/jacobt/src/blot2/build/bench/gdev-owner-words-total/main-57e2115f41246d4",
+    "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+    "compilerSha256": "f4849b0ee2f5d217109c3140107ef7d2d1f97b8d0d8a2005de13f5bd4b61f02e",
+    "identity": "3f239a9961e8fe040cf407fa7bd7b8b711398d986eb882c83daec46661011e9c",
+    "sourceCheckpoint": {
+      "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+      "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+    },
+    "buildMs": 10632.888087000001,
+    "sessionOpenMs": 9.970106000000001,
+    "totalCompileMs": 10642.859875999999,
+    "wasmBytes": 29211724,
+    "wasm_sha256": "9e0afd96e2a9f03d4a40d37056e77bc2e59a319783d8a812f81ba0e5afd97bff",
+    "definition": "Startup plus build through bytes returned; excludes evidence hashing, artifact write, disposal. One bounded no-cache run, optimized Wasm tier,4frontend/4codegenworkers."
   }
 }
