@@ -60,11 +60,20 @@ lambda flattening already happens in the parser. Extra pointer queries are also
 neutral. No held patch changed live compiler/library/game sources. See
 [probe evidence](zig-native/measurements/after-walks-and-bounds-probes-2026-11-02.json).
 
-A small private outliner preview shortcut passes its bound/OOM laws and makes
-one synthetic component workload 9.65% faster with identical Wasm. It retains
-exact fallback/final compaction; full-main benefit is unmeasured, so it remains
-unlanded. Fresh profiling points to repeated layout/ownership/type evidence and
-outliner preparation; the next representation experiment is not implemented.
+The private outliner preview shortcut passes its bound/OOM laws and improves a
+synthetic component 9.65%, but the matched World backend is neutral
+(2.738s versus 2.728s). Host CPU tuning is also neutral. Both remain held, with
+no extra LLVM builds or live changes.
+
+A bounded query ledger now measures exact repeats within actual body expansions,
+with rollback-restored substitution identities and nested-query suspension. The
+uncensored 1/128 cohort has no overflow: roughly 52–53% of resolution/scan work
+repeats in World, but only 7.3% of layout work and 0.7% of admission work. These are
+sampled work counts, not CPU savings. Builder serialization and mapping/refinement
+outside these spans remain unmeasured. The result does not justify the proposed
+resolution/layout-slot IR or its 25% backend gate; no new representation is
+implemented. Do not reuse the initial censored run or multiply broad CPU family
+unions by these ratios. A different typed-body design remains an open question.
 
 ## Latest checked transport batch
 

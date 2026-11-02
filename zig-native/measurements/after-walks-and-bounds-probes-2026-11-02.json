@@ -63,9 +63,19 @@
       "identicalWholeWasm": true,
       "decision": "Hypothesis false:parser already normalizes simple returned lambdas. No further tests orlivechanges",
       "evidence": "build/bench/private-prototypes/flat-math/manifest.json"
-    }
-  },
-  "privateReadyButUnqualified": {
+    },
+    "hostCpuNative": {
+      "flags": [
+        "-Doptimize=fast",
+        "-Dllvm=false",
+        "-Dcpu=native"
+      ],
+      "host": "AMD Ryzen7 3800X,AVX2/BMI2",
+      "worldBackendChangePercent": -1.3040172938085681,
+      "equivalentWasmAndRuntime": true,
+      "decision": "Neutral single Fast/noLLVM comparison; no host-tuned LLVM release build or live flag change",
+      "evidence": "build/bench/private-prototypes/host-cpu/result.json"
+    },
     "outlinePreviewConservativeBound": {
       "productionNetLines": 12,
       "newBoundaryLawFullOOM": true,
@@ -75,8 +85,189 @@
         "candidate": 177894956
       },
       "equivalentSyntheticWasm": true,
-      "scope": "9.65%outliner microbenchmark gain only; full-main benefit unmeasured. NoLLVM/livechanges.",
-      "evidence": "build/bench/private-prototypes/outline-preview-bound/result.json"
+      "scope": "Synthetic component improves9.65%, but actualWorldbackend2737.8ms versus2727.8ms is neutral. SameWasm/7checks bothmodes; HOLD/noLLVM orliveedits.",
+      "evidence": "build/bench/private-prototypes/outline-preview-bound/result.json",
+      "actualWorld": {
+        "world-base": {
+          "buildMs": 8573.560642999999,
+          "backend": {
+            "us": 2727784,
+            "requested_bytes": 356452018,
+            "allocations": 248135,
+            "rss_growth_kib": 0
+          },
+          "wasmSha256": "0d470ec0f4d8da99c8ba6bc0b8181de829fb7b8fb0a8213c0ab64176a1b01807"
+        },
+        "world-candidate": {
+          "buildMs": 8632.328633,
+          "backend": {
+            "us": 2737832,
+            "requested_bytes": 349413696,
+            "allocations": 247873,
+            "rss_growth_kib": 0
+          },
+          "wasmSha256": "0d470ec0f4d8da99c8ba6bc0b8181de829fb7b8fb0a8213c0ab64176a1b01807"
+        }
+      }
+    },
+    "bodyQueryLedger": {
+      "evidence": "build/bench/private-prototypes/body-query-ledger/evidence/summary.json",
+      "sample": {
+        "mask": 127,
+        "fixed_seed": "0x51c0a7e128",
+        "keys": "complete field-wise Key including instance and exact token/env pointers",
+        "per_ledger_cap": 16384,
+        "active_cap": 32768
+      },
+      "workloads": {
+        "kites": {
+          "wasm_bytes": 118649,
+          "wasm_sha256": "729a2835edf3cf99a7af2b749ad934a5ba435a7fdb141d14962c614d3eee4eba",
+          "instances": 515,
+          "closure_instances": 23,
+          "total_outer_queries": 305496,
+          "sampled_eligible": 1969,
+          "sampled_repeated": 1159,
+          "overflow": 0,
+          "unknown": 0,
+          "metrics": {
+            "resolve": {
+              "original": 559070,
+              "successful_body": 556164,
+              "sampled_eligible": 4299,
+              "sampled_repeated": 2228,
+              "sampled_repeat_percent": 51.826
+            },
+            "scans": {
+              "original": 30921,
+              "successful_body": 29514,
+              "sampled_eligible": 178,
+              "sampled_repeated": 86,
+              "sampled_repeat_percent": 48.315
+            },
+            "lookups": {
+              "original": 199722,
+              "successful_body": 198070,
+              "sampled_eligible": 1922,
+              "sampled_repeated": 875,
+              "sampled_repeat_percent": 45.525
+            },
+            "layout": {
+              "original": 22752,
+              "successful_body": 22684,
+              "sampled_eligible": 165,
+              "sampled_repeated": 70,
+              "sampled_repeat_percent": 42.424
+            },
+            "layout_steps": {
+              "original": 19679,
+              "successful_body": 19542,
+              "sampled_eligible": 69,
+              "sampled_repeated": 2,
+              "sampled_repeat_percent": 2.899
+            },
+            "admission": {
+              "original": 84102,
+              "successful_body": 84081,
+              "sampled_eligible": 1018,
+              "sampled_repeated": 231,
+              "sampled_repeat_percent": 22.692
+            },
+            "key_nodes": {
+              "original": 76481,
+              "successful_body": 0,
+              "sampled_eligible": 0,
+              "sampled_repeated": 0,
+              "sampled_repeat_percent": null
+            },
+            "key_words": {
+              "original": 281280,
+              "successful_body": 0,
+              "sampled_eligible": 0,
+              "sampled_repeated": 0,
+              "sampled_repeat_percent": null
+            }
+          }
+        },
+        "world": {
+          "wasm_bytes": 711109,
+          "wasm_sha256": "0d470ec0f4d8da99c8ba6bc0b8181de829fb7b8fb0a8213c0ab64176a1b01807",
+          "instances": 2215,
+          "closure_instances": 217,
+          "total_outer_queries": 1732747,
+          "sampled_eligible": 12528,
+          "sampled_repeated": 8149,
+          "overflow": 0,
+          "unknown": 0,
+          "metrics": {
+            "resolve": {
+              "original": 3626931,
+              "successful_body": 3490576,
+              "sampled_eligible": 28396,
+              "sampled_repeated": 14629,
+              "sampled_repeat_percent": 51.518
+            },
+            "scans": {
+              "original": 12051143,
+              "successful_body": 11239695,
+              "sampled_eligible": 94587,
+              "sampled_repeated": 50465,
+              "sampled_repeat_percent": 53.353
+            },
+            "lookups": {
+              "original": 1513685,
+              "successful_body": 1426218,
+              "sampled_eligible": 13401,
+              "sampled_repeated": 5543,
+              "sampled_repeat_percent": 41.363
+            },
+            "layout": {
+              "original": 51508,
+              "successful_body": 50900,
+              "sampled_eligible": 373,
+              "sampled_repeated": 120,
+              "sampled_repeat_percent": 32.172
+            },
+            "layout_steps": {
+              "original": 38667,
+              "successful_body": 36014,
+              "sampled_eligible": 286,
+              "sampled_repeated": 21,
+              "sampled_repeat_percent": 7.343
+            },
+            "admission": {
+              "original": 395571,
+              "successful_body": 395492,
+              "sampled_eligible": 4720,
+              "sampled_repeated": 33,
+              "sampled_repeat_percent": 0.699
+            },
+            "key_nodes": {
+              "original": 554859,
+              "successful_body": 0,
+              "sampled_eligible": 0,
+              "sampled_repeated": 0,
+              "sampled_repeat_percent": null
+            },
+            "key_words": {
+              "original": 5227331,
+              "successful_body": 0,
+              "sampled_eligible": 0,
+              "sampled_repeated": 0,
+              "sampled_repeat_percent": null
+            }
+          }
+        }
+      },
+      "qualification": "Diagnostic-only Safe inventory2866 compiles;2 token/scope laws pass full allocation faults. Exact7rendererstreams and7worldchecks sync/JSPI.",
+      "initialCensoredWorldOverflow": 1418208,
+      "decision": "Resolution/scans show repetition; layout/admission do not establish25%backend opportunity. Hold before IR/cache.",
+      "limitations": [
+        "Counts are unscaled sampled work, not CPU savings.",
+        "Builder serialization/map/refine outsidequery spans remainunmeasured.",
+        "Do not multiply broad sampledCPU family unions by thesecohortratios.",
+        "Thisrejects thecurrentunjustifiedresolution/layoutslotrewrite,notallpossibletypedIRs."
+      ]
     }
   },
   "freshProfile": {
