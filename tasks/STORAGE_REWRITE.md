@@ -2,13 +2,13 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-nominal-hooks-2026-11-02.json)
-now completes in **9.87 seconds total**, producing **29.00 MB Wasm**, cache
-disabled. The preceding checkpoint took 10.64 seconds/29.21MB. The checked
-[callback bundle batch](../zig-native/measurements/nominal-callback-bundles-2026-11-02.json)
-compiles 2,846 native laws, passes 94 full-fault laws, 63 guests, seven matching
-renderer streams and seven world/editor checks in sync/JSPI on the final
-optimized release. The five-second gate remains unmet. Full qualification
+[Actual full main](../zig-native/measurements/gdev-after-literal-constants-2026-11-02.json)
+now completes in **9.23 seconds total**, producing **24.12 MB Wasm**, cache
+disabled. The preceding checkpoint took 9.87 seconds/29.00MB. The checked
+[literal data/projection batch](../zig-native/measurements/literal-data-and-record-projection-2026-11-02.json)
+compiles 2,853 native laws, passes 101 full-fault laws, 76 guests, seven
+matching renderer streams and seven world/editor checks in sync/JSPI on the
+final optimized release. The five-second gate remains unmet. Full qualification
 retains the baseline List/chunk failure, and a fresh full-game frame still needs
 a matching ABI 8 Pen binary.
 

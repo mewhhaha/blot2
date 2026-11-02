@@ -66,3 +66,44 @@ test "data stacks reject incompatible profiles before installing any runtime sta
         try std.testing.expectEqual(recorder, module.artifacts);
     }
 }
+
+fn literalDataOwnership(allocator: std.mem.Allocator) !void {
+    const wasm = @import("../backend/wasm.zig");
+    var module = wasm.Module.init(allocator);
+    defer module.deinit();
+    const runtime = try stacks.emit(&module);
+    const mark = module.tailCheckpoint().?;
+    _ = try module.scopedDataWord(runtime.literal_base, 0x80000000);
+    _ = try module.scopedDataWord(runtime.literal_base, 0x7fc01234);
+    try std.testing.expectEqualSlices(u8, &.{ 0, 0, 0, 128, 52, 18, 192, 127 }, module.data.items);
+    module.rollbackTail(mark);
+    try std.testing.expectEqual(@as(usize, 0), module.data.items.len);
+    try std.testing.expectEqual(@as(u32, 0), try module.scopedDataWord(runtime.literal_base, 0xffffffff));
+    const plan: stacks.Plan = .{ .region_capacities = &.{4096}, .owner_capacity = 16 };
+    const memory = try stacks.layout(plan);
+    try stacks.finishPlan(&module, runtime, plan);
+    try std.testing.expect(module.arena == null);
+    try std.testing.expectEqual(memory.total_bytes, module.globals.items[runtime.literal_base].bits);
+    try std.testing.expectEqual(memory.total_bytes + 4, module.fixed_memory_bytes);
+    try std.testing.expectError(error.InvalidFunctionReference, module.scopedDataWord(runtime.literal_base, 0));
+    const bytes = try module.assembleWithOptions(.{ .export_memory = true });
+    defer allocator.free(bytes);
+    try std.testing.expect(bytes.len > 8);
+}
+test "scoped literal data owns exact bits rolls back tails and finalizes after owner regions through OOM" {
+    try literalDataOwnership(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, literalDataOwnership, .{});
+}
+test "scoped literal data rejects foreign profiles and checked final address overflow" {
+    const wasm = @import("../backend/wasm.zig");
+    var counted = wasm.Module.init(std.testing.allocator);
+    defer counted.deinit();
+    const base = try counted.addGlobal(.u32, 0, false);
+    try std.testing.expectError(error.InvalidFunctionReference, counted.scopedDataWord(base, 1));
+    var module = wasm.Module.init(std.testing.allocator);
+    defer module.deinit();
+    const runtime = try stacks.emit(&module);
+    _ = try module.scopedDataWord(runtime.literal_base, 0);
+    _ = try module.scopedDataWord(runtime.literal_base, 0);
+    try std.testing.expectError(error.InvalidPlan, stacks.finishPlan(&module, runtime, .{ .region_capacities = &.{0xfffefffc}, .owner_capacity = 1 }));
+}

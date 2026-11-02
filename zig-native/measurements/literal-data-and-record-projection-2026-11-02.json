@@ -1,0 +1,229 @@
+{
+  "date": "2026-11-02",
+  "source": {
+    "base_commit": "91b5680c23aeb89aaafe257906bb7cf4db69748b",
+    "patch_sha256": "68e6574553da251cecaaf15c2ec1d9a8b5d1fd8e3185a6116248ca00b6118aa8",
+    "source_files_sha256": {
+      "scripts/dev_check_areas.ts": "d54e34e6af1607a4dfc999ddf97e71bdc40b28ba95fc8fce8cad10baffed2ec4",
+      "zig-native/src/backend/scoped_backend.zig": "dc49d0b588f0e76c73f987a8c76220b58b0fbeeb6a7127ebfb65a208f3217378",
+      "zig-native/src/backend/scoped_backend_tests.zig": "76ef3013bad02c98747fac161ddef7538996af6d5d7dd05c881746444598659c",
+      "zig-native/src/backend/storage_calls_tests.zig": "316a48952a492d621203fbcbd868b467aac17bc93fe257106cdc66e1def85c85",
+      "zig-native/src/backend/wasm.zig": "6a11c4e5e5113b7b12e26dd678f24d25692b99d108c8b125bd36d2284c2e954f",
+      "zig-native/src/runtime/data_stacks.zig": "cc9ca9de65edc064caa06eb592823697ddecf767a468dfa973320bdd3cec8b0e",
+      "zig-native/src/runtime/data_stacks_tests.zig": "f11c7b3ae7ea677fd3d304dc136ba84bd904e801fbcc0110e066dfbc08012626",
+      "zig-native/src/work_counters.zig": "467a4da62d7d27d828b17efe8a1efa576f8c709e3d3d9c20fd78fafe60350c59",
+      "zig-native/tests/scoped_literal_data_execution.test.ts": "52ccc90f2bf6bc7e68a302a772c2886dae59bf257aa65df857cc83b1c062f04d",
+      "zig-native/tests/storage_literal_projection_execution.test.ts": "24898229294e6cd8fb1862b2660b1464a34f0fbd2348c1e9a422921b1aeced9f"
+    },
+    "frozen_manifest": "build/bench/frozen-literal-batch-68e6574553da/source-manifest.json"
+  },
+  "changes": [
+    "Fresh intrinsic scalar literal arrays retain normal owner creation and copy immutable bytes from a data segment beyond all owner/transport regions. Exact literal global initializers use ordinary checked invocation without the destination-helper detour.",
+    "Projection of a closed single-constructor nominal global containing only primitive constants keeps the complete source-body proof and selects by caller spelling/source destinations; unused nonliteral or invalid fields do not bypass checking.",
+    "The previously checked local-declaration grouping is included in this optimized release."
+  ],
+  "contracts": [
+    "Guest ABI 8, session protocol 2 and save schema 26 unchanged.",
+    "Original modes, capacities, fresh mutability, expression limits, source evidence, alias/lifetime checks, ordering, and reset/retry retained.",
+    "Literal offsets roll back with module tails; appending after final memory placement is rejected.",
+    "No supplied destination enters the literal-copy shortcut. No partial runtime value or weaker sharing key is published."
+  ],
+  "qualification": {
+    "check_dev": "build/bench/literal-batch-central-check/run-b697331021b0c30a/results.json",
+    "compiled_native": 2853,
+    "selected_exhaustive_fault_laws": 101,
+    "full_faults": "build/bench/literal-batch-central-check/run-b697331021b0c30a/full-faults.log",
+    "executed_guests": 76,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/literal-batch-full-gate",
+    "full_gate_outcome": "48 passed / one independently reproduced baseline List/chunk storage_escape at bytes 312..345; full qualification pending",
+    "full_game_frame": "pending matching ABI 8 Pen host"
+  },
+  "world_editor_release": {
+    "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+    "compiler": "/home/jacobt/src/blot2/build/bench/frozen-literal-batch-68e6574553da/zig-native/zig-out/bin/blotc",
+    "buildMs": 1394.3197710000002,
+    "wasmBytes": 997699,
+    "abi": 8,
+    "calls": [
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": false,
+        "runtimeMs": 61.958184000000074,
+        "row": [
+          7,
+          0
+        ]
+      },
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": true,
+        "runtimeMs": 23.72804599999995,
+        "row": [
+          7,
+          0
+        ]
+      }
+    ],
+    "success": true
+  },
+  "renderer": {
+    "evidence": "build/bench/literal-batch-kites/pair-319da2c4665fa310/result.json",
+    "streams_equal": true,
+    "builds": [
+      {
+        "name": "baseline",
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff"
+      },
+      {
+        "name": "candidate",
+        "wasm_bytes": 136886,
+        "wasm_sha256": "1f96229a272bd12721f618d2e04820840d92722ef52b4c044bf723d0b69a3fe0"
+      }
+    ],
+    "timing_scope": "Integration under LLVM compiler-build activity; no CPU timing comparison."
+  },
+  "isolated_prototypes": {
+    "scalar_data": {
+      "source": "build/bench/private-prototypes/scoped-literal-data/evidence-summary.json",
+      "actual_text": {
+        "evidence": "evidence/matrix/result.json",
+        "words": 10905,
+        "before_routing_evidence": "evidence/matrix-initial-result.json",
+        "before_routing_activation": 0,
+        "before_routing_note": "Named initializer destination helper correctly declined the literal fastpath. Exact guarded ordinary invocation was added and reviewed before the final pair.",
+        "baseline": {
+          "name": "actual-text-payload",
+          "role": "baseline",
+          "words": 10905,
+          "source_sha256": "ab0453b986f6485201e72d03abdf5cc61d5b65892b9a352804c10c5060d4a913",
+          "compiler_sha256": "89d9eb83f241213cd2a68467c23143e8620718d20c5cbc8e3d142645b961655c",
+          "build_ms": 258.90461799999997,
+          "wasm_bytes": 342686,
+          "wasm_sha256": "8b8d3894ee1fc2d1441d34e6793e4f1480710e33c74f0c1c1851e61b0eed4bbd",
+          "backend": {
+            "us": 73854,
+            "requested_bytes": 20488807,
+            "allocations": 264,
+            "rss_growth_kib": 14124
+          },
+          "work": {
+            "scoped_emission_expressions": 10924,
+            "max_scoped_emission_body_steps": 10906
+          }
+        },
+        "candidate": {
+          "name": "actual-text-payload",
+          "role": "candidate",
+          "words": 10905,
+          "source_sha256": "ab0453b986f6485201e72d03abdf5cc61d5b65892b9a352804c10c5060d4a913",
+          "compiler_sha256": "d14a7bc0851a92d082a6119b72b62f1d1117c2e2a8e49d4e6aed028879769a59",
+          "build_ms": 203.78617700000007,
+          "wasm_bytes": 47222,
+          "wasm_sha256": "b5cf0adccf55aacd5dbea3f879f1d817fc9ee333b2162ac71325c61f0c58b469",
+          "backend": {
+            "us": 38398,
+            "requested_bytes": 1278655,
+            "allocations": 249,
+            "rss_growth_kib": 4076
+          },
+          "work": {
+            "scoped_emission_expressions": 10924,
+            "scoped_literal_data_bytes": 43620,
+            "scoped_literal_writes_avoided": 10905,
+            "max_scoped_emission_body_steps": 10924
+          }
+        },
+        "backend_percent": -48.0082324586346,
+        "build_percent": -21.289091490828447,
+        "wasm_percent": -86.22003816905271,
+        "source_expressions_baseline": 10924,
+        "source_expressions_candidate": 10924
+      },
+      "synthetic_note": "These first pairs predate only the named-pool routing addition, which is absent from their local-literal sources. Synthetic1 has13additionalWasmbytes and inconclusive cold tiny timing; large literals show the intended reduction. No threshold/interner was added.",
+      "budget_caveat": "The exact global initializer route uses ordinary inline invocation accounting; all children remain charged, but aggregation may differ from the former destination helper. Astra explicitly rejected adding a reset/exception. Final full main must still accept at existing limits."
+    },
+    "literal_fields": {
+      "source": "build/bench/private-prototypes/literal-record-projection-evidence/summary.json",
+      "renderer": [
+        {
+          "name": "baseline",
+          "build_ms": 3966.412087,
+          "wasm_bytes": 211471,
+          "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+          "backend": {
+            "us": 574174,
+            "requested_bytes": 57086416,
+            "allocations": 81529,
+            "rss_growth_kib": 0
+          },
+          "work": {}
+        },
+        {
+          "name": "candidate",
+          "build_ms": 4060.097487,
+          "wasm_bytes": 146368,
+          "wasm_sha256": "6cdb28c3f146ab04c94b510933ae28f001248292932785f78503c1a691abdaf4",
+          "backend": {
+            "us": 540541,
+            "requested_bytes": 43388713,
+            "allocations": 80102,
+            "rss_growth_kib": 0
+          },
+          "work": {
+            "scoped_literal_record_projections": 27,
+            "scoped_literal_projection_fields_skipped": 5212,
+            "scoped_literal_projection_preflight_nodes": 5328
+          }
+        }
+      ],
+      "catalog_reproducer": {
+        "result": "catalog/result.json",
+        "source": "catalog/main.blot",
+        "fields": 305,
+        "reads": 65,
+        "output": [
+          8077,
+          126
+        ],
+        "cpu_timing": "excluded; parent LLVM build was active",
+        "builds": [
+          {
+            "name": "baseline",
+            "wasm_bytes": 171019,
+            "wasm_sha256": "a452e3006466c64a9fdcbfd55216188fe25c99a06a0b6a0c574109524f095b78",
+            "compiler_sha256": "89d9eb83f241213cd2a68467c23143e8620718d20c5cbc8e3d142645b961655c",
+            "backend_requested_bytes": 38647027,
+            "backend_allocations": 3327,
+            "work": {}
+          },
+          {
+            "name": "candidate",
+            "wasm_bytes": 4375,
+            "wasm_sha256": "39b6fd37ca1b3ddefb475e45264233dc810cdcc43d413b8155e8217975be8a93",
+            "compiler_sha256": "e7dd54dc1c148a931cccedf30c56502799f513370cfa03fb2695325338dea777",
+            "backend_requested_bytes": 227786,
+            "backend_allocations": 215,
+            "work": {
+              "scoped_literal_record_projections": 65,
+              "scoped_literal_projection_fields_skipped": 19760,
+              "scoped_literal_projection_preflight_nodes": 20020
+            }
+          }
+        ]
+      },
+      "safety": [
+        "All siblings are primitive Core constants before folding",
+        "Closed global nonruntime nonfunction zero-parameter nominal, single constructor, construct.c zero",
+        "Current active binding/capture takes precedence",
+        "Projection ordinal uses caller constructor dictionary; source record children mapped through recordDestinations and UTF8 names",
+        "Original checkedInterfaceBodyCached helper preserves requested binding identity and exact budget/diagnostics",
+        "Only the original receiver is charged as emitted source work; full bounded preflight counted separately",
+        "Source-unit primitive witness and exact F32 bits retained"
+      ]
+    }
+  },
+  "release_actual_main": "gdev-after-literal-constants-2026-11-02.json",
+  "status": "Central development and selected exhaustive faults pass; optimized actual main accepts existing limits. Full qualification and fresh game frame remain pending."
+}

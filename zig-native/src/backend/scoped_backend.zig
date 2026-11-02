@@ -1165,6 +1165,36 @@ const Generator = struct {
         }
         for (value.fields) |field| try self.checkEscape(m, id, field, boundary);
     }
+    fn scalarLiteralArray(m: *const core.Module, element: T.Id, values: []const core.Id) bool {
+        if (values.len == 0 or values.len > std.math.maxInt(u32) / 4) return false;
+        if (element != T.unit and element != T.boolean and element != T.u32_type and element != T.f32_type) return false;
+        for (values) |child| {
+            const node = m.node(child);
+            if (node.tag != .constant or node.ty != element) return false;
+        }
+        return true;
+    }
+    fn initializeLiteralArray(self: *Generator, m: *const core.Module, id: core.Id, result: Value, values: []const core.Id, depth: usize) Error!void {
+        const offset = std.math.cast(u32, self.module.data.items.len) orelse return self.unsupported(m, id);
+        for (values) |child| {
+            try self.chargeExpression(m, child, depth + 1);
+            _ = self.module.scopedDataWord(self.runtime.literal_base, m.node(child).a) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return self.unsupported(m, id),
+            };
+        }
+        // This path owns a fresh scalar owner, so no input write or shape can
+        // be hidden. Keep the ordinary metadata/observer checks once.
+        const owner = &self.roots.items[result.root.?];
+        try self.storedShape(m, id, &owner.element, .{ .word = .{ .id = 0 }, .floating = m.node(values[0]).ty == T.f32_type }, owner.depth);
+        owner.element_initialized = true;
+        owner.known_empty = false;
+        try self.writerEvent(m, id, result, .write);
+        const bytes: u32 = @intCast(values.len * 4);
+        try self.c.copy(.{ .call, self.runtime.functions.address, result.token, result.epoch_low, result.epoch_high, result.word, 0 }, .{ .i32_add, .{ .global, self.runtime.literal_base }, offset }, bytes);
+        self.emission_work.scoped_literal_data_bytes +|= bytes;
+        self.emission_work.scoped_literal_writes_avoided +|= values.len;
+    }
     fn array(self: *Generator, m: *const core.Module, id: core.Id, capacity: Local, mode: storage.Mode) Error!Value {
         const element = @import("storage_collections.zig").element(m, m.typeOf(id)) orelse return self.unsupported(m, id);
         const element_shape = try self.shape(m, id, element, 0);
@@ -1317,7 +1347,12 @@ const Generator = struct {
         try self.c.value(.{ .call, self.runtime.functions.close, token, epoch_low, epoch_high });
         const temporary_start = self.roots.items.len;
         const initialization_mark = try self.frameMark();
-        const source = try self.invoke(target, &.{}, 0);
+        // Literal data needs a fresh temporary, not a helper's supplied
+        // destination. Ordinary invocation keeps all source and escape checks.
+        var source: Value = undefined;
+        if (self.destination == null and owner.node(initializer).tag == .array and scalarLiteralArray(owner, element, owner.children(initializer))) {
+            source = try self.invokeBody(target, &.{}, 0, false);
+        } else source = try self.invoke(target, &.{}, 0);
         if (source.tag != .array) return self.unsupported(owner, initializer);
         for (self.roots.items, 0..) |root_, root_index| if (hasRoot(source, root_index) and root_.persistent) {
             return self.fail(owner, initializer, .storage_unsupported, "A named pool initializer must build fresh storage; use an explicit copy for an existing pool");
@@ -4719,17 +4754,9 @@ const Generator = struct {
     fn invoke(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize) Error!Value {
         return self.invokeBody(target, arguments, depth, true);
     }
-    // Definitions bypass their own registry entry. Reached calls still share
-    // scalar definitions across generators; owner-bearing ABIs remain local.
-    fn invokeBody(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize, reuse: bool) Error!Value {
-        const m = try self.unit(target.unit);
-        const body = m.body(target.binding) orelse return error.Declined;
-        const parameters = m.bodyParameters(body);
-        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = m.unit, .id = target.binding, .kind = .named, .context = self.invocationContext() };
-        var selected: std.ArrayList(u32) = .empty;
-        defer selected.deinit(self.allocator);
+    fn checkSourceBody(self: *Generator, m: *const core.Module, body: *const core.Body, binding_id: core.BindingId) Error!void {
         var origin: ?@import("../check/scheme_equations.zig").SourceFailure = null;
-        source_proof.checkedInterfaceBodyCached(self.proof_cache, m, target.binding, self.validation_budget, &origin, null) catch |err| {
+        source_proof.checkedInterfaceBodyCached(self.proof_cache, m, binding_id, self.validation_budget, &origin, null) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             if (self.proof_cache.exhaustedUnit()) |exhausted| {
                 self.diagnostic = .{ .unit = exhausted, .span = if (origin) |failure| failure.span else .{ .start = 0, .end = 0 }, .code = .storage_unsupported, .detail = "Source module storage validation exceeded its checked work budget" };
@@ -4742,6 +4769,17 @@ const Generator = struct {
             }
             return self.fail(m, body.root, .storage_unsupported, "The scoped body lacks complete type evidence");
         };
+    }
+    // Definitions bypass their own registry entry. Reached calls still share
+    // scalar definitions across generators; owner-bearing ABIs remain local.
+    fn invokeBody(self: *Generator, target: core.BindingRef, arguments: []const Value, depth: usize, reuse: bool) Error!Value {
+        const m = try self.unit(target.unit);
+        const body = m.body(target.binding) orelse return error.Declined;
+        const parameters = m.bodyParameters(body);
+        const selected_target: call_plan.ActiveCalls.Target = .{ .unit = m.unit, .id = target.binding, .kind = .named, .context = self.invocationContext() };
+        var selected: std.ArrayList(u32) = .empty;
+        defer selected.deinit(self.allocator);
+        try self.checkSourceBody(m, body, target.binding);
         if (arguments.len < parameters.len) {
             if (depth > 128) return self.unsupported(m, body.root);
             const fields = try self.arena.allocator().alloc(Value, arguments.len);
@@ -5882,6 +5920,90 @@ const Generator = struct {
         }
         return (try self.projected(m, id, &value, projection)).*;
     }
+    const LiteralProjection = struct { owner: *const core.Module, body: *const core.Body, binding: core.BindingId, constant: core.Id, fields: usize };
+    fn intrinsicConstant(m: *const core.Module, id: core.Id) bool {
+        const node = m.node(id);
+        return node.tag == .constant and node.ty >= T.unit and node.ty <= T.f32_type;
+    }
+    fn literalProjectionPlan(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) ?LiteralProjection {
+        // The skipped reference must fit the ordinary expression-depth bound.
+        if (depth >= 128) return null;
+        const project = m.node(id);
+        const reference = m.node(project.a);
+        if (reference.tag != .reference) return null;
+        var target = m.reference(project.a);
+        if (target.unit == 0) target.unit = m.unit;
+        if (target.unit == 0 or target.unit > self.units.len) return null;
+        const owner = &self.units[target.unit - 1];
+        const binding = owner.binding(target.binding);
+        const body = owner.body(target.binding) orelse return null;
+        if (binding.kind != .global or body.runtime or body.is_function or owner.bodyParameters(body).len != 0) return null;
+        // Ordinary references prefer an active binding/capture to the global
+        // declaration, even when its source identity names a global binding.
+        for (self.bindings.items) |active| if (active.unit == target.unit and active.id == target.binding) return null;
+        for ([_]T.Scheme{ binding.scheme, body.scheme }) |scheme| {
+            if (scheme.variables.len != 0 or scheme.row_variables.len != 0 or scheme.generative.len != 0 or scheme.obligations.len != 0) return null;
+        }
+        if (binding.public_variables.len != 0 or binding.public_rows.len != 0) return null;
+        const construct = owner.node(body.root);
+        if (construct.tag != .construct or construct.b == 0 or construct.c != 0) return null;
+        const constructor = owner.constructor(construct.a);
+        const nominal = owner.nominal(constructor.nominal);
+        if (nominal.parameters.len != 0 or nominal.variables.len != 0 or nominal.is_opaque or nominal.has_usage or nominal.affine or owner.nominalConstructors(constructor.nominal).len != 1) return null;
+        const projection = m.projection(project.b);
+        const variants = m.projectionVariants(project.b);
+        if (projection.nominal.decl == 0 or !std.meta.eql(projection.nominal, nominal.identity) or variants.len != 1 or variants[0].tag != constructor.tag) return null;
+        const payload = owner.types.node(constructor.payload);
+        if (payload.tag != .record) return null;
+        // The projection's ordinal belongs to the caller's imported catalog,
+        // whose field dictionary/order need not match the producer's.
+        const name = for (m.constructors) |candidate| {
+            if (!std.meta.eql(m.nominal(candidate.nominal).identity, projection.nominal) or candidate.tag != variants[0].tag) continue;
+            const caller_payload = m.types.node(candidate.payload);
+            if (caller_payload.tag != .record or variants[0].field >= caller_payload.b) return null;
+            break m.fieldSpelling(m.types.recordField(caller_payload, variants[0].field).name) orelse return null;
+        } else return null;
+        const record = owner.node(construct.b);
+        if (record.tag != .record) return null;
+        const schema = owner.types.node(record.ty);
+        const children = owner.children(construct.b);
+        if (schema.tag != .record or schema.b != children.len or schema.b != payload.b or children.len > 4096 - 3) return null;
+        self.emission_work.scoped_literal_projection_preflight_nodes +|= 3;
+        var selected: ?core.Id = null;
+        // Children execute in source order. Destinations identify the record
+        // type's fields; neither their ordinal nor the constructor's ordinal
+        // is the source child's position.
+        for (children, owner.recordDestinations(construct.b)) |child, destination| {
+            self.emission_work.scoped_literal_projection_preflight_nodes +|= 1;
+            if (!intrinsicConstant(owner, child) or destination >= schema.b) return null;
+            const field = owner.types.recordField(schema, destination);
+            if (field.ty != owner.node(child).ty) return null;
+            const spelling = owner.fieldSpelling(field.name) orelse return null;
+            if (std.mem.eql(u8, name, spelling)) selected = child;
+        }
+        return .{ .owner = owner, .body = body, .binding = target.binding, .constant = selected orelse return null, .fields = children.len };
+    }
+    fn literalRecordProjection(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!?Value {
+        const plan = self.literalProjectionPlan(m, id, depth) orelse return null;
+        const project = m.node(id);
+        const expected = self.resolveType(.{ .unit = m.unit, .ty = m.projection(project.b).result_type }, 0) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            error.Declined => return null,
+        };
+        if (expected.unit == 0 or expected.unit > self.units.len) return null;
+        const expected_owner = &self.units[expected.unit - 1];
+        const literal = plan.owner.node(plan.constant);
+        if (expected_owner.types.node(expected.ty).tag != plan.owner.types.node(literal.ty).tag) return null;
+        try self.chargeExpression(m, project.a, depth + 1);
+        try self.checkSourceBody(plan.owner, plan.body, plan.binding);
+        var value = try self.constant(literal.a);
+        value.literal = if (literal.ty == T.u32_type) literal.a else null;
+        value.floating = literal.ty == T.f32_type;
+        value.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = plan.owner.unit, .ty = literal.ty }, .arguments = &.{} });
+        self.emission_work.scoped_literal_record_projections +|= 1;
+        self.emission_work.scoped_literal_projection_fields_skipped +|= plan.fields - 1;
+        return value;
+    }
     fn indexedProjection(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!?Value {
         const projection = m.node(id);
         const read = m.node(projection.a);
@@ -6312,6 +6434,7 @@ const Generator = struct {
                 return merged;
             },
             .project => {
+                if (try self.literalRecordProjection(m, id, depth)) |value| return value;
                 if (try self.indexedProjection(m, id, depth)) |value| return value;
                 const value = try self.expression(m, n.a, depth + 1);
                 return self.projectValue(m, id, value, depth);
@@ -6365,10 +6488,10 @@ const Generator = struct {
             },
             .array => {
                 const element = @import("storage_collections.zig").element(m, n.ty) orelse return self.unsupported(m, id);
-                _ = element;
                 const info = types.info(&m.types, n.ty);
                 const mode: storage.Mode = if (self.privateAppendNode(m.unit, id, "initial")) .grow else if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed;
                 const values = m.children(id);
+                const literal = self.destination == null and scalarLiteralArray(m, element, values);
                 const capacity = try self.constant(@intCast(values.len));
                 const result = try self.array(m, id, capacity.word, mode);
                 if (values.len == 0 and result.other_roots.len == 0) if (result.root) |owner| {
@@ -6378,6 +6501,10 @@ const Generator = struct {
                     try self.writableCapacity(request);
                     self.capacity_requests.initial(request, @intCast(values.len), try width(self.roots.items[owner_id].element)) catch return self.fail(m, id, .storage_unsupported, "Array capacity exceeds the Wasm32 storage plan");
                 };
+                if (literal) {
+                    try self.initializeLiteralArray(m, id, result, values, depth);
+                    return result;
+                }
                 for (values, 0..) |child, index| {
                     const value = try self.expression(m, child, depth + 1);
                     if (value.terminated) return value;

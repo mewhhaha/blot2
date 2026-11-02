@@ -539,6 +539,18 @@ pub const Module = struct {
         }
         return self.dataWords(&words);
     }
+    /// Scoped literals are relocated after the complete owner-region plan.
+    /// The immutable base remains zero until finishPlan; appending later fails.
+    pub fn scopedDataWord(self: *Module, base_global: u32, word: u32) !u32 {
+        if (self.memory_model != .data_stacks or self.arena != null or self.artifacts != null or
+            base_global >= self.globals.items.len or self.globals.items[base_global].bits != 0) return error.InvalidFunctionReference;
+        if (self.data.items.len > std.math.maxInt(u32) - 4) return error.ModuleTooLarge;
+        const offset: u32 = @intCast(self.data.items.len);
+        var bytes: [4]u8 = undefined;
+        std.mem.writeInt(u32, &bytes, word, .little);
+        try self.data.appendSlice(self.allocator, &bytes);
+        return offset;
+    }
     pub fn dataWords(self: *Module, words: []const u32) !u32 {
         _ = try self.ensureArena();
         if (words.len > (std.math.maxInt(u32) - self.data.items.len) / 4) return error.ModuleTooLarge;
@@ -1479,11 +1491,16 @@ pub const Module = struct {
                 stats.query_capacity_bytes = current.queries.capacity_bytes;
             };
         }
-        if (self.arena != null and self.data.items.len != 0) {
-            try payload.uleb(1); // one active data segment at memory zero
+        if ((self.arena != null or self.memory_model == .data_stacks) and self.data.items.len != 0) {
+            var data_offset: u32 = 0;
+            if (self.memory_model == .data_stacks) {
+                if (self.data.items.len > self.fixed_memory_bytes) return error.ModuleTooLarge;
+                data_offset = self.fixed_memory_bytes - @as(u32, @intCast(self.data.items.len));
+            }
+            try payload.uleb(1); // one active segment outside scoped owner regions
             try payload.byte(0);
             try payload.byte(0x41);
-            try payload.byte(0);
+            try payload.sleb(@bitCast(data_offset));
             try payload.byte(0x0b);
             try payload.uleb(@intCast(self.data.items.len));
             try payload.raw(self.data.items);

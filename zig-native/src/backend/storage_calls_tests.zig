@@ -1416,3 +1416,64 @@ test "SSA aggregate transport proves every loop exit and preserves physical fall
     try std.testing.expect(fallback.diagnostic == null);
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_transport_words_avoided);
 }
+
+const literal_projection_source =
+    \\type Palette is data = $Palette {z: U32, a: F32, m: U32}
+    \\const palette: Palette = $Palette {m: 7, z: 11, a: 0.1}
+    \\entry const literal_words = func (input: U32): Array U32 => return do:
+    \\  let owner: GrowArray U32 = #[input]
+    \\  return #[palette.z, palette.m, owner[0]]
+    \\entry const literal_floats = func (): Array F32 => return do:
+    \\  let owner: GrowArray F32 = #[0.0]
+    \\  return #[palette.a, owner[0]]
+;
+fn publishLiteralProjection(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_literal_record_projections >= 3);
+    try std.testing.expect(result.counters.scoped_literal_projection_fields_skipped >= 6);
+}
+test "literal record projections map source destinations and retain full source proof through OOM" {
+    var module = try lower(a, literal_projection_source);
+    defer module.deinit(a);
+    try publishLiteralProjection(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishLiteralProjection, .{@as([]const core.Module, &.{module})});
+}
+test "literal record projections decline every nonliteral sibling and reject invalid unused fields" {
+    const sources = [_][]const u8{
+        \\type Pair is data = $Pair {chosen: U32, other: U32}
+        \\const leaf = func (): U32 => return 19
+        \\const pair: Pair = $Pair {chosen: 7, other: leaf ()}
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let owner: GrowArray U32 = #[input]
+        \\  return @u32.add pair.chosen owner[0]
+        ,
+        \\type Pair is data = $Pair {chosen: U32, other: U32}
+        \\const leaf: U32 = 19
+        \\const pair: Pair = $Pair {chosen: 7, other: leaf}
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let owner: GrowArray U32 = #[input]
+        \\  return @u32.add pair.chosen owner[0]
+        ,
+    };
+    for (sources) |source| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        var result = try scoped.compile(a, &.{module}, 1);
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_literal_record_projections);
+    }
+    var invalid = try lower(a, literal_projection_source);
+    defer invalid.deinit(a);
+    var changed = false;
+    for (invalid.nodes) |*node| if (node.tag == .constant and node.ty == @import("../check/types.zig").u32_type and node.a == 7) {
+        node.ty = @import("../check/types.zig").boolean;
+        changed = true;
+    };
+    try std.testing.expect(changed);
+    var refused = try scoped.compile(a, &.{invalid}, 1);
+    defer refused.deinit(a);
+    try std.testing.expect(refused.diagnostic != null);
+}

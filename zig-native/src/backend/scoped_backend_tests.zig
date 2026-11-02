@@ -345,3 +345,39 @@ test "scoped emission work limits bound reusable children without publishing par
     try std.testing.expect(sufficient.counters.max_scoped_emission_body_steps <= 1024);
     try std.testing.expect(sufficient.counters.scoped_emission_expressions > sufficient.counters.max_scoped_emission_body_steps);
 }
+
+fn publishLiteralArrays(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try @import("scoped_backend.zig").compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 12), result.counters.scoped_literal_data_bytes);
+    try std.testing.expectEqual(@as(u64, 3), result.counters.scoped_literal_writes_avoided);
+    try std.testing.expect(result.bytes.len > 8);
+}
+test "scoped scalar literal copies publish owned data and retain source expression budgets through OOM" {
+    const scoped = @import("scoped_backend.zig");
+    var module = try lower(a, "entry const answer = func (input: U32): U32 => return do:\n  let rows: ResizeArray U32 = #[1,2,3]\n  rows[0] := input\n  return rows[1]\n");
+    defer module.deinit(a);
+    try publishLiteralArrays(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishLiteralArrays, .{@as([]const core.Module, &.{module})});
+    var limited = try scoped.compileWithOptions(a, &.{module}, 1, .{ .work_limits = .{ .expressions = 3 } });
+    defer limited.deinit(a);
+    try std.testing.expect(limited.diagnostic != null);
+    try std.testing.expectEqual(@as(usize, 0), limited.bytes.len);
+    try std.testing.expectEqualStrings("Storage source expansion exceeded its expression budget", limited.diagnostic.?.message());
+    try std.testing.expectEqual(@as(u64, 3), limited.counters.max_scoped_emission_body_steps);
+}
+test "scoped scalar literal copies retain mixed and computed child evaluation" {
+    const scoped = @import("scoped_backend.zig");
+    for ([_][]const u8{
+        "const identity = func (input: U32): U32 => return input\nentry const answer = func (input: U32): U32 => return do:\n  let rows: ResizeArray U32 = #[1,identity input,3]\n  return rows[0]\n",
+        "entry const answer = func (input: U32): U32 => return do:\n  let rows: ResizeArray U32 = #[1,input,3]\n  return rows[0]\n",
+    }) |source| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        var result = try scoped.compile(a, &.{module}, 1);
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic == null);
+        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_literal_data_bytes);
+    }
+}

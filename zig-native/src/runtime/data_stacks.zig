@@ -82,6 +82,7 @@ pub const Runtime = struct {
     checked: u32,
     initialize: u32,
     initialized: u32,
+    literal_base: u32,
 };
 fn function(module: *wasm.Module, comptime count: usize, result: wasm.ValueType) !u32 {
     return module.addTypedFunction(&@as([count]wasm.ValueType, @splat(.i32)), result, .scalar);
@@ -106,7 +107,9 @@ pub fn finishPlan(module: *wasm.Module, r: Runtime, plan: Plan) !void {
     module.globals.items[r.count].bits = @intCast(plan.region_capacities.len);
     module.globals.items[r.owner_count].bits = plan.owner_capacity;
     module.globals.items[r.owner_table].bits = memory.owner_base;
-    module.fixed_memory_bytes = memory.total_bytes;
+    const total = std.math.add(u32, memory.total_bytes, std.math.cast(u32, module.data.items.len) orelse return error.InvalidPlan) catch return error.InvalidPlan;
+    module.globals.items[r.literal_base].bits = memory.total_bytes;
+    module.fixed_memory_bytes = total;
     const c = code(module, r.initialize);
     try c.when(.{ .i32_eqz, .{ .global, r.initialized } });
     try c.zero(0, memory.data_base);
@@ -159,6 +162,7 @@ pub fn emit(module: *wasm.Module) !Runtime {
         .checked = try function(module, 4, .i32),
         .initialize = try function(module, 0, .none),
         .initialized = try module.addGlobal(.u32, 0, true),
+        .literal_base = try module.addGlobal(.u32, 0, false),
     };
     {
         const c = code(module, r.region);
