@@ -63,8 +63,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const work = built.stats?.workCounters as
         | Record<string, number>
         | undefined;
-      assert.equal(work?.scoped_inline_definitions, 6);
-      assert.equal(work?.scoped_reader_definitions, 2);
+      assert.equal(work?.scoped_function_plan_definitions, 8);
       assert.equal(work?.scoped_context_sensitive_definitions ?? 0, 0);
       assert.equal(work?.scoped_context_free_definitions, 8);
 

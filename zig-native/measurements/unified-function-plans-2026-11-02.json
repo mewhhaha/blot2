@@ -1,0 +1,741 @@
+{
+  "date": "2026-11-02",
+  "scope": "One completed named-function call route with immutable ABI/result/ordered-access plans; closure admission remains separate; this is not a monomorphic expression IR.",
+  "source": {
+    "zig-native/src/backend/scoped_backend.zig": "c18ea9924bada240fb22b4b67fd8f487cfcedba34b3d8fc0dd7598dca75d98cc",
+    "zig-native/src/work_counters.zig": "384a85c6d95763679ad91b21c709e19d6f3c2289275fc4335a117008b3d88e8d",
+    "zig-native/src/backend/storage_calls_tests.zig": "f8d0bde69c3c821112d20b85349237962fc2aba82a4ecab637401f84e7a0fd94"
+  },
+  "release_source_pin": {
+    "base": "cd02242bed03c2507d78731d37887fe94044118e",
+    "patchSha256": "5c477c1e6f69076631f2eccea78fea360c3f1b7b7d6640113a4b6c71c1a0472f",
+    "files": {
+      "scripts/dev_check_areas.ts": "b12f988d78c8b399deacbd8c7d384a2861196a709661da5676e89178e6082cfb",
+      "zig-native/src/backend/scoped_backend.zig": "c18ea9924bada240fb22b4b67fd8f487cfcedba34b3d8fc0dd7598dca75d98cc",
+      "zig-native/src/backend/storage_calls_tests.zig": "f8d0bde69c3c821112d20b85349237962fc2aba82a4ecab637401f84e7a0fd94",
+      "zig-native/src/work_counters.zig": "384a85c6d95763679ad91b21c709e19d6f3c2289275fc4335a117008b3d88e8d",
+      "zig-native/tests/completed_context_execution.test.ts": "424232e5674cbbe2c24a73ae3cb121e4f4af02bc9ee1376e894b54e7c5aed30c",
+      "zig-native/tests/completed_function_execution.test.ts": "dcebbe019550531837b4ea92bc1c55be8f737b7c5cf680b7cfedfba8427d34c2",
+      "zig-native/tests/completed_plain_execution.test.ts": "27977d7d9b34175f3cdcc4d9896e5b5627085d598db3818aac47f8befe03a2ac",
+      "zig-native/tests/concrete_fields_execution.test.ts": "ef2cfe58e8659886601df015f96af0ace4a8556fc8c99c93473edd9f397bf052",
+      "zig-native/tests/owner_graph_execution.test.ts": "e194fc677eab4033e8fe42c42694198fcca1b7920838059c476613920907cac3",
+      "zig-native/tests/parameter_copy_execution.test.ts": "998fdc343164cdb447c7f69c2cbafa438cb2585c64f60d231d9d3aff0652b08a",
+      "zig-native/tests/prepared_reader_arguments_execution.test.ts": "1d8129d25419c85a749f82fafdb43f1cdb0dbc6c45c28f941e87f91c879d1856",
+      "zig-native/tests/projected_parameter_execution.test.ts": "231c0698eea40fc8e761b0d9e87dcf1ae257afa12cfc1484247da419083b12aa",
+      "zig-native/tests/scoped_aggregate_reader_execution.test.ts": "774674b5614afb22a05e4e0c916b7a0ce32cade3e82549aa41ed880fc7d5c1f5",
+      "zig-native/tests/storage_call_graph_execution.test.ts": "f401d52453239892b10dfa440e50680217102a9756b5c6651e444dd5f8eb17bc",
+      "zig-native/tests/function_plan_execution.test.ts": "4310c51922a52ca04dfba2b44d3c14f9c9a0872e9e5775cbc157826a98d20cd4"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "development_llvm": false,
+    "release_llvm": true,
+    "release_optimize": "fast",
+    "abi": 8,
+    "session_protocol": 2
+  },
+  "workload_heads": {
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+  },
+  "main": {
+    "baseline": {
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/main-baseline-pair/main-c3b74e0303044282/result.json",
+      "success": true,
+      "compiler_sha256": "cbebffb8496a521b9988a4b4dea94849bb6381ddf2ce1e0a9669348f0121517b",
+      "identity": "63276e7aad3c239f993c30c07c8de7d55b45c188c3cc8d16f7b8fc0c82c667e2",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 7327.7956460000005,
+      "total_compile_ms": 7337.276599,
+      "wasm_bytes": 22346701,
+      "wasm_sha256": "c5ec7c6444051d463d7197e468044fa9deea2157a62b90d4546a667083dae87d",
+      "sections": {
+        "1": {
+          "bytes": 5618
+        },
+        "2": {
+          "bytes": 40
+        },
+        "3": {
+          "bytes": 7358
+        },
+        "5": {
+          "bytes": 6
+        },
+        "6": {
+          "bytes": 573214
+        },
+        "7": {
+          "bytes": 51
+        },
+        "10": {
+          "bytes": 21709539,
+          "functions": 7356
+        },
+        "11": {
+          "bytes": 49792
+        },
+        "0": {
+          "bytes": 21
+        }
+      }
+    },
+    "candidate": {
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/main-accepted/main-2d1744e0441ccd4c/result.json",
+      "success": true,
+      "compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+      "identity": "429cd6b9709ba7161c4cd66bd5dc4445c9285712d4a9b877e717773db2d009b5",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 5914.469023000001,
+      "total_compile_ms": 5920.651732,
+      "wasm_bytes": 21576480,
+      "wasm_sha256": "d8ec77bc757bd16a36c7b369622bac893eb98309139dba5b82a0942c04005edf",
+      "sections": {
+        "1": {
+          "bytes": 5849
+        },
+        "2": {
+          "bytes": 40
+        },
+        "3": {
+          "bytes": 8060
+        },
+        "5": {
+          "bytes": 6
+        },
+        "6": {
+          "bytes": 551379
+        },
+        "7": {
+          "bytes": 51
+        },
+        "10": {
+          "bytes": 20960328,
+          "functions": 8058
+        },
+        "11": {
+          "bytes": 49684
+        },
+        "0": {
+          "bytes": 21
+        }
+      }
+    },
+    "configured_path": {
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/main-configured/main-348f6741215034fe/result.json",
+      "success": true,
+      "compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+      "identity": "429cd6b9709ba7161c4cd66bd5dc4445c9285712d4a9b877e717773db2d009b5",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 6057.196893,
+      "total_compile_ms": 6065.4587710000005,
+      "wasm_bytes": 21576480,
+      "wasm_sha256": "d8ec77bc757bd16a36c7b369622bac893eb98309139dba5b82a0942c04005edf",
+      "sections": {
+        "1": {
+          "bytes": 5849
+        },
+        "2": {
+          "bytes": 40
+        },
+        "3": {
+          "bytes": 8060
+        },
+        "5": {
+          "bytes": 6
+        },
+        "6": {
+          "bytes": 551379
+        },
+        "7": {
+          "bytes": 51
+        },
+        "10": {
+          "bytes": 20960328,
+          "functions": 8058
+        },
+        "11": {
+          "bytes": 49684
+        },
+        "0": {
+          "bytes": 21
+        }
+      }
+    },
+    "build_speedup_percent": 19.287200288827485,
+    "wasm_reduction_percent": 3.446687723615222,
+    "cache": false,
+    "frontend_workers": 4,
+    "codegen_workers": 4,
+    "limits_ms": 30000,
+    "interpretation": "Individual fresh completions, not a distribution. Explicit/configured artifacts have identical complete hashes."
+  },
+  "profile": {
+    "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/main-accepted-profile/main-74d84f6f45c5700f/result.json",
+    "build_ms": 6077.585808999999,
+    "phase_profile": {
+      "total_us": 6026046,
+      "peak_rss_kib": 1308708,
+      "phases": {
+        "other": {
+          "us": 16779,
+          "requested_bytes": 23275374,
+          "allocations": 652,
+          "rss_growth_kib": 860
+        },
+        "assets": {
+          "us": 31375,
+          "requested_bytes": 28714381,
+          "allocations": 517,
+          "rss_growth_kib": 3600
+        },
+        "inputs": {
+          "us": 440,
+          "requested_bytes": 206080,
+          "allocations": 444,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 9729,
+          "requested_bytes": 10919780,
+          "allocations": 21056,
+          "rss_growth_kib": 804
+        },
+        "lex": {
+          "us": 45573,
+          "requested_bytes": 28518784,
+          "allocations": 4750,
+          "rss_growth_kib": 17572
+        },
+        "parse": {
+          "us": 27348,
+          "requested_bytes": 43645564,
+          "allocations": 137698,
+          "rss_growth_kib": 3384
+        },
+        "check": {
+          "us": 516996,
+          "requested_bytes": 676080848,
+          "allocations": 1417424,
+          "rss_growth_kib": 187144
+        },
+        "lower": {
+          "us": 121201,
+          "requested_bytes": 161025716,
+          "allocations": 168173,
+          "rss_growth_kib": 60024
+        },
+        "freeze": {
+          "us": 54534,
+          "requested_bytes": 103608101,
+          "allocations": 346990,
+          "rss_growth_kib": 19724
+        },
+        "validation": {
+          "us": 101308,
+          "requested_bytes": 40018973,
+          "allocations": 40789,
+          "rss_growth_kib": 4452
+        },
+        "backend": {
+          "us": 5100759,
+          "requested_bytes": 5258646595,
+          "allocations": 3418595,
+          "rss_growth_kib": 1008920
+        }
+      }
+    },
+    "work": {
+      "scoped_function_plan_machine_declines": 0,
+      "scoped_function_plan_read_events": 6742,
+      "scoped_function_plan_write_events": 2608,
+      "scoped_function_plan_empty_owner_contracts": 1032,
+      "scoped_function_plan_closed_scalar_preparations": 11876,
+      "scoped_function_plan_callback_evidence_nodes": 7580,
+      "scoped_function_plan_preparations": 205922,
+      "scoped_function_plan_constructions": 18020,
+      "scoped_function_plan_definitions": 7458,
+      "scoped_function_plan_hits": 162732,
+      "scoped_function_plan_emissions": 138596,
+      "scoped_function_plan_register_calls": 10952,
+      "scoped_function_plan_post_type_queries": 0,
+      "scoped_emission_expressions": 1017503,
+      "scoped_closure_definitions": 54,
+      "scoped_closure_cache_hits": 172,
+      "scoped_completed_plan_attempts": 11859,
+      "scoped_context_sensitive_calls": 630,
+      "scoped_context_free_calls": 172116,
+      "scoped_context_sensitive_definitions": 156,
+      "scoped_context_free_definitions": 7356,
+      "scoped_context_queries": 0,
+      "scoped_completed_plan_definitions": 7458,
+      "scoped_completed_plan_rollbacks": 2107,
+      "scoped_completed_plan_discarded_expressions": 188790,
+      "scoped_argument_preparations": 205936,
+      "scoped_argument_projection_preparations": 4061,
+      "scoped_argument_projection_discards": 1095,
+      "max_scoped_emission_body_steps": 45670,
+      "max_scoped_emission_limit": 500000
+    },
+    "interpretation": "Separate profiled run. Discarded expression ratios measure work, not CPU shares. Zero post-plan type queries covers call emission, not preparation/key construction."
+  },
+  "native": {
+    "base": "029fcbbe16593a25bcff2167b877bf8677ef0660",
+    "zig": "0.17.0",
+    "llvm": false,
+    "native_inventory": 2866,
+    "binary": {
+      "path": "/home/jacobt/src/blot2/build/bench/private-prototypes/function-plan-prototype/zig-native/zig-out-function-plan-safe/bin/blot-tests",
+      "sha256": "0344618fda3a4516352a322bc5e86dbba622535c5daf7f4423272e9f982369de"
+    },
+    "source": {
+      "zig-native/src/backend/scoped_backend.zig": "c18ea9924bada240fb22b4b67fd8f487cfcedba34b3d8fc0dd7598dca75d98cc",
+      "zig-native/src/work_counters.zig": "384a85c6d95763679ad91b21c709e19d6f3c2289275fc4335a117008b3d88e8d",
+      "zig-native/src/backend/storage_calls_tests.zig": "f8d0bde69c3c821112d20b85349237962fc2aba82a4ecab637401f84e7a0fd94"
+    },
+    "selection": {
+      "path": "/home/jacobt/src/blot2/build/bench/private-prototypes/function-plan-prototype/evidence/native-full-affected-selection.json",
+      "sha256": "8cdce476e32147b621777aa2b4d6b45244cd3deaac235620aabb01bbcd607e64"
+    },
+    "log": {
+      "path": "/home/jacobt/src/blot2/build/bench/private-prototypes/function-plan-prototype/evidence/native-full-affected.log",
+      "sha256": "1978fe9b3d77ecc29e7a81259c555bc4f7c9b62dddcd417eee7fa27e3a531013"
+    },
+    "result": {
+      "selected": 58,
+      "passed": 58,
+      "full_sweeps": 28,
+      "sampled_sweeps": 0,
+      "duration_s": 30.281179664,
+      "leaks": 0,
+      "logged_errors": 0
+    }
+  },
+  "guests": {
+    "type_effects": {
+      "passed": 86,
+      "failed": 0,
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/guest-type-effects-accepted.log"
+    },
+    "broader_scoped_storage_static_sharing": {
+      "passed": 185,
+      "baseline_failures": 15,
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/guest-broad-accepted.log",
+      "baseline_control": "build/bench/private-prototypes/function-plan-prototype/evidence/guest-baseline-controls.log",
+      "baseline_files": [
+        "source_proof_dag_execution.test.ts",
+        "storage_refinement_index_execution.test.ts",
+        "summary_job_principal_reuse.test.ts"
+      ]
+    },
+    "full_gate": {
+      "passed": 48,
+      "baseline_failures": 1,
+      "code": "storage_escape",
+      "span": [
+        312,
+        345
+      ],
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/full-gate-final.log",
+      "qualification": "pending"
+    },
+    "zig_lint": {
+      "findings": 0,
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/zig-lint-final.log"
+    },
+    "final_llvm_contracts": {
+      "passed": 4,
+      "failed": 0,
+      "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/guest-final-release.log"
+    }
+  },
+  "world": {
+    "success": true,
+    "wasmBytes": 659365,
+    "wasmSha256": "7c32ebe7d61abb019b9fa721378adb47a13b80592ca55ab99392f08bf44cc5b5",
+    "calls": [
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": false,
+        "runtimeMs": 54.02024499999993,
+        "row": [
+          7,
+          0
+        ]
+      },
+      {
+        "name": "test_hooks_keep_world_and_editor_behavior",
+        "asynchronous": true,
+        "runtimeMs": 21.404333999999835,
+        "row": [
+          7,
+          0
+        ]
+      }
+    ],
+    "abi": 8,
+    "error": null
+  },
+  "hand": {
+    "success": true,
+    "wasmBytes": 296655,
+    "wasmSha256": "0d3539a62fabd7c81e56296b36d02111b2bd5cb8e5987aae69f9be92e12d4213",
+    "calls": [
+      {
+        "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+        "asynchronous": false,
+        "runtimeMs": 49.48402599999997,
+        "row": [
+          160,
+          0
+        ]
+      },
+      {
+        "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+        "asynchronous": true,
+        "runtimeMs": 17.65360899999996,
+        "row": [
+          160,
+          0
+        ]
+      }
+    ],
+    "abi": 8,
+    "error": null
+  },
+  "renderer": {
+    "builds": [
+      {
+        "name": "baseline",
+        "status": "complete",
+        "build_ms": 559.1505010000001,
+        "wasm_bytes": 118649,
+        "wasm_sha256": "729a2835edf3cf99a7af2b749ad934a5ba435a7fdb141d14962c614d3eee4eba",
+        "executed_streams": 7
+      },
+      {
+        "name": "candidate",
+        "status": "complete",
+        "build_ms": 503.545561,
+        "wasm_bytes": 112218,
+        "wasm_sha256": "c22aac7836c11bbee202481019d615f1099aca6cbc19c4a7afa0b689872ef903",
+        "executed_streams": 7
+      }
+    ],
+    "comparisons": [
+      {
+        "scenario": 0,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 1,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 2,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 4,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 8,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 16,
+        "equal": true,
+        "first_difference": -1
+      },
+      {
+        "scenario": 31,
+        "equal": true,
+        "first_difference": -1
+      }
+    ],
+    "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/kites-final.log"
+  },
+  "throughput": {
+    "description": "Reachable primitive U32 workload with balanced calls and three executed checks. Distinct workload from Gdev. Both old and new compilers already approach 0.5s here; no general throughput gain established. Generation is reported separately.",
+    "runs": [
+      {
+        "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/throughput-50k-modules-baseline.json",
+        "status": "passed",
+        "compilerSha256": "cbebffb8496a521b9988a4b4dea94849bb6381ddf2ce1e0a9669348f0121517b",
+        "compilerIdentity": "4b53ad96565a38df6c585fa66e1d70fa9893890d60c243f1fa7ab646e6afd4ef",
+        "generationMs": 24.793430999999998,
+        "coldStartupBuildMs": 470.47555199999994,
+        "generationPlusColdStartupBuildMs": 495.26898299999993,
+        "linesPerSecond": 101005.7195526012,
+        "codegenWorkers": 4,
+        "frontendWorkers": 4,
+        "source_manifest_sha256": "d419562d3dca705dd68a83057ef86e2919d51ff7f30bdc1044c6a7758c0ab356",
+        "wasm_sha256": "68c7e735dd43420f953f1311880776b030a915c29358607b540d569bf016cdcb",
+        "executed_checks_passed": true
+      },
+      {
+        "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/throughput-50k-modules-accepted.json",
+        "status": "passed",
+        "compilerSha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+        "compilerIdentity": "f6899f9de51ed4455a22fb104a029b4a7d1531e185ea66c8637f85e2d6a61a83",
+        "generationMs": 25.579357,
+        "coldStartupBuildMs": 479.655673,
+        "generationPlusColdStartupBuildMs": 505.23503,
+        "linesPerSecond": 99013.32455114998,
+        "codegenWorkers": 4,
+        "frontendWorkers": 4,
+        "source_manifest_sha256": "d419562d3dca705dd68a83057ef86e2919d51ff7f30bdc1044c6a7758c0ab356",
+        "wasm_sha256": "68c7e735dd43420f953f1311880776b030a915c29358607b540d569bf016cdcb",
+        "executed_checks_passed": true
+      },
+      {
+        "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/throughput-50k-modules-repeat.json",
+        "status": "passed",
+        "compilerSha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+        "compilerIdentity": "f6899f9de51ed4455a22fb104a029b4a7d1531e185ea66c8637f85e2d6a61a83",
+        "generationMs": 26.050442,
+        "coldStartupBuildMs": 490.831854,
+        "generationPlusColdStartupBuildMs": 516.882296,
+        "linesPerSecond": 96782.18887961294,
+        "codegenWorkers": 4,
+        "frontendWorkers": 4,
+        "source_manifest_sha256": "d419562d3dca705dd68a83057ef86e2919d51ff7f30bdc1044c6a7758c0ab356",
+        "wasm_sha256": "68c7e735dd43420f953f1311880776b030a915c29358607b540d569bf016cdcb",
+        "executed_checks_passed": true
+      }
+    ],
+    "single_module_failure": {
+      "source": {
+        "lines": 50010,
+        "nonblankLines": 50010,
+        "overTargetLines": 10,
+        "estimatedLexicalTokens": 439553,
+        "tokenEstimateMethod": "ASCII names, intrinsics and numbers are single tokens; punctuation is split",
+        "bytes": 2498312,
+        "sha256": "3fec0cb83f4fc2c592976f9bac47fbb2a2181a1078fcc663fe76d5036a647dbf",
+        "leafFunctions": 2632,
+        "branchFunctions": 2631,
+        "reachableFunctions": 5264,
+        "callEdges": 5263,
+        "maximumCallDepth": 13,
+        "primitiveStatements": 42112,
+        "distinctLeafConstantSequences": 2632,
+        "allLeavesContributeToChecksum": true
+      },
+      "status": "failed",
+      "coldStartupBuildMs": 493.89897700000006,
+      "diagnostics": [
+        {
+          "filename": "/tmp/blot-throughput-5432a57b681ee0ea/main.blot",
+          "stage": "emit",
+          "code": "storage_unsupported",
+          "start": 0,
+          "end": 0,
+          "message": "Application pool dependency discovery exceeded its checked node budget",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    "script_sha256": "fe58efc1446e052e3c3ec404547278d1c2bf4b8f3d0553e7e88d3f2c31c8ed86",
+    "source": {
+      "lines": 50025,
+      "nonblankLines": 50025,
+      "overTargetLines": 25,
+      "estimatedLexicalTokens": 444637,
+      "tokenEstimateMethod": "ASCII names, intrinsics and numbers are single tokens; punctuation is split",
+      "bytes": 2519614,
+      "sha256": "d419562d3dca705dd68a83057ef86e2919d51ff7f30bdc1044c6a7758c0ab356",
+      "hashKind": "canonical-source-manifest-sha256",
+      "manifestSha256": "d419562d3dca705dd68a83057ef86e2919d51ff7f30bdc1044c6a7758c0ab356",
+      "manifestSerialization": "compact JSON array sorted by relative path with path,lines,bytes,sha256 keys",
+      "modules": 16,
+      "files": [
+        {
+          "path": "leaves_1.blot",
+          "lines": 2970,
+          "bytes": 140977,
+          "sha256": "e13ebfbbf25732fc8cb387231207026af2c5682cda37d7f43615d4ebe25f547c"
+        },
+        {
+          "path": "leaves_10.blot",
+          "lines": 2952,
+          "bytes": 140135,
+          "sha256": "5dfd59374715588c18868b471b3ec91c9e19528ff269404588232a6e60a8b668"
+        },
+        {
+          "path": "leaves_11.blot",
+          "lines": 2952,
+          "bytes": 140142,
+          "sha256": "e16e8c77834f8e2809d070649081253f83e74440d5b85d381881e5cea3d50cb2"
+        },
+        {
+          "path": "leaves_12.blot",
+          "lines": 2952,
+          "bytes": 140130,
+          "sha256": "5048d15b1ce6c5914dbb1c59b8cedb405a3ad1cdc6b21dcedc6595a03b1525f7"
+        },
+        {
+          "path": "leaves_13.blot",
+          "lines": 2952,
+          "bytes": 140137,
+          "sha256": "9e084bcf84d05eec80be1b679e82496c46719b0039bf88f577dcf5aa8a095de2"
+        },
+        {
+          "path": "leaves_14.blot",
+          "lines": 2952,
+          "bytes": 140138,
+          "sha256": "275f51e68cf6f2f05b82ad84b58f97bf62b335cef578861f7cdf719eea07dc06"
+        },
+        {
+          "path": "leaves_15.blot",
+          "lines": 2952,
+          "bytes": 140141,
+          "sha256": "0b5deec3822399d64d9528186563330ea0e0ce152149426ca43bbfad28d4804e"
+        },
+        {
+          "path": "leaves_2.blot",
+          "lines": 2970,
+          "bytes": 140972,
+          "sha256": "ddfdc7b8ff505578925a9caa874375d6f882238b9516514a60501366dd77bcee"
+        },
+        {
+          "path": "leaves_3.blot",
+          "lines": 2970,
+          "bytes": 140978,
+          "sha256": "7f8019da9f5336795eb455ab57dd4c5b5ed03d5c2a202cc8685d9eb5db86b442"
+        },
+        {
+          "path": "leaves_4.blot",
+          "lines": 2970,
+          "bytes": 140985,
+          "sha256": "d8ea6fdc106ce28e45e464d6c96bc0f80a2eb4803916f446ef7f02e2926882e9"
+        },
+        {
+          "path": "leaves_5.blot",
+          "lines": 2970,
+          "bytes": 140981,
+          "sha256": "508a3864a2d5035895deea8fbbfc2ca4f31a80a434fde0fc54607729ce79e72b"
+        },
+        {
+          "path": "leaves_6.blot",
+          "lines": 2970,
+          "bytes": 140978,
+          "sha256": "6471d8867d8ba47438453c463a04616a74c5ef119560d2735c5ee892140bb5dc"
+        },
+        {
+          "path": "leaves_7.blot",
+          "lines": 2970,
+          "bytes": 140986,
+          "sha256": "f58d81bbace45152438e35728f703a795e7347f18de50fe1f1637af205f30d4a"
+        },
+        {
+          "path": "leaves_8.blot",
+          "lines": 2952,
+          "bytes": 140130,
+          "sha256": "40496d3436fea17a24a6ed94e44feb83c0ef0f273a0030ac20c9d20adf95fb53"
+        },
+        {
+          "path": "leaves_9.blot",
+          "lines": 2952,
+          "bytes": 140135,
+          "sha256": "994f9815648480cd2997389dc7ae33e9ad1b39e37d8ef956294bf73bb8954d57"
+        },
+        {
+          "path": "main.blot",
+          "lines": 5619,
+          "bytes": 411669,
+          "sha256": "4928a1e64a5f41170abc3599ccfa1ae799ff4a7f01db0262b29ef05ceab87cb3"
+        }
+      ],
+      "leafFunctions": 2632,
+      "branchFunctions": 2631,
+      "reachableFunctions": 5264,
+      "callEdges": 5263,
+      "maximumCallDepth": 13,
+      "primitiveStatements": 42112,
+      "distinctLeafConstantSequences": 2632,
+      "allLeavesContributeToChecksum": true
+    },
+    "wasm": {
+      "bytes": 973511,
+      "sha256": "68c7e735dd43420f953f1311880776b030a915c29358607b540d569bf016cdcb"
+    },
+    "checks": [
+      {
+        "input": 0,
+        "expected": 709178368,
+        "actual": 709178368,
+        "passed": true
+      },
+      {
+        "input": 17,
+        "expected": 2236527816,
+        "actual": 2236527816,
+        "passed": true
+      },
+      {
+        "input": 4294967295,
+        "expected": 2380424376,
+        "actual": 2380424376,
+        "passed": true
+      }
+    ]
+  },
+  "semantics": [
+    "Complete original source/type/mapping/goal checks precede physical projection.",
+    "Replay actual ordered reads/writes, including compiled branches; unused owner arguments do not invent reads.",
+    "Retain caller-specific initialization, alias, frozen, outlives and runtime epoch checks.",
+    "Array/view result aliases must refer only to input owners, including alternate roots; fresh owners still decline.",
+    "Root exports retain outlining; oversized helpers roll back before plan publication.",
+    "Trapping bodies retain the declared result layout."
+  ],
+  "integration": {
+    "pen": {
+      "returncode": 1,
+      "success": false,
+      "compiled_wasm_unchanged": true,
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "compiler_sha256": "352200af2eb75c042fcbaf6ec4f6f84eb9c61e97a05796fdd3fbdbfcdba096ff",
+      "wasm_sha256": "d8ec77bc757bd16a36c7b369622bac893eb98309139dba5b82a0942c04005edf"
+    },
+    "frame_qualified": false,
+    "reason": "Installed Pen rejects ABI 8 before rendering.",
+    "evidence": "build/bench/private-prototypes/function-plan-prototype/evidence/pen-final/result.json"
+  },
+  "remaining": [
+    "Five-second Gdev and subsecond complex-workload targets remain unmet; Wasm is still 21.58 MB.",
+    "A completed ownership/layout instruction IR should replace speculative body emission; current body-level contracts do not complete that representation.",
+    "Keep #run build-stage unification as a separate simplification: ordinary checked functions plus tracked readFile/publishModule effects and normally checked generated modules. Current #run remains pure.",
+    "No measured reason to cut ownership/effect/callback features; no library or game API rewrite in this batch.",
+    "First private Fast percentages omitted: binary preserved but exact old source reconstruction was not verified."
+  ],
+  "original_elements": {
+    "entry": "/home/jacobt/src/gdev/tests/elements_game.blot",
+    "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+    "overlayManifest": {
+      "sources": "live",
+      "frozenManifest": "build/bench/frozen-nominal-slicing-f3309955c887/source-manifest.json"
+    },
+    "buildMs": 3538.45516,
+    "success": false,
+    "error": "Error: [{\"filename\":\"/home/jacobt/src/gdev/tests/elements_game.blot\",\"stage\":\"emit\",\"code\":\"storage_unsupported\",\"start\":1675,\"end\":1753,\"message\":\"Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here\",\"offset_encoding\":\"utf8_bytes\",\"utf16\":null,\"details\":null}]"
+  }
+}

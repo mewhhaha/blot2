@@ -65,14 +65,16 @@ fn publishRefinedModule(allocator: std.mem.Allocator, modules: []const core.Modu
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_refinement_indexed_bindings > 0);
+    // The unified route does not run the removed numeric refinement probe.
+    try std.testing.expect(result.counters.scoped_function_plan_preparations > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_function_plan_post_type_queries);
 }
 fn publishSharedScalarModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expectEqual(@as(u64, 4), result.counters.scoped_scalar_definitions);
-    try std.testing.expect(result.counters.scoped_scalar_cache_hits >= 2);
+    try std.testing.expectEqual(@as(u64, 3), result.counters.scoped_function_plan_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 2);
 }
 fn publishConcreteFields(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
@@ -80,9 +82,9 @@ fn publishConcreteFields(allocator: std.mem.Allocator, modules: []const core.Mod
     try std.testing.expect(result.diagnostic == null);
     // Both source field orders share each of read, twice and outer once.
     // The strict semantic key retains their symbolic ambient row identities.
-    try std.testing.expectEqual(@as(u64, 3), result.counters.scoped_inline_definitions);
-    try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
-    try std.testing.expect(result.counters.scoped_concrete_admission_hits > 0);
+    try std.testing.expectEqual(@as(u64, 3), result.counters.scoped_function_plan_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 3);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_function_plan_post_type_queries);
     try std.testing.expect(result.counters.scoped_field_recipe_hits > 0);
     try std.testing.expect(result.counters.scoped_field_name_probes < 32);
 }
@@ -159,8 +161,8 @@ test "nested scalar call definitions share diamonds across exports" {
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expectEqual(@as(u64, depth + 3), result.counters.scoped_scalar_definitions);
-    try std.testing.expect(result.counters.scoped_scalar_cache_hits >= depth + 1);
+    try std.testing.expectEqual(@as(u64, depth + 1), result.counters.scoped_function_plan_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= depth + 1);
     try std.testing.expect(result.counters.scoped_emission_expressions < 300);
     try std.testing.expect(result.counters.scoped_scalar_admission_nodes < 600);
     try std.testing.expect(result.counters.scoped_call_admission_nodes == 0);
@@ -415,7 +417,7 @@ test "context free inline layouts substitute constructor variables and reject op
     }
     try std.testing.expectEqual(@as(usize, 6), found);
 }
-test "closed generic row templates keep repeated copies within the fixed layout budget" {
+fn closedRowFixture(copies: usize, indirect: bool) !core.Module {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
     try source.appendSlice(a, "type Maybe a is data = $Some a | $Nothing\ntype Row is data = $Row {");
@@ -431,13 +433,25 @@ test "closed generic row templates keep repeated copies within the fixed layout 
         try source.appendSlice(a, field);
     }
     try source.appendSlice(a, "}\nconst copy = func (pool: ResizeArray Row) => return @storage.copy pool\nentry const answer = func (input: F32) => return do:\n  let pool: ResizeArray Row = #[make input]\n");
-    for (0..200) |index| {
+    for (0..copies) |index| {
         const call = try a.print("  let copied{d} = copy pool\n", .{index});
         defer a.free(call);
         try source.appendSlice(a, call);
     }
     try source.appendSlice(a, "  return @storage.length pool\n");
-    var module = try lower(a, source.items);
+    if (indirect) {
+        const ordinary = try std.mem.replaceOwned(u8, a, source.items, "entry const answer", "const enormous");
+        defer a.free(ordinary);
+        var complete: std.ArrayList(u8) = .empty;
+        defer complete.deinit(a);
+        try complete.appendSlice(a, ordinary);
+        try complete.appendSlice(a, "entry const answer = func (input: F32): U32 => return enormous input\n");
+        return lower(a, complete.items);
+    }
+    return lower(a, source.items);
+}
+test "closed generic row templates keep repeated copies within the fixed layout budget" {
+    var module = try closedRowFixture(200, false);
     defer module.deinit(a);
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
@@ -445,6 +459,17 @@ test "closed generic row templates keep repeated copies within the fixed layout 
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
 }
+test "function plans decline oversized ordinary helpers into registered root outlining" {
+    var module = try closedRowFixture(42, true);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_function_plan_machine_declines > 0);
+    try std.testing.expect(result.counters.scoped_completed_plan_rollbacks > 0);
+}
+
 fn publishGeneratorModule(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compileWithOptions(allocator, modules, 1, .{ .work_limits = .{ .expressions = 128 } });
     defer result.deinit(allocator);
@@ -592,11 +617,13 @@ fn publishLargeKeyFallback(allocator: std.mem.Allocator, modules: []const core.M
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_outline_key_declines >= 2);
+    try std.testing.expect(result.counters.scoped_function_plan_preparations >= 2);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_function_plan_definitions);
 }
 
 test "optional oversized reader and writer keys fall back without hiding invalid borrows" {
-    var name: [7000]u8 = undefined;
+    // Exceed the unified table's 65,536-word encoded bound.
+    var name: [70000]u8 = undefined;
     @memset(&name, 'x');
     const source = try a.print("type State = {{{s}: ResizeArray U32}}\n" ++
         "const write = func (state: State) -> (amount: U32) => return do:\n  state.{s}[0] := @u32.add state.{s}[0] amount\n" ++
@@ -645,9 +672,12 @@ test "selected parameterized readers outline exact descriptor payloads across ow
     defer callable_module.deinit(a);
     var declined = try scoped.compileWithOptions(a, &.{callable_module}, 1, .{ .work_limits = .{ .expressions = 512 } });
     defer declined.deinit(a);
-    try std.testing.expect(declined.diagnostic != null);
-    try std.testing.expectEqualStrings("Storage source expansion exceeded its expression budget", declined.diagnostic.?.message());
-    try std.testing.expectEqual(@as(usize, 0), declined.bytes.len);
+    // A fully witnessed but unused callback field is valid data in the
+    // actual-body contract; it no longer triggers the old Reader heuristic.
+    try std.testing.expect(declined.diagnostic == null);
+    try std.testing.expect(declined.counters.scoped_function_plan_definitions > 0);
+    try std.testing.expectEqual(@as(u64, 0), declined.counters.scoped_function_plan_post_type_queries);
+    try std.testing.expect(declined.counters.max_scoped_emission_body_steps <= 512);
 }
 fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
     return lowerWithCatalog(allocator, source, false);
@@ -757,7 +787,10 @@ test "closed owned calls reuse code across unrelated generic environments" {
     defer right.deinit(a);
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
-    try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
+    try std.testing.expectEqual(left.emitted_functions + 1, right.emitted_functions);
+    try std.testing.expectEqual(@as(u64, 2), left.counters.scoped_function_plan_definitions);
+    try std.testing.expectEqual(@as(u64, 3), right.counters.scoped_function_plan_definitions);
+    try std.testing.expect(right.counters.scoped_function_plan_hits > 0);
 }
 
 test "closed direct call graphs reuse inline data without admitting recursive calls" {
@@ -993,8 +1026,8 @@ test "selected primitive associated partials reuse their saturated callers" {
     }
     try std.testing.expect(left.diagnostic == null);
     try std.testing.expect(right.diagnostic == null);
-    // Expanded callers would emit two distinct numeric leaf helpers instead.
-    try std.testing.expectEqual(base.emitted_functions + 1, left.emitted_functions);
+    // The common contract retains interpolate and both selected numeric leaves.
+    try std.testing.expectEqual(base.emitted_functions + 3, left.emitted_functions);
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
 
@@ -1043,8 +1076,8 @@ fn publishNominalFields(allocator: std.mem.Allocator, modules: []const core.Modu
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_inline_definitions >= 3);
-    try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions >= 3);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 3);
     try std.testing.expect(result.counters.scoped_emission_expressions < 500);
     try std.testing.expect(result.counters.scoped_call_admission_nodes < 500);
 }
@@ -1132,8 +1165,8 @@ test "shared aggregate readers retain nominal physical schemas across independen
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.counters.scoped_reader_definitions >= 3);
-    try std.testing.expect(result.counters.scoped_reader_cache_hits >= 4);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions >= 3);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 4);
     try std.testing.expect(result.counters.scoped_emission_expressions < 2000);
 }
 
@@ -1162,7 +1195,7 @@ test "shared aggregate reader diamonds keep emission growth bounded" {
     var second = try scoped.compile(a, &.{deep}, 1);
     defer second.deinit(a);
     try std.testing.expect(first.diagnostic == null and second.diagnostic == null);
-    try std.testing.expect(second.counters.scoped_reader_cache_hits >= 6);
+    try std.testing.expect(second.counters.scoped_function_plan_hits >= 6);
     try std.testing.expect(second.counters.scoped_emission_expressions < first.counters.scoped_emission_expressions * 3);
     try std.testing.expect(second.counters.scoped_emission_expressions < 1200);
 }
@@ -1172,7 +1205,7 @@ fn publishAggregateReader(allocator: std.mem.Allocator, modules: []const core.Mo
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_reader_cache_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
 }
 
 test "shared aggregate reader publication survives allocation failures" {
@@ -1533,7 +1566,7 @@ test "inline return registers retain buffers for width five and runtime variants
         var result = try scoped.compile(a, &.{module}, 1);
         defer result.deinit(a);
         try std.testing.expect(result.diagnostic == null);
-        try std.testing.expect(result.counters.scoped_inline_definitions > 0);
+        try std.testing.expect(result.counters.scoped_function_plan_definitions > 0);
         try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_inline_register_calls);
     }
 }

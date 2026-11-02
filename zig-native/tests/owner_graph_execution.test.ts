@@ -53,7 +53,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(built.success, JSON.stringify(built));
       const work = built.stats.workCounters as Record<string, number>;
       assert(work.scoped_owner_graph_definitions >= 5, JSON.stringify(work));
-      assert(work.scoped_owner_graph_hits >= 2, JSON.stringify(work));
+      assert(work.scoped_function_plan_hits >= 2, JSON.stringify(work));
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {
@@ -182,7 +182,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(built.success, JSON.stringify(built));
         const work = built.stats.workCounters as Record<string, number>;
         assert.equal(work.scoped_owner_graph_definitions, fixture.definitions);
-        assert(work.scoped_owner_graph_hits >= 1, JSON.stringify(work));
+        assert(work.scoped_function_plan_hits >= 1, JSON.stringify(work));
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {

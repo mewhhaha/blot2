@@ -1,5 +1,6 @@
 // Reachable primitive throughput, not declaration padding. No compiler build.
-// --lines is a minimum; the final whole leaf and branch can exceed it.
+// --lines is a minimum; whole leaves, branches and imports can exceed it.
+// --modules counts source files including main; 1 keeps the monolithic control.
 // deno run -A scripts/bench/compiler_throughput.ts --compiler PATH --lines 50000
 import { parseArgs } from "node:util";
 import { dirname, resolve } from "node:path";
@@ -9,6 +10,8 @@ import { createZigProjectCompiler } from "../../compiler/zig_project_client.ts";
 const { values } = parseArgs({
   options: {
     compiler: { type: "string" },
+    modules: { type: "string", default: "16" },
+    workers: { type: "string", default: "4" },
     lines: { type: "string", default: "1000" },
     "statements-per-leaf": { type: "string", default: "16" },
     "timeout-ms": { type: "string", default: "5000" },
@@ -28,6 +31,14 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) {
 }
 if (!Number.isSafeInteger(statements) || statements < 2) {
   throw new Error("--statements-per-leaf must be an integer >= 2");
+}
+const requestedModules = Number(values.modules);
+const workers = Number(values.workers);
+if (!Number.isInteger(requestedModules) || requestedModules < 1) {
+  throw new Error("--modules must be a positive integer");
+}
+if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
+  throw new Error("--workers must be an integer from 1 to 16");
 }
 const compilerPath = resolve(values.compiler);
 const encoder = new TextEncoder();
@@ -59,10 +70,13 @@ function expectedChecksum(input: number, leaves: number) {
 }
 
 const report: Record<string, unknown> = {
-  schema: 2,
-  workload: "reachable-u32-balanced-tree-v2",
+  schema: 3,
+  workload: "reachable-u32-balanced-tree-v3",
   requestedMinimumLines: lines,
   statementsPerLeaf: statements,
+  requestedModules,
+  codegenWorkers: workers,
+  frontendWorkers: workers,
   timeoutMs,
   compilerPath,
   cacheDirectory: false,
@@ -82,25 +96,34 @@ try {
   if (leafCount * statements > 0x7ffffffe) {
     throw new Error("workload exceeds distinct U32 operation-constant budget");
   }
-  const sourceLines: string[] = [];
+  const moduleCount = Math.min(requestedModules, leafCount);
+  const moduleLines: string[][] = Array.from({ length: moduleCount }, () => []);
+  const sourceLines = moduleLines[0];
+  for (let index = 1; index < moduleCount; index++) {
+    sourceLines.push(`import * as batch_${index} from "./leaves_${index}"`);
+  }
   let level: string[] = [];
   for (let index = 0; index < leafCount; index++) {
     const name = `leaf_${index}`;
-    sourceLines.push(`const ${name} = func (input: U32): U32 => return do:`);
+    const moduleIndex = index % moduleCount;
+    const leafLines = moduleLines[moduleIndex];
+    leafLines.push(`const ${name} = func (input: U32): U32 => return do:`);
     let previous = "input";
     for (let step = 0; step < statements; step++) {
       const value = `value_${step}`;
       let operation = "bit_xor";
       if (step % 2 === 0) operation = "mul";
-      sourceLines.push(
+      leafLines.push(
         `  let ${value}: U32 = @u32.${operation} ${previous} ${
           operationConstant(index, step)
         }`,
       );
       previous = value;
     }
-    sourceLines.push(`  return ${previous}`);
-    level.push(name);
+    leafLines.push(`  return ${previous}`);
+    let reference = name;
+    if (moduleIndex > 0) reference = `batch_${moduleIndex}.${name}`;
+    level.push(reference);
   }
   let nodeCount = 0;
   let depth = 0;
@@ -127,22 +150,43 @@ try {
     `  let output: GrowArray U32 = #[${level[0]} input]`,
     `  return @storage.freeze output`,
   );
-  const source = sourceLines.join("\n") + "\n";
-  const sourceBytes = encoder.encode(source);
+  const files = moduleLines.map((text, index) => {
+    let path = `leaves_${index}.blot`;
+    if (index === 0) path = "main.blot";
+    const source = text.join("\n") + "\n";
+    return { path, source, lines: text.length, bytes: encoder.encode(source) };
+  });
   const generationMs = performance.now() - generationStart;
-  const exactLines = source.split("\n").length - 1;
+  const exactLines = files.reduce((sum, file) => sum + file.lines, 0);
+  const exactBytes = files.reduce((sum, file) => sum + file.bytes.length, 0);
   if (exactLines < lines) throw new Error("generator LOC below target");
+  const manifest = await Promise.all(files.map(async (file) => ({
+    path: file.path,
+    lines: file.lines,
+    bytes: file.bytes.length,
+    sha256: await sha256(file.bytes),
+  })));
+  manifest.sort((left, right) => left.path.localeCompare(right.path, "en"));
+  const manifestSha256 = await sha256(encoder.encode(JSON.stringify(manifest)));
   report.source = {
     lines: exactLines,
     nonblankLines: exactLines,
     overTargetLines: exactLines - lines,
-    estimatedLexicalTokens:
-      source.match(/@[A-Za-z0-9_.]+|[A-Za-z_][A-Za-z0-9_]*|[0-9]+|=>|->|[^\s]/g)
-        ?.length ?? 0,
+    estimatedLexicalTokens: files.reduce((sum, file) =>
+      sum +
+      (file.source.match(
+        /@[A-Za-z0-9_.]+|[A-Za-z_][A-Za-z0-9_]*|[0-9]+|=>|->|[^\s]/g,
+      )?.length ?? 0), 0),
     tokenEstimateMethod:
       "ASCII names, intrinsics and numbers are single tokens; punctuation is split",
-    bytes: sourceBytes.length,
-    sha256: await sha256(sourceBytes),
+    bytes: exactBytes,
+    sha256: manifestSha256,
+    hashKind: "canonical-source-manifest-sha256",
+    manifestSha256,
+    manifestSerialization:
+      "compact JSON array sorted by relative path with path,lines,bytes,sha256 keys",
+    modules: moduleCount,
+    files: manifest,
     leafFunctions: leafCount,
     branchFunctions: nodeCount,
     reachableFunctions: leafCount + nodeCount + 1,
@@ -165,12 +209,16 @@ try {
     cacheDirectory: false,
     codegenTier: "optimized",
     profileBackend: values.profile,
+    codegenWorkers: workers,
+    frontendWorkers: workers,
     startupTimeoutMs: timeoutMs,
   });
   const startupMs = performance.now() - coldStart;
   report.compilerIdentity = compiler.compilerIdentity;
+  const sources: Record<string, string> = {};
+  for (const file of files) sources[`${directory}/${file.path}`] = file.source;
   const result = await compiler.build({
-    sources: { [entryPath]: source },
+    sources,
     signal: signal.signal,
   });
   const coldStartupBuildMs = performance.now() - coldStart;

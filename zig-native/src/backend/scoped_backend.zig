@@ -159,13 +159,22 @@ const WriterEvent = struct { owner: usize, kind: WriterKind, shape: Value };
 const WriterTrace = struct { inputs: usize, stable: bool = false, allows_writes: bool = true, events: std.ArrayList(WriterEvent) = .empty, remaining: usize = 100_000 };
 // Physical descriptor calls own their summaries for the complete compilation.
 // Incoming owners are formal descriptor roles, never retained caller roots.
+const FunctionAbi = enum { scalar, registers, result_slot, buffered };
+const CheckedFunctionPlan = struct {
+    entry: call_plan.Entry,
+    input_words: usize,
+    unit_result: bool,
+    abi: FunctionAbi,
+    return_registers: usize,
+    result: Value,
+    events: []const WriterEvent,
+    regions: []const usize,
+};
 const DescriptorCalls = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
     calls: call_plan.Cache,
-    facts: std.AutoHashMapUnmanaged(u32, []const WriterEvent) = .empty,
-    regions: std.AutoHashMapUnmanaged(u32, []const usize) = .empty,
-    results: std.AutoHashMapUnmanaged(u32, Value) = .empty,
+    plans: std.AutoHashMapUnmanaged(u32, *const CheckedFunctionPlan) = .empty,
     declined: std.HashMapUnmanaged(call_plan.Key, void, call_plan.KeyContext, 80) = .empty,
     transports: std.AutoHashMapUnmanaged(u32, ?*transport_plan.Index) = .empty,
     record_metadata: RecordMetadataCache,
@@ -194,12 +203,7 @@ const DescriptorCalls = struct {
         self.calls.deinit();
         // Summary slices and shapes belong to the compilation arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.facts.deinit(self.allocator);
-        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.regions.deinit(self.allocator);
-        // Result shapes belong to the same compilation arena.
-        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.results.deinit(self.allocator);
+        self.plans.deinit(self.allocator);
         // Keys borrow flat immutable words in the compilation arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.declined.deinit(self.allocator);
@@ -339,12 +343,10 @@ const Generator = struct {
     // Templates contain only closed inline data and zero local words. Each use
     // receives independent fields; root/variant evidence is never cached here.
     plain_layouts: std.AutoHashMapUnmanaged(u64, Value) = .empty,
-    reader_results: std.AutoHashMapUnmanaged(u32, Value) = .empty,
-    writer_facts: std.AutoHashMapUnmanaged(u32, []const WriterEvent) = .empty,
-    writer_regions: std.AutoHashMapUnmanaged(u32, []const usize) = .empty,
     // Borrowed only while compiling one selected writer specialization.
     writer_trace: ?*WriterTrace = null,
     planning_writer: bool = false,
+    emitting_function_plan: bool = false,
     planning_owner_graph: bool = false,
     validation_budget: *usize,
     proof_cache: *source_proof.SourceProofCache,
@@ -373,13 +375,10 @@ const Generator = struct {
         self.plain_layouts.deinit(self.allocator);
         // Result trees and captured type environments belong to this arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.reader_results.deinit(self.allocator);
         // Event shapes belong to the generator arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.writer_facts.deinit(self.allocator);
         // Scratch footprints belong to the generator arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
-        self.writer_regions.deinit(self.allocator);
         self.bindings.deinit(self.allocator);
         self.controls.deinit(self.allocator);
         self.loops.deinit(self.allocator);
@@ -591,6 +590,7 @@ const Generator = struct {
         return false;
     }
     fn shape(self: *Generator, m: *const core.Module, id: core.Id, ty: T.Id, depth: usize) Error!Value {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (depth > 128) return self.fail(m, id, .storage_unsupported, "Storage layout exceeded its nesting bound");
         if (self.type_arguments.latestNonidentity(m.unit, ty)) |argument_index| {
             const argument = self.type_arguments.items[argument_index];
@@ -634,6 +634,7 @@ const Generator = struct {
     // argument has resolved in its own caller environment; a phantom parameter
     // does not license an unknown, callable or borrowed argument.
     fn closedLayoutArgument(self: *Generator, input: TypeRef, remaining: *usize, depth: usize) Error!bool {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (remaining.* == 0 or depth > 128) return false;
         remaining.* -= 1;
         const actual = try self.resolveType(input, 0);
@@ -1717,6 +1718,7 @@ const Generator = struct {
         return captured;
     }
     fn resolveType(self: *Generator, input: TypeRef, depth: usize) Error!TypeRef {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (depth > 128) return error.Declined;
         if (input.environment) |environment| return self.resolveActual(.{ .unit = input.unit, .ty = input.ty }, environment, depth + 1);
         // Bounds fix these IDs; fresh substitutions bind only variable/bound
@@ -1733,6 +1735,7 @@ const Generator = struct {
     // environment. Installing it globally can overwrite an active callee's
     // inference variables when the same generic helper is instantiated twice.
     fn resolveActual(self: *Generator, input: TypeRef, environment: []const TypeArgument, depth: usize) Error!TypeRef {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (depth > 128) return error.Declined;
         if (input.ty >= T.unit and input.ty <= T.never) {
             self.emission_work.scoped_primitive_environment_entries_avoided +|= environment.len;
@@ -1752,6 +1755,7 @@ const Generator = struct {
         return .{ .unit = resolved.unit, .ty = resolved.ty, .environment = resolved.environment orelse environment };
     }
     fn mapTypesUnder(self: *Generator, formal: TypeRef, input: TypeRef, environment: ?[]const TypeArgument, depth: usize) Error!void {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (depth > 128) return error.Declined;
         const actual = if (environment) |captured| try self.resolveActual(input, captured, 0) else try self.resolveType(input, 0);
         const actual_environment = actual.environment orelse environment;
@@ -1832,6 +1836,7 @@ const Generator = struct {
     /// The checked receiver and its actual catalog declaration establish the
     /// result; the spelling of a member never implies a collection element type.
     fn refineFields(self: *Generator, m: *const core.Module, goals: []const core.Obligation) Error!void {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         self.emission_work.scoped_field_refinements +|= 1;
         const before_stats = self.type_arguments.stats;
         defer {
@@ -1922,6 +1927,7 @@ const Generator = struct {
         return self.selectedDataType(input, false, remaining, 0);
     }
     fn selectedDataType(self: *Generator, input: TypeRef, readers: bool, remaining: *usize, depth: usize) Error!bool {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (remaining.* == 0 or depth > 128) return false;
         remaining.* -= 1;
         const actual = try self.resolveType(input, 0);
@@ -2542,6 +2548,7 @@ const Generator = struct {
         return admitted;
     }
     fn numericExpression(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, active: *[128]core.BindingRef, used: usize, readers: bool, depth: usize) Error!bool {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         self.numeric_call_peak = @max(self.numeric_call_peak, used);
         self.emission_work.scoped_call_admission_nodes +|= 1;
         if (id == 0) return true;
@@ -2876,209 +2883,6 @@ const Generator = struct {
     }
     /// Scalar leaves use a normal Wasm call, not repeated source expansion.
     /// The initial ABI transports F32 as exact i32 bits, matching Value.word.
-    const ScalarKey = struct { key: call_plan.Key, closed_frontier: bool };
-    fn scalarKey(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, result_type: T.Id, owned_result: bool, isolated: bool) Error!ScalarKey {
-        var evidence: std.ArrayList(u32) = .empty;
-        errdefer evidence.deinit(self.allocator);
-        try evidence.append(self.allocator, result_type);
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (m.bodyParameters(body), arguments) |parameter, arg| {
-            try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(arg.floating) });
-            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-        }
-        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        var closed_frontier = isolated;
-        if (!owned_result and !isolated) {
-            const result_schema: Value = .{ .word = .{ .id = 0 }, .floating = result_type == T.f32_type };
-            if (try self.inlineCallEvidence(m, body, arguments, result_schema)) |complete| {
-                defer self.allocator.free(complete);
-                try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 9, @intCast(complete.len) });
-                try evidence.appendSlice(self.allocator, complete);
-                closed_frontier = true;
-            }
-        }
-        var context = self.invocationContext();
-        // The complete primitive DAG proof excludes every operation which can
-        // select a caller-visible method, dictionary, global or effect.
-        if (isolated) context = 0;
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = body.binding, .context = context, .context_free = isolated, .evidence = try evidence.toOwnedSlice(self.allocator) };
-        return .{ .key = key, .closed_frontier = closed_frontier };
-    }
-    const CompletedScalar = struct { entry: call_plan.Entry, result_type: T.Id };
-    fn completedScalar(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value) Error!?CompletedScalar {
-        const types_before = self.type_arguments.items.len;
-        const diagnostic_before = self.diagnostic;
-        defer self.type_arguments.shrinkRetainingCapacity(types_before);
-        defer self.diagnostic = diagnostic_before;
-        return self.completedScalarInner(m, body, arguments) catch |err| switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.Declined => null,
-        };
-    }
-    fn completedScalarInner(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value) Error!?CompletedScalar {
-        const resolved = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
-        const result_type: T.Id = switch ((try self.unit(resolved.unit)).types.node(resolved.ty).tag) {
-            .unit => T.unit,
-            .boolean => T.boolean,
-            .u32 => T.u32_type,
-            .f32 => T.f32_type,
-            else => return null,
-        };
-        const prepared = try self.scalarKey(m, body, arguments, result_type, false, false);
-        defer self.allocator.free(prepared.key.evidence);
-        if (!prepared.closed_frontier) return null;
-        const index = self.shared_calls.find(prepared.key) orelse return null;
-        const entry = self.shared_calls.entries.items[index];
-        if (entry.building) return null;
-        return .{ .entry = entry, .result_type = result_type };
-    }
-    fn reusableCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
-        const body = m.body(target.binding) orelse return null;
-        const raw_result_type = m.typeOf(body.root);
-        switch (m.types.node(raw_result_type).tag) {
-            .record, .product => return null,
-            else => {},
-        }
-        const owned_result = m.types.node(raw_result_type).tag == .array;
-        if (owned_result and !self.specialize) return null;
-        var result_type = raw_result_type;
-        for (arguments) |arg| if (arg.tag != .scalar or arg.demand != null) return null;
-        var remaining: usize = 100_000;
-        const isolated = !owned_result and try self.closedScalarBody(m, target.binding);
-        if (!owned_result and !isolated) if (try self.completedScalar(m, body, arguments)) |completed| {
-            self.emission_work.scoped_scalar_completed_hits +|= 1;
-            self.emission_work.scoped_scalar_cache_hits +|= 1;
-            return try self.callScalarFunction(m, body.root, completed.entry, arguments, null, completed.result_type);
-        };
-        // A failed or weak early probe proves nothing. Numeric admission may
-        // refine the return and selected types; preserve the original order
-        // and build the final key only after those refinements complete.
-        if (owned_result) {
-            var arrays: usize = 0;
-            if (!call_plan.destinationBody(m, body.root, &arrays, &remaining, 0) or arrays != 1) return null;
-        } else if (!isolated and !call_plan.scalarBody(m, body.root, &remaining, 0)) {
-            var active: [128]core.BindingRef = undefined;
-            active[0] = target;
-            if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
-        }
-        if (!owned_result) {
-            const resolved = try self.resolveType(.{ .unit = m.unit, .ty = raw_result_type }, 0);
-            const tag = (try self.unit(resolved.unit)).types.node(resolved.ty).tag;
-            result_type = switch (tag) {
-                .unit => T.unit,
-                .boolean => T.boolean,
-                .u32 => T.u32_type,
-                .f32 => T.f32_type,
-                else => return null,
-            };
-        }
-        const destination: ?Value = if (owned_result) blk: {
-            const element_shape = try self.shape(m, body.root, m.types.node(result_type).a, 0);
-            if (!plainShape(element_shape)) return null;
-            break :blk try self.reserveOwner(m, body.root, .fixed, element_shape);
-        } else null;
-        const prepared = try self.scalarKey(m, body, arguments, result_type, owned_result, isolated);
-        defer self.allocator.free(prepared.key.evidence);
-        const key = prepared.key;
-        const closed_frontier = prepared.closed_frontier;
-        var cache = self.shared_calls;
-        if (owned_result) cache = &self.calls;
-        const existing = cache.find(key);
-        if (existing != null and !owned_result) self.emission_work.scoped_scalar_cache_hits +|= 1;
-        const index = if (existing) |found| found else blk: {
-            const parameter_count = std.math.add(usize, arguments.len, if (owned_result) 3 else 0) catch return self.unsupported(m, body.root);
-            const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
-            defer self.allocator.free(signature);
-            @memset(signature, .i32);
-            const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => return self.unsupported(m, body.root),
-            };
-            const inserted = try cache.insert(key, function, result_type == T.f32_type);
-            var child: Generator = .{
-                .allocator = self.allocator,
-                .arena = std.heap.ArenaAllocator.init(self.allocator),
-                .calls = .{ .allocator = self.allocator },
-                .shared_calls = self.shared_calls,
-                .descriptor_calls = self.descriptor_calls,
-                .field_recipes = self.field_recipes,
-                .scalar_admission = self.scalar_admission,
-                .active_calls = self.active_calls,
-                .specialize = false,
-                .work_limits = self.work_limits,
-                .emission_work = self.emission_work,
-                .outlining = self.outlining,
-                .units = self.units,
-                .unit_views = self.unit_views,
-                .proof_cache = self.proof_cache,
-                .dispatches = self.dispatches,
-                .capacity_requests = self.capacity_requests,
-                .capacity_prefix = self.capacity_prefix,
-                .validation_budget = self.validation_budget,
-                .entry_unit = self.entry_unit,
-                .specialization_origin = self.specialization_origin,
-                .methods = self.methods,
-                .module = self.module,
-                .runtime = self.runtime,
-                .fixed_region = self.fixed_region,
-                .c = .{ .module = self.module, .function = function },
-            };
-            defer child.deinit();
-            // A closed primitive DAG cannot observe ambient substitutions.
-            // Generic and destination bodies retain the complete caller frame.
-            if (!isolated) try self.inheritTypes(&child);
-            const inputs = try self.allocator.alloc(Value, arguments.len);
-            defer self.allocator.free(inputs);
-            for (inputs, arguments, 0..) |*input, argument, parameter| input.* = .{
-                .word = .{ .id = @intCast(parameter) },
-                .floating = argument.floating,
-            };
-            if (destination) |owner| {
-                const input: Value = .{
-                    .tag = .array,
-                    .word = try child.c.temp(),
-                    .token = .{ .id = @intCast(arguments.len) },
-                    .epoch_low = .{ .id = @intCast(arguments.len + 1) },
-                    .epoch_high = .{ .id = @intCast(arguments.len + 2) },
-                    .root = 0,
-                    .mode = .fixed,
-                };
-                const shape_ = (try self.root(m, body.root, owner)).element;
-                try child.roots.append(self.allocator, .{ .word = input.word, .token = input.token, .epoch_low = input.epoch_low, .epoch_high = input.epoch_high, .stack = self.fixed_region, .depth = 0, .element = shape_, .dedicated = false });
-                child.destination = input;
-                child.external_destination = 0;
-            }
-            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
-                if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
-                return err;
-            };
-            try child.c.value(if (owned_result) output.word else try child.scalar(m, body.root, output));
-            try self.completeCall(cache, inserted, child.context_sensitive, closed_frontier);
-            if (!owned_result) self.emission_work.scoped_scalar_definitions +|= 1;
-            break :blk inserted;
-        };
-        return try self.callScalarFunction(m, body.root, cache.entries.items[index], arguments, destination, result_type);
-    }
-    fn callScalarFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, destination: ?Value, result_type: T.Id) Error!Value {
-        if (entry.building) return self.fail(m, id, .storage_unsupported, "Recursive storage specializations are not admitted");
-        self.noteCalleeContext(entry);
-        for (arguments) |argument| try self.c.value(argument.word);
-        if (destination) |owner| {
-            try self.c.value(owner.token);
-            try self.c.value(owner.epoch_low);
-            try self.c.value(owner.epoch_high);
-        }
-        try self.c.op(.call, entry.function);
-        const result = try self.c.temp();
-        try self.c.op(.local_set, result.id);
-        if (destination) |owner| {
-            try self.c.set(owner.word, result);
-            return owner;
-        }
-        return .{ .word = result, .floating = entry.floating, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = &.{} }) };
-    }
     fn inlineWords(value: Value) Error!usize {
         if (value.tag == .scalar) return 1;
         var count: usize = @intFromBool(value.variant_tags.len != 0);
@@ -3143,180 +2947,10 @@ const Generator = struct {
         for (fields, original.fields) |*field, input| field.* = try self.inlineParameter(input, next);
         return value;
     }
-    fn inlineArgument(self: *Generator, value: Value) Error!void {
-        if (value.tag == .scalar or value.variant_tags.len != 0) try self.c.value(value.word);
-        for (value.fields) |field| try self.inlineArgument(field);
-    }
+
     /// Inline fields travel as ordinary word parameters. Small plain results
     /// return through an instance-private word bank, drained immediately into
     /// locals; other aggregates use a caller-owned slot and immediate rewind.
-    fn reusableInlineCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
-        const body = m.body(target.binding) orelse return null;
-        var eligible = !self.planning_writer;
-        for (arguments) |argument| if (!plainInlineValue(argument)) {
-            eligible = false;
-            break;
-        };
-        var early: ?[]const u32 = null;
-        if (eligible) early = try self.inlineCallEvidence(m, body, arguments, null);
-        defer if (early) |evidence| self.allocator.free(evidence);
-        if (!self.specialize and early == null) return null;
-        var completed: ?usize = null;
-        if (early) |evidence| {
-            const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence };
-            if (self.shared_calls.find(key)) |found| if (!self.shared_calls.entries.items[found].building) {
-                completed = found;
-            };
-        }
-        var remaining: usize = 100_000;
-        if (completed == null and !call_plan.inlineBody(self.units, m, target.binding, &remaining)) {
-            var active: [128]core.BindingRef = undefined;
-            active[0] = target;
-            if (!try self.numericExpression(m, body.root, &remaining, &active, 1, false, 0)) return null;
-        }
-        for (m.bodyParameters(body), arguments) |parameter, argument| {
-            if (!plainInlineValue(argument)) return null;
-            if (!try self.selectedInlineType(.{ .unit = m.unit, .ty = parameter.ty }, &remaining)) return null;
-        }
-        const result_type = m.typeOf(body.root);
-        const result_shape = try self.shape(m, body.root, result_type, 0);
-        if (!plainShape(result_shape)) return null;
-        var words: usize = 0;
-        for (arguments) |argument| words = std.math.add(usize, words, try inlineWords(argument)) catch return self.unsupported(m, body.root);
-        const aggregate_result = result_shape.tag == .aggregate;
-        // A scratch result slot must never consume an array-return destination.
-        if (aggregate_result and self.destination != null) return null;
-        const return_registers = try inlineReturnRegisters(result_shape);
-        const buffered_result = aggregate_result and return_registers == 0;
-        const parameter_count = std.math.add(usize, words, @intFromBool(buffered_result)) catch return self.unsupported(m, body.root);
-        if (parameter_count > std.math.maxInt(u32)) return self.unsupported(m, body.root);
-        var concrete: ?[]const u32 = null;
-        if (eligible) concrete = try self.inlineCallEvidence(m, body, arguments, result_shape);
-        defer if (concrete) |evidence| self.allocator.free(evidence);
-        if (!self.specialize and concrete == null) return null;
-        var evidence: std.ArrayList(u32) = .empty;
-        defer evidence.deinit(self.allocator);
-        var cache = &self.calls;
-        var encoded: []const u32 = undefined;
-        if (concrete) |closed| {
-            cache = self.shared_calls;
-            encoded = closed;
-        } else {
-            try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32), result_type });
-            var type_work: usize = 4096;
-            var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-            defer type_key.deinit();
-            for (m.bodyParameters(body)) |parameter| try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = result_type }, &evidence, &type_key, 0);
-            try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-            encoded = evidence.items;
-        }
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = encoded };
-        const existing = cache.find(key);
-        if (existing != null and concrete != null) self.emission_work.scoped_inline_cache_hits +|= 1;
-        const index = if (existing) |found| found else blk: {
-            const signature = try self.allocator.alloc(wasm.ValueType, parameter_count);
-            defer self.allocator.free(signature);
-            @memset(signature, .i32);
-            const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => return self.unsupported(m, body.root),
-            };
-            const inserted = try cache.insert(key, function, result_shape.floating);
-            var child: Generator = .{
-                .allocator = self.allocator,
-                .arena = std.heap.ArenaAllocator.init(self.allocator),
-                .calls = .{ .allocator = self.allocator },
-                .shared_calls = self.shared_calls,
-                .descriptor_calls = self.descriptor_calls,
-                .field_recipes = self.field_recipes,
-                .scalar_admission = self.scalar_admission,
-                .active_calls = self.active_calls,
-                .specialize = false,
-                .work_limits = self.work_limits,
-                .emission_work = self.emission_work,
-                .outlining = self.outlining,
-                .units = self.units,
-                .unit_views = self.unit_views,
-                .proof_cache = self.proof_cache,
-                .dispatches = self.dispatches,
-                .capacity_requests = self.capacity_requests,
-                .capacity_prefix = self.capacity_prefix,
-                .validation_budget = self.validation_budget,
-                .entry_unit = self.entry_unit,
-                .specialization_origin = self.specialization_origin,
-                .methods = self.methods,
-                .module = self.module,
-                .runtime = self.runtime,
-                .fixed_region = self.fixed_region,
-                .c = .{ .module = self.module, .function = function },
-            };
-            defer child.deinit();
-            try self.inheritTypes(&child);
-            const inputs = try child.arena.allocator().alloc(Value, arguments.len);
-            var next: u32 = 0;
-            for (inputs, arguments) |*input, argument| input.* = try child.inlineParameter(argument, &next);
-            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
-                if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
-                return err;
-            };
-            if (return_registers != 0) {
-                try child.publishInlineReturn(output, return_registers);
-            } else if (aggregate_result) {
-                try child.storeValue(.{ .id = @intCast(words) }, 0, output);
-                try child.c.value(0);
-            } else try child.c.value(try child.scalar(m, body.root, output));
-            try self.completeCall(cache, inserted, child.context_sensitive, concrete != null);
-            if (concrete != null) self.emission_work.scoped_inline_definitions +|= 1;
-            break :blk inserted;
-        };
-        const entry = cache.entries.items[index];
-        self.noteCalleeContext(entry);
-        if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive inline specializations are not admitted");
-        return try self.callInlineFunction(m, body.root, entry, arguments, result_shape, result_type, return_registers);
-    }
-    fn callInlineFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, result_shape: Value, result_type: T.Id, return_registers: usize) Error!Value {
-        if (return_registers != 0) {
-            for (arguments) |argument| try self.inlineArgument(argument);
-            try self.c.op(.call, entry.function);
-            var words: [4]Local = undefined;
-            for (words[0..return_registers]) |*word| word.* = try self.c.temp();
-            try self.c.op(.local_set, words[0].id);
-            // Drain every result word before any call, import or cleanup can
-            // overwrite this instance's bank. Retained results own fresh locals.
-            for (1..return_registers) |index| try self.c.set(words[index], .{ .global, self.runtime.inline_returns[index - 1] });
-            var next: usize = 0;
-            var result = try self.inlineReturnValue(result_shape, words[0..return_registers], &next);
-            std.debug.assert(next == return_registers);
-            result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
-            self.emission_work.scoped_inline_register_calls +|= 1;
-            self.emission_work.scoped_inline_result_owners_avoided +|= 1;
-            self.emission_work.scoped_inline_result_roots_avoided +|= 1;
-            self.emission_work.scoped_inline_result_bytes_avoided +|= storage.header_bytes + try width(result_shape);
-            return result;
-        }
-        const aggregate_result = result_shape.tag == .aggregate;
-        const first_root = self.roots.items.len;
-        const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
-        var address: ?Local = null;
-        if (aggregate_result) {
-            const slot = try self.arrayWithShape(m, id, (try self.constant(1)).word, .fixed, result_shape);
-            address = try self.c.temp();
-            try self.c.set(address.?, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
-        }
-        for (arguments) |argument| try self.inlineArgument(argument);
-        if (address) |pointer| try self.c.value(pointer);
-        try self.c.op(.call, entry.function);
-        const word = try self.c.temp();
-        try self.c.op(.local_set, word.id);
-        var result = if (address) |pointer| try self.loadValue(pointer, 0, result_shape) else Value{ .word = word, .floating = entry.floating };
-        if (mark) |saved| {
-            try self.release(first_root, null);
-            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
-        }
-        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
-        return result;
-    }
     fn readerWords(value: Value) usize {
         return readerWordsPointer(&value);
     }
@@ -3716,6 +3350,7 @@ const Generator = struct {
     // A shared descriptor definition must not key environment-dependent forms
     // through selectedTypeNode's deliberately opaque source-ID fallback.
     fn descriptorType(self: *Generator, input: TypeRef, remaining: *usize, depth: usize) Error!void {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (remaining.* == 0 or depth > 128) return error.Declined;
         remaining.* -= 1;
         const actual = try self.resolveType(input, 0);
@@ -3893,179 +3528,11 @@ const Generator = struct {
         }
         try self.finishSelectedTypes(m, body.root, evidence, &type_key);
     }
-    fn reusableReaderCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, original_arguments: []const Value) Error!?Value {
-        const body = m.body(target.binding) orelse return null;
-        const result_type = m.typeOf(body.root);
-        var remaining: usize = 100_000;
-        if (!try self.selectedDataType(.{ .unit = m.unit, .ty = result_type }, true, &remaining, 0)) return null;
-        const result_shape = try self.shape(m, body.root, result_type, 0);
-        const aggregate_result = result_shape.tag != .scalar;
-        var has_descriptor = false;
-        var words: usize = 0;
-        for (m.bodyParameters(body), arguments) |parameter, argument| {
-            if (!self.readerArgument(argument, &has_descriptor, &remaining)) return null;
-            if (argument.tag != .callable and !try self.selectedDataType(.{ .unit = m.unit, .ty = parameter.ty }, true, &remaining, 0)) return null;
-            words = std.math.add(usize, words, readerWords(argument)) catch return self.unsupported(m, body.root);
-        }
-        if (!has_descriptor) return null;
-        var descriptors: std.ArrayList(Value) = .empty;
-        defer descriptors.deinit(self.allocator);
-        for (arguments) |argument| try self.readerDescriptors(argument, &descriptors);
-        const parameter_words = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return null;
-        if (parameter_words > std.math.maxInt(u32)) return null;
-        var evidence: std.ArrayList(u32) = .empty;
-        defer evidence.deinit(self.allocator);
-        if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
-        if (aggregate_result and self.destination != null) {
-            self.traceDescriptorBarrier(m, body.root, result_shape, "descriptor.reader.pending-destination", false);
-            return null;
-        }
-        var result_schema: ?Value = null;
-        if (aggregate_result) result_schema = result_shape;
-        var shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
-        if (!self.specialize and !shared) return null;
-        var cache = &self.calls;
-        if (shared) cache = &self.descriptor_calls.calls;
-        var key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
-        var existing: ?usize = null;
-        if (shared) existing = cache.find(key);
-        if (existing == null) {
-            if (!call_plan.readerBody(m, body.root, &remaining, 0)) {
-                var active: [128]core.BindingRef = undefined;
-                active[0] = target;
-                const before = self.bindings.items.len;
-                defer self.bindings.shrinkRetainingCapacity(before);
-                for (m.bodyParameters(body), arguments) |parameter, value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = parameter.binding, .value = value, .remaining = 0 });
-                if (!try self.numericExpression(m, body.root, &remaining, &active, 1, true, 0)) return null;
-            }
-            evidence.clearRetainingCapacity();
-            if (!try self.optionalReaderEvidence(m, body, arguments, &evidence)) return null;
-            shared = try self.sharedDescriptorEvidence(m, body, arguments, &evidence, result_schema);
-            if (!self.specialize and !shared) return null;
-            cache = &self.calls;
-            if (shared) cache = &self.descriptor_calls.calls;
-            key.evidence = evidence.items;
-            existing = cache.find(key);
-        }
-        // Replay reads in the enclosing loop and writer summary on hits too.
-        for (original_arguments) |argument| try self.readerReads(m, body.root, argument);
-        if (existing != null) self.emission_work.scoped_reader_cache_hits +|= 1;
-        const index = if (existing) |found| found else blk: {
-            const signature = try self.allocator.alloc(wasm.ValueType, parameter_words);
-            defer self.allocator.free(signature);
-            @memset(signature, .i32);
-            const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => return self.unsupported(m, body.root),
-            };
-            const inserted = try cache.insert(key, function, result_shape.floating);
-            var child: Generator = .{
-                .allocator = self.allocator,
-                .arena = std.heap.ArenaAllocator.init(self.allocator),
-                .calls = .{ .allocator = self.allocator },
-                .shared_calls = self.shared_calls,
-                .descriptor_calls = self.descriptor_calls,
-                .field_recipes = self.field_recipes,
-                .scalar_admission = self.scalar_admission,
-                .active_calls = self.active_calls,
-                .specialize = false,
-                .work_limits = self.work_limits,
-                .emission_work = self.emission_work,
-                .outlining = self.outlining,
-                .units = self.units,
-                .unit_views = self.unit_views,
-                .proof_cache = self.proof_cache,
-                .dispatches = self.dispatches,
-                .capacity_requests = self.capacity_requests,
-                .capacity_prefix = self.capacity_prefix,
-                .validation_budget = self.validation_budget,
-                .entry_unit = self.entry_unit,
-                .specialization_origin = self.specialization_origin,
-                .methods = self.methods,
-                .module = self.module,
-                .runtime = self.runtime,
-                .fixed_region = self.fixed_region,
-                .c = .{ .module = self.module, .function = function },
-            };
-            defer child.deinit();
-            try self.inheritTypes(&child);
-            const inputs = try child.arena.allocator().alloc(Value, arguments.len);
-            var next: u32 = 0;
-            for (inputs, arguments) |*input, argument| {
-                try self.readerParameter(&child, input, argument, &next);
-            }
-            const output = child.invokeBody(target, inputs, 0, false) catch |err| {
-                if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
-                return err;
-            };
-            if (aggregate_result) {
-                if (shared) {
-                    if (!plainReaderResultABI(output, result_shape)) return self.fail(m, body.root, .storage_unsupported, "Shared reader output differs from its checked layout");
-                } else {
-                    var copies: EnvironmentCopies = .empty;
-                    defer copies.deinit(self.allocator);
-                    const template = try self.retainReaderResult(output, descriptors.items.len, &copies, true, 0);
-                    try self.reader_results.put(self.allocator, function, template);
-                }
-                try child.storeReaderResult(.{ .id = next }, 0, output);
-                try child.c.value(0);
-            } else try child.c.value(try child.scalar(m, body.root, output));
-            try self.completeCall(cache, inserted, child.context_sensitive, shared);
-            self.emission_work.scoped_reader_definitions +|= 1;
-            break :blk inserted;
-        };
-        const entry = cache.entries.items[index];
-        self.noteCalleeContext(entry);
-        if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive reader specializations are not admitted");
-        var result_template = result_shape;
-        if (aggregate_result and !shared) result_template = try self.readerResult(self.reader_results.get(entry.function) orelse return self.unsupported(m, body.root), descriptors.items);
-        const first_root = self.roots.items.len;
-        const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
-        var address: ?Local = null;
-        if (aggregate_result) {
-            const count = std.math.cast(u32, @max(1, readerWords(result_template))) orelse return self.unsupported(m, body.root);
-            const lane: Value = .{ .word = .{ .id = 0 } };
-            const slot = try self.arrayWithShape(m, body.root, (try self.constant(count)).word, .fixed, lane);
-            address = try self.c.temp();
-            try self.c.set(address.?, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
-        }
-        for (arguments) |argument| try self.readerValues(argument);
-        if (address) |pointer| try self.c.value(pointer);
-        try self.c.op(.call, entry.function);
-        const word = try self.c.temp();
-        try self.c.op(.local_set, word.id);
-        var result = if (address) |pointer| try self.loadReaderResult(pointer, 0, result_template) else Value{ .word = word, .floating = entry.floating };
-        if (mark) |saved| {
-            try self.release(first_root, null);
-            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
-        }
-        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
-        return result;
-    }
+
     fn writerOrdinal(owners: []const usize, owner_id: usize) Error!usize {
         return std.mem.findScalar(usize, owners, owner_id) orelse error.Declined;
     }
-    fn writerCacheEntry(self: *Generator, m: *const core.Module, id: core.Id, key: call_plan.Key, shared: bool) Error!?usize {
-        var cache = &self.calls;
-        var regions_by_function = &self.writer_regions;
-        if (shared) {
-            cache = &self.descriptor_calls.calls;
-            regions_by_function = &self.descriptor_calls.regions;
-        }
-        var candidates = cache.candidates(key);
-        while (candidates.next()) |index| {
-            const entry = cache.entries.items[index];
-            if (entry.building) return index;
-            const regions = regions_by_function.get(entry.function) orelse return self.unsupported(m, id);
-            var available = true;
-            for (regions) |region| if (region < self.stacks.items.len and self.stacks.items[region]) {
-                available = false;
-                break;
-            };
-            if (available) return index;
-        }
-        return null;
-    }
+
     fn writerInput(self: *Generator, value: *Value, owners: []const usize, assigned: []bool) Error!void {
         value.literal = null;
         value.depth = 0;
@@ -4092,6 +3559,7 @@ const Generator = struct {
     // Layout/type evidence and root edges are separate: the graph numbers each
     // owner once, so cyclic stored borrows never recurse through type evidence.
     fn graphValueEvidence(self: *Generator, m: *const core.Module, id: core.Id, value: Value, evidence: *std.ArrayList(u32), keys: *selected_types.Builder, remaining: *usize, depth: usize) Error!void {
+        if (value.callable != null) self.emission_work.scoped_function_plan_callback_evidence_nodes +|= 1;
         if (depth > 128) return error.Declined;
         var metadata = value;
         metadata.fields = &.{};
@@ -4100,7 +3568,7 @@ const Generator = struct {
         try evidence.appendSlice(self.allocator, &.{ @intFromBool(value.pool_borrow), @intFromBool(value.terminated) });
         for (value.fields) |field| try self.graphValueEvidence(m, id, field, evidence, keys, remaining, depth + 1);
     }
-    fn graphWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error!void {
+    fn graphWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, actual_binding: core.BindingId, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error!void {
         var remaining: usize = 100_000;
         var type_work: usize = 100_000;
         var keys = selected_types.Builder.init(self.allocator, &type_work, .{});
@@ -4109,6 +3577,20 @@ const Generator = struct {
         for (m.bodyParameters(body)) |parameter| try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, evidence, &keys, &remaining);
         try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = m.typeOf(body.root) }, evidence, &keys, &remaining);
         try self.descriptorBodyEvidence(m, body, null, evidence, &keys, &remaining);
+        if (actual_binding != body.binding) {
+            const checked = m.binding(actual_binding);
+            if (checked.scheme.generative.len != 0) return error.Declined;
+            for ([_]T.List{ checked.scheme.variables, checked.public_variables }) |variables| {
+                try evidence.append(self.allocator, variables.len);
+                for (m.types.list(variables)) |variable| try self.descriptorTypeEvidence(m, body.root, .{ .unit = m.unit, .ty = variable }, evidence, &keys, &remaining);
+            }
+            for ([_]T.List{ checked.scheme.row_variables, checked.public_rows }) |rows| {
+                if (rows.len > remaining) return error.Declined;
+                remaining -= rows.len;
+                try evidence.append(self.allocator, rows.len);
+                try evidence.appendSlice(self.allocator, m.types.list(rows));
+            }
+        }
         for (arguments) |argument| {
             try self.graphValueEvidence(m, body.root, argument, evidence, &keys, &remaining, 0);
             try self.readerLayoutEvidence(m, body.root, argument, evidence, &keys);
@@ -4123,9 +3605,9 @@ const Generator = struct {
         }
         try self.finishSelectedTypes(m, body.root, evidence, &keys);
     }
-    fn optionalGraphWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error!bool {
+    fn optionalGraphWriterEvidence(self: *Generator, m: *const core.Module, body: *const core.Body, actual_binding: core.BindingId, arguments: []const Value, graph: *const OwnerGraph, evidence: *std.ArrayList(u32)) Error!bool {
         const before = self.diagnostic;
-        self.graphWriterEvidence(m, body, arguments, graph, evidence) catch |err| {
+        self.graphWriterEvidence(m, body, actual_binding, arguments, graph, evidence) catch |err| {
             if (err == error.OutOfMemory) return err;
             self.diagnostic = before;
             return false;
@@ -4142,12 +3624,15 @@ const Generator = struct {
         for (try self.writableFields(value)) |*field| try self.graphInputShape(field, graph);
     }
     fn graphResultLayout(value: Value) bool {
-        if (value.host != null or value.demand != null or value.tag == .array or value.tag == .callable) return false;
+        if (value.host != null or value.demand != null or value.tag == .callable) return false;
         for (value.fields) |field| if (!graphResultLayout(field)) return false;
         return true;
     }
     fn retainGraphShape(self: *Generator, source: Value, inputs: usize, copies: *EnvironmentCopies, depth: usize) Error!Value {
-        if (depth > 128 or source.host != null or source.demand != null or source.tag == .callable or source.tag == .array) return error.Declined;
+        if (depth > 128 or source.host != null or source.demand != null or source.tag == .callable) return error.Declined;
+        // Array results may alias incoming owners; a fresh/copy result has no
+        // formal owner ordinal and must return to ordinary checked expansion.
+        if (source.tag == .array and source.root == null) return error.Declined;
         if (source.root) |owner| if (owner >= inputs) return error.Declined;
         for (source.other_roots) |owner| if (owner >= inputs) return error.Declined;
         const arena = self.descriptor_calls.arena.allocator();
@@ -4309,7 +3794,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4333,12 +3818,7 @@ const Generator = struct {
             const last = g.module.functions.items.len;
             for (self.module.functions..last) |index| {
                 const function: u32 = @intCast(index);
-                _ = g.descriptor_calls.facts.remove(function);
-                _ = g.descriptor_calls.regions.remove(function);
-                _ = g.descriptor_calls.results.remove(function);
-                _ = g.reader_results.remove(function);
-                _ = g.writer_facts.remove(function);
-                _ = g.writer_regions.remove(function);
+                _ = g.descriptor_calls.plans.remove(function);
             }
             g.calls.rollbackEntries(self.local_calls);
             g.shared_calls.rollbackEntries(self.shared_calls);
@@ -4359,7 +3839,7 @@ const Generator = struct {
             g.module.rollbackTail(self.module);
         }
     };
-    fn tryOwnedFunction(self: *Generator, input: OwnedFunctionInput) Error!?usize {
+    fn tryFunctionPlan(self: *Generator, input: FunctionPlanInput) Error!?usize {
         if (self.descriptor_calls.declined.contains(input.key)) return null;
         const mark = FunctionMark.begin(self) orelse return null;
         const prefix_before = self.capacity_prefix;
@@ -4370,7 +3850,7 @@ const Generator = struct {
         const expressions_before = self.emission_work.scoped_emission_expressions;
         const discarded_before = self.emission_work.scoped_completed_plan_discarded_expressions;
         self.emission_work.scoped_completed_plan_attempts +|= 1;
-        const result = self.emitOwnedFunction(input) catch |err| {
+        const result = self.buildFunctionPlan(input) catch |err| {
             if (err == error.OutOfMemory) return err;
             self.emission_work.scoped_completed_plan_rollbacks +|= 1;
             const nested_discarded = self.emission_work.scoped_completed_plan_discarded_expressions - discarded_before;
@@ -4386,7 +3866,7 @@ const Generator = struct {
         // Bound the complete machine signature, including the result pointer.
         return words <= 512 - @as(usize, @intFromBool(result.tag != .scalar));
     }
-    const OwnedFunctionInput = struct {
+    const FunctionPlanInput = struct {
         module: *const core.Module,
         target: core.BindingRef,
         arguments: []const Value,
@@ -4399,7 +3879,7 @@ const Generator = struct {
         shared: bool,
         key: call_plan.Key,
     };
-    fn emitOwnedFunction(self: *Generator, request: OwnedFunctionInput) Error!usize {
+    fn buildFunctionPlan(self: *Generator, request: FunctionPlanInput) Error!usize {
         const m = request.module;
         const target = request.target;
         const body = m.body(target.binding) orelse return error.Declined;
@@ -4411,16 +3891,10 @@ const Generator = struct {
         const unit_result = request.unit_result;
         const shared = request.shared;
         const direct = ownedWordAbi(words, request.result_shape);
-        const buffered_result = request.result_shape.tag != .scalar;
+        const return_registers = if (direct) try inlineReturnRegisters(request.result_shape) else 0;
+        const buffered_result = request.result_shape.tag != .scalar and return_registers == 0;
         const key = request.key;
-        var cache = &self.calls;
-        var facts_by_function = &self.writer_facts;
-        var regions_by_function = &self.writer_regions;
-        if (shared) {
-            cache = &self.descriptor_calls.calls;
-            facts_by_function = &self.descriptor_calls.facts;
-            regions_by_function = &self.descriptor_calls.regions;
-        }
+        const cache = &self.descriptor_calls.calls;
         var signature: []const wasm.ValueType = &.{.i32};
         if (direct) {
             const count = std.math.add(usize, words, @intFromBool(buffered_result)) catch return error.Declined;
@@ -4495,12 +3969,15 @@ const Generator = struct {
         };
         var copies: EnvironmentCopies = .empty;
         defer copies.deinit(self.allocator);
+        var result_template = request.result_shape;
         if (unit_result) {
             try child.c.value(try child.scalar(m, body.root, output));
         } else {
-            const template = try self.retainGraphShape(output, owners.len, &copies, 0);
-            try self.descriptor_calls.results.put(self.allocator, function, template);
-            if (direct and !buffered_result) {
+            const template = try self.retainGraphShape(if (output.terminated) request.result_shape else output, owners.len, &copies, 0);
+            result_template = template;
+            if (return_registers != 0) {
+                try child.publishInlineReturn(output, return_registers);
+            } else if (direct and !buffered_result) {
                 try child.c.value(try child.scalar(m, body.root, output));
             } else {
                 if (direct) {
@@ -4508,6 +3985,18 @@ const Generator = struct {
                 } else try child.storeReaderResult(.{ .id = 0 }, @intCast(words * 4), output);
                 try child.c.value(0);
             }
+        }
+        // An ordinary helper has no registered outline root. Do not publish
+        // a body the existing Wasm engine cannot encode; expanded fallback
+        // retains the caller's outliner. Standard scoped instructions encode
+        // within 64 bytes, including vector immediates. This conservative raw
+        // body bound includes local groups/header; final encoding remains the
+        // authority after optimization (this is not an arbitrary-IR proof).
+        const machine = &self.module.functions.items[function];
+        const raw_bytes = 6 +| (machine.locals.items.len *| 6) +| (machine.instructions.items.len *| 64);
+        if (machine.parameters.len > 50_000 or machine.locals.items.len > 50_000 - machine.parameters.len or raw_bytes > 7_654_321) {
+            self.emission_work.scoped_function_plan_machine_declines +|= 1;
+            return error.Declined;
         }
         self.max_stacks = @max(self.max_stacks, child.max_stacks);
         var regions: std.ArrayList(usize) = .empty;
@@ -4527,9 +4016,17 @@ const Generator = struct {
             } else if (shared) shape_ = try self.retainDescriptorShape(original.shape) else shape_ = try self.retainReaderResult(original.shape, 0, &copies, true, 0);
             fact.* = .{ .owner = original.owner, .kind = original.kind, .shape = shape_ };
         }
-        try facts_by_function.put(self.allocator, function, facts);
-        try regions_by_function.put(self.allocator, function, try summary_arena.dupe(usize, regions.items));
+        const retained_regions = try summary_arena.dupe(usize, regions.items);
+        const plan = try summary_arena.create(CheckedFunctionPlan);
+        try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
+        self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
+        for (facts) |event| {
+            if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
+        }
+        if (owners.len != 0 and facts.len == 0) self.emission_work.scoped_function_plan_empty_owner_contracts +|= 1;
+        self.emission_work.scoped_function_plan_definitions +|= 1;
         self.emission_work.scoped_writer_definitions +|= 1;
         if (graph_mode and owners.len == 0) {
             self.emission_work.scoped_plain_plan_definitions +|= 1;
@@ -4540,179 +4037,103 @@ const Generator = struct {
         }
         return inserted;
     }
-    fn reusableOwnedCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value, graph_only: bool) Error!?Value {
+
+    const PreparedFunctionCall = struct {
+        graph: OwnerGraph,
+        evidence: std.ArrayList(u32),
+        key: call_plan.Key,
+        words: usize,
+        arguments: []const Value,
+        closed_scalar: bool,
+        fn deinit(self: *PreparedFunctionCall, allocator: std.mem.Allocator) void {
+            self.graph.deinit();
+            self.evidence.deinit(allocator);
+        }
+    };
+    fn prepareFunctionCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?PreparedFunctionCall {
         if (self.destination != null) return null;
         const body = m.body(target.binding) orelse return null;
-        const result = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
+        var graph = OwnerGraph.init(self.allocator, self.roots.items, arguments) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            return null;
+        };
+        var evidence: std.ArrayList(u32) = .empty;
+        var keep = false;
+        defer if (!keep) {
+            graph.deinit();
+            evidence.deinit(self.allocator);
+        };
+        self.emission_work.scoped_function_plan_preparations +|= 1;
+        var scalar_inputs = true;
+        for (arguments) |argument| if (argument.tag != .scalar or argument.callable != null or argument.demand != null or argument.host != null or argument.root != null or argument.other_roots.len != 0 or argument.fields.len != 0 or argument.variant_tags.len != 0) {
+            scalar_inputs = false;
+            break;
+        };
+        const closed_scalar = scalar_inputs and try self.closedScalarBody(m, target.binding);
+        if (closed_scalar) {
+            try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 12, m.typeOf(body.root), @intCast(arguments.len) });
+            for (m.bodyParameters(body), arguments) |parameter, argument| try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(argument.floating) });
+            self.emission_work.scoped_function_plan_closed_scalar_preparations +|= 1;
+        } else if (!try self.optionalGraphWriterEvidence(m, body, target.binding, arguments, &graph, &evidence)) return null;
+        var words: usize = 0;
+        for (arguments) |argument| words = std.math.add(usize, words, readerWords(argument)) catch return null;
+        keep = true;
+        return .{ .graph = graph, .evidence = evidence, .words = words, .arguments = arguments, .closed_scalar = closed_scalar, .key = .{ .unit = m.unit, .binding = target.binding, .context = if (closed_scalar) 0 else self.invocationContext(), .context_free = closed_scalar, .evidence = evidence.items } };
+    }
+    fn getOrBuildFunctionPlan(self: *Generator, m: *const core.Module, target: core.BindingRef, call: *PreparedFunctionCall) Error!?*const CheckedFunctionPlan {
+        const body = m.body(target.binding) orelse return null;
+        var candidates = self.descriptor_calls.calls.candidates(call.key);
+        while (candidates.next()) |index| {
+            const entry = self.descriptor_calls.calls.entries.items[index];
+            if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive function plans are not admitted");
+            const plan = self.descriptor_calls.plans.get(entry.function) orelse return self.unsupported(m, body.root);
+            var available = true;
+            for (plan.regions) |region| if (region < self.stacks.items.len and self.stacks.items[region]) {
+                available = false;
+                break;
+            };
+            if (!available) continue;
+            self.emission_work.scoped_function_plan_hits +|= 1;
+            return plan;
+        }
+        if (self.descriptor_calls.declined.contains(call.key)) return null;
+        self.emission_work.scoped_function_plan_constructions +|= 1;
+        const result: TypeRef = if (call.closed_scalar) .{ .unit = m.unit, .ty = m.typeOf(body.root) } else try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
         const unit_result = (try self.unit(result.unit)).types.node(result.ty).tag == .unit;
         var result_shape: Value = .{ .word = .{ .id = 0 } };
-        if (!unit_result) {
+        if (call.closed_scalar) {
+            result_shape.floating = result.ty == T.f32_type;
+        } else if (!unit_result) {
             const graph_before = self.planning_owner_graph;
             self.planning_owner_graph = true;
             defer self.planning_owner_graph = graph_before;
-            var result_work: usize = 100_000;
-            if (!try self.selectedDataType(result, true, &result_work, 0)) return null;
+            var remaining: usize = 100_000;
+            if (!try self.selectedDataType(result, true, &remaining, 0)) return null;
             const before = self.type_arguments.items.len;
             defer self.type_arguments.shrinkRetainingCapacity(before);
             if (result.environment) |environment| try self.restoreTypes(environment);
-            var source_id = body.root;
-            if (result.unit != m.unit) source_id = 0;
-            result_shape = try self.shape(try self.unit(result.unit), source_id, result.ty, 0);
+            result_shape = try self.shape(try self.unit(result.unit), if (result.unit == m.unit) body.root else 0, result.ty, 0);
             if (!graphResultLayout(result_shape)) return null;
         }
-        const writable_result = unit_result or plainInlineValue(result_shape);
-        if (!graph_only and !writable_result) return null;
-        // Plain helpers with updates or nominal operators can fail the older
-        // expression whitelist. Complete their actual body through the same
-        // transactional ABI; no borrowed or owning argument is admitted here.
-        var plain = writable_result;
-        for (arguments) |argument| if (!plainInlineValue(argument)) {
-            plain = false;
-            break;
-        };
-        var remaining: usize = 100_000;
-        var descriptor = false;
-        var words: usize = 0;
-        var graph_mode = !unit_result and !stableDescriptorShape(result_shape);
-        if (plain) graph_mode = true;
-        for (arguments) |argument| {
-            if (!self.readerArgument(argument, &descriptor, &remaining)) graph_mode = true;
-        }
-        var descriptors: std.ArrayList(Value) = .empty;
-        defer descriptors.deinit(self.allocator);
-        var owners: std.ArrayList(usize) = .empty;
-        defer owners.deinit(self.allocator);
-        if (!graph_mode) {
-            for (arguments) |argument| try self.readerDescriptors(argument, &descriptors);
-            for (descriptors.items) |value| {
-                const first = value.root orelse return null;
-                if (first >= self.roots.items.len) return null;
-                if (std.mem.findScalar(usize, owners.items, first) == null) try owners.append(self.allocator, first);
-                for (value.other_roots) |other| {
-                    if (other >= self.roots.items.len) return null;
-                    if (std.mem.findScalar(usize, owners.items, other) == null) try owners.append(self.allocator, other);
-                }
-            }
-            for (owners.items) |owner_id| if (!stableDescriptorShape(self.roots.items[owner_id].element)) {
-                graph_mode = true;
-            };
-        }
-        if (graph_mode != graph_only) return null;
-        // Ordinary plain readers get their smaller ABI first. If they decline,
-        // a writer returning fixed plain data uses the same exact owner graph
-        // and result buffer as a descriptor-bearing reader. No returned owner
-        // or borrow authority is introduced by this extension.
-        if (!unit_result and !graph_only) graph_mode = true;
-        var graph: ?OwnerGraph = null;
-        defer if (graph) |*value| value.deinit();
-        if (graph_mode) {
-            graph = OwnerGraph.init(self.allocator, self.roots.items, arguments) catch |err| {
-                if (err == error.OutOfMemory) return err;
-                return null;
-            };
-            owners.clearRetainingCapacity();
-            try owners.appendSlice(self.allocator, graph.?.owners.items);
-            descriptor = owners.items.len != 0;
-        }
-        if (!descriptor and !plain) return null;
-        // Only walk the ABI after the ordinary or graph admission bounded every
-        // field. A failed reader probe must not trigger an unbounded fallback.
-        for (arguments) |argument| words = std.math.add(usize, words, readerWords(argument)) catch return null;
-        var evidence: std.ArrayList(u32) = .empty;
-        defer evidence.deinit(self.allocator);
-        if (graph) |*value| {
-            if (!try self.optionalGraphWriterEvidence(m, body, arguments, value, &evidence)) return null;
-        } else if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
-        var stable = true;
-        for (owners.items) |owner_id| {
-            if (!stableDescriptorShape(self.roots.items[owner_id].element)) {
-                self.traceDescriptorBarrier(m, body.root, self.roots.items[owner_id].element, "descriptor.writer.stable-row", true);
-                stable = false;
-            }
-        }
-        var shared = graph_mode;
-        if (!graph_mode) shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null);
-        if (!self.specialize and !shared) return null;
-        var key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = self.invocationContext(), .evidence = evidence.items };
-        var existing: ?usize = null;
-        if (shared) existing = try self.writerCacheEntry(m, body.root, key, true);
-        if (existing == null) {
-            if (!graph_mode) {
-                // Input-owner schemas permit nested fixed-layout borrows. The
-                // existing body admission still rejects shrinking, freezing, host
-                // calls and fresh-owner results. Mutating calls may return only
-                // Unit or fixed plain data; borrowed results remain read-only.
-                {
-                    const planning_before = self.planning_writer;
-                    const graph_before = self.planning_owner_graph;
-                    self.planning_writer = writable_result;
-                    self.planning_owner_graph = graph_mode;
-                    defer self.planning_writer = planning_before;
-                    defer self.planning_owner_graph = graph_before;
-                    const roots_before = self.roots.items.len;
-                    defer self.roots.shrinkRetainingCapacity(roots_before);
-                    const bindings_before = self.bindings.items.len;
-                    defer self.bindings.shrinkRetainingCapacity(bindings_before);
-                    for (m.bodyParameters(body), arguments) |parameter, value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = parameter.binding, .value = value, .remaining = 0 });
-                    var active: [128]core.BindingRef = undefined;
-                    active[0] = target;
-                    const types_before = self.type_arguments.items.len;
-                    const diagnostic_before = self.diagnostic;
-                    var admitted = false;
-                    defer if (!admitted) {
-                        self.type_arguments.shrinkRetainingCapacity(types_before);
-                        self.diagnostic = diagnostic_before;
-                    };
-                    admitted = self.numericExpression(m, body.root, &remaining, &active, 1, true, 0) catch |err| switch (err) {
-                        error.OutOfMemory => return err,
-                        error.Declined => return null,
-                    };
-                    if (!admitted) return null;
-                }
-                evidence.clearRetainingCapacity();
-                if (graph) |*value| {
-                    if (!try self.optionalGraphWriterEvidence(m, body, arguments, value, &evidence)) return null;
-                } else if (!try self.optionalWriterEvidence(m, body, arguments, descriptors.items, owners.items, &evidence)) return null;
-                shared = graph_mode;
-                if (!graph_mode) shared = stable and try self.sharedDescriptorEvidence(m, body, arguments, &evidence, null);
-                if (!self.specialize and !shared) return null;
-                key.evidence = evidence.items;
-                existing = try self.writerCacheEntry(m, body.root, key, shared);
-            }
-        }
-        var cache = &self.calls;
-        var facts_by_function = &self.writer_facts;
-        var regions_by_function = &self.writer_regions;
-        if (shared) {
-            cache = &self.descriptor_calls.calls;
-            facts_by_function = &self.descriptor_calls.facts;
-            regions_by_function = &self.descriptor_calls.regions;
-        }
-        if (existing != null) {
-            self.emission_work.scoped_writer_cache_hits +|= 1;
-            if (graph_mode and owners.items.len == 0) {
-                self.emission_work.scoped_plain_plan_hits +|= 1;
-            } else if (graph_mode) self.emission_work.scoped_owner_graph_hits +|= 1;
-        }
-        var index = existing;
-        if (index == null) {
-            var graph_input: ?*const OwnerGraph = null;
-            if (graph) |*value| graph_input = value;
-            const input: OwnedFunctionInput = .{ .module = m, .target = target, .arguments = arguments, .owners = owners.items, .graph = graph_input, .words = words, .unit_result = unit_result, .writable_result = writable_result, .result_shape = result_shape, .shared = shared, .key = key };
-            if (graph_mode) {
-                index = try self.tryOwnedFunction(input);
-                if (index == null) return null;
-            } else index = try self.emitOwnedFunction(input);
-        }
-        const entry = cache.entries.items[index.?];
-        if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive writer specializations are not admitted");
+        const request: FunctionPlanInput = .{ .module = m, .target = target, .arguments = call.arguments, .owners = call.graph.owners.items, .graph = &call.graph, .words = call.words, .unit_result = unit_result, .writable_result = unit_result or plainInlineValue(result_shape), .result_shape = result_shape, .shared = true, .key = call.key };
+        const index = (try self.tryFunctionPlan(request)) orelse return null;
+        return self.descriptor_calls.plans.get(self.descriptor_calls.calls.entries.items[index].function) orelse return self.unsupported(m, body.root);
+    }
+    fn emitPlannedCall(self: *Generator, m: *const core.Module, body: *const core.Body, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
+        self.emission_work.scoped_function_plan_emissions +|= 1;
+        const emitting_before = self.emitting_function_plan;
+        self.emitting_function_plan = true;
+        defer self.emitting_function_plan = emitting_before;
+        const entry = plan.entry;
+        const words = plan.input_words;
+        const unit_result = plan.unit_result;
         self.noteCalleeContext(entry);
         // Replay the actual compiler access order even on cache hits. Caller
         // loop scopes see the same row shapes as expanded selected bodies.
-        for (facts_by_function.get(entry.function) orelse return self.unsupported(m, body.root)) |event| {
-            const owner_id = owners.items[event.owner];
+        for (plan.events) |event| {
+            const owner_id = owners[event.owner];
             var shape_ = event.shape;
-            if (graph_mode) shape_ = try self.graphCallerShape(shape_, owners.items);
+            shape_ = try self.graphCallerShape(shape_, owners);
             if (event.kind == .write) {
                 const owner = &self.roots.items[owner_id];
                 try self.storedShape(m, body.root, &owner.element, shape_, owner.depth);
@@ -4726,22 +4147,22 @@ const Generator = struct {
             const replay: Value = .{ .tag = .array, .word = self.roots.items[owner_id].word, .root = owner_id };
             try self.writerEvent(m, body.root, replay, event.kind);
         }
-        for (regions_by_function.get(entry.function) orelse return self.unsupported(m, body.root)) |region| {
+        for (plan.regions) |region| {
             try self.used_regions.put(self.allocator, region, {});
             self.max_stacks = @max(self.max_stacks, @as(u32, @intCast(region + 1)));
         }
-        if (ownedWordAbi(words, result_shape)) {
-            var template = result_shape;
-            if (!unit_result) template = try self.graphCallerShape(self.descriptor_calls.results.get(entry.function) orelse return self.unsupported(m, body.root), owners.items);
-            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result);
+        if (plan.abi != .buffered) {
+            var template = plan.result;
+            if (!unit_result) template = try self.graphCallerShape(plan.result, owners);
+            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers);
         }
         self.emission_work.scoped_owned_packed_calls +|= 1;
         const first_root = self.roots.items.len;
         const mark = try self.frameMark();
-        var result_template = result_shape;
+        var result_template = plan.result;
         var total_words = words;
         if (!unit_result) {
-            result_template = try self.graphCallerShape(self.descriptor_calls.results.get(entry.function) orelse return self.unsupported(m, body.root), owners.items);
+            result_template = try self.graphCallerShape(plan.result, owners);
             total_words = std.math.add(usize, words, readerWords(result_template)) catch return self.unsupported(m, body.root);
         }
         const count = std.math.cast(u32, @max(1, total_words)) orelse return self.unsupported(m, body.root);
@@ -4765,13 +4186,13 @@ const Generator = struct {
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() });
         return returned;
     }
-    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool) Error!Value {
+    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize) Error!Value {
         self.emission_work.scoped_owned_word_calls +|= 1;
         self.emission_work.scoped_owned_argument_words_avoided +|= words;
         const first_root = self.roots.items.len;
         var mark: ?Local = null;
         var address: ?Local = null;
-        if (template.tag != .scalar) {
+        if (template.tag != .scalar and return_registers == 0) {
             mark = try self.frameMark();
             const count = std.math.cast(u32, @max(1, readerWords(template))) orelse return self.unsupported(m, id);
             const slot = try self.arrayWithShape(m, id, (try self.constant(count)).word, .fixed, .{ .word = .{ .id = 0 } });
@@ -4785,7 +4206,22 @@ const Generator = struct {
         const word = try self.c.temp();
         try self.c.op(.local_set, word.id);
         var returned: Value = .{ .word = word, .floating = entry.floating };
-        if (address) |pointer| returned = try self.loadReaderResult(pointer, 0, template);
+        if (return_registers != 0) {
+            var results: [4]Local = undefined;
+            results[0] = word;
+            for (1..return_registers) |index| {
+                results[index] = try self.c.temp();
+                try self.c.set(results[index], .{ .global, self.runtime.inline_returns[index - 1] });
+            }
+            var next: usize = 0;
+            returned = try self.inlineReturnValue(template, results[0..return_registers], &next);
+            std.debug.assert(next == return_registers);
+            self.emission_work.scoped_function_plan_register_calls +|= 1;
+            self.emission_work.scoped_inline_register_calls +|= 1;
+            self.emission_work.scoped_inline_result_owners_avoided +|= 1;
+            self.emission_work.scoped_inline_result_roots_avoided +|= 1;
+            self.emission_work.scoped_inline_result_bytes_avoided +|= storage.header_bytes + try width(template);
+        } else if (address) |pointer| returned = try self.loadReaderResult(pointer, 0, template);
         if (mark) |saved| {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
@@ -4848,6 +4284,7 @@ const Generator = struct {
         height.* = @max(height.*, child.height + 1);
     }
     fn selectedTypeNode(self: *Generator, m: *const core.Module, id: core.Id, input: TypeRef, keys: *selected_types.Builder, depth: usize) (Error || selected_types.Error)!selected_types.Result {
+        if (self.emitting_function_plan) self.emission_work.scoped_function_plan_post_type_queries +|= 1;
         if (keys.remaining.* == 0 or depth > 128) return error.Limit;
         const actual = try self.resolveType(input, 0);
         var reference: selected_types.Reference = .{
@@ -4980,24 +4417,15 @@ const Generator = struct {
         try self.finishSelectedTypes(m, body.root, &selected, &type_key);
         if (self.active_calls.contains(selected_target, selected.items)) return self.fail(m, body.root, .storage_unsupported, "Recursive selected calls are not supported by the owned-storage backend");
         if (self.active_calls.frames.items.len >= 128) return self.fail(m, body.root, .storage_unsupported, "Selected calls exceeded their active call bound");
-        if (reuse) if (try self.reusableCall(m, target, arguments)) |value| return value;
-        if (reuse) if (try self.reusableInlineCall(m, target, arguments)) |value| return value;
         if (reuse) {
-            // Semantic mapping, goals, selected callbacks and the scalar/inline
-            // probes above consume the originals. Share one physical ABI only
-            // between owned/reader probes; expanded fallback also binds originals.
             const prepared = try self.projectedArguments(m, body, arguments);
-            if (try self.reusableOwnedCall(m, target, prepared.values, true)) |value| {
-                self.commitPreparedArguments(prepared, .owned);
-                return value;
-            }
-            if (try self.reusableReaderCall(m, target, prepared.values, arguments)) |value| {
-                self.commitPreparedArguments(prepared, .reader);
-                return value;
-            }
-            if (try self.reusableOwnedCall(m, target, prepared.values, false)) |value| {
-                self.commitPreparedArguments(prepared, .owned);
-                return value;
+            if (try self.prepareFunctionCall(m, target, prepared.values)) |candidate| {
+                var call = candidate;
+                defer call.deinit(self.allocator);
+                if (try self.getOrBuildFunctionPlan(m, target, &call)) |plan| {
+                    self.commitPreparedArguments(prepared, .owned);
+                    return self.emitPlannedCall(m, body, plan, prepared.values, call.graph.owners.items);
+                }
             }
             if (prepared.fields_omitted != 0) self.emission_work.scoped_argument_projection_discards +|= 1;
         }
@@ -6948,7 +6376,8 @@ const Generator = struct {
                 try self.c.op(.local_set, input.id);
                 break :blk .{ .word = input, .floating = parameter == .f32 };
             };
-            const value = try self.invoke(.{ .unit = m.unit, .binding = body.binding }, &.{argument}, 0);
+            // The exported function already owns its registered outline root.
+            const value = try self.invokeBody(.{ .unit = m.unit, .binding = body.binding }, &.{argument}, 0, false);
             if (arrayAbi(result)) try self.resetPackets();
             const word = if (value.terminated) value.word else if (arrayAbi(result)) try self.toWire(m, body.root, value, result) else try self.scalar(m, body.root, value);
             try self.release(0, null);
@@ -7156,6 +6585,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
 fn immutableMetadataSnapshots(allocator: std.mem.Allocator) !void {
     // These helpers use metadata only; emission and type selection stay idle.
     var g: Generator = undefined;
+    g.emitting_function_plan = false;
     g.allocator = allocator;
     g.arena = std.heap.ArenaAllocator.init(allocator);
     defer g.arena.deinit();
@@ -7231,6 +6661,7 @@ test "immutable metadata preserves read writer and loop snapshots through alloca
 fn sparseReadFrames(allocator: std.mem.Allocator) !void {
     // Metadata-only helpers; runtime emission and type selection stay idle.
     var g: Generator = undefined;
+    g.emitting_function_plan = false;
     g.allocator = allocator;
     g.arena = std.heap.ArenaAllocator.init(allocator);
     defer g.arena.deinit();
@@ -7473,21 +6904,30 @@ fn scalarAdmissionRefinement(allocator: std.mem.Allocator, units: []const core.M
         const unresolved = try g.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
         try std.testing.expect(m.types.node(unresolved.ty).tag == .variable);
         const saved = g.type_arguments.items.len;
-        try std.testing.expect(try g.completedScalar(m, body, &arguments) == null);
+        var unready = try g.prepareFunctionCall(m, target, &arguments);
+        defer if (unready) |*call| call.deinit(allocator);
+        try std.testing.expect(unready == null);
         try std.testing.expectEqual(saved, g.type_arguments.items.len);
         try std.testing.expect(g.diagnostic == null);
-        const result = try g.reusableCall(m, target, &arguments);
-        try std.testing.expect(result != null);
-        try std.testing.expectEqual(actual == T.f32_type, result.?.floating);
+        const result = try g.invokeBody(target, &arguments, 0, true);
+        try std.testing.expectEqual(actual == T.f32_type, result.floating);
+        // The ordinary expanded result is correct even while the optional
+        // planner declines an unresolved return. A checked result use closes
+        // that instance before it can enter the shared plan dictionary.
+        try g.mapTypes(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, .{ .unit = m.unit, .ty = actual }, 0);
         const resolved = try g.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
         try std.testing.expectEqual(actual, resolved.ty);
-        const definitions = emission_work.scoped_scalar_definitions;
-        const hits = emission_work.scoped_scalar_completed_hits;
-        const repeated = try g.reusableCall(m, target, &arguments);
-        try std.testing.expect(repeated != null);
-        try std.testing.expectEqual(actual == T.f32_type, repeated.?.floating);
-        try std.testing.expectEqual(definitions, emission_work.scoped_scalar_definitions);
-        try std.testing.expectEqual(hits + 1, emission_work.scoped_scalar_completed_hits);
+        // Once ordinary proof/refinement has completed, both result families
+        // use the same immutable plan and retain distinct scalar bit ABIs.
+        const second = try g.invokeBody(target, &arguments, 0, true);
+        try std.testing.expectEqual(actual == T.f32_type, second.floating);
+        const definitions = emission_work.scoped_function_plan_definitions;
+        const hits = emission_work.scoped_function_plan_hits;
+        const repeated = try g.invokeBody(target, &arguments, 0, true);
+        try std.testing.expectEqual(actual == T.f32_type, repeated.floating);
+        try std.testing.expectEqual(definitions, emission_work.scoped_function_plan_definitions);
+        try std.testing.expectEqual(hits + 1, emission_work.scoped_function_plan_hits);
+        try std.testing.expectEqual(@as(u64, 0), emission_work.scoped_function_plan_post_type_queries);
     }
 }
 test "scalar completed hits preserve unresolved numeric admission and distinct return instantiations through OOM" {
@@ -7519,6 +6959,7 @@ test "scalar completed hits preserve unresolved numeric admission and distinct r
 fn primitiveEnvironments(allocator: std.mem.Allocator) !void {
     // Metadata-only resolution. No emission or source-query state is active.
     var g: Generator = undefined;
+    g.emitting_function_plan = false;
     g.allocator = allocator;
     g.type_arguments = .empty;
     defer g.type_arguments.deinit(allocator);
@@ -7595,6 +7036,7 @@ fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
     var retained: Value = undefined;
     {
         var g: Generator = undefined;
+        g.emitting_function_plan = false;
         g.allocator = allocator;
         g.arena = .init(allocator);
         defer g.arena.deinit();
@@ -7639,6 +7081,7 @@ fn primitiveKeyMemo(allocator: std.mem.Allocator) !void {
     var units = [_]core.Module{ metadataTestModule(1), metadataTestModule(2) };
     for (&units) |*unit_| unit_.types = .{ .nodes = &nodes, .extra = &.{} };
     var g: Generator = undefined;
+    g.emitting_function_plan = false;
     g.allocator = allocator;
     g.units = &units;
     g.type_arguments = .empty;
@@ -7728,6 +7171,7 @@ fn preparedReaderHistory(allocator: std.mem.Allocator) !void {
     // Metadata replay is independent of formal admission. In particular, no
     // future admission can silently replace the original read set with its ABI.
     var g: Generator = undefined;
+    g.emitting_function_plan = false;
     g.allocator = allocator;
     g.arena = .init(allocator);
     defer g.arena.deinit();
@@ -7771,4 +7215,98 @@ fn preparedReaderHistory(allocator: std.mem.Allocator) !void {
 test "prepared reader original read replay retains omitted owner loop history through OOM" {
     try preparedReaderHistory(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, preparedReaderHistory, .{});
+}
+
+fn functionPlanAccessContract(allocator: std.mem.Allocator, units: []const core.Module) !void {
+    const m = &units[0];
+    const body = for (m.bodies) |*candidate| {
+        if (std.mem.eql(u8, m.name(candidate.declaration_name), "ignore")) break candidate;
+    } else return error.TestUnexpectedResult;
+    const target: core.BindingRef = .{ .unit = m.unit, .binding = body.binding };
+    const views = [_]*const core.Module{m};
+    var module = wasm.Module.init(allocator);
+    defer module.deinit();
+    const runtime = try storage.emit(&module);
+    const function = try module.addTypedFunction(&.{}, .i32, .scalar);
+    var emission_work: @import("../work_counters.zig").Counters = .{};
+    var proof_cache = try source_proof.SourceProofCache.initWithInventoryBudget(allocator, &views);
+    defer proof_cache.deinit();
+    var dispatches: Dispatches = .empty;
+    defer dispatches.deinit(allocator);
+    var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };
+    defer capacity_requests.deinit();
+    var validation_budget: usize = 1_000_000;
+    var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
+    defer active_calls.deinit();
+    var scalar_admission: call_plan.ScalarAdmission = .{ .allocator = allocator, .units = units };
+    defer scalar_admission.deinit();
+    var field_recipes: field_plan.Cache = .{ .allocator = allocator };
+    defer field_recipes.deinit();
+    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
+    defer descriptor_calls.deinit();
+    var shared_calls: call_plan.Cache = .{ .allocator = allocator };
+    defer shared_calls.deinit();
+    var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
+    defer outlining.deinit();
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = m.unit, .bounds = .{ .allocator = allocator } };
+    defer methods.deinit();
+    var g: Generator = .{ .entry_unit = m.unit, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = &views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .emission_work = &emission_work, .outlining = &outlining, .c = .{ .module = &module, .function = function } };
+    defer g.deinit();
+    const parameters = m.bodyParameters(body);
+    const element: Value = .{ .word = .{ .id = 0 }, .type_evidence = try g.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.u32_type }, .arguments = &.{} }) };
+    const rows: Value = .{ .tag = .array, .word = try g.c.temp(), .token = try g.c.temp(), .epoch_low = try g.c.temp(), .epoch_high = try g.c.temp(), .root = 0, .type_evidence = try g.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = parameters[0].ty }, .arguments = &.{} }) };
+    try g.roots.append(allocator, .{ .word = rows.word, .token = rows.token, .epoch_low = rows.epoch_low, .epoch_high = rows.epoch_high, .stack = 0, .depth = 0, .element = element });
+    const arguments = [_]Value{ rows, try g.constant(5) };
+    var call = (try g.prepareFunctionCall(m, target, &arguments)) orelse return error.TestUnexpectedResult;
+    defer call.deinit(allocator);
+    const plan = (try g.getOrBuildFunctionPlan(m, target, &call)) orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 1), call.graph.owners.items.len);
+    try std.testing.expectEqual(@as(usize, 0), plan.events.len);
+    try std.testing.expectEqual(@as(usize, 5), plan.input_words);
+    try std.testing.expectEqual(FunctionAbi.scalar, plan.abi);
+    const warm = (try g.getOrBuildFunctionPlan(m, target, &call)) orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(plan, warm);
+    _ = try g.emitPlannedCall(m, body, plan, &arguments, call.graph.owners.items);
+    try std.testing.expectEqual(@as(u64, 1), emission_work.scoped_function_plan_empty_owner_contracts);
+    try std.testing.expectEqual(@as(u64, 0), emission_work.scoped_function_plan_read_events);
+    try std.testing.expectEqual(@as(u64, 0), emission_work.scoped_function_plan_write_events);
+    for (m.bodies) |*reader| {
+        if (!std.mem.eql(u8, m.name(reader.declaration_name), "observe") and !std.mem.eql(u8, m.name(reader.declaration_name), "branch")) continue;
+        const selected: core.BindingRef = .{ .unit = m.unit, .binding = reader.binding };
+        var query = (try g.prepareFunctionCall(m, selected, &arguments)) orelse return error.TestUnexpectedResult;
+        defer query.deinit(allocator);
+        const read_plan = (try g.getOrBuildFunctionPlan(m, selected, &query)) orelse return error.TestUnexpectedResult;
+        try std.testing.expect(read_plan.events.len > 0);
+        for (read_plan.events) |event| {
+            try std.testing.expectEqual(WriterKind.read, event.kind);
+            try std.testing.expectEqual(@as(usize, 0), event.owner);
+        }
+    }
+    try std.testing.expectEqual(@as(u64, 0), emission_work.scoped_function_plan_post_type_queries);
+}
+
+test "function plans retain empty unused-owner contracts actual reads and branch reads through OOM" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\const ignore = func (rows: Array U32) -> (value: U32): U32 => return @u32.add value 17
+        \\const observe = func (rows: Array U32) -> (value: U32): U32 => return @u32.add (@storage.read rows 0) value
+        \\const branch = func (rows: Array U32) -> (value: U32): U32 => return if @u32.eq value 0 then @storage.read rows 0 else value
+        \\entry const answer = func (): U32 => return 0
+    ;
+    var lexed = try @import("../parse/lexer.zig").lex(allocator, source);
+    defer lexed.deinit(allocator);
+    var names: @import("../parse/symbols.zig").Pool = .{};
+    defer names.deinit(allocator);
+    var tree = try @import("../parse/parser.zig").parse(allocator, source, lexed.tokens.items, &names);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try @import("../check/check.zig").checkModuleWithOptions(allocator, &tree, &names, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var lowered = try core.lower(allocator, &tree, &names, &checked);
+    defer lowered.deinit(allocator);
+    lowered.unit = 1;
+    try std.testing.expectEqual(@as(usize, 0), lowered.diagnostics.len);
+    try functionPlanAccessContract(allocator, &.{lowered});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, functionPlanAccessContract, .{@as([]const core.Module, &.{lowered})});
 }

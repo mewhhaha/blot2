@@ -123,10 +123,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         8,
       );
       const work = built.stats.workCounters as Record<string, number>;
-      assert.equal(work.scoped_plain_plan_definitions, 5, JSON.stringify(work));
+      assert.equal(work.scoped_plain_plan_definitions, 11, JSON.stringify(work));
       assert.equal(work.scoped_owner_graph_definitions, 0);
       assert.equal(work.scoped_owner_graph_inputs, 0);
-      assert(work.scoped_writer_cache_hits >= 5);
+      assert(work.scoped_function_plan_hits >= 5);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {
@@ -338,7 +338,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(WebAssembly.validate(built.bytes));
       const work = built.stats.workCounters as Record<string, number>;
       assert.equal(work.scoped_plain_plan_definitions, 6);
-      assert(work.scoped_plain_plan_hits >= 3);
+      assert(work.scoped_function_plan_hits >= 3);
       assert.equal(work.scoped_owner_graph_inputs, 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });

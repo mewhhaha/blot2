@@ -410,8 +410,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(built.success, JSON.stringify(built));
       const work = built.stats.workCounters as Record<string, number>;
       // Six library bodies and two wrapper bodies in each of three units.
-      assert.equal(work.scoped_scalar_definitions, 12, JSON.stringify(work));
-      assert(work.scoped_scalar_cache_hits > 0);
+      assert.equal(work.scoped_function_plan_definitions, 12, JSON.stringify(work));
+      assert(work.scoped_function_plan_hits > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {

@@ -152,7 +152,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert.equal(counters.scoped_owner_graph_definitions, 1, fixture.name);
         if (fixture.name === "borrow") {
           assert.equal(counters.scoped_completed_plan_rollbacks, 0);
-          assert(counters.scoped_owner_graph_hits >= 1);
+          assert(counters.scoped_function_plan_hits >= 1);
         } else {
           assert.equal(
             counters.scoped_completed_plan_rollbacks,

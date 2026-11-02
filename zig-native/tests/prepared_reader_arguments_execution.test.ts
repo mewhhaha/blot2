@@ -84,7 +84,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
       const work = result.stats.workCounters as Record<string, number>;
-      assert(work.scoped_reader_projection_calls > 0);
+      assert(work.scoped_owned_projection_calls > 0);
       const guest = await instantiateGuest(result.bytes);
       try {
         for (const input of [0, 7, 1000]) {
@@ -124,14 +124,39 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const formal = await compiler.build({ sources: { [entry]: fullFormal } });
       assert(formal.success, JSON.stringify(formal));
       const formalWork = formal.stats.workCounters as Record<string, number>;
-      assert.equal(formalWork.scoped_reader_projection_calls, 0);
-      assert(formalWork.scoped_argument_projection_discards > 0);
+      assert(formalWork.scoped_owned_projection_calls > 0);
+      assert.equal(formalWork.scoped_function_plan_definitions, 1);
+      assert.equal(formalWork.scoped_function_plan_post_type_queries, 0);
       const guarded = await instantiateGuest(formal.bytes);
       try {
         assert.equal(guarded.call("answer", 7), 7);
       } finally {
         guarded.dispose();
       }
+      const invalidField = await compiler.build({
+        sources: {
+          [entry]: fullFormal.replace("a_omitted: plus", "a_omitted: 7"),
+        },
+      });
+      assert(
+        !invalidField.success,
+        "unused fields retain their written formal types",
+      );
+      assert(invalidField.diagnostics.some((d) => d.stage === "check-project"));
+      const effectful = "effect Signal: U32 -> U32\n" + fullFormal.replace(
+        "const plus = func (value: U32): U32 ! {} => return @u32.add value 1",
+        "const plus = func (value: U32): U32 => return Signal value",
+      );
+      const invalidEffect = await compiler.build({
+        sources: { [entry]: effectful },
+      });
+      assert(
+        !invalidEffect.success,
+        "unused callbacks retain their written effect rows",
+      );
+      assert(
+        invalidEffect.diagnostics.some((d) => d.code === "effect_mismatch"),
+      );
     } finally {
       await compiler.dispose();
       await Deno.remove(directory, { recursive: true });

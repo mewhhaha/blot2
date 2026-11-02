@@ -48,7 +48,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(built.success, JSON.stringify(built));
       const work = built.stats.workCounters as Record<string, number>;
       assert(work.scoped_owner_graph_definitions >= 1, JSON.stringify(work));
-      assert(work.scoped_owner_graph_hits >= 1, JSON.stringify(work));
+      assert(work.scoped_function_plan_hits >= 1, JSON.stringify(work));
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {
@@ -124,18 +124,14 @@ for (const codegenTier of ["development", "optimized"] as const) {
           assert.equal(work.scoped_owner_graph_definitions, 1);
           assert.equal(work.scoped_plain_plan_definitions, 1);
           assert.equal(work.scoped_completed_plan_definitions, 2);
-          assert(work.scoped_owner_graph_hits >= 1);
+          assert(work.scoped_function_plan_hits >= 1);
         } else {
-          assert.equal(work.scoped_owner_graph_definitions, 0);
-          assert.equal(work.scoped_plain_plan_definitions, 1);
-          assert.equal(work.scoped_completed_plan_attempts, 1);
-          assert(
-            compiler.profileProgress?.events.some((event) =>
-              event.kind === "detail" &&
-              event.stage === "descriptor.shared.callback-evidence"
-            ),
-          );
+          // Captured source goals still require checked expansion.
+          assert.equal(work.scoped_function_plan_definitions, 0);
+          assert.equal(work.scoped_completed_plan_attempts, 0);
+          assert(work.scoped_function_plan_callback_evidence_nodes > 0);
         }
+        assert.equal(work.scoped_function_plan_post_type_queries, 0);
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {
@@ -194,8 +190,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
       });
       assert(built.success, JSON.stringify(built));
       const work = built.stats.workCounters as Record<string, number>;
-      assert(work.scoped_projected_parameter_fields >= 2, JSON.stringify(work));
-      assert(work.scoped_owner_graph_hits >= 1, JSON.stringify(work));
+      assert(work.scoped_owned_argument_fields_omitted >= 2, JSON.stringify(work));
+      assert(work.scoped_function_plan_hits >= 1, JSON.stringify(work));
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {

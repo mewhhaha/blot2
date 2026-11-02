@@ -93,10 +93,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(result.success, JSON.stringify(result));
         const counters = result.stats.workCounters as Record<string, number>;
         assert(
-          counters.scoped_inline_definitions > 0,
+          counters.scoped_function_plan_definitions > 0,
           JSON.stringify(counters),
         );
-        assert(counters.scoped_inline_cache_hits > 0, JSON.stringify(counters));
+        assert(counters.scoped_function_plan_hits > 0, JSON.stringify(counters));
         assert(counters.scoped_field_recipe_hits > 0, JSON.stringify(counters));
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });

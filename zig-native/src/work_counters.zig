@@ -115,6 +115,20 @@ pub const SchemeMembership = struct {
     indexed_items: u64 = 0,
 };
 pub const Counters = struct {
+    scoped_function_plan_machine_declines: u64 = 0,
+    scoped_function_plan_read_events: u64 = 0,
+    scoped_function_plan_write_events: u64 = 0,
+    scoped_function_plan_empty_owner_contracts: u64 = 0,
+    scoped_function_plan_closed_scalar_preparations: u64 = 0,
+    scoped_function_plan_callback_evidence_nodes: u64 = 0,
+    scoped_function_plan_preparations: u64 = 0,
+    scoped_function_plan_constructions: u64 = 0,
+    scoped_function_plan_definitions: u64 = 0,
+    scoped_function_plan_hits: u64 = 0,
+    scoped_function_plan_emissions: u64 = 0,
+    scoped_function_plan_register_calls: u64 = 0,
+    scoped_function_plan_post_type_queries: u64 = 0,
+
     scoped_core_validation_reused: u64 = 0,
     scoped_core_validation_fresh: u64 = 0,
     scoped_source_proof_instances: u64 = 0,

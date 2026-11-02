@@ -2,16 +2,18 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-walks-and-bounds-2026-11-02.json)
-now completes in **7.26–7.42 seconds total**, producing **22.35 MB Wasm**, cache
-disabled, versus 8.30s at the preceding checkpoint. Compile-scoped getter bounds
-receipts and borrowed shape/width walks retain the identical complete Wasm hash.
-All 2,864 native laws compile; 113 selected laws pass full faults and 84 guests
-pass. The [nominal frame/payload batch](../zig-native/measurements/nominal-frame-and-payload-slicing-2026-11-02.json)
-retains seven world/editor and 160 focused hand checks in sync/JSPI. The
-five-second gate remains unmet. Full qualification retains the baseline
-List/chunk failure; installed Pen rejects ABI 8, so no fresh full-game frame/PNG
-is qualified.
+[Actual full main](../zig-native/measurements/unified-function-plans-2026-11-02.json)
+now completes in **5.91 seconds**, versus matched 7.33s, with **21.58 MB Wasm**.
+The configured path takes 6.06s with the identical complete hash. One immutable
+named-function contract replaces the probe cascade; actual ordered accesses,
+full type/source evidence and input-owner aliases remain checked. All 2,866
+native laws compile, 58 affected laws pass full faults, 86 type/effect guests
+pass and Zig lint is clean. Final LLVM retains seven world/editor, 160 hand and
+seven renderer checks. The five-second target remains unmet. Full qualification
+retains the baseline List/chunk failure; installed Pen rejects ABI 8, so no fresh
+full-game frame/PNG is qualified. The next slice is an ownership/layout function
+IR that completes before Wasm emission; ordinary `#run` build functions are a
+separate, unimplemented language simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

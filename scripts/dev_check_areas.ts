@@ -45,6 +45,8 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.scoped_backend.test.function plans retain empty unused-owner contracts actual reads and branch reads through OOM",
+      "backend.storage_calls_tests.test.function plans decline oversized ordinary helpers into registered root outlining",
       "backend.wasm.test.local declaration groups preserve mixed slots and LEB run boundaries",
       "parse.parser_tests.test.boolean words are literal patterns and logical precedence is fixed",
       "check.frozen_core_validation_tests.test.frozen demanded diagnostic display ranges reject stale and overflowing names",
@@ -215,6 +217,7 @@ export const devCheckAreas = {
       "zig-native/tests/scoped_literal_data_execution.test.ts",
       "zig-native/tests/storage_literal_projection_execution.test.ts",
       "zig-native/tests/storage_inline_registers_execution.test.ts",
+      "zig-native/tests/function_plan_execution.test.ts",
     ],
     guestFilters: {} as Record<string, string>,
   },
@@ -566,6 +569,8 @@ export const devCheckAreas = {
       "backend.scoped_backend.test.sparse loop read frames preserve sorted first snapshots nested backedges and lazy persistent owners through OOM",
       "backend.scoped_backend.test.record metadata snapshots raw fields and missing spellings through full OOM",
       "backend.scoped_backend.test.scalar completed hits preserve unresolved numeric admission and distinct return instantiations through OOM",
+      "backend.scoped_backend.test.function plans retain empty unused-owner contracts actual reads and branch reads through OOM",
+      "backend.storage_calls_tests.test.function plans decline oversized ordinary helpers into registered root outlining",
       "backend.scoped_backend.test.primitive resolution preserves captured witnesses variable chains and depth boundaries through OOM",
       "backend.scoped_backend.test.primitive key memo shares only encoded atoms across units captured frames and depth through OOM",
       "backend.scoped_backend.test.boxed type witnesses preserve primitive units environments and retained arena ownership through OOM",
@@ -647,6 +652,7 @@ export const devCheckAreas = {
       "zig-native/tests/scoped_literal_data_execution.test.ts",
       "zig-native/tests/storage_literal_projection_execution.test.ts",
       "zig-native/tests/storage_inline_registers_execution.test.ts",
+      "zig-native/tests/function_plan_execution.test.ts",
       "zig-native/tests/storage_globals_execution.test.ts",
       "zig-native/tests/storage_host_execution.test.ts",
       "zig-native/tests/typed_closure_execution.test.ts",

@@ -152,16 +152,26 @@ travel through caller-owned scratch loaded before release/rewind. Caller
 refinement and definition reuse are independent. Each use replays descriptor
 reads into enclosing loops and writers. Qualified/goaled closures keep the
 checked scalar leaf fallback; pending array destinations still decline aggregate
-scratch calls. Plain inline keys omit only variant refinements erased by their
-parameter ABI; descriptor ownership/initialization evidence remains exact.
+scratch calls. Literal closures retain this separate admission path.
+
+Named functions use one immutable completed plan keyed by complete semantic
+and owner-graph evidence. It stores the ABI, result layout, ordered actual
+reads/writes and required regions. Every call replays those events, including
+reads from compiled branches; unused arguments do not invent reads. Caller
+initialization, alias, frozen-owner, outlives and epoch checks remain. Returned
+array/view aliases must retain only input roots, including alternate roots;
+fresh owners decline into checked expansion. Trapping bodies retain the declared
+result layout. Export bodies stay in registered outline roots; oversized helpers
+roll back before publication. Raw-body feasibility never replaces final encoder
+limits. Planning and key construction still perform semantic work.
 
 Reusable plain inline aggregates with one to four scalar words may return through
 an eager instance-private word bank and the ordinary scalar return. Callees
 publish only after nested calls and cleanup; callers immediately drain every
 word into fresh locals. Other shapes retain caller-owned scratch. Physical
 argument projection follows complete original source/type checking, uses one
-consistent descriptor ordinal space, and never narrows Reader history or formal
-type admission. Expanded fallback always binds the original arguments.
+consistent descriptor ordinal space, and preserves complete formal type admission.
+Expanded fallback always binds the original arguments.
 Zero-argument, nonopaque single-constructor data may narrow its named-record
 payload under the same complete footprint. The nominal wrapper and full semantic
 witness remain intact; getters and whole-value uses retain the full argument.
