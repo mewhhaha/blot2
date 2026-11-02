@@ -1,0 +1,99 @@
+{
+  "date": "2026-11-02",
+  "shippedCompiler": "90d1d684e9e0d1277a259ac7f56f23da6ddd7ac0",
+  "shippedMainMs": [
+    7263.024167,
+    7416.820839999999
+  ],
+  "fiveSecondTarget": "unmet",
+  "held": {
+    "canonicalCertificateStore": {
+      "worldBackendChangePercent": -12.46,
+      "rendererBackendChangePercent": -3.0,
+      "worldAllocationsChangePercent": -32.81,
+      "equivalentWasmAndRuntime": true,
+      "qualification": "2868 native inventory compiled;11engine laws with5fullOOMsweeps/4sameStore retries,Scoped OOM laws,6guests both tiers sync/JSPI pass",
+      "decision": "No LLVM or live changes: missed20%go gate for about300netproductionlines",
+      "evidence": "build/bench/private-prototypes/canonical-type-store/evidence/README.md"
+    },
+    "canonicalDirectEdges": {
+      "worldBackendChangePercent": -11.66,
+      "rendererBackendChangePercent": -4.35,
+      "worldAllocationsChangePercent": -33.29,
+      "equivalentWasmAndRuntime": true,
+      "storeLines": 357,
+      "certificateVariantStoreLines": 389,
+      "baselineStoreLines": 207,
+      "decision": "Simpler but belowsamegate;noLLVM orlivechanges",
+      "evidence": "build/bench/private-prototypes/canonical-direct-edges-evidence/engine-summary.json",
+      "patchSha256": "5ad672b04c22e3d0516efc9a110fe5050e9d32726c0f0117b2f41a5864396174"
+    },
+    "additionalBorrowedQueries": {
+      "worldBackendUs": {
+        "baseline": 2882517,
+        "candidate": 2847734
+      },
+      "equivalentWasmAndRuntime": true,
+      "decision": "1.2%movement withinnoise;noLLVM/livechanges",
+      "evidence": "build/bench/private-prototypes/current-binding-queries/result.json"
+    },
+    "directStateReaders": {
+      "files": 108,
+      "qualifiedCalls": 562,
+      "internalCalls": 7,
+      "readerDefinitions": 2,
+      "mainMs": {
+        "baseline": 7283.8,
+        "candidate": 7348.7
+      },
+      "wasmBytes": {
+        "baseline": 22346701,
+        "candidate": 22056342
+      },
+      "decision": "Source accepts butCPUneutral/slower;no runtime/generalization/livechanges",
+      "evidence": "build/bench/private-prototypes/direct-state-readers/README.md",
+      "overlaySha256": "6f3edca174a492d1f6abd8f3aaa930da8fc9cf2084b03170a14231107dbed7ce"
+    },
+    "flattenedMathLambdas": {
+      "headers": 50,
+      "rewrittenImmediateReturns": 118,
+      "mainMs": 7226.995127,
+      "coreBodies": 5972,
+      "wasmBytes": 22346701,
+      "identicalWholeWasm": true,
+      "decision": "Hypothesis false:parser already normalizes simple returned lambdas. No further tests orlivechanges",
+      "evidence": "build/bench/private-prototypes/flat-math/manifest.json"
+    }
+  },
+  "privateReadyButUnqualified": {
+    "outlinePreviewConservativeBound": {
+      "productionNetLines": 12,
+      "newBoundaryLawFullOOM": true,
+      "existingOutlineLaws": 9,
+      "syntheticEightHelperMedianNs": {
+        "baseline": 196902084,
+        "candidate": 177894956
+      },
+      "equivalentSyntheticWasm": true,
+      "scope": "9.65%outliner microbenchmark gain only; full-main benefit unmeasured. NoLLVM/livechanges.",
+      "evidence": "build/bench/private-prototypes/outline-preview-bound/result.json"
+    }
+  },
+  "freshProfile": {
+    "evidence": "build/bench/gdev-walk-bounds-cpu/main-bd310b4b53881e01/cpu-report.json",
+    "coveredCpuRatio": 0.98813510496,
+    "sourceBodyMetadataCoveragePercent": 59.7,
+    "scope": "Compiler owner attribution covers nearly99%of sampledCPU; source-body contexts only59.7%and nearestavailable/optimized-DWARF-biased. Trace writing and allocation counting are diagnostic overhead. No single known source function dominates.",
+    "largestOwnerPercent": {
+      "wasm_scope_outline.prepareBody": 6.53,
+      "storage_plan.hasRoot": 4.51,
+      "Generator.resolveActual": 4.18,
+      "Generator.selectedDataType": 4.15,
+      "owner_graph.visit": 3.49,
+      "type_key.descriptorWord": 3.48,
+      "callLayoutEvidence": 3.26,
+      "Proof.scan": 3.09,
+      "storage_plan.borrows": 2.96
+    }
+  }
+}

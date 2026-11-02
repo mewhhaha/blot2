@@ -52,8 +52,19 @@ Closed-fragment replay, early scalar-key skipping and paged outliner facts are
 held after neutral or worse CPU pairs. The callsite BodyInstance cache also
 stays held after low measured preparation coverage. A later typed-body/type-node
 representation must remove repeated resolution and Builder work rather than
-wrap it in another cache. The private canonical type-store replacement now
-builds; its differential laws and CPU pairs remain pending.
+wrap it in another cache. Both canonical type-store replacements now pass
+focused correctness but remain held: World backend improves about 12%, renderer
+3–4%, below their 20% gate for roughly 300 added production lines. Direct owner
+inputs for Salt/Rock reduce bytes 1.3% but leave main CPU unchanged; trivial math
+lambda flattening already happens in the parser. Extra pointer queries are also
+neutral. No held patch changed live compiler/library/game sources. See
+[probe evidence](zig-native/measurements/after-walks-and-bounds-probes-2026-11-02.json).
+
+A small private outliner preview shortcut passes its bound/OOM laws and makes
+one synthetic component workload 9.65% faster with identical Wasm. It retains
+exact fallback/final compaction; full-main benefit is unmeasured, so it remains
+unlanded. Fresh profiling points to repeated layout/ownership/type evidence and
+outliner preparation; the next representation experiment is not implemented.
 
 ## Latest checked transport batch
 
