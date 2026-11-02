@@ -1,0 +1,482 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "b4547ddd2066e94a9846dfe8f5308a695f467a20",
+  "changes": [
+    "Use exact all-edge Core identity proof to omit invariant aggregate transport after indexed writes under whole-inventory no-local-address proof. Keep Core/source receipts, stores, liveness and all shape/escape/read checks.",
+    "Complete zero-owner plain/Unit functions with actual checked emission after older expression admissions decline. Use existing direct word ABI, retainGraphShape(0), host/global/escape fallback and transactional rollback.",
+    "Skip scalar shadow admission only on completed strong closed-frontier keys; preserve weak-key and destination fallback.",
+    "Sparse sorted loop first-read snapshots preserve ordinary owner order and late persistent encounter order.",
+    "Cache immutable raw record names/order only. Resolve generic children in current environment and retain exact key bytes and budgets.",
+    "Remove obsolete deep copies from closed immutable shape templates.",
+    "Inherit only the latestAny/latestNonidentity heads in source order when raw history is at least8times active keys; all other child frames retain baseline copies.",
+    "Correct the scalar early probe: restore substitutions/diagnostics on miss and preserve original admission-before-final-key ordering. New causal U32/F32 result-refinement law passes exhaustive faults."
+  ],
+  "qualification": {
+    "check_dev": "build/bench/aggregate-inheritance-final-check-dev/run-de90b3772a9ba68/results.json",
+    "compiled_native": 2839,
+    "selected_full_faults": 80,
+    "full_faults": "build/bench/aggregate-inheritance-final-check-dev/run-de90b3772a9ba68/full-faults.log",
+    "guests": 56,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/aggregate-inheritance-full-gate;48passed/1reproducedbaselineList/chunk storage_escape312..345",
+    "scope": "Selected affected family; full release/native qualification pending"
+  },
+  "renderer_controls": [
+    {
+      "scope": "plain_and_direct_transport",
+      "evidence": "build/bench/direct-plans-transport-kites/pair-8834e8ee3b5cc573/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 4141.561572,
+          "wasm_bytes": 220771,
+          "sha256": "d7cf98b177489ea8a5f402c9e288f41e07fa6b9c9ce9f5295e3e5c5789cbedaa",
+          "work": {
+            "scoped_emission_expressions": 7919,
+            "scoped_call_admission_nodes": 28531
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 4076.057658999999,
+          "wasm_bytes": 224384,
+          "sha256": "98cc3eee825b0d806d7db1cdc91984a71568a63d01b4e6de30ca3bd38ea674b0",
+          "work": {
+            "scoped_emission_expressions": 7056,
+            "scoped_scalar_completed_hits": 515,
+            "scoped_call_admission_nodes": 17309,
+            "scoped_plain_plan_definitions": 22,
+            "scoped_plain_plan_hits": 25,
+            "scoped_transport_words_avoided": 0
+          }
+        }
+      ],
+      "warning": "Single traced native-fast control, not whole-main latency. Plain completion reduces expansion but increases renderer bytes; exact record cache control is byte-identical."
+    },
+    {
+      "scope": "record_names",
+      "evidence": "build/bench/record-metadata-kites/pair-b52fc32087baab56/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 3983.935541,
+          "wasm_bytes": 224384,
+          "sha256": "98cc3eee825b0d806d7db1cdc91984a71568a63d01b4e6de30ca3bd38ea674b0",
+          "work": {
+            "scoped_emission_expressions": 7056,
+            "scoped_scalar_completed_hits": 515,
+            "scoped_call_admission_nodes": 17309,
+            "scoped_plain_plan_definitions": 22,
+            "scoped_plain_plan_hits": 25,
+            "scoped_transport_words_avoided": 0
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 3854.206876,
+          "wasm_bytes": 224384,
+          "sha256": "98cc3eee825b0d806d7db1cdc91984a71568a63d01b4e6de30ca3bd38ea674b0",
+          "work": {
+            "scoped_emission_expressions": 7056,
+            "scoped_scalar_completed_hits": 515,
+            "scoped_call_admission_nodes": 17309,
+            "scoped_plain_plan_definitions": 22,
+            "scoped_plain_plan_hits": 25,
+            "scoped_transport_words_avoided": 0
+          }
+        }
+      ],
+      "warning": "Single traced native-fast control, not whole-main latency. Plain completion reduces expansion but increases renderer bytes; exact record cache control is byte-identical."
+    },
+    {
+      "scope": "correct_scalar_order_and_immutable_layouts",
+      "evidence": "build/bench/scalar-fixed-kites/pair-b071fa88ad5a6629/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 3861.042478,
+          "wasm_bytes": 224384,
+          "sha256": "98cc3eee825b0d806d7db1cdc91984a71568a63d01b4e6de30ca3bd38ea674b0",
+          "work": {
+            "scoped_emission_expressions": 7056,
+            "scoped_scalar_completed_hits": 515,
+            "scoped_call_admission_nodes": 17309
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 3954.35621,
+          "wasm_bytes": 224349,
+          "sha256": "33c8aa675e20105da02556fb3818445bc93be386af5885e932ce4ab31bd78814",
+          "work": {
+            "scoped_emission_expressions": 7047,
+            "scoped_scalar_completed_hits": 517,
+            "scoped_call_admission_nodes": 24891
+          }
+        }
+      ],
+      "warning": "Single native-fast renderer control; earlier admission17,309control predated the scalar ordering correction and does not qualify the final candidate. Final renderer admissions24,891, bytes224,349. Inheritance does not activate on this small renderer."
+    },
+    {
+      "scope": "guarded_type_inheritance",
+      "evidence": "build/bench/type-inheritance-kites/pair-d168e4ea6ef674a1/result.json",
+      "all_seven_complete_streams_equal": true,
+      "builds": [
+        {
+          "name": "baseline",
+          "build_ms": 4025.0058089999998,
+          "wasm_bytes": 224349,
+          "sha256": "33c8aa675e20105da02556fb3818445bc93be386af5885e932ce4ab31bd78814",
+          "work": {
+            "scoped_emission_expressions": 7047,
+            "scoped_scalar_completed_hits": 517,
+            "scoped_call_admission_nodes": 24891
+          }
+        },
+        {
+          "name": "candidate",
+          "build_ms": 3987.8397349999996,
+          "wasm_bytes": 224349,
+          "sha256": "33c8aa675e20105da02556fb3818445bc93be386af5885e932ce4ab31bd78814",
+          "work": {
+            "scoped_emission_expressions": 7047,
+            "scoped_type_environment_inherited_raw_bindings": 2507,
+            "scoped_type_environment_inherited_bindings": 2507,
+            "scoped_scalar_completed_hits": 517,
+            "scoped_call_admission_nodes": 24891
+          }
+        }
+      ],
+      "warning": "Single native-fast renderer control; earlier admission17,309control predated the scalar ordering correction and does not qualify the final candidate. Final renderer admissions24,891, bytes224,349. Inheritance does not activate on this small renderer."
+    }
+  ],
+  "ssa_fixture": {
+    "scope": "Frozen source same-source native/noLLVM fixture comparison; not whole Gdev or release qualification",
+    "baseline_scoped_source_sha256": "801d05213b6b8074483940e2aa46dfb2524a9e6b5870e68e95c3deb2df2e9a32",
+    "candidate_scoped_source_sha256": "f3c004e38287355f2739b7a4da6b781b1a6174c00f6d7aa5cc377fe14eedc328",
+    "baseline_binary_sha256": "5c49aea18e5853a2597aa43d984ec6755a94eabcc1ea886fb0a2bc4609c72c28",
+    "candidate_binary_sha256": "6b4a9cddec260e7d94217f22b58f4674725d54916bb70206123caa6bdb2cb53a",
+    "zig": "0.17.0 native safe llvm=false",
+    "fixture": "165 scalar fields + nested nominal pooled access, conditional heap updates, nested loops, swapped scalar carries, continue/break, shadowed/field-updated breaks, both-arms-return, Op.ref inventory control",
+    "rows": [
+      {
+        "tier": "development",
+        "local_ref_inventory": false,
+        "baseline_bytes": 30138,
+        "candidate_bytes": 17810,
+        "saved_bytes": 12328,
+        "copy_writes_avoided": 2061,
+        "baseline_expressions": 1171,
+        "candidate_expressions": 1171
+      },
+      {
+        "tier": "development",
+        "local_ref_inventory": true,
+        "baseline_bytes": 44552,
+        "candidate_bytes": 44552,
+        "saved_bytes": 0,
+        "copy_writes_avoided": 0,
+        "baseline_expressions": 1171,
+        "candidate_expressions": 1171
+      },
+      {
+        "tier": "optimized",
+        "local_ref_inventory": false,
+        "baseline_bytes": 30138,
+        "candidate_bytes": 17810,
+        "saved_bytes": 12328,
+        "copy_writes_avoided": 2061,
+        "baseline_expressions": 1171,
+        "candidate_expressions": 1171
+      },
+      {
+        "tier": "optimized",
+        "local_ref_inventory": true,
+        "baseline_bytes": 44552,
+        "candidate_bytes": 44552,
+        "saved_bytes": 0,
+        "copy_writes_avoided": 0,
+        "baseline_expressions": 1171,
+        "candidate_expressions": 1171
+      }
+    ],
+    "native_existing_semantic_laws": 8,
+    "native_existing_full_fault_sweeps": 5,
+    "native_new_full_fault_sweeps": 1,
+    "new_executed_calls": 240,
+    "existing_guest_tests_passed": 6,
+    "patch": "/tmp/blot-ssa-transport/ssa-transport-refreshed.patch",
+    "qualification": "Private candidate passed; refreshed patch includes newer root code and needs central integration build"
+  },
+  "sparse_frame_control": {
+    "scope": "Isolated historical-owner read-frame metadata; not a Gdev compiler latency claim",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "llvm": false,
+    "sha256": {
+      "base.zig": "801d05213b6b8074483940e2aa46dfb2524a9e6b5870e68e95c3deb2df2e9a32",
+      "scoped_backend.zig": "c42865f410e33c1f76c8f5cbc76029c36421c5966d50dab655af411ae80cef3f",
+      "law.zig": "6171d6536d73082459aa6ca9f824d2c3e6b76eb340ed4e0059b1a70a78de47f9",
+      "bench.zig": "a28451a6a041e4a2bf31a12403b86c1b5a9909ae51f5f7f0b074a3b9772fab47",
+      "run.py": "0fec0abb9314d3779c6a6ced2084953558ad57004f17b241759a104d9108e108",
+      "bench": "251459f4755f66e13d1a7c8ad14fa1e8fc6ddf55eeb26a3e141212a2a07e721d",
+      "native-tests": "dec87c80a40daf24e6dfc63dd431428494b64b983e8a4ab7882a16f4f366f8b4"
+    },
+    "workload": {
+      "historical_roots": 5000,
+      "frames": 1000,
+      "reads_per_frame": [
+        4999,
+        3,
+        2500,
+        4999
+      ],
+      "distinct_read_owners": 3,
+      "snapshot_bytes": 320,
+      "timeout_seconds": 10
+    },
+    "cpu_accounting": "resource.RUSAGE_CHILDREN user+system per executable",
+    "commands": {
+      "build": [
+        "zig",
+        "build-exe",
+        "/tmp/blot-sparse-read-frame/bench.zig",
+        "-O",
+        "ReleaseSafe",
+        "-fno-llvm",
+        "-femit-bin=/tmp/blot-sparse-read-frame/bench"
+      ],
+      "run": [
+        "python3",
+        "/tmp/blot-sparse-read-frame/run.py"
+      ]
+    },
+    "runs": [
+      {
+        "variant": "old",
+        "exit_code": 0,
+        "cpu_ms": 41.937,
+        "wall_ms": 42.64263799996115,
+        "work": {
+          "requested_bytes": 40960000,
+          "allocation_requests": 4000,
+          "checked_slots": 5000000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":40960000,\"allocation_requests\":4000,\"checked_slots\":5000000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      },
+      {
+        "variant": "new",
+        "exit_code": 0,
+        "cpu_ms": 2.8280000000000074,
+        "wall_ms": 3.036077003343962,
+        "work": {
+          "requested_bytes": 1104000,
+          "allocation_requests": 4000,
+          "checked_slots": 3000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":1104000,\"allocation_requests\":4000,\"checked_slots\":3000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      },
+      {
+        "variant": "new",
+        "exit_code": 0,
+        "cpu_ms": 3.3599999999999968,
+        "wall_ms": 3.512212002533488,
+        "work": {
+          "requested_bytes": 1104000,
+          "allocation_requests": 4000,
+          "checked_slots": 3000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":1104000,\"allocation_requests\":4000,\"checked_slots\":3000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      },
+      {
+        "variant": "old",
+        "exit_code": 0,
+        "cpu_ms": 36.11799999999999,
+        "wall_ms": 36.37933099525981,
+        "work": {
+          "requested_bytes": 40960000,
+          "allocation_requests": 4000,
+          "checked_slots": 5000000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":40960000,\"allocation_requests\":4000,\"checked_slots\":5000000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      },
+      {
+        "variant": "old",
+        "exit_code": 0,
+        "cpu_ms": 36.33900000000001,
+        "wall_ms": 36.67177700845059,
+        "work": {
+          "requested_bytes": 40960000,
+          "allocation_requests": 4000,
+          "checked_slots": 5000000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":40960000,\"allocation_requests\":4000,\"checked_slots\":5000000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      },
+      {
+        "variant": "new",
+        "exit_code": 0,
+        "cpu_ms": 5.21099999999998,
+        "wall_ms": 5.364385986467823,
+        "work": {
+          "requested_bytes": 1104000,
+          "allocation_requests": 4000,
+          "checked_slots": 3000,
+          "checksum": 334000,
+          "snapshot_bytes": 320
+        },
+        "stderr": "{\"requested_bytes\":1104000,\"allocation_requests\":4000,\"checked_slots\":3000,\"checksum\":334000,\"snapshot_bytes\":320}\n"
+      }
+    ],
+    "median_cpu_ms": {
+      "old": 36.33900000000001,
+      "new": 3.3599999999999968
+    },
+    "cpu_reduction_percent": 90.75373565590688
+  },
+  "new_abi_guests": {
+    "direct_guest_tests": {
+      "passed": 6,
+      "failed": 0
+    },
+    "packed_guest_tests_before_extra_boundaries": {
+      "passed": 4,
+      "failed": 0
+    },
+    "baseline_semantic_control_tests": {
+      "passed": 6,
+      "failed": 0,
+      "counter_expectations": "baseline has no plain plans/rollbacks"
+    },
+    "scope": "Private tests only; native three full-OOM laws pending parent central compilation",
+    "multi_module_plans": 5,
+    "word_abi_boundary_plans": 6,
+    "coverage": [
+      "two caller modules and U32/F32 distinct nominal types",
+      "functional nominal updates and generic identity",
+      "signed zero infinity and subnormal F32 bits",
+      "scalar F32 result including NaN payload bits",
+      "nullary Unit and aggregate results",
+      "dynamic tagged results",
+      "repeated scalar local scratch allocation",
+      "local scalar references preserve caller values",
+      "hidden persistent read declines; ordinary fallback preserves mutation",
+      "unknown host callback ordinary fallback preserves effects",
+      "fresh borrowed result remains rejected"
+    ]
+  },
+  "whole_main": "Next optimized measurement pending; b454 main15.1454s/32,724,450B qualifies only b454.",
+  "inheritance_control": {
+    "scope": "Same-source native Stack helper control, Zig0.17.0 optimize=safe llvm=false. Whole-Gdev benefit and renderer byte identity remain integration checks owned by root.",
+    "policy": "Only compact if raw>=8*active keys; retain latestAny and distinct latestNonidentity in original index order, with original environment pointers. No unit/semantic frontier filtering.",
+    "native_tests": 12,
+    "full_fault_sweeps": 5,
+    "executed_guest_files": [
+      "parameter_copy_execution.test.ts",
+      "completed_context_execution.test.ts",
+      "storage_inline_witnesses_execution.test.ts"
+    ],
+    "executed_guest_tests": 12,
+    "guest_scope": "Private candidate before density guard; guard selects original inheritance path only. Guarded native differential/OOM laws rerun.",
+    "benchmark": [
+      {
+        "keys": 96,
+        "raw": 4418,
+        "compressed": false,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 4418000,
+        "requested_bytes": 972344000,
+        "heap_allocations": 3000,
+        "elapsed_us": 1096948
+      },
+      {
+        "keys": 96,
+        "raw": 4418,
+        "compressed": true,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 190000,
+        "requested_bytes": 39656000,
+        "heap_allocations": 4000,
+        "elapsed_us": 137767
+      },
+      {
+        "keys": 3072,
+        "raw": 4418,
+        "compressed": false,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 4418000,
+        "requested_bytes": 972344000,
+        "heap_allocations": 3000,
+        "elapsed_us": 1182636
+      },
+      {
+        "keys": 3072,
+        "raw": 4418,
+        "compressed": true,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 4418000,
+        "requested_bytes": 972344000,
+        "heap_allocations": 3000,
+        "elapsed_us": 1177897
+      },
+      {
+        "keys": 4418,
+        "raw": 4418,
+        "compressed": false,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 4418000,
+        "requested_bytes": 972344000,
+        "heap_allocations": 3000,
+        "elapsed_us": 1198463
+      },
+      {
+        "keys": 4418,
+        "raw": 4418,
+        "compressed": true,
+        "repeats": 1000,
+        "argument_bytes": 32,
+        "synchronized": 4418000,
+        "requested_bytes": 972344000,
+        "heap_allocations": 3000,
+        "elapsed_us": 1197111
+      }
+    ],
+    "rejected_trial": "Unguarded sorted frontier regressed moderate4418->3072 rows from1.146s to1.688s/1000children; density guard prevents this.",
+    "patch": "/tmp/blot-type-inheritance/inheritance.patch",
+    "sha256": {
+      "src/backend/scoped_backend.zig": {
+        "base": "0ff81a9a6f33b594a763cdcf85c90e46cf2ef18f76de6e0535b70ace44d91b49",
+        "candidate": "40d6d3ec39d422645e5510fdb7c57d923bbbc3addc20c9722d89dd8ab77e60f5"
+      },
+      "src/backend/storage_type_arguments.zig": {
+        "base": "9ad4a98c4b48045b90549c41cfd2c8b29ca0f56f36c9faee6d954ccf7ca6cfa4",
+        "candidate": "32dd8e23f5b71d6dfde3ccea25ea5a6f4a61d62531c26d886e275f6bf4947cd4"
+      },
+      "src/backend/storage_type_arguments_tests.zig": {
+        "base": "5719b0c4212a2282d92c5c9006d047416d6dbbc15d9b3f5581c45162123876b7",
+        "candidate": "fe4c25f841accc48d4fb0ccefe4b3bc059c27d4de73795b121ec05907fed0846"
+      },
+      "src/work_counters.zig": {
+        "base": "fb9ec3f6ec78afd8d16998b6d419914c3445571d07529696261ca82f33268f9f",
+        "candidate": "ea0e16dc550d054df9ffee4114a12b8b2099fdc45db47b77c38cf86c2f81e8cb"
+      }
+    }
+  }
+}

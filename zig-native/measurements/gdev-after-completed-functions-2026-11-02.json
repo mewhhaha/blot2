@@ -1,0 +1,202 @@
+{
+  "date": "2026-11-02",
+  "compiler_source": "b4547ddd2066e94a9846dfe8f5308a695f467a20",
+  "compiler_sha256": "7f12ac4c3e2e13d61d400fe27ef64b5c64874eb16e438b84caed55c32c5459f1",
+  "compiler_identity": "9a7c04b98e20480206c2330e5412f2b0bd28e13f3c009cddbe184a80926d6a34",
+  "toolchain": "Zig0.17 fast/LLVM, actual plain git archive source build",
+  "gdev_revision": "7733add6f89cf03deb62e1474dfaf13ef46de375",
+  "ink_revision": "d520a903a13479455a4380680f64ce590e8d58c5",
+  "source_checkpoint": {
+    "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "penJsonSha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+  },
+  "entry": "src/main.blot",
+  "cache": false,
+  "profile": false,
+  "workers": 4,
+  "frontend_workers": 4,
+  "build_ms": 15145.427721,
+  "wasm_bytes": 32724450,
+  "wasm_sha256": "37bf8630700a81bfdb0383cde5d3b5c9fa4e2d8d88d5a5592907c039f6a51fd0",
+  "evidence": "build/bench/gdev-completed-context-release-first/main-5cf7d3741015d85d/result.json",
+  "work": {
+    "scoped_core_validation_reused": 263,
+    "scoped_core_validation_fresh": 1,
+    "scoped_source_proof_instances": 0,
+    "scoped_source_proof_hits": 0,
+    "scoped_source_completed_bodies": 5973,
+    "scoped_emission_expressions": 1004801,
+    "scoped_type_environment_captures": 271280,
+    "scoped_type_environment_capture_hits": 772468,
+    "scoped_type_environment_copied_bindings": 21328166,
+    "scoped_scalar_definitions": 2726,
+    "scoped_scalar_cache_hits": 114280,
+    "scoped_call_admission_nodes": 1976145,
+    "scoped_scalar_admission_nodes": 257629,
+    "scoped_scalar_admission_hits": 13353,
+    "scoped_inline_definitions": 1267,
+    "scoped_inline_cache_hits": 18290,
+    "scoped_closure_definitions": 54,
+    "scoped_closure_cache_hits": 167,
+    "scoped_reader_definitions": 844,
+    "scoped_reader_cache_hits": 17959,
+    "scoped_writer_definitions": 1985,
+    "scoped_writer_cache_hits": 12537,
+    "scoped_owner_graph_definitions": 1837,
+    "scoped_owner_graph_hits": 10752,
+    "scoped_owner_graph_inputs": 15109,
+    "scoped_completed_plan_attempts": 2766,
+    "scoped_context_sensitive_calls": 3983,
+    "scoped_context_free_calls": 167723,
+    "scoped_context_sensitive_definitions": 546,
+    "scoped_context_free_definitions": 6398,
+    "scoped_context_queries": 0,
+    "scoped_completed_plan_definitions": 1837,
+    "scoped_completed_plan_rollbacks": 764,
+    "scoped_completed_plan_discarded_expressions": 82051,
+    "scoped_parameter_words_shared": 31152,
+    "scoped_local_words_shared": 50437,
+    "scoped_record_updates_shared": 4906,
+    "scoped_indexed_update_roots_shared": 6214,
+    "scoped_projected_parameter_fields": 512773,
+    "scoped_descriptor_admissions": 1150,
+    "scoped_descriptor_admission_hits": 11445,
+    "scoped_concrete_admissions": 8673,
+    "scoped_concrete_admission_hits": 154073,
+    "scoped_field_refinements": 540970,
+    "scoped_field_goal_visits": 1545799,
+    "scoped_field_recipe_hits": 624306,
+    "scoped_field_name_probes": 136347,
+    "scoped_outline_key_declines": 177,
+    "scoped_outlined_regions": 664,
+    "scoped_outlined_globals": 120478,
+    "scoped_refinement_lookups": 11884617,
+    "scoped_refinement_indexed_bindings": 613365,
+    "scoped_refinement_linear_bindings": 0,
+    "scoped_refinement_index_declines": 0
+  },
+  "separate_profile": {
+    "evidence": "build/bench/gdev-completed-context-release-profile/main-db6264e38d56bc54/result.json",
+    "build_ms": 15219.560528,
+    "phases": {
+      "other": {
+        "us": 18843,
+        "requested_bytes": 34423010,
+        "allocations": 652,
+        "rss_growth_kib": 636
+      },
+      "assets": {
+        "us": 53125,
+        "requested_bytes": 28714381,
+        "allocations": 517,
+        "rss_growth_kib": 3732
+      },
+      "inputs": {
+        "us": 441,
+        "requested_bytes": 206080,
+        "allocations": 444,
+        "rss_growth_kib": 0
+      },
+      "load": {
+        "us": 34737,
+        "requested_bytes": 11090545,
+        "allocations": 21058,
+        "rss_growth_kib": 5004
+      },
+      "lex": {
+        "us": 49791,
+        "requested_bytes": 28518784,
+        "allocations": 4750,
+        "rss_growth_kib": 9084
+      },
+      "parse": {
+        "us": 29870,
+        "requested_bytes": 43475493,
+        "allocations": 137697,
+        "rss_growth_kib": 5668
+      },
+      "check": {
+        "us": 567750,
+        "requested_bytes": 722227072,
+        "allocations": 1465849,
+        "rss_growth_kib": 192880
+      },
+      "lower": {
+        "us": 125851,
+        "requested_bytes": 163346907,
+        "allocations": 169607,
+        "rss_growth_kib": 59204
+      },
+      "freeze": {
+        "us": 57022,
+        "requested_bytes": 103998189,
+        "allocations": 348166,
+        "rss_growth_kib": 20768
+      },
+      "validation": {
+        "us": 108195,
+        "requested_bytes": 40290932,
+        "allocations": 40789,
+        "rss_growth_kib": 4516
+      },
+      "backend": {
+        "us": 14106612,
+        "requested_bytes": 16827369407,
+        "allocations": 12225113,
+        "rss_growth_kib": 3705716
+      }
+    },
+    "peak_rss_kib": 4009384,
+    "regions": [
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6491,
+        "thread": 2895505,
+        "stage": "owned.emit",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 14201458,
+        "us": 13114503,
+        "cpu_us": 13039001,
+        "input_items": 0,
+        "output_items": 0
+      },
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6493,
+        "thread": 2895505,
+        "stage": "owned.outline",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 14718936,
+        "us": 517439,
+        "cpu_us": 515289,
+        "input_items": 0,
+        "output_items": 0
+      },
+      {
+        "kind": "end",
+        "build": 2,
+        "space": "core",
+        "id": 6494,
+        "thread": 2895505,
+        "stage": "owned.assemble",
+        "unit": 264,
+        "start": 0,
+        "end": 0,
+        "at_us": 15028221,
+        "us": 309274,
+        "cpu_us": 307123,
+        "input_items": 0,
+        "output_items": 0
+      }
+    ]
+  },
+  "comparison": "Same game/library sources as17.4476s/38,824,580B a151. Each is one completion, not a distribution. Five-second gate remains unmet."
+}

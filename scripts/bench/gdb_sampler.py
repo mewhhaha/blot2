@@ -62,12 +62,17 @@ def emission_frame(frame, name, tid, metadata):
             work = {}
             for key in ("scoped_source_completed_bodies", "scoped_type_environment_captures",
                         "scoped_type_environment_capture_hits", "scoped_type_environment_copied_bindings",
+                        "scoped_type_environment_inherited_raw_bindings",
+                        "scoped_type_environment_inherited_bindings",
                         "scoped_owner_graph_definitions", "scoped_owner_graph_hits",
                         "scoped_owner_graph_inputs", "scoped_parameter_words_shared",
                         "scoped_local_words_shared", "scoped_record_updates_shared",
                         "scoped_indexed_update_roots_shared",
                         "scoped_completed_plan_attempts", "scoped_completed_plan_definitions",
                         "scoped_completed_plan_rollbacks", "scoped_completed_plan_discarded_expressions",
+                        "scoped_context_sensitive_definitions", "scoped_context_free_definitions",
+                        "scoped_plain_plan_definitions", "scoped_plain_plan_hits",
+                        "scoped_transport_words_avoided", "scoped_scalar_completed_hits",
                         "scoped_projected_parameter_fields"):
                 try:
                     work[key] = int(counters[key])

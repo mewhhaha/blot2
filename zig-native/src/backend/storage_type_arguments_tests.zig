@@ -283,3 +283,97 @@ test "refinement active captures match linear order and exact prefixes after eve
     try activeCaptureLaw(a);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, activeCaptureLaw, .{});
 }
+
+fn compareInherited(left: *Stack(Argument), right: *Stack(Argument), arena: std.mem.Allocator) !void {
+    for (1..5) |unit| for (0..8) |parameter| {
+        const left_any = left.latestAny(@intCast(unit), @intCast(parameter));
+        const right_any = right.latestAny(@intCast(unit), @intCast(parameter));
+        try std.testing.expectEqual(left_any != null, right_any != null);
+        if (left_any) |position| try std.testing.expect(std.meta.eql(left.items[position], right.items[right_any.?]));
+        const left_nonidentity = left.latestNonidentity(@intCast(unit), @intCast(parameter));
+        const right_nonidentity = right.latestNonidentity(@intCast(unit), @intCast(parameter));
+        try std.testing.expectEqual(left_nonidentity != null, right_nonidentity != null);
+        if (left_nonidentity) |position| try std.testing.expect(std.meta.eql(left.items[position], right.items[right_nonidentity.?]));
+    };
+    const left_capture = try left.capture(arena);
+    const right_capture = try right.capture(arena);
+    try std.testing.expectEqual(left_capture.len, right_capture.len);
+    for (left_capture, right_capture) |before, after| try std.testing.expect(std.meta.eql(before, after));
+}
+fn inheritedHeadsLaw(allocator: std.mem.Allocator) !void {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const left_environment = [_]u32{ 11, 19 };
+    const right_environment = [_]u32{ 11, 19 };
+    var original_child: Stack(Argument) = .empty;
+    defer original_child.deinit(allocator);
+    var child: Stack(Argument) = .empty;
+    defer child.deinit(allocator);
+    {
+        var source: Stack(Argument) = .empty;
+        defer source.deinit(allocator);
+        // Retained inactive keys must not enter the inherited frontier.
+        for (0..64) |ordinal| try source.append(allocator, .{ .unit = 9, .parameter = @intCast(ordinal), .argument_unit = 4, .argument = 17 });
+        source.shrinkRetainingCapacity(0);
+        for (0..96) |ordinal| {
+            const unit: u32 = @intCast(ordinal % 3 + 1);
+            const parameter: u32 = @intCast(ordinal % 7);
+            try source.append(allocator, .{ .unit = unit, .parameter = parameter, .argument_unit = 4, .argument = @intCast(ordinal + 20), .environment = &left_environment });
+            try source.append(allocator, .{ .unit = unit, .parameter = parameter, .argument_unit = unit, .argument = parameter, .environment = &right_environment });
+        }
+        try original_child.appendSlice(allocator, source.items);
+        const retained = try child.inheritActive(allocator, &source);
+        try std.testing.expect(retained < source.items.len);
+        try std.testing.expectEqual(source.active_count * 2, retained);
+        // Preserve the exact relative order of both head classes, including
+        // pointer-distinct environments with equal contents.
+        var next: usize = 0;
+        for (source.items, 0..) |argument, position| {
+            if (original(source.items, argument.unit, argument.parameter, false) != position and original(source.items, argument.unit, argument.parameter, true) != position) continue;
+            try std.testing.expect(std.meta.eql(argument, child.items[next]));
+            next += 1;
+        }
+        try std.testing.expectEqual(retained, next);
+        try compareInherited(&original_child, &child, arena.allocator());
+    }
+    // Both child stacks own their vectors after the source stack dies; the
+    // immutable environment storage still belongs to the surviving caller.
+    try compareInherited(&original_child, &child, arena.allocator());
+    const prefix = child.items.len;
+    const original_prefix = original_child.items.len;
+    const snapshot = try child.capture(arena.allocator());
+    const additions = [_]Argument{
+        .{ .unit = 1, .parameter = 0, .argument_unit = 4, .argument = 77, .environment = &left_environment },
+        .{ .unit = 1, .parameter = 0, .argument_unit = 1, .argument = 0, .environment = &right_environment },
+    };
+    for (additions) |argument| {
+        try original_child.append(allocator, argument);
+        try child.append(allocator, argument);
+        try compareInherited(&original_child, &child, arena.allocator());
+    }
+    original_child.shrinkRetainingCapacity(original_prefix);
+    child.shrinkRetainingCapacity(prefix);
+    try compareInherited(&original_child, &child, arena.allocator());
+    try std.testing.expectEqual(snapshot.ptr, (try child.capture(arena.allocator())).ptr);
+}
+test "child refinement inheritance preserves both lookup heads order captures and rollback through OOM" {
+    try inheritedHeadsLaw(a);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, inheritedHeadsLaw, .{});
+}
+
+test "child refinement inheritance preserves unshadowed and minimal two-head prefixes" {
+    var source: Stack(Argument) = .empty;
+    defer source.deinit(a);
+    var first: Stack(Argument) = .empty;
+    defer first.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), try first.inheritActive(a, &source));
+    try source.append(a, .{ .unit = 1, .parameter = 7, .argument_unit = 4, .argument = 99 });
+    try std.testing.expectEqual(@as(usize, 1), try first.inheritActive(a, &source));
+    try std.testing.expect(std.meta.eql(source.items[0], first.items[0]));
+    try source.append(a, .{ .unit = 1, .parameter = 7, .argument_unit = 1, .argument = 7 });
+    var child: Stack(Argument) = .empty;
+    defer child.deinit(a);
+    try std.testing.expectEqual(@as(usize, 2), try child.inheritActive(a, &source));
+    try std.testing.expectEqual(@as(?usize, 1), child.latestAny(1, 7));
+    try std.testing.expectEqual(@as(?usize, 0), child.latestNonidentity(1, 7));
+}

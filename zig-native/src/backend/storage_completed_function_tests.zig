@@ -161,3 +161,145 @@ test "completed function borrowed results reuse distinct caller owners and prese
     try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, rejected.diagnostic.?.code);
     try std.testing.expectEqual(@as(usize, 0), rejected.bytes.len);
 }
+
+const plain_native_source =
+    \\type Vec is data = $Vec {x: U32, y: U32}
+    \\type Pose is data = $Pose {position: Vec, stamp: U32}
+    \\const Vec.add = func (left: Vec) -> (right: Vec): Vec => return $Vec {x: @u32.add left.x right.x, y: @u32.add left.y right.y}
+    \\const translate = func (pose: Pose) -> (shift: Vec): Pose => return do:
+    \\  pose.position := @type.call "add" self shift
+    \\  return pose
+    \\const scratch = func (value: {x: U32, y: U32}): {x: U32, y: U32} => return do:
+    \\  let words: Array U32 = #[value.x, value.y]
+    \\  value.x := @u32.add words[0] words[1]
+    \\  return value
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let live: GrowArray U32 = #[input]
+    \\  let before = $Pose {position: $Vec {x: live[0], y: 2}, stamp: 17}
+    \\  let first = translate before ($Vec {x: 3,y: 5})
+    \\  let second = translate before ($Vec {x: 7,y: 11})
+    \\  let a = scratch {x: first.position.x,y: first.position.y}
+    \\  let b = scratch {x: second.position.x,y: second.position.y}
+    \\  return #[before.position.x,a.x,b.x,first.stamp,second.stamp]
+;
+
+const plain_persistent_source =
+    \\const pool: ResizeArray U32 = #[4]
+    \\const peek = func (value: {x: U32}): {x: U32} => return do:
+    \\  value.x := @u32.add self pool[0]
+    \\  return value
+    \\entry const answer = func (input: U32): Array U32 => return do:
+    \\  let a = peek {x: input}
+    \\  @storage.write (@storage.at pool 0) (@u32.add pool[0] 10)
+    \\  let b = peek {x: input}
+    \\  return #[a.x,b.x,pool[0]]
+;
+
+const plain_escape_source =
+    \\const bad = func (input: U32): Ref U32 => return do:
+    \\  let words: Array U32 = #[input]
+    \\  return @storage.at words 0
+    \\entry const answer = func (input: U32): U32 => return @storage.load (bad input)
+;
+
+fn publishPlainPlans(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_plain_plan_definitions);
+    try std.testing.expect(result.counters.scoped_writer_cache_hits >= 2);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_inputs);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+}
+test "completed plain plans retain functional nominal updates and local scratch results through OOM" {
+    var module = try lower(a, plain_native_source);
+    defer module.deinit(a);
+    try publishPlainPlans(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPlainPlans, .{@as([]const core.Module, &.{module})});
+}
+fn publishPlainFallback(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_plain_plan_definitions);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expect(result.counters.scoped_completed_plan_discarded_expressions > 0);
+}
+test "completed plain plans decline hidden persistent pools and preserve fresh borrow rejection through OOM" {
+    var module = try lower(a, plain_persistent_source);
+    defer module.deinit(a);
+    try publishPlainFallback(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPlainFallback, .{@as([]const core.Module, &.{module})});
+    var escaped = try lower(a, plain_escape_source);
+    defer escaped.deinit(a);
+    var rejected = try scoped.compile(a, &.{escaped}, 1);
+    defer rejected.deinit(a);
+    try std.testing.expect(rejected.diagnostic != null);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, rejected.diagnostic.?.code);
+    try std.testing.expectEqual(@as(usize, 0), rejected.bytes.len);
+}
+
+const plain_boundary_source =
+    \\type Choice is data = $Count U32 | $Pair {x: U32, y: U32}
+    \\const floating = func (input: F32): F32 => return do:
+    \\  let row = {value: input}
+    \\  row.value := @f32.neg self
+    \\  return row.value
+    \\const unit = func (): Unit => return do:
+    \\  let values: Array U32 = #[1]
+    \\  values[0] := 2
+    \\  return ()
+    \\const aggregate = func (): {x: U32, y: U32} => return do:
+    \\  let row = {x: 2, y: 3}
+    \\  row.x := @u32.add self 5
+    \\  return row
+    \\const choose = func (flag: Bool) -> (input: U32): Choice => return do:
+    \\  let row = {value: input}
+    \\  row.value := @u32.add self 1
+    \\  if flag:
+    \\    return $Count row.value
+    \\  return $Pair {x: row.value, y: 17}
+    \\const total = func (input: U32): U32 => return do:
+    \\  let values: Array U32 = #[input, @u32.add input 1]
+    \\  return @u32.add values[0] values[1]
+    \\const local_ref = func (input: U32): U32 => return do:
+    \\  let value = input
+    \\  @storage.write (&value) (@u32.add input 5)
+    \\  return value
+    \\entry const answer = func (bits: U32): Array U32 => return do:
+    \\  let marker: GrowArray U32 = #[bits]
+    \\  let (input,a,b,c) = @simd.u32x4.from_bits (bits,bits,bits,bits)
+    \\  let result = floating input
+    \\  let (output,d,e,f) = @simd.f32x4.bits (result,result,result,result)
+    \\  unit ()
+    \\  unit ()
+    \\  let record = aggregate ()
+    \\  let again = aggregate ()
+    \\  let first = total marker[0]
+    \\  let second = total (@u32.add marker[0] 1)
+    \\  let local = local_ref marker[0]
+    \\  let choice = choose (@u32.eq (@u32.rem bits 2) 0) bits
+    \\  let selected = case choice of
+    \\    $Count value => value
+    \\    $Pair {x,y} => @u32.add x y
+    \\  return #[output,record.x,record.y,again.x,again.y,first,second,local,marker[0],selected]
+;
+
+fn publishPlainBoundaries(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expectEqual(@as(u64, 6), result.counters.scoped_plain_plan_definitions);
+    try std.testing.expect(result.counters.scoped_plain_plan_hits >= 3);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_inputs);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+}
+test "completed plain word ABI retains scalar float nullary variants scratch and local references through OOM" {
+    var module = try lower(a, plain_boundary_source);
+    defer module.deinit(a);
+    try publishPlainBoundaries(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPlainBoundaries, .{@as([]const core.Module, &.{module})});
+}

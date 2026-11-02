@@ -84,6 +84,47 @@ pub fn Stack(comptime Argument: type) type {
             try self.reserve(allocator, arguments.len);
             for (arguments) |argument| self.appendAssumeCapacity(argument);
         }
+        /// A fresh child cannot pop into its inherited prefix. Preserve the
+        /// two observable heads per key, in their original source order:
+        /// capture/restore uses latestAny; resolution uses latestNonidentity.
+        pub fn inheritActive(self: *Self, allocator: A, source: *const Self) A.Error!usize {
+            std.debug.assert(self.items.len == 0);
+            // At most two retained heads per active key. Only compact when
+            // history is at least eight times wider, guaranteeing 75% pruning
+            // before paying for scratch allocation, hash lookups or sorting.
+            if (source.items.len == 0 or source.active_count > source.items.len / 8) {
+                try self.appendSlice(allocator, source.items);
+                return source.items.len;
+            }
+            var count = source.active_count;
+            var cursor = source.first_active;
+            while (cursor != absent) : (cursor = source.undo.items[cursor].next) {
+                const argument = source.items[cursor];
+                const heads = source.positions.get(key(argument.unit, argument.parameter)).?;
+                if (heads.nonidentity) |position| if (position != cursor) {
+                    count += 1;
+                };
+            }
+            const indexes = try allocator.alloc(usize, count);
+            defer allocator.free(indexes);
+            var next: usize = 0;
+            cursor = source.first_active;
+            while (cursor != absent) : (cursor = source.undo.items[cursor].next) {
+                indexes[next] = cursor;
+                next += 1;
+                const argument = source.items[cursor];
+                const heads = source.positions.get(key(argument.unit, argument.parameter)).?;
+                if (heads.nonidentity) |position| if (position != cursor) {
+                    indexes[next] = position;
+                    next += 1;
+                };
+            }
+            std.debug.assert(next == indexes.len);
+            std.mem.sortUnstable(usize, indexes, {}, std.sort.asc(usize));
+            try self.reserve(allocator, count);
+            for (indexes) |position| self.appendAssumeCapacity(source.items[position]);
+            return count;
+        }
         pub fn shrinkRetainingCapacity(self: *Self, length: usize) void {
             std.debug.assert(length <= self.items.len);
             if (length == self.items.len) return;

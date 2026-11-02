@@ -18,6 +18,7 @@ const type_arguments_index = @import("storage_type_arguments.zig");
 const selected_types = @import("storage_type_key.zig");
 const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
+const transport_plan = @import("storage_transport.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const source_proof = @import("../check/package_core.zig");
 const evaluation = @import("../eval/core_eval.zig");
@@ -131,9 +132,22 @@ const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
 const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining: u32 };
 const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ?Value = null };
-const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
-const RootRead = struct { owner: usize, shape: Value };
-const ReadFrame = struct { first: []?*const Value, persistent: std.ArrayList(RootRead) = .empty };
+const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const bool, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
+const RootRead = struct { owner: usize, shape: *const Value };
+const ReadFrame = struct {
+    owner_limit: usize,
+    first: std.ArrayList(RootRead) = .empty,
+    persistent: std.ArrayList(RootRead) = .empty,
+    fn position(self: *const ReadFrame, owner: usize) usize {
+        var low: usize = 0;
+        var high = self.first.items.len;
+        while (low < high) {
+            const middle = low + (high - low) / 2;
+            if (self.first.items[middle].owner < owner) low = middle + 1 else high = middle;
+        }
+        return low;
+    }
+};
 const WriterKind = enum { read, write };
 const WriterEvent = struct { owner: usize, kind: WriterKind, shape: Value };
 const WriterTrace = struct { inputs: usize, stable: bool = false, allows_writes: bool = true, events: std.ArrayList(WriterEvent) = .empty, remaining: usize = 100_000 };
@@ -147,6 +161,8 @@ const DescriptorCalls = struct {
     regions: std.AutoHashMapUnmanaged(u32, []const usize) = .empty,
     results: std.AutoHashMapUnmanaged(u32, Value) = .empty,
     declined: std.HashMapUnmanaged(call_plan.Key, void, call_plan.KeyContext, 80) = .empty,
+    transports: std.AutoHashMapUnmanaged(u32, ?*transport_plan.Index) = .empty,
+    record_metadata: RecordMetadataCache,
     fn decline(self: *DescriptorCalls, key: call_plan.Key) Error!void {
         if (self.declined.contains(key)) return;
         try self.declined.ensureUnusedCapacity(self.allocator, 1);
@@ -167,6 +183,10 @@ const DescriptorCalls = struct {
         // Keys borrow flat immutable words in the compilation arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.declined.deinit(self.allocator);
+        // Source indexes and nested buffers belong to the compilation arena.
+        // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
+        self.transports.deinit(self.allocator);
+        self.record_metadata.deinit();
         self.arena.deinit();
     }
 };
@@ -192,6 +212,59 @@ const MethodSelector = struct {
             self.session.?.diagnostic_context.entry = self.entry;
         }
         return &self.session.?;
+    }
+};
+const RecordMetadataCache = struct {
+    const Key = struct { unit: u32, ty: T.Id };
+    const Field = struct { ty: T.Id, symbol: u32, spelling: ?[]const u8 };
+    const Metadata = struct { fields: []Field, name_words: usize };
+
+    allocator: std.mem.Allocator,
+    entries: std.AutoHashMapUnmanaged(Key, Metadata) = .empty,
+
+    fn deinit(self: *RecordMetadataCache) void {
+        var values = self.entries.valueIterator();
+        while (values.next()) |metadata| self.allocator.free(metadata.fields);
+        self.entries.deinit(self.allocator);
+    }
+
+    fn less(_: void, left: Field, right: Field) bool {
+        if (left.spelling) |name| {
+            if (right.spelling) |other| return std.mem.order(u8, name, other) == .lt;
+            return true;
+        }
+        if (right.spelling != null) return false;
+        return left.symbol < right.symbol;
+    }
+
+    fn get(self: *RecordMetadataCache, owner: *const core.Module, ty: T.Id, node: T.Node, encoded_words: usize, word_work: usize) (std.mem.Allocator.Error || error{Limit})!Metadata {
+        const key: Key = .{ .unit = owner.unit, .ty = ty };
+        if (self.entries.get(key)) |metadata| {
+            if (metadata.name_words > encoded_words or metadata.name_words > word_work) return error.Limit;
+            return metadata;
+        }
+
+        var name_words: usize = 1;
+        for (0..node.b) |index| {
+            const field = owner.types.recordField(node, index);
+            const spelling = owner.fieldSpelling(field.name);
+            var words: usize = 4;
+            if (spelling) |name| words = std.math.add(usize, name.len, 2) catch return error.Limit;
+            name_words = std.math.add(usize, name_words, words) catch return error.Limit;
+            if (name_words > encoded_words or name_words > word_work) return error.Limit;
+        }
+
+        const fields = try self.allocator.alloc(Field, node.b);
+        errdefer self.allocator.free(fields);
+        for (fields, 0..) |*cached, index| {
+            const field = owner.types.recordField(node, index);
+            const spelling = owner.fieldSpelling(field.name);
+            cached.* = .{ .ty = field.ty, .symbol = field.name, .spelling = spelling };
+        }
+        std.mem.sort(Field, fields, {}, less);
+        const metadata: Metadata = .{ .fields = fields, .name_words = name_words };
+        try self.entries.put(self.allocator, key, metadata);
+        return metadata;
     }
 };
 const Generator = struct {
@@ -330,6 +403,53 @@ const Generator = struct {
         } else value = try self.snapshot(original);
         try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = id, .value = value, .remaining = if (id < self.uses.len) self.uses[id] else 0 });
     }
+    fn transportIndex(self: *Generator, m: *const core.Module) Error!?*transport_plan.Index {
+        if (self.scalar_admission.hasScalarReferences() or m.updates.len == 0) return null;
+        if (self.descriptor_calls.transports.get(m.unit)) |index| return index;
+        const index = try transport_plan.Index.create(&self.descriptor_calls.arena, m);
+        try self.descriptor_calls.transports.put(self.allocator, m.unit, index);
+        return index;
+    }
+    fn mergeTransport(self: *Generator, m: *const core.Module, merges: []const core.Merge, merged: []?Value) Error![]const bool {
+        const shared = try self.arena.allocator().alloc(bool, merges.len);
+        @memset(shared, false);
+        if (merges.len == 0) return shared;
+        const index = try self.transportIndex(m) orelse return shared;
+        for (merges, shared, merged) |merge, *reuse, *value| {
+            const left = try index.canonical(merge.then_binding) orelse continue;
+            const right = try index.canonical(merge.else_binding) orelse continue;
+            if (left != right) continue;
+            // Resolve the representative before either arm. Its physical
+            // lanes dominate both paths; this lookup consumes no source use.
+            var cursor = self.bindings.items.len;
+            while (cursor != 0) {
+                cursor -= 1;
+                const binding = self.bindings.items[cursor];
+                if (binding.unit != m.unit or binding.id != left) continue;
+                if (binding.value.tag == .aggregate and @import("storage_control.zig").fixedCarry(binding.value)) {
+                    value.* = binding.value;
+                    reuse.* = true;
+                }
+                break;
+            }
+        }
+        return shared;
+    }
+    fn transportSnapshot(self: *Generator, value: Value, shared: bool) Error!Value {
+        if (!shared) return self.snapshot(value);
+        self.emission_work.scoped_transport_words_avoided +|= snapshotWords(value);
+        return value;
+    }
+    fn snapshotWords(value: Value) usize {
+        if (value.tag == .scalar) return 1;
+        if (value.tag == .view) return 6;
+        if (value.tag == .link or (value.tag == .ref and (value.root != null or value.pool_borrow))) return 5;
+        if (value.tag != .aggregate) return 0;
+        var words: usize = 0;
+        if (value.variant_tags.len != 0) words += 1;
+        for (value.fields) |field| words += snapshotWords(field);
+        return words;
+    }
     fn immutableBindingValue(self: *Generator, original: Value, parameter: bool) Value {
         var value = original;
         if (value.tag == .scalar) {
@@ -441,7 +561,7 @@ const Generator = struct {
             return self.shape(try self.unit(argument.argument_unit), 0, argument.argument, depth + 1);
         }
         const key = (@as(u64, m.unit) << 32) | ty;
-        if (self.plain_layouts.get(key)) |template| return self.cloneLayout(template);
+        if (self.plain_layouts.get(key)) |template| return template;
         self.layout_steps += 1;
         if (self.layout_steps > 100_000) return self.fail(m, id, .storage_unsupported, "Storage layout exceeded its checked node budget");
         // Prove closure without ambient substitutions before building a
@@ -467,16 +587,8 @@ const Generator = struct {
             .root = .{ .unit = m.unit, .ty = ty },
             .arguments = if (closed) &.{} else try self.captureTypes(),
         };
-        if (closed and plainShape(value)) try self.plain_layouts.put(self.allocator, key, try self.cloneLayout(value));
+        if (closed and plainShape(value)) try self.plain_layouts.put(self.allocator, key, value);
         return value;
-    }
-    fn cloneLayout(self: *Generator, template: Value) Error!Value {
-        var result = template;
-        if (template.fields.len != 0) {
-            const fields = initializeFields(&result, try self.arena.allocator().alloc(Value, template.fields.len));
-            for (fields, template.fields) |*field, original| field.* = try self.cloneLayout(original);
-        }
-        return result;
     }
     // Closed-storage facts are independently validated against their producer
     // before emission. An opaque layout may use them only after every actual
@@ -799,10 +911,8 @@ const Generator = struct {
         return initializeFields(value, try self.arena.allocator().dupe(Value, value.fields));
     }
     fn beginReadFrame(self: *Generator) Error!usize {
-        const first = try self.arena.allocator().alloc(?*const Value, self.roots.items.len);
-        @memset(first, null);
         const index = self.read_frames.items.len;
-        try self.read_frames.append(self.allocator, .{ .first = first });
+        try self.read_frames.append(self.allocator, .{ .owner_limit = self.roots.items.len });
         return index;
     }
     fn readShapeSnapshot(self: *Generator, value: Value) Error!*const Value {
@@ -814,24 +924,26 @@ const Generator = struct {
         // Every enclosing runtime loop needs the read, including reads in a
         // nested generator. Evidence must not share mutable field slices.
         for (self.read_frames.items) |*frame| {
-            if (value.root) |owner| if (owner < frame.first.len and frame.first[owner] == null) {
-                frame.first[owner] = try self.readShapeSnapshot(self.roots.items[owner].element);
-            } else if (owner >= frame.first.len) {
-                try self.registerPersistentRead(frame, owner);
-            };
-            for (value.other_roots) |owner| if (owner < frame.first.len and frame.first[owner] == null) {
-                frame.first[owner] = try self.readShapeSnapshot(self.roots.items[owner].element);
-            } else if (owner >= frame.first.len) {
-                try self.registerPersistentRead(frame, owner);
-            };
+            if (value.root) |owner| try self.registerFrameRead(frame, owner);
+            for (value.other_roots) |owner| try self.registerFrameRead(frame, owner);
         }
+    }
+    fn registerFrameRead(self: *Generator, frame: *ReadFrame, owner: usize) Error!void {
+        if (owner >= frame.owner_limit) return self.registerPersistentRead(frame, owner);
+        const position = frame.position(owner);
+        if (position < frame.first.items.len and frame.first.items[position].owner == owner) return;
+        const shape_ = try self.readShapeSnapshot(self.roots.items[owner].element);
+        // Arena lifetime matches immutable snapshots. Keep ordinary owner order
+        // for deterministic first-error selection, independent of read order.
+        try frame.first.insert(self.arena.allocator(), position, .{ .owner = owner, .shape = shape_ });
     }
     fn registerPersistentRead(self: *Generator, frame: *ReadFrame, owner: usize) Error!void {
         // Global owners may be opened lazily inside a loop. Their storage is
         // persistent even though their compiler root index is new here.
         if (!self.roots.items[owner].persistent) return;
         for (frame.persistent.items) |read| if (read.owner == owner) return;
-        try frame.persistent.append(self.arena.allocator(), .{ .owner = owner, .shape = self.roots.items[owner].element });
+        const shape_ = try self.readShapeSnapshot(self.roots.items[owner].element);
+        try frame.persistent.append(self.arena.allocator(), .{ .owner = owner, .shape = shape_ });
     }
     fn includesReadShape(before: Value, after: Value) bool {
         if (before.tag != after.tag or before.fields.len != after.fields.len or before.variant_tags.len != after.variant_tags.len) return false;
@@ -844,11 +956,11 @@ const Generator = struct {
         return true;
     }
     fn checkReadFrame(self: *Generator, m: *const core.Module, id: core.Id, index: usize) Error!void {
-        for (self.read_frames.items[index].first, 0..) |first, owner| if (first) |shape_| {
-            if (!includesReadShape(shape_.*, self.roots.items[owner].element)) return self.fail(m, id, .storage_escape, "A loop cannot widen stored variants or borrowed roots after reading them; write the complete shape before its first read");
-        };
+        for (self.read_frames.items[index].first.items) |read| {
+            if (!includesReadShape(read.shape.*, self.roots.items[read.owner].element)) return self.fail(m, id, .storage_escape, "A loop cannot widen stored variants or borrowed roots after reading them; write the complete shape before its first read");
+        }
         for (self.read_frames.items[index].persistent.items) |read| {
-            if (!includesReadShape(read.shape, self.roots.items[read.owner].element)) return self.fail(m, id, .storage_escape, "A loop cannot widen stored variants or borrowed roots after reading them; write the complete shape before its first read");
+            if (!includesReadShape(read.shape.*, self.roots.items[read.owner].element)) return self.fail(m, id, .storage_escape, "A loop cannot widen stored variants or borrowed roots after reading them; write the complete shape before its first read");
         }
     }
     fn writeElement(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: ?Local, value: Value) Error!void {
@@ -947,6 +1059,9 @@ const Generator = struct {
         for (try self.writableFields(value)) |*field| try self.loopHeader(field);
     }
     fn assign(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value) Error!void {
+        return self.assignTransport(m, id, target, value, true);
+    }
+    fn assignTransport(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, copies: bool) Error!void {
         target.literal = null;
         if (target.tag != value.tag or target.fields.len != value.fields.len or target.mode != value.mode or target.floating != value.floating) return self.unsupported(m, id);
         if (!std.meta.eql(target.nominal, value.nominal) or target.demand != value.demand) return self.unsupported(m, id);
@@ -954,18 +1069,26 @@ const Generator = struct {
         if (target.tag == .callable and target.host == null and (target.callable.?.unit != value.callable.?.unit or target.callable.?.node != value.callable.?.node or target.callable.?.target != value.callable.?.target)) return self.fail(m, id, .storage_unsupported, "A callback must have a statically known function body");
         if (target.tag == .ref and target.root == null and !target.pool_borrow) {
             if (value.root != null or target.word.id != value.word.id) return self.unsupported(m, id);
-        } else if (hasWord(target.*)) try self.c.set(target.word, value.word);
-        if (target.root != null or target.pool_borrow or target.tag == .array) {
-            try self.c.set(target.token, value.token);
-            try self.c.set(target.epoch_low, value.epoch_low);
-            try self.c.set(target.epoch_high, value.epoch_high);
+        } else if (hasWord(target.*)) {
+            if (copies) try self.c.set(target.word, value.word) else self.emission_work.scoped_transport_words_avoided +|= 1;
         }
-        if (value.tag == .ref or value.tag == .view or value.tag == .link) try self.c.set(target.index, value.index);
-        if (value.tag == .view) try self.c.set(target.length, value.length);
+        if (target.root != null or target.pool_borrow or target.tag == .array) {
+            if (copies) {
+                try self.c.set(target.token, value.token);
+                try self.c.set(target.epoch_low, value.epoch_low);
+                try self.c.set(target.epoch_high, value.epoch_high);
+            } else self.emission_work.scoped_transport_words_avoided +|= 3;
+        }
+        if (value.tag == .ref or value.tag == .view or value.tag == .link) {
+            if (copies) try self.c.set(target.index, value.index) else self.emission_work.scoped_transport_words_avoided +|= 1;
+        }
+        if (value.tag == .view) {
+            if (copies) try self.c.set(target.length, value.length) else self.emission_work.scoped_transport_words_avoided +|= 1;
+        }
         try self.unionRoots(target, value);
         for (try self.writableFields(target), value.fields, 0..) |*field, original, index| {
             if (!possibleVariant(value, index)) continue;
-            try self.assign(m, id, field, original);
+            try self.assignTransport(m, id, field, original, copies);
         }
         try self.unionVariants(target, value);
     }
@@ -1502,6 +1625,11 @@ const Generator = struct {
             if (self.type_arguments.latestAny(argument.unit, argument.parameter)) |position| present = std.meta.eql(self.type_arguments.items[position], argument);
             if (!present) try self.type_arguments.append(self.allocator, argument);
         }
+    }
+    fn inheritTypes(self: *Generator, child: *Generator) Error!void {
+        const retained = try child.type_arguments.inheritActive(self.allocator, &self.type_arguments);
+        self.emission_work.scoped_type_environment_inherited_raw_bindings +|= self.type_arguments.items.len;
+        self.emission_work.scoped_type_environment_inherited_bindings +|= retained;
     }
     fn captureTypes(self: *Generator) Error![]const TypeArgument {
         const before = self.type_arguments.stats;
@@ -2648,6 +2776,64 @@ const Generator = struct {
     }
     /// Scalar leaves use a normal Wasm call, not repeated source expansion.
     /// The initial ABI transports F32 as exact i32 bits, matching Value.word.
+    const ScalarKey = struct { key: call_plan.Key, closed_frontier: bool };
+    fn scalarKey(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value, result_type: T.Id, owned_result: bool, isolated: bool) Error!ScalarKey {
+        var evidence: std.ArrayList(u32) = .empty;
+        errdefer evidence.deinit(self.allocator);
+        try evidence.append(self.allocator, result_type);
+        var type_work: usize = 4096;
+        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
+        defer type_key.deinit();
+        for (m.bodyParameters(body), arguments) |parameter, arg| {
+            try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(arg.floating) });
+            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
+        }
+        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
+        var closed_frontier = isolated;
+        if (!owned_result and !isolated) {
+            const result_schema: Value = .{ .word = .{ .id = 0 }, .floating = result_type == T.f32_type };
+            if (try self.inlineCallEvidence(m, body, arguments, result_schema)) |complete| {
+                defer self.allocator.free(complete);
+                try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 9, @intCast(complete.len) });
+                try evidence.appendSlice(self.allocator, complete);
+                closed_frontier = true;
+            }
+        }
+        var context = self.invocationContext();
+        // The complete primitive DAG proof excludes every operation which can
+        // select a caller-visible method, dictionary, global or effect.
+        if (isolated) context = 0;
+        const key: call_plan.Key = .{ .unit = m.unit, .binding = body.binding, .context = context, .context_free = isolated, .evidence = try evidence.toOwnedSlice(self.allocator) };
+        return .{ .key = key, .closed_frontier = closed_frontier };
+    }
+    const CompletedScalar = struct { entry: call_plan.Entry, result_type: T.Id };
+    fn completedScalar(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value) Error!?CompletedScalar {
+        const types_before = self.type_arguments.items.len;
+        const diagnostic_before = self.diagnostic;
+        defer self.type_arguments.shrinkRetainingCapacity(types_before);
+        defer self.diagnostic = diagnostic_before;
+        return self.completedScalarInner(m, body, arguments) catch |err| switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Declined => null,
+        };
+    }
+    fn completedScalarInner(self: *Generator, m: *const core.Module, body: *const core.Body, arguments: []const Value) Error!?CompletedScalar {
+        const resolved = try self.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
+        const result_type: T.Id = switch ((try self.unit(resolved.unit)).types.node(resolved.ty).tag) {
+            .unit => T.unit,
+            .boolean => T.boolean,
+            .u32 => T.u32_type,
+            .f32 => T.f32_type,
+            else => return null,
+        };
+        const prepared = try self.scalarKey(m, body, arguments, result_type, false, false);
+        defer self.allocator.free(prepared.key.evidence);
+        if (!prepared.closed_frontier) return null;
+        const index = self.shared_calls.find(prepared.key) orelse return null;
+        const entry = self.shared_calls.entries.items[index];
+        if (entry.building) return null;
+        return .{ .entry = entry, .result_type = result_type };
+    }
     fn reusableCall(self: *Generator, m: *const core.Module, target: core.BindingRef, arguments: []const Value) Error!?Value {
         const body = m.body(target.binding) orelse return null;
         const raw_result_type = m.typeOf(body.root);
@@ -2661,6 +2847,14 @@ const Generator = struct {
         for (arguments) |arg| if (arg.tag != .scalar or arg.demand != null) return null;
         var remaining: usize = 100_000;
         const isolated = !owned_result and try self.closedScalarBody(m, target.binding);
+        if (!owned_result and !isolated) if (try self.completedScalar(m, body, arguments)) |completed| {
+            self.emission_work.scoped_scalar_completed_hits +|= 1;
+            self.emission_work.scoped_scalar_cache_hits +|= 1;
+            return try self.callScalarFunction(m, body.root, completed.entry, arguments, null, completed.result_type);
+        };
+        // A failed or weak early probe proves nothing. Numeric admission may
+        // refine the return and selected types; preserve the original order
+        // and build the final key only after those refinements complete.
         if (owned_result) {
             var arrays: usize = 0;
             if (!call_plan.destinationBody(m, body.root, &arrays, &remaining, 0) or arrays != 1) return null;
@@ -2685,32 +2879,10 @@ const Generator = struct {
             if (!plainShape(element_shape)) return null;
             break :blk try self.reserveOwner(m, body.root, .fixed, element_shape);
         } else null;
-        var evidence: std.ArrayList(u32) = .empty;
-        defer evidence.deinit(self.allocator);
-        try evidence.append(self.allocator, result_type);
-        var type_work: usize = 4096;
-        var type_key = selected_types.Builder.init(self.allocator, &type_work, .{});
-        defer type_key.deinit();
-        for (m.bodyParameters(body), arguments) |parameter, arg| {
-            try evidence.appendSlice(self.allocator, &.{ parameter.ty, @intFromBool(arg.floating) });
-            try self.selectedType(m, body.root, .{ .unit = m.unit, .ty = parameter.ty }, &evidence, &type_key, 0);
-        }
-        try self.finishSelectedTypes(m, body.root, &evidence, &type_key);
-        var closed_frontier = isolated;
-        if (!owned_result and !isolated) {
-            const result_schema: Value = .{ .word = .{ .id = 0 }, .floating = result_type == T.f32_type };
-            if (try self.inlineCallEvidence(m, body, arguments, result_schema)) |complete| {
-                defer self.allocator.free(complete);
-                try evidence.appendSlice(self.allocator, &.{ std.math.maxInt(u32) - 9, @intCast(complete.len) });
-                try evidence.appendSlice(self.allocator, complete);
-                closed_frontier = true;
-            }
-        }
-        var context = self.invocationContext();
-        // The complete primitive DAG proof excludes every operation which can
-        // select a caller-visible method, dictionary, global or effect.
-        if (isolated) context = 0;
-        const key: call_plan.Key = .{ .unit = m.unit, .binding = target.binding, .context = context, .context_free = isolated, .evidence = evidence.items };
+        const prepared = try self.scalarKey(m, body, arguments, result_type, owned_result, isolated);
+        defer self.allocator.free(prepared.key.evidence);
+        const key = prepared.key;
+        const closed_frontier = prepared.closed_frontier;
         var cache = self.shared_calls;
         if (owned_result) cache = &self.calls;
         const existing = cache.find(key);
@@ -2756,7 +2928,7 @@ const Generator = struct {
             defer child.deinit();
             // A closed primitive DAG cannot observe ambient substitutions.
             // Generic and destination bodies retain the complete caller frame.
-            if (!isolated) try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            if (!isolated) try self.inheritTypes(&child);
             const inputs = try self.allocator.alloc(Value, arguments.len);
             defer self.allocator.free(inputs);
             for (inputs, arguments, 0..) |*input, argument, parameter| input.* = .{
@@ -2787,8 +2959,10 @@ const Generator = struct {
             if (!owned_result) self.emission_work.scoped_scalar_definitions +|= 1;
             break :blk inserted;
         };
-        const entry = cache.entries.items[index];
-        if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive storage specializations are not admitted");
+        return try self.callScalarFunction(m, body.root, cache.entries.items[index], arguments, destination, result_type);
+    }
+    fn callScalarFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, destination: ?Value, result_type: T.Id) Error!Value {
+        if (entry.building) return self.fail(m, id, .storage_unsupported, "Recursive storage specializations are not admitted");
         self.noteCalleeContext(entry);
         for (arguments) |argument| try self.c.value(argument.word);
         if (destination) |owner| {
@@ -2931,7 +3105,7 @@ const Generator = struct {
                 .c = .{ .module = self.module, .function = function },
             };
             defer child.deinit();
-            try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            try self.inheritTypes(&child);
             const inputs = try child.arena.allocator().alloc(Value, arguments.len);
             var next: u32 = 0;
             for (inputs, arguments) |*input, argument| input.* = try child.inlineParameter(argument, &next);
@@ -2950,11 +3124,15 @@ const Generator = struct {
         const entry = cache.entries.items[index];
         self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, body.root, .storage_unsupported, "Recursive inline specializations are not admitted");
+        return try self.callInlineFunction(m, body.root, entry, arguments, result_shape, result_type);
+    }
+    fn callInlineFunction(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, result_shape: Value, result_type: T.Id) Error!Value {
+        const aggregate_result = result_shape.tag == .aggregate;
         const first_root = self.roots.items.len;
         const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
         var address: ?Local = null;
         if (aggregate_result) {
-            const slot = try self.arrayWithShape(m, body.root, (try self.constant(1)).word, .fixed, result_shape);
+            const slot = try self.arrayWithShape(m, id, (try self.constant(1)).word, .fixed, result_shape);
             address = try self.c.temp();
             try self.c.set(address.?, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
         }
@@ -3606,7 +3784,7 @@ const Generator = struct {
                 .c = .{ .module = self.module, .function = function },
             };
             defer child.deinit();
-            try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            try self.inheritTypes(&child);
             const inputs = try child.arena.allocator().alloc(Value, arguments.len);
             var next: u32 = 0;
             for (inputs, arguments) |*input, argument| {
@@ -3850,7 +4028,7 @@ const Generator = struct {
         }
         return result orelse original;
     }
-    const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions" };
+    const published_fields = .{ "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -3927,6 +4105,7 @@ const Generator = struct {
         words: usize,
         unit_result: bool,
         writable_result: bool,
+        result_shape: Value,
         shared: bool,
         key: call_plan.Key,
     };
@@ -3941,6 +4120,8 @@ const Generator = struct {
         const words = request.words;
         const unit_result = request.unit_result;
         const shared = request.shared;
+        const direct = graph_mode and owners.len == 0;
+        const aggregate_result = request.result_shape.tag == .aggregate;
         const key = request.key;
         var cache = &self.calls;
         var facts_by_function = &self.writer_facts;
@@ -3950,11 +4131,19 @@ const Generator = struct {
             facts_by_function = &self.descriptor_calls.facts;
             regions_by_function = &self.descriptor_calls.regions;
         }
-        const function = self.module.addTypedFunction(&.{.i32}, .i32, .scalar) catch |err| switch (err) {
+        var signature: []const wasm.ValueType = &.{.i32};
+        if (direct) {
+            const count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return error.Declined;
+            if (count > std.math.maxInt(u32)) return error.Declined;
+            const parameters = try self.arena.allocator().alloc(wasm.ValueType, count);
+            @memset(parameters, .i32);
+            signature = parameters;
+        }
+        const function = self.module.addTypedFunction(signature, .i32, .scalar) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return self.unsupported(m, body.root),
         };
-        const inserted = try cache.insert(key, function, false);
+        const inserted = try cache.insert(key, function, direct and request.result_shape.floating);
         var trace: WriterTrace = .{ .inputs = owners.len, .stable = shared and !graph_mode, .allows_writes = request.writable_result };
         defer trace.events.deinit(self.allocator);
         var child: Generator = .{
@@ -3988,7 +4177,7 @@ const Generator = struct {
             .c = .{ .module = self.module, .function = function },
         };
         defer child.deinit();
-        try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+        try self.inheritTypes(&child);
         try child.stacks.appendSlice(self.allocator, self.stacks.items);
         for (owners) |owner_id| {
             const original = self.roots.items[owner_id];
@@ -4002,9 +4191,13 @@ const Generator = struct {
         const inputs = try child.arena.allocator().alloc(Value, arguments.len);
         var offset: u32 = 0;
         for (inputs, arguments) |*input, argument| {
-            input.* = try child.loadReaderResult(.{ .id = 0 }, offset, argument);
+            if (direct) {
+                input.* = try child.inlineParameter(argument, &offset);
+            } else {
+                input.* = try child.loadReaderResult(.{ .id = 0 }, offset, argument);
+                offset += @intCast(readerWords(argument) * 4);
+            }
             try child.writerInput(input, owners, assigned);
-            offset += @intCast(readerWords(argument) * 4);
         }
         const output = child.invokeBody(target, inputs, 0, false) catch |err| {
             if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
@@ -4017,8 +4210,14 @@ const Generator = struct {
         } else {
             const template = try self.retainGraphShape(output, owners.len, &copies, 0);
             try self.descriptor_calls.results.put(self.allocator, function, template);
-            try child.storeReaderResult(.{ .id = 0 }, @intCast(words * 4), output);
-            try child.c.value(0);
+            if (direct and !aggregate_result) {
+                try child.c.value(try child.scalar(m, body.root, output));
+            } else {
+                if (direct) {
+                    try child.storeValue(.{ .id = @intCast(words) }, 0, output);
+                } else try child.storeReaderResult(.{ .id = 0 }, @intCast(words * 4), output);
+                try child.c.value(0);
+            }
         }
         self.max_stacks = @max(self.max_stacks, child.max_stacks);
         var regions: std.ArrayList(usize) = .empty;
@@ -4042,7 +4241,9 @@ const Generator = struct {
         try regions_by_function.put(self.allocator, function, try summary_arena.dupe(usize, regions.items));
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
         self.emission_work.scoped_writer_definitions +|= 1;
-        if (graph_mode) {
+        if (graph_mode and owners.len == 0) {
+            self.emission_work.scoped_plain_plan_definitions +|= 1;
+        } else if (graph_mode) {
             self.emission_work.scoped_owner_graph_definitions +|= 1;
             self.emission_work.scoped_owner_graph_inputs +|= owners.len;
             @import("../phase_profile.zig").detail("descriptor.owner-graph.complete", m.unit, m.span(body.root).start, m.span(body.root).end, owners.len);
@@ -4074,10 +4275,19 @@ const Generator = struct {
         }
         const writable_result = unit_result or plainInlineValue(result_shape);
         if (!graph_only and !writable_result) return null;
+        // Plain helpers with updates or nominal operators can fail the older
+        // expression whitelist. Complete their actual body through the same
+        // transactional ABI; no borrowed or owning argument is admitted here.
+        var plain = writable_result;
+        for (arguments) |argument| if (!plainInlineValue(argument)) {
+            plain = false;
+            break;
+        };
         var remaining: usize = 100_000;
         var descriptor = false;
         var words: usize = 0;
         var graph_mode = !unit_result and !stableDescriptorShape(result_shape);
+        if (plain) graph_mode = true;
         for (arguments) |argument| {
             if (!self.readerArgument(argument, &descriptor, &remaining)) graph_mode = true;
         }
@@ -4117,7 +4327,7 @@ const Generator = struct {
             try owners.appendSlice(self.allocator, graph.?.owners.items);
             descriptor = owners.items.len != 0;
         }
-        if (!descriptor) return null;
+        if (!descriptor and !plain) return null;
         // Only walk the ABI after the ordinary or graph admission bounded every
         // field. A failed reader probe must not trigger an unbounded fallback.
         for (arguments) |argument| words = std.math.add(usize, words, readerWords(argument)) catch return null;
@@ -4193,13 +4403,15 @@ const Generator = struct {
         }
         if (existing != null) {
             self.emission_work.scoped_writer_cache_hits +|= 1;
-            if (graph_mode) self.emission_work.scoped_owner_graph_hits +|= 1;
+            if (graph_mode and owners.items.len == 0) {
+                self.emission_work.scoped_plain_plan_hits +|= 1;
+            } else if (graph_mode) self.emission_work.scoped_owner_graph_hits +|= 1;
         }
         var index = existing;
         if (index == null) {
             var graph_input: ?*const OwnerGraph = null;
             if (graph) |*value| graph_input = value;
-            const input: OwnedFunctionInput = .{ .module = m, .target = target, .arguments = arguments, .owners = owners.items, .graph = graph_input, .words = words, .unit_result = unit_result, .writable_result = writable_result, .shared = shared, .key = key };
+            const input: OwnedFunctionInput = .{ .module = m, .target = target, .arguments = arguments, .owners = owners.items, .graph = graph_input, .words = words, .unit_result = unit_result, .writable_result = writable_result, .result_shape = result_shape, .shared = shared, .key = key };
             if (graph_mode) {
                 index = try self.tryOwnedFunction(input);
                 if (index == null) return null;
@@ -4230,6 +4442,11 @@ const Generator = struct {
         for (regions_by_function.get(entry.function) orelse return self.unsupported(m, body.root)) |region| {
             try self.used_regions.put(self.allocator, region, {});
             self.max_stacks = @max(self.max_stacks, @as(u32, @intCast(region + 1)));
+        }
+        if (graph_mode and owners.items.len == 0) {
+            var template = result_shape;
+            if (!unit_result) template = self.descriptor_calls.results.get(entry.function) orelse return self.unsupported(m, body.root);
+            return try self.callInlineFunction(m, body.root, entry, arguments, template, m.typeOf(body.root));
         }
         const first_root = self.roots.items.len;
         const mark = try self.frameMark();
@@ -4354,41 +4571,13 @@ const Generator = struct {
                 // Keys follow semantic field order, just as inline words do.
                 // Bound both ordinal count and name bytes before sorting.
                 if (node.b > keys.remaining.*) return error.Limit;
-                var name_words: usize = 1;
-                for (0..node.b) |index| {
-                    const field = owner.types.recordField(node, index);
-                    var words: usize = 4;
-                    if (owner.fieldSpelling(field.name)) |name| words = std.math.add(usize, name.len, 2) catch return error.Limit;
-                    name_words = std.math.add(usize, name_words, words) catch return error.Limit;
-                    if (name_words > keys.options.encoded_words or name_words > keys.word_work) return error.Limit;
-                }
-                const order = try self.allocator.alloc(u32, node.b);
-                defer self.allocator.free(order);
-                for (order, 0..) |*ordinal, index| ordinal.* = @intCast(index);
-                const Ordering = struct {
-                    owner: *const core.Module,
-                    node: T.Node,
-                    fn less(context: @This(), left: u32, right: u32) bool {
-                        const a = context.owner.types.recordField(context.node, left).name;
-                        const b = context.owner.types.recordField(context.node, right).name;
-                        const a_name = context.owner.fieldSpelling(a);
-                        const b_name = context.owner.fieldSpelling(b);
-                        if (a_name) |name| {
-                            if (b_name) |other| return std.mem.order(u8, name, other) == .lt;
-                            return true;
-                        }
-                        if (b_name != null) return false;
-                        return a < b;
-                    }
-                };
-                std.mem.sort(u32, order, Ordering{ .owner = owner, .node = node }, Ordering.less);
+                const metadata = try self.descriptor_calls.record_metadata.get(owner, actual.ty, node, keys.options.encoded_words, keys.word_work);
                 try keys.addWord(&descriptor, node.b);
-                for (order) |index| {
-                    const field = owner.types.recordField(node, index);
-                    if (owner.fieldSpelling(field.name)) |name| {
+                for (metadata.fields) |field| {
+                    if (field.spelling) |name| {
                         try keys.addWord(&descriptor, @intCast(name.len));
                         for (name) |byte| try keys.addWord(&descriptor, byte);
-                    } else try keys.addWords(&descriptor, &.{ std.math.maxInt(u32), actual.unit, field.name });
+                    } else try keys.addWords(&descriptor, &.{ std.math.maxInt(u32), actual.unit, field.symbol });
                     try self.selectedTypeChild(m, id, .{ .unit = actual.unit, .ty = field.ty, .environment = actual.environment }, &descriptor, keys, depth, &height);
                 }
             },
@@ -4656,7 +4845,7 @@ const Generator = struct {
                 .c = .{ .module = self.module, .function = target },
             };
             defer child.deinit();
-            try child.type_arguments.appendSlice(self.allocator, self.type_arguments.items);
+            try self.inheritTypes(&child);
             var input = function;
             const fields = initializeFields(&input, try child.arena.allocator().alloc(Value, function.fields.len));
             var next: u32 = 0;
@@ -4967,6 +5156,7 @@ const Generator = struct {
         const merges = m.branchMerges(id);
         const merged = try self.arena.allocator().alloc(?Value, merges.len);
         @memset(merged, null);
+        const shared_merges = try self.mergeTransport(m, merges, merged);
         if (merges.len != 0 and m.matchArms(id).len != 2) return self.unsupported(m, id);
         var continuing: usize = 0;
         var survivor: []const Binding = &.{};
@@ -5009,10 +5199,10 @@ const Generator = struct {
                     arm_continues = true;
                     if (result == null) result = try self.temporary(body);
                     try self.assign(m, id, &result.?, body);
-                    for (merges, merged) |merge, *value| {
+                    for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, if (arm_index == 0) merge.then_binding else merge.else_binding);
                         if (value.* == null) value.* = try self.temporary(incoming);
-                        try self.assign(m, id, &value.*.?, incoming);
+                        try self.assignTransport(m, id, &value.*.?, incoming, !shared_merge);
                     }
                     if (m.matchInfo(id).statement) try self.continuationBindings(m, id, &arm_bindings, self.bindings.items[bindings_before..]);
                 }
@@ -5029,7 +5219,9 @@ const Generator = struct {
         }
         try self.c.trap(.{ .i32_eqz, done });
         if (m.matchInfo(id).statement and continuing == 1) try self.bindings.appendSlice(self.allocator, survivor);
-        for (merges, merged) |merge, value| if (value) |joined| try self.bind(m, merge.result, joined);
+        if (result != null) {
+            for (merges, merged) |merge, value| if (value) |joined| try self.bind(m, merge.result, joined);
+        }
         return result orelse try self.terminated();
     }
     fn namedField(self: *Generator, m: *const core.Module, id: core.Id, value: Value, name: u32) Error!Value {
@@ -5741,11 +5933,18 @@ const Generator = struct {
         const carries = m.loopCarries(id);
         const values = try self.arena.allocator().alloc(Value, carries.len);
         const headers = try self.arena.allocator().alloc(Value, carries.len);
-        for (values, carries, headers) |*value, carry, *header| {
+        const shared = try self.arena.allocator().alloc(bool, carries.len);
+        @memset(shared, false);
+        const transport = try self.transportIndex(m);
+        for (values, carries, headers, shared, 0..) |*value, carry, *header, *reuse, ordinal| {
             const incoming = try self.bindingValue(m, carry.incoming);
             if (!@import("storage_control.zig").fixedCarry(incoming)) return self.unsupported(m, id);
-            value.* = try self.temporary(incoming);
-            try self.assign(m, id, value, incoming);
+            if (transport) |index| if (incoming.tag == .aggregate) {
+                reuse.* = try index.invariant(id, ordinal);
+            };
+            value.* = incoming;
+            if (!reuse.*) value.* = try self.temporary(incoming);
+            try self.assignTransport(m, id, value, incoming, !reuse.*);
             try self.loopHeader(value);
             header.* = value.*;
         }
@@ -5754,7 +5953,7 @@ const Generator = struct {
         self.nesting += 2;
         const frame_mark = try self.c.temp();
         try self.c.set(frame_mark, .{ .call, self.runtime.functions.mark, self.fixed_region });
-        try self.loops.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .carries = values, .headers = headers, .iterator = if (info.kind != .forever) iterator else null, .mark = frame_mark, .depth = self.depth + 1, .read_frame = read_frame });
+        try self.loops.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .carries = values, .shared = shared, .headers = headers, .iterator = if (info.kind != .forever) iterator else null, .mark = frame_mark, .depth = self.depth + 1, .read_frame = read_frame });
         defer _ = self.loops.pop();
         if (info.kind != .forever) {
             try self.c.value(.{ .i32_ge_u, iterator, end });
@@ -5771,14 +5970,14 @@ const Generator = struct {
         if (!body.terminated) {
             try self.checkReadFrame(m, id, read_frame);
             const next_values = try self.arena.allocator().alloc(Value, carries.len);
-            for (carries, next_values) |carry, *next| {
-                next.* = try self.snapshot(try self.bindingValue(m, carry.backedge));
+            for (carries, next_values, shared) |carry, *next, reuse| {
+                next.* = try self.transportSnapshot(try self.bindingValue(m, carry.backedge), reuse);
                 try self.checkEscape(m, id, next.*, self.depth);
             }
-            for (values, next_values, headers) |*value, next, header| {
+            for (values, next_values, headers, shared) |*value, next, header, reuse| {
                 if (!@import("storage_control.zig").stableCarry(value.*, next)) return self.fail(m, id, .storage_escape, "A loop must retain the same named owners and borrowed roots across iterations");
                 if (!includesReadShape(header, next)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
-                try self.assign(m, id, value, next);
+                try self.assignTransport(m, id, value, next, !reuse);
             }
         }
         // A conditional return reserves its result's static slot for the
@@ -6029,14 +6228,14 @@ const Generator = struct {
                     const args = m.breakValues(id);
                     if (args.len != target.carries.len) return self.unsupported(m, id);
                     const snapshots = try self.arena.allocator().alloc(Value, args.len);
-                    for (args, snapshots) |arg, *value| {
-                        value.* = try self.snapshot(try self.expression(m, arg, depth + 1));
+                    for (args, snapshots, target.shared) |arg, *value, reuse| {
+                        value.* = try self.transportSnapshot(try self.expression(m, arg, depth + 1), reuse);
                         try self.checkEscape(m, id, value.*, target.depth);
                     }
-                    for (target.carries, snapshots, target.headers) |*carry, value, header| {
+                    for (target.carries, snapshots, target.headers, target.shared) |*carry, value, header, reuse| {
                         if (!@import("storage_control.zig").stableCarry(carry.*, value)) return self.fail(m, id, .storage_escape, "A loop exit must retain the same named owners and borrowed roots");
                         if (n.op == .continue_ and !includesReadShape(header, value)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
-                        try self.assign(m, id, carry, value);
+                        try self.assignTransport(m, id, carry, value, !reuse);
                     }
                     if (n.op == .continue_) try self.checkReadFrame(m, id, target.read_frame);
                     try self.closeRuntime(target.roots_before, try self.constant(0));
@@ -6184,6 +6383,7 @@ const Generator = struct {
                 const merges = m.branchMerges(id);
                 const merged = try self.arena.allocator().alloc(?Value, merges.len);
                 @memset(merged, null);
+                const shared_merges = try self.mergeTransport(m, merges, merged);
                 var result: ?Value = null;
                 try self.c.when(condition);
                 self.nesting += 1;
@@ -6192,10 +6392,10 @@ const Generator = struct {
                 if (!left.terminated) {
                     result = try self.temporary(left);
                     try self.assign(m, id, &result.?, left);
-                    for (merges, merged) |merge, *value| {
+                    for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, merge.then_binding);
-                        value.* = try self.temporary(incoming);
-                        try self.assign(m, id, &value.*.?, incoming);
+                        if (value.* == null) value.* = try self.temporary(incoming);
+                        try self.assignTransport(m, id, &value.*.?, incoming, !shared_merge);
                     }
                     if (n.tag == .if_stmt) left_bindings = try self.arena.allocator().dupe(Binding, self.bindings.items[bindings_before..]);
                 }
@@ -6206,10 +6406,10 @@ const Generator = struct {
                 if (!right.terminated) {
                     if (result == null) result = try self.temporary(right);
                     try self.assign(m, id, &result.?, right);
-                    for (merges, merged) |merge, *value| {
+                    for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, merge.else_binding);
                         if (value.* == null) value.* = try self.temporary(incoming);
-                        try self.assign(m, id, &value.*.?, incoming);
+                        try self.assignTransport(m, id, &value.*.?, incoming, !shared_merge);
                     }
                     if (n.tag == .if_stmt) right_bindings = try self.arena.allocator().dupe(Binding, self.bindings.items[bindings_before..]);
                 }
@@ -6217,7 +6417,9 @@ const Generator = struct {
                 self.nesting -= 1;
                 try self.c.end();
                 if (n.tag == .if_stmt and left.terminated != right.terminated) try self.bindings.appendSlice(self.allocator, if (left.terminated) right_bindings else left_bindings);
-                for (merges, merged) |merge, value| if (value) |normal| try self.bind(m, merge.result, normal);
+                if (result != null) {
+                    for (merges, merged) |merge, value| if (value) |normal| try self.bind(m, merge.result, normal);
+                }
                 return result orelse try self.terminated();
             },
             .contract_method => return self.contractMethod(m, id, depth),
@@ -6449,7 +6651,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer scalar_admission.deinit();
     var field_recipes: field_plan.Cache = .{ .allocator = allocator };
     defer field_recipes.deinit();
-    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator } };
+    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
     defer descriptor_calls.deinit();
     var shared_calls: call_plan.Cache = .{ .allocator = allocator };
     defer shared_calls.deinit();
@@ -6594,4 +6796,292 @@ fn immutableMetadataSnapshots(allocator: std.mem.Allocator) !void {
 test "immutable metadata preserves read writer and loop snapshots through allocation failures" {
     try immutableMetadataSnapshots(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, immutableMetadataSnapshots, .{});
+}
+
+fn sparseReadFrames(allocator: std.mem.Allocator) !void {
+    // Metadata-only helpers; runtime emission and type selection stay idle.
+    var g: Generator = undefined;
+    g.allocator = allocator;
+    g.arena = std.heap.ArenaAllocator.init(allocator);
+    defer g.arena.deinit();
+    g.roots = .empty;
+    defer g.roots.deinit(allocator);
+    g.read_frames = .empty;
+    defer g.read_frames.deinit(allocator);
+    g.diagnostic = null;
+    var spans = [_]core.Span{.{ .start = 0, .end = 0 }};
+    const m: core.Module = .{
+        .unit = 1,
+        .types = .{ .nodes = &.{}, .extra = &.{} },
+        .nodes = &.{},
+        .spans = &spans,
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    const initial: Value = .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &.{.{ .tag = .view, .word = .{ .id = 0 }, .root = 0 }} };
+    const widened: Value = .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = &.{.{ .tag = .view, .word = .{ .id = 0 }, .root = 0, .other_roots = &.{1} }} };
+    const root_: Root = .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = 0, .depth = 0, .element = initial };
+    try g.roots.appendNTimes(allocator, root_, 6);
+    const outer = try g.beginReadFrame();
+    try std.testing.expectEqual(@as(usize, 6), g.read_frames.items[outer].owner_limit);
+    try std.testing.expectEqual(@as(usize, 0), g.read_frames.items[outer].first.capacity);
+    // Read encounter order differs from the required ascending owner order.
+    try g.registerShapeRead(.{ .word = .{ .id = 0 }, .root = 4, .other_roots = &.{ 1, 4 } });
+    try std.testing.expectEqual(@as(usize, 2), g.read_frames.items[outer].first.items.len);
+    try std.testing.expectEqual(@as(usize, 1), g.read_frames.items[outer].first.items[0].owner);
+    try std.testing.expectEqual(@as(usize, 4), g.read_frames.items[outer].first.items[1].owner);
+    const first = g.read_frames.items[outer].first.items[1].shape;
+    g.roots.items[4].element = widened;
+    const inner = try g.beginReadFrame();
+    try g.registerShapeRead(.{ .word = .{ .id = 0 }, .root = 4 });
+    // The outer first read is immutable; the inner first read sees the latest
+    // shape. Re-reading cannot replace either frame's original snapshot.
+    try std.testing.expectEqual(first, g.read_frames.items[outer].first.items[1].shape);
+    try std.testing.expect(!Generator.includesReadShape(first.*, widened));
+    try g.checkReadFrame(&m, 0, inner);
+    try std.testing.expectError(error.Declined, g.checkReadFrame(&m, 0, outer));
+    try std.testing.expectEqual(backend.Code.storage_escape, g.diagnostic.?.code);
+    g.diagnostic = null;
+    g.roots.items[4].element = initial;
+    try g.checkReadFrame(&m, 0, inner);
+    try g.checkReadFrame(&m, 0, outer);
+    // Lazily opened globals remain separate and retain encounter order; local
+    // owners created after the frame are excluded from both ordinary lists.
+    var persistent = root_;
+    persistent.persistent = true;
+    try g.roots.appendNTimes(allocator, persistent, 2);
+    try g.roots.append(allocator, root_);
+    try g.registerShapeRead(.{ .word = .{ .id = 0 }, .root = 7, .other_roots = &.{ 8, 6, 7 } });
+    for (g.read_frames.items) |frame| {
+        try std.testing.expectEqual(@as(usize, 2), frame.persistent.items.len);
+        try std.testing.expectEqual(@as(usize, 7), frame.persistent.items[0].owner);
+        try std.testing.expectEqual(@as(usize, 6), frame.persistent.items[1].owner);
+        try std.testing.expectEqual(frame.first.items.len, frame.position(8));
+    }
+    const saved = g.read_frames.items[outer].persistent.items[0].shape;
+    g.roots.items[7].element = widened;
+    try g.registerShapeRead(.{ .word = .{ .id = 0 }, .root = 7 });
+    try std.testing.expectEqual(saved, g.read_frames.items[outer].persistent.items[0].shape);
+    try std.testing.expectError(error.Declined, g.checkReadFrame(&m, 0, outer));
+    g.diagnostic = null;
+    // Closing a nested frame, then opening a sibling, observes the new prefix
+    // and newest shape without overwriting the enclosing frame's first read.
+    g.read_frames.shrinkRetainingCapacity(inner);
+    const sibling = try g.beginReadFrame();
+    try g.registerShapeRead(.{ .word = .{ .id = 0 }, .root = 7 });
+    try std.testing.expectEqual(@as(usize, 9), g.read_frames.items[sibling].owner_limit);
+    try std.testing.expectEqual(@as(usize, 7), g.read_frames.items[sibling].first.items[0].owner);
+    try std.testing.expectEqual(@as(usize, 0), g.read_frames.items[sibling].persistent.items.len);
+    try g.checkReadFrame(&m, 0, sibling);
+    try std.testing.expectEqual(saved, g.read_frames.items[outer].persistent.items[0].shape);
+    try std.testing.expectEqual(@as(usize, 2 * @sizeOf(usize)), @sizeOf(RootRead));
+}
+fn recordMetadataScenario(allocator: std.mem.Allocator) !void {
+    var record_node = [_]T.Node{.{ .tag = .record, .a = 0, .b = 5 }};
+    var record_words = [_]u32{ 12, 6, 9, 3, 2, 4, 5, 2, 7, 1 };
+    var name_bytes = [_]u8{ 'z', 'a', 'b' };
+    var field_names = [_]core.FieldName{
+        .{ .symbol = 5, .spelling = .{ .start = 0, .len = 1 } },
+        .{ .symbol = 7, .spelling = .{ .start = 1, .len = 1 } },
+        .{ .symbol = 9, .spelling = .{ .start = 2, .len = 1 } },
+    };
+    const owner: core.Module = .{
+        .unit = 42,
+        .types = .{ .nodes = &record_node, .extra = &record_words },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &name_bytes,
+        .field_names = &field_names,
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    var cache: RecordMetadataCache = .{ .allocator = allocator };
+    defer cache.deinit();
+
+    try std.testing.expectError(error.Limit, cache.get(&owner, 0, record_node[0], 17, 17));
+    const first = try cache.get(&owner, 0, record_node[0], 18, 18);
+    const again = try cache.get(&owner, 0, record_node[0], 18, 18);
+    try std.testing.expectEqual(@as(usize, 18), first.name_words);
+    try std.testing.expectEqual(first.fields.ptr, again.fields.ptr);
+    try std.testing.expectEqualSlices(u32, &.{ 1, 3, 2, 4, 6 }, &.{
+        first.fields[0].ty,
+        first.fields[1].ty,
+        first.fields[2].ty,
+        first.fields[3].ty,
+        first.fields[4].ty,
+    });
+    try std.testing.expectEqualSlices(u32, &.{ 7, 9, 5, 2, 12 }, &.{
+        first.fields[0].symbol,
+        first.fields[1].symbol,
+        first.fields[2].symbol,
+        first.fields[3].symbol,
+        first.fields[4].symbol,
+    });
+    try std.testing.expectEqualStrings("a", first.fields[0].spelling.?);
+    try std.testing.expectEqualStrings("b", first.fields[1].spelling.?);
+    try std.testing.expectEqualStrings("z", first.fields[2].spelling.?);
+    try std.testing.expect(first.fields[3].spelling == null);
+    try std.testing.expect(first.fields[4].spelling == null);
+    try std.testing.expectError(error.Limit, cache.get(&owner, 0, record_node[0], 17, 17));
+
+    var old_order = [_]u32{ 0, 1, 2, 3, 4 };
+    const OldOrdering = struct {
+        owner: *const core.Module,
+        node: T.Node,
+        fn less(context: @This(), left: u32, right: u32) bool {
+            const a = context.owner.types.recordField(context.node, left).name;
+            const b = context.owner.types.recordField(context.node, right).name;
+            const a_name = context.owner.fieldSpelling(a);
+            const b_name = context.owner.fieldSpelling(b);
+            if (a_name) |name| {
+                if (b_name) |other| return std.mem.order(u8, name, other) == .lt;
+                return true;
+            }
+            if (b_name != null) return false;
+            return a < b;
+        }
+    };
+    std.mem.sort(u32, &old_order, OldOrdering{ .owner = &owner, .node = record_node[0] }, OldOrdering.less);
+    var old_words: std.ArrayList(u32) = .empty;
+    defer old_words.deinit(allocator);
+    var cached_words: std.ArrayList(u32) = .empty;
+    defer cached_words.deinit(allocator);
+    for (old_order) |ordinal| {
+        const field = owner.types.recordField(record_node[0], ordinal);
+        if (owner.fieldSpelling(field.name)) |name| {
+            try old_words.append(allocator, @intCast(name.len));
+            for (name) |byte| try old_words.append(allocator, byte);
+        } else try old_words.appendSlice(allocator, &.{ std.math.maxInt(u32), owner.unit, field.name });
+        try old_words.append(allocator, field.ty);
+    }
+    for (first.fields) |field| {
+        if (field.spelling) |name| {
+            try cached_words.append(allocator, @intCast(name.len));
+            for (name) |byte| try cached_words.append(allocator, byte);
+        } else try cached_words.appendSlice(allocator, &.{ std.math.maxInt(u32), owner.unit, field.symbol });
+        try cached_words.append(allocator, field.ty);
+    }
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(old_words.items), std.mem.sliceAsBytes(cached_words.items));
+}
+
+test "record metadata snapshots raw fields and missing spellings through full OOM" {
+    try recordMetadataScenario(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, recordMetadataScenario, .{});
+}
+
+test "sparse loop read frames preserve sorted first snapshots nested backedges and lazy persistent owners through OOM" {
+    try sparseReadFrames(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sparseReadFrames, .{});
+}
+
+fn scalarAdmissionRefinement(allocator: std.mem.Allocator, units: []const core.Module) !void {
+    const m = &units[0];
+    const body = for (m.bodies) |*candidate| {
+        if (std.mem.eql(u8, m.name(candidate.declaration_name), "difference")) break candidate;
+    } else return error.TestUnexpectedResult;
+    const target: core.BindingRef = .{ .unit = m.unit, .binding = body.binding };
+    const views = [_]*const core.Module{m};
+    var module = wasm.Module.init(allocator);
+    defer module.deinit();
+    const runtime = try storage.emit(&module);
+    const function = try module.addTypedFunction(&.{}, .i32, .scalar);
+    var emission_work: @import("../work_counters.zig").Counters = .{};
+    var proof_cache = try source_proof.SourceProofCache.initWithInventoryBudget(allocator, &views);
+    defer proof_cache.deinit();
+    var dispatches: Dispatches = .empty;
+    defer dispatches.deinit(allocator);
+    var capacity_requests: storage_plan.CapacityRequests = .{ .allocator = allocator };
+    defer capacity_requests.deinit();
+    var validation_budget: usize = 1_000_000;
+    var active_calls: call_plan.ActiveCalls = .{ .allocator = allocator };
+    defer active_calls.deinit();
+    var scalar_admission: call_plan.ScalarAdmission = .{ .allocator = allocator, .units = units };
+    defer scalar_admission.deinit();
+    var field_recipes: field_plan.Cache = .{ .allocator = allocator };
+    defer field_recipes.deinit();
+    var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
+    defer descriptor_calls.deinit();
+    var shared_calls: call_plan.Cache = .{ .allocator = allocator };
+    defer shared_calls.deinit();
+    var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
+    defer outlining.deinit();
+    var methods: MethodSelector = .{ .allocator = allocator, .units = units, .entry = m.unit };
+    defer methods.deinit();
+    var g: Generator = .{ .entry_unit = m.unit, .methods = &methods, .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .shared_calls = &shared_calls, .descriptor_calls = &descriptor_calls, .field_recipes = &field_recipes, .scalar_admission = &scalar_admission, .active_calls = &active_calls, .units = units, .unit_views = &views, .proof_cache = &proof_cache, .dispatches = &dispatches, .capacity_requests = &capacity_requests, .validation_budget = &validation_budget, .module = &module, .runtime = runtime, .emission_work = &emission_work, .outlining = &outlining, .c = .{ .module = &module, .function = function } };
+    defer g.deinit();
+    for ([_]T.Id{ T.u32_type, T.f32_type, T.u32_type, T.f32_type }) |actual| {
+        const before = g.type_arguments.items.len;
+        defer g.type_arguments.shrinkRetainingCapacity(before);
+        var arguments: [2]Value = undefined;
+        for (m.bodyParameters(body), &arguments, 0..) |parameter, *argument, ordinal| {
+            try g.mapTypes(.{ .unit = m.unit, .ty = parameter.ty }, .{ .unit = m.unit, .ty = actual }, 0);
+            argument.* = try g.constant(@intCast(ordinal + 1));
+            argument.floating = actual == T.f32_type;
+            argument.type_evidence = .{ .root = .{ .unit = m.unit, .ty = actual }, .arguments = &.{} };
+        }
+        // A checked generic method's input types are known, but its return
+        // variable is deliberately left for ordinary numeric admission.
+        const unresolved = try g.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
+        try std.testing.expect(m.types.node(unresolved.ty).tag == .variable);
+        const saved = g.type_arguments.items.len;
+        try std.testing.expect(try g.completedScalar(m, body, &arguments) == null);
+        try std.testing.expectEqual(saved, g.type_arguments.items.len);
+        try std.testing.expect(g.diagnostic == null);
+        const result = try g.reusableCall(m, target, &arguments);
+        try std.testing.expect(result != null);
+        try std.testing.expectEqual(actual == T.f32_type, result.?.floating);
+        const resolved = try g.resolveType(.{ .unit = m.unit, .ty = m.typeOf(body.root) }, 0);
+        try std.testing.expectEqual(actual, resolved.ty);
+        const definitions = emission_work.scoped_scalar_definitions;
+        const hits = emission_work.scoped_scalar_completed_hits;
+        const repeated = try g.reusableCall(m, target, &arguments);
+        try std.testing.expect(repeated != null);
+        try std.testing.expectEqual(actual == T.f32_type, repeated.?.floating);
+        try std.testing.expectEqual(definitions, emission_work.scoped_scalar_definitions);
+        try std.testing.expectEqual(hits + 1, emission_work.scoped_scalar_completed_hits);
+    }
+}
+test "scalar completed hits preserve unresolved numeric admission and distinct return instantiations through OOM" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\const U32.minus = func (left: U32) -> (right: U32): U32 => return @u32.sub left right
+        \\const F32.minus = func (left: F32) -> (right: F32): F32 => return @f32.sub left right
+        \\const difference = func left -> right => return @type.call "minus" left right
+        \\entry const answer = func (): U32 => return 0
+    ;
+    var lexed = try @import("../parse/lexer.zig").lex(allocator, source);
+    defer lexed.deinit(allocator);
+    var names: @import("../parse/symbols.zig").Pool = .{};
+    defer names.deinit(allocator);
+    var tree = try @import("../parse/parser.zig").parse(allocator, source, lexed.tokens.items, &names);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    var checked = try @import("../check/check.zig").checkModuleWithOptions(allocator, &tree, &names, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    var lowered = try core.lower(allocator, &tree, &names, &checked);
+    defer lowered.deinit(allocator);
+    lowered.unit = 1;
+    try std.testing.expectEqual(@as(usize, 0), lowered.diagnostics.len);
+    try scalarAdmissionRefinement(allocator, &.{lowered});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, scalarAdmissionRefinement, .{@as([]const core.Module, &.{lowered})});
 }

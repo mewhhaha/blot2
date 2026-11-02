@@ -1328,3 +1328,91 @@ test "immutable local bindings preserve parallel loops captures and functional r
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_record_updates_shared);
     try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_indexed_update_roots_shared);
 }
+
+const aggregate_transport_source =
+    \\entry const invariant = func (input: U32): Array U32 => return do:
+    \\  let rows: Array U32 = #[input]
+    \\  let world = {rows: rows, stamp: 7}
+    \\  for index in 0 .. 4:
+    \\    if @u32.eq index 1:
+    \\      world.rows[0] := @u32.add self 2
+    \\      continue
+    \\    else:
+    \\      world.rows[0] := @u32.add self 1
+    \\    for inner in 0 .. 2:
+    \\      world.rows[0] := @u32.add self inner
+    \\    if @u32.eq index 2:
+    \\      break
+    \\  return #[world.rows[0], world.stamp]
+    \\entry const shadow = func (input: U32): Array U32 => return do:
+    \\  let rows: Array U32 = #[input]
+    \\  let world = {rows: rows, stamp: 7}
+    \\  let other = {rows: rows, stamp: 99}
+    \\  for index in 0 .. 3:
+    \\    world.rows[0] := @u32.add self 1
+    \\    if @u32.eq index 1:
+    \\      let world = other
+    \\      break
+    \\  return #[world.rows[0], world.stamp]
+    \\entry const fields = func (input: U32): Array U32 => return do:
+    \\  let rows: Array U32 = #[input]
+    \\  let world = {rows: rows, stamp: 7}
+    \\  for index in 0 .. 3:
+    \\    world.rows[0] := @u32.add self 1
+    \\    world.stamp := @u32.add self index
+    \\  return #[world.rows[0], world.stamp]
+;
+fn publishAggregateTransport(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_transport_words_avoided > 0);
+}
+test "SSA aggregate transport proves every loop exit and preserves physical fallback through OOM" {
+    var module = try lower(a, aggregate_transport_source);
+    defer module.deinit(a);
+    const transport = @import("storage_transport.zig");
+    var arena: std.heap.ArenaAllocator = .init(a);
+    defer arena.deinit();
+    const index = (try transport.Index.create(&arena, &module)).?;
+    const shadow_start = std.mem.find(u8, aggregate_transport_source, "entry const shadow").?;
+    var invariant_count: usize = 0;
+    var changed_count: usize = 0;
+    for (module.nodes, 0..) |node, ordinal| {
+        if (node.tag != .loop) continue;
+        const id: core.Id = @intCast(ordinal);
+        for (module.loopCarries(id), 0..) |carry, position| {
+            const proof = try index.invariant(id, position);
+            // The nested proof must not publish an outer iteration hypothesis.
+            try std.testing.expectEqual(carry.iteration, (try index.canonical(carry.iteration)).?);
+            if (module.span(id).start < shadow_start) {
+                try std.testing.expect(proof);
+                invariant_count += 1;
+            } else {
+                try std.testing.expect(!proof);
+                changed_count += 1;
+            }
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), invariant_count);
+    try std.testing.expectEqual(@as(usize, 2), changed_count);
+    index.remaining = 0;
+    for (module.nodes, 0..) |node, ordinal| {
+        if (node.tag != .loop) continue;
+        for (module.loopCarries(@intCast(ordinal))) |carry| {
+            try std.testing.expect(try index.canonical(carry.outgoing) == null);
+        }
+    }
+    try publishAggregateTransport(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateTransport, .{@as([]const core.Module, &.{module})});
+    var addressed = try lower(a, aggregate_transport_source ++ "\n" ++
+        \\const address = func (): U32 => return do:
+        \\  let value = 1
+        \\  return @storage.load (&value)
+    );
+    defer addressed.deinit(a);
+    var fallback = try scoped.compile(a, &.{addressed}, 1);
+    defer fallback.deinit(a);
+    try std.testing.expect(fallback.diagnostic == null);
+    try std.testing.expectEqual(@as(u64, 0), fallback.counters.scoped_transport_words_avoided);
+}

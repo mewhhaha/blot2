@@ -89,7 +89,10 @@ test "projected anonymous parameters complete selected named callback source pro
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_owner_graph_definitions);
     try std.testing.expect(result.counters.scoped_owner_graph_hits >= 1);
-    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_definitions);
+    // The plain enclosing/helper body can complete independently; the selected
+    // descriptor callback still requires the original whole-source proof.
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_plain_plan_definitions);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_completed_plan_definitions);
 }
 test "projected anonymous parameters reject selected literal callbacks with captured goals" {
     var module = try lower(
@@ -118,7 +121,10 @@ test "projected anonymous parameters reject selected literal callbacks with capt
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owner_graph_definitions);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_attempts);
+    // A plain named body may contain this literal locally; the literal is
+    // still excluded from the shared descriptor callback interface above.
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_plain_plan_definitions);
+    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_completed_plan_attempts);
 }
 test "projected anonymous parameters retain whole-record forwarding" {
     var module = try lower(callback ++

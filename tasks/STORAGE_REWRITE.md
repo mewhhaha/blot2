@@ -2,22 +2,14 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/gdev-after-indexed-access-2026-11-02.json)
-now completes in **17.45 seconds**, producing **38.82 MB Wasm**, cache disabled.
-The preceding matched-source completions were19.74 seconds/43.06 MB and24.55
-seconds/45.98 MB. Neither meets the five-second gate. Emission still expands 1.3
-million expressions and performs 3.85 million shadow admission visits; completed
-typed function plans and cheaper aggregate transport are the next architectural
-hill.
-
-[Active captures](../zig-native/measurements/active-type-captures-2026-11-02.json)
-qualify 59 selected native laws with full faults, 34 guests and seven unchanged
-actual renderer streams.
-[Structural type IDs](../zig-native/measurements/rejected-global-type-ids-2026-11-02.json)
-are rejected and removed after a 5.3% renderer emission regression. Full gate
-qualification retains the baseline List/chunk failure. A fresh full-game frame
-remains pending because available Pen binaries reject ABI 8. Use the pinned
-records and Git history for superseded checkpoint details.
+[Actual full main](../zig-native/measurements/gdev-after-completed-functions-2026-11-02.json)
+now completes in **15.15 seconds**, producing **32.72 MB Wasm**, cache disabled.
+The same-workload predecessor took 17.45 seconds/38.82MB. The next checked
+[transport batch](../zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json)
+qualifies 80 full-fault native laws, 56 guests and seven matching renderer streams;
+its optimized full-main measurement is pending. The five-second gate remains
+unmet. Full qualification retains the baseline List/chunk failure, and a fresh
+full-game frame still needs a matching ABI 8 Pen binary.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

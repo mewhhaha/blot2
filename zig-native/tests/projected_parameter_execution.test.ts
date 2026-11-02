@@ -122,11 +122,13 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const work = built.stats.workCounters as Record<string, number>;
         if (fixture.shared) {
           assert.equal(work.scoped_owner_graph_definitions, 1);
-          assert.equal(work.scoped_completed_plan_definitions, 1);
+          assert.equal(work.scoped_plain_plan_definitions, 1);
+          assert.equal(work.scoped_completed_plan_definitions, 2);
           assert(work.scoped_owner_graph_hits >= 1);
         } else {
           assert.equal(work.scoped_owner_graph_definitions, 0);
-          assert.equal(work.scoped_completed_plan_attempts, 0);
+          assert.equal(work.scoped_plain_plan_definitions, 1);
+          assert.equal(work.scoped_completed_plan_attempts, 1);
           assert(
             compiler.profileProgress?.events.some((event) =>
               event.kind === "detail" &&
