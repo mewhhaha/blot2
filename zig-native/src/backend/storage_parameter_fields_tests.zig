@@ -93,6 +93,7 @@ test "projected anonymous parameters complete selected named callback source pro
     // descriptor callback still requires the original whole-source proof.
     try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_plain_plan_definitions);
     try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_completed_plan_definitions);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
 test "projected anonymous parameters reject selected literal callbacks with captured goals" {
     var module = try lower(

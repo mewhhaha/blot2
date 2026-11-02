@@ -108,10 +108,10 @@ const Value = struct {
     floating: bool = false,
     literal: ?u32 = null,
     name: []const u8 = "",
-    callable: ?Callable = null,
+    callable: ?*const Callable = null,
     host: ?wasm.Callback = null,
     nominal: ?T.NominalIdentity = null,
-    type_evidence: ?struct { root: TypeRef, arguments: []const TypeArgument } = null,
+    type_evidence: ?*const TypeEvidence = null,
     // Set only after a complete anonymous-formal footprint. Semantic type
     // evidence remains complete; this bit describes the physical parameter.
     projected_parameter_fields: bool = false,
@@ -130,6 +130,12 @@ const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: L
 const Global = struct { target: core.BindingRef, word: u32, token: u32, epoch_low: u32, epoch_high: u32, capacity_request: usize, literal_bytes: ?u32 = null, initializing: bool = false };
 const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument = null };
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
+const TypeEvidence = struct { root: TypeRef, arguments: []const TypeArgument };
+fn boxTypeEvidenceIn(arena: std.mem.Allocator, source: TypeEvidence) Error!*const TypeEvidence {
+    const value = try arena.create(TypeEvidence);
+    value.* = source;
+    return value;
+}
 const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining: u32 };
 const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ?Value = null };
 const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const bool, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
@@ -163,6 +169,20 @@ const DescriptorCalls = struct {
     declined: std.HashMapUnmanaged(call_plan.Key, void, call_plan.KeyContext, 80) = .empty,
     transports: std.AutoHashMapUnmanaged(u32, ?*transport_plan.Index) = .empty,
     record_metadata: RecordMetadataCache,
+    primitive_evidence: []const TypeEvidence = &.{},
+    fn initPrimitiveEvidence(self: *DescriptorCalls, units: []const core.Module) std.mem.Allocator.Error!void {
+        const count = std.math.mul(usize, units.len, 5) catch return error.OutOfMemory;
+        const cached = try self.arena.allocator().alloc(TypeEvidence, count);
+        for (units, 0..) |unit, index| {
+            for (0..5) |primitive| {
+                cached[index * 5 + primitive] = .{
+                    .root = .{ .unit = unit.unit, .ty = T.unit + @as(T.Id, @intCast(primitive)) },
+                    .arguments = &.{},
+                };
+            }
+        }
+        self.primitive_evidence = cached;
+    }
     fn decline(self: *DescriptorCalls, key: call_plan.Key) Error!void {
         if (self.declined.contains(key)) return;
         try self.declined.ensureUnusedCapacity(self.allocator, 1);
@@ -365,6 +385,11 @@ const Generator = struct {
         self.read_frames.deinit(self.allocator);
         self.arena.deinit();
     }
+    fn boxCallable(self: *Generator, source: Callable) Error!*const Callable {
+        const value = try self.arena.allocator().create(Callable);
+        value.* = source;
+        return value;
+    }
     fn fail(self: *Generator, m: *const core.Module, id: core.Id, code: backend.Code, detail: []const u8) Error {
         if (self.diagnostic == null) self.diagnostic = .{ .unit = m.unit, .span = m.span(id), .code = code, .detail = detail };
         return error.Declined;
@@ -375,6 +400,17 @@ const Generator = struct {
     fn unit(self: *Generator, id: u32) Error!*const core.Module {
         if (id == 0 or id > self.units.len) return error.Declined;
         return &self.units[id - 1];
+    }
+    fn boxTypeEvidence(self: *Generator, source: TypeEvidence) Error!*const TypeEvidence {
+        if (source.root.environment == null and source.arguments.len == 0 and source.root.ty >= T.unit and source.root.ty <= T.never and source.root.unit != 0 and source.root.unit <= self.descriptor_calls.primitive_evidence.len / 5) {
+            const unit_index = @as(usize, source.root.unit - 1);
+            const index = unit_index * 5 + @as(usize, source.root.ty - T.unit);
+            if (index < self.descriptor_calls.primitive_evidence.len) {
+                const cached = &self.descriptor_calls.primitive_evidence[index];
+                if (cached.root.unit == source.root.unit) return cached;
+            }
+        }
+        return boxTypeEvidenceIn(self.arena.allocator(), source);
     }
     fn constant(self: *Generator, word: u32) Error!Value {
         const local = try self.c.temp();
@@ -583,10 +619,10 @@ const Generator = struct {
         // when a generic projection has not resolved its own result variable.
         // Constructor-local mappings have unwound here. Closed cache entries
         // must not retain unrelated caller substitutions.
-        if (value.type_evidence == null and value.nominal != null and m.types.node(ty).tag == .nominal) value.type_evidence = .{
+        if (value.type_evidence == null and value.nominal != null and m.types.node(ty).tag == .nominal) value.type_evidence = try self.boxTypeEvidence(.{
             .root = .{ .unit = m.unit, .ty = ty },
             .arguments = if (closed) &.{} else try self.captureTypes(),
-        };
+        });
         if (closed and plainShape(value)) try self.plain_layouts.put(self.allocator, key, value);
         return value;
     }
@@ -628,7 +664,7 @@ const Generator = struct {
     }
     fn shapeUncached(self: *Generator, m: *const core.Module, id: core.Id, ty: T.Id, depth: usize) Error!Value {
         const n = m.types.node(ty);
-        if (n.tag == .unit or n.tag == .u32 or n.tag == .boolean or n.tag == .f32) return .{ .word = .{ .id = 0 }, .floating = n.tag == .f32, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = &.{} } };
+        if (n.tag == .unit or n.tag == .u32 or n.tag == .boolean or n.tag == .f32) return .{ .word = .{ .id = 0 }, .floating = n.tag == .f32, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = &.{} }) };
         if (@import("storage_collections.zig").element(m, ty) != null) return .{
             .tag = .array,
             .word = .{ .id = 0 },
@@ -638,13 +674,13 @@ const Generator = struct {
                 .resize => .resize,
                 else => .fixed,
             } else .fixed,
-            .type_evidence = .{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = try self.captureTypes() },
+            .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = try self.captureTypes() }),
         };
         if (n.tag == .cursor) return .{
             .tag = .view,
             .word = .{ .id = 0 },
             .pool_borrow = true,
-            .type_evidence = .{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = try self.captureTypes() },
+            .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = ty }, .arguments = try self.captureTypes() }),
         };
         if (n.tag == .record or n.tag == .product) {
             const fields = try self.arena.allocator().alloc(Value, n.b);
@@ -1642,6 +1678,9 @@ const Generator = struct {
     fn resolveType(self: *Generator, input: TypeRef, depth: usize) Error!TypeRef {
         if (depth > 128) return error.Declined;
         if (input.environment) |environment| return self.resolveActual(.{ .unit = input.unit, .ty = input.ty }, environment, depth + 1);
+        // Bounds fix these IDs; fresh substitutions bind only variable/bound
+        // nodes. Captures and inheritance preserve that same key invariant.
+        if (input.ty >= T.unit and input.ty <= T.never) return input;
         const position = self.type_arguments.latestNonidentity(input.unit, input.ty) orelse return input;
         const argument = self.type_arguments.items[position];
         return self.resolveType(.{ .unit = argument.argument_unit, .ty = argument.argument, .environment = argument.environment }, depth + 1);
@@ -1654,15 +1693,19 @@ const Generator = struct {
     // inference variables when the same generic helper is instantiated twice.
     fn resolveActual(self: *Generator, input: TypeRef, environment: []const TypeArgument, depth: usize) Error!TypeRef {
         if (depth > 128) return error.Declined;
-        var at = environment.len;
-        while (at != 0) {
-            at -= 1;
-            const item = environment[at];
-            if (item.unit != input.unit or item.parameter != input.ty) continue;
-            const next: TypeRef = .{ .unit = item.argument_unit, .ty = item.argument, .environment = item.environment };
-            if (std.meta.eql(input, next)) continue;
-            if (next.environment != null) return self.resolveType(next, depth + 1);
-            return self.resolveActual(next, environment, depth + 1);
+        if (input.ty >= T.unit and input.ty <= T.never) {
+            self.emission_work.scoped_primitive_environment_entries_avoided +|= environment.len;
+        } else {
+            var at = environment.len;
+            while (at != 0) {
+                at -= 1;
+                const item = environment[at];
+                if (item.unit != input.unit or item.parameter != input.ty) continue;
+                const next: TypeRef = .{ .unit = item.argument_unit, .ty = item.argument, .environment = item.environment };
+                if (std.meta.eql(input, next)) continue;
+                if (next.environment != null) return self.resolveType(next, depth + 1);
+                return self.resolveActual(next, environment, depth + 1);
+            }
         }
         const resolved = try self.resolveType(input, depth);
         return .{ .unit = resolved.unit, .ty = resolved.ty, .environment = resolved.environment orelse environment };
@@ -1933,7 +1976,7 @@ const Generator = struct {
         const fields = try self.arena.allocator().alloc(Value, function.fields.len + 1);
         @memcpy(fields[0..function.fields.len], function.fields);
         fields[function.fields.len] = argument;
-        return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = .{ .unit = owner.unit, .target = callable.target, .types = try self.captureTypes() } };
+        return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = try self.boxCallable(.{ .unit = owner.unit, .target = callable.target, .types = try self.captureTypes() }) };
     }
     fn planGraphRead(self: *Generator, m: *const core.Module, id: core.Id, receiver: Value) Error!?Value {
         const first = receiver.root orelse return null;
@@ -1943,7 +1986,7 @@ const Generator = struct {
             if (other >= self.roots.items.len) return null;
             if (self.roots.items[other].element_initialized) try self.storedShape(m, id, &value, self.roots.items[other].element, std.math.maxInt(usize));
         }
-        value.type_evidence = .{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() };
+        value.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() });
         return value;
     }
     fn planValue(self: *Generator, m: *const core.Module, id: core.Id, remaining: *usize, depth: usize) Error!?Value {
@@ -1967,7 +2010,7 @@ const Generator = struct {
                 }
                 const source = try self.unit(ref.unit);
                 if (source.body(ref.binding)) |body| {
-                    if (body.is_function) return .{ .tag = .callable, .word = .{ .id = 0 }, .callable = .{ .unit = ref.unit, .target = ref.binding, .types = try self.captureTypes() } };
+                    if (body.is_function) return .{ .tag = .callable, .word = .{ .id = 0 }, .callable = try self.boxCallable(.{ .unit = ref.unit, .target = ref.binding, .types = try self.captureTypes() }) };
                 } else if (source.binding(ref.binding).kind != .local and source.binding(ref.binding).kind != .parameter) return null;
             },
             .closure => {
@@ -1987,7 +2030,7 @@ const Generator = struct {
                     }
                     if (!found) return null;
                 }
-                return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = .{ .unit = m.unit, .node = id, .captures = captures, .types = try self.captureTypes(), .goals = self.active_goals } };
+                return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .types = try self.captureTypes(), .goals = self.active_goals }) };
             },
             .project => {
                 const receiver = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return null;
@@ -2005,7 +2048,7 @@ const Generator = struct {
                 try self.mapTypes(.{ .unit = owner.unit, .ty = signature.b }, .{ .unit = m.unit, .ty = projection.result_type }, 0);
                 // A curried getter captures its receiver now; admission of its
                 // body waits for the saturated callback, just like invoke.
-                if (owner.bodyParameters(body).len > 1) return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = try self.arena.allocator().dupe(Value, &.{receiver}), .callable = .{ .unit = owner.unit, .target = selection.target.binding, .types = try self.captureTypes() } };
+                if (owner.bodyParameters(body).len > 1) return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = try self.arena.allocator().dupe(Value, &.{receiver}), .callable = try self.boxCallable(.{ .unit = owner.unit, .target = selection.target.binding, .types = try self.captureTypes() }) };
             },
             .product, .record => {
                 const children = m.children(id);
@@ -2032,7 +2075,7 @@ const Generator = struct {
                 if (call.arguments.len < owner.bodyParameters(body).len) {
                     const fields = try self.arena.allocator().alloc(Value, call.arguments.len);
                     for (fields, call.arguments) |*field, argument| field.* = (try self.planValue(m, argument, remaining, depth + 1)) orelse return null;
-                    return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = .{ .unit = owner.unit, .target = target.binding, .types = try self.captureTypes() } };
+                    return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = try self.boxCallable(.{ .unit = owner.unit, .target = target.binding, .types = try self.captureTypes() }) };
                 }
                 if (call.arguments.len == owner.bodyParameters(body).len and owner.node(body.root).tag == .associated) {
                     const types_before = self.type_arguments.items.len;
@@ -2062,10 +2105,10 @@ const Generator = struct {
                     receiver.tag = if (op == .view) .view else if (op == .at) .ref else .link;
                     // Roots describe physical provenance; the checked result
                     // describes the selected capability, not its source owner.
-                    receiver.type_evidence = .{
+                    receiver.type_evidence = try self.boxTypeEvidence(.{
                         .root = .{ .unit = m.unit, .ty = n.ty },
                         .arguments = try self.captureTypes(),
-                    };
+                    });
                     return receiver;
                 }
             },
@@ -2075,7 +2118,7 @@ const Generator = struct {
                     var receiver = (try self.planValue(m, m.children(id)[0], remaining, depth + 1)) orelse return null;
                     if (op == .get or op == .cursor_value) return self.planGraphRead(m, id, receiver);
                     receiver.tag = .view;
-                    receiver.type_evidence = .{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() };
+                    receiver.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() });
                     return receiver;
                 }
             },
@@ -2096,7 +2139,7 @@ const Generator = struct {
                 try self.mapValueTypes(.{ .unit = owner.unit, .ty = parameters[0].ty }, first, 0);
                 try self.mapValueTypes(.{ .unit = owner.unit, .ty = parameters[1].ty }, second, 0);
                 const fields = try self.arena.allocator().dupe(Value, &.{ first, second });
-                return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = .{ .unit = owner.unit, .target = target.binding, .types = try self.captureTypes() } };
+                return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = fields, .callable = try self.boxCallable(.{ .unit = owner.unit, .target = target.binding, .types = try self.captureTypes() }) };
             },
             else => {},
         }
@@ -2119,12 +2162,12 @@ const Generator = struct {
                 // allocation, aliases and ordered input-root access facts.
                 const root_id = self.roots.items.len;
                 try self.roots.append(self.allocator, .{ .word = .{ .id = 0 }, .token = .{ .id = 0 }, .epoch_low = .{ .id = 0 }, .epoch_high = .{ .id = 0 }, .stack = self.fixed_region, .depth = self.depth, .element = row, .element_initialized = true, .dedicated = false });
-                return .{ .tag = .array, .word = .{ .id = 0 }, .root = root_id, .depth = self.depth, .mode = if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed, .type_evidence = .{ .root = actual, .arguments = try self.captureTypes() } };
+                return .{ .tag = .array, .word = .{ .id = 0 }, .root = root_id, .depth = self.depth, .mode = if (info) |kind| (if (kind.kind == .grow) .grow else .resize) else .fixed, .type_evidence = try self.boxTypeEvidence(.{ .root = actual, .arguments = try self.captureTypes() }) };
             }
         }
         if (!try self.selectedInlineType(.{ .unit = m.unit, .ty = n.ty }, remaining)) return null;
         var value = try self.shape(m, id, n.ty, 0);
-        value.type_evidence = .{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() };
+        value.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() });
         return value;
     }
     fn plannedCallback(self: *Generator, function: Value, argument: Value, remaining: *usize, active: *[128]core.BindingRef, used: usize, depth: usize) Error!bool {
@@ -2666,7 +2709,7 @@ const Generator = struct {
                 if (op == .generate) {
                     const function = (try self.planValue(m, arguments[1], remaining, depth + 1)) orelse return false;
                     // Runtime indices carry their checked type, never a literal.
-                    const index: Value = .{ .word = .{ .id = 0 }, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = T.u32_type }, .arguments = &.{} } };
+                    const index: Value = .{ .word = .{ .id = 0 }, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.u32_type }, .arguments = &.{} }) };
                     if (!try self.plannedCallback(function, index, remaining, active, used, depth + 1)) return false;
                 }
             },
@@ -2681,7 +2724,7 @@ const Generator = struct {
                     if (pattern_.tag != .bind) return false;
                     const receiver = (try self.planValue(m, loop.first, remaining, depth + 1)) orelse return false;
                     var item = (try self.planGraphRead(m, id, receiver)) orelse return false;
-                    item.type_evidence = .{ .root = .{ .unit = m.unit, .ty = pattern_.ty }, .arguments = try self.captureTypes() };
+                    item.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = pattern_.ty }, .arguments = try self.captureTypes() });
                     try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = pattern_.a, .value = item, .remaining = 0 });
                 }
                 if (!try self.numericExpression(m, loop.body, remaining, active, used, readers, depth + 1)) return false;
@@ -2977,7 +3020,7 @@ const Generator = struct {
             try self.c.set(owner.word, result);
             return owner;
         }
-        return .{ .word = result, .floating = entry.floating, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = &.{} } };
+        return .{ .word = result, .floating = entry.floating, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = &.{} }) };
     }
     fn inlineWords(value: Value) Error!usize {
         if (value.tag == .scalar) return 1;
@@ -3146,7 +3189,7 @@ const Generator = struct {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
         }
-        result.type_evidence = .{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() };
+        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
         return result;
     }
     fn readerWords(value: Value) usize {
@@ -3318,6 +3361,36 @@ const Generator = struct {
         for (fields, source.fields) |*field, original| field.* = try self.readerPlainShape(original);
         return value;
     }
+    // The graph owns metadata and owner ordinals. Rebind only runtime words,
+    // in exactly readerValues order; writerInput performs the existing remap.
+    fn readerWordParameter(self: *Generator, original: Value, next: *u32) Error!Value {
+        var value = original;
+        if (value.tag == .aggregate or value.tag == .callable) {
+            if (value.variant_tags.len != 0) {
+                value.word = .{ .id = next.* };
+                next.* += 1;
+            } else if (value.tag == .aggregate) value.word = .{ .id = 0 } else value.word = (try self.constant(0)).word;
+            const fields = initializeFields(&value, try self.arena.allocator().alloc(Value, original.fields.len));
+            for (fields, original.fields) |*field, source| field.* = try self.readerWordParameter(source, next);
+            return value;
+        }
+        value.word = .{ .id = next.* };
+        next.* += 1;
+        if (value.tag == .scalar) return value;
+        value.token = .{ .id = next.* };
+        value.epoch_low = .{ .id = next.* + 1 };
+        value.epoch_high = .{ .id = next.* + 2 };
+        next.* += 3;
+        if (value.tag != .array) {
+            value.index = .{ .id = next.* };
+            next.* += 1;
+        }
+        if (value.tag == .view) {
+            value.length = .{ .id = next.* };
+            next.* += 1;
+        }
+        return value;
+    }
     // Runtime descriptors are rebound to independent child roots; owner identity
     // and epochs remain runtime parameters rather than specialization keys.
     fn readerParameter(self: *Generator, child: *Generator, input: *Value, argument: Value, next: *u32) Error!void {
@@ -3407,7 +3480,7 @@ const Generator = struct {
         if (source.type_evidence) |known| {
             var root_type = known.root;
             if (root_type.environment) |environment| root_type.environment = try self.retainEnvironment(environment, copies, 0);
-            result.type_evidence = .{ .root = root_type, .arguments = try self.retainEnvironment(known.arguments, copies, 0) };
+            result.type_evidence = try boxTypeEvidenceIn(self.arena.allocator(), .{ .root = root_type, .arguments = try self.retainEnvironment(known.arguments, copies, 0) });
         }
         return result;
     }
@@ -3835,7 +3908,7 @@ const Generator = struct {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
         }
-        result.type_evidence = .{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() };
+        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = result_type }, .arguments = try self.captureTypes() });
         return result;
     }
     fn writerOrdinal(owners: []const usize, owner_id: usize) Error!usize {
@@ -3956,7 +4029,7 @@ const Generator = struct {
         if (source.type_evidence) |known| {
             var root_type = known.root;
             if (root_type.environment) |environment| root_type.environment = try self.retainEnvironmentIn(arena, environment, copies, 0);
-            result.type_evidence = .{ .root = root_type, .arguments = try self.retainEnvironmentIn(arena, known.arguments, copies, 0) };
+            result.type_evidence = try boxTypeEvidenceIn(arena, .{ .root = root_type, .arguments = try self.retainEnvironmentIn(arena, known.arguments, copies, 0) });
         }
         result.name = try arena.dupe(u8, source.name);
         result.other_roots = try arena.dupe(usize, source.other_roots);
@@ -4096,6 +4169,10 @@ const Generator = struct {
         complete = true;
         return result;
     }
+    fn ownedWordAbi(words: usize, result: Value) bool {
+        // Bound the complete machine signature, including the result pointer.
+        return words <= 512 - @as(usize, @intFromBool(result.tag != .scalar));
+    }
     const OwnedFunctionInput = struct {
         module: *const core.Module,
         target: core.BindingRef,
@@ -4120,8 +4197,8 @@ const Generator = struct {
         const words = request.words;
         const unit_result = request.unit_result;
         const shared = request.shared;
-        const direct = graph_mode and owners.len == 0;
-        const aggregate_result = request.result_shape.tag == .aggregate;
+        const direct = ownedWordAbi(words, request.result_shape);
+        const buffered_result = request.result_shape.tag != .scalar;
         const key = request.key;
         var cache = &self.calls;
         var facts_by_function = &self.writer_facts;
@@ -4133,8 +4210,7 @@ const Generator = struct {
         }
         var signature: []const wasm.ValueType = &.{.i32};
         if (direct) {
-            const count = std.math.add(usize, words, @intFromBool(aggregate_result)) catch return error.Declined;
-            if (count > std.math.maxInt(u32)) return error.Declined;
+            const count = std.math.add(usize, words, @intFromBool(buffered_result)) catch return error.Declined;
             const parameters = try self.arena.allocator().alloc(wasm.ValueType, count);
             @memset(parameters, .i32);
             signature = parameters;
@@ -4192,13 +4268,14 @@ const Generator = struct {
         var offset: u32 = 0;
         for (inputs, arguments) |*input, argument| {
             if (direct) {
-                input.* = try child.inlineParameter(argument, &offset);
+                input.* = try child.readerWordParameter(argument, &offset);
             } else {
                 input.* = try child.loadReaderResult(.{ .id = 0 }, offset, argument);
                 offset += @intCast(readerWords(argument) * 4);
             }
             try child.writerInput(input, owners, assigned);
         }
+        if (direct) std.debug.assert(offset == words);
         const output = child.invokeBody(target, inputs, 0, false) catch |err| {
             if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
             return err;
@@ -4210,11 +4287,11 @@ const Generator = struct {
         } else {
             const template = try self.retainGraphShape(output, owners.len, &copies, 0);
             try self.descriptor_calls.results.put(self.allocator, function, template);
-            if (direct and !aggregate_result) {
+            if (direct and !buffered_result) {
                 try child.c.value(try child.scalar(m, body.root, output));
             } else {
                 if (direct) {
-                    try child.storeValue(.{ .id = @intCast(words) }, 0, output);
+                    try child.storeReaderResult(.{ .id = @intCast(words) }, 0, output);
                 } else try child.storeReaderResult(.{ .id = 0 }, @intCast(words * 4), output);
                 try child.c.value(0);
             }
@@ -4443,11 +4520,12 @@ const Generator = struct {
             try self.used_regions.put(self.allocator, region, {});
             self.max_stacks = @max(self.max_stacks, @as(u32, @intCast(region + 1)));
         }
-        if (graph_mode and owners.items.len == 0) {
+        if (ownedWordAbi(words, result_shape)) {
             var template = result_shape;
-            if (!unit_result) template = self.descriptor_calls.results.get(entry.function) orelse return self.unsupported(m, body.root);
-            return try self.callInlineFunction(m, body.root, entry, arguments, template, m.typeOf(body.root));
+            if (!unit_result) template = try self.graphCallerShape(self.descriptor_calls.results.get(entry.function) orelse return self.unsupported(m, body.root), owners.items);
+            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result);
         }
+        self.emission_work.scoped_owned_packed_calls +|= 1;
         const first_root = self.roots.items.len;
         const mark = try self.frameMark();
         var result_template = result_shape;
@@ -4473,8 +4551,37 @@ const Generator = struct {
         if (!unit_result) returned = try self.loadReaderResult(address, @intCast(words * 4), result_template);
         try self.release(first_root, null);
         try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark });
-        returned.type_evidence = .{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} };
-        if (!unit_result) returned.type_evidence = .{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() };
+        returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
+        if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() });
+        return returned;
+    }
+    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool) Error!Value {
+        self.emission_work.scoped_owned_word_calls +|= 1;
+        self.emission_work.scoped_owned_argument_words_avoided +|= words;
+        const first_root = self.roots.items.len;
+        var mark: ?Local = null;
+        var address: ?Local = null;
+        if (template.tag != .scalar) {
+            mark = try self.frameMark();
+            const count = std.math.cast(u32, @max(1, readerWords(template))) orelse return self.unsupported(m, id);
+            const slot = try self.arrayWithShape(m, id, (try self.constant(count)).word, .fixed, .{ .word = .{ .id = 0 } });
+            const pointer = try self.c.temp();
+            try self.c.set(pointer, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
+            address = pointer;
+        }
+        for (arguments) |argument| try self.readerValues(argument);
+        if (address) |pointer| try self.c.value(pointer);
+        try self.c.op(.call, entry.function);
+        const word = try self.c.temp();
+        try self.c.op(.local_set, word.id);
+        var returned: Value = .{ .word = word, .floating = entry.floating };
+        if (address) |pointer| returned = try self.loadReaderResult(pointer, 0, template);
+        if (mark) |saved| {
+            try self.release(first_root, null);
+            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
+        }
+        returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
+        if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() });
         return returned;
     }
     fn selectedCallbacks(self: *Generator, m: *const core.Module, id: core.Id, value: Value, path: *std.ArrayList(u32), selection: *std.ArrayList(u32), remaining: *usize, depth: usize) Error!void {
@@ -4629,7 +4736,7 @@ const Generator = struct {
             if (depth > 128) return self.unsupported(m, body.root);
             const fields = try self.arena.allocator().alloc(Value, arguments.len);
             for (fields, arguments) |*field, argument| field.* = try self.snapshot(argument);
-            return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = .{ .unit = m.unit, .target = target.binding, .types = try self.captureTypes() }, .fields = fields };
+            return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = try self.boxCallable(.{ .unit = m.unit, .target = target.binding, .types = try self.captureTypes() }), .fields = fields };
         }
         if (arguments.len > parameters.len) {
             if (depth > 128) return self.unsupported(m, body.root);
@@ -4890,7 +4997,7 @@ const Generator = struct {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
         }
-        result.type_evidence = .{ .root = .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, .arguments = try self.captureTypes() };
+        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, .arguments = try self.captureTypes() });
         return result;
     }
     fn apply(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value, depth: usize) Error!Value {
@@ -6014,10 +6121,10 @@ const Generator = struct {
             // cursor descriptor produced by Array.iter. Its physical view
             // layout does not identify the Cursor associated-method family.
             const owner = try self.unit(actual.unit);
-            if (T.receiverIdentity(owner.types.node(actual.ty)) != null) value.type_evidence = .{
+            if (T.receiverIdentity(owner.types.node(actual.ty)) != null) value.type_evidence = try self.boxTypeEvidence(.{
                 .root = actual,
                 .arguments = if (actual.ty <= T.f32_type) &.{} else try self.captureTypes(),
-            };
+            });
         }
         return value;
     }
@@ -6106,7 +6213,7 @@ const Generator = struct {
                 if (m.nominalConstructors(constructor.nominal).len == 1) {
                     const fields = try self.arena.allocator().alloc(Value, 1);
                     fields[0] = payload;
-                    return .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = fields, .nominal = nominal.identity, .type_evidence = .{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() } };
+                    return .{ .tag = .aggregate, .word = .{ .id = 0 }, .fields = fields, .nominal = nominal.identity, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = n.ty }, .arguments = try self.captureTypes() }) };
                 }
                 var result = try self.zeroShape(try self.shape(m, id, n.ty, 0));
                 const selected = @import("storage_layout.zig").variantIndex(result.variant_tags, constructor.tag) orelse return self.unsupported(m, id);
@@ -6121,7 +6228,7 @@ const Generator = struct {
                 for (captures, values) |capture, *value| value.* = try self.snapshot(try self.bindingValue(m, capture));
                 const demand: ?*Demand = if (n.tag == .suspend_) try self.arena.allocator().create(Demand) else null;
                 if (demand) |memo| memo.* = .{ .ready = (try self.constant(0)).word };
-                return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = .{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }, .fields = values, .demand = demand, .depth = self.depth };
+                return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }), .fields = values, .demand = demand, .depth = self.depth };
             },
             .force => {
                 const pending = try self.expression(m, n.a, depth + 1);
@@ -6653,6 +6760,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     defer field_recipes.deinit();
     var descriptor_calls: DescriptorCalls = .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
     defer descriptor_calls.deinit();
+    try descriptor_calls.initPrimitiveEvidence(units);
     var shared_calls: call_plan.Cache = .{ .allocator = allocator };
     defer shared_calls.deinit();
     var outlining = scope_outline.Context.init(allocator, &module, .scoped_numeric_adapter_nonreentrant, .{});
@@ -7036,7 +7144,7 @@ fn scalarAdmissionRefinement(allocator: std.mem.Allocator, units: []const core.M
             try g.mapTypes(.{ .unit = m.unit, .ty = parameter.ty }, .{ .unit = m.unit, .ty = actual }, 0);
             argument.* = try g.constant(@intCast(ordinal + 1));
             argument.floating = actual == T.f32_type;
-            argument.type_evidence = .{ .root = .{ .unit = m.unit, .ty = actual }, .arguments = &.{} };
+            argument.type_evidence = try g.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = actual }, .arguments = &.{} });
         }
         // A checked generic method's input types are known, but its return
         // variable is deliberately left for ordinary numeric admission.
@@ -7084,4 +7192,118 @@ test "scalar completed hits preserve unresolved numeric admission and distinct r
     try std.testing.expectEqual(@as(usize, 0), lowered.diagnostics.len);
     try scalarAdmissionRefinement(allocator, &.{lowered});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, scalarAdmissionRefinement, .{@as([]const core.Module, &.{lowered})});
+}
+
+fn primitiveEnvironments(allocator: std.mem.Allocator) !void {
+    // Metadata-only resolution. No emission or source-query state is active.
+    var g: Generator = undefined;
+    g.allocator = allocator;
+    g.type_arguments = .empty;
+    defer g.type_arguments.deinit(allocator);
+    var work: @import("../work_counters.zig").Counters = .{};
+    g.emission_work = &work;
+    const environment = try allocator.alloc(TypeArgument, 4096);
+    defer allocator.free(environment);
+    for (environment, 0..) |*item, ordinal| item.* = .{
+        .unit = 1,
+        .parameter = @intCast(ordinal + 8),
+        .argument_unit = 1,
+        .argument = T.u32_type,
+    };
+    const outer = [_]TypeArgument{.{ .unit = 1, .parameter = 7, .argument_unit = 1, .argument = T.f32_type }};
+    for (T.unit..T.never + 1) |primitive| {
+        const plain: TypeRef = .{ .unit = 1, .ty = @intCast(primitive) };
+        const captured: TypeRef = .{ .unit = 1, .ty = @intCast(primitive), .environment = environment };
+        try std.testing.expect(std.meta.eql(plain, try g.resolveType(plain, 128)));
+        try std.testing.expect(std.meta.eql(captured, try g.resolveType(captured, 127)));
+        try std.testing.expect(std.meta.eql(captured, try g.resolveActual(plain, environment, 128)));
+        // A separate use environment cannot replace the witness's own frame.
+        try std.testing.expect(std.meta.eql(captured, try g.resolveActual(captured, &outer, 127)));
+        try std.testing.expectError(error.Declined, g.resolveType(captured, 128));
+        try std.testing.expectError(error.Declined, g.resolveActual(captured, &outer, 128));
+        try std.testing.expectError(error.Declined, g.resolveType(plain, 129));
+        try std.testing.expectError(error.Declined, g.resolveActual(plain, environment, 129));
+    }
+    try g.type_arguments.append(allocator, .{ .unit = 1, .parameter = 6, .argument_unit = 1, .argument = 7 });
+    try g.type_arguments.append(allocator, .{ .unit = 1, .parameter = 7, .argument_unit = 1, .argument = T.f32_type, .environment = environment });
+    const result = try g.resolveType(.{ .unit = 1, .ty = 6 }, 0);
+    try std.testing.expectEqual(T.f32_type, result.ty);
+    try std.testing.expectEqual(environment.ptr, result.environment.?.ptr);
+    const selected = try g.resolveActual(.{ .unit = 1, .ty = 7 }, &outer, 0);
+    try std.testing.expectEqual(T.f32_type, selected.ty);
+    try std.testing.expectEqual(outer[0..].ptr, selected.environment.?.ptr);
+    // ID zero deliberately retains the ordinary lookup path.
+    try g.type_arguments.append(allocator, .{ .unit = 1, .parameter = 0, .argument_unit = 1, .argument = T.u32_type });
+    try std.testing.expectEqual(T.u32_type, (try g.resolveType(.{ .unit = 1, .ty = 0 }, 0)).ty);
+    try std.testing.expect(work.scoped_primitive_environment_entries_avoided > 4096);
+}
+test "primitive resolution preserves captured witnesses variable chains and depth boundaries through OOM" {
+    try primitiveEnvironments(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, primitiveEnvironments, .{});
+}
+
+fn typeEvidenceBoxLifetimes(allocator: std.mem.Allocator) !void {
+    const blank: core.Module = .{
+        .unit = 1,
+        .types = .{ .nodes = &.{}, .extra = &.{} },
+        .nodes = &.{},
+        .spans = &.{},
+        .extra = &.{},
+        .bindings = &.{},
+        .bodies = &.{},
+        .parameters = &.{},
+        .references = &.{},
+        .calls = &.{},
+        .merges = &.{},
+        .merge_ranges = &.{},
+        .names = &.{},
+        .obligations = &.{},
+        .diagnostics = &.{},
+        .body_lowerings = 0,
+    };
+    var units = [_]core.Module{ blank, blank };
+    units[1].unit = 2;
+    var summaries: DescriptorCalls = .{ .allocator = allocator, .arena = .init(allocator), .calls = .{ .allocator = allocator }, .record_metadata = .{ .allocator = allocator } };
+    defer summaries.deinit();
+    try summaries.initPrimitiveEvidence(&units);
+    var retained: Value = undefined;
+    {
+        var g: Generator = undefined;
+        g.allocator = allocator;
+        g.arena = .init(allocator);
+        defer g.arena.deinit();
+        g.descriptor_calls = &summaries;
+        const primitive = try g.boxTypeEvidence(.{ .root = .{ .unit = 1, .ty = T.u32_type }, .arguments = &.{} });
+        try std.testing.expectEqual(primitive, try g.boxTypeEvidence(.{ .root = primitive.root, .arguments = &.{} }));
+        const other = try g.boxTypeEvidence(.{ .root = .{ .unit = 2, .ty = T.u32_type }, .arguments = &.{} });
+        try std.testing.expect(primitive != other);
+        try std.testing.expectEqual(@as(u32, 2), other.root.unit);
+        // A present empty environment remains present, and cannot use a plain
+        // primitive witness from the table.
+        const captured = try g.boxTypeEvidence(.{ .root = .{ .unit = 1, .ty = T.u32_type, .environment = &.{} }, .arguments = &.{} });
+        try std.testing.expect(captured != primitive);
+        try std.testing.expect(captured.root.environment != null);
+        for ([_]u32{ 0, 3, std.math.maxInt(u32) }) |unit_id| {
+            const outside = try g.boxTypeEvidence(.{ .root = .{ .unit = unit_id, .ty = T.u32_type }, .arguments = &.{} });
+            try std.testing.expectEqual(unit_id, outside.root.unit);
+        }
+        const arguments = try g.arena.allocator().alloc(TypeArgument, 1);
+        arguments[0] = .{ .unit = 1, .parameter = 6, .argument_unit = 1, .argument = T.f32_type };
+        const witness = try g.boxTypeEvidence(.{ .root = .{ .unit = 1, .ty = 6, .environment = arguments }, .arguments = arguments });
+        try std.testing.expectEqual(arguments.ptr, witness.arguments.ptr);
+        var copies: Generator.EnvironmentCopies = .empty;
+        defer copies.deinit(allocator);
+        retained = try g.retainGraphShape(.{ .word = .{ .id = 0 }, .type_evidence = witness }, 0, &copies, 0);
+        try std.testing.expect(retained.type_evidence.? != witness);
+        try std.testing.expect(retained.type_evidence.?.arguments.ptr != arguments.ptr);
+        // Both aliases of the same captured environment retain one owned copy.
+        try std.testing.expectEqual(retained.type_evidence.?.arguments.ptr, retained.type_evidence.?.root.environment.?.ptr);
+    }
+    // The source Generator and its witness/environment arena are gone.
+    try std.testing.expectEqual(@as(u32, 6), retained.type_evidence.?.root.ty);
+    try std.testing.expectEqual(T.f32_type, retained.type_evidence.?.arguments[0].argument);
+}
+test "boxed type witnesses preserve primitive units environments and retained arena ownership through OOM" {
+    try typeEvidenceBoxLifetimes(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, typeEvidenceBoxLifetimes, .{});
 }

@@ -72,6 +72,9 @@ def emission_frame(frame, name, tid, metadata):
                         "scoped_completed_plan_rollbacks", "scoped_completed_plan_discarded_expressions",
                         "scoped_context_sensitive_definitions", "scoped_context_free_definitions",
                         "scoped_plain_plan_definitions", "scoped_plain_plan_hits",
+                        "scoped_primitive_environment_entries_avoided",
+                        "scoped_owned_word_calls", "scoped_owned_packed_calls",
+                        "scoped_owned_argument_words_avoided",
                         "scoped_transport_words_avoided", "scoped_scalar_completed_hits",
                         "scoped_projected_parameter_fields"):
                 try:

@@ -1,0 +1,475 @@
+{
+  "date": "2026-11-02",
+  "base_commit": "66eeb535cb4cf50af97aee327ffe8b98d1da340a",
+  "changes": [
+    "Direct reader-order word arguments for completed owner calls up to512totalparams; scalar/Unit calls avoid argument-buffer owners and marks; nonscalar returns use a result-only slot; wider calls retain packed emission. Preserve symbolic owner graph remapping and ordinary source admission.",
+    "Box immutable callable/type-witness metadata in its owning arena; retainers deep-copy captured environments into their retained arena. Cache only environment-free primitive witnesses per source unit.",
+    "Skip primitive substitution scans only for fixed IDs1..5, preserving captured environment identity and original depth/delegation order.",
+    "Complete structural key memo entries through one existing-entry lookup, with unchanged exact keys, bounds and OOM behavior."
+  ],
+  "qualification": {
+    "check_dev": "build/bench/owner-words-witness-final-check-dev/run-51224ffc19948514/results.json",
+    "compiled_native": 2842,
+    "selected_exhaustive_faults": 90,
+    "full_faults": "build/bench/owner-words-witness-final-check-dev/run-51224ffc19948514/full-faults.log",
+    "guests": 61,
+    "zig_lint": "zero findings",
+    "full_gate": "build/bench/owner-words-witness-full-gate/run-3f743ce2eb9c5083/timings.json",
+    "full_gate_outcome": "48passed/1 independently reproduced baseline List/chunk storage_escape312..345; full qualification pending",
+    "source_input_digest": "08893c98c50063b0cecc8d2e453f88a8f70aaa1527a2b1aa56f0285b8a6dc11c"
+  },
+  "renderer_control": {
+    "evidence": "build/bench/owner-words-witness-checked-kites/pair-5652c6676686ab04/result.json",
+    "toolchain": "Zig0.17.0 Fast/native noLLVM both compilers; optimized Wasm tier; same unchanged real sources; cache disabled",
+    "pins": {
+      "compiler_sha256": "78c080c8bf491f5e9150cf8c5d3de1b758063881c58159349c78959bcf346949",
+      "baseline_compiler_sha256": "d72396381b629983969e58253e7f368b62b7980c9728003fb8fb832260d653e0",
+      "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+      "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+      "pen_json_sha256": "65c33964841981b203a68f3ea8b6fe65779518487c7400989625b1c5823bd58e"
+    },
+    "all_seven_complete_streams_equal": true,
+    "builds": [
+      {
+        "name": "baseline",
+        "build_ms": 3825.935676,
+        "wasm_bytes": 224349,
+        "wasm_sha256": "33c8aa675e20105da02556fb3818445bc93be386af5885e932ce4ab31bd78814",
+        "backend_timing": {
+          "prepare_us": 0,
+          "generate_us": 0,
+          "initialize_us": 0,
+          "assemble_us": 0,
+          "capture_us": 0
+        },
+        "phase_profile": {
+          "total_us": 3819774,
+          "peak_rss_kib": 187408,
+          "phases": {
+            "other": {
+              "us": 10700,
+              "requested_bytes": 1267113,
+              "allocations": 393,
+              "rss_growth_kib": 0
+            },
+            "assets": {
+              "us": 237011,
+              "requested_bytes": 28714381,
+              "allocations": 517,
+              "rss_growth_kib": 4912
+            },
+            "inputs": {
+              "us": 905,
+              "requested_bytes": 233856,
+              "allocations": 456,
+              "rss_growth_kib": 0
+            },
+            "load": {
+              "us": 17033,
+              "requested_bytes": 6368428,
+              "allocations": 8980,
+              "rss_growth_kib": 1524
+            },
+            "lex": {
+              "us": 202957,
+              "requested_bytes": 17665672,
+              "allocations": 2835,
+              "rss_growth_kib": 10256
+            },
+            "parse": {
+              "us": 130054,
+              "requested_bytes": 26679496,
+              "allocations": 84220,
+              "rss_growth_kib": 4604
+            },
+            "check": {
+              "us": 1844138,
+              "requested_bytes": 314457929,
+              "allocations": 703984,
+              "rss_growth_kib": 116400
+            },
+            "lower": {
+              "us": 347864,
+              "requested_bytes": 81753115,
+              "allocations": 78498,
+              "rss_growth_kib": 36936
+            },
+            "freeze": {
+              "us": 148395,
+              "requested_bytes": 45677893,
+              "allocations": 143945,
+              "rss_growth_kib": 4312
+            },
+            "validation": {
+              "us": 274637,
+              "requested_bytes": 16847067,
+              "allocations": 10360,
+              "rss_growth_kib": 1692
+            },
+            "backend": {
+              "us": 606075,
+              "requested_bytes": 68082473,
+              "allocations": 96081,
+              "rss_growth_kib": 0
+            }
+          },
+          "checking": {
+            "parallel_batches": 20,
+            "parallel_jobs": 153,
+            "parallel_retries": 0,
+            "parallel_prepare_us": 0,
+            "parallel_batch_us": 0,
+            "parallel_capacity_us": 0,
+            "parallel_worker_us": 0,
+            "parallel_worker_cpu_us": 0,
+            "parallel_worker_cpu_samples": 0,
+            "parallel_worker_slots": 0,
+            "parallel_worker_jobs": 0,
+            "modules": 154,
+            "scheme_calls": 7887,
+            "closed_array_locals": 1035,
+            "candidate_scans": 1987868,
+            "candidates": 15859,
+            "candidate_parts": 37443,
+            "candidate_variables": 20985,
+            "candidate_rows": 4427,
+            "dependency_hits": 12151,
+            "dependency_recomputations": 3708,
+            "import_requests": 207643,
+            "imported_schemes": 25115,
+            "imported_summary_reuses": 1897,
+            "imported_read": 4992,
+            "type_nodes": 719807,
+            "normalization": {
+              "substitute_nodes_added": 59847,
+              "substitute_depth_entries": 153441,
+              "substitute_memo_hits": 169,
+              "substitute_unchanged": 0,
+              "resolve_nodes_added": 225301,
+              "resolve_depth_entries": 2034606,
+              "unify_pairs": 254509,
+              "unify_projected_pairs": 0,
+              "unify_resolve_calls": 509018,
+              "unify_resolve_entries": 547365,
+              "unify_resolve_nodes": 13921,
+              "open_nodes_added": 38395,
+              "open_depth_entries": 195979,
+              "close_nodes_added": 10435,
+              "close_depth_entries": 24193,
+              "import_nodes_added": 146264,
+              "import_depth_entries": 361903,
+              "variable_views_created": 130071,
+              "type_binders_created": 130071,
+              "row_requests": 714909,
+              "closed_row_hits": 0,
+              "epoch_row_hits": 0,
+              "epoch_row_probes": 0,
+              "epoch_row_collisions": 0,
+              "epoch_row_stale": 0,
+              "epoch_row_context_misses": 0,
+              "epoch_row_publications": 0,
+              "composite_probes": 580218,
+              "composite_hits": 217,
+              "composite_collisions": 298840,
+              "composite_stale_dependencies": 49,
+              "composite_future_clock_misses": 0,
+              "composite_frontier_declines": 675,
+              "composite_publications": 6159,
+              "free_type_queries": 13549,
+              "free_type_visits": 59761,
+              "free_row_queries": 75511,
+              "free_row_visits": 335750,
+              "argument_rows": 0,
+              "labels": 0,
+              "arguments": 0,
+              "changed_rows": 0,
+              "closed_row_evictions": 0,
+              "interner_requests": 0,
+              "interner_candidates": 0,
+              "interner_arguments": 0,
+              "interner_linked": 0,
+              "interner_rebuilds": 0,
+              "closed_operation_hits": 0,
+              "argument_height_checks": 0
+            }
+          }
+        },
+        "work": {},
+        "streams": [
+          {
+            "scenario": 0,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+          },
+          {
+            "scenario": 1,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+          },
+          {
+            "scenario": 2,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+          },
+          {
+            "scenario": 4,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+          },
+          {
+            "scenario": 8,
+            "draw_count": 57,
+            "vector_count": 1,
+            "lane_count": 1254,
+            "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+          },
+          {
+            "scenario": 16,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+          },
+          {
+            "scenario": 31,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "build_ms": 3708.3093419999996,
+        "wasm_bytes": 211471,
+        "wasm_sha256": "1b4ef962fc14d5351a6fb7106ba266a3e4f0bc62205269ee693682516882dfff",
+        "backend_timing": {
+          "prepare_us": 0,
+          "generate_us": 0,
+          "initialize_us": 0,
+          "assemble_us": 0,
+          "capture_us": 0
+        },
+        "phase_profile": {
+          "total_us": 3704078,
+          "peak_rss_kib": 190664,
+          "phases": {
+            "other": {
+              "us": 10470,
+              "requested_bytes": 1254267,
+              "allocations": 393,
+              "rss_growth_kib": 92
+            },
+            "assets": {
+              "us": 223994,
+              "requested_bytes": 28714381,
+              "allocations": 517,
+              "rss_growth_kib": 4608
+            },
+            "inputs": {
+              "us": 918,
+              "requested_bytes": 233856,
+              "allocations": 456,
+              "rss_growth_kib": 0
+            },
+            "load": {
+              "us": 17891,
+              "requested_bytes": 6368428,
+              "allocations": 8980,
+              "rss_growth_kib": 1460
+            },
+            "lex": {
+              "us": 199733,
+              "requested_bytes": 17665672,
+              "allocations": 2835,
+              "rss_growth_kib": 10164
+            },
+            "parse": {
+              "us": 132318,
+              "requested_bytes": 26679496,
+              "allocations": 84220,
+              "rss_growth_kib": 4632
+            },
+            "check": {
+              "us": 1802442,
+              "requested_bytes": 314457929,
+              "allocations": 703984,
+              "rss_growth_kib": 117604
+            },
+            "lower": {
+              "us": 345326,
+              "requested_bytes": 81753115,
+              "allocations": 78498,
+              "rss_growth_kib": 37228
+            },
+            "freeze": {
+              "us": 147232,
+              "requested_bytes": 45677893,
+              "allocations": 143945,
+              "rss_growth_kib": 3796
+            },
+            "validation": {
+              "us": 270990,
+              "requested_bytes": 16847067,
+              "allocations": 10360,
+              "rss_growth_kib": 3764
+            },
+            "backend": {
+              "us": 552759,
+              "requested_bytes": 59038444,
+              "allocations": 95585,
+              "rss_growth_kib": 0
+            }
+          },
+          "checking": {
+            "parallel_batches": 20,
+            "parallel_jobs": 153,
+            "parallel_retries": 0,
+            "parallel_prepare_us": 0,
+            "parallel_batch_us": 0,
+            "parallel_capacity_us": 0,
+            "parallel_worker_us": 0,
+            "parallel_worker_cpu_us": 0,
+            "parallel_worker_cpu_samples": 0,
+            "parallel_worker_slots": 0,
+            "parallel_worker_jobs": 0,
+            "modules": 154,
+            "scheme_calls": 7887,
+            "closed_array_locals": 1035,
+            "candidate_scans": 1987868,
+            "candidates": 15859,
+            "candidate_parts": 37443,
+            "candidate_variables": 20985,
+            "candidate_rows": 4427,
+            "dependency_hits": 12151,
+            "dependency_recomputations": 3708,
+            "import_requests": 207643,
+            "imported_schemes": 25115,
+            "imported_summary_reuses": 1897,
+            "imported_read": 4992,
+            "type_nodes": 719807,
+            "normalization": {
+              "substitute_nodes_added": 59847,
+              "substitute_depth_entries": 153441,
+              "substitute_memo_hits": 169,
+              "substitute_unchanged": 0,
+              "resolve_nodes_added": 225301,
+              "resolve_depth_entries": 2034606,
+              "unify_pairs": 254509,
+              "unify_projected_pairs": 0,
+              "unify_resolve_calls": 509018,
+              "unify_resolve_entries": 547365,
+              "unify_resolve_nodes": 13921,
+              "open_nodes_added": 38395,
+              "open_depth_entries": 195979,
+              "close_nodes_added": 10435,
+              "close_depth_entries": 24193,
+              "import_nodes_added": 146264,
+              "import_depth_entries": 361903,
+              "variable_views_created": 130071,
+              "type_binders_created": 130071,
+              "row_requests": 714909,
+              "closed_row_hits": 0,
+              "epoch_row_hits": 0,
+              "epoch_row_probes": 0,
+              "epoch_row_collisions": 0,
+              "epoch_row_stale": 0,
+              "epoch_row_context_misses": 0,
+              "epoch_row_publications": 0,
+              "composite_probes": 580218,
+              "composite_hits": 217,
+              "composite_collisions": 298840,
+              "composite_stale_dependencies": 49,
+              "composite_future_clock_misses": 0,
+              "composite_frontier_declines": 675,
+              "composite_publications": 6159,
+              "free_type_queries": 13549,
+              "free_type_visits": 59761,
+              "free_row_queries": 75511,
+              "free_row_visits": 335750,
+              "argument_rows": 0,
+              "labels": 0,
+              "arguments": 0,
+              "changed_rows": 0,
+              "closed_row_evictions": 0,
+              "interner_requests": 0,
+              "interner_candidates": 0,
+              "interner_arguments": 0,
+              "interner_linked": 0,
+              "interner_rebuilds": 0,
+              "closed_operation_hits": 0,
+              "argument_height_checks": 0
+            }
+          }
+        },
+        "work": {},
+        "streams": [
+          {
+            "scenario": 0,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+          },
+          {
+            "scenario": 1,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+          },
+          {
+            "scenario": 2,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+          },
+          {
+            "scenario": 4,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+          },
+          {
+            "scenario": 8,
+            "draw_count": 57,
+            "vector_count": 1,
+            "lane_count": 1254,
+            "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+          },
+          {
+            "scenario": 16,
+            "draw_count": 64,
+            "vector_count": 92,
+            "lane_count": 1786,
+            "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+          },
+          {
+            "scenario": 31,
+            "draw_count": 34,
+            "vector_count": 1,
+            "lane_count": 702,
+            "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+          }
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "Renderer timing is one diagnostic pair, not an optimized whole-game latency claim.",
+    "Latest completed optimized whole-game remains11.806990086seconds on d8ae217; this batch awaits a frozen LLVM candidate.",
+    "A fresh ABI8 full-game frame remains pending a matching Pen binary."
+  ]
+}

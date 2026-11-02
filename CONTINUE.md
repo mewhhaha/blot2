@@ -10,39 +10,47 @@ or an unchanged five-minute diagnostic.
 The latest completed actual main takes **11.81 seconds** and produces
 **31,654,251 bytes of Wasm**, cache disabled. Compiler source is
 `d8ae21718919bf5c5b5809fc4d372f14df687fef`, Zig 0.17 fast/LLVM; Gdev/Ink remain
-`7733add6`/`d520a903`. Same-workload predecessors took 15.15s/32.72MB,17.45s/38.82MB,
-19.74s/43.06MB and 24.55s/45.98MB. These are single completions, not distributions.
-See [latest full-main evidence](zig-native/measurements/gdev-after-aggregate-transport-2026-11-02.json)
-and [previous completion](zig-native/measurements/gdev-after-completed-functions-2026-11-02.json).
+`7733add6`/`d520a903`. Same-workload predecessors took
+15.15s/32.72MB,17.45s/38.82MB, 19.74s/43.06MB and 24.55s/45.98MB. These are
+single completions, not distributions. See
+[latest full-main evidence](zig-native/measurements/gdev-after-aggregate-transport-2026-11-02.json)
+and
+[previous completion](zig-native/measurements/gdev-after-completed-functions-2026-11-02.json).
 
-The latest separate profile attributes 11.70s to the backend; emitted expressions
-fall to938,465 and shadow admission visits to1,508,488. Backend requested
-allocations fall to10.30GB. Child inheritance keeps3.23M of13.53M substitutions.
-Completed actual functions, immutable metadata and proven context-independent
-sharing reduce expansion. The five-second gate remains unmet.
+The latest separate profile attributes 11.70s to the backend; emitted
+expressions fall to938,465 and shadow admission visits to1,508,488. Backend
+requested allocations fall to10.30GB. Child inheritance keeps3.23M of13.53M
+substitutions. Completed actual functions, immutable metadata and proven
+context-independent sharing reduce expansion. The five-second gate remains
+unmet.
 
 The checked batch removes proven invariant whole-record transport through
 branches/loops, completes zero-owner plain functions with the direct word ABI,
 skips scalar shadow walks on completed strong keys, sparsifies loop read frames
-and reuses raw record-name ordering. Child type inheritance drops proven shadowed
-history only when at least75% can be removed. All 2,839 native laws compile; 80 selected
-laws pass exhaustive allocation faults, 56 guests pass and Zig lint is clean.
-Seven actual renderer streams match. Plain sharing reduces renderer expressions
-7,919->7,056 and shadow visits 28,531->24,891, but increases Wasm 220,771->224,349B;
-record-name caching is byte-identical. A 165-field control falls 30,138->17,810B
-with 2,061 copies avoided; the local-reference fallback stays byte-identical.
-The optimized main result above qualifies this batch. See
+and reuses raw record-name ordering. Child type inheritance drops proven
+shadowed history only when at least75% can be removed. All 2,839 native laws
+compile; 80 selected laws pass exhaustive allocation faults, 56 guests pass and
+Zig lint is clean. Seven actual renderer streams match. Plain sharing reduces
+renderer expressions 7,919->7,056 and shadow visits 28,531->24,891, but
+increases Wasm 220,771->224,349B; record-name caching is byte-identical. A
+165-field control falls 30,138->17,810B with 2,061 copies avoided; the
+local-reference fallback stays byte-identical. The optimized main result above
+qualifies this batch. See
 [transport evidence](zig-native/measurements/direct-plans-and-aggregate-transport-2026-11-02.json).
 
-Preserve token/epoch, alias, read/write ordering, frozen/init, lifetime and escape
-checks. Physical optimization does not weaken complete source/semantic proofs.
-Prior [completed-function](zig-native/measurements/completed-functions-and-immutable-metadata-2026-11-02.json)
-and [context sharing](zig-native/measurements/completed-context-aliases-2026-11-02.json)
+Preserve token/epoch, alias, read/write ordering, frozen/init, lifetime and
+escape checks. Physical optimization does not weaken complete source/semantic
+proofs. Prior
+[completed-function](zig-native/measurements/completed-functions-and-immutable-metadata-2026-11-02.json)
+and
+[context sharing](zig-native/measurements/completed-context-aliases-2026-11-02.json)
 evidence pins their exact candidates. Structural global type IDs remain
 [rejected after a renderer regression](zig-native/measurements/rejected-global-type-ids-2026-11-02.json).
-The [same source rewrites retested on d8](zig-native/measurements/rejected-source-call-shapes-d8-2026-11-02.json)
-remain rejected: only3.1% fewer expressions and0.18% fewer bytes, no latency win.
-The two [source-call shape experiments](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
+The
+[same source rewrites retested on d8](zig-native/measurements/rejected-source-call-shapes-d8-2026-11-02.json)
+remain rejected: only3.1% fewer expressions and0.18% fewer bytes, no latency
+win. The two
+[source-call shape experiments](zig-native/measurements/rejected-source-call-shapes-2026-11-02.json)
 are also rejected and reverted on their named old compiler.
 
 The required full gate still stops at **48 passed/one baseline List/chunk
@@ -55,6 +63,19 @@ Release snapshots under `build/bench/frozen-release-COMMIT` use plain
 `git archive`, not worktrees, and pin source/toolchain/binary hashes. Start LLVM
 builds in the actual snapshot directory. Reserve the five-minute build for
 meaningful checked candidates; native/noLLVM iterations take seconds.
+
+## Next checked latency batch
+
+Direct word arguments now cover completed owner calls up to 512 parameters.
+Scalar/Unit calls avoid argument-buffer owners; aggregate/borrow returns use a
+result-only slot. Immutable callable and type witnesses are boxed in their
+owning arenas. Primitive resolution skips impossible substitution searches;
+structural-key completion removes a repeated hash lookup. All 2,842 native laws
+compile, 90 selected laws pass exhaustive faults, 61 guests pass, and Zig lint
+is clean. Seven actual renderer streams match; Wasm falls 224,349->211,471B. The
+required full gate retains the same 48/1 baseline failure. Optimized actual main
+measurement is pending; the latest completed figure remains 11.81s. See
+[checked batch evidence](zig-native/measurements/owned-word-calls-and-cold-metadata-2026-11-02.json).
 
 ## Checked compiler fixes
 

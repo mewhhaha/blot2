@@ -88,8 +88,8 @@ pub const Builder = struct {
     pub fn complete(self: *Builder, reference: Reference, descriptor: []const u32, height: usize) Error!Result {
         errdefer self.poisoned = true;
         if (self.poisoned or self.finished or height > 128) return error.Limit;
-        const pending = self.memo.get(reference) orelse return error.Cycle;
-        if (pending != .active) return error.Cycle;
+        const pending = self.memo.getPtr(reference) orelse return error.Cycle;
+        if (pending.* != .active) return error.Cycle;
         if (height > 128 - pending.active) return error.Limit;
         try self.wordWork(descriptor.len);
         const hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(descriptor)) & self.options.hash_mask;
@@ -100,7 +100,7 @@ pub const Builder = struct {
             if (try self.equal(self.words.items[node.start..][0..node.len], descriptor)) {
                 if (node.height != height) return error.Cycle;
                 const result: Result = .{ .id = id, .height = height };
-                self.memo.getPtr(reference).?.* = .{ .complete = result };
+                pending.* = .{ .complete = result };
                 return result;
             }
             next = node.next;
@@ -119,7 +119,7 @@ pub const Builder = struct {
         self.nodes.appendAssumeCapacity(.{ .start = start, .len = descriptor.len, .height = height, .next = self.buckets.get(hash) });
         self.buckets.putAssumeCapacity(hash, id);
         const result: Result = .{ .id = id, .height = height };
-        self.memo.getPtr(reference).?.* = .{ .complete = result };
+        pending.* = .{ .complete = result };
         return result;
     }
     pub fn root(self: *Builder, output: *std.ArrayList(u32), result: Result) Error!void {
