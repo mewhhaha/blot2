@@ -144,13 +144,19 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert(built.success, `${fixture.name}: ${JSON.stringify(built)}`);
         assert(WebAssembly.validate(built.bytes), fixture.name);
         const counters = built.stats.workCounters as Record<string, number>;
+        let definitions = 1;
+        if (fixture.name === "simd") definitions = 2;
         assert.equal(
           counters.scoped_completed_plan_definitions,
-          1,
+          definitions,
           fixture.name,
         );
-        assert.equal(counters.scoped_owner_graph_definitions, 1, fixture.name);
-        if (fixture.name === "borrow") {
+        assert.equal(
+          counters.scoped_owner_graph_definitions,
+          definitions,
+          fixture.name,
+        );
+        if (fixture.name === "borrow" || fixture.name === "simd") {
           assert.equal(counters.scoped_completed_plan_rollbacks, 0);
           assert(counters.scoped_function_plan_hits >= 1);
         } else {

@@ -169,6 +169,7 @@ pub const Counters = struct {
     scoped_packed_argument_words_avoided: u64 = 0,
     scoped_direct_input_words_avoided: u64 = 0,
     scoped_direct_argument_words_avoided: u64 = 0,
+    scoped_result_slots_avoided: u64 = 0,
     scoped_result_store_words_avoided: u64 = 0,
     scoped_result_load_words_avoided: u64 = 0,
     scoped_owned_argument_words_avoided: u64 = 0,

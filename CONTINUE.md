@@ -14,24 +14,42 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest release produces **14,125,344 bytes of Wasm**, down from 14,332,601
-(207,257B / 1.45% smaller). A matched fresh pair takes **5.588s → 5.555s**;
-the configured launcher takes **5.551s** with identical compiler identity and
-full Wasm hash. No meaningful latency change is established. The five-second,
-subsecond and 1–2MB targets remain unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/direct-input-2026-11-03.json).
-Release source is `5eb12b31` plus complete patch `e72d54d4c8a4`; all eight frozen
+The latest release produces **13,935,123 bytes of Wasm**, down from 14,125,344
+(190,221B / 1.35% smaller). A matched fresh pair takes **5.605s → 5.552s**;
+the configured launcher takes **5.675s** with identical compiler identity and
+full Wasm hash. These individual shared-host completions establish no meaningful
+latency improvement. The five-second, subsecond and 1–2MB targets remain unmet.
+Exact pins and qualification are in
+[the current evidence](zig-native/measurements/owned-return-2026-11-03.json).
+Release source is `3ab232b4` plus complete patch `9ac688127317`; all 14 frozen
 implementation, test and contract files match the candidate. The installed LLVM
-binary is `a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3`.
+binary is `a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325`.
 
-Completed direct helpers now receive only incoming words read by their finished
-IR, including result serialization. Narrow private signatures and descending
-entry copies preserve logical local IDs/types; result aliases still address
-complete semantic arguments. All actual arguments and ordered owner events
-still execute. Hidden operands, table/provider identities and instruction
-position catalogs retain ordinary inputs. Main omits 12,522 helper input words
-and 74,421 physical call arguments. Packed calls and result packet allocation
-keep their existing paths; mutation-plus-owner-result admission is unchanged.
+Checked graph helpers now reuse bodies that mutate input owners and return
+input-owned records or borrows. Complete result/event retention, actual caller
+lifetimes, alias topology and ordered reads/writes remain checked. Fresh results
+and stored borrow escapes retain fallback/rejection; input freeze, reserve, pop
+and truncate retain their barriers. Only compiled child input roots precede
+all cleanup ranges and keep immutable token locals. Local/export owners, loop
+carriers and demand caches retain their separate mutable marking. Direct results
+whose every word aliases an input skip caller result-slot allocation and rewind;
+partial results and packed packets keep their allocation paths.
+
+The first gate-only experiment sped up the small cases but grew one output
+30.5 → 118.5kB. Preserving input tokens and removing unread direct result slots
+fixed that regression. Final matched LLVM width-32 controls shrink 22–24%; the
+width-128 shared/distinct cases take 38 → 25ms and 48 → 21ms respectively.
+The widest distinct-owner control still grows 620B (2.03%). These ratios do not
+predict whole-game savings: Main gains only 99 completed helpers, removes 98
+rollbacks and skips 288 result slots. Classify its remaining 2,009 rollbacks and
+large transfers before choosing another admission change.
+
+Completed direct-input demand remains installed. Main omits 12,694 helper input
+words and 75,414 physical call arguments while still evaluating all semantic
+arguments and replaying owner events. Private entry copies preserve logical
+local IDs/types. Hidden operands, table/provider identities and instruction
+position catalogs retain ordinary inputs. See
+[the preceding direct-input evidence](zig-native/measurements/direct-input-2026-11-03.json).
 
 Checked aggregate joins now preserve immutable physical words and materialize
 only differing or non-dominating lanes. Mutable owner tokens, loop carriers,
@@ -40,21 +58,17 @@ demand and unowned-reference subtrees keep ordinary transport while eligible
 siblings share. Completed buffered helpers may return unchanged input words
 without result stores or caller loads. Statement completions and static callable
 placeholders share one unwritten default-zero local per function. Complete type,
-owner, read, effect and variant checks remain. Main shares 48,699 join words,
-avoids 3,060 result stores and 24,284 result loads, and shares 145,227 zero values.
+owner, read, effect and variant checks remain. Main shares 44,426 join words,
+avoids 3,657 result stores and 29,642 result loads, and shares 139,130 zero values.
 Counts describe compiler work, not additive byte savings.
 
-Use the new `scripts/bench/aggregate_scaling.ts` controls for the next hill:
-45 cases × three fresh compilations complete in 1.6s with 1,350 executed checks.
-At 128 fields and 32 calls, scalar records take 13ms versus 47–59ms for mutating
-owner-bearing result records. Those mutating helpers decline reuse and expand
-at every call. Unit-return controls compile faster but can emit more Wasm;
-read-only helpers already reuse definitions. Completed direct-input demand now removes that argument traffic. The next
-focused target is mutation-plus-owner-result admission; isolate it with the Unit
-and read-only controls before changing its lifetime/owner contract. See
-[the scaling evidence](zig-native/measurements/aggregate-scaling-2026-11-03.json).
-Wider checked-source validation-budget failures remain pinned; no full-game
-build is required for each microbenchmark iteration.
+Use `scripts/bench/aggregate_scaling.ts` for short iterations: 45 cases × three
+fresh compilations take roughly two seconds with executed checksums. Its Unit,
+read-only, shared-owner and distinct-owner controls isolate argument/result
+transport from helper admission. Keep native Fast and final LLVM timings
+separate. The earlier wider checked-source validation-budget failures remain
+pinned in [the scaling evidence](zig-native/measurements/aggregate-scaling-2026-11-03.json);
+no full-game build is required for each microbenchmark iteration.
 
 The first pilot shrank the output but regressed compilation to 10.470s.
 A bounded stack sample attributed 46.3% of sampled emission CPU to rebuilding
@@ -74,8 +88,8 @@ for its exact baseline and byte accounting.
 Packed helper inputs now reserve logical input locals in the existing Value
 layout. After complete body checking, result serialization and cleanup, the
 backend loads only words read by the finished IR and omits their unused caller
-stores. Main avoids 7,392 input-word loads and 11,088 argument-word stores; the
-World witness shrinks 10%. Semantic arguments, owner/read/effect admission,
+stores. The preceding packed-input batch avoided 7,392 loads and 11,088 stores, with
+a 10% World witness reduction. Semantic arguments, owner/read/effect admission,
 evaluation order, full packet offsets and output serialization remain intact.
 Direct-word calls retain their ABI. This uses the existing value tree rather
 than adding another representation or source-footprint cache.
@@ -96,27 +110,26 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,902 native laws compile. The selected batch has 137 passes and three
-pre-existing completed-plan assertion failures, reproduced on the unchanged
-native baseline. All 134 core selected laws pass, including direct-input moves,
-parameter writes, empty signatures and full allocation faults (56 sweeps across
-the complete selected batch). The final LLVM guest family has 110 passes and the
-two unchanged unsupported legacy memory-profile cases; both reproduce with the
-preceding frozen LLVM compiler. Zig lint is clean. The required full gate still
-stops at 48 passes/one baseline List/chunk failure, so full qualification remains
-pending. Final LLVM passes seven world/editor, 160 hand and seven identical
-renderer checks. World shrinks 529,248 → 526,637B; hand 210,126 → 209,182B.
-Renderer grows 100,146 → 100,319B: entry copies can outweigh argument savings
-in small helpers. All seven renderer streams remain identical. Installed Pen still rejects ABI 8 before rendering;
-no new frame/PNG is qualified. The configured launcher selects the exact release.
+All 2,907 native laws compile. Selected execution has 142 passes and three
+unchanged completed-plan assertions, reproduced on the exact preserved baseline
+binary; 59 full allocation-failure sweeps finish with no leaks/logged errors.
+The six new or updated mutation/return laws pass, including input-token aliases,
+nested loops, prewrite borrows, warmed lifetime rejection, truncation conflicts
+and fresh-owner fallback. Final LLVM guests have 112 passes and the two unchanged
+unsupported legacy memory-profile cases. Zig lint is clean. The required full
+gate still stops at 48 passes/one baseline List/chunk failure: full qualification
+remains pending. Final LLVM passes seven world/editor, 160 hand and seven
+identical renderer streams. World shrinks 526,637 → 520,832B; hand 209,182 →
+208,221B; renderer 100,319 → 100,229B. Installed Pen still rejects ABI 8 before
+rendering; no new frame/PNG is qualified. The configured launcher selects the
+exact measured release.
 
-The current artifact has 430,867 declared locals and 64,400 mutable globals.
-Local/global instructions still occupy 9,627,119B (68.15%). The outliner banks
-64,032 globals, with a 368,182B root reset run. Logical input padding increases
-the local count while total encoding shrinks. Only four functions with 59 total
-body bytes are unreachable. Local self-copies and adjacent same-local set/get
-readbacks remain absent. Byte counts describe static encodings, not runtime
-cost or removable work.
+The current artifact has 421,732 declared locals and 65,244 mutable globals.
+Local/global instructions occupy 9,480,557B (68.03%). The outliner banks 64,876
+globals, with a 373,246B root reset run. Banking increases despite smaller total
+output. Only four functions with 59 total body bytes are unreachable; local
+self-copies and adjacent same-local set/get readbacks remain absent. Static
+encoding counts do not establish runtime cost or prove removable work.
 
 The **2,076,028B historical predecessor was recovered exactly**, with its
 original SHA, using the preserved compiler and source in one 30-second-capped

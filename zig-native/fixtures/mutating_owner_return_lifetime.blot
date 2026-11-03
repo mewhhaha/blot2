@@ -1,0 +1,14 @@
+type Row is data = $Row {values: &[U32]}
+const put = func (rows: ResizeArray Row) -> (values: &[U32]) => return do:
+  @storage.push rows ($Row {values})
+  return rows
+entry const answer = func (): U32 => return do:
+  let seed: Array U32 = #[1]
+  let warm: Array U32 = #[2]
+  let warmed: ResizeArray Row = #[$Row {values: &seed[0..1]}]
+  let destination: ResizeArray Row = #[$Row {values: &seed[0..1]}]
+  let admitted = put warmed (&warm[0..1])
+  do:
+    let local: Array U32 = #[3]
+    let rejected = put destination (&local[0..1])
+  return @storage.length admitted

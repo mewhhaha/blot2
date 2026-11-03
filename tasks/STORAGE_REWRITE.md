@@ -3,27 +3,29 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/direct-input-2026-11-03.json)
-produces **14.13 MB Wasm**, down from 14.33 MB (207kB / 1.45%). A matched fresh
-pair takes 5.588s → 5.555s; the configured launcher takes 5.551s with identical
-output. Completed direct-input demand removes 74,421 physical call arguments
-while preserving full semantic evaluation and owner contracts. A roughly
-2-second, 45-case aggregate sweep isolates width, copying and ownership effects;
-keep using it before full-game confirmation. Mutation-plus-owner-result helpers
-still decline reuse and are the next focused target.
+[Actual full main](../zig-native/measurements/owned-return-2026-11-03.json)
+produces **13.94 MB Wasm**, down from 14.13 MB (190kB / 1.35%). A matched fresh
+pair takes 5.605s → 5.552s; the configured launcher takes 5.675s with identical
+output. No meaningful latency gain is established. Checked helpers now admit
+mutation plus input-owned results, preserve input tokens and omit fully aliased
+direct result slots. Source/owner/read/write/escape checks and invalidation
+barriers remain intact. Packed and partial-result allocation paths remain.
 
-All 2,902 native laws compile. Selected native execution has 137 passes/three
-reproduced baseline assertions; all 134 core selected laws pass full faults.
-Final LLVM guests have 110 passes/two baseline legacy memory-profile failures.
-Zig lint and world/editor, hand and seven identical renderer streams pass.
-Renderer size grows 173B while whole-game output shrinks. Full qualification
-retains the baseline List/chunk failure; installed Pen rejects ABI 8 before
-rendering. Five-second, subsecond and 1–2MB targets remain unmet.
+The roughly two-second aggregate suite isolated a gate-only size regression and
+verified the narrower transport fix. Whole Main admits only 99 more helpers;
+classify the remaining 2,009 rollbacks before selecting another admission hill.
+All 2,907 native laws compile; selected execution has 142 passes/three exact
+baseline assertions with 59 full fault sweeps. Final LLVM guests have 112
+passes/two baseline legacy memory-profile failures. Zig lint and world/editor,
+hand and seven identical renderer streams pass, with smaller output in all
+three. Full qualification retains the baseline List/chunk failure; installed
+Pen rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB targets
+remain unmet.
 
 The exact historical 2.08MB output was recovered from preserved inputs in a
 bounded 2.88s replay. Historical records used heap pointers; current aggregate
 transport still moves physical Value leaves and owner/borrow metadata. The
-remaining 9.63MB of local/global instructions makes selective materialization
+remaining 9.48MB of local/global instructions makes selective materialization
 and global banking the next size hills. Preserve semantic checks and explicit
 copies. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.

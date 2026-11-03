@@ -1,0 +1,10 @@
+type Row is data = $Row {values: &[U32]}
+const bad = func (rows: ResizeArray Row) => return do:
+  let local: Array U32 = #[7]
+  @storage.push rows ($Row {values: &local[0..1]})
+  return rows
+entry const answer = func (): U32 => return do:
+  let seed: Array U32 = #[1]
+  let rows: ResizeArray Row = #[$Row {values: &seed[0..1]}]
+  let result = bad rows
+  return @storage.length result

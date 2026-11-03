@@ -1,0 +1,14 @@
+const tick = func (rows: Array U32): Unit => return do:
+  rows[0] := @u32.add self 1
+const nested = func (row: {__TYPES__}) => return do:
+  for index in 0 .. 3:
+    tick row.f0
+  return row
+entry const answer = func (input: U32): Array U32 => return do:
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[@u32.add input 10]
+  let original = {__DISTINCT__}
+  let before = nested original
+  let current = nested before
+  current.f0[0] := @u32.add self 5
+  return #[first[0], second[0], before.f0[0], __READS__]

@@ -1,0 +1,18 @@
+const change = func (row: {__TYPES__}) => return do:
+  let saved = @storage.at row.f0 0
+  row.f0[0] := @u32.add self 1
+  return {row, saved}
+entry const answer = func (input: U32): Array U32 => return do:
+  let first: Array U32 = #[input]
+  let second: Array U32 = #[@u32.add input 10]
+  let distinct = {__DISTINCT__}
+  let shared = {__SHARED__}
+  let a = change distinct
+  let b = change shared
+  let c = change a.row
+  let joined = if @u32.eq (@u32.rem input 2) 0 then c.row else b.row
+  let selected = change joined
+  let current = selected.row
+  for index in 0 .. 3:
+    current := (change self).row
+  return #[first[0], second[0], @storage.load a.saved, @storage.load b.saved, @storage.load selected.saved, __READS__]

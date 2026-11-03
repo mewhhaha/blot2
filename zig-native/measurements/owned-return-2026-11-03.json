@@ -1,0 +1,887 @@
+{
+  "date": "2026-11-03",
+  "scope": "Admit checked graph helpers that mutate input owners and return input-owned records/borrows; preserve input token words; omit direct result slots for complete aliases. No sibling/source/ABI or environment publication changes.",
+  "source_pin": {
+    "base": "3ab232b457d95fc3f9a1040a0fc942a4eaf395cd",
+    "patch_sha256": "9ac688127317652ad688afaaafe4e5d490d2b45a2777df7cdfca4a2db4ba01a7",
+    "files": {
+      "scripts/dev_check_areas.ts": "1277e05e86e49ccbf659d28534f5454982de30939ab5e4d3c2e0ec45ef883af9",
+      "zig-native/CONTRACT.md": "b71114521024aa8ad981ff4bd830a46e874b1429afb23b5d4d199b6993651077",
+      "zig-native/src/backend/scoped_backend.zig": "27b77ed2a1e7699698bb5fd97761bd6ebb99467f4aca4ffe96104af66bf98e5c",
+      "zig-native/src/backend/storage_completed_function_tests.zig": "b5bfb123e74e952214b10a17b2378915cc1e2daf249acb75d8e4f9bdca41ea86",
+      "zig-native/src/work_counters.zig": "4e6a53d4e59ebe5e02d27bfb06b47810d39bef75c73f406e4146d30c24676701",
+      "zig-native/tests/completed_function_execution.test.ts": "3a28a67cba62f0fd10628617c378be080d5b2876a61b533c9c3ba4b287fb15ee",
+      "zig-native/tests/direct_input_execution.test.ts": "20a277d7e5fbb2a08fb6c5198c4629ab0cbc9dc37a3652220faf962d94e7e4c6",
+      "zig-native/fixtures/mutating_owner_return.blot.in": "a3deaa190852960733ab9ea6d9dddc332203bc93f5ae90e57b2d6117aba8869e",
+      "zig-native/fixtures/mutating_owner_return_event_escape.blot": "20bcc941a896753abb7ec2a89dee56c3d51179649f529c3447eb18e65244785f",
+      "zig-native/fixtures/mutating_owner_return_fresh.blot": "7d429dd6407591319cbcfd97be753b2a8b2edcb073e7d3cd0b52f2d4582dae9a",
+      "zig-native/fixtures/mutating_owner_return_lifetime.blot": "0b4ef34b6581bc16878a4227a6bd66e3cc9cb9d6adf4c8014f0ea5180120a466",
+      "zig-native/fixtures/mutating_owner_return_nested.blot.in": "997950fef07c0b672578521b7ff5cacd43b1f16c37e69bf9a8052789007672d7",
+      "zig-native/fixtures/mutating_owner_return_truncate.blot": "740097bf3c2d48f69722b1f0bc1554bc49d6075aad2d40275eab3fc3cac24078",
+      "zig-native/tests/mutating_owner_return_execution.test.ts": "8f1d19cd265343541939ae89a4bdafd30ec3c5813ac926ead83efda61ab00c84"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "development": "Fast/noLLVM private experiments; Safe/noLLVM complete native test compilation",
+    "release": {
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-owned-return-9ac688127317/zig-native/zig-out/bin/blotc",
+      "sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+      "sidecar_hex": "16d7638b643eb96a81ccc30576ab92006259016fd78ffa4f55e414e1ffa3fab0",
+      "runtime_project_identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+      "zig": "0.17.0",
+      "backend": "LLVM Fast",
+      "release_build_exit": 0
+    },
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3"
+  },
+  "workload": {
+    "heads": {
+      "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+    },
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a",
+    "source_bytes": 2537167,
+    "siblings_unchanged": true
+  },
+  "main": {
+    "runs": {
+      "baseline": {
+        "evidence": "build/bench/owned-return-2026-11-03/main-baseline/main-83a3cde580b78b8/result.json",
+        "build_ms": 5604.822339,
+        "wasm_bytes": 14125344,
+        "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "compiler_identity": "2dadacc4540175ac5770d45570f3e35e61a29106d21d5d39ab6b83fbba35b5d9",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_emission_expressions": 1017503,
+          "scoped_result_store_words_avoided": 3060,
+          "scoped_result_load_words_avoided": 24284,
+          "scoped_completed_plan_definitions": 7458,
+          "scoped_completed_plan_rollbacks": 2107,
+          "scoped_completed_plan_discarded_expressions": 188790,
+          "scoped_join_words_shared": 48699,
+          "scoped_outlined_regions": 422,
+          "scoped_outlined_globals": 64032
+        }
+      },
+      "candidate": {
+        "evidence": "build/bench/owned-return-2026-11-03/main-candidate/main-60ca2ed74b409c54/result.json",
+        "build_ms": 5551.82381,
+        "wasm_bytes": 13935123,
+        "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "compiler_identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_emission_expressions": 988608,
+          "scoped_result_slots_avoided": 288,
+          "scoped_result_store_words_avoided": 3657,
+          "scoped_result_load_words_avoided": 29642,
+          "scoped_completed_plan_definitions": 7557,
+          "scoped_completed_plan_rollbacks": 2009,
+          "scoped_completed_plan_discarded_expressions": 181762,
+          "scoped_join_words_shared": 44426,
+          "scoped_outlined_regions": 411,
+          "scoped_outlined_globals": 64876
+        }
+      },
+      "configured": {
+        "evidence": "build/bench/owned-return-2026-11-03/main-configured/main-3451fa72a7eabeee/result.json",
+        "build_ms": 5675.040702,
+        "wasm_bytes": 13935123,
+        "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "compiler_identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+        "source_bytes": 2537167
+      }
+    },
+    "bytes_removed": 190221,
+    "size_reduction_percent": 1.3466645484881643,
+    "measurement": "Fresh cache-disabled pair with four frontend/codegen workers and a 30-second cap; no concurrent compiler/check workload. 5.605\u21925.552s paired; configured 5.675s. Individual shared-host completions establish no meaningful latency improvement.",
+    "targets": "Five-second, subsecond and1\u20132MBtargets remain unmet.",
+    "engine_validation": {
+      "valid": true,
+      "imports": [
+        {
+          "module": "blot:host/1",
+          "name": "call_array_f32_array_f32",
+          "kind": "function"
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function"
+        },
+        {
+          "name": "blot:memory",
+          "kind": "memory"
+        },
+        {
+          "name": "blot:allocate",
+          "kind": "function"
+        },
+        {
+          "name": "blot:reset",
+          "kind": "function"
+        }
+      ]
+    },
+    "coverage": "99 more definitions,98 fewer rollbacks and 288 direct result slots removed. Strong small-case gains cover a limited part of Gdev; the remaining 2009 rollbacks need attribution before another admission change."
+  },
+  "microbenchmarks": {
+    "stages": {
+      "baseline": {
+        "report": "build/bench/owned-return-2026-11-03/baseline/run-f39691c4be26abd0/result.json",
+        "compiler_sha256": "c838a3114022c4da038324dbc62fc472eac92a2993b9a21cec5ca81298932f80",
+        "executed_checks": 300,
+        "elapsed_ms": 3903.2741250000004,
+        "repetitions": 3,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 77.738608,
+            "coldMs": 81.17985300000004,
+            "wasmBytes": 8189
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 64.27632500000004,
+            "coldMs": 65.54569600000002,
+            "wasmBytes": 12126
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 312.153288,
+            "coldMs": 313.773279,
+            "wasmBytes": 14735
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 385.13320699999986,
+            "coldMs": 386.45037,
+            "wasmBytes": 30528
+          }
+        ]
+      },
+      "candidate": {
+        "report": "build/bench/owned-return-2026-11-03/candidate/run-ab268a8c5b61d1f0/result.json",
+        "compiler_sha256": "77d9ab86f62f0dd4b456715621ce1447584f3ee2c07b8669bc27414d998ac46b",
+        "executed_checks": 300,
+        "elapsed_ms": 2715.063189,
+        "repetitions": 3,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 53.905940000000044,
+            "coldMs": 55.69192700000002,
+            "wasmBytes": 8918
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 63.84215700000004,
+            "coldMs": 65.30445600000007,
+            "wasmBytes": 26995
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 84.71222200000011,
+            "coldMs": 85.62023499999987,
+            "wasmBytes": 15007
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 174.8310389999997,
+            "coldMs": 175.95980199999985,
+            "wasmBytes": 118542
+          }
+        ]
+      },
+      "stable-input-tokens": {
+        "report": "build/bench/owned-return-2026-11-03/stable-input-tokens/run-53160d33c53d7259/result.json",
+        "compiler_sha256": "e077e70d200019b26ad5da6994c40a92e67510272f95e9d845871a1f95de7fd2",
+        "executed_checks": 300,
+        "elapsed_ms": 2461.9312999999997,
+        "repetitions": 3,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 41.379996000000006,
+            "coldMs": 50.840033000000005,
+            "wasmBytes": 8592
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 38.94937900000002,
+            "coldMs": 40.414022000000045,
+            "wasmBytes": 12649
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 86.31775800000014,
+            "coldMs": 87.31853699999988,
+            "wasmBytes": 14723
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 160.19193500000029,
+            "coldMs": 161.79389200000014,
+            "wasmBytes": 31148
+          }
+        ]
+      },
+      "forwarded-result": {
+        "report": "build/bench/owned-return-2026-11-03/forwarded-result/run-3149ad425e9b12fc/result.json",
+        "compiler_sha256": "fe39c5fa6e6f6aabf6688904ca72c50efa87aa65f0f720d3e9d50fad8a745b87",
+        "executed_checks": 300,
+        "elapsed_ms": 2412.0378560000004,
+        "repetitions": 3,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 36.112037999999984,
+            "coldMs": 38.695312,
+            "wasmBytes": 6192
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 51.61791199999993,
+            "coldMs": 52.68953299999998,
+            "wasmBytes": 9440
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 98.29949299999998,
+            "coldMs": 99.55192699999998,
+            "wasmBytes": 14723
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 146.45027100000016,
+            "coldMs": 147.5868959999998,
+            "wasmBytes": 31148
+          }
+        ]
+      },
+      "release-micro-baseline": {
+        "report": "build/bench/owned-return-2026-11-03/release-micro-baseline/run-8119d3cbea40fecd/result.json",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "executed_checks": 500,
+        "elapsed_ms": 1124.035569,
+        "repetitions": 5,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 9.088945999999993,
+            "coldMs": 10.06562199999999,
+            "wasmBytes": 8189
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 9.871474999999975,
+            "coldMs": 10.719495999999992,
+            "wasmBytes": 12126
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 38.21368899999999,
+            "coldMs": 39.113388999999984,
+            "wasmBytes": 14735
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 47.99055299999986,
+            "coldMs": 49.15777100000014,
+            "wasmBytes": 30528
+          }
+        ]
+      },
+      "release-micro-candidate": {
+        "report": "build/bench/owned-return-2026-11-03/release-micro-candidate/run-3454f6548a86037f/result.json",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "executed_checks": 500,
+        "elapsed_ms": 880.449107,
+        "repetitions": 5,
+        "profile": false,
+        "controls": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 6.069876999999991,
+            "coldMs": 6.943267999999989,
+            "wasmBytes": 6192
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "buildMs": 6.60472500000003,
+            "coldMs": 7.301958999999954,
+            "wasmBytes": 9440
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 24.771145999999987,
+            "coldMs": 26.034208000000035,
+            "wasmBytes": 14723
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "buildMs": 20.60016799999994,
+            "coldMs": 21.334713999999963,
+            "wasmBytes": 31148
+          }
+        ]
+      }
+    },
+    "method": "Final LLVM baseline/candidate measured sequentially, five fresh repetitions, single worker, no cache; all sources feed independent checksum checks in sync/async guests. Native Fast timings compare only the two native builds and never to LLVM.",
+    "held_variants": "Gate removal alone improved compilation but grew distinct 128 output from 30528 to 118542B. Input tokens were marked mutable as if the helper owned them, forcing 128 token stores/loads per call. Excluding the borrowed input prefix restored all descriptor aliases; omitting unread direct result slots then removed the narrow-case overhead.",
+    "source_limit": "Intermediate native variants were exploratory rather than source-frozen. Raw compiler and generated-workload hashes survive in their reports; the final candidate is source-frozen above.",
+    "final_limits": "At width128, distinct-owner output grows 620B (2.03%) while shared-owner output shrinks 12B. Width32 shared/distinct output shrinks 1997/2686B. Do not extrapolate these ratios to the whole game."
+  },
+  "contracts": {
+    "admission": "Result and ordered event shapes retain only input owner ordinals. Actual caller depths, source/type witnesses, read-before-write order and alias topology remain checked. Fresh owner results/event escape fall back or reject. Input freeze/reserve/pop/truncate retain barriers.",
+    "tokens": "Only closeRuntime/release rewrite root token locals; helper cleanup ranges start after all input roots. Exempt only that compiled child prefix, preserving local/export roots plus independent loop/demand marks.",
+    "result_slots": "A complete nonempty alias recipe has zero result stores/loads. Direct caller omits slot/mark/rewind, keeps logical W+1 mask, and supplies an unread default-zero pointer to unchanged signatures. Partial results and packed packets retain allocation. Calls, arguments and owner events still execute."
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2907,
+      "selected_count": 145,
+      "completed_count": 145,
+      "exit_code": 1,
+      "elapsed_seconds": 74.63864399999147,
+      "passed": 142,
+      "failed": [
+        "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+        "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+        "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM"
+      ],
+      "full_fault_sweeps": 59,
+      "leaks": 0,
+      "logged_errors": 0
+    },
+    "new_native_laws": {
+      "inventory": 2907,
+      "selected": 6,
+      "completed": 6,
+      "exit_code": 0,
+      "elapsed_seconds": 3.01932660600869,
+      "passed": 6,
+      "failed": [],
+      "full_fault_sweeps": 4
+    },
+    "baseline_native_comparison": {
+      "compiler_head": "3ab232b457d95fc3f9a1040a0fc942a4eaf395cd",
+      "binary_sha256": "1a7e2466232bbaad06c07555fd57a22adff520fecb3a526a47727f611a74c67c",
+      "tests": [
+        {
+          "name": "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+          "exit_code": 1
+        },
+        {
+          "name": "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+          "exit_code": 1
+        },
+        {
+          "name": "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM",
+          "exit_code": 1
+        }
+      ]
+    },
+    "guests": {
+      "files": 38,
+      "exit_code": 1,
+      "elapsed_seconds": 6.626935084990691,
+      "summary": [
+        "FAILED | 112 passed | 2 failed (6s)"
+      ],
+      "passed": 112,
+      "baseline_failures": 2,
+      "failure": "legacy memory-profile Array elements require a fixed inline layout, unchanged from the preceding frozen release",
+      "baseline_evidence": "build/bench/transport-cleanup-2026-11-03/baseline-memory-profile.log"
+    },
+    "lint": "591 production plus 1 generated Zig files, zero findings; Zig 0.17 on PATH",
+    "deno_check": "changed test files and dev-area manifest pass",
+    "full_gate": {
+      "status": "pending: baseline List/chunk storage_escape",
+      "smoke_passed": 48,
+      "smoke_failed": 1,
+      "evidence": "build/bench/owned-return-2026-11-03/full-gate/timings.json"
+    }
+  },
+  "integration": {
+    "world": {
+      "checks": 7,
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "source_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+          "wasm_bytes": 526637,
+          "wasm_sha256": "7cc8df5169dcf0d37cac4ad81cf22f43b4cfa3ec0cdd830c5d4a0c079adf1873",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+          "wasm_bytes": 520832,
+          "wasm_sha256": "9dd99a1be6a03579d22ef5cc18af70f64689f51659f427c8006db69ad1bd6ccb",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "hand": {
+      "checks": 160,
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "source_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+          "wasm_bytes": 209182,
+          "wasm_sha256": "5691466bedf702b31476efae9323ad3405edd06a701d57553d8c5397b7ff5857",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+          "wasm_bytes": 208221,
+          "wasm_sha256": "5efc4e2dee0a1cc95d7b835d286deac262aff099ff737007873f0646ba554664",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "renderer": {
+      "pins": {
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "baseline_compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ],
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 100319,
+          "wasm_sha256": "f3bec51b2e80e63d5da35acd267164de8340ec9d0f591cb1bfffe22041721026",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 100229,
+          "wasm_sha256": "931d019362a1e6afd4aed851d3694a283535fc022045bb234b577e5cd33a6930",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        }
+      ]
+    },
+    "pen": {
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+      "returncode": 1,
+      "error": "invalid_abi: unsupported ABI version 8",
+      "compiled_main_reused": true,
+      "new_frame_png_qualified": false
+    }
+  },
+  "byte_accounting": {
+    "declared_locals": 421732,
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 65244
+    },
+    "categories": [
+      {
+        "name": "locals",
+        "count": 2739874,
+        "bytes": 7568427
+      },
+      {
+        "name": "globals",
+        "count": 554447,
+        "bytes": 1912130
+      },
+      {
+        "name": "constants",
+        "count": 591395,
+        "bytes": 1409383
+      },
+      {
+        "name": "calls",
+        "count": 382344,
+        "bytes": 866598
+      },
+      {
+        "name": "loads",
+        "count": 234709,
+        "bytes": 731635
+      },
+      {
+        "name": "control",
+        "count": 371814,
+        "bytes": 551622
+      },
+      {
+        "name": "stores",
+        "count": 107674,
+        "bytes": 330424
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 136173,
+        "bytes": 136497
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643
+      }
+    ],
+    "instruction_bytes": 13508359,
+    "remaining_local_global_bytes": 9480557,
+    "largest_reset_run": {
+      "kind": "i32.const 0 -> global.set",
+      "function": 26,
+      "offset": 351346,
+      "pairs": 64876,
+      "bytes": 373246,
+      "first_source": 0,
+      "first_target": 374,
+      "consecutive_targets": true,
+      "consecutive_sources": false,
+      "last_source": 0,
+      "last_target": 65249
+    },
+    "direct_call_reachability": {
+      "supported": true,
+      "unsupported": [],
+      "roots": [
+        23,
+        24,
+        26
+      ],
+      "unreachable_functions": [
+        1,
+        11,
+        12,
+        13
+      ],
+      "unreachable_body_bytes": 59
+    },
+    "limits": "Static encodings do not prove runtime cost or removability. Banked globals increase even though total output and locals decrease."
+  },
+  "review": {
+    "reviewer": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "admission": "No concrete admission bug found after review of full result/event retention, actual caller lifetime replay, alias topology and ordered events.",
+    "input_tokens": "Only closeRuntime/release rewrite Root.token locals; all helper cleanup boundaries start beyond inputs. Nested calls cannot rewrite caller locals. Loop/demand marking stays independent. Only compiled child input prefixes are exempt.",
+    "forwarded_results": "Complete nonempty aliases imply no result stores or loads. Direct caller may omit slot/mark/rewind while preserving logical W+1 mask and semantic call. A real default-zero pointer is passed only when unchanged signature still expects it. Partial and packed results retain their existing paths.",
+    "test_scope": "Distinct/shared/joined owners, direct and packed widths, nested loop writes, prewrite borrows, warmed lifetime negatives, truncation conflicts and fresh-owner fallback, plus existing local-owner cleanup laws."
+  },
+  "raw_evidence": {
+    "build/bench/owned-return-2026-11-03/baseline/run-f39691c4be26abd0/result.json": "cad3a3a938e0cb8a75966a96927a40f274a9c8f9529ea7198907b274cfb54bee",
+    "build/bench/owned-return-2026-11-03/baseline/run-f39691c4be26abd0/samples.jsonl": "8773395e23988077dd93967045fe60aa95173dc51c5534dbcf1eadfcee62b6fa",
+    "build/bench/owned-return-2026-11-03/candidate/run-ab268a8c5b61d1f0/result.json": "e421b0b5b049a79e04e14e68363a6f5c6c38d7f1b3815ce5cffd14125b64ee6a",
+    "build/bench/owned-return-2026-11-03/candidate/run-ab268a8c5b61d1f0/samples.jsonl": "d56818cec0349acd5fd647ab85b05a9d4ce9e644a72c2263fcfb82f40d89f2f2",
+    "build/bench/owned-return-2026-11-03/stable-input-tokens/run-53160d33c53d7259/result.json": "559f6f98972c3962f14dc02eef84f33180b4a0d5741aa682411ed21996d86a6a",
+    "build/bench/owned-return-2026-11-03/stable-input-tokens/run-53160d33c53d7259/samples.jsonl": "21fbf3d5029a881e4424c48529c1bfdafbebf46be6a4ff132e7f8154385fedf3",
+    "build/bench/owned-return-2026-11-03/forwarded-result/run-3149ad425e9b12fc/result.json": "bb977bc0782a1692a74f7fbb3aa65663a61c3931ee1c65cff14ae6e6b3bb0567",
+    "build/bench/owned-return-2026-11-03/forwarded-result/run-3149ad425e9b12fc/samples.jsonl": "8244588fe252e266036fdba3ee036cf66e4d461bab240a6aa3709eeba80daa73",
+    "build/bench/owned-return-2026-11-03/release-micro-baseline/run-8119d3cbea40fecd/result.json": "d7faa1025443dec9b93193cd32f7a1fff057abdde35d122497e75cc92f2c3387",
+    "build/bench/owned-return-2026-11-03/release-micro-baseline/run-8119d3cbea40fecd/samples.jsonl": "e7e6f355453608243f575897e29770c89df07735bd7ab7786660b3a8041a6e18",
+    "build/bench/owned-return-2026-11-03/release-micro-candidate/run-3454f6548a86037f/result.json": "d0f4dc8866d51baef547306731b5f438bac4d179a9e8daeef2dc2b0b4d3e5da4",
+    "build/bench/owned-return-2026-11-03/release-micro-candidate/run-3454f6548a86037f/samples.jsonl": "65d94db905d63f80cdd48c831328c3061df9b6ea1fe3ef4d51c0d67669d67cb2",
+    "build/bench/owned-return-2026-11-03/world-pair/result.json": "1c51618803cab38d94f2b3266927229a4701699491f41cc3c4c92ab49c88f2ab",
+    "build/bench/owned-return-2026-11-03/hand-pair/result.json": "47b4a8f2303696bfa9543223964a91def6c023d65b35d452a915fef033c52e6b",
+    "build/bench/owned-return-2026-11-03/renderer/pair-1db9dc2e686da81f/result.json": "a45b41743b28100faeda38043a8b8ddcf891d681568cfabecfe5f9bafe719d8e",
+    "build/bench/owned-return-2026-11-03/source.patch": "9ac688127317652ad688afaaafe4e5d490d2b45a2777df7cdfca4a2db4ba01a7",
+    "build/bench/owned-return-2026-11-03/source-pin.json": "ca881936b02ee225d06841e12f9e8838b8da408cb4827b104d9984e98dd99f1b",
+    "build/bench/owned-return-2026-11-03/native-compile.log": "429e10cd81ad35e8c92c5d292d6d7a94bf7e4faaeacdad6bef6145b3c9793fda",
+    "build/bench/owned-return-2026-11-03/native-full.log": "5e84a12205079d41d85d4d7cb21454ea4058dd0e721d059df149a2e26477bc24",
+    "build/bench/owned-return-2026-11-03/native-result.json": "fb7dae816b73a07a96c5e5a996b1a52b009f052881693d3eab145bfc204d2ac0",
+    "build/bench/owned-return-2026-11-03/new-native-full.log": "8b00a0ade36913b5e359adec646aa9d571721a1a66e5f17bb8c2d4c67439b1e2",
+    "build/bench/owned-return-2026-11-03/new-native-result.json": "64869b7316c98571d8372b247f33a351a133121ae7044de0ac8df5a74df3b877",
+    "build/bench/owned-return-2026-11-03/baseline-native-pin.json": "362f2f4acda090acb6d18973abff92f0c9ed7cdf6cdeac1f7dad619a120bfcc5",
+    "build/bench/owned-return-2026-11-03/baseline-native-failures.log": "918d6141226929935e69373b9a6939434f2e7cb4cc6daca12761e5544c2eca3b",
+    "build/bench/owned-return-2026-11-03/baseline-native-failures.json": "51ab9cab1e31c8949e576e67296bbd05c4f906420d1e9fe2e9c8e032c6378729",
+    "build/bench/owned-return-2026-11-03/final-guests.log": "cf4809382d57431052906246b26d8baaaa1f61c53d9a425c4274edfb492b822c",
+    "build/bench/owned-return-2026-11-03/guest-result.json": "a27b86f18ac48cc960dc917eba622ba5b9813d9e65fb00f80860784ce2afb26f",
+    "build/bench/owned-return-2026-11-03/release-build.log": "4237dbf4e7b4c885d9b1818dc7fa520037525f0ea8293d0dcf1c46943cfdb52e",
+    "build/bench/owned-return-2026-11-03/release-identity.json": "7078bf720250d63046e6f5bef869307459b4788f35242578876a8eea441cf19f",
+    "build/bench/owned-return-2026-11-03/full-gate.log": "c8440869326244139ca77aea8fda71f66a48215859689bedfc8195473f414d4d",
+    "build/bench/owned-return-2026-11-03/full-gate/timings.json": "0e69ddd65059d67f5108364341f36dc992b6235131915fc2c1debb9551e1ad18",
+    "build/bench/owned-return-2026-11-03/zig-lint.log": "086d0cc2d3a59d366fdbb23dd884e98362cc16633472d948bf7a2d256310ee7b",
+    "build/bench/owned-return-2026-11-03/main-pair.json": "43a952abe71743584453e15ab667e11b30e9c16a3feb33195017e70c19e18f86",
+    "build/bench/owned-return-2026-11-03/main-summary.json": "47203a20dcb7c0052e10667ffde7d9ee0bb7b9e684ca0144b6e8840a81e41b9e",
+    "build/bench/owned-return-2026-11-03/main-engine-validation.json": "12a262c37800ee1af77358d2fad7a142b743f72236a44f8e865fcaff08feb5e4",
+    "build/bench/owned-return-2026-11-03/candidate-census.json": "86d3740621b5d2640835a80d9adf311212e8ff8677648e647a0bb462b5ee2873",
+    "build/bench/owned-return-2026-11-03/candidate-transfers.json": "7045176fe1119d6e737459d53420d309044d0f9b188b47f5822b105151bc9c62",
+    "build/bench/owned-return-2026-11-03/pen/result.json": "c4df457b274c0b8ebd99313c13427578be6675e725a0f1804d2fd4863229b776",
+    "build/bench/owned-return-2026-11-03/pen/run.log": "23c04c160167bbbbcfac0d4aba9192a9dea05e5331dc71cb35d87f3237fc0a78",
+    "build/bench/owned-return-2026-11-03/private-final-guests-passed.log": "72dd00114446cc9dd6be38a5a0fd8404d39fa6453c35fab791d2f63463be89c1",
+    "build/bench/owned-return-2026-11-03/review.json": "ef0b88575d13329e52bf8bce658f993b3a03ac2bd941f9a4b3470146651eea51",
+    "build/bench/owned-return-2026-11-03/main-baseline/main-83a3cde580b78b8/result.json": "14616c2ce03812c2e4e72e021a3e87ea71ba65f6a80bdf9bba59ffe74a8fa35f",
+    "build/bench/owned-return-2026-11-03/main-candidate/main-60ca2ed74b409c54/result.json": "6d1bbacfd5285f7f828659fd552c2717140b591b7fc313e962e9aa224584c69f",
+    "build/bench/owned-return-2026-11-03/main-configured/main-3451fa72a7eabeee/result.json": "cd7e66be0db7fe3642a2a9f0f38e845c4183ab83f88f70aa1ca0d523e32a9cf2"
+  }
+}

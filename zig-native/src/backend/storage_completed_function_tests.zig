@@ -135,11 +135,163 @@ test "completed function rollback removes nested helpers before truncate reserve
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishRollback, .{@as([]const core.Module, &.{module})});
 }
 
-test "completed function read only borrowed results decline SIMD stores before inline fallback through OOM" {
+fn publishMutatingBorrow(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_completed_plan_definitions);
+    try std.testing.expectEqual(@as(u64, 2), result.counters.scoped_owner_graph_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+}
+
+test "completed function mutating borrowed results retain prewrite refs through OOM" {
     var module = try lower(a, simd_source);
     defer module.deinit(a);
-    try publishRollback(a, &.{module});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishRollback, .{@as([]const core.Module, &.{module})});
+    try publishMutatingBorrow(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishMutatingBorrow, .{@as([]const core.Module, &.{module})});
+}
+
+fn mutatingOwnerSource(width: usize, comptime path: []const u8) ![]u8 {
+    var types: std.ArrayList(u8) = .empty;
+    defer types.deinit(a);
+    var distinct: std.ArrayList(u8) = .empty;
+    defer distinct.deinit(a);
+    var shared: std.ArrayList(u8) = .empty;
+    defer shared.deinit(a);
+    var reads: std.ArrayList(u8) = .empty;
+    defer reads.deinit(a);
+    for (0..width) |index| {
+        const ty = try a.print("f{d}: Array U32,", .{index});
+        defer a.free(ty);
+        try types.appendSlice(a, ty);
+        var owner: []const u8 = "first";
+        if (index % 2 != 0) owner = "second";
+        const field = try a.print("f{d}: {s},", .{ index, owner });
+        defer a.free(field);
+        try distinct.appendSlice(a, field);
+        const alias = try a.print("f{d}: second,", .{index});
+        defer a.free(alias);
+        try shared.appendSlice(a, alias);
+        const read = try a.print("current.f{d}[0],", .{index});
+        defer a.free(read);
+        try reads.appendSlice(a, read);
+    }
+    const template = @import("fixtures").source(path);
+    const typed = try std.mem.replaceOwned(u8, a, template, "__TYPES__", types.items);
+    defer a.free(typed);
+    const first = try std.mem.replaceOwned(u8, a, typed, "__DISTINCT__", distinct.items);
+    defer a.free(first);
+    const second = try std.mem.replaceOwned(u8, a, first, "__SHARED__", shared.items);
+    defer a.free(second);
+    return std.mem.replaceOwned(u8, a, second, "__READS__", reads.items);
+}
+
+fn publishMutatingOwner(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_owner_graph_definitions > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+}
+
+test "completed mutating owner results retain shared distinct joined and loop caller roots through OOM" {
+    const source = try mutatingOwnerSource(8, "mutating_owner_return.blot.in");
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publishMutatingOwner(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishMutatingOwner, .{@as([]const core.Module, &.{module})});
+}
+
+test "completed mutating owner results retain packed wide caller roots" {
+    const source = try mutatingOwnerSource(128, "mutating_owner_return.blot.in");
+    defer a.free(source);
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
+}
+
+test "completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes" {
+    inline for (.{ "mutating_owner_return_lifetime.blot", "mutating_owner_return_event_escape.blot" }) |path| {
+        var module = try lower(a, @import("fixtures").source(path));
+        defer module.deinit(a);
+        var result = try scoped.compile(a, &.{module}, 1);
+        defer result.deinit(a);
+        try std.testing.expect(result.diagnostic != null);
+        try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, result.diagnostic.?.code);
+        try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
+        if (comptime std.mem.eql(u8, path, "mutating_owner_return_lifetime.blot")) {
+            try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+        } else {
+            try std.testing.expect(result.counters.scoped_completed_plan_rollbacks > 0);
+        }
+    }
+    var module = try lower(a, @import("fixtures").source("mutating_owner_return_truncate.blot"));
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic != null);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_borrow_conflict, result.diagnostic.?.code);
+    try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
+    try std.testing.expect(result.counters.scoped_completed_plan_definitions > 0);
+}
+
+fn publishNestedOwner(allocator: std.mem.Allocator, modules: []const core.Module, width: usize) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
+    // Only nested returns descriptors. Each unchanged Array has four words;
+    // forwarding three words would leave its owner address in the result slot.
+    try std.testing.expect(result.counters.scoped_result_store_words_avoided >= width * 4);
+    try std.testing.expect(result.counters.scoped_result_load_words_avoided >= width * 4);
+    if (width == 8) {
+        try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
+        try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owned_packed_calls);
+    } else {
+        try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
+    }
+}
+
+test "completed mutating owner results forward complete descriptors across nested loop writes through OOM" {
+    for ([_]usize{ 8, 128 }) |width| {
+        const source = try mutatingOwnerSource(width, "mutating_owner_return_nested.blot.in");
+        defer a.free(source);
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        try publishNestedOwner(a, &.{module}, width);
+        if (width == 8) try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishNestedOwner, .{ @as([]const core.Module, &.{module}), width });
+    }
+}
+
+fn publishFreshOwnerFallback(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_definitions);
+    try std.testing.expect(result.counters.scoped_completed_plan_rollbacks > 0);
+}
+
+test "completed mutating owner results decline fresh result owners through OOM" {
+    var module = try lower(a, @import("fixtures").source("mutating_owner_return_fresh.blot"));
+    defer module.deinit(a);
+    try publishFreshOwnerFallback(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishFreshOwnerFallback, .{@as([]const core.Module, &.{module})});
 }
 
 test "completed function borrowed results reuse distinct caller owners and preserve lifetime rejection" {

@@ -58,6 +58,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
       assert(work.scoped_direct_argument_words_avoided > 0);
       assert(work.scoped_result_store_words_avoided > 0);
       assert(work.scoped_result_load_words_avoided > 0);
+      // keep forwards every word; change and change_float retain result slots.
+      assert(work.scoped_result_slots_avoided > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         const call = async (name: string, input: number) => {

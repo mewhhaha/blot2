@@ -102,7 +102,19 @@ filtering; ordered owner events remain independent. Only unpublished helpers
 without semantic/table position catalogs may gain this prefix. Hidden operands,
 table identities, entry/provider roles and non-i32 formals keep ordinary inputs.
 Packed inputs retain their existing path. Unused result pointers may disappear
-from the private signature; packet allocation/layout remain unchanged.
+from the private signature; logical result word positions remain unchanged.
+
+Graph helpers may write input owners and return input-owned records or borrows.
+Completed output and ordered event shapes must retain only input owner ordinals;
+fresh owners still decline, and caller replay checks actual lifetimes and loop
+read/write order. Input freeze, reserve, pop and truncate retain their separate
+barriers. A helper's input-root prefix precedes every cleanup range, so its token
+locals are immutable through joins; local owners, loop carriers and demand
+caches retain their mutable marking. This exemption does not apply to exports.
+Direct results with complete input-alias recipes need no caller result slot or
+rewind. The logical result-pointer mask position remains present; an unchanged
+signature receives an unread zero pointer. Partial results retain allocation,
+and packed packets keep their existing layout and allocation.
 
 Checked aggregate joins reserve edge copies and materialize only lanes whose
 physical origins differ. Multiple edges may share only a dominating immutable

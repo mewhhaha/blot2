@@ -45,6 +45,11 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.storage_completed_function_tests.test.completed mutating owner results retain shared distinct joined and loop caller roots through OOM",
+      "backend.storage_completed_function_tests.test.completed mutating owner results retain packed wide caller roots",
+      "backend.storage_completed_function_tests.test.completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes",
+      "backend.storage_completed_function_tests.test.completed mutating owner results forward complete descriptors across nested loop writes through OOM",
+      "backend.storage_completed_function_tests.test.completed mutating owner results decline fresh result owners through OOM",
       "backend.direct_input_demand.test.direct input demand preserves overlapping moves logical locals and body suffix through full OOM",
       "backend.direct_input_demand.test.direct input demand keeps written then read parameters and removes all unread parameters",
       "backend.direct_input_demand.test.direct input demand declines hidden operands and retains fully demanded signatures",
@@ -215,6 +220,7 @@ export const devCheckAreas = {
       "backend.storage_initialization_tests.test.owned computed flat pools publish a complete module",
     ],
     guests: [
+      "zig-native/tests/mutating_owner_return_execution.test.ts",
       "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",
       "zig-native/tests/storage_result_alias_execution.test.ts",
@@ -339,6 +345,11 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.storage_completed_function_tests.test.completed mutating owner results retain shared distinct joined and loop caller roots through OOM",
+      "backend.storage_completed_function_tests.test.completed mutating owner results retain packed wide caller roots",
+      "backend.storage_completed_function_tests.test.completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes",
+      "backend.storage_completed_function_tests.test.completed mutating owner results forward complete descriptors across nested loop writes through OOM",
+      "backend.storage_completed_function_tests.test.completed mutating owner results decline fresh result owners through OOM",
       "backend.direct_input_demand.test.direct input demand preserves overlapping moves logical locals and body suffix through full OOM",
       "backend.direct_input_demand.test.direct input demand keeps written then read parameters and removes all unread parameters",
       "backend.direct_input_demand.test.direct input demand declines hidden operands and retains fully demanded signatures",
@@ -530,6 +541,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/mutating_owner_return_execution.test.ts",
       "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",
       "zig-native/tests/storage_result_alias_execution.test.ts",
@@ -605,7 +617,7 @@ export const devCheckAreas = {
       "backend.storage_calls.test.completed call context free aliases separate origin zero and preserve exact first collision alternatives through OOM",
       "backend.storage_calls.test.completed call context free aliases roll back owned duplicate tails and publish atomically through OOM",
       "backend.storage_completed_function_tests.test.completed function rollback removes nested helpers before truncate reserve and freeze through OOM",
-      "backend.storage_completed_function_tests.test.completed function read only borrowed results decline SIMD stores before inline fallback through OOM",
+      "backend.storage_completed_function_tests.test.completed function mutating borrowed results retain prewrite refs through OOM",
       "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
       "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
       "backend.storage_completed_function_tests.test.completed plain plans decline hidden persistent pools and preserve fresh borrow rejection through OOM",
