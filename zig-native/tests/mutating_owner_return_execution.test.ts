@@ -124,8 +124,9 @@ for (const codegenTier of ["development", "optimized"] as const) {
       });
       assert(fresh.success, JSON.stringify(fresh));
       const work = fresh.stats.workCounters as Record<string, number>;
-      assert.equal(work.scoped_completed_plan_definitions, 0);
-      assert(work.scoped_completed_plan_rollbacks > 0);
+      assert(work.scoped_completed_plan_definitions > 0);
+      assert(work.scoped_function_plan_hits > 0);
+      assert.equal(work.scoped_completed_plan_rollbacks, 0);
       const guest = await instantiateGuest(fresh.bytes);
       try {
         for (const input of [0, 7, 0xffff_ffff, 0]) {

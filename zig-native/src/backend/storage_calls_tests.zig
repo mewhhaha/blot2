@@ -12,6 +12,7 @@ test {
     _ = @import("scoped_opaque_tests.zig");
     _ = @import("storage_owner_graph_tests.zig");
     _ = @import("storage_completed_function_tests.zig");
+    _ = @import("storage_fresh_owner_tests.zig");
     _ = @import("storage_parameter_fields_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");

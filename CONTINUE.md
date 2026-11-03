@@ -15,53 +15,66 @@ Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
 The current
-[primitive-alias checkpoint](scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
-replaces 30 terminal numeric wrappers with ordinary scalar primitive aliases.
-The owned backend supports their partial applications/callbacks and shares
-scalar opcode/result semantics with constant evaluation. Exact runtime folds
-retain separate source-literal authority; ordinary const evaluation preserves
-NaNs. ABI 8 and session protocol 2 remain unchanged.
+[fresh-owner checkpoint](scripts/bench/goose/results/2026-11-03-fresh-owners.md)
+admits fresh fixed-array results through reusable calls. Compact fresh roles
+follow input roles; aliases/borrowed siblings share imported caller roots.
+Donors must be unconditional singleton arrays outside variant payloads, with
+plain inline elements, in the shared fixed region. Packets close before lexical
+rewind preserves results. Conditional/mixed origins, resizable results and
+borrowed escapes keep fallback/rejection. ABI 8/session protocol 2 are
+unchanged. See the updated ownership contract for the exact private boundary.
 
-Five fresh-process Blot before/after pairs show Mandelbrot F32 **96.04 →
-73.18ms** (24% less time), CRC32 2.5% slower and the other three kernels flat.
-The final seven-case Goose survey retains two explicit recursive sort failures;
-Goose gaps are CRC32 8.29x, custom hash 6.98x, Sieve 3.07x, F32 Mandelbrot 1.86x
-and Fannkuch 0.97x. Original F64 and the other 43 catalog tasks remain
-uncovered. The README charts use the final compiler.
+Three fresh uncached Gdev pairs improve **6.848 → 6.526s (4.7%)** in this round.
+The 6.85s baseline is a new shared-host control, not the earlier 5.81s snapshot.
+Main Wasm shrinks **12,490,827 → 12,113,691B (3.0%)**; local/global traffic is
+8,017,336B. Rollbacks fall **2,009 → 1,464**, discarded expressions **184,212 →
+108,775** and emission expressions **998,564 → 853,678**. There are 405
+successful owner-transfer definitions; work counts are not runtime counts.
+Five-second, subsecond and 1–2MB targets remain unmet.
 
-Three fresh Gdev compile pairs are effectively flat, **5.860 → 5.814s**. Main
-Wasm grows **12,476,667 → 12,490,827B** (0.11%), with 8,257,498B of local/global
-instructions. Five-second, subsecond and 1–2MB targets remain unmet. The
-installed LLVM compiler is
-`88709e2adf6f29ff41a2eaf475851964c05f7d48854dc6f3c78031c87d14daa4`. It was built
-once; noLLVM development compiler rebuilds take about 5s. A single noLLVM Gdev
-debug probe stopped at its 30s cap and was not repeated. Fresh before/after
-builds use their matching preludes; the preserved old Main SHA matches exactly.
-Runner `--std-root` supports this comparison.
+Final LLVM compiler:
+`1ccf0e50b158971a3fa3d7943be3f6393db4212e61714cfc7ca0835c8b57068a`. A separate
+exact-artifact profile records backend **5.440s**, check **0.565s**, lower
+**0.139s**, validation **0.121s**; backend remains the main latency target. Do
+not sum overlapping timing families. Development compiler builds take 5–6s,
+native inventory compilation 10–11s. Fast noLLVM Main stopped at its 30s cap.
+Two LLVM builds were needed after wider checks found an older constexpr bug;
+only the final candidate supplies published performance numbers.
 
-All 2,945 native laws compile. The affected 214-law/196-guest development family
-passes in 52.42s; nine focused laws pass full-fault mode, and the final LLVM
-compiler passes the same 196 guests. Zig lint is clean; Astra found no remaining
-blocker. Full compiler qualification remains pending; the bounded full-gate
-attempt passes 49 smoke and 57 harness checks, then stops at its 180s budget:
-110 completed native laws, 83 full sweeps, zero failures/leaks/logged errors.
-This is incomplete; the linked JSON pins the logs and records.
+All 2,954 native laws compile. Affected batches pass 390 unique native laws; ten
+focused laws pass full-fault mode. The final LLVM guest union has 280 passes and
+two failures also reproduced on the frozen baseline: unsupported ECS summary-job
+export and legacy optimized iter.take(0) allocation. Full gate passes 49
+smoke/57 harness checks, then stops at 180s: 102 completed native laws, 76 full
+sweeps, zero failures/leaks/logged errors. This is incomplete; full
+qualification remains pending. Zig lint is clean. Staged numeric aliases now use
+ordinary typed application when selected methods have nonexact syntactic arity;
+effects/providers and integer division checks remain intact.
 
-World/editor, hand and seven renderer streams pass unchanged; the two small
-control binaries shrink. The final Main passes a headless NVIDIA frame; its
-inspected PNG and guest trace are byte-identical to the preceding checkpoint.
-See
-[current frame evidence](tasks/storage-handoff-evidence/2026-11-03-primitive-aliases-frame.json).
-Broader gameplay and software-adapter coverage remain pending. Ink/Gdev/Pen
-sources and assets are preserved and clean.
+World/editor, hand and seven renderer scenarios match their controls. Hand and
+renderer small binaries grow slightly; retain these regressions in evidence. The
+final Main passes the original budgets in a headless NVIDIA frame; its inspected
+PNG and guest trace match the baseline byte for byte. See
+[current frame evidence](tasks/storage-handoff-evidence/2026-11-03-fresh-owners-frame.json).
+Broader gameplay/software-adapter coverage remains pending. Ink/Gdev/Pen
+sources/assets are unchanged and clean. Numeric benchmark binaries are
+byte-identical to the preceding checkpoint; runtime fluctuations are controls.
+The README charts rerun the seven adapted Goose cases with the final compiler;
+two recursive sorts and original F64 remain unsupported.
 
-Next replace fresh fixed-array return expansion with an explicit owner-transfer
-contract for reusable calls. **2,009 completed-plan rollbacks** remain, now
-184,212 discarded expressions. The 512-word selector already uses a buffered
-ABI; do not widen limits. CRC32's conditional shift/XOR recurrence remains the
-largest kernel gap. Preserve the
-[fixed-span evidence](scripts/bench/goose/results/2026-11-03-fixed-spans.md) and
-[expanded survey controls](scripts/bench/goose/results/2026-11-03-expanded.md).
+Next measure repeated physical descriptors in wide callback environments. Gdev
+world_storage.with_owners creates four callbacks capturing the same base;
+semantic owner-role deduplication does not deduplicate every physical word.
+Prototype a separate donor table seeded only by unconditional singleton array
+leaves. Existing root assignments are unsafe donors after mixed-root arguments
+or inactive variants. Select donors structurally, not by caller-local IDs. Probe
+width32/128, one/four captures, one/eight calls, then consider immutable
+aggregate places. Preserve argument evaluation, owner and effect facts, snapshot
+indices/lengths and logical packet extents. Do not widen the 512-word ABI
+selector. Classify remaining non-result rollbacks before attributing them to
+globals or callbacks. Preserve earlier
+[primitive-alias evidence](scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
+and [survey controls](scripts/bench/goose/results/2026-11-03-expanded.md).
 
 The preceding
 [copy-coalescing checkpoint](zig-native/measurements/copy-coalesce-2026-11-03.json)

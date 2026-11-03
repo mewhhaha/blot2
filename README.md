@@ -23,12 +23,12 @@ blocked by owned-storage recursion.
 
 ![Bounded Wasm runtime: five paired cases and two unsupported Blot sorts](scripts/bench/goose/charts/runtime.svg)
 
-Five matched pairs expose **8.3x CRC32**, **7.0x custom hash**, **3.1x Sieve**
+Five matched pairs expose **8.1x CRC32**, **7.0x custom hash**, **3.2x Sieve**
 and **1.9x F32 Mandelbrot** gaps; Fannkuch is roughly at parity. Unsupported
-cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Primitive
-aliases reduce Mandelbrot kernel time by 24%; Gdev remains **12.49MB / 5.81s**.
-See
-[results and remaining hills](scripts/bench/goose/results/2026-11-03-primitive-aliases.md).
+cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Fresh-owner
+reuse reduces Gdev Wasm **12.49 → 12.11MB**; paired builds improve **6.85 →
+6.53s** in this shared-host round. See
+[results, qualification and next hills](scripts/bench/goose/results/2026-11-03-fresh-owners.md).
 
 ## Development
 

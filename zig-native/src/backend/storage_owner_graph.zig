@@ -24,6 +24,44 @@ pub fn Graph(comptime Value: type) type {
             }
             return self;
         }
+        /// Result roles extend the immutable input prefix. A fresh owner needs
+        /// an unconditional array descriptor from which the caller can recover
+        /// its real token; inactive variant payloads cannot provide that token.
+        pub fn result(allocator: A, roots: anytype, inputs: usize, output: Value, fixed_region: u32, comptime plain: fn (Value) bool) Error!Self {
+            var self: Self = .{ .allocator = allocator };
+            errdefer self.deinit();
+            for (0..inputs) |index| try self.add(index, roots.len);
+            var donors: std.ArrayList(usize) = .empty;
+            defer donors.deinit(allocator);
+            try self.resultValue(output, roots.len, inputs, false, &donors, 0);
+            for (self.owners.items[inputs..]) |index| {
+                const owner = roots[index];
+                if (!owner.live or owner.persistent or owner.dedicated or owner.stack != fixed_region or !plain(owner.element)) return error.Declined;
+                if (std.mem.findScalar(usize, donors.items, index) == null) return error.Declined;
+            }
+            return self;
+        }
+        fn resultValue(self: *Self, value: Value, owner_count: usize, inputs: usize, conditional: bool, donors: *std.ArrayList(usize), depth: usize) Error!void {
+            if (self.remaining == 0 or depth > 128) return error.Declined;
+            self.remaining -= 1;
+            var fresh = false;
+            if (value.root) |owner| if (owner >= inputs) {
+                fresh = true;
+            };
+            for (value.other_roots) |owner| if (owner >= inputs) {
+                fresh = true;
+            };
+            if (fresh and value.other_roots.len != 0) return error.Declined;
+            if (value.root) |owner| {
+                try self.add(owner, owner_count);
+                if (owner >= inputs and value.tag == .array and !conditional) {
+                    if (value.mode != .fixed) return error.Declined;
+                    if (std.mem.findScalar(usize, donors.items, owner) == null) try donors.append(self.allocator, owner);
+                }
+            }
+            for (value.other_roots) |owner| try self.add(owner, owner_count);
+            for (value.fields) |field| try self.resultValue(field, owner_count, inputs, conditional or value.variant_tags.len != 0, donors, depth + 1);
+        }
         pub fn deinit(self: *Self) void {
             self.owners.deinit(self.allocator);
             self.ordinals.deinit(self.allocator);

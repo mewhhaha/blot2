@@ -278,20 +278,21 @@ test "completed mutating owner results forward complete descriptors across neste
     }
 }
 
-fn publishFreshOwnerFallback(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+fn publishFreshOwnerTransfer(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_definitions);
-    try std.testing.expect(result.counters.scoped_completed_plan_rollbacks > 0);
+    try std.testing.expect(result.counters.scoped_completed_plan_definitions > 0);
+    try std.testing.expect(result.counters.scoped_result_owner_transfer_definitions > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
 }
 
-test "completed mutating owner results decline fresh result owners through OOM" {
+test "completed mutating owner results transfer fresh fixed result owners through OOM" {
     var module = try lower(a, @import("fixtures").source("mutating_owner_return_fresh.blot"));
     defer module.deinit(a);
-    try publishFreshOwnerFallback(a, &.{module});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishFreshOwnerFallback, .{@as([]const core.Module, &.{module})});
+    try publishFreshOwnerTransfer(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishFreshOwnerTransfer, .{@as([]const core.Module, &.{module})});
 }
 
 test "completed function borrowed results reuse distinct caller owners and preserve lifetime rejection" {

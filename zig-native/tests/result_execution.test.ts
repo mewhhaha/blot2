@@ -1,3 +1,4 @@
+import { strict as assert } from "node:assert";
 import {
   compileAndRun,
   compileExpectedFailure,
@@ -7,7 +8,8 @@ import { resultCases } from "./result_cases.ts";
 import { decodeText } from "../../compiler/text.ts";
 
 Deno.test("written result interfaces select the destination through aliases contracts and local templates", async () => {
-  await compileAndRun(`
+  await compileAndRun(
+    `
 type Box a is data = $Box a
 const Box.from = func value => return $Box value
 type Convert (a, b) is contract = { result "from" a b }
@@ -18,11 +20,17 @@ entry const answer = func () => return do:
   let $Box first: Box U32 = local 40
   let $Box second: Box F32 = local 2.5
   break @u32.add first (@f32.to_u32 second)
-`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
-  await compileAndRun(`
+`,
+    (guest) => equal(guest.call("answer", null), 42),
+    { prelude: "none" },
+  );
+  await compileAndRun(
+    `
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 entry const answer = func () => return @u32.add (convert (floor 40.5)) (convert (ceil 1.5))
-`, (guest) => equal(guest.call("answer", null), 42));
+`,
+    (guest) => equal(guest.call("answer", null), 42),
+  );
 });
 
 Deno.test("written result interfaces propagate selected effects and reject missing or incompatible evidence", async () => {
@@ -34,13 +42,18 @@ const Box.from: Unit -> Box ! {Read} = func () => return do:
   break $Box value
 const convert: a -> b ! {|e} where { result "from" a b ! {|e} } = func value => return @type.result "from" value
 `;
-  await compileAndRun(header + `
+  await compileAndRun(
+    header + `
 entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
   let $Box value = box
   break value
-`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
-  await compileAndRun(`
+`,
+    (guest) => equal(guest.call("answer", null), 42),
+    { prelude: "none" },
+  );
+  await compileAndRun(
+    `
 type Tick is effect = Unit -> Unit
 type Box is data = $Box U32
 const Box.from = func (value: U32) => return $Box value
@@ -51,28 +64,47 @@ entry const answer = func () => return do (@effect.provider Tick (func () => ret
   use box: Box <- convert 42
   let $Box value = box
   break value
-`, (guest) => equal(guest.call("answer", null), 42), { prelude: "none" });
-  await compileExpectedFailure(`
+`,
+    (guest) => equal(guest.call("answer", null), 42),
+    { prelude: "none" },
+  );
+  await compileExpectedFailure(
+    `
 type Source is data = $Source U32
 type Target is data = $Target U32
 const Source.from = func value => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 entry const answer: Target = convert ($Source 1)
-`, "missing_associated", undefined, { prelude: "none" });
-  await compileExpectedFailure(`
+`,
+    "missing_associated",
+    undefined,
+    { prelude: "none" },
+  );
+  await compileExpectedFailure(
+    `
 type Target is data = $Target U32
 const Target.from = func (value: F32) => return $Target 42
 const convert: a -> b where { result "from" a b } = func value => return @type.result "from" value
 entry const answer: Target = convert 1
-`, "type_mismatch", undefined, { prelude: "none" });
-  await compileExpectedFailure(header.replace(
-    'result "from" a b ! {|e}', 'result "from" a b ! {}',
-  ) + `
+`,
+    "type_mismatch",
+    undefined,
+    { prelude: "none" },
+  );
+  await compileExpectedFailure(
+    header.replace(
+      'result "from" a b ! {|e}',
+      'result "from" a b ! {}',
+    ) + `
 entry const answer = func () => return do (@effect.provider Read (func () => return 42)):
   use box: Box <- convert ()
   let $Box value = box
   break value
-`, "effect_mismatch", undefined, { prelude: "none" });
+`,
+    "effect_mismatch",
+    undefined,
+    { prelude: "none" },
+  );
 });
 
 Deno.test("staged nested conversions infer their destination from the surrounding operator", async () => {
@@ -80,11 +112,39 @@ Deno.test("staged nested conversions infer their destination from the surroundin
     `
 const count = 42
 entry const answer = from (ceil (sqrt (from count))) + 2
+entry const floating: F32 = from (ceil (sqrt (from count))) + 2.5
+entry const direct = U32.add 40 2
+entry const associated = @type.call "add" 40 2
+entry const float_associated = @type.call "add" 1.5 2.5
+entry const integer_operator = 6 * 7
+entry const float_operator = 1.5 * 2.0
+entry const infinite = 1.0 / 0.0
+entry const saturated: U32 = from (sqrt (-1.0))
+entry const divide = func (divisor: U32): U32 => return 42 / divisor
 `,
-    (guest) => equal(guest.read("answer"), 9),
+    (guest) => {
+      for (const name of ["direct", "associated", "integer_operator"]) {
+        equal(guest.read(name), 42);
+      }
+      equal(guest.read("answer"), 9);
+      equal(guest.read("floating"), 9.5);
+      equal(guest.read("float_associated"), 4);
+      equal(guest.read("float_operator"), 3);
+      equal(guest.read("infinite"), Infinity);
+      equal(guest.read("saturated"), 0);
+      assert.throws(() => guest.call("divide", 0), WebAssembly.RuntimeError);
+      equal(guest.call("divide", 7), 6);
+    },
     {
       prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     },
+  );
+});
+
+Deno.test("selected primitive aliases retain staged integer division diagnostics", async () => {
+  await compileExpectedFailure(
+    `entry const answer = @type.call "div" 42 0\n`,
+    "integer_divide_by_zero",
   );
 });
 

@@ -3,38 +3,47 @@
 The current priorities are shared-kernel runtime and Gdev Wasm size, with short
 iterations. Subsecond compilation remains the goal; the next latency gate is
 below five seconds. The
-[current primitive-alias checkpoint](../scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
-removes 30 numeric forwarding wrappers and supports ordinary scalar primitive
-partial applications/callbacks. Scalar evaluation and Wasm lowering share one
-operation contract. Literal authority remains separate from exact constant bits;
-ABI 8 and session protocol 2 stay unchanged.
+[fresh-owner checkpoint](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
+shares helpers returning fresh fixed arrays through explicit owner roles. Narrow
+unconditional donors and imported caller lifetimes preserve cleanup, aliases,
+borrowed siblings and input-event contracts. Conditional/mixed origins and
+resizable results keep fallback. ABI 8 and session protocol 2 stay unchanged.
 
-Mandelbrot F32 uses 24% less kernel time; CRC32 is 2.5% slower and the other
-three matched kernels are flat. Main compile medians are **5.860 → 5.814s**,
-with Wasm **12,476,667 → 12,490,827B**. The large size/latency targets remain
-unmet; local/global instructions occupy 8,257,498B. All 2,945 native laws
-compile; 214 affected native laws and 196 guests pass, including final LLVM
-guest checks. Nine focused laws pass full-fault mode. Full qualification remains
-pending; interrupted full sweeps never count as passes.
+Current paired Main builds improve **6.848 → 6.526s**, with Wasm **12,490,827 →
+12,113,691B (3.0%)**. The earlier 5.81s snapshot is a different round; use the
+paired control. Rollbacks fall 2,009 → 1,464 and discarded expressions 184,212 →
+108,775. Local/global instructions still occupy 8,017,336B. Backend time is
+5.440s in the separate profile. Subsecond/five-second and 1–2MB goals remain
+unmet.
 
-World/editor, hand and seven renderer streams retain their results. The final
-Main's inspected NVIDIA frame PNG and guest trace match the baseline exactly;
-see
-[frame evidence](storage-handoff-evidence/2026-11-03-primitive-aliases-frame.json).
-Broader gameplay and software-adapter coverage remain pending. Next address
-2,009 completed-plan rollbacks (184,212 discarded expressions), particularly
-fresh fixed-array result transfer. The 512-word selector already supports wide
-calls through a buffered ABI; no limit widening is justified. Preserve earlier
-[fixed-span evidence](../scripts/bench/goose/results/2026-11-03-fixed-spans.md)
-and
-[seven-case survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
+All 2,954 native laws compile. Affected batches pass 390 unique native laws; ten
+focused laws pass full-fault mode. Final LLVM guests have 280 passes and two
+failures also present on the frozen baseline: the ECS summary-job export and
+legacy iter.take(0) allocation fixture. Full gate stops at its 180s budget after
+49 smoke/57 harness checks and 102 native laws, 76 full sweeps, zero
+failures/leaks/logged errors. Full qualification remains incomplete. Staged
+numeric aliases now use the ordinary typed-call path with effects/providers and
+integer division diagnostics preserved.
+
+World/editor, hand and seven renderer streams match; small hand/renderer
+binaries grow slightly. The final Main's inspected NVIDIA PNG and guest trace
+match the baseline exactly; see
+[frame evidence](storage-handoff-evidence/2026-11-03-fresh-owners-frame.json).
+Broader gameplay/software-adapter coverage remains pending. Next measure
+physical descriptor duplication across wide callback captures before a larger
+addressed-environment IR change. Mixed-root/inactive-variant descriptors cannot
+seed donors; keep logical packet bounds and the existing 512-word selector. The
+remaining rollback causes are not yet classified. Preserve previous
+[primitive-alias evidence](../scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
+and [survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
 physical Value leaves and owner/borrow metadata. Remaining local/global
-instructions occupy 8.54MB. Preserve semantic checks and explicit copies while
-changing that representation. Ordinary `#run` build functions remain a separate,
-unimplemented simplification.
+instructions occupied 8.54MB at that older checkpoint; the current census is
+8.02MB. Preserve semantic checks and explicit copies while changing that
+representation. Ordinary `#run` build functions remain a separate, unimplemented
+simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

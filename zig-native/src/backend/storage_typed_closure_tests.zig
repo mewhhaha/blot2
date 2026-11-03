@@ -80,7 +80,9 @@ test "typed closures share definitions inside shared callback reader parents" {
     defer result.deinit(a);
     if (result.diagnostic) |diagnostic| std.debug.print("shared parent: {s}\n", .{diagnostic.message()});
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.counters.scoped_reader_definitions >= 2);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions >= 2);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
     try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_closure_definitions);
     try std.testing.expect(result.counters.scoped_closure_cache_hits > 0);
 }
@@ -131,8 +133,9 @@ test "plain call input keys erase constructor refinements while keeping runtime 
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expectEqual(@as(u64, 1), result.counters.scoped_inline_definitions);
-    try std.testing.expect(result.counters.scoped_inline_cache_hits >= 3);
+    try std.testing.expectEqual(@as(u64, 4), result.counters.scoped_function_plan_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
 }
 
 const semantic_source =

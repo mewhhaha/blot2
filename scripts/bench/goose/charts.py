@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-03-primitive-aliases.json"
+EVIDENCE = HERE / "results/2026-11-03-fresh-owners.json"
 LABELS = {
     "fannkuch": "Fannkuch",
     "crc32": "CRC32",

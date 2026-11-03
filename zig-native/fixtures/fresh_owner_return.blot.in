@@ -1,0 +1,17 @@
+type Result is data = $Result {left: Array U32, right: Array U32, view: &[U32], __TYPES__}
+const make = func (input: {__INPUT_TYPES__}): Result => return do:
+  let words: Array U32 = #[input.f0[0], @u32.add input.f0[0] 1]
+  return $Result {left: words, right: words, view: &words[0..2], __FIELDS__}
+const nested = func (input: {__NESTED_TYPES__}): Result => return make input
+entry const answer = func (input: U32): Array U32 => return do:
+  let marker: GrowArray U32 = #[input]
+  let original: Array U32 = #[marker[0]]
+  let first = nested {__FIRST__}
+  let later: Array U32 = #[@u32.add marker[0] 10]
+  let second = nested {__SECOND__}
+  first.left[0] := @u32.add self 20
+  second.right[1] := @u32.add self 30
+  let first_total = 0
+  let second_total = 0
+__READS__
+  return #[first.left[0], first.right[0], @storage.read first.view 0, first.right[1], second.left[0], second.left[1], @storage.read second.view 1, first_total, second_total]

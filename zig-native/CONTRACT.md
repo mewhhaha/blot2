@@ -117,9 +117,19 @@ Packed inputs retain their existing path. Unused result pointers may disappear
 from the private signature; logical result word positions remain unchanged.
 
 Graph helpers may write input owners and return input-owned records or borrows.
-Completed output and ordered event shapes must retain only input owner ordinals;
-fresh owners still decline, and caller replay checks actual lifetimes and loop
-read/write order. Input freeze, reserve, pop and truncate retain their separate
+Ordered event shapes retain only input owner ordinals; caller replay checks
+actual lifetimes and loop read/write order. Results may additionally transfer
+fixed, nonpersistent, nondedicated owners with plain inline elements from the
+caller's fixed region. Each fresh owner needs an unconditional singleton array
+descriptor outside variant payloads. Input roles precede compact fresh roles;
+repeated aliases and borrowed siblings map to one caller root. Mixed fresh/input
+alternatives, conditional donors and resizable results retain fallback.
+Summaries own element/type evidence and retain no child span/capacity locals.
+Imported roots use caller depth and ordinary mutable-token analysis. Packets
+close after result import; rewind preserves transferred extents until enclosing
+scope cleanup. Packet bytes can remain below live results, but packet owner
+slots close immediately. Bare borrowed escapes and fresh borrows stored into
+input owners remain rejected. Input freeze, reserve, pop and truncate retain their separate
 barriers. A helper's input-root prefix precedes every cleanup range, so its token
 locals are immutable through joins; local owners, loop carriers and demand
 caches retain their mutable marking. This exemption does not apply to exports.

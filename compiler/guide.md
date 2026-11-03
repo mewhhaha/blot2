@@ -732,9 +732,10 @@ through those aliases. Inline records and scalar values copy by value.
 history and previous-state data; copy separately referenced payloads as needed.
 A view records a borrowed range and length, not a snapshot of its contents.
 `@storage.freeze` removes growth authority across aliases; it does not copy the
-payload. Keep fresh result owners in caller-supplied destinations or within a
-known consumer's lifetime. Do not return borrowed rows into younger storage or
-carry a fresh owner through a loop.
+payload. Functions can return fresh owners directly; their checked lifetime
+transfers to the caller. Return an owner together with any borrowed fields that
+need it. A bare borrow cannot outlive its owner. Do not store borrowed rows in
+older storage or carry a fresh owner through a loop.
 
 The planner checks fixed rows, owner capacities and lexical reuse. Capacity
 exhaustion traps; it does not trigger collection or implicit growth beyond the

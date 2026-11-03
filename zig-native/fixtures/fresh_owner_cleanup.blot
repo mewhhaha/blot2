@@ -1,0 +1,25 @@
+const make = func (input: U32): Array U32 => return #[input, @u32.add input 1]
+const forwarded = func (input: U32): Array U32 => return make input
+const early = func (count: U32): U32 => return do:
+  for index in 0 .. count:
+    let words = forwarded index
+    if @u32.eq (@u32.add index 1) count:
+      return words[1]
+  return 0
+entry const cleanup = func (count: U32): Array U32 => return do:
+  let marker: GrowArray U32 = #[7]
+  let total = 0
+  for index in 0 .. count:
+    let first = forwarded index
+    if @u32.eq (@u32.rem index 2) 0:
+      continue
+    for lane in 0 .. 2:
+      let second = make (@u32.add first[0] lane)
+      total := @u32.add self second[1]
+      break
+  let last = early count
+  return #[total, last, marker[0]]
+entry const bounds = func (index: U32): U32 => return do:
+  let marker: GrowArray U32 = #[index]
+  let words = forwarded 41
+  return words[marker[0]]

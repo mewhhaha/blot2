@@ -248,6 +248,7 @@ const WriterTrace = struct { inputs: usize, stable: bool = false, events: std.Ar
 // Physical descriptor calls own their summaries for the complete compilation.
 // Incoming owners are formal descriptor roles, never retained caller roots.
 const FunctionAbi = enum { scalar, registers, result_slot, buffered };
+const ReturnedOwner = struct { element: Value, element_initialized: bool, known_empty: bool, frozen: bool };
 const CheckedFunctionPlan = struct {
     entry: call_plan.Entry,
     input_words: usize,
@@ -257,6 +258,7 @@ const CheckedFunctionPlan = struct {
     abi: FunctionAbi,
     return_registers: usize,
     result: Value,
+    returned_owners: []const ReturnedOwner = &.{},
     events: []const WriterEvent,
     regions: []const usize,
 };
@@ -4098,11 +4100,16 @@ const Generator = struct {
     }
     fn retainGraphShape(self: *Generator, source: Value, inputs: usize, copies: *EnvironmentCopies, depth: usize) Error!Value {
         if (depth > 128 or source.host != null or source.demand != null or source.tag == .callable) return error.Declined;
-        // Array results may alias incoming owners; a fresh/copy result has no
-        // formal owner ordinal and must return to ordinary checked expansion.
-        if (source.tag == .array and source.root == null) return error.Declined;
-        if (source.root) |owner| if (owner >= inputs) return error.Declined;
-        for (source.other_roots) |owner| if (owner >= inputs) return error.Declined;
+        // Retained graphs contain only checked owner roles. Fresh result
+        // owners are numbered before this copy; writer events stay input-only.
+        if ((source.tag == .array and source.root == null) or (source.root != null and source.root.? >= inputs)) {
+            self.emission_work.scoped_fresh_owner_summary_declines +|= 1;
+            return error.Declined;
+        }
+        for (source.other_roots) |owner| if (owner >= inputs) {
+            self.emission_work.scoped_fresh_owner_summary_declines +|= 1;
+            return error.Declined;
+        };
         const arena = self.descriptor_calls.arena.allocator();
         var result = source;
         result.word = .{ .id = 0 };
@@ -4263,7 +4270,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_result_owner_transfer_definitions", "scoped_transferred_result_owners", "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4446,10 +4453,34 @@ const Generator = struct {
         var result_aliases: []u32 = &.{};
         defer self.allocator.free(result_aliases);
         var result_template = request.result_shape;
+        var returned_owners: []const ReturnedOwner = &.{};
         if (unit_result) {
             try child.c.value(try child.scalar(m, body.root, output));
         } else {
-            const template = try self.retainGraphShape(if (output.terminated) request.result_shape else output, owners.len, &copies, 0);
+            var source = request.result_shape;
+            if (!output.terminated) source = output;
+            var roles: ?OwnerGraph = null;
+            defer if (roles) |*value| value.deinit();
+            var result_owner_count = owners.len;
+            if (!output.terminated and storage_plan.nextRoot(source, owners.len, child.roots.items.len) != null) {
+                roles = OwnerGraph.result(self.allocator, child.roots.items, owners.len, source, child.fixed_region, plainInlineValue) catch |err| {
+                    if (err != error.OutOfMemory) {
+                        self.emission_work.scoped_fresh_owner_summary_declines +|= 1;
+                        @import("../phase_profile.zig").detail("descriptor.result.fresh-owner", m.unit, m.span(body.root).start, m.span(body.root).end, target.binding);
+                    }
+                    return err;
+                };
+                const graph_ = &roles.?;
+                result_owner_count = graph_.owners.items.len;
+                try child.graphInputShape(&source, graph_);
+                const summaries = try self.descriptor_calls.arena.allocator().alloc(ReturnedOwner, result_owner_count - owners.len);
+                for (summaries, graph_.owners.items[owners.len..]) |*summary, index| {
+                    const owner = child.roots.items[index];
+                    summary.* = .{ .element = try self.retainGraphShape(owner.element, 0, &copies, 0), .element_initialized = owner.element_initialized, .known_empty = owner.known_empty, .frozen = owner.frozen };
+                }
+                returned_owners = summaries;
+            }
+            const template = try self.retainGraphShape(source, result_owner_count, &copies, 0);
             result_template = template;
             if (return_registers != 0) {
                 try child.publishInlineReturn(output, return_registers);
@@ -4542,12 +4573,13 @@ const Generator = struct {
         const retained_aliases = try summary_arena.dupe(u32, result_aliases);
         try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
-        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .returned_owners = returned_owners, .events = facts, .regions = retained_regions };
         self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
         for (facts) |event| {
             if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
         }
         if (owners.len != 0 and facts.len == 0) self.emission_work.scoped_function_plan_empty_owner_contracts +|= 1;
+        if (returned_owners.len != 0) self.emission_work.scoped_result_owner_transfer_definitions +|= 1;
         self.emission_work.scoped_function_plan_definitions +|= 1;
         self.emission_work.scoped_writer_definitions +|= 1;
         if (graph_mode and owners.len == 0) {
@@ -4641,6 +4673,24 @@ const Generator = struct {
         const index = (try self.tryFunctionPlan(request)) orelse return null;
         return self.descriptor_calls.plans.get(self.descriptor_calls.calls.entries.items[index].function) orelse return self.unsupported(m, body.root);
     }
+    fn resultOwnerDescriptor(value: Value, ordinal: usize) ?Value {
+        if (value.variant_tags.len != 0) return null;
+        if (value.tag == .array and value.root == ordinal and value.other_roots.len == 0) return value;
+        for (value.fields) |field| if (resultOwnerDescriptor(field, ordinal)) |found| return found;
+        return null;
+    }
+    fn importReturnedOwners(self: *Generator, plan: *const CheckedFunctionPlan, result: Value, inputs: []const usize) Error!Value {
+        if (plan.returned_owners.len == 0) return self.graphCallerShape(result, inputs);
+        const roles = try self.arena.allocator().alloc(usize, inputs.len + plan.returned_owners.len);
+        @memcpy(roles[0..inputs.len], inputs);
+        for (plan.returned_owners, roles[inputs.len..], 0..) |summary, *role, index| {
+            const descriptor = resultOwnerDescriptor(result, inputs.len + index) orelse return error.Declined;
+            role.* = self.roots.items.len;
+            try self.roots.append(self.allocator, .{ .word = descriptor.word, .token = descriptor.token, .epoch_low = descriptor.epoch_low, .epoch_high = descriptor.epoch_high, .stack = self.fixed_region, .depth = self.depth, .element = summary.element, .element_initialized = summary.element_initialized, .known_empty = summary.known_empty, .frozen = summary.frozen, .dedicated = false });
+        }
+        self.emission_work.scoped_transferred_result_owners +|= plan.returned_owners.len;
+        return self.graphCallerShape(result, roles);
+    }
     fn emitPlannedCall(self: *Generator, m: *const core.Module, body: *const core.Body, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
         self.emission_work.scoped_function_plan_emissions +|= 1;
         const emitting_before = self.emitting_function_plan;
@@ -4673,18 +4723,13 @@ const Generator = struct {
             try self.used_regions.put(self.allocator, region, {});
             self.max_stacks = @max(self.max_stacks, @as(u32, @intCast(region + 1)));
         }
-        if (plan.abi != .buffered) {
-            var template = plan.result;
-            if (!unit_result) template = try self.graphCallerShape(plan.result, owners);
-            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers, plan.result_aliases, plan.used_input_words);
-        }
+        if (plan.abi != .buffered) return self.callOwnedWords(m, body.root, plan, arguments, owners);
         self.emission_work.scoped_owned_packed_calls +|= 1;
         const first_root = self.roots.items.len;
         const mark = try self.frameMark();
-        var result_template = plan.result;
+        const result_template = plan.result;
         var total_words = words;
         if (!unit_result) {
-            result_template = try self.graphCallerShape(plan.result, owners);
             total_words = std.math.add(usize, words, readerWords(result_template)) catch return self.unsupported(m, body.root);
         }
         const count = std.math.cast(u32, @max(1, total_words)) orelse return self.unsupported(m, body.root);
@@ -4702,9 +4747,12 @@ const Generator = struct {
         const word = try self.c.temp();
         try self.c.op(.local_set, word.id);
         var returned: Value = .{ .word = word };
-        if (!unit_result) returned = try self.loadPlannedResult(address, @intCast(words * 4), result_template, plan.result_aliases, arguments);
-        try self.release(first_root, null);
-        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark.word });
+        if (!unit_result) {
+            returned = try self.loadPlannedResult(address, @intCast(words * 4), result_template, plan.result_aliases, arguments);
+            returned = try self.importReturnedOwners(plan, returned, owners);
+        }
+        try self.release(first_root, returned);
+        try self.rewindUnescaped(first_root, mark, returned);
         returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() });
         return returned;
@@ -4724,7 +4772,14 @@ const Generator = struct {
         for (aliases) |alias| if (alias == @import("storage_result_alias.zig").absent) return false;
         return true;
     }
-    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize, result_aliases: []const u32, used: []const bool) Error!Value {
+    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, plan: *const CheckedFunctionPlan, arguments: []const Value, owners: []const usize) Error!Value {
+        const entry = plan.entry;
+        const template = plan.result;
+        const words = plan.input_words;
+        const unit_result = plan.unit_result;
+        const return_registers = plan.return_registers;
+        const result_aliases = plan.result_aliases;
+        const used = plan.used_input_words;
         self.emission_work.scoped_owned_word_calls +|= 1;
         self.emission_work.scoped_owned_argument_words_avoided +|= words;
         const first_root = self.roots.items.len;
@@ -4773,9 +4828,10 @@ const Generator = struct {
             // Every word comes from an actual argument; no address is read.
             returned = try self.loadPlannedResult(.{ .id = 0 }, 0, template, result_aliases, arguments);
         } else if (address) |pointer| returned = try self.loadPlannedResult(pointer, 0, template, result_aliases, arguments);
+        if (!unit_result) returned = try self.importReturnedOwners(plan, returned, owners);
         if (mark) |saved| {
-            try self.release(first_root, null);
-            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved.word });
+            try self.release(first_root, returned);
+            try self.rewindUnescaped(first_root, saved, returned);
         }
         returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() });

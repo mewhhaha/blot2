@@ -1,0 +1,14 @@
+const make = func (input: U32): {a: Array U32, z: Array U32, again: Array U32} => return do:
+  let earlier: Array U32 = #[input]
+  let scratch: Array U32 = #[input, 7, 9]
+  let later: Array U32 = #[@u32.add input 10]
+  return {a: later, z: earlier, again: earlier}
+entry const answer = func (input: U32): Array U32 => return do:
+  let marker: GrowArray U32 = #[input]
+  let first = make marker[0]
+  let second = make (@u32.add marker[0] 100)
+  first.a[0] := @u32.add self 1
+  first.again[0] := @u32.add self 2
+  second.z[0] := @u32.add self 3
+  second.a[0] := @u32.add self 4
+  return #[first.a[0], first.z[0], first.again[0], second.a[0], second.z[0], second.again[0], marker[0]]

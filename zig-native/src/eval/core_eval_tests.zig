@@ -6130,3 +6130,107 @@ test "compile time capability scopes use fresh local operation witnesses and ali
     try freshCapabilityScenario(a, &module);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, freshCapabilityScenario, .{&module});
 }
+
+const selected_numeric_alias_source =
+    \\infixl 60 (+) = add
+    \\const add = func left -> right => return @type.call "add" left right
+    \\const addition = @u32.add
+    \\const U32.add = addition
+    \\const F32.add = @f32.add
+    \\const U32.mul = func left => return @u32.mul left
+    \\const F32.mul = func left => return @f32.mul left
+    \\const U32.sub = func left -> right => return @u32.sub left right
+    \\const from = func value => return @type.result "from" value
+    \\const F32.from = func value => return value.to_f32
+    \\const U32.from = func value => return value.to_u32
+    \\const U32.to_f32 = @u32.to_f32
+    \\const F32.to_u32 = @f32.to_u32
+    \\const F32.to_f32 = func (value: F32) => return value
+    \\const U32.to_u32 = func (value: U32) => return value
+    \\const sqrt = @f32.sqrt
+    \\const ceil = @f32.ceil
+    \\const count = 42
+    \\entry const direct = addition 40 2
+    \\entry const selected = @type.call "add" 40 2
+    \\entry const overapplied = @type.call "mul" 6 7
+    \\entry const exact = @type.call "sub" 44 2
+    \\entry const floating = @type.call "add" 1.5 2.5
+    \\entry const float_overapplied = @type.call "mul" 1.5 2.0
+    \\entry const staged = from (ceil (sqrt (from count))) + 2
+    \\entry const staged_float: F32 = from (ceil (sqrt (from count))) + 2.5
+;
+
+test "selected callable aliases evaluate primitive operations and overapplied named bodies" {
+    var module = try lowerWithOptions(selected_numeric_alias_source, .{ .builtin_catalog = true });
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    for ([_][]const u8{ "direct", "selected", "overapplied", "exact" }) |name|
+        try std.testing.expectEqual(scalar_ops.Value{ .scalar = .u32, .bits = 42 }, try session.value(target(&module, name)));
+    try std.testing.expectEqual(scalar_ops.Value{ .scalar = .u32, .bits = 9 }, try session.value(target(&module, "staged")));
+    inline for (.{ "floating", "float_overapplied", "staged_float" }, .{ @as(f32, 4), @as(f32, 3), @as(f32, 9.5) }) |name, expected|
+        try std.testing.expectEqual(scalar_ops.Value{ .scalar = .f32, .bits = @bitCast(expected) }, try session.value(target(&module, name)));
+}
+
+test "selected primitive aliases preserve constant integer division traps" {
+    var module = try lowerWithOptions(
+        \\const U32.div = @u32.div
+        \\entry const answer = @type.call "div" 10 0
+    , .{ .builtin_catalog = true });
+    defer module.deinit(a);
+    const result = try evaluator.evaluate(a, &.{module}, target(&module, "answer"), .{});
+    try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, result.diagnostic.?.code);
+    try std.testing.expect(result.value == null);
+}
+
+fn selectedAliasPublication(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    try std.testing.expectEqual(scalar_ops.Value{ .scalar = .u32, .bits = 42 }, try session.value(target(module, "answer")));
+    try std.testing.expect(session.diagnostic == null);
+}
+
+test "selected callable alias publication remains transactional through allocation failures" {
+    var module = try lowerWithOptions(
+        \\const U32.add = @u32.add
+        \\entry const answer = @type.call "add" 40 2
+    , .{ .builtin_catalog = true });
+    defer module.deinit(a);
+    try selectedAliasPublication(a, &module);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, selectedAliasPublication, .{&module});
+}
+
+test "selected callable aliases retain handled effects and reject missing providers" {
+    const header =
+        \\effect Read: Unit -> U32
+        \\const addition = func (left: U32) -> (right: U32): U32 => return do:
+        \\  use extra <- Read ()
+        \\  return @u32.add (@u32.add left right) extra
+        \\const U32.add = addition
+    ;
+    var module = try lowerWithOptions(header ++ "\n" ++
+        \\entry const handled = do (@effect.provider Read (func () => return 2)):
+        \\  break @type.call "add" 39 1
+        \\entry const handled_other = do (@effect.provider Read (func () => return 12)):
+        \\  break @type.call "add" 39 1
+    , .{ .builtin_catalog = true });
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(&module, "handled"))).bits);
+    try std.testing.expectEqual(@as(u32, 52), (try session.value(target(&module, "handled_other"))).bits);
+    try std.testing.expect(session.diagnostic == null);
+
+    const invalid_source = header ++ "\nentry const unhandled = @type.call \"add\" 39 1\n";
+    var tokens = try lexer.lex(a, invalid_source);
+    defer tokens.deinit(a);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    var syntax = try parser.parse(a, invalid_source, tokens.tokens.items, &pool);
+    defer syntax.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), syntax.diagnostics.items.len);
+    var checked = try checker.checkModuleWithOptions(a, &syntax, &pool, &.{}, &.{}, 1, .{ .builtin_catalog = true });
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
+    try std.testing.expectEqual(checker.Code.const_effect, checked.diagnostics[0].code);
+}

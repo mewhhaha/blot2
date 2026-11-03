@@ -1,0 +1,6 @@
+const bad = func (input: U32): &[U32] => return do:
+  let local: Array U32 = #[input]
+  return &local[0..1]
+entry const answer = func (input: U32): U32 => return do:
+  let marker: GrowArray U32 = #[input]
+  return @storage.read (bad marker[0]) 0

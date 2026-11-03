@@ -6165,7 +6165,17 @@ pub const Session = struct {
         }
     }
     fn invokeNamed(self: *Session, resolved: Target, arguments: []const ValueId, owner: usize, source: core.Id, actual: type_evidence.Id, head: provider_chain.Head) Error!Flow {
-        return self.invokeNamedWithSeeds(resolved, arguments, owner, source, actual, head, &.{}, &.{});
+        const module = &self.units[resolved.unit];
+        const body = module.body(resolved.binding) orelse return self.failNode(owner, source, .unsupported);
+        if (body.is_function and arguments.len == module.bodyParameters(body).len)
+            return self.invokeNamedWithSeeds(resolved, arguments, owner, source, actual, head, &.{}, &.{});
+        var function = try self.typedView(owner, source, try self.constant(resolved), actual);
+        for (arguments) |argument| {
+            const outcome = try self.applyValue(owner, source, function, argument, head);
+            if (outcome != .value) return outcome;
+            function = outcome.value;
+        }
+        return .{ .value = function };
     }
     fn invokeNamedWithSeeds(self: *Session, resolved: Target, arguments: []const ValueId, owner: usize, source: core.Id, actual: type_evidence.Id, head: provider_chain.Head, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!Flow {
         const module = &self.units[resolved.unit];
