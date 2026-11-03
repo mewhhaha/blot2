@@ -35,6 +35,18 @@ owner, read, effect and variant checks remain. Main shares 48,699 join words,
 avoids 3,060 result stores and 24,284 result loads, and shares 145,227 zero values.
 Counts describe compiler work, not additive byte savings.
 
+Use the new `scripts/bench/aggregate_scaling.ts` controls for the next hill:
+45 cases × three fresh compilations complete in 1.6s with 1,350 executed checks.
+At 128 fields and 32 calls, scalar records take 13ms versus 47–59ms for mutating
+owner-bearing result records. Those mutating helpers decline reuse and expand
+at every call. Unit-return controls compile faster but can emit more Wasm;
+read-only helpers already reuse definitions. The focused next experiment is
+completed direct-input demand, removing unused physical arguments while keeping
+complete semantic arguments and result-alias recipes. See
+[the scaling evidence](zig-native/measurements/aggregate-scaling-2026-11-03.json).
+Wider checked-source validation-budget failures remain pinned; no full-game
+build is required for each microbenchmark iteration.
+
 The first pilot shrank the output but regressed compilation to 10.470s.
 A bounded stack sample attributed 46.3% of sampled emission CPU to rebuilding
 all historical mutable-local sets at every join. The final implementation indexes
