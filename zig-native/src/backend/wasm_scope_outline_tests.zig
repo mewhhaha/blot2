@@ -68,12 +68,14 @@ fn exactState(allocator: A) !void {
     try std.testing.expectEqual(@as(u64, @bitCast(ir.Instruction{ .op = .i32_const, .operand = 0, .table_reference = true, .table_kind = .callable, .origin = 19 })), @as(u64, @bitCast(symbolic)));
     const root = &module.functions.items[0];
     for (0..4) |index| {
-        try std.testing.expectEqual(ir.Op.i32_const, root.instructions.items[index * 2].op);
+        var op: ir.Op = .i32_const;
+        if (index == 0) op = .local_get;
+        try std.testing.expectEqual(op, root.instructions.items[index * 2].op);
         try std.testing.expectEqual(@as(u32, 0), root.instructions.items[index * 2].operand);
         try std.testing.expectEqual(ir.Op.global_set, root.instructions.items[index * 2 + 1].op);
     }
-    try std.testing.expectEqual(ir.Op.call, root.instructions.items[10].op);
-    try std.testing.expectEqual(@as(u32, 1), root.instructions.items[10].operand);
+    try std.testing.expectEqual(ir.Op.call, root.instructions.items[8].op);
+    try std.testing.expectEqual(@as(u32, 1), root.instructions.items[8].operand);
     try std.testing.expectError(error.InvalidOutline, context.finalize());
 }
 test "scoped machine helpers preserve future references zero lanes tee metadata and loop state through OOM" {
@@ -84,7 +86,7 @@ test "scoped machine helpers preserve future references zero lanes tee metadata 
 test "nested scoped machine helpers credit each body once and preserve cross helper registers" {
     var module = try moduleWithRoot(a, &.{.i32}, .i32, &.{ .i32, .i32, .i32, .i32 });
     defer module.deinit();
-    var context = outline.Context.init(a, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+    var context = outline.Context.init(a, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1, .verify_copy_inputs = true });
     defer context.deinit();
     try context.registerRoot(0);
     try emit(&module, 0, &.{ .{ .op = .local_get }, .{ .op = .local_set, .operand = 1 } });
@@ -103,11 +105,12 @@ test "nested scoped machine helpers credit each body once and preserve cross hel
     try emit(&module, 0, &.{.{ .op = .local_get, .operand = 4 }});
     const stats = try context.finalize();
     try std.testing.expectEqual(@as(u64, 2), stats.regions);
-    try std.testing.expectEqual(@as(u64, 4), stats.globals);
-    try std.testing.expectEqual(ir.Op.call, module.functions.items[0].instructions.items[10].op);
-    try std.testing.expectEqual(@as(u32, 2), module.functions.items[0].instructions.items[10].operand);
-    try std.testing.expectEqual(ir.Op.call, module.functions.items[2].instructions.items[2].op);
-    try std.testing.expectEqual(@as(u32, 1), module.functions.items[2].instructions.items[2].operand);
+    try std.testing.expectEqual(@as(u64, 2), stats.globals);
+    try std.testing.expectEqual(@as(u64, 3), stats.copies_removed);
+    try std.testing.expectEqual(ir.Op.call, module.functions.items[0].instructions.items[4].op);
+    try std.testing.expectEqual(@as(u32, 2), module.functions.items[0].instructions.items[4].operand);
+    try std.testing.expectEqual(ir.Op.call, module.functions.items[2].instructions.items[0].op);
+    try std.testing.expectEqual(@as(u32, 1), module.functions.items[2].instructions.items[0].operand);
 }
 
 test "scoped machine helpers decline externref parents while preserving committed numeric children" {

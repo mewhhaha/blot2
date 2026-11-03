@@ -4,11 +4,14 @@
 const std = @import("std");
 const ir = @import("runtime_ir.zig");
 const wasm = @import("wasm.zig");
+const coalesce = @import("wasm_copy_coalesce.zig");
 const A = std.mem.Allocator;
 const absent = std.math.maxInt(u32);
 pub const Error = A.Error || error{ InvalidOutline, OutlineLimit };
 pub const Contract = enum { scoped_numeric_adapter_nonreentrant };
 pub const Options = struct {
+    /// Replay/test audit against an independently reconstructed entry-read set.
+    verify_copy_inputs: bool = false,
     minimum_instructions: usize = 5_000,
     maximum_range_instructions: usize = 1_800_000,
     maximum_helpers: usize = 8_192,
@@ -20,7 +23,7 @@ pub const Options = struct {
 pub const Work = struct { expressions: usize, layouts: usize };
 pub const Ticket = struct { function: u32, start: usize, work: Work };
 pub const Credit = Work;
-pub const Stats = struct { regions: u64 = 0, globals: u64 = 0 };
+pub const Stats = struct { regions: u64 = 0, globals: u64 = 0, copies_removed: u64 = 0, reads_forwarded: u64 = 0 };
 const Total = struct { references: usize = 0, writes: usize = 0 };
 const Root = struct {
     function: u32,
@@ -203,6 +206,8 @@ pub const Context = struct {
         }
         const first_global = self.module.globals.items.len;
         var next_global = first_global;
+        var copies_removed: u64 = 0;
+        var reads_forwarded: u64 = 0;
         for (0..self.roots.items.len) |root_index| {
             if (self.roots.items[root_index].pending.count() != 0) return error.InvalidOutline;
             try self.sync(root_index);
@@ -211,6 +216,24 @@ pub const Context = struct {
             if (hasCoordinates(self.module, root.function)) return error.InvalidOutline;
             try acyclic(self.allocator, self.module, root.function);
             const source = &self.module.functions.items[root.function];
+            const logical = try self.allocator.alloc(coalesce.Body, root.helpers.items.len + 1);
+            defer self.allocator.free(logical);
+            logical[0] = .{ .function = root.function, .instructions = source.instructions.items };
+            for (root.helpers.items, logical[1..]) |ordinal, *body| {
+                const helper = self.helpers.items[ordinal];
+                if (hasCoordinates(self.module, helper.function)) return error.InvalidOutline;
+                body.* = .{ .function = helper.function, .instructions = self.module.functions.items[helper.function].instructions.items };
+            }
+            var optimized = try coalesce.run(self.allocator, source, logical);
+            defer if (optimized) |*result| result.deinit(self.allocator);
+            // Borrowed until this iteration ends; prepareBody owns its output.
+            // zig-analyzer: disable-next-line returning-released-value
+            var bodies: []const coalesce.Body = logical;
+            if (optimized) |result| {
+                bodies = result.bodies;
+                copies_removed += result.removed_copies;
+                reads_forwarded += result.forwarded_reads;
+            }
             const count = std.math.add(usize, source.parameters.len, source.locals.items.len) catch return error.InvalidOutline;
             const map = try self.allocator.alloc(u32, count);
             var map_owned = true;
@@ -222,18 +245,35 @@ pub const Context = struct {
             const shared = try self.allocator.alloc(bool, count);
             defer self.allocator.free(shared);
             @memset(shared, false);
-            try observe(source.instructions.items, root.function, first, shared);
-            for (root.helpers.items) |ordinal| {
+            const writes = try self.allocator.alloc(u32, count);
+            defer self.allocator.free(writes);
+            @memset(writes, 0);
+            const verified_inputs = try self.allocator.alloc(u32, if (self.options.verify_copy_inputs and optimized != null) count else 0);
+            defer self.allocator.free(verified_inputs);
+            @memset(verified_inputs, absent);
+            try observe(bodies[0], first, shared, writes, map);
+            for (root.helpers.items, bodies[1..]) |ordinal, body| {
                 const helper = self.helpers.items[ordinal];
-                if (hasCoordinates(self.module, helper.function)) return error.InvalidOutline;
-                try observe(self.module.functions.items[helper.function].instructions.items, helper.function, first, shared);
+                try observe(body, first, shared, writes, map);
                 for (helper.read_before_def) |id| {
                     if (id >= count) return error.InvalidOutline;
-                    if (id < source.parameters.len or root.totals.items[id].writes != 0) shared[id] = true;
+                    var input = id;
+                    if (optimized) |result| input = result.aliases[id];
+                    if (verified_inputs.len != 0) verified_inputs[input] = helper.function;
+                    // A removed copy's original read witnesses the forwarded
+                    // live-in. Keep only inputs actually read by this helper.
+                    if (map[input] == helper.function) shared[input] = true;
+                }
+                if (verified_inputs.len != 0) {
+                    var proof = (try Proof.analyze(self.allocator, self.module, source, body.instructions, self.options.maximum_control_depth)) orelse return error.InvalidOutline;
+                    defer proof.deinit(self.allocator);
+                    var inputs = proof.read_before_def.keyIterator();
+                    while (inputs.next()) |id| if (verified_inputs[id.*] != helper.function) return error.InvalidOutline;
                 }
             }
+            @memset(map, absent);
             for (shared, 0..) |yes, id| {
-                if (!yes or (id >= source.parameters.len and root.totals.items[id].writes == 0)) continue; // independently zero
+                if (!yes or (id >= source.parameters.len and writes[id] == 0)) continue; // independently zero
                 if (localType(source, @intCast(id)) != .i32) return error.InvalidOutline;
                 if (next_global >= self.options.maximum_globals or next_global >= absent) return error.OutlineLimit;
                 map[id] = @intCast(next_global);
@@ -241,15 +281,15 @@ pub const Context = struct {
             }
             try banks.append(self.allocator, .{ .root = root.function, .globals = map });
             map_owned = false;
-            var caller = try prepareBody(self.allocator, source, source.instructions.items, true, .{ .dense = map });
+            var caller = try prepareBody(self.allocator, source, bodies[0].instructions, true, .{ .dense = map });
             var caller_owned = true;
             errdefer if (caller_owned) caller.deinit(self.allocator);
             if (!bounded(&caller, source.parameters.len, self.options)) return error.OutlineLimit;
             try prepared.append(self.allocator, .{ .function = root.function, .body = caller });
             caller_owned = false;
-            for (root.helpers.items) |ordinal| {
+            for (root.helpers.items, bodies[1..]) |ordinal, logical_body| {
                 const helper = self.helpers.items[ordinal];
-                var body = try prepareBody(self.allocator, source, self.module.functions.items[helper.function].instructions.items, false, .{ .dense = map });
+                var body = try prepareBody(self.allocator, source, logical_body.instructions, false, .{ .dense = map });
                 errdefer body.deinit(self.allocator);
                 if (!bounded(&body, 0, self.options)) return error.OutlineLimit;
                 try prepared.append(self.allocator, .{ .function = helper.function, .body = body });
@@ -271,7 +311,7 @@ pub const Context = struct {
             destination.annotations = 0;
             item.body = .{};
         }
-        self.stats = .{ .regions = self.helpers.items.len, .globals = next_global - first_global };
+        self.stats = .{ .regions = self.helpers.items.len, .globals = next_global - first_global, .copies_removed = copies_removed, .reads_forwarded = reads_forwarded };
         self.finalized = true;
         return self.stats;
     }
@@ -546,10 +586,11 @@ fn prepareBody(a: A, source: *const ir.Function, code: []const ir.Instruction, i
     }
     return result;
 }
-fn observe(code: []const ir.Instruction, function: u32, first: []u32, shared: []bool) Error!void {
-    for (code) |inst| if (local(inst.op)) {
+fn observe(body: coalesce.Body, first: []u32, shared: []bool, writes: []u32, reads: []u32) Error!void {
+    for (body.instructions) |inst| if (local(inst.op)) {
         if (inst.operand >= first.len) return error.InvalidOutline;
-        if (first[inst.operand] == absent) first[inst.operand] = function else if (first[inst.operand] != function) shared[inst.operand] = true;
+        if (first[inst.operand] == absent) first[inst.operand] = body.function else if (first[inst.operand] != body.function) shared[inst.operand] = true;
+        if (inst.op == .local_get) reads[inst.operand] = body.function else writes[inst.operand] +|= 1;
     };
 }
 fn acyclic(a: A, module: *const wasm.Module, root: u32) Error!void {

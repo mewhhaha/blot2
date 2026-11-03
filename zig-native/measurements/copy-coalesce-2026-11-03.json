@@ -1,0 +1,593 @@
+{
+  "date": "2026-11-03",
+  "decision": "Retain multi-use copy coalescing before bank selection and in completed scoped bodies. This removes proven redundant transport without moving computation/effects. Main size improves4.87%; all primary matched timings remain slightly slower. No latency target is met.",
+  "source": {
+    "head": "fca848cd3ea12b83143d0b5ecf5f802bed03b7fc",
+    "patch_sha256": "60d1d680bd107dfda5116dc1719bde73133246aece2492cf7e8f4984bc80d679",
+    "directory": "/home/jacobt/src/blot2/build/bench/frozen-copy-coalesce-60d1d680bd10",
+    "files": {
+      "scripts/dev_check_areas.ts": "afe36ca849159130cb99819f7122b37a575b8f7bb50468c75a1f2926b40c3fe8",
+      "zig-native/CONTRACT.md": "6a6df68f4ded25126bb63aed22be4642577e766d35ba2474ae46842463fc265c",
+      "zig-native/build.zig": "46fb6b477db777927de6c84e4b66e0372edfbb5aa6866a1b8c3f3e93f64fc77d",
+      "zig-native/src/backend/runtime_pipeline.zig": "71742ab36dea06a10eb3bc1f870bea560c4851d1d3d85098869238b0bae3d022",
+      "zig-native/src/backend/scoped_backend.zig": "9244baa762cd43cab8b7389750196794dd997d5709b693e96539f1b0b5071a62",
+      "zig-native/src/backend/wasm_scope_outline.zig": "026b865d68e258f48c233c7a262b0d01841b926da376f3435593ec2d6c5952a6",
+      "zig-native/src/backend/wasm_scope_outline_tests.zig": "b6fa688397682c7328138db8ec4559946bedc24e2dd6a6882c57ec1288e591ad",
+      "zig-native/src/work_counters.zig": "bfbcb29df6683b8d0fb866aa0a92fd330c9617fa8b8885f798e6b3116efbc260",
+      "zig-native/src/backend/wasm_copy_coalesce.zig": "5de6c14586b8ef083a1fe493cb2e938739f0f578eb374db7ddb5ebf6a646857c",
+      "zig-native/src/backend/wasm_copy_coalesce_tests.zig": "25d7f67fe18234440b14af1a13ccb5fa71817d8d9a150beab9dd10fdefed633c",
+      "zig-native/src/bench_outline.zig": "465f4aa0fe72e102a5e103ba98458b1057b5ea3c270b25b9aa4b42f0af5ea045"
+    },
+    "release_binary_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+    "identity_sidecar_sha256": "2a928fee4075f750a48a3c37fb30c80d357d9d17edb2246640366eeec1b88413"
+  },
+  "baseline": {
+    "head": "fca848cd3ea12b83143d0b5ecf5f802bed03b7fc",
+    "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+    "compiler_identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929"
+  },
+  "workload": {
+    "gdev_head": "a99703d89b19210040d996f121884126eeb62f2d",
+    "ink_head": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "pen_head": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a",
+    "source_bytes": 2537167,
+    "source_manifest_sha256": "53d9cb5bb227519e7ab97109858cea0984c59e8ea94434500c3a3921ce12b2c6"
+  },
+  "contracts": [
+    "ABI8/session2/saved schema26 unchanged",
+    "Complete semantic/type/owner/read/write/escape/variant admission remains",
+    "Adjacent neutral numeric local copies only; one destination write; all original reads must see the same source version in one control segment",
+    "Unique-callsite outline helpers traverse iteratively; ordinary calls cannot mutate caller locals; calls/loads/stores/computation never move",
+    "Analysis follows canonical source versions; published alias chains stop at retained intermediate snapshots",
+    "Cached helper entry reads translate through accepted aliases and intersect actual reads; bank sharing and writes recomputed from staged IR",
+    "Default-zero reads, control crossings, later source writes, parallel swaps and unsupported hidden/table operands retain transport",
+    "Only eliminated destinations are pruned from completed private bodies; parameter IDs/types remain fixed; all original bodies survive allocation failure"
+  ],
+  "review": {
+    "model": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "result": "No remaining correctness or ownership blocker; independently audited all411 helper input sets. Added no-candidate early exit before redundant virtual walk. Replay timing is phase-only NativeSafe, not LLVM end-to-end."
+  },
+  "engine_replay": {
+    "fixture": {
+      "format": 1,
+      "functions": 8047,
+      "roots": [
+        {
+          "function": 25
+        }
+      ],
+      "helpers": 411,
+      "binary_bytes": 43905342,
+      "binary_sha256": "74725b6246fbf096f13bc737052dc2c266935fcc0c0484638428a85a83bea976",
+      "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+      "source_manifest_sha256": "53d9cb5bb227519e7ab97109858cea0984c59e8ea94434500c3a3921ce12b2c6",
+      "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+      "manifest": "build/bench/copy-coalesce-2026-11-03/tracked-capture-final/manifest.json"
+    },
+    "baseline": {
+      "stats": {
+        "regions": 411,
+        "globals": 64876
+      },
+      "ns": 3204236606,
+      "instructions": 5276460,
+      "locals": 523548,
+      "prepared_ir_sha256": "78fdbab611d58898618981c708170c02161b72e78253fda7c06f59ca8666e1be"
+    },
+    "candidate": {
+      "stats": {
+        "regions": 411,
+        "globals": 55754,
+        "copies_removed": 110067,
+        "reads_forwarded": 39299
+      },
+      "ns": 3469390339,
+      "instructions": 5061618,
+      "locals": 514760,
+      "prepared_ir_sha256": "1e6da1541d69f0d4c30787787608db6d42ea5bfed4621bb1cd5e6de016346eea"
+    },
+    "independent_input_audit": {
+      "stats": {
+        "regions": 411,
+        "globals": 55754,
+        "copies_removed": 110067,
+        "reads_forwarded": 39299
+      },
+      "ns": 4671569942,
+      "instructions": 5061618,
+      "locals": 514760,
+      "prepared_ir_sha256": "1e6da1541d69f0d4c30787787608db6d42ea5bfed4621bb1cd5e6de016346eea"
+    },
+    "scope": "Finalization only on a pinned private pre-bank IR snapshot. Baseline/candidate timing pair uses Zig0.17 NativeSafe/noLLVM; not whole-build/LLVM timing. Audit independently reconstructs every changed helper entry-read set; fresh must be a subset of translated cached inputs. Audit uses NativeFast/noLLVM and includes extra work.",
+    "tool_sources": {
+      "scripts/bench/capture_outline.ts": "3196dabcab6a700ab418a6bbb653ccb42beb4f351e66fae5977fab23c8452ce8",
+      "scripts/bench/capture_outline.py": "21b1157b105dbd908d9f8260d2e640b82e51016ff5b7f0b3dd8cc7bdada72f00",
+      "zig-native/src/bench_outline.zig": "465f4aa0fe72e102a5e103ba98458b1057b5ea3c270b25b9aa4b42f0af5ea045"
+    },
+    "replay_build": "zig build bench-outline -Doptimize=fast -Dllvm=false --prefix zig-out-native-dev",
+    "replay_command": "zig-native/zig-out-native-dev/bin/blot-outline-replay CAPTURE [verify]",
+    "tool_compile_ms": 493,
+    "native_game_probes": 0
+  },
+  "controls": {
+    "rows": [
+      {
+        "kind": "scalar",
+        "width": 8,
+        "operations": 8,
+        "baseline_bytes": 4283,
+        "candidate_bytes": 4283
+      },
+      {
+        "kind": "branch",
+        "width": 8,
+        "operations": 8,
+        "baseline_bytes": 4327,
+        "candidate_bytes": 4327
+      },
+      {
+        "kind": "loop",
+        "width": 8,
+        "operations": 8,
+        "baseline_bytes": 3444,
+        "candidate_bytes": 3444
+      },
+      {
+        "kind": "scalar",
+        "width": 32,
+        "operations": 8,
+        "baseline_bytes": 4621,
+        "candidate_bytes": 4621
+      },
+      {
+        "kind": "branch",
+        "width": 32,
+        "operations": 8,
+        "baseline_bytes": 4665,
+        "candidate_bytes": 4665
+      },
+      {
+        "kind": "loop",
+        "width": 32,
+        "operations": 8,
+        "baseline_bytes": 3757,
+        "candidate_bytes": 3757
+      },
+      {
+        "kind": "scalar",
+        "width": 128,
+        "operations": 8,
+        "baseline_bytes": 6254,
+        "candidate_bytes": 6254
+      },
+      {
+        "kind": "branch",
+        "width": 128,
+        "operations": 8,
+        "baseline_bytes": 6319,
+        "candidate_bytes": 6319
+      },
+      {
+        "kind": "loop",
+        "width": 128,
+        "operations": 8,
+        "baseline_bytes": 5161,
+        "candidate_bytes": 5161
+      }
+    ],
+    "checks_per_compiler": 270,
+    "interpretation": "Nine scalar/branch/loop source controls retain identical Wasm sizes. Candidate NativeFast vs baseline LLVM timings are intentionally not compared. Wide multi-use/nested snapshot behavior is covered by native laws and the real Main snapshot."
+  },
+  "main": {
+    "baseline_bytes": 13594002,
+    "candidate_bytes": 12932581,
+    "saved_bytes": 661421,
+    "saved_percent": 4.865535550163962,
+    "samples": [
+      {
+        "name": "baseline",
+        "sample": 1,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-baseline-1/main-7e78ea19bdfd6629/result.json",
+        "build_ms": 5742.7203,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 1,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-candidate-1/main-948c9dccf7cd999c/result.json",
+        "build_ms": 5809.152908,
+        "wasm_bytes": 12932581,
+        "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+        "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 2,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-candidate-2/main-eaf700a2e01b6e14/result.json",
+        "build_ms": 5821.821508,
+        "wasm_bytes": 12932581,
+        "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+        "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "baseline",
+        "sample": 2,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-baseline-2/main-b2892e415a1752bc/result.json",
+        "build_ms": 5673.109729,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "baseline",
+        "sample": 3,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-baseline-3/main-b3c9ecf29c63b00a/result.json",
+        "build_ms": 5652.894894,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 3,
+        "result": "build/bench/copy-coalesce-2026-11-03/main-candidate-3/main-3a1ca9ae3b2fab80/result.json",
+        "build_ms": 5710.051288,
+        "wasm_bytes": 12932581,
+        "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+        "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+        "source_bytes": 2537167
+      }
+    ],
+    "paired": [
+      {
+        "sample": 1,
+        "baseline_ms": 5742.7203,
+        "candidate_ms": 5809.152908,
+        "delta_ms": 66.43260800000007,
+        "delta_percent": 1.156814271452511
+      },
+      {
+        "sample": 2,
+        "baseline_ms": 5673.109729,
+        "candidate_ms": 5821.821508,
+        "delta_ms": 148.7117790000002,
+        "delta_percent": 2.62134501364939
+      },
+      {
+        "sample": 3,
+        "baseline_ms": 5652.894894,
+        "candidate_ms": 5710.051288,
+        "delta_ms": 57.156393999999636,
+        "delta_percent": 1.011099535225135
+      }
+    ],
+    "independent_medians_ms": {
+      "baseline": 5673.109729,
+      "candidate": 5809.152908
+    },
+    "median_paired_delta_ms": 66.43260800000007,
+    "median_paired_delta_percent": 1.156814271452511,
+    "configured": [
+      {
+        "name": "configured-main",
+        "build_ms": 8307.679696000001,
+        "wasm_bytes": 12932581,
+        "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+        "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+        "evidence": "build/bench/copy-coalesce-2026-11-03/configured-main/main-f73eebd84fbeaa84/result.json"
+      },
+      {
+        "name": "configured-baseline-check",
+        "build_ms": 6403.6534759999995,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "evidence": "build/bench/copy-coalesce-2026-11-03/configured-baseline-check/main-1cbc553aeb1d5454/result.json"
+      },
+      {
+        "name": "configured-repeat",
+        "build_ms": 6470.0250750000005,
+        "wasm_bytes": 12932581,
+        "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+        "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+        "evidence": "build/bench/copy-coalesce-2026-11-03/configured-repeat/main-ed1700dd1fa7b6d0/result.json"
+      }
+    ],
+    "interpretation": "All three primary pairs are57-149ms slower; median paired66ms/1.16%. Difference of independent medians136ms/2.40% is not the paired median. Initial configured8.308s is retained as an unpaired outlier; adjacent control/repeat6.404/6.470s reproduces~66ms cost. Host-dependent absolute times across rounds are incomparable; no compile/runtime-speed improvement established.",
+    "validation": {
+      "path": "build/bench/copy-coalesce-2026-11-03/main-candidate-1/main-948c9dccf7cd999c/main.wasm",
+      "valid": true,
+      "imports": [
+        {
+          "module": "blot:host/1",
+          "name": "call_array_f32_array_f32",
+          "kind": "function"
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function"
+        },
+        {
+          "name": "blot:memory",
+          "kind": "memory"
+        },
+        {
+          "name": "blot:allocate",
+          "kind": "function"
+        },
+        {
+          "name": "blot:reset",
+          "kind": "function"
+        }
+      ]
+    },
+    "work": {
+      "scoped_outlined_regions": 411,
+      "scoped_outlined_globals": 55754,
+      "scoped_copy_pairs_removed": 110067,
+      "scoped_copy_reads_forwarded": 39299
+    },
+    "remaining": {
+      "declared_locals": 408892,
+      "mutable_i32_globals": 56122,
+      "local_instruction_bytes": 6812073,
+      "global_instruction_bytes": 1729884,
+      "local_global_instruction_bytes": 8541957,
+      "root_reset": {
+        "kind": "i32.const 0 -> global.set",
+        "function": 26,
+        "offset": 305736,
+        "pairs": 55754,
+        "bytes": 318514,
+        "first_source": 0,
+        "first_target": 374,
+        "consecutive_targets": true,
+        "consecutive_sources": false,
+        "last_source": 0,
+        "last_target": 56127
+      },
+      "unreachable_body_bytes": 59,
+      "note": "Static encoding counts are not runtime costs or proofs of removability. Calls/loads/stores/arithmetic instruction bytes remain unchanged; constants lose the removed root resets. Further bulk representation work remains."
+    }
+  },
+  "qualification": {
+    "native": {
+      "selected": 165,
+      "passed": 162,
+      "failed": [
+        "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+        "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+        "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM"
+      ],
+      "full_sweeps": 63,
+      "leaks": 0,
+      "logged_errors": 0,
+      "inventory": 2929,
+      "integrated_candidate_patch_sha256": "7f09391ce9e318a39d85030388588464305ffb4f24db0e7d78d44dca4268fa20",
+      "integrated_evidence": "build/bench/copy-coalesce-2026-11-03/native-selected.log",
+      "final_guard_binary_sha256": "29d85ef5d8fde5d3f969247f7e2a9172f1b83b4c6c81c43a1d656445ef08c640",
+      "final_guard_evidence": "build/bench/copy-coalesce-2026-11-03/native-focused-guard.log",
+      "final_guard_laws": 34,
+      "final_guard_status": "34 passed after the output-preserving no-candidate fast exit; complete final inventory compiled",
+      "qualification_note": "The165-law full fault batch precedes only that final fast exit; the affected34-law family was rerun with full faults. Three failures match the exact preserved baseline assertions."
+    },
+    "llvm_guests": {
+      "passed": 119,
+      "failed": 2,
+      "reason": "Unchanged unsupported legacy memory-profile cases, previously reproduced on exact baseline",
+      "evidence": "build/bench/copy-coalesce-2026-11-03/llvm-guests.log"
+    },
+    "full_gate": {
+      "status": "Attempted on final source;48 smoke passes/1 known List/chunk storage_escape failure; broader phases not reached; full qualification pending",
+      "evidence": "build/bench/copy-coalesce-2026-11-03/final-full-gate/timings.json"
+    },
+    "lint": "596 Zig source files and1 fixture file checked;zero findings",
+    "components": {
+      "world": {
+        "evidence": "build/bench/copy-coalesce-2026-11-03/world/result.json",
+        "entry_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+        "builds": [
+          {
+            "name": "baseline",
+            "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+            "wasm_bytes": 507288,
+            "wasm_sha256": "f7006c72d0dae951bb1f72d48dff4761834d59576506fbdc9efd397f88fa49ac",
+            "calls": [
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": false,
+                "row": [
+                  7,
+                  0
+                ]
+              },
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": true,
+                "row": [
+                  7,
+                  0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "candidate",
+            "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+            "wasm_bytes": 495494,
+            "wasm_sha256": "24b246aafa89e5c22cf4ed5f72b03f369c633a7579819426166c61337abed99e",
+            "calls": [
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": false,
+                "row": [
+                  7,
+                  0
+                ]
+              },
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": true,
+                "row": [
+                  7,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "hand": {
+        "evidence": "build/bench/copy-coalesce-2026-11-03/hand/result.json",
+        "entry_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+        "builds": [
+          {
+            "name": "baseline",
+            "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+            "wasm_bytes": 205425,
+            "wasm_sha256": "a6ad79c9167aedf6822f463d95446f084c3b0f8a262752434a63b839168ce652",
+            "calls": [
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": false,
+                "row": [
+                  160,
+                  0
+                ]
+              },
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": true,
+                "row": [
+                  160,
+                  0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "candidate",
+            "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+            "wasm_bytes": 203340,
+            "wasm_sha256": "c07f159e73d22c494efd3e2bbc1d03dfd22630fbe34ee5dacaa919b7de3b4513",
+            "calls": [
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": false,
+                "row": [
+                  160,
+                  0
+                ]
+              },
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": true,
+                "row": [
+                  160,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "renderer": {
+        "evidence": "build/bench/copy-coalesce-2026-11-03/renderer/pair-3c4aca7a6e1d9afe/result.json",
+        "pins": {
+          "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+          "baseline_compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+          "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+          "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+          "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+          "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+        },
+        "builds": [
+          {
+            "name": "baseline",
+            "wasm_bytes": 97891
+          },
+          {
+            "name": "candidate",
+            "wasm_bytes": 94648
+          }
+        ],
+        "comparisons": [
+          {
+            "scenario": 0,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 1,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 2,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 4,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 8,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 16,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 31,
+            "equal": true,
+            "first_difference": -1
+          }
+        ]
+      }
+    },
+    "pen": {
+      "status": "Installed Pen rejects ABI8 before rendering;no frame/PNG qualified",
+      "evidence": "build/bench/copy-coalesce-2026-11-03/pen/result.json",
+      "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+      "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+      "compile_invoked": false,
+      "returncode": 1,
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "compiled_wasm_unchanged": true
+    }
+  },
+  "iteration": "One preliminary LLVM build was stopped after97s for the output-preserving no-candidate fast path; no preliminary release artifact was installed. The completed release is the final source above. No noLLVM whole-game probe was run. New capture/replay tooling was exercised through actual Gdev capture plus native independent-input audit."
+}

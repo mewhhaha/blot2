@@ -14,40 +14,53 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest release produces **13,594,002 bytes of Wasm**, down from 13,935,123
-(341,121B / 2.45% smaller). This is a **size/compile-time tradeoff**: all three
-matched final pairs add 206–365ms (median paired increase 351ms / 5.39%).
-Independent medians are 6.767s → 6.973s; the configured launcher takes 6.369s
-with identical compiler identity and full Wasm hash. Shared-host baseline times
-shifted from the preceding 5.6s round, so do not compare absolute times across
-rounds. No latency or runtime-speed improvement is established. The five-second,
-subsecond and 1–2MB targets remain unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/stack-lanes-2026-11-03.json).
-Release source is `6bb30d10` plus complete patch `3f12a3012325`; all 13 frozen
-implementation, test and contract files match. The installed LLVM binary is
-`ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e`.
+The latest release produces **12,932,581 bytes of Wasm**, down from 13,594,002
+(661,421B / 4.87% smaller). Three matched fresh pairs add 57–149ms (median
+paired increase 66ms / 1.16%); independent medians are 5.673s → 5.809s. The
+configured launcher repeats at 6.470s beside a 6.404s preserved-compiler
+control, with identical compiler identity and full Wasm hash. Its first isolated
+8.308s result remains recorded; do not compare absolute times across shared-host
+rounds. This remains a size/compile-time tradeoff, with no latency or
+runtime-speed improvement established. The five-second, subsecond and 1–2MB
+targets remain unmet. Exact pins and qualification are in
+[the current evidence](zig-native/measurements/copy-coalesce-2026-11-03.json).
+Release source is `fca848cd` plus complete patch `60d1d680bd10`; all 11 frozen
+compiler/build/benchmark/test/contract files match. The installed LLVM binary is
+`f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643`.
 
-The first two
-[Astra representation recommendations](zig-native/measurements/representation-review-2026-11-03.json)
-are now implemented. Single-set/single-read numeric expressions remain on the
-Wasm stack within effect/control/write barriers. Opaque stack prefixes and
-symbolic operands stay in place; emission is iterative. The 32-operation scalar
-control now adds 134B versus the preceding 388B, matching the preserved Clang
-control with zero added local traffic. Flat unowned scalar record loops share
-only fields proved unchanged through every backedge, continue and break. The
-isolated width-128 one-field control shrinks 8,394 → 6,343B; no-op/all-field
-controls retain identical hashes. Complete assignment/owner/read/variant checks
-remain. Nominal, tagged, nested, borrowed and callable shapes keep fallback.
+Multi-use aggregate copies now coalesce before outline banking. A complete
+adjacent numeric copy disappears only when every destination read can use the
+same unchanged source version within one control segment. The unique-callsite
+outline tree is traversed iteratively; no computation or effects move. Published
+aliases stop at retained snapshots. Cached helper entry reads translate through
+accepted aliases and keep only actual reads; bank sharing and writes are
+recomputed from staged IR. All 411 changed helpers pass an independent fresh
+entry-read audit. Default-zero reads, source mutation, control crossings, loops,
+hidden identities and symbolic operands retain their required snapshots.
+Ordinary completed bodies use the same proof before slot reuse, pruning only
+eliminated destinations. Empty candidate inventories skip the second scan.
 
-The first scalar candidate also ran in temporary outline previews and built
-forests that effects would always flush. Final preparation keeps the trees;
-provisional previews retain conservative bounds, and hard-barrier intervals skip
-wholly futile passes without changing rewrite candidacy. Main bytes remain
-identical after this bookkeeping change. A compile-time penalty still remains;
-retain it for the current size priority and stop scalar widening. Aggregate
-boundary materialization and live outlined interfaces are the next substantive
-hill. Existing Core/stack IR was sufficient for these pilots; no source rewrite
-or feature cut was needed.
+Actual Main removes 110,067 pre-bank copy pairs and forwards 39,299 surviving
+reads. Its outline bank shrinks **64,876 → 55,754 globals**; reset bytes fall
+373,246 → 318,514. These are work counts, not additive byte savings. The nine
+small scalar/branch/loop source controls retain identical sizes and pass 270
+executed checks per compiler. Wide chains, retained intermediate snapshots,
+parallel writes, nested helpers and full allocation faults have dedicated native
+laws. The earlier scalar stackification and flat scalar loop-field sharing
+remain installed; stop scalar widening and target larger aggregate boundaries
+and live outlined interfaces next.
+
+Real-game backend iterations can now replay a checked private IR snapshot. Use
+`deno run -A scripts/bench/capture_outline.ts --output DIR` once with the pinned
+installed compiler, then
+`(cd zig-native && zig build bench-outline -Doptimize=fast -Dllvm=false --prefix zig-out-native-dev)`
+and `zig-native/zig-out-native-dev/bin/blot-outline-replay DIR [verify]`. The
+native replay tool builds in ~0.5s and replays finalization in ~3s; the
+independent 411-helper input audit adds work. It verifies capture
+format/bytes/SHA. The tracked capture command was exercised end to end with
+before/after source pins and the exact baseline Main hash. This is private
+compiler-engine evidence, not an authority for caller-supplied IR or
+whole-runtime qualification. No noLLVM whole-game probe was run for this batch.
 
 Checked graph helpers now reuse bodies that mutate input owners and return
 input-owned records or borrows. Complete result/event retention, actual caller
@@ -135,28 +148,26 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,916 native laws compile. Selected execution has 150 passes and three
-unchanged completed-plan assertions, reproduced on the exact preserved baseline
-binary; 61 full allocation-failure sweeps finish with no leaks/logged errors.
-New laws cover typed ordered trees, opaque prefixes,
-mutation/effect/trap/control barriers, symbolic flags, F32/vector bits, a
-50,001-step chain, conservative fast rejection and loop exits. Final LLVM guests
-have 119 passes and two unchanged unsupported legacy memory-profile cases, also
-reproduced on baseline. Zig lint is clean. The required full gate still stops at
-48 passes/one baseline List/chunk failure: full qualification remains pending.
-Final LLVM passes seven world/editor, 160 hand and seven identical renderer
-streams. World shrinks 520,832 → 507,288B; hand 208,221 → 205,425B; renderer
-100,229 → 97,891B. Installed Pen still rejects ABI 8 before rendering; no new
-frame/PNG is qualified. The configured launcher selects the exact measured
-release.
+All 2,929 native laws compile. The integrated 165-law family has 162 passes and
+three unchanged completed-plan assertions with 63 full allocation-failure
+sweeps, no leaks or logged errors. The affected 34-law family passes full faults
+again after the output-preserving no-candidate fast exit. The exact baseline
+assertion reproductions remain pinned in the preceding evidence. Final LLVM
+guests have 119 passes/two unchanged unsupported legacy memory-profile cases.
+Zig lint is clean. The full gate still stops at 48 passes/one baseline
+List/chunk failure: full qualification remains pending. Final LLVM passes seven
+world/editor, 160 hand and seven identical renderer streams. World shrinks
+507,288 → 495,494B; hand 205,425 → 203,340B; renderer 97,891 → 94,648B.
+Installed Pen still rejects ABI 8 before rendering; no new frame/PNG is
+qualified. The configured launcher selects the exact measured release.
 
-The current artifact has 420,741 declared locals and 65,244 mutable globals.
-Local/global instructions occupy 9,139,480B (67.23%): 7,227,350B local and
-1,912,130B global. The outliner still banks 64,876 globals, with a 373,246B root
-reset run; Main work counters and call/load/store/constant bytes stay unchanged.
-Only four functions with 59 total body bytes are unreachable. Static encoding
-counts do not establish runtime cost or prove removable work. The remaining bulk
-transport needs a larger representation change than single-use scalars.
+The current artifact has 408,892 declared locals and 56,122 mutable globals.
+Local/global instructions occupy 8,541,957B: 6,812,073B local and 1,729,884B
+global. Only four functions with 59 total body bytes are unreachable. Calls,
+loads, stores and arithmetic instruction bytes remain unchanged; constants lose
+the removed bank resets. Static encoding counts do not establish runtime cost or
+prove removable work. Larger aggregate boundary and outlining representation
+changes remain the next size hills.
 
 The **2,076,028B historical predecessor was recovered exactly**, with its
 original SHA, using the preserved compiler and source in one 30-second-capped

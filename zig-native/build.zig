@@ -89,6 +89,13 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = .safe,
     });
+    const outline_replay = b.addExecutable(.{
+        .name = "blot-outline-replay",
+        .root_module = b.createModule(.{ .root_source_file = b.path("src/bench_outline.zig"), .target = target, .optimize = optimize }),
+        .use_llvm = false,
+    });
+    const install_replay = b.addInstallArtifact(outline_replay, .{});
+    b.step("bench-outline", "Build the private pre-outline IR replay engine").dependOn(&install_replay.step);
     const demand_inventory_exe = b.addExecutable(.{
         .name = "blot-demand-inventory",
         .root_module = demand_inventory_module,

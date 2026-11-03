@@ -150,6 +150,19 @@ Only eliminated locals disappear; parameter positions and original bodies stay
 unchanged. Hidden ownership/resource/layout operands decline the pass. Tree
 emission is iterative, including long chains.
 
+Before outline banking, adjacent numeric copies may share a retained source
+when every destination read observes that exact unchanged source version within
+one control segment. The unique-callsite outline tree is traversed iteratively;
+ordinary calls cannot mutate caller locals. Computation and effects never move.
+Only complete destination proofs erase copies; published aliases stop at retained
+snapshots. Cached helper entry reads translate through accepted aliases and keep
+only words actually read. A replay audit reconstructs entry reads independently.
+Bank writes and sharing are recomputed from staged bodies before publication.
+Ordinary completed bodies use the same proof before slot reuse, pruning only the
+eliminated destinations. Parameters, hidden operands and source bodies retain
+their identities. Source writes, branches, default-zero reads and loop backedges
+retain snapshots when the complete proof fails.
+
 Flat unowned scalar record loop carries may share fields whose exact Core
 projection identities survive every backedge, continue and break. Changed
 fields retain carriers and simultaneous snapshots. Complete assignment, owner,

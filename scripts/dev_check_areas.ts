@@ -45,6 +45,19 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing follows nested logical helpers and transitive multiuse aliases through OOM",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing handles wide chains without recursive alias walks",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains every read after unsafe late source writes and tee",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains zero reads control crossings parameters and repeated writes",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing preserves opaque stack effects calls globals and symbolic metadata",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing declines hidden and flagged local identities anywhere",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing declines cyclic duplicate disconnected and multiply called helpers",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains canonical sources with earlier zero reads",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing publishes through accepted copies and stops at retained intermediates",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing observes helper writes before later caller reads",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing walks deeply nested helpers iteratively",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing standalone prunes only removed destinations and remaps typed locals through OOM",
+
       "backend.wasm_stackify_tests.test.scoped stack expressions retain ordered single use trees and original coordinates through OOM",
       "backend.wasm_stackify_tests.test.scoped stack expressions flush at effects traps writes control and symbolic operands",
       "backend.wasm_stackify_tests.test.scoped stack expressions retain opaque prefixes reused locals zero reads and tee",
@@ -357,6 +370,19 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing follows nested logical helpers and transitive multiuse aliases through OOM",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing handles wide chains without recursive alias walks",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains every read after unsafe late source writes and tee",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains zero reads control crossings parameters and repeated writes",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing preserves opaque stack effects calls globals and symbolic metadata",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing declines hidden and flagged local identities anywhere",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing declines cyclic duplicate disconnected and multiply called helpers",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains canonical sources with earlier zero reads",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing publishes through accepted copies and stops at retained intermediates",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing observes helper writes before later caller reads",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing walks deeply nested helpers iteratively",
+      "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing standalone prunes only removed destinations and remaps typed locals through OOM",
+
       "backend.wasm_stackify_tests.test.scoped stack expressions retain ordered single use trees and original coordinates through OOM",
       "backend.wasm_stackify_tests.test.scoped stack expressions flush at effects traps writes control and symbolic operands",
       "backend.wasm_stackify_tests.test.scoped stack expressions retain opaque prefixes reused locals zero reads and tee",

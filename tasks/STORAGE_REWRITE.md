@@ -3,37 +3,42 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/stack-lanes-2026-11-03.json)
-produces **13.59 MB Wasm**, down from 13.94 MB (341,121B / 2.45%). This is a
-size/compile-time tradeoff: three matched pairs add 206–365ms, with a median
-paired increase of 351ms / 5.39%. Independent medians are 6.767s → 6.973s on a
-slower shared-host round; the configured launcher takes 6.369s with identical
-output. Do not compare absolute times across rounds. No latency or runtime-speed
-improvement is established.
+[Actual full main](../zig-native/measurements/copy-coalesce-2026-11-03.json)
+produces **12.93 MB Wasm**, down from 13.59 MB (661,421B / 4.87%). Three matched
+pairs add 57–149ms (median paired increase 66ms / 1.16%); independent medians
+are 5.673s → 5.809s. The configured repeat takes 6.470s beside a 6.404s
+preserved-compiler control. Its isolated 8.308s first result remains recorded.
+Do not compare absolute shared-host times across rounds. No latency or
+runtime-speed improvement is established.
 
-Single-use pure numeric expressions now stay on the Wasm stack inside checked
-barriers. The scalar control adds 134B instead of 388B, matching Clang's added
-arithmetic/constant bytes. Flat unowned scalar record loops copy only changed
-fields after exact Core identity proofs on every exit; the width-128 one-field
-control shrinks 8,394 → 6,343B. Complete source/owner/read/write/escape/variant
-checks remain, with fallback for unsupported shapes. Provisional outline
-previews skip final expression trees, and wholly futile stack passes exit early.
+Multi-use numeric copies coalesce across the unique-callsite outline tree only
+when every read observes the exact unchanged source version within one control
+segment. No computation/effects move. Accepted aliases stop at retained
+snapshots; cached entry reads translate and bank sharing/writes are recomputed
+from staged IR. All 411 rewritten helper inputs pass independent reconstruction.
+Main removes 110,067 pre-bank copies and reduces the bank from 64,876 to 55,754
+globals. Complete semantic/type/owner/read/write/escape/variant checks remain.
+Larger aggregate boundaries and live outlined interfaces are the next hills.
 
-All 2,916 native laws compile; selected execution has 150 passes/three exact
-baseline assertions with 61 full fault sweeps and no leaks. Final LLVM guests
-have 119 passes/two baseline legacy memory-profile failures. Zig lint and
-world/editor, hand and seven identical renderer streams pass, with smaller
-output in all three. Full qualification retains the baseline List/chunk failure;
-installed Pen rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB
-targets remain unmet.
+The tracked private IR capture/replay tools now support real-game backend
+experiments without full source compilation. The replay executable builds in
+~0.5s and finalization takes ~3s; its extra input audit is separate. Exact
+source, compiler, IR and Wasm fingerprints are pinned. No noLLVM whole-game
+probe was run.
 
-The exact historical 2.08MB output was recovered from preserved inputs in a
-bounded 2.88s replay. Historical records used heap pointers; current aggregate
-transport still moves physical Value leaves and owner/borrow metadata. The
-remaining 7.23MB of local and 1.91MB of global instructions, including the
-unchanged 64,876-slot outline bank, make aggregate boundary materialization and
-live outlined interfaces the next hills. Stop scalar widening; preserve semantic
-checks and explicit copies. Ordinary `#run` build functions remain a separate,
+All 2,929 native laws compile. Integrated execution has 162 passes/three
+baseline assertions and 63 full fault sweeps, with no leaks. The final fast-exit
+change passes its affected 34-law full-fault family. Final LLVM guests have 119
+passes/two baseline legacy memory-profile failures. Zig lint and world/editor,
+hand and seven identical renderer streams pass with smaller output. Full
+qualification retains the baseline List/chunk failure; installed Pen rejects ABI
+8 before rendering. Five-second, subsecond and 1–2MB targets remain unmet.
+
+The historical 2.08MB output was recovered from preserved inputs in a bounded
+2.88s replay. Historical records used heap pointers; current transport moves
+physical Value leaves and owner/borrow metadata. Remaining local/global
+instructions occupy 8.54MB. Preserve semantic checks and explicit copies while
+changing that representation. Ordinary `#run` build functions remain a separate,
 unimplemented simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact

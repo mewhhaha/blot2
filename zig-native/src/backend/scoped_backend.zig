@@ -6932,6 +6932,8 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     };
     emission_work.scoped_outlined_regions = outlined.regions;
     emission_work.scoped_outlined_globals = outlined.globals;
+    emission_work.scoped_copy_pairs_removed = outlined.copies_removed;
+    emission_work.scoped_copy_reads_forwarded = outlined.reads_forwarded;
     var runtime_optimization: @import("optimized_bodies.zig").Stats = .{ .tier = options.tier };
     const bytes = assembly_block: {
         const trace = @import("../phase_profile.zig").region("owned.assemble", entry, 0, 0);

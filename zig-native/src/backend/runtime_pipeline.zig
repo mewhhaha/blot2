@@ -255,6 +255,14 @@ pub const Session = struct {
                 view.locals = body.locals;
                 view.instructions = body.instructions;
             }
+            if (try @import("wasm_copy_coalesce.zig").runSingle(self.allocator, &view)) |replacement| {
+                if (owned) |*body| body.deinit(self.allocator);
+                owned = replacement;
+            }
+            if (owned) |body| {
+                view.locals = body.locals;
+                view.instructions = body.instructions;
+            }
             if (try @import("wasm_stackify.zig").run(self.allocator, &view)) |replacement| {
                 if (owned) |*body| body.deinit(self.allocator);
                 owned = replacement;
