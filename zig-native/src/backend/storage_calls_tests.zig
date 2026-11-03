@@ -1084,6 +1084,80 @@ test "selected pure calls follow exact reference aliases without expanding calle
     try std.testing.expectEqual(left.emitted_functions, right.emitted_functions);
 }
 
+fn publishPrimitivePartials(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    if (result.diagnostic) |diagnostic| std.debug.print("primitive partial: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_primitive_applications >= 4);
+}
+
+test "scalar primitive aliases preserve partial snapshots through allocation failures" {
+    var module = try lower(a,
+        \\const add = @u32.add
+        \\const subtract = @u32.sub
+        \\entry const answer = func (input: U32): Array U32 => return do:
+        \\  let current = input
+        \\  let before = add current
+        \\  current := add current 10
+        \\  let after = subtract current
+        \\  return #[before 2, after 2, before 3, current]
+    );
+    defer module.deinit(a);
+    try publishPrimitivePartials(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishPrimitivePartials, .{@as([]const core.Module, &.{module})});
+}
+
+test "scalar primitive callback identities retain distinct reusable function plans" {
+    var module = try lower(a,
+        \\const add = @u32.add
+        \\const subtract = @u32.sub
+        \\const apply = func operation -> (value: U32): U32 => return operation value 3
+        \\entry const answer = func (input: U32): Array U32 => return
+        \\  #[apply add input, apply subtract input, apply add input, apply subtract input]
+    );
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("primitive callback: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions >= 2);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 2);
+    try std.testing.expect(result.counters.scoped_primitive_applications >= 2);
+}
+
+test "scalar primitive receiver callbacks preserve bound alias source evidence" {
+    var module = try lowerWithCatalog(a,
+        \\const U32.add = @u32.add
+        \\const U32.mul = @u32.mul
+        \\const apply = func operation -> (value: U32): U32 => return operation value
+        \\entry const answer = func (value: U32): Array U32 => return
+        \\  #[apply (2.add) value, apply (9.add) value, apply (2.mul) value, apply (9.mul) value]
+    , true);
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("primitive receiver: {d}..{d} {s}\n", .{ diagnostic.span.start, diagnostic.span.end, diagnostic.detail });
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_function_plan_hits >= 2);
+}
+
+test "scalar primitive aliases fold exact constants" {
+    var module = try lower(a,
+        \\const multiply = @f32.mul
+        \\const negate = @f32.neg
+        \\entry const answer = func (): Array F32 => return
+        \\  #[multiply 2.0 2.0, negate 0.0, @f32.add (multiply 2.0 2.0) 1.0]
+    );
+    defer module.deinit(a);
+    var result = try scoped.compile(a, &.{module}, 1);
+    defer result.deinit(a);
+    if (result.diagnostic) |diagnostic| std.debug.print("primitive constant: {s}\n", .{diagnostic.message()});
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_primitive_applications >= 3);
+    try std.testing.expect(result.counters.scoped_scalar_constants_folded >= 4);
+}
+
 test "selected primitive associated partials reuse their saturated callers" {
     const helper = "const F32.blend = func (left: F32) -> (right: F32) -> (weight: F32): F32 => return @f32.add left (@f32.mul (@f32.sub right left) weight)\nconst F32.weighted = func (left: F32) -> (right: F32) -> (weight: F32): F32 => return @f32.add left (@f32.mul right weight)\nconst blend = func left -> right => return @type.call \"blend\" left right\nconst weighted = func left -> right => return @type.call \"weighted\" left right\nconst interpolate = func (value: F32): F32 => return @f32.add (blend 0.0 value 0.25) (weighted 1.0 value 0.75)\n";
     const entry = "entry const answer = func (): F32 => return do:\n  let rows: ResizeArray F32 = #[2.0, 4.0]\n";

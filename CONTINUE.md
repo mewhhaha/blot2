@@ -14,65 +14,54 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-Shared Goose direct-Wasm benchmarks are available in
-[`scripts/bench/goose`](scripts/bench/goose/README.md). The
-[seven-case survey](scripts/bench/goose/results/2026-11-03-expanded.md) uses the
-same installed compiler: four original-numeric pairs and an explicit F32
-Mandelbrot control qualify; two original recursive sort ports fail with
-`storage_unsupported`. Original F64 Mandelbrot fails a native type probe and is
-not scored. The other 43 catalog tasks remain unadapted in Goose.
+The current
+[primitive-alias checkpoint](scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
+replaces 30 terminal numeric wrappers with ordinary scalar primitive aliases.
+The owned backend supports their partial applications/callbacks and shares
+scalar opcode/result semantics with constant evaluation. Exact runtime folds
+retain separate source-literal authority; ordinary const evaluation preserves
+NaNs. ABI 8 and session protocol 2 remain unchanged.
 
-Five matched pairs show Blot/Goose time ratios: CRC32 8.08x, custom hash 6.71x,
-Sieve 3.10x, F32 Mandelbrot 2.40x and Fannkuch 0.96x. A matched-width Sieve
-control still leaves about 2.3x. In Mandelbrot, replacing only two `2.0 * 2.0`
-expressions with `4.0` gives 1.297x, essentially matching broad primitive
-substitution. Investigate constant propagation/inlining decisions before broad
-helper inlining. These source controls are diagnostic; baseline ports are
-unchanged. Structured build failures remain visible; the survey is partial. No
-compiler rebuild or source change was needed. Existing compiler-wide
-qualification and Gdev results remain unchanged.
+Five fresh-process Blot before/after pairs show Mandelbrot F32 **96.04 →
+73.18ms** (24% less time), CRC32 2.5% slower and the other three kernels flat.
+The final seven-case Goose survey retains two explicit recursive sort failures;
+Goose gaps are CRC32 8.29x, custom hash 6.98x, Sieve 3.07x, F32 Mandelbrot 1.86x
+and Fannkuch 0.97x. Original F64 and the other 43 catalog tasks remain
+uncovered. The README charts use the final compiler.
 
-The preceding
-[fixed-span checkpoint](scripts/bench/goose/results/2026-11-03-fixed-spans.md)
-validated fixed scalar-array descriptors lazily in private helpers while
-retaining every bounds check. Fresh creates refresh length snapshots;
-grow/freeze locals and merged descriptors retain fallback.
-
-Invariant fixed-array descriptors and named nested record fields share loop
-carriers under existing all-exit identity and storage proofs. Frequency-ordered
-private bank IDs save 85,891 encoded operand bytes in Main. Final Main is
-**12,476,667 bytes**, down 73,943B (0.59%); local/global traffic still occupies
-8,254,281B. Three fresh compile pairs have medians **5.987 → 6.140s**, an
-observed 2.6% regression. World/editor, hand and seven identical renderer
-streams pass, but their small Wasm controls grow. Five-second, subsecond and
-1–2MB targets remain unmet. Exact samples, source and compiler pins are in
-[the evidence](scripts/bench/goose/results/2026-11-03-fixed-spans.json). The
+Three fresh Gdev compile pairs are effectively flat, **5.860 → 5.814s**. Main
+Wasm grows **12,476,667 → 12,490,827B** (0.11%), with 8,257,498B of local/global
+instructions. Five-second, subsecond and 1–2MB targets remain unmet. The
 installed LLVM compiler is
-`89cd47f3b9a3d4bbfa37857edb6b974d0e8bbf11432c3a4531f44d3b51c96bcb`.
+`88709e2adf6f29ff41a2eaf475851964c05f7d48854dc6f3c78031c87d14daa4`. It was built
+once; noLLVM development compiler rebuilds take about 5s. A single noLLVM Gdev
+debug probe stopped at its 30s cap and was not repeated. Fresh before/after
+builds use their matching preludes; the preserved old Main SHA matches exactly.
+Runner `--std-root` supports this comparison.
 
-All 2,937 native laws compile. The affected 201-law/192-guest family passes in
-60.04s, nine focused laws pass exhaustive allocation faults, final LLVM passes
-all 192 guests, and Zig lint is clean. The List/chunk smoke is fixed by applying
-the existing guarded private append proof to explicit consuming conversions. The
-full gate passes 49 smoke and 57 harness checks; a generated TypeScript
-fixture's invalid logical operators were repaired. Broad full-fault execution
-was stopped after 355.79s: 445 completed laws, 298 full sweeps, no failures,
-leaks or logged errors. This is incomplete; full qualification remains pending.
+All 2,945 native laws compile. The affected 214-law/196-guest development family
+passes in 52.42s; nine focused laws pass full-fault mode, and the final LLVM
+compiler passes the same 196 guests. Zig lint is clean; Astra found no remaining
+blocker. Full compiler qualification remains pending; the bounded full-gate
+attempt passes 49 smoke and 57 harness checks, then stops at its 180s budget:
+110 completed native laws, 83 full sweeps, zero failures/leaks/logged errors.
+This is incomplete; the linked JSON pins the logs and records.
 
-Rebuilt Pen accepts ABI 8. The current final Main passes all headless NVIDIA
-one-frame checks; its inspected PNG and guest trace are byte-identical to the
-baseline. See
-[frame evidence](tasks/storage-handoff-evidence/2026-11-03-fixed-spans-frame.json).
-Software-adapter coverage remains unavailable. Sibling sources/assets are clean
-and preserved. This qualifies one frame, not full gameplay.
+World/editor, hand and seven renderer streams pass unchanged; the two small
+control binaries shrink. The final Main passes a headless NVIDIA frame; its
+inspected PNG and guest trace are byte-identical to the preceding checkpoint.
+See
+[current frame evidence](tasks/storage-handoff-evidence/2026-11-03-primitive-aliases-frame.json).
+Broader gameplay and software-adapter coverage remain pending. Ink/Gdev/Pen
+sources and assets are preserved and clean.
 
-Next classify Main's 2,009 completed-plan rollbacks and 181,762 discarded
-expressions, especially fresh fixed-array returns that force caller expansion.
-The 512-word selector already chooses a buffered ABI, with zero machine-limit or
-outline-key declines; do not widen limits. CRC32's remaining conditional
-shift/XOR recurrence has a promising source-only basis-column control; a proved
-compiler fold is still unimplemented. Larger aggregate boundaries remain the
-main size target.
+Next replace fresh fixed-array return expansion with an explicit owner-transfer
+contract for reusable calls. **2,009 completed-plan rollbacks** remain, now
+184,212 discarded expressions. The 512-word selector already uses a buffered
+ABI; do not widen limits. CRC32's conditional shift/XOR recurrence remains the
+largest kernel gap. Preserve the
+[fixed-span evidence](scripts/bench/goose/results/2026-11-03-fixed-spans.md) and
+[expanded survey controls](scripts/bench/goose/results/2026-11-03-expanded.md).
 
 The preceding
 [copy-coalescing checkpoint](zig-native/measurements/copy-coalesce-2026-11-03.json)

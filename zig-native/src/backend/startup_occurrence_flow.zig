@@ -457,12 +457,7 @@ const Walk = struct {
         }
         var result = left;
         result.known = false;
-        result.scalar.scalar = switch (op) {
-            .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => .bool,
-            .convert_u32_f32 => .f32,
-            .convert_f32_u32 => .u32,
-            else => left.scalar.scalar,
-        };
+        result.scalar.scalar = scalar_ops.resultScalar(op, left.scalar.scalar);
         return self.add(result);
     }
     fn dispatchedScalar(self: *Walk, owner: usize, node: core.Id, op: core.Op, member: u32, left: ValueId, right: ValueId, weak: bool, observe: bool) Error!ValueId {

@@ -398,7 +398,14 @@ fn Validator(comptime Context: type) type {
                 self.fail(.unknown_intrinsic, head, self.tree.span(head).start, symbol);
                 return;
             }
-            const arity = self.context.sourceIntrinsicArity(symbol) orelse return;
+            const arity = self.context.sourceIntrinsicArity(symbol) orelse {
+                const application = self.tree.node(id);
+                if (application.tag == .apply) {
+                    try self.walk(application.a, depth);
+                    try self.walk(application.b, depth);
+                }
+                return;
+            };
             if (argument_count != arity or argument_count > 4) {
                 self.fail(.call_arity, head, self.tree.span(head).start, 0);
                 return;

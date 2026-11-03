@@ -96,7 +96,7 @@ pub fn methodWorkspace(m: *const core.Module, units: []const *const core.Module,
         for (catalog.associated) |entry| {
             try require(remaining.* != 0);
             remaining.* -= 1;
-            if (entry.member != member or entry.operator != .none or !cross.sameIdentity(catalog, entry.identity, m, identity)) continue;
+            if (entry.member != member or !cross.sameIdentity(catalog, entry.identity, m, identity)) continue;
             var selected = entry.target;
             if (selected.unit == 0) selected.unit = catalog.unit;
             const producer = try ownerWorkspace(m, units, selected, workspace);

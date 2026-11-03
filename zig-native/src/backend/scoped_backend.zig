@@ -21,6 +21,7 @@ const private_append = @import("private_append_region.zig");
 const storage_plan = @import("storage_plan.zig");
 const transport_plan = @import("storage_transport.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
+const scalar_ops = @import("scalar_ops.zig");
 const source_proof = @import("../check/package_core.zig");
 const evaluation = @import("../eval/core_eval.zig");
 const Error = std.mem.Allocator.Error || error{Declined};
@@ -108,6 +109,7 @@ const Value = struct {
     mode: storage.Mode = .fixed,
     floating: bool = false,
     literal: ?u32 = null,
+    constant_bits: ?u32 = null,
     name: []const u8 = "",
     callable: ?*const Callable = null,
     host: ?wasm.Callback = null,
@@ -179,7 +181,28 @@ test "default zero source checkpoints never retain a rolled back local" {
     try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].locals.items.len);
 }
 const Demand = struct { ready: Local, result: ?Value = null, building: bool = false };
-const Callable = struct { unit: u32, node: core.Id = 0, target: core.BindingId = 0, captures: []const core.BindingId = &.{}, types: []const TypeArgument = &.{}, goals: []const core.Obligation = &.{} };
+const Callable = struct {
+    unit: u32,
+    node: core.Id = 0,
+    target: core.BindingId = 0,
+    captures: []const core.BindingId = &.{},
+    types: []const TypeArgument = &.{},
+    goals: []const core.Obligation = &.{},
+
+    const Kind = enum { named, closure, primitive };
+    fn kind(self: Callable, owner: *const core.Module) Kind {
+        if (self.node == 0) return .named;
+        if (owner.node(self.node).tag == .primitive_function) return .primitive;
+        return .closure;
+    }
+    fn signature(self: Callable, owner: *const core.Module) T.Id {
+        return switch (self.kind(owner)) {
+            .named => owner.binding(self.target).ty,
+            .closure => owner.closure(self.node).function_type,
+            .primitive => owner.typeOf(self.node),
+        };
+    }
+};
 fn orderFields(fields: []Value) void {
     std.mem.sort(Value, fields, {}, struct {
         fn less(_: void, left: Value, right: Value) bool {
@@ -589,6 +612,7 @@ const Generator = struct {
         var value = original;
         if (value.tag == .scalar) {
             value.literal = self.knownLiteral(original);
+            value.constant_bits = self.knownConstant(original);
             value.depth = self.depth;
             if (parameter) {
                 self.emission_work.scoped_parameter_words_shared +|= 1;
@@ -600,9 +624,14 @@ const Generator = struct {
         if (self.invalid_literals.contains(value.word.id)) return null;
         return value.literal;
     }
+    fn knownConstant(self: *Generator, value: Value) ?u32 {
+        if (self.invalid_literals.contains(value.word.id)) return null;
+        return value.constant_bits;
+    }
     fn snapshot(self: *Generator, original: Value) Error!Value {
         var value = original;
         value.literal = self.knownLiteral(original);
+        value.constant_bits = self.knownConstant(original);
         if (value.tag == .scalar) {
             value.word = try self.c.temp();
             try self.c.set(value.word, original.word);
@@ -1208,6 +1237,7 @@ const Generator = struct {
     fn temporary(self: *Generator, value: Value) Error!Value {
         var result = value;
         result.literal = null;
+        result.constant_bits = null;
         if (value.host != null) {
             result.word = .{ .id = try self.module.addLocal(self.c.function, .externref) };
         } else if (!hasWord(value)) {
@@ -1245,6 +1275,7 @@ const Generator = struct {
     }
     fn assignTransportParts(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, copies: bool, shared_fields: []const bool) Error!void {
         target.literal = null;
+        target.constant_bits = null;
         if (target.tag != value.tag or target.fields.len != value.fields.len or target.mode != value.mode or target.floating != value.floating) return self.unsupported(m, id);
         if (!std.meta.eql(target.nominal, value.nominal) or target.demand != value.demand) return self.unsupported(m, id);
         if (!std.meta.eql(target.host, value.host)) return self.unsupported(m, id);
@@ -1344,6 +1375,7 @@ const Generator = struct {
     fn joinedWords(self: *Generator, value: *Value, physical: deferred_join.Join, cursor: *usize) Error!void {
         if (!shareableNode(value.*)) return;
         value.literal = null;
+        value.constant_bits = null;
         if (hasWord(value.*)) {
             value.word = physical.word(cursor.*);
             cursor.* += 1;
@@ -1716,6 +1748,7 @@ const Generator = struct {
                 try self.invalid_literals.put(self.allocator, first.word.id, {});
                 var result = first;
                 result.literal = null;
+                result.constant_bits = null;
                 result.tag = .ref;
                 result.type_evidence = null;
                 return result;
@@ -2172,13 +2205,71 @@ const Generator = struct {
         if (value.demand != null) return null;
         const callable = value.callable orelse return null;
         const owner = try self.unit(callable.unit);
-        var signature = if (callable.node == 0) owner.binding(callable.target).ty else owner.closure(callable.node).function_type;
-        if (callable.node == 0) for (value.fields) |_| {
+        var signature = callable.signature(owner);
+        if (callable.kind(owner) != .closure) for (value.fields) |_| {
             const arrow = owner.types.node(signature);
             if (arrow.tag != .function) return null;
             signature = arrow.b;
         };
         return .{ .unit = owner.unit, .ty = signature, .environment = callable.types };
+    }
+    fn primitiveCallable(self: *Generator, m: *const core.Module, id: core.Id) Error!?Value {
+        const primitive_ = m.primitive(id);
+        if (primitive_.kind != .scalar or primitive_.arity == 0 or primitive_.arity > 2) return null;
+        var signature = m.typeOf(id);
+        var machine: wasm.Scalar = .u32;
+        for (0..primitive_.arity) |index| {
+            const arrow = m.types.node(signature);
+            if (arrow.tag != .function) return null;
+            const input = m.types.node(arrow.a);
+            switch (input.tag) {
+                .u32, .boolean => {},
+                .f32 => if (index == 0) {
+                    machine = .f32;
+                },
+                else => return null,
+            }
+            signature = arrow.b;
+        }
+        switch (m.types.node(signature).tag) {
+            .u32, .f32, .boolean => {},
+            else => return null,
+        }
+        if (scalar_ops.opcode(primitive_.op, machine) == null) return null;
+        return .{ .tag = .callable, .word = .{ .id = 0 }, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id }), .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = &.{} }) };
+    }
+    fn primitivePartial(self: *Generator, function: Value, argument: Value, emitting: bool) Error!Value {
+        const callable = function.callable.?;
+        const owner = try self.unit(callable.unit);
+        const signature = (try self.callableType(function)) orelse return error.Declined;
+        const arrow = owner.types.node(signature.ty);
+        if (arrow.tag != .function) return error.Declined;
+        try self.mapValueTypes(.{ .unit = owner.unit, .ty = arrow.a }, argument, 0);
+        const fields = try self.arena.allocator().alloc(Value, function.fields.len + 1);
+        @memcpy(fields[0..function.fields.len], function.fields);
+        fields[function.fields.len] = argument;
+        if (emitting) fields[function.fields.len] = try self.snapshot(argument);
+        return .{ .tag = .callable, .word = function.word, .fields = fields, .callable = callable, .type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = owner.unit, .ty = arrow.b }, .arguments = &.{} }) };
+    }
+    fn applyPrimitive(self: *Generator, m: *const core.Module, id: core.Id, function: Value, argument: Value) Error!Value {
+        const callable = function.callable.?;
+        const owner = try self.unit(callable.unit);
+        const primitive_ = owner.primitive(callable.node);
+        if (function.fields.len + 1 < primitive_.arity) return self.primitivePartial(function, argument, true);
+        if (function.fields.len + 1 != primitive_.arity) return self.unsupported(m, id);
+        var left = argument;
+        var right = try self.unitValue();
+        if (primitive_.arity == 2) {
+            left = function.fields[0];
+            right = argument;
+        }
+        self.emission_work.scoped_primitive_applications +|= 1;
+        var result = try self.scalarPrimitive(m, id, primitive_.op, primitive_.arity == 2, left, right);
+        const signature = (try self.callableType(function)) orelse return self.unsupported(m, id);
+        const arrow = owner.types.node(signature.ty);
+        if (arrow.tag != .function) return self.unsupported(m, id);
+        result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = owner.unit, .ty = arrow.b }, .arguments = &.{} });
+        return result;
     }
     // Additional inline-data specializations follow exact checked numeric
     // selections. No storage, host calls, captures, global values or unknown
@@ -2258,8 +2349,14 @@ const Generator = struct {
         const n = m.node(id);
         const function = (try self.planValue(m, n.a, remaining, depth + 1)) orelse return null;
         const callable = function.callable orelse return null;
-        if (callable.node != 0 or function.host != null or function.demand != null) return null;
+        if (function.host != null or function.demand != null) return null;
         const owner = try self.unit(callable.unit);
+        if (callable.kind(owner) == .primitive) {
+            if (function.fields.len + 1 >= owner.primitive(callable.node).arity) return null;
+            const argument = (try self.planValue(m, n.b, remaining, depth + 1)) orelse return null;
+            return try self.primitivePartial(function, argument, false);
+        }
+        if (callable.kind(owner) != .named) return null;
         const body = owner.body(callable.target) orelse return null;
         const parameters = owner.bodyParameters(body);
         if (function.fields.len + 1 >= parameters.len) return null;
@@ -2319,8 +2416,10 @@ const Generator = struct {
                 const source = try self.unit(ref.unit);
                 if (source.body(ref.binding)) |body| {
                     if (body.is_function) return .{ .tag = .callable, .word = .{ .id = 0 }, .callable = try self.boxCallable(.{ .unit = ref.unit, .target = ref.binding, .types = try self.captureTypes() }) };
+                    if (source.node(body.root).tag == .primitive_function or source.node(body.root).tag == .reference) return self.planValue(source, body.root, remaining, depth + 1);
                 } else if (source.binding(ref.binding).kind != .local and source.binding(ref.binding).kind != .parameter) return null;
             },
+            .primitive_function => return self.primitiveCallable(m, id),
             .closure => {
                 const captures = m.closureCaptures(id);
                 const fields = try self.arena.allocator().alloc(Value, captures.len);
@@ -2354,6 +2453,14 @@ const Generator = struct {
                 if (signature.tag != .function) return null;
                 try self.mapTypes(.{ .unit = owner.unit, .ty = signature.a }, selection.receiver, 0);
                 try self.mapTypes(.{ .unit = owner.unit, .ty = signature.b }, .{ .unit = m.unit, .ty = projection.result_type }, 0);
+                if (owner.bodyParameters(body).len == 0) {
+                    if (try self.planValue(owner, body.root, remaining, depth + 1)) |function| {
+                        if (function.callable) |callable| {
+                            const source = try self.unit(callable.unit);
+                            if (callable.kind(source) == .primitive and source.primitive(callable.node).arity == 2) return try self.primitivePartial(function, receiver, false);
+                        }
+                    }
+                }
                 // A curried getter captures its receiver now; admission of its
                 // body waits for the saturated callback, just like invoke.
                 if (owner.bodyParameters(body).len > 1) return .{ .tag = .callable, .word = .{ .id = 0 }, .fields = try self.arena.allocator().dupe(Value, &.{receiver}), .callable = try self.boxCallable(.{ .unit = owner.unit, .target = selection.target.binding, .types = try self.captureTypes() }) };
@@ -2380,6 +2487,19 @@ const Generator = struct {
                 if (target.unit == 0) target.unit = m.unit;
                 const owner = try self.unit(target.unit);
                 const body = owner.body(target.binding) orelse return null;
+                if (owner.bodyParameters(body).len == 0 and call.arguments.len != 0) {
+                    var value = (try self.planValue(owner, body.root, remaining, depth + 1)) orelse return null;
+                    const callable = value.callable orelse return null;
+                    const source = try self.unit(callable.unit);
+                    if (callable.kind(source) != .primitive) return null;
+                    const arity = source.primitive(callable.node).arity;
+                    for (call.arguments) |argument_id| {
+                        if (value.fields.len + 1 >= arity) break;
+                        const argument = (try self.planValue(m, argument_id, remaining, depth + 1)) orelse return null;
+                        value = try self.primitivePartial(value, argument, false);
+                    }
+                    if (call.arguments.len < arity) return value;
+                }
                 if (call.arguments.len < owner.bodyParameters(body).len) {
                     const fields = try self.arena.allocator().alloc(Value, call.arguments.len);
                     for (fields, call.arguments) |*field, argument| field.* = (try self.planValue(m, argument, remaining, depth + 1)) orelse return null;
@@ -2482,6 +2602,14 @@ const Generator = struct {
         const callable = function.callable orelse return false;
         if (function.demand != null or function.host != null or used == active.len) return false;
         const owner = try self.unit(callable.unit);
+        if (callable.kind(owner) == .primitive) {
+            if (function.fields.len + 1 != owner.primitive(callable.node).arity) return false;
+            const signature = (try self.callableType(function)) orelse return false;
+            const arrow = owner.types.node(signature.ty);
+            if (arrow.tag != .function) return false;
+            try self.mapValueTypes(.{ .unit = owner.unit, .ty = arrow.a }, argument, 0);
+            return true;
+        }
         if (callable.node == 0) {
             const values = try self.arena.allocator().alloc(Value, function.fields.len + 1);
             @memcpy(values[0..function.fields.len], function.fields);
@@ -2752,6 +2880,20 @@ const Generator = struct {
         defer self.active_goals = previous_goals;
         const parameters = owner.bodyParameters(body);
         if (parameters.len != inputs.len) {
+            if (parameters.len == 0 and inputs.len != 0 and owner.node(body.root).tag == .primitive_function) {
+                const function = (try self.primitiveCallable(owner, body.root)) orelse return false;
+                const callable = function.callable.?;
+                if (inputs.len != owner.primitive(callable.node).arity) return false;
+                var signature = callable.signature(owner);
+                for (inputs) |input| {
+                    const arrow = owner.types.node(signature);
+                    if (arrow.tag != .function) return false;
+                    try self.mapTypes(.{ .unit = owner.unit, .ty = arrow.a }, input, 0);
+                    signature = arrow.b;
+                }
+                try self.mapTypes(.{ .unit = owner.unit, .ty = signature }, output, 0);
+                return true;
+            }
             // A source alias such as `floor = F32.floor` has no own
             // parameters. Follow only its exact reference body; evaluating a
             // factory or choosing a callback remains a separate admission.
@@ -2860,7 +3002,7 @@ const Generator = struct {
                 if (readers) if (try self.planValue(m, n.b, remaining, depth + 1)) |value| try self.bindings.append(self.allocator, .{ .unit = m.unit, .id = n.a, .value = value, .remaining = 0 });
             },
             .construct, .return_ => if (!try self.numericExpression(m, if (n.tag == .return_) n.a else n.b, remaining, active, used, readers, depth + 1)) return false,
-            .closure => {
+            .closure, .primitive_function => {
                 if (!readers) return false;
                 const value = (try self.planValue(m, id, remaining, depth + 1)) orelse return false;
                 var descriptor = false;
@@ -2922,7 +3064,8 @@ const Generator = struct {
                         defer self.type_arguments.shrinkRetainingCapacity(before);
                         const selection = (try self.selectedGetter(m, id, value)) orelse return false;
                         const declaration = (try self.unit(selection.target.unit)).body(selection.target.binding) orelse return false;
-                        if ((try self.unit(selection.target.unit)).bodyParameters(declaration).len > 1) {
+                        const source = try self.unit(selection.target.unit);
+                        if (source.bodyParameters(declaration).len > 1 or (source.node(declaration.root).tag == .primitive_function and source.primitive(declaration.root).arity == 2)) {
                             const function = (try self.planValue(m, id, remaining, depth + 1)) orelse return false;
                             if (function.tag != .callable) return false;
                             if (!readers) {
@@ -3185,6 +3328,7 @@ const Generator = struct {
     fn inlineReturnValue(self: *Generator, template: Value, words: []const Local, next: *usize) Error!Value {
         var value = template;
         value.literal = null;
+        value.constant_bits = null;
         if (value.tag == .scalar) {
             value.word = words[next.*];
             next.* += 1;
@@ -3198,6 +3342,7 @@ const Generator = struct {
     fn inlineParameter(self: *Generator, original: Value, next: *u32) Error!Value {
         var value = original;
         value.literal = null;
+        value.constant_bits = null;
         if (value.tag == .scalar or value.variant_tags.len != 0) {
             value.word = .{ .id = next.* };
             next.* += 1;
@@ -3409,6 +3554,7 @@ const Generator = struct {
     fn readerPlainShape(self: *Generator, source: Value) Error!Value {
         var value = source;
         value.literal = null;
+        value.constant_bits = null;
         value.variant_index = null;
         value.variant_possible = &.{};
         const fields = initializeFields(&value, try self.arena.allocator().alloc(Value, source.fields.len));
@@ -3450,6 +3596,7 @@ const Generator = struct {
     fn readerParameter(self: *Generator, child: *Generator, input: *Value, argument: Value, next: *u32) Error!void {
         input.* = argument;
         input.literal = null;
+        input.constant_bits = null;
         if (argument.tag == .aggregate or argument.tag == .callable) {
             const fields = initializeFields(input, try child.arena.allocator().alloc(Value, argument.fields.len));
             if (argument.variant_tags.len != 0) {
@@ -3463,6 +3610,7 @@ const Generator = struct {
         }
         input.word = .{ .id = next.* };
         input.literal = null;
+        input.constant_bits = null;
         next.* += 1;
         input.depth = 0;
         if (argument.tag == .scalar) return;
@@ -3723,16 +3871,16 @@ const Generator = struct {
         if (value.callable) |callable| {
             const owner = try self.unit(callable.unit);
             if (callable.target == 0) {
-                if (callable.node == 0 or owner.node(callable.node).tag != .closure or callable.goals.len != 0) {
+                if (callable.node == 0 or callable.goals.len != 0) {
                     self.traceDescriptorBarrier(m, id, value, "descriptor.shared.callback-evidence", false);
                     return error.Declined;
                 }
-                if (owner.closures[owner.node(callable.node).a].qualifier != 0) {
+                if (callable.kind(owner) == .closure and owner.closures[owner.node(callable.node).a].qualifier != 0) {
                     self.traceDescriptorBarrier(m, id, value, "descriptor.shared.callback-qualifier", false);
                     return error.Declined;
                 }
             }
-            const signature = if (callable.target != 0) owner.binding(callable.target).ty else owner.typeOf(callable.node);
+            const signature = callable.signature(owner);
             try self.descriptorTypeEvidence(m, id, .{ .unit = owner.unit, .ty = signature, .environment = callable.types }, evidence, keys, remaining);
             if (callable.target != 0) try self.descriptorBodyEvidence(owner, owner.body(callable.target) orelse return error.Declined, callable.types, evidence, keys, remaining);
         }
@@ -3792,6 +3940,7 @@ const Generator = struct {
         var result = source;
         result.word = .{ .id = 0 };
         result.literal = null;
+        result.constant_bits = null;
         result.type_evidence = null;
         result.name = try arena.dupe(u8, source.name);
         const fields = initializeFields(&result, try arena.alloc(Value, source.fields.len));
@@ -3850,6 +3999,7 @@ const Generator = struct {
 
     fn writerInput(self: *Generator, value: *Value, owners: []const usize, assigned: []bool) Error!void {
         value.literal = null;
+        value.constant_bits = null;
         value.depth = 0;
         for (try self.writableFields(value)) |*field| try self.writerInput(field, owners, assigned);
         if (value.tag == .scalar or value.tag == .aggregate or value.tag == .callable) return;
@@ -3869,6 +4019,7 @@ const Generator = struct {
     }
     fn clearWriterLiterals(self: *Generator, value: *Value) Error!void {
         value.literal = null;
+        value.constant_bits = null;
         for (try self.writableFields(value)) |*field| try self.clearWriterLiterals(field);
     }
     const OwnerGraph = @import("storage_owner_graph.zig").Graph(Value);
@@ -3932,6 +4083,7 @@ const Generator = struct {
     }
     fn graphInputShape(self: *Generator, value: *Value, graph: *const OwnerGraph) Error!void {
         value.literal = null;
+        value.constant_bits = null;
         value.depth = 0;
         if (value.root) |owner| value.root = try graph.ordinal(owner);
         const others = try self.arena.allocator().alloc(usize, value.other_roots.len);
@@ -3955,6 +4107,7 @@ const Generator = struct {
         var result = source;
         result.word = .{ .id = 0 };
         result.literal = null;
+        result.constant_bits = null;
         // Projected results need semantic witnesses as well as physical layout.
         // They are immutable, owned by this compilation, and selected by the
         // complete graph/type key; no child-generator arena may escape here.
@@ -4110,7 +4263,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_primitive_applications", "scoped_scalar_constants_folded", "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4783,6 +4936,11 @@ const Generator = struct {
         var selected: std.ArrayList(u32) = .empty;
         defer selected.deinit(self.allocator);
         try self.checkSourceBody(m, body, target.binding);
+        if (parameters.len == 0 and m.node(body.root).tag == .primitive_function) {
+            var function = try self.expression(m, body.root, depth + 1);
+            for (arguments) |argument| function = try self.applyUse(m, body.root, function, argument, depth + 1, .{ .checked = false });
+            return function;
+        }
         if (arguments.len < parameters.len) {
             if (depth > 128) return self.unsupported(m, body.root);
             const fields = try self.arena.allocator().alloc(Value, arguments.len);
@@ -5078,9 +5236,9 @@ const Generator = struct {
         // refine after restoring the capture's earlier type environment.
         if (options.checked and m.node(id).tag == .apply) {
             const owner = try self.unit(callable.unit);
-            var signature = if (callable.node == 0) owner.binding(callable.target).ty else owner.closure(callable.node).function_type;
+            var signature = callable.signature(owner);
             var skipped: usize = 0;
-            while (skipped < if (callable.node == 0) function.fields.len else 0) : (skipped += 1) {
+            while (skipped < if (callable.kind(owner) != .closure) function.fields.len else 0) : (skipped += 1) {
                 const arrow = owner.types.node(signature);
                 if (arrow.tag != .function) return self.unsupported(m, id);
                 signature = arrow.b;
@@ -5091,6 +5249,7 @@ const Generator = struct {
                 try self.mapTypes(.{ .unit = owner.unit, .ty = arrow.b }, use_output.?, 0);
             }
         }
+        if (callable.kind(try self.unit(callable.unit)) == .primitive) return self.applyPrimitive(m, id, function, argument);
         if (callable.node == 0) {
             const args = try self.arena.allocator().alloc(Value, function.fields.len + 1);
             @memcpy(args[0..function.fields.len], function.fields);
@@ -5741,66 +5900,40 @@ const Generator = struct {
         }
         return result;
     }
-    fn primitive(self: *Generator, m: *const core.Module, id: core.Id, left_value: Value, right_value: Value) Error!Value {
-        if (left_value.tag == .aggregate) return self.vectorPrimitive(m, id, left_value, right_value);
-        const n = m.node(id);
-        const left = try self.scalar(m, n.a, left_value);
+    fn primitive(self: *Generator, m: *const core.Module, id: core.Id, left: Value, right: Value) Error!Value {
+        if (left.tag == .aggregate) return self.vectorPrimitive(m, id, left, right);
+        const node = m.node(id);
+        return self.scalarPrimitive(m, id, node.op, node.b != 0, left, right);
+    }
+    fn scalarPrimitive(self: *Generator, m: *const core.Module, id: core.Id, operation_: core.Op, binary: bool, left_value: Value, right_value: Value) Error!Value {
+        const left = try self.scalar(m, id, left_value);
         const right = try self.scalar(m, id, right_value);
-        const op: wasm.Op = if (left_value.floating) switch (n.op) {
-            .add => .f32_add,
-            .sub => .f32_sub,
-            .mul => .f32_mul,
-            .div => .f32_div,
-            .equal => .f32_eq,
-            .not_equal => .f32_ne,
-            .less => .f32_lt,
-            .less_equal => .f32_le,
-            .greater => .f32_gt,
-            .greater_equal => .f32_ge,
-            .neg => .f32_neg,
-            .abs => .f32_abs,
-            .ceil => .f32_ceil,
-            .floor => .f32_floor,
-            .trunc => .f32_trunc,
-            .sqrt => .f32_sqrt,
-            .min => .f32_min,
-            .max => .f32_max,
-            .convert_f32_u32 => .i32_trunc_sat_f32_u,
-            .bits => .i32_reinterpret_f32,
-            else => return self.unsupported(m, id),
-        } else switch (n.op) {
-            .add => .i32_add,
-            .sub => .i32_sub,
-            .mul => .i32_mul,
-            .div => .i32_div_u,
-            .rem => .i32_rem_u,
-            .equal => .i32_eq,
-            .not_equal => .i32_ne,
-            .less => .i32_lt_u,
-            .less_equal => .i32_le_u,
-            .greater => .i32_gt_u,
-            .greater_equal => .i32_ge_u,
-            .bit_and => .i32_and,
-            .bit_or => .i32_or,
-            .bit_xor => .i32_xor,
-            .shift_left => .i32_shl,
-            .shift_right => .i32_shr_u,
-            .convert_u32_f32 => .f32_convert_i32_u,
-            .from_bits => .f32_reinterpret_i32,
-            else => return self.unsupported(m, id),
-        };
+        var machine: wasm.Scalar = .u32;
+        if (left_value.floating) machine = .f32;
+        const opcode = scalar_ops.opcode(operation_, machine) orelse return self.unsupported(m, id);
+        const floating = scalar_ops.resultScalar(operation_, machine) == .f32;
+        if (self.knownConstant(left_value)) |a| {
+            var b: ?u32 = 0;
+            if (binary) b = self.knownConstant(right_value);
+            if (b) |bits| {
+                const folded = scalar_ops.evaluateExact(operation_, .{ .scalar = machine, .bits = a }, .{ .scalar = machine, .bits = bits }) catch null;
+                if (folded) |constant_| {
+                    var result = try self.constant(constant_.bits);
+                    result.floating = constant_.scalar == .f32;
+                    result.constant_bits = constant_.bits;
+                    self.emission_work.scoped_scalar_constants_folded +|= 1;
+                    return result;
+                }
+            }
+        }
         const word = try self.c.temp();
         try self.c.value(left);
         if (left_value.floating) try self.c.op(.f32_reinterpret_i32, 0);
-        if (n.b != 0) {
+        if (binary) {
             try self.c.value(right);
             if (right_value.floating) try self.c.op(.f32_reinterpret_i32, 0);
         }
-        try self.c.op(op, 0);
-        const floating = n.ty == T.f32_type or (left_value.floating and switch (n.op) {
-            .add, .sub, .mul, .div, .neg, .abs, .ceil, .floor, .trunc, .sqrt, .min, .max => true,
-            else => false,
-        });
+        try self.c.op(opcode, 0);
         if (floating) try self.c.op(.i32_reinterpret_f32, 0);
         try self.c.op(.local_set, word.id);
         return .{ .word = word, .floating = floating };
@@ -6017,6 +6150,7 @@ const Generator = struct {
         try self.checkSourceBody(plan.owner, plan.body, plan.binding);
         var value = try self.constant(literal.a);
         value.literal = if (literal.ty == T.u32_type) literal.a else null;
+        value.constant_bits = literal.a;
         value.floating = literal.ty == T.f32_type;
         value.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = plan.owner.unit, .ty = literal.ty }, .arguments = &.{} });
         self.emission_work.scoped_literal_record_projections +|= 1;
@@ -6305,6 +6439,7 @@ const Generator = struct {
                 if (n.ty != T.u32_type and n.ty != T.boolean and n.ty != T.unit and n.ty != T.f32_type) return self.unsupported(m, id);
                 var value = try self.constant(n.a);
                 value.literal = if (n.ty == T.u32_type) n.a else null;
+                value.constant_bits = n.a;
                 value.floating = n.ty == T.f32_type;
                 return value;
             },
@@ -6386,6 +6521,11 @@ const Generator = struct {
                 (try self.writableFields(&result))[selected] = payload;
                 result.variant_index = selected;
                 return result;
+            },
+            .primitive_function => {
+                var value = (try self.primitiveCallable(m, id)) orelse return self.unsupported(m, id);
+                value.word = (try self.unitValue()).word;
+                return value;
             },
             .closure, .suspend_ => {
                 const captures = if (n.tag == .suspend_) m.suspensionCaptures(id) else m.closureCaptures(id);
@@ -6565,6 +6705,7 @@ const Generator = struct {
                 if (value.scalar != .u32 and value.scalar != .unit and value.scalar != .bool and value.scalar != .f32) return self.unsupported(m, id);
                 var result = try self.constant(value.bits);
                 result.literal = if (value.scalar == .u32) value.bits else null;
+                result.constant_bits = value.bits;
                 result.floating = value.scalar == .f32;
                 return result;
             },

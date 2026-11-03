@@ -1429,7 +1429,7 @@ const Engine = struct {
     pub fn sourceIntrinsicArity(self: *const Engine, symbol: symbols.Symbol) ?usize {
         const text = self.pool.get(symbol);
         if (std.mem.eql(u8, text, "@requests") or std.mem.eql(u8, text, "@computation")) return 1;
-        return intrinsicArity(text);
+        return exactIntrinsicArity(text);
     }
     pub fn sourceIntrinsicKnown(self: *const Engine, symbol: symbols.Symbol) bool {
         const text = self.pool.get(symbol);
@@ -11802,6 +11802,10 @@ const Engine = struct {
         }
         try self.constrain(item.ty, shape, id);
     }
+    fn exactIntrinsicArity(name: []const u8) ?usize {
+        if (std.mem.startsWith(u8, name, "@u32.") or std.mem.startsWith(u8, name, "@f32.")) return null;
+        return intrinsicArity(name);
+    }
     fn intrinsicArity(name: []const u8) ?usize {
         if (@import("storage_ops.zig").lookup(name)) |op| return @import("storage_ops.zig").arity(op);
         if (@import("task_types.zig").lookup(name)) |operation| return @import("task_types.zig").arity(operation);
@@ -11873,7 +11877,7 @@ const Engine = struct {
             try self.diagnostic(if (std.mem.eql(u8, text, "@requests")) .requests_scope else .intrinsic_arity, id);
             return self.types.fresh();
         }
-        if (intrinsicArity(text) != null and self.permitted_intrinsic != id) {
+        if (exactIntrinsicArity(text) != null and self.permitted_intrinsic != id) {
             try self.diagnostic(.call_arity, id);
             return self.types.fresh();
         }
@@ -12503,7 +12507,7 @@ const Engine = struct {
         const saved_intrinsic = self.permitted_intrinsic;
         defer self.permitted_intrinsic = saved_intrinsic;
         if (self.tree.node(leaf).tag == .intrinsic) {
-            if (intrinsicArity(self.pool.get(self.tree.node(leaf).a))) |expected| {
+            if (exactIntrinsicArity(self.pool.get(self.tree.node(leaf).a))) |expected| {
                 if (self.permitted_intrinsic != leaf and arity != expected) {
                     try self.diagnostic(.call_arity, id);
                     return try self.types.fresh();

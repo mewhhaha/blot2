@@ -2,40 +2,32 @@
 
 The current priorities are shared-kernel runtime and Gdev Wasm size, with short
 iterations. Subsecond compilation remains the goal; the next latency gate is
-below five seconds.
-[The current fixed-span checkpoint](../scripts/bench/goose/results/2026-11-03-fixed-spans.md)
-produces **12,476,667B Main Wasm**, down another 73,943B (0.59%). Three fresh
-compile pairs have medians 5.987 → 6.140s, an observed 2.6% regression. Five
-matched kernel pairs improve Fannkuch 12.49x, CRC32 1.19x and custom hash 9.40x
-over the preceding release; all production cases finish below the 30-second cap.
-World/editor, hand and seven renderer streams retain their executed results;
-their small control binaries grow. Five-second, subsecond and 1–2MB goals remain
-unmet.
+below five seconds. The
+[current primitive-alias checkpoint](../scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
+removes 30 numeric forwarding wrappers and supports ordinary scalar primitive
+partial applications/callbacks. Scalar evaluation and Wasm lowering share one
+operation contract. Literal authority remains separate from exact constant bits;
+ABI 8 and session protocol 2 stay unchanged.
 
-Private helpers validate stable fixed scalar-array descriptors lazily once per
-invocation, retaining every bounds check. Fresh creates refresh snapshots; local
-grow/freeze and merged descriptors retain fallback. Existing owner, borrow,
-escape, variant and effect proofs remain. Invariant array descriptors and
-unchanged named nested fields share loop carries. Frequency-ordered private bank
-IDs save 85,891 operand bytes in Main; local/global traffic still occupies
-8,254,281B.
+Mandelbrot F32 uses 24% less kernel time; CRC32 is 2.5% slower and the other
+three matched kernels are flat. Main compile medians are **5.860 → 5.814s**,
+with Wasm **12,476,667 → 12,490,827B**. The large size/latency targets remain
+unmet; local/global instructions occupy 8,257,498B. All 2,945 native laws
+compile; 214 affected native laws and 196 guests pass, including final LLVM
+guest checks. Nine focused laws pass full-fault mode. Full qualification remains
+pending; interrupted full sweeps never count as passes.
 
-All 2,937 native laws compile. The affected 201-law/192-guest family passes in
-60.04s; nine focused laws pass full allocation faults, final LLVM passes all 192
-guests, and Zig lint is clean. The prior List/chunk smoke now passes by applying
-the existing guarded private append proof to explicit consuming conversions.
-Full qualification passes 49 smoke and 57 harness checks, but broad native
-execution was stopped after 355.79s with 445 completed laws and 298 full sweeps,
-no failures/leaks/logged errors. This remains **incomplete**.
-
-Rebuilt unchanged Pen accepts ABI 8. Current Main passes all headless NVIDIA
-one-frame checks; the inspected PNG and guest trace are byte-identical to the
-baseline. See
-[current frame evidence](storage-handoff-evidence/2026-11-03-fixed-spans-frame.json).
-Broader gameplay and software-adapter coverage remain pending. Next classify
-completed-plan rollbacks, especially fresh fixed-array returns, before changing
-larger aggregate boundaries. The existing 512-word selector already admits wide
-calls through a buffered ABI; no machine-limit widening is justified.
+World/editor, hand and seven renderer streams retain their results. The final
+Main's inspected NVIDIA frame PNG and guest trace match the baseline exactly;
+see
+[frame evidence](storage-handoff-evidence/2026-11-03-primitive-aliases-frame.json).
+Broader gameplay and software-adapter coverage remain pending. Next address
+2,009 completed-plan rollbacks (184,212 discarded expressions), particularly
+fresh fixed-array result transfer. The 512-word selector already supports wide
+calls through a buffered ABI; no limit widening is justified. Preserve earlier
+[fixed-span evidence](../scripts/bench/goose/results/2026-11-03-fixed-spans.md)
+and
+[seven-case survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves

@@ -25,7 +25,7 @@ const cases = [_]Case{
     .{ .source = "const first=4294967296\nconst later:Missing=42\n", .code = .unsupported_type, .point = 35 }, // overflow-before-later-annotation
     .{ .source = "const first:Missing=42\nconst later=4294967296\n", .code = .integer_range, .point = 35 }, // annotation-before-later-overflow
     .{ .source = "const answer=func(value:Missing)=> return 4294967296\n", .code = .unsupported_type, .point = 24 }, // lambda-annotation-overflow
-    .{ .source = "const answer=@u32.add 4294967296\n", .code = .call_arity, .point = 13 }, // primitive-arity-overflow
+    .{ .source = "const answer=@u32.add 4294967296\n", .code = .integer_range, .point = 22 }, // primitive-partial-overflow
     .{ .source = "const answer=@u32.add missing 4294967296\n", .code = .unknown_value, .point = 22 }, // primitive-first-name-overflow
     .{ .source = "const answer=@u32.add 4294967296 missing\n", .code = .integer_range, .point = 22 }, // primitive-first-overflow-name
     .{ .source = "const answer=do:\n  break 42\n  4294967296\n", .code = .unreachable_statement, .point = 30 }, // unreachable-overflow
@@ -58,7 +58,7 @@ const cases = [_]Case{
     .{ .source = "type Wrapped is data= $Wrapped {value:U32}\nconst answer=func value=> return case value of\n  $Wrapped {value:4294967296}=>42\n", .code = .integer_range, .point = 108 }, // record-pattern-overflow
     .{ .source = "const answer:Missing=1e999\n", .code = .unsupported_type, .point = 13 }, // float-unknown-annotation
     .{ .source = "const first=1e999\nconst later=missing\n", .code = .unknown_value, .point = 30 }, // float-before-name
-    .{ .source = "const answer=@f32.add 1e999\n", .code = .call_arity, .point = 13 }, // float-primitive-arity
+    .{ .source = "const answer=@f32.add 1e999\n", .code = .float_range, .point = 22 }, // float-primitive-partial-overflow
     .{ .source = "type Box a is data= $Box a\nconst answer=Box 4294967296\n", .code = .integer_range, .point = 44 }, // nominal-type-argument-overflow
     .{ .source = "type Box a is data= $Box a\nconst answer=Box {value:4294967296}\n", .code = .constructor_marker, .point = 40 }, // nominal-record-type-argument-overflow
     .{ .source = "type Box a is data= $Box a\nconst answer=Box (missing,4294967296)\n", .code = .unknown_value, .point = 45 }, // nominal-type-argument-name-before-overflow
@@ -107,7 +107,7 @@ const cases = [_]Case{
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:U32,value:U32} ()\n", .code = .unknown_value, .point = 97 }, // operation-record-duplicate-field
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {} ()\n", .code = .integer_range, .point = 57 }, // operation-record-empty
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:Missing} ()\n", .code = .unknown_value, .point = 97 }, // operation-record-unbound-value
-    .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:@u32.add} ()\n", .code = .call_arity, .point = 97 }, // operation-record-intrinsic-value
+    .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst first=4294967296\nconst later=Tick.read {value:@u32.add} ()\n", .code = .integer_range, .point = 57 }, // operation-record-intrinsic-value
     .{ .source = "type Tick {value:a} is effect={read:Unit->a}\nconst answer=Tick.read {value:1e999} ()\n", .code = .float_range, .point = 75 }, // operation-record-float-overflow
     .{ .source = "const Box=func value=> return value\ntype Box a is data= $Box a\nconst answer=4294967296\n", .code = .duplicate_name, .point = 0 }, // nominal-value-collision-reverse
     .{ .source = "const answer= $Missing {value:4294967296}\n", .code = .unknown_constructor, .point = 15 }, // unknown-record-before-overflow

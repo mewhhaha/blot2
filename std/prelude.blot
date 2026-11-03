@@ -71,45 +71,45 @@ const Type.eq = func left -> right => return case left, right of
   $Type a, $Type b => @type.same a b
 const Type.ne = func left -> right => return Bool.not (Type.eq left right)
 
-const U32.add = func left -> right => return @u32.add left right
-const U32.sub = func left -> right => return @u32.sub left right
-const U32.mul = func left -> right => return @u32.mul left right
+const U32.add = @u32.add
+const U32.sub = @u32.sub
+const U32.mul = @u32.mul
 // Division/remainder require a nonzero divisor. Shifts use the low five bits.
-const U32.div = func left -> right => return @u32.div left right
-const U32.rem = func left -> right => return @u32.rem left right
-const U32.bit_and = func left -> right => return @u32.bit_and left right
-const U32.bit_or = func left -> right => return @u32.bit_or left right
-const U32.bit_xor = func left -> right => return @u32.bit_xor left right
+const U32.div = @u32.div
+const U32.rem = @u32.rem
+const U32.bit_and = @u32.bit_and
+const U32.bit_or = @u32.bit_or
+const U32.bit_xor = @u32.bit_xor
 const U32.bit_not = func value => return @u32.bit_xor value 0xFFFFFFFF
-const U32.shl = func value -> count => return @u32.shl value count
-const U32.shr = func value -> count => return @u32.shr value count
+const U32.shl = @u32.shl
+const U32.shr = @u32.shr
 const U32.abs = func value => return value
-const U32.eq = func left -> right => return @u32.eq left right
-const U32.lt = func left -> right => return @u32.lt left right
+const U32.eq = @u32.eq
+const U32.lt = @u32.lt
 const U32.ne = func left -> right => return Bool.not (U32.eq left right)
 const U32.le = func left -> right => return Bool.not (U32.lt right left)
 const U32.gt = func left -> right => return U32.lt right left
 const U32.ge = func left -> right => return Bool.not (U32.lt left right)
-const U32.to_f32 = func value => return @u32.to_f32 value
+const U32.to_f32 = @u32.to_f32
 
-const F32.add = func left -> right => return @f32.add left right
-const F32.sub = func left -> right => return @f32.sub left right
-const F32.mul = func left -> right => return @f32.mul left right
-const F32.div = func left -> right => return @f32.div left right
-const F32.eq = func left -> right => return @f32.eq left right
-const F32.ne = func left -> right => return @f32.ne left right
-const F32.lt = func left -> right => return @f32.lt left right
-const F32.le = func left -> right => return @f32.le left right
-const F32.gt = func left -> right => return @f32.gt left right
-const F32.ge = func left -> right => return @f32.ge left right
-const F32.neg = func value => return @f32.neg value
-const F32.abs = func value => return @f32.abs value
-const F32.sqrt = func value => return @f32.sqrt value
-const F32.floor = func value => return @f32.floor value
-const F32.ceil = func value => return @f32.ceil value
-const F32.trunc = func value => return @f32.trunc value
+const F32.add = @f32.add
+const F32.sub = @f32.sub
+const F32.mul = @f32.mul
+const F32.div = @f32.div
+const F32.eq = @f32.eq
+const F32.ne = @f32.ne
+const F32.lt = @f32.lt
+const F32.le = @f32.le
+const F32.gt = @f32.gt
+const F32.ge = @f32.ge
+const F32.neg = @f32.neg
+const F32.abs = @f32.abs
+const F32.sqrt = @f32.sqrt
+const F32.floor = @f32.floor
+const F32.ceil = @f32.ceil
+const F32.trunc = @f32.trunc
 // Truncates toward zero and saturates; NaN/negative values become zero.
-const F32.to_u32 = func value => return @f32.to_u32 value
+const F32.to_u32 = @f32.to_u32
 const F32.min = func left -> right => return if F32.lt left right then left else right
 const F32.max = func left -> right => return if F32.gt left right then left else right
 const F32.clamp = func low -> high -> value => return

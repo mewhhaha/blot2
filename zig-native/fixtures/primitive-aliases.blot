@@ -1,0 +1,130 @@
+const add = @u32.add
+const subtract = @u32.sub
+const multiply = @u32.mul
+const divide = @u32.div
+const remainder = @u32.rem
+const bit_and = @u32.bit_and
+const bit_or = @u32.bit_or
+const bit_xor = @u32.bit_xor
+const shift_left = @u32.shl
+const shift_right = @u32.shr
+const equal = @u32.eq
+const less = @u32.lt
+const to_float = @u32.to_f32
+const float_add = @f32.add
+const float_subtract = @f32.sub
+const float_multiply = @f32.mul
+const float_divide = @f32.div
+const float_equal = @f32.eq
+const float_unequal = @f32.ne
+const float_less = @f32.lt
+const float_less_equal = @f32.le
+const float_greater = @f32.gt
+const float_greater_equal = @f32.ge
+const negate = @f32.neg
+const absolute = @f32.abs
+const square_root = @f32.sqrt
+const floor = @f32.floor
+const ceil = @f32.ceil
+const truncate = @f32.trunc
+const to_integer = @f32.to_u32
+const U32.combine = @u32.add
+const F32.combine = @f32.mul
+
+const apply_binary = func operation -> left -> right => return operation left right
+const apply_unary = func operation -> value => return operation value
+const walk = func operation -> (seed: U32): U32 => return do:
+  let total = seed
+  for index in 0..8:
+    total := operation total index
+  return total
+
+// The named growth capability explicitly selects storage ABI 8 for every entry.
+const profile: GrowArray U32 = #[0]
+
+entry const integers = func (value: U32): Array U32 => return do:
+  let local = add
+  return #[local value 2, subtract value 2, multiply value 3,
+    divide value 3, remainder value 3, bit_and value 15,
+    bit_or value 16, bit_xor value 15, shift_left value 33,
+    shift_right value 33, if equal value 7 then 1 else 0,
+    if less value 7 then 1 else 0, profile[0]]
+
+entry const higher_order = func (value: U32): Array U32 => return do:
+  let first = add value
+  let second = subtract value
+  let third = add (@u32.add value 1)
+  return #[apply_binary add value 7, apply_binary subtract value 7,
+    apply_binary multiply value 7, apply_unary first 7,
+    apply_unary second 7, apply_unary third 7,
+    walk add value, walk bit_xor value,
+    U32.combine value 2, U32.combine value 3]
+
+entry const snapshots = func (value: U32): Array U32 => return do:
+  let current = value
+  let first = add current
+  current := @u32.add current 10
+  let second = add current
+  return #[first 2, second 2, first 3, current]
+
+entry const references = func (value: U32): Array U32 => return do:
+  let owner: GrowArray U32 = #[value]
+  let reference: &U32 = &owner[0]
+  let before = add (@storage.load reference)
+  @storage.write reference (apply_binary add (@storage.load reference) 10)
+  let after = add (@storage.load reference)
+  return #[before 2, after 2, owner[0]]
+
+entry const scalar_reference = func (value: U32): Array U32 => return do:
+  let current = value
+  let reference: &U32 = &current
+  let before = add (@storage.load reference)
+  @storage.write reference (apply_binary multiply (@storage.load reference) 3)
+  return #[before 2, add (@storage.load reference) 2, current]
+
+entry const float_reference = func (value: F32): Array F32 => return do:
+  let current = value
+  let reference: &F32 = &current
+  let before = float_multiply (@storage.load reference)
+  @storage.write reference (apply_unary negate (@storage.load reference))
+  return #[before 2.0, float_multiply (@storage.load reference) 2.0, current]
+
+entry const floating = func (value: F32): Array F32 => return
+  #[float_add value 0.5, float_subtract value 0.5,
+    float_multiply value 2.0, float_divide value 2.0,
+    negate value, absolute value, square_root (absolute value),
+    floor value, ceil value, truncate value,
+    apply_binary float_multiply value 2.0,
+    F32.combine value 2.0, F32.combine value 3.0]
+
+entry const comparisons = func (value: F32): Array U32 => return
+  #[if float_equal value 0.0 then 1 else 0,
+    if float_unequal value 0.0 then 1 else 0,
+    if float_less value 0.0 then 1 else 0,
+    if float_less_equal value 0.0 then 1 else 0,
+    if float_greater value 0.0 then 1 else 0,
+    if float_greater_equal value 0.0 then 1 else 0]
+
+entry const from_integer = func (value: U32): F32 => return apply_unary to_float value
+entry const from_float = func (value: F32): U32 => return apply_unary to_integer value
+entry const signed_zero = func (value: F32): F32 => return apply_unary negate value
+entry const literal_product = func (): F32 => return @f32.mul 2.0 2.0
+entry const trap_divide = func (divisor: U32): U32 => return apply_binary divide 7 divisor
+entry const trap_remainder = func (divisor: U32): U32 => return apply_binary remainder 7 divisor
+
+entry const eager = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use result <- add (host 1) (host 2)
+  return result
+
+const select_partial = func operation -> value => return operation value
+entry const partial_constants = func (value: U32): Array U32 => return do:
+  let current = 4
+  let reference: &U32 = &current
+  let before = add (@storage.load reference)
+  @storage.write reference 11
+  let after = add (@storage.load reference)
+  return #[select_partial (add 2) value, select_partial (add 9) value,
+    select_partial (add 2) value, select_partial (add 9) value,
+    select_partial before value, select_partial after value]
+const nan = @f32.div 0.0 0.0
+entry const constant_nan = func (): F32 => return nan

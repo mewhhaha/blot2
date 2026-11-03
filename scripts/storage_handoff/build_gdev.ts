@@ -7,6 +7,7 @@ const { values, positionals } = parseArgs({
   options: {
     compiler: { type: "string" },
     entry: { type: "string" },
+    "std-root": { type: "string", default: "std" },
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
     trace: { type: "boolean", default: false },
@@ -49,6 +50,9 @@ const compilerPath = resolve(
     resolve(root, project.plugins[project.compiler.plugin].run.blotc),
 );
 const entryPath = resolve(root, values.entry ?? "src/main.blot");
+const stdRoot = resolve(values["std-root"]);
+const preludePath = resolve(stdRoot, "prelude.blot");
+const preludeBytes = await Deno.readFile(preludePath);
 const entryBytes = await Deno.readFile(entryPath);
 const penBytes = await Deno.readFile(`${root}/pen.json`);
 const sha256 = async (bytes: BufferSource) =>
@@ -66,8 +70,8 @@ try {
   compiler = await createZigProjectCompiler({
     executable: compilerPath,
     entry: entryPath,
-    prelude: resolve("std/prelude.blot"),
-    stdRoot: resolve("std"),
+    prelude: preludePath,
+    stdRoot,
     imports: Object.fromEntries(
       Object.entries(settings.imports).map((
         [key, path],
@@ -147,8 +151,10 @@ const output = {
   compiler: compilerPath,
   compilerSha256,
   entry: entryPath,
+  stdRoot,
   sourceCheckpoint: {
     entrySha256: await sha256(entryBytes),
+    preludeSha256: await sha256(preludeBytes),
     penJsonSha256: await sha256(penBytes),
   },
   deadlineMs: timeoutMs,

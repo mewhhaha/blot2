@@ -55,6 +55,12 @@ Functions take one argument at a time. Calls associate left: `f a b` means
 function; `f(a, b)` passes one tuple. Unit thunks defer work until called with
 `()`, without memoization. Recursion is supported.
 
+Scalar numeric primitives are ordinary functions: `const multiply = @f32.mul`
+and `const increment = @u32.add 1` work as aliases, partial applications and
+callbacks. Captured scalar arguments copy their current value. The prelude uses
+these aliases for terminal U32/F32 operations. Storage capacities and SIMD lane
+selectors retain their literal-only rules.
+
 Function bodies return explicitly: `func x => return x`, or `func x => do:` with
 `return x` inside. Every path through a function's bare `do:` body must return;
 `break value` only finishes a block. To return a block's result, write
