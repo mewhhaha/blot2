@@ -27,9 +27,11 @@ const Root = struct {
     scanned: usize = 0,
     totals: std.ArrayList(Total) = .empty,
     helpers: std.ArrayList(u32) = .empty, // indexes in Context.helpers
+    pending: std.AutoHashMapUnmanaged(usize, void) = .empty,
     fn deinit(self: *Root, a: A) void {
         self.totals.deinit(a);
         self.helpers.deinit(a);
+        self.pending.deinit(a);
     }
 };
 const Helper = struct { function: u32, root: u32, read_before_def: []u32, credit: Credit };
@@ -84,11 +86,60 @@ pub const Context = struct {
         };
         root.scanned = function.instructions.items.len;
     }
+    // Reservations never move instructions. A pending pair can precede a
+    // nested extracted range, but a range containing one cannot be extracted.
+    pub fn reserveCopy(self: *Context, function: u32) Error!usize {
+        if (self.finalized or function >= self.module.functions.items.len) return error.InvalidOutline;
+        const source = &self.module.functions.items[function];
+        const index = source.instructions.items.len;
+        try source.instructions.ensureUnusedCapacity(self.allocator, 2);
+        if (self.rootIndex(function)) |root| try self.roots.items[root].pending.put(self.allocator, index, {});
+        source.instructions.appendAssumeCapacity(.{ .op = .nop });
+        source.instructions.appendAssumeCapacity(.{ .op = .nop });
+        return index;
+    }
+    fn copyPair(self: *Context, function: u32, index: usize) Error!*ir.Function {
+        if (self.finalized or function >= self.module.functions.items.len) return error.InvalidOutline;
+        const source = &self.module.functions.items[function];
+        if (index >= source.instructions.items.len or source.instructions.items.len - index < 2) return error.InvalidOutline;
+        for (source.instructions.items[index..][0..2]) |inst| {
+            if (inst.op != .nop or inst.table_reference or inst.table_kind != .unknown) return error.InvalidOutline;
+        }
+        return source;
+    }
+    pub fn releaseCopy(self: *Context, function: u32, index: usize) Error!void {
+        _ = try self.copyPair(function, index);
+        if (self.rootIndex(function)) |root| _ = self.roots.items[root].pending.remove(index);
+    }
+    pub fn patchCopy(self: *Context, function: u32, index: usize, src: u32, dst: u32) Error!void {
+        const source = try self.copyPair(function, index);
+        const count = std.math.add(usize, source.parameters.len, source.locals.items.len) catch return error.InvalidOutline;
+        if (src >= count or dst >= count or localType(source, src) != .i32 or localType(source, dst) != .i32) return error.InvalidOutline;
+        if (self.rootIndex(function)) |root_index| {
+            const root = &self.roots.items[root_index];
+            if (count < root.totals.items.len) return error.InvalidOutline;
+            try root.totals.appendNTimes(self.allocator, .{}, count - root.totals.items.len);
+            if (index < root.scanned) {
+                if (root.scanned - index < 2) return error.InvalidOutline;
+                root.totals.items[src].references += 1;
+                root.totals.items[dst].references += 1;
+                root.totals.items[dst].writes += 1;
+            }
+            _ = root.pending.remove(index);
+        }
+        // All checks and allocation precede either instruction mutation.
+        source.instructions.items[index].op = .local_get;
+        source.instructions.items[index].operand = src;
+        source.instructions.items[index + 1].op = .local_set;
+        source.instructions.items[index + 1].operand = dst;
+    }
     pub fn tryExtract(self: *Context, ticket: Ticket, after: Work) Error!?Credit {
         const root_index = self.rootIndex(ticket.function) orelse return null;
         if (self.finalized) return error.InvalidOutline;
         const source = &self.module.functions.items[ticket.function];
         if (ticket.start > source.instructions.items.len or after.expressions < ticket.work.expressions or after.layouts < ticket.work.layouts) return error.InvalidOutline;
+        var pending = self.roots.items[root_index].pending.keyIterator();
+        while (pending.next()) |index| if (index.* >= ticket.start) return null;
         const length = source.instructions.items.len - ticket.start;
         if (length == 0 or length < self.options.minimum_instructions or length > self.options.maximum_range_instructions or self.helpers.items.len >= self.options.maximum_helpers) return null;
         if (hasCoordinates(self.module, ticket.function)) return null;
@@ -153,6 +204,7 @@ pub const Context = struct {
         const first_global = self.module.globals.items.len;
         var next_global = first_global;
         for (0..self.roots.items.len) |root_index| {
+            if (self.roots.items[root_index].pending.count() != 0) return error.InvalidOutline;
             try self.sync(root_index);
             const root = &self.roots.items[root_index];
             if (root.helpers.items.len == 0) continue;

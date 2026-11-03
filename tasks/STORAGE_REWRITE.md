@@ -3,23 +3,25 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/transport-cleanup-2026-11-03.json)
-produces **15.54 MB Wasm**, down from 16.22 MB (685kB / 4.22%). A matched fresh
-pair takes 5.652s → 5.636s; the configured launcher takes 5.702s with identical
-output. Final local transport cleanup removes every measured self-copy and
-set/get readback pair; no meaningful latency gain is established. All 2,884
-native laws compile, 116 selected laws pass full faults, and the final LLVM
-guest family has 102 passes/two baseline legacy memory-profile failures. Zig
-lint and world/editor, hand and renderer checks pass. Full qualification retains
-the baseline List/chunk failure; installed Pen rejects ABI 8 before rendering.
+[Actual full main](../zig-native/measurements/aggregate-identity-2026-11-03.json)
+produces **14.33 MB Wasm**, down from 15.54 MB (1.20MB / 7.74%). A matched fresh
+pair takes 5.773s → 5.778s; the configured launcher takes 5.660s with identical
+output. Deferred aggregate joins, helper input/result aliases and immutable zero
+sources reduce physical materialization. An initial 10.470s regression was held;
+indexing mutable locals once per function restores baseline latency with exact
+Wasm preserved. All 2,899 native laws compile; 131 selected laws pass full faults
+(52 sweeps). Final LLVM guests have 108 passes/two baseline legacy memory-profile
+failures. Zig lint and world/editor, hand and renderer checks pass. Full
+qualification retains the baseline List/chunk failure; installed Pen rejects
+ABI 8 before rendering. Five-second, subsecond and 1–2MB targets remain unmet.
 
 The exact historical 2.08MB output was recovered from preserved inputs in a
-bounded 2.88s replay. Historical records used heap pointers; the current backend
-recursively transports Value leaves and owner/borrow metadata. Source snapshots
-differ, but the remaining 10.63MB of local/global instructions points toward
-selective aggregate materialization as the next size pilot. Preserve complete
-semantic checks and explicit copies. Ordinary `#run` build functions remain a
-separate, unimplemented simplification.
+bounded 2.88s replay. Historical records used heap pointers; current aggregate
+transport still moves physical Value leaves and owner/borrow metadata. The
+remaining 9.83MB of local/global instructions makes selective materialization
+and global banking the next size hills. Preserve semantic checks and explicit
+copies. Ordinary `#run` build functions remain a separate, unimplemented
+simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

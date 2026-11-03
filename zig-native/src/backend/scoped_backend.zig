@@ -14,6 +14,7 @@ const backend = @import("core_backend.zig");
 const call_plan = @import("storage_calls.zig");
 const field_plan = @import("storage_field_plan.zig");
 const scope_outline = @import("wasm_scope_outline.zig");
+const deferred_join = @import("storage_deferred_join.zig");
 const type_arguments_index = @import("storage_type_arguments.zig");
 const selected_types = @import("storage_type_key.zig");
 const private_append = @import("private_append_region.zig");
@@ -117,6 +118,66 @@ const Value = struct {
     projected_parameter_fields: bool = false,
     demand: ?*Demand = null,
 };
+const ZeroSource = struct {
+    function: ?u32 = null,
+    word: Local = .{ .id = 0 },
+    fn get(self: *ZeroSource, code: Code) std.mem.Allocator.Error!Local {
+        if (self.function != code.function) {
+            self.word = try code.temp();
+            self.function = code.function;
+        }
+        return self.word;
+    }
+};
+fn checkZeroSource(a: std.mem.Allocator) !void {
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    _ = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+    _ = try module.addTypedFunction(&.{}, .i32, .scalar);
+    var source: ZeroSource = .{};
+    const first: Code = .{ .module = &module, .function = 0 };
+    const second: Code = .{ .module = &module, .function = 1 };
+    const word = try source.get(first);
+    try std.testing.expectEqual(@as(u32, 1), word.id);
+    try std.testing.expectEqual(word, try source.get(first));
+    try std.testing.expectEqual(@as(usize, 1), module.functions.items[0].locals.items.len);
+    try std.testing.expectEqual(@as(usize, 0), module.functions.items[0].instructions.items.len);
+    try first.value(word);
+    const other = try source.get(second);
+    try second.value(other);
+    try std.testing.expectEqual(@as(u32, 0), other.id);
+    try std.testing.expectEqual(@as(usize, 1), module.functions.items[1].locals.items.len);
+    for (module.functions.items) |function| for (function.instructions.items) |inst| {
+        try std.testing.expect(inst.op != .local_set and inst.op != .local_tee);
+    };
+}
+test "default zero sources share unwritten locals per function through OOM" {
+    try checkZeroSource(std.testing.allocator);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, checkZeroSource, .{});
+}
+test "default zero source checkpoints never retain a rolled back local" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    module.memory_model = .data_stacks;
+    module.fixed_memory_bytes = 65_536;
+    const code: Code = .{ .module = &module, .function = 0 };
+    var source: ZeroSource = .{};
+    const saved = source;
+    const mark = module.tailCheckpoint().?;
+    _ = try module.addTypedFunction(&.{}, .i32, .scalar);
+    const discarded = try source.get(code);
+    module.rollbackTail(mark);
+    source = saved;
+    _ = try module.addTypedFunction(&.{}, .i32, .scalar);
+    const replacement = try code.temp();
+    try code.set(replacement, 123);
+    const zero = try source.get(code);
+    try std.testing.expectEqual(discarded, replacement);
+    try std.testing.expect(zero.id != replacement.id);
+    try code.value(zero);
+    try std.testing.expectEqual(@as(usize, 2), module.functions.items[0].locals.items.len);
+}
 const Demand = struct { ready: Local, result: ?Value = null, building: bool = false };
 const Callable = struct { unit: u32, node: core.Id = 0, target: core.BindingId = 0, captures: []const core.BindingId = &.{}, types: []const TypeArgument = &.{}, goals: []const core.Obligation = &.{} };
 fn orderFields(fields: []Value) void {
@@ -137,7 +198,8 @@ fn boxTypeEvidenceIn(arena: std.mem.Allocator, source: TypeEvidence) Error!*cons
     return value;
 }
 const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining: u32 };
-const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ?Value = null };
+const ValueJoin = struct { value: ?Value = null, physical: deferred_join.Join, selective: bool = false };
+const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ValueJoin };
 const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const bool, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
 const RootRead = struct { owner: usize, shape: *const Value };
 const ReadFrame = struct {
@@ -164,6 +226,7 @@ const CheckedFunctionPlan = struct {
     entry: call_plan.Entry,
     input_words: usize,
     used_input_words: []const bool,
+    result_aliases: []const u32,
     unit_result: bool,
     abi: FunctionAbi,
     return_registers: usize,
@@ -323,6 +386,7 @@ const Generator = struct {
     destination: ?Value = null,
     external_destination: ?usize = null,
     c: Code = undefined,
+    zero_source: ZeroSource = .{},
     stacks: std.ArrayList(bool) = .empty,
     globals: std.ArrayList(Global) = .empty,
     type_arguments: type_arguments_index.Stack(TypeArgument) = .empty,
@@ -331,6 +395,8 @@ const Generator = struct {
     roots: std.ArrayList(Root) = .empty,
     bindings: std.ArrayList(Binding) = .empty,
     controls: std.ArrayList(Control) = .empty,
+    mutable_join_words: std.AutoHashMapUnmanaged(u32, void) = .empty,
+    indexed_mutable_roots: usize = 0,
     loops: std.ArrayList(Loop) = .empty,
     read_frames: std.ArrayList(ReadFrame) = .empty,
     diagnostic: ?backend.Diagnostic = null,
@@ -371,6 +437,7 @@ const Generator = struct {
         self.globals.deinit(self.allocator);
         self.type_arguments.deinit(self.allocator);
         self.invalid_literals.deinit(self.allocator);
+        self.mutable_join_words.deinit(self.allocator);
         // Templates and nested fields are owned by the generator arena.
         // zig-analyzer: disable-next-line incomplete-owned-field-cleanup
         self.plain_layouts.deinit(self.allocator);
@@ -420,8 +487,13 @@ const Generator = struct {
         try self.c.set(local, word);
         return .{ .word = local };
     }
+    fn unitValue(self: *Generator) Error!Value {
+        const word = try self.zero_source.get(self.c);
+        self.emission_work.scoped_zero_values_shared +|= 1;
+        return .{ .word = word };
+    }
     fn terminated(self: *Generator) Error!Value {
-        var value = try self.constant(0);
+        var value = try self.unitValue();
         value.terminated = true;
         return value;
     }
@@ -551,7 +623,7 @@ const Generator = struct {
         return error.Declined;
     }
     fn returnedRoot(self: *Generator, index: usize) bool {
-        for (self.controls.items) |control| if (control.result) |value| if (hasRoot(value, index)) return true;
+        for (self.controls.items) |control| if (control.result.value) |value| if (hasRoot(value, index)) return true;
         return false;
     }
     fn closeRuntime(self: *Generator, first: usize, keep: Value) Error!void {
@@ -1133,6 +1205,113 @@ const Generator = struct {
         }
         try self.unionVariants(target, value);
     }
+    fn newJoin(self: *Generator) ValueJoin {
+        return .{ .physical = deferred_join.Join.init(self.c) };
+    }
+    fn shareableNode(value: Value) bool {
+        if (value.variant_tags.len != 0 or value.host != null or value.demand != null) return false;
+        if ((value.tag == .ref or value.tag == .view or value.tag == .link) and value.root == null and !value.pool_borrow) return false;
+        return true;
+    }
+    fn joinNodeWords(self: *Generator, value: Value, words: *std.ArrayList(Local)) Error!void {
+        const arena = self.arena.allocator();
+        if (hasWord(value)) try words.append(arena, value.word);
+        if (value.root != null or value.pool_borrow or value.tag == .array) {
+            try words.appendSlice(arena, &.{ value.token, value.epoch_low, value.epoch_high });
+        }
+        if (value.tag == .ref or value.tag == .view or value.tag == .link) try words.append(arena, value.index);
+        if (value.tag == .view) try words.append(arena, value.length);
+    }
+    // Mutable inventories include every payload, even where sharing declines.
+    fn joinWords(self: *Generator, value: Value, words: *std.ArrayList(Local)) Error!void {
+        try self.joinNodeWords(value, words);
+        for (value.fields) |field| try self.joinWords(field, words);
+    }
+    fn selectiveJoinWords(self: *Generator, value: Value, words: *std.ArrayList(Local)) Error!void {
+        if (!shareableNode(value)) return;
+        try self.joinNodeWords(value, words);
+        for (value.fields) |field| try self.selectiveJoinWords(field, words);
+    }
+    fn joinTemplate(self: *Generator, incoming: Value) Error!Value {
+        if (!shareableNode(incoming)) return self.temporary(incoming);
+        var result = incoming;
+        const fields = initializeFields(&result, try self.arena.allocator().alloc(Value, incoming.fields.len));
+        for (fields, incoming.fields) |*field, original| field.* = try self.joinTemplate(original);
+        return result;
+    }
+    fn assignFixedJoinParts(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, incoming: Value) Error!void {
+        if (!shareableNode(target.*)) return self.assign(m, id, target, incoming);
+        for (try self.writableFields(target), incoming.fields) |*field, original| try self.assignFixedJoinParts(m, id, field, original);
+    }
+    fn joinFailure(err: scope_outline.Error) Error {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        return error.Declined;
+    }
+    fn addJoin(self: *Generator, m: *const core.Module, id: core.Id, join: *ValueJoin, incoming: Value) Error!void {
+        if (join.value == null) {
+            join.selective = !self.scalar_admission.hasScalarReferences() and
+                incoming.tag != .scalar and shareableNode(incoming);
+            join.value = incoming;
+            if (join.selective) join.value = try self.joinTemplate(incoming) else join.value = try self.temporary(incoming);
+        }
+        if (!join.selective) return self.assign(m, id, &join.value.?, incoming);
+        {
+            // Keep the complete validation and owner/variant union. Its dry
+            // transport is not a saving: a later edge can backfill every word.
+            const avoided = self.emission_work.scoped_transport_words_avoided;
+            defer self.emission_work.scoped_transport_words_avoided = avoided;
+            try self.assignTransport(m, id, &join.value.?, incoming, false);
+        }
+        try self.assignFixedJoinParts(m, id, &join.value.?, incoming);
+        var words: std.ArrayList(Local) = .empty;
+        try self.selectiveJoinWords(incoming, &words);
+        join.physical.add(self.arena.allocator(), self.c, self.outlining, words.items) catch |err| return joinFailure(err);
+    }
+    fn markMutableWords(self: *Generator, value: Value, mutable: *std.AutoHashMapUnmanaged(u32, void)) Error!void {
+        var words: std.ArrayList(Local) = .empty;
+        try self.joinWords(value, &words);
+        for (words.items) |word| try mutable.put(self.allocator, word.id, {});
+    }
+    fn joinedWords(self: *Generator, value: *Value, physical: deferred_join.Join, cursor: *usize) Error!void {
+        if (!shareableNode(value.*)) return;
+        value.literal = null;
+        if (hasWord(value.*)) {
+            value.word = physical.word(cursor.*);
+            cursor.* += 1;
+        }
+        if (value.root != null or value.pool_borrow or value.tag == .array) {
+            value.token = physical.word(cursor.*);
+            value.epoch_low = physical.word(cursor.* + 1);
+            value.epoch_high = physical.word(cursor.* + 2);
+            cursor.* += 3;
+        }
+        if (value.tag == .ref or value.tag == .view or value.tag == .link) {
+            value.index = physical.word(cursor.*);
+            cursor.* += 1;
+        }
+        if (value.tag == .view) {
+            value.length = physical.word(cursor.*);
+            cursor.* += 1;
+        }
+        // The validated metadata may still share immutable child slices with
+        // incoming bindings and owner evidence. Detach before replacing words.
+        for (try self.writableFields(value)) |*field| try self.joinedWords(field, physical, cursor);
+    }
+    fn finishJoin(self: *Generator, join: *ValueJoin, fallthrough: bool) Error!?Value {
+        if (!join.selective) return join.value;
+        // Root tokens remain mutable after release. Index each appended root
+        // once; loop carriers and demand storage are marked when created.
+        for (self.roots.items[self.indexed_mutable_roots..]) |owner| try self.mutable_join_words.put(self.allocator, owner.token.id, {});
+        self.indexed_mutable_roots = self.roots.items.len;
+        const shared = join.physical.finish(self.arena.allocator(), self.c, self.outlining, &self.mutable_join_words, fallthrough) catch |err| return joinFailure(err);
+        var result = join.value.?;
+        var cursor: usize = 0;
+        try self.joinedWords(&result, join.physical, &cursor);
+        std.debug.assert(cursor == join.physical.lanes.len);
+        self.emission_work.scoped_join_words_shared +|= shared;
+        join.value = result;
+        return result;
+    }
     fn promote(self: *Generator, value: *Value, boundary: usize) Error!void {
         if (value.tag == .array) {
             var cursor: usize = 0;
@@ -1528,7 +1707,7 @@ const Generator = struct {
                 return copied;
             },
         }
-        return self.constant(0);
+        return self.unitValue();
     }
     fn copyRange(self: *Generator, m: *const core.Module, id: core.Id, target: Value, offset: Local, source: Value, start: Local, count: Local) Error!void {
         const index = try self.c.temp();
@@ -3115,6 +3294,27 @@ const Generator = struct {
         if (value.tag != .array) try self.c.value(value.index);
         if (value.tag == .view) try self.c.value(value.length);
     }
+    fn readerWordLocals(self: *Generator, value: Value, output: *std.ArrayList(Local)) Error!void {
+        if (value.tag == .aggregate or value.tag == .callable) {
+            if (value.variant_tags.len != 0) try output.append(self.allocator, value.word);
+            for (value.fields) |field| try self.readerWordLocals(field, output);
+            return;
+        }
+        try output.append(self.allocator, value.word);
+        if (value.tag == .scalar) return;
+        try output.appendSlice(self.allocator, &.{ value.token, value.epoch_low, value.epoch_high });
+        if (value.tag != .array) try output.append(self.allocator, value.index);
+        if (value.tag == .view) try output.append(self.allocator, value.length);
+    }
+    fn resultAliasCandidates(self: *Generator, value: Value, output: *std.ArrayList(Local)) Error!void {
+        if (!shareableNode(value)) {
+            try output.appendNTimes(self.allocator, .{ .id = @import("storage_result_alias.zig").absent }, readerWords(value));
+            return;
+        }
+        if (value.tag == .aggregate or value.tag == .callable) {
+            for (value.fields) |field| try self.resultAliasCandidates(field, output);
+        } else try self.readerWordLocals(value, output);
+    }
     fn readerPlainShape(self: *Generator, source: Value) Error!Value {
         var value = source;
         value.literal = null;
@@ -3132,7 +3332,7 @@ const Generator = struct {
             if (value.variant_tags.len != 0) {
                 value.word = .{ .id = next.* };
                 next.* += 1;
-            } else if (value.tag == .aggregate) value.word = .{ .id = 0 } else value.word = (try self.constant(0)).word;
+            } else if (value.tag == .aggregate) value.word = .{ .id = 0 } else value.word = (try self.unitValue()).word;
             const fields = initializeFields(&value, try self.arena.allocator().alloc(Value, original.fields.len));
             for (fields, original.fields) |*field, source| field.* = try self.readerWordParameter(source, next);
             return value;
@@ -3304,38 +3504,48 @@ const Generator = struct {
         if (value.tag == .view) try self.storeReaderWord(address, at + 20, value.length, used);
     }
     fn loadReaderResult(self: *Generator, address: Local, offset: u32, template: Value) Error!Value {
+        var ordinal: usize = 0;
+        return self.loadReaderResultAliased(address, offset, template, &.{}, &.{}, &ordinal);
+    }
+    fn loadReaderWordAliased(self: *Generator, address: Local, offset: u32, aliases: []const u32, arguments: []const Local, ordinal: *usize) Error!Local {
+        const index = ordinal.*;
+        ordinal.* += 1;
+        if (aliases.len != 0) {
+            std.debug.assert(index < aliases.len);
+            const alias = aliases[index];
+            if (alias != @import("storage_result_alias.zig").absent) {
+                std.debug.assert(alias < arguments.len);
+                self.emission_work.scoped_result_load_words_avoided +|= 1;
+                return arguments[alias];
+            }
+        }
+        const result = try self.c.temp();
+        try self.c.set(result, .{ .load, address, offset });
+        return result;
+    }
+    fn loadReaderResultAliased(self: *Generator, address: Local, offset: u32, template: Value, aliases: []const u32, arguments: []const Local, ordinal: *usize) Error!Value {
         var result = template;
         var at = offset;
         result.word = .{ .id = 0 };
-        if (hasWord(result)) result.word = try self.c.temp();
         if (result.tag == .aggregate or result.tag == .callable) {
             if (result.variant_tags.len != 0) {
-                try self.c.set(result.word, .{ .load, address, at });
+                result.word = try self.loadReaderWordAliased(address, at, aliases, arguments, ordinal);
                 at += 4;
-            } else if (result.tag == .callable) try self.c.set(result.word, 0);
+            } else if (result.tag == .callable) result.word = (try self.unitValue()).word;
             const fields = initializeFields(&result, try self.arena.allocator().alloc(Value, template.fields.len));
             for (fields, template.fields) |*field, original| {
-                field.* = try self.loadReaderResult(address, at, original);
+                field.* = try self.loadReaderResultAliased(address, at, original, aliases, arguments, ordinal);
                 at += @intCast(readerWords(original) * 4);
             }
             return result;
         }
-        try self.c.set(result.word, .{ .load, address, at });
+        result.word = try self.loadReaderWordAliased(address, at, aliases, arguments, ordinal);
         if (result.tag == .scalar) return result;
-        result.token = try self.c.temp();
-        result.epoch_low = try self.c.temp();
-        result.epoch_high = try self.c.temp();
-        try self.c.set(result.token, .{ .load, address, at + 4 });
-        try self.c.set(result.epoch_low, .{ .load, address, at + 8 });
-        try self.c.set(result.epoch_high, .{ .load, address, at + 12 });
-        if (result.tag != .array) {
-            result.index = try self.c.temp();
-            try self.c.set(result.index, .{ .load, address, at + 16 });
-        }
-        if (result.tag == .view) {
-            result.length = try self.c.temp();
-            try self.c.set(result.length, .{ .load, address, at + 20 });
-        }
+        result.token = try self.loadReaderWordAliased(address, at + 4, aliases, arguments, ordinal);
+        result.epoch_low = try self.loadReaderWordAliased(address, at + 8, aliases, arguments, ordinal);
+        result.epoch_high = try self.loadReaderWordAliased(address, at + 12, aliases, arguments, ordinal);
+        if (result.tag != .array) result.index = try self.loadReaderWordAliased(address, at + 16, aliases, arguments, ordinal);
+        if (result.tag == .view) result.length = try self.loadReaderWordAliased(address, at + 20, aliases, arguments, ordinal);
         return result;
     }
     // Only key encoding can decline here. Source/body admission and child
@@ -3560,6 +3770,7 @@ const Generator = struct {
         for (self.roots.items, 0..) |*owner, index| if (hasRoot(value.*, index) and !assigned[index]) {
             owner.word = value.word;
             owner.token = value.token;
+            try self.mutable_join_words.put(self.allocator, owner.token.id, {});
             owner.epoch_low = value.epoch_low;
             owner.epoch_high = value.epoch_high;
             assigned[index] = true;
@@ -3808,7 +4019,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -3821,12 +4032,13 @@ const Generator = struct {
         types: usize,
         diagnostic: ?backend.Diagnostic,
         context_sensitive: bool,
+        zero_source: ZeroSource,
         publications: [published_fields.len]u64,
         fn begin(g: *Generator) ?FunctionMark {
             const module = g.module.tailCheckpoint() orelse return null;
             var publications: [published_fields.len]u64 = undefined;
             inline for (published_fields, 0..) |field, index| publications[index] = @field(g.emission_work.*, field);
-            return .{ .module = module, .local_calls = g.calls.checkpoint(), .shared_calls = g.shared_calls.checkpoint(), .descriptor_calls = g.descriptor_calls.calls.checkpoint(), .capacities = g.capacity_requests.items.items.len, .validation_budget = g.validation_budget.*, .max_stacks = g.max_stacks, .active_calls = g.active_calls.frames.items.len, .types = g.type_arguments.items.len, .diagnostic = g.diagnostic, .context_sensitive = g.context_sensitive, .publications = publications };
+            return .{ .module = module, .local_calls = g.calls.checkpoint(), .shared_calls = g.shared_calls.checkpoint(), .descriptor_calls = g.descriptor_calls.calls.checkpoint(), .capacities = g.capacity_requests.items.items.len, .validation_budget = g.validation_budget.*, .max_stacks = g.max_stacks, .active_calls = g.active_calls.frames.items.len, .types = g.type_arguments.items.len, .diagnostic = g.diagnostic, .context_sensitive = g.context_sensitive, .zero_source = g.zero_source, .publications = publications };
         }
         fn rollback(self: FunctionMark, g: *Generator) void {
             const last = g.module.functions.items.len;
@@ -3844,6 +4056,7 @@ const Generator = struct {
             g.type_arguments.shrinkRetainingCapacity(self.types);
             g.diagnostic = self.diagnostic;
             g.context_sensitive = self.context_sensitive;
+            g.zero_source = self.zero_source;
             inline for (published_fields, 0..) |field, index| {
                 if (comptime std.mem.eql(u8, field, "scoped_reader_projection_calls") or std.mem.eql(u8, field, "scoped_owned_projection_calls")) {
                     g.emission_work.scoped_argument_projection_discards +|= @field(g.emission_work.*, field) -| self.publications[index];
@@ -3984,6 +4197,8 @@ const Generator = struct {
         };
         var copies: EnvironmentCopies = .empty;
         defer copies.deinit(self.allocator);
+        var result_aliases: []u32 = &.{};
+        defer self.allocator.free(result_aliases);
         var result_template = request.result_shape;
         if (unit_result) {
             try child.c.value(try child.scalar(m, body.root, output));
@@ -3995,9 +4210,31 @@ const Generator = struct {
             } else if (direct and !buffered_result) {
                 try child.c.value(try child.scalar(m, body.root, output));
             } else {
+                var output_words: std.ArrayList(Local) = .empty;
+                defer output_words.deinit(self.allocator);
+                try child.readerWordLocals(output, &output_words);
+                if (!output.terminated and !self.scalar_admission.hasScalarReferences()) {
+                    var candidates: std.ArrayList(Local) = .empty;
+                    defer candidates.deinit(self.allocator);
+                    try child.resultAliasCandidates(output, &candidates);
+                    std.debug.assert(candidates.items.len == output_words.items.len);
+                    var first: u32 = 0;
+                    if (!direct) first = 1;
+                    result_aliases = try @import("storage_result_alias.zig").analyze(self.allocator, &self.module.functions.items[function], first, words, candidates.items);
+                }
+                var address: Local = .{ .id = 0 };
+                var base: usize = words * 4;
                 if (direct) {
-                    try child.storeReaderResult(.{ .id = @intCast(words) }, 0, output);
-                } else try child.storeReaderResult(.{ .id = 0 }, @intCast(words * 4), output);
+                    address.id = @intCast(words);
+                    base = 0;
+                }
+                for (output_words.items, 0..) |word, ordinal| {
+                    if (result_aliases.len != 0 and result_aliases[ordinal] != @import("storage_result_alias.zig").absent) {
+                        self.emission_work.scoped_result_store_words_avoided +|= 1;
+                        continue;
+                    }
+                    try child.c.store(address, @intCast(base + ordinal * 4), word);
+                }
                 try child.c.value(0);
             }
         }
@@ -4041,9 +4278,10 @@ const Generator = struct {
         const retained_regions = try summary_arena.dupe(usize, regions.items);
         const plan = try summary_arena.create(CheckedFunctionPlan);
         const used_input_words = try summary_arena.dupe(bool, input_demand);
+        const retained_aliases = try summary_arena.dupe(u32, result_aliases);
         try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
-        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .result_aliases = retained_aliases, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
         self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
         for (facts) |event| {
             if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
@@ -4177,7 +4415,7 @@ const Generator = struct {
         if (plan.abi != .buffered) {
             var template = plan.result;
             if (!unit_result) template = try self.graphCallerShape(plan.result, owners);
-            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers);
+            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers, plan.result_aliases);
         }
         self.emission_work.scoped_owned_packed_calls +|= 1;
         const first_root = self.roots.items.len;
@@ -4203,14 +4441,24 @@ const Generator = struct {
         const word = try self.c.temp();
         try self.c.op(.local_set, word.id);
         var returned: Value = .{ .word = word };
-        if (!unit_result) returned = try self.loadReaderResult(address, @intCast(words * 4), result_template);
+        if (!unit_result) returned = try self.loadPlannedResult(address, @intCast(words * 4), result_template, plan.result_aliases, arguments);
         try self.release(first_root, null);
         try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark });
         returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() });
         return returned;
     }
-    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize) Error!Value {
+    fn loadPlannedResult(self: *Generator, address: Local, offset: u32, template: Value, aliases: []const u32, arguments: []const Value) Error!Value {
+        if (aliases.len == 0) return self.loadReaderResult(address, offset, template);
+        var inputs: std.ArrayList(Local) = .empty;
+        defer inputs.deinit(self.allocator);
+        for (arguments) |argument| try self.readerWordLocals(argument, &inputs);
+        var ordinal: usize = 0;
+        const result = try self.loadReaderResultAliased(address, offset, template, aliases, inputs.items, &ordinal);
+        std.debug.assert(ordinal == aliases.len);
+        return result;
+    }
+    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize, result_aliases: []const u32) Error!Value {
         self.emission_work.scoped_owned_word_calls +|= 1;
         self.emission_work.scoped_owned_argument_words_avoided +|= words;
         const first_root = self.roots.items.len;
@@ -4245,7 +4493,7 @@ const Generator = struct {
             self.emission_work.scoped_inline_result_owners_avoided +|= 1;
             self.emission_work.scoped_inline_result_roots_avoided +|= 1;
             self.emission_work.scoped_inline_result_bytes_avoided +|= storage.header_bytes + try width(template);
-        } else if (address) |pointer| returned = try self.loadReaderResult(pointer, 0, template);
+        } else if (address) |pointer| returned = try self.loadPlannedResult(pointer, 0, template, result_aliases, arguments);
         if (mark) |saved| {
             try self.release(first_root, null);
             try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
@@ -4413,7 +4661,7 @@ const Generator = struct {
             if (depth > 128) return self.unsupported(m, body.root);
             const fields = try self.arena.allocator().alloc(Value, arguments.len);
             for (fields, arguments) |*field, argument| field.* = try self.snapshot(argument);
-            return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = try self.boxCallable(.{ .unit = m.unit, .target = target.binding, .types = try self.captureTypes() }), .fields = fields };
+            return .{ .tag = .callable, .word = (try self.unitValue()).word, .callable = try self.boxCallable(.{ .unit = m.unit, .target = target.binding, .types = try self.captureTypes() }), .fields = fields };
         }
         if (arguments.len > parameters.len) {
             if (depth > 128) return self.unsupported(m, body.root);
@@ -4943,7 +5191,7 @@ const Generator = struct {
             try self.protected.append(self.allocator, value.*);
         }
         const done = (try self.constant(0)).word;
-        var result: ?Value = null;
+        var result = self.newJoin();
         const merges = m.branchMerges(id);
         const merged = try self.arena.allocator().alloc(?Value, merges.len);
         @memset(merged, null);
@@ -4985,11 +5233,10 @@ const Generator = struct {
                 try self.c.when(try self.scalar(m, id, guard));
                 self.nesting += 1;
                 try self.c.set(done, 1);
-                const body = if (guard.terminated) guard else if (arm.body != 0) try self.expression(m, arm.body, depth + 1) else try self.constant(0);
+                const body = if (guard.terminated) guard else if (arm.body != 0) try self.expression(m, arm.body, depth + 1) else try self.unitValue();
                 if (!body.terminated) {
                     arm_continues = true;
-                    if (result == null) result = try self.temporary(body);
-                    try self.assign(m, id, &result.?, body);
+                    try self.addJoin(m, id, &result, body);
                     for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, if (arm_index == 0) merge.then_binding else merge.else_binding);
                         if (value.* == null) value.* = try self.temporary(incoming);
@@ -5018,10 +5265,11 @@ const Generator = struct {
         }
         try self.c.trap(.{ .i32_eqz, done });
         if (m.matchInfo(id).statement and continuing == 1) try self.bindings.appendSlice(self.allocator, survivor);
-        if (result != null) {
+        const resolved = try self.finishJoin(&result, false);
+        if (resolved != null) {
             for (merges, merged) |merge, value| if (value) |joined| try self.bind(m, merge.result, joined);
         }
-        return result orelse try self.terminated();
+        return resolved orelse try self.terminated();
     }
     fn namedField(self: *Generator, m: *const core.Module, id: core.Id, value: Value, name: u32) Error!Value {
         const spelling = m.fieldSpelling(name) orelse return self.unsupported(m, id);
@@ -5832,6 +6080,10 @@ const Generator = struct {
             try self.loopHeader(value);
             header.* = value.*;
         }
+        // Retain this inventory beyond loop pop: a surrounding return join
+        // can finish after the loop whose physical carriers it observed.
+        for (values) |value| try self.markMutableWords(value, &self.mutable_join_words);
+        try self.mutable_join_words.put(self.allocator, iterator.id, {});
         try self.c.op(.block, 0);
         try self.c.op(.loop, 0);
         self.nesting += 2;
@@ -5867,7 +6119,7 @@ const Generator = struct {
         // A conditional return reserves its result's static slot for the
         // caller, but the path reaching this backedge did not return it.
         // Rewind that iteration too; the next iteration reopens the same slot.
-        try self.closeRuntime(roots_before, try self.constant(0));
+        try self.closeRuntime(roots_before, try self.unitValue());
         try self.release(roots_before, null);
         try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, frame_mark });
         self.depth -= 1;
@@ -5878,7 +6130,7 @@ const Generator = struct {
         try self.c.end();
         self.nesting -= 2;
         for (carries, values) |carry, value| try self.bind(m, carry.outgoing, value);
-        return self.constant(0);
+        return self.unitValue();
     }
     fn chargeExpression(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!void {
         if (self.steps >= self.work_limits.expressions) return self.fail(m, id, .storage_unsupported, "Storage source expansion exceeded its expression budget");
@@ -5943,7 +6195,7 @@ const Generator = struct {
                 const value = try self.expression(m, n.b, depth + 1);
                 if (value.terminated) return value;
                 try self.bind(m, n.a, value);
-                return self.constant(0);
+                return self.unitValue();
             },
             .pattern_bind => {
                 const value = try self.expression(m, n.b, depth + 1);
@@ -5966,7 +6218,7 @@ const Generator = struct {
                     self.nesting -= 1;
                     try self.c.end();
                 }
-                return self.constant(0);
+                return self.unitValue();
             },
             .construct => {
                 const constructor = m.constructor(n.a);
@@ -6004,8 +6256,11 @@ const Generator = struct {
                 const values = try self.arena.allocator().alloc(Value, captures.len);
                 for (captures, values) |capture, *value| value.* = try self.snapshot(try self.bindingValue(m, capture));
                 const demand: ?*Demand = if (n.tag == .suspend_) try self.arena.allocator().create(Demand) else null;
-                if (demand) |memo| memo.* = .{ .ready = (try self.constant(0)).word };
-                return .{ .tag = .callable, .word = (try self.constant(0)).word, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }), .fields = values, .demand = demand, .depth = self.depth };
+                if (demand) |memo| {
+                    memo.* = .{ .ready = (try self.constant(0)).word };
+                    try self.mutable_join_words.put(self.allocator, memo.ready.id, {});
+                }
+                return .{ .tag = .callable, .word = (try self.unitValue()).word, .callable = try self.boxCallable(.{ .unit = m.unit, .node = id, .captures = captures, .goals = self.active_goals, .types = try self.captureTypes() }), .fields = values, .demand = demand, .depth = self.depth };
             },
             .force => {
                 const pending = try self.expression(m, n.a, depth + 1);
@@ -6018,7 +6273,10 @@ const Generator = struct {
                 self.nesting += 1;
                 const computed = try self.apply(m, id, pending, try self.constant(0), depth + 1);
                 if (computed.tag != .scalar) return self.fail(m, id, .storage_unsupported, "A local memoized demand currently requires a scalar result");
-                if (memo.result == null) memo.result = try self.temporary(computed);
+                if (memo.result == null) {
+                    memo.result = try self.temporary(computed);
+                    try self.markMutableWords(memo.result.?, &self.mutable_join_words);
+                }
                 try self.assign(m, id, &memo.result.?, computed);
                 try self.c.set(memo.ready, 1);
                 self.nesting -= 1;
@@ -6123,7 +6381,7 @@ const Generator = struct {
                         try self.assignTransport(m, id, carry, value, !reuse);
                     }
                     if (n.op == .continue_) try self.checkReadFrame(m, id, target.read_frame);
-                    try self.closeRuntime(target.roots_before, try self.constant(0));
+                    try self.closeRuntime(target.roots_before, try self.unitValue());
                     try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, target.mark });
                     if (n.op == .continue_) if (target.iterator) |iterator| try self.c.next(iterator);
                     try self.c.op(.br, self.nesting - target.nesting + @as(u32, if (n.op == .continue_) 0 else 1));
@@ -6217,7 +6475,7 @@ const Generator = struct {
                 try self.c.op(.block, 0);
                 self.nesting += 1;
                 const control_index = self.controls.items.len;
-                try self.controls.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before });
+                try self.controls.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .result = self.newJoin() });
                 defer _ = self.controls.pop();
                 var exits = false;
                 for (m.children(id)) |child| {
@@ -6229,7 +6487,7 @@ const Generator = struct {
                 }
                 self.nesting -= 1;
                 try self.c.end();
-                var result = self.controls.items[control_index].result orelse if (exits) try self.terminated() else try self.constant(0);
+                var result = (try self.finishJoin(&self.controls.items[control_index].result, !exits)) orelse if (exits) try self.terminated() else try self.unitValue();
                 try self.escape(m, id, &result, self.depth);
                 try self.release(roots_before, result);
                 try self.rewindUnescaped(roots_before, mark, result);
@@ -6240,7 +6498,7 @@ const Generator = struct {
                     const value = try self.expression(m, child, depth + 1);
                     if (value.terminated) return value;
                 }
-                return self.constant(0);
+                return self.unitValue();
             },
             .return_ => {
                 const value = try self.expression(m, n.a, depth + 1);
@@ -6254,8 +6512,7 @@ const Generator = struct {
                     i -= 1;
                     if (self.controls.items[i].unit == m.unit and self.controls.items[i].id == n.b) {
                         var target = self.controls.items[i];
-                        if (target.result == null) target.result = try self.temporary(value);
-                        try self.assign(m, id, &target.result.?, value);
+                        try self.addJoin(m, id, &target.result, value);
                         self.controls.items[i] = target;
                         try self.closeRuntime(target.roots_before, value);
                         try self.c.op(.br, self.nesting - target.nesting);
@@ -6273,14 +6530,13 @@ const Generator = struct {
                 const merged = try self.arena.allocator().alloc(?Value, merges.len);
                 @memset(merged, null);
                 const shared_merges = try self.mergeTransport(m, merges, merged);
-                var result: ?Value = null;
+                var result = self.newJoin();
                 try self.c.when(condition);
                 self.nesting += 1;
                 const left = try self.expression(m, n.b, depth + 1);
                 var left_bindings: []const Binding = &.{};
                 if (!left.terminated) {
-                    result = try self.temporary(left);
-                    try self.assign(m, id, &result.?, left);
+                    try self.addJoin(m, id, &result, left);
                     for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, merge.then_binding);
                         if (value.* == null) value.* = try self.temporary(incoming);
@@ -6290,11 +6546,10 @@ const Generator = struct {
                 }
                 self.bindings.shrinkRetainingCapacity(bindings_before);
                 try self.c.op(.else_, 0);
-                const right = if (n.c != 0) try self.expression(m, n.c, depth + 1) else try self.constant(0);
+                const right = if (n.c != 0) try self.expression(m, n.c, depth + 1) else try self.unitValue();
                 var right_bindings: []const Binding = &.{};
                 if (!right.terminated) {
-                    if (result == null) result = try self.temporary(right);
-                    try self.assign(m, id, &result.?, right);
+                    try self.addJoin(m, id, &result, right);
                     for (merges, merged, shared_merges) |merge, *value, shared_merge| {
                         const incoming = try self.bindingValue(m, merge.else_binding);
                         if (value.* == null) value.* = try self.temporary(incoming);
@@ -6306,10 +6561,11 @@ const Generator = struct {
                 self.nesting -= 1;
                 try self.c.end();
                 if (n.tag == .if_stmt and left.terminated != right.terminated) try self.bindings.appendSlice(self.allocator, if (left.terminated) right_bindings else left_bindings);
-                if (result != null) {
+                const joined = try self.finishJoin(&result, false);
+                if (joined != null) {
                     for (merges, merged) |merge, value| if (value) |normal| try self.bind(m, merge.result, normal);
                 }
-                return result orelse try self.terminated();
+                return joined orelse try self.terminated();
             },
             .contract_method => return self.contractMethod(m, id, depth),
             .call => {
@@ -6392,6 +6648,8 @@ const Generator = struct {
             self.layout_steps = 0;
             self.type_arguments.clearRetainingCapacity();
             self.invalid_literals.clearRetainingCapacity();
+            self.mutable_join_words.clearRetainingCapacity();
+            self.indexed_mutable_roots = 0;
             self.active_goals = &.{};
             self.specialization_origin = .{ .unit = m.unit, .span = body.span };
             self.roots.clearRetainingCapacity();

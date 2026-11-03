@@ -28,6 +28,7 @@ fn rewrite(code: []const ir.Instruction, output: ?*std.ArrayList(ir.Instruction)
         }
         const inst = code[at];
         at += 1;
+        if (inst.op == .nop and neutral(inst)) continue;
         if (pending) |previous| {
             if (pair(previous, inst) == .tee) {
                 // The set becomes tee; retain its complete diagnostic origin.

@@ -112,7 +112,7 @@ test "scoped transport conserves packed flags declines hidden operands and alloc
         source.instructions.items[2] = invalid;
         try std.testing.expect((try run(failing.allocator(), &source)) == null);
     }
-    source.instructions.items[2] = .{ .op = .nop };
+    source.instructions.items[2] = .{ .op = .i32_const };
     for (0..2) |which| {
         for ([_]ir.Instruction{ .{ .op = .local_get, .table_reference = true }, .{ .op = .local_get, .table_kind = .callable }, .{ .op = .local_get, .table_kind = .demand } }) |flagged| {
             source.instructions.items[0] = .{ .op = .local_get };
@@ -122,8 +122,8 @@ test "scoped transport conserves packed flags declines hidden operands and alloc
             try std.testing.expect((try run(failing.allocator(), &source)) == null);
         }
     }
-    source.instructions.items[0] = .{ .op = .local_set };
-    source.instructions.items[1] = .{ .op = .nop };
+    source.instructions.items[0] = .{ .op = .local_get };
+    source.instructions.items[1] = .{ .op = .drop };
     source.instructions.items[2] = .{ .op = .local_get };
     try std.testing.expect((try run(failing.allocator(), &source)) == null);
     // Metadata on untouched instructions is copied bit for bit next to a clean pair.
@@ -179,4 +179,26 @@ test "scoped transport pipeline preserves source coordinates and final body iden
         try std.testing.expectEqualDeep(site, module.semantic_sites.items[0]);
         try std.testing.expectEqualDeep(origin, module.table_origins.items[0]);
     }
+}
+
+test "scoped final transport strips neutral reservation nops without moving source coordinates" {
+    var source: ir.Function = .{ .parameters = &.{}, .result = .none, .signature = 0 };
+    defer source.deinit(a);
+    try source.locals.append(a, .i32);
+    const instructions = [_]ir.Instruction{
+        .{ .op = .local_set, .origin = 31 },
+        .{ .op = .nop, .origin = 419 },
+        .{ .op = .local_get, .origin = 51 },
+        .{ .op = .nop, .table_reference = true },
+        .{ .op = .nop, .table_kind = .callable },
+    };
+    try source.instructions.appendSlice(a, &instructions);
+    var output = (try run(a, &source)).?;
+    defer output.deinit(a);
+    try std.testing.expectEqual(@as(usize, 3), output.instructions.items.len);
+    try std.testing.expectEqual(ir.Op.local_tee, output.instructions.items[0].op);
+    try std.testing.expectEqual(@as(u21, 31), output.instructions.items[0].origin);
+    try std.testing.expectEqual(instructions[3], output.instructions.items[1]);
+    try std.testing.expectEqual(instructions[4], output.instructions.items[2]);
+    try std.testing.expectEqualSlices(ir.Instruction, &instructions, source.instructions.items);
 }

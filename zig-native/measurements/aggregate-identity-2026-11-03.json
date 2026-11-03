@@ -1,0 +1,1384 @@
+{
+  "date": "2026-11-03",
+  "scope": "Preserve immutable physical words across control joins and completed helper results; share function-local default-zero sources. No ABI, sibling source or environment publication changes.",
+  "source_pin": {
+    "base": "35aa2fdedc569429302c0227c2af7262cd067f44",
+    "patch_sha256": "bc908f3c32fcefd8ebb82db6a302acd9dcdeb12d0953db0f8d4d2a9afd6ecbb5",
+    "files": {
+      "scripts/dev_check_areas.ts": "427f916dd3439efe0fccfe2b3eb99610003a2fdab9d1f68118fce137154dc6b4",
+      "zig-native/CONTRACT.md": "32183dfbf91c12e632d71c8e41173f9c18e08cee65b2ae3af7ad8fe7b8b074c1",
+      "zig-native/src/backend/scoped_backend.zig": "78e94299ae41384bfe57c00eeeb078cf026f3d121a6cdd0096c1d75fed2ac7c6",
+      "zig-native/src/backend/storage_calls_tests.zig": "b3c2a68fca39cb86ad07dc1523af89de0738cd1cec03017f25149f984fc8b7f8",
+      "zig-native/src/backend/wasm_scope_outline.zig": "d08aed1674cac4ea227eb1857af990c263438c3229ed00fc6ffd4ee5e0b43976",
+      "zig-native/src/backend/wasm_transport_cleanup.zig": "204160a18e8dc372ef389ca16f79e23c35d960678250667f57c544e15ccff3c4",
+      "zig-native/src/backend/wasm_transport_cleanup_tests.zig": "3c870ceb6649e3f047c7d81feba06c2ccb98782d1b3756b2ee1bc9131f7c4b08",
+      "zig-native/src/work_counters.zig": "06748407df36e50caba3f5f9415e5ef30f0b012b500c66b13a473536cfc8bf74",
+      "zig-native/fixtures/deferred_join.blot": "edc4bedb1cb8c41babf73e90c764c97471d92af775b9b7ed3463a58aba963430",
+      "zig-native/src/backend/storage_deferred_join.zig": "253cb188bb1699157c050cdec36a535093095db701ed187b65c3502735ff2465",
+      "zig-native/src/backend/storage_deferred_join_tests.zig": "cfbb30f999fc224a7e456c90e86d4ed4f1b3f7138d7314d0174cd7b4b5805061",
+      "zig-native/src/backend/storage_deferred_value_tests.zig": "05b21c9607b9d1dd5ac03ed70ba4427bf31a31ff41556ee29fe4dbc7dc66441c",
+      "zig-native/src/backend/storage_result_alias.zig": "d5d71a9238bdfb93e8c3290864e0e949803d8eb474ffbecc7f55dd501d297e9e",
+      "zig-native/tests/deferred_join_execution.test.ts": "e49e46335f628f9cf76f4dc7d7a582558842d7a2473afca29136c292e20093f4",
+      "zig-native/tests/storage_result_alias_execution.test.ts": "946f1097c65df00b89ff31e6e543f957aebd26d77633d203742c4c4e3fe94b3e"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "native_backend": "Safe/noLLVM complete inventory, Fast/noLLVM development compiler",
+    "release": {
+      "compiler": "build/bench/frozen-aggregate-identity-bc908f3c32fc/zig-native/zig-out/bin/blotc",
+      "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+      "sidecar_hex": "38d4a1decca18d8bc1f0e262e369c361e99b64cc380908e8a7cc932316204de1",
+      "runtime_project_identity": "3be40c1c8262abe550732163d1a19d718a25fae9e261356f984e0ab4875779c0",
+      "zig": "0.17.0",
+      "release_backend": "LLVM Fast",
+      "release_build_exit": 0
+    },
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3"
+  },
+  "workload": {
+    "heads": {
+      "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+    },
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a",
+    "source_bytes": 2537167,
+    "unchanged_source": true
+  },
+  "main": {
+    "runs": {
+      "baseline": {
+        "evidence": "build/bench/aggregate-identity-2026-11-03/indexed-main-baseline/main-9513a55dd3e2a20d/result.json",
+        "build_ms": 5773.070614,
+        "wasm_bytes": 15535572,
+        "wasm_sha256": "c66846282b714a801af94ca91d57813704cc0591900eb3f381feba46b148abd8",
+        "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "compiler_identity": "2b303b4e4e6730639eceff7032752ebabe01e9522fdc31dc2a2917c0e9f708c6",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_outlined_regions": 462,
+          "scoped_outlined_globals": 67833
+        }
+      },
+      "candidate": {
+        "evidence": "build/bench/aggregate-identity-2026-11-03/indexed-main-candidate/main-35a23f6c2025d542/result.json",
+        "build_ms": 5778.256993999999,
+        "wasm_bytes": 14332601,
+        "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "compiler_identity": "3be40c1c8262abe550732163d1a19d718a25fae9e261356f984e0ab4875779c0",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_result_store_words_avoided": 3060,
+          "scoped_result_load_words_avoided": 24284,
+          "scoped_zero_values_shared": 145227,
+          "scoped_join_words_shared": 48699,
+          "scoped_outlined_regions": 424,
+          "scoped_outlined_globals": 64595
+        }
+      },
+      "configured": {
+        "evidence": "build/bench/aggregate-identity-2026-11-03/main-configured/main-3609996401724e93/result.json",
+        "build_ms": 5660.128044,
+        "wasm_bytes": 14332601,
+        "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "compiler_identity": "3be40c1c8262abe550732163d1a19d718a25fae9e261356f984e0ab4875779c0",
+        "source_bytes": 2537167
+      }
+    },
+    "bytes_removed": 1202971,
+    "size_reduction_percent": 7.743332527440895,
+    "limits": "One fresh cache-disabled pair, four frontend/codegen workers, 30-second cap, no concurrent compiler/check workload. 5.773 to 5.778 seconds establishes no meaningful latency change; configured 5.660 seconds. Five-second/subsecond and 1-2MB targets remain unmet.",
+    "engine_validation": {
+      "valid": true,
+      "imports": [
+        {
+          "module": "blot:host/1",
+          "name": "call_array_f32_array_f32",
+          "kind": "function"
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function"
+        },
+        {
+          "name": "blot:memory",
+          "kind": "memory"
+        },
+        {
+          "name": "blot:allocate",
+          "kind": "function"
+        },
+        {
+          "name": "blot:reset",
+          "kind": "function"
+        }
+      ]
+    }
+  },
+  "implementation": {
+    "control_joins": "Reserve edge copies; materialize differing/non-dominating or mutable lanes. Complete semantic assignment still runs. Tagged/demand/host/unowned-reference subtrees retain transport while siblings may share.",
+    "helper_results": "Finished unwritten formal locals map result words to original logical inputs. Alias stores/loads disappear; packet extents and semantic owner/effect events remain intact.",
+    "zero_sources": "Only value-less completions, terminated values and static callable placeholders share one unwritten i32 local per function. Writable flags, caches and counters remain independent.",
+    "mutable_origins": "One set per Generator. Root prefix cursor, full loop carriers and demand ready/results marked once. Root token remaps are recorded. Export switches clear namespace state. Failed helper generators own and destroy their state."
+  },
+  "rejected_iteration": {
+    "source_pin": {
+      "base": "35aa2fdedc569429302c0227c2af7262cd067f44",
+      "patch_sha256": "899e86ffa48f59b29beca0b59804220cde74a860e3ca5502524caecfe7f122a2",
+      "frozen": "/home/jacobt/src/blot2/build/bench/frozen-aggregate-identity-899e86ffa48f",
+      "files": {
+        "scripts/dev_check_areas.ts": "427f916dd3439efe0fccfe2b3eb99610003a2fdab9d1f68118fce137154dc6b4",
+        "zig-native/src/backend/scoped_backend.zig": "e726dcae9d0b311ec0371e0d0508f7b06c0f35c0fdd3b452b909ab7030720eeb",
+        "zig-native/src/backend/storage_calls_tests.zig": "b3c2a68fca39cb86ad07dc1523af89de0738cd1cec03017f25149f984fc8b7f8",
+        "zig-native/src/backend/wasm_scope_outline.zig": "d08aed1674cac4ea227eb1857af990c263438c3229ed00fc6ffd4ee5e0b43976",
+        "zig-native/src/backend/wasm_transport_cleanup.zig": "204160a18e8dc372ef389ca16f79e23c35d960678250667f57c544e15ccff3c4",
+        "zig-native/src/backend/wasm_transport_cleanup_tests.zig": "3c870ceb6649e3f047c7d81feba06c2ccb98782d1b3756b2ee1bc9131f7c4b08",
+        "zig-native/src/work_counters.zig": "06748407df36e50caba3f5f9415e5ef30f0b012b500c66b13a473536cfc8bf74",
+        "zig-native/fixtures/deferred_join.blot": "edc4bedb1cb8c41babf73e90c764c97471d92af775b9b7ed3463a58aba963430",
+        "zig-native/src/backend/storage_deferred_join.zig": "253cb188bb1699157c050cdec36a535093095db701ed187b65c3502735ff2465",
+        "zig-native/src/backend/storage_deferred_join_tests.zig": "cfbb30f999fc224a7e456c90e86d4ed4f1b3f7138d7314d0174cd7b4b5805061",
+        "zig-native/src/backend/storage_deferred_value_tests.zig": "05b21c9607b9d1dd5ac03ed70ba4427bf31a31ff41556ee29fe4dbc7dc66441c",
+        "zig-native/src/backend/storage_result_alias.zig": "d5d71a9238bdfb93e8c3290864e0e949803d8eb474ffbecc7f55dd501d297e9e",
+        "zig-native/tests/deferred_join_execution.test.ts": "e49e46335f628f9cf76f4dc7d7a582558842d7a2473afca29136c292e20093f4",
+        "zig-native/tests/storage_result_alias_execution.test.ts": "946f1097c65df00b89ff31e6e543f957aebd26d77633d203742c4c4e3fe94b3e"
+      }
+    },
+    "main": {
+      "baseline": {
+        "evidence": "build/bench/aggregate-identity-2026-11-03/main-baseline/main-8ce6b21a9d6f81f1/result.json",
+        "build_ms": 5795.902007,
+        "wasm_bytes": 15535572,
+        "wasm_sha256": "c66846282b714a801af94ca91d57813704cc0591900eb3f381feba46b148abd8",
+        "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "compiler_identity": "2b303b4e4e6730639eceff7032752ebabe01e9522fdc31dc2a2917c0e9f708c6",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_outlined_regions": 462,
+          "scoped_outlined_globals": 67833
+        }
+      },
+      "candidate": {
+        "evidence": "build/bench/aggregate-identity-2026-11-03/main-candidate/main-ec15400ea837054f/result.json",
+        "build_ms": 10469.690647,
+        "wasm_bytes": 14332601,
+        "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+        "compiler_sha256": "5b482bf306377834e725f31fea6173b113aa91240805d2082d7e1621ed9c657b",
+        "compiler_identity": "1efb5f044e80ff8ec9502d608b7d4ae94d9ca8630df6777112c76569ae2c2f98",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_result_store_words_avoided": 3060,
+          "scoped_result_load_words_avoided": 24284,
+          "scoped_zero_values_shared": 145227,
+          "scoped_join_words_shared": 48699,
+          "scoped_outlined_regions": 424,
+          "scoped_outlined_globals": 64595
+        }
+      }
+    },
+    "reason": "10.470s candidate versus 5.796s baseline, despite same final 14.33MB Wasm. Held until fixed.",
+    "profile": {
+      "evidence": "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/cpu-report.json",
+      "complete_intervals": 79,
+      "coverage_ratio": 0.9904270175911252,
+      "nearest_compiler_owner": {
+        "name": "backend.scoped_backend.Generator.finishJoin",
+        "cpu_ms": 2894.70342,
+        "sampled_cpu_percent": 46.31825998951563
+      },
+      "limits": "CPU-weighted endpoint stack sample; inclusive categories overlap and instrumented elapsed time is not a latency benchmark."
+    },
+    "fix": "Index mutable local origins once per function, instead of rebuilding all historical sets at each join. World and actual Main full Wasm hashes unchanged after fix."
+  },
+  "byte_accounting": {
+    "before": {
+      "instruction_count": 5697727,
+      "instruction_bytes": 15094295,
+      "declared_locals": 462178,
+      "global_types": {
+        "0x7f:mutable=0": 6,
+        "0x7f:mutable=1": 68201
+      },
+      "categories": [
+        {
+          "name": "locals",
+          "count": 3075492,
+          "bytes": 8574632
+        },
+        {
+          "name": "globals",
+          "count": 594439,
+          "bytes": 2059610
+        },
+        {
+          "name": "constants",
+          "count": 748182,
+          "bytes": 1726542
+        },
+        {
+          "name": "calls",
+          "count": 389506,
+          "bytes": 883908
+        },
+        {
+          "name": "loads",
+          "count": 257377,
+          "bytes": 802069
+        },
+        {
+          "name": "control",
+          "count": 382381,
+          "bytes": 568084
+        },
+        {
+          "name": "stores",
+          "count": 109986,
+          "bytes": 337524
+        },
+        {
+          "name": "arithmetic_simd",
+          "count": 139952,
+          "bytes": 140283
+        },
+        {
+          "name": "memory_table_reference",
+          "count": 412,
+          "bytes": 1643
+        }
+      ]
+    },
+    "after": {
+      "wasm_bytes": 14332601,
+      "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+      "instruction_count": 5250497,
+      "instruction_bytes": 13907896,
+      "declared_locals": 424255,
+      "global_types": {
+        "0x7f:mutable=0": 6,
+        "0x7f:mutable=1": 64963
+      },
+      "categories": [
+        {
+          "name": "locals",
+          "count": 2799452,
+          "bytes": 7768294
+        },
+        {
+          "name": "globals",
+          "count": 599134,
+          "bytes": 2061306
+        },
+        {
+          "name": "constants",
+          "count": 599717,
+          "bytes": 1429612
+        },
+        {
+          "name": "calls",
+          "count": 389468,
+          "bytes": 883794
+        },
+        {
+          "name": "loads",
+          "count": 233093,
+          "bytes": 726856
+        },
+        {
+          "name": "control",
+          "count": 382343,
+          "bytes": 568046
+        },
+        {
+          "name": "stores",
+          "count": 106926,
+          "bytes": 328062
+        },
+        {
+          "name": "arithmetic_simd",
+          "count": 139952,
+          "bytes": 140283
+        },
+        {
+          "name": "memory_table_reference",
+          "count": 412,
+          "bytes": 1643
+        }
+      ],
+      "sections": [
+        {
+          "id": 1,
+          "offset": 8,
+          "payload_offset": 11,
+          "payload_bytes": 5849,
+          "bytes": 5852
+        },
+        {
+          "id": 2,
+          "offset": 5860,
+          "payload_offset": 5862,
+          "payload_bytes": 40,
+          "bytes": 42
+        },
+        {
+          "id": 3,
+          "offset": 5902,
+          "payload_offset": 5905,
+          "payload_bytes": 7964,
+          "bytes": 7967
+        },
+        {
+          "id": 5,
+          "offset": 13869,
+          "payload_offset": 13871,
+          "payload_bytes": 6,
+          "bytes": 8
+        },
+        {
+          "id": 6,
+          "offset": 13877,
+          "payload_offset": 13881,
+          "payload_bytes": 324864,
+          "bytes": 324868
+        },
+        {
+          "id": 7,
+          "offset": 338745,
+          "payload_offset": 338747,
+          "payload_bytes": 51,
+          "bytes": 53
+        },
+        {
+          "id": 10,
+          "offset": 338798,
+          "payload_offset": 338803,
+          "payload_bytes": 13943060,
+          "bytes": 13943065
+        },
+        {
+          "id": 11,
+          "offset": 14281863,
+          "payload_offset": 14281867,
+          "payload_bytes": 49684,
+          "bytes": 49688
+        },
+        {
+          "id": 0,
+          "offset": 14331551,
+          "payload_offset": 14331554,
+          "payload_bytes": 1024,
+          "bytes": 1027,
+          "name": "blot:collector-contract"
+        },
+        {
+          "id": 0,
+          "offset": 14332578,
+          "payload_offset": 14332580,
+          "payload_bytes": 21,
+          "bytes": 23,
+          "name": "blot:abi"
+        }
+      ]
+    },
+    "remaining_local_global_bytes": 9829600,
+    "transfers": {
+      "format": 1,
+      "path": "build/bench/aggregate-identity-2026-11-03/main-candidate/main-ec15400ea837054f/main.wasm",
+      "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+      "wasm_bytes": 14332601,
+      "elapsed_seconds": 6.879487056983635,
+      "note": "Static nonoverlapping adjacent get/set or zero/set runs. These are not proofs of removability.",
+      "direct_call_reachability": {
+        "supported": true,
+        "unsupported": [],
+        "roots": [
+          23,
+          24,
+          26
+        ],
+        "unreachable_functions": [
+          1,
+          11,
+          12,
+          13
+        ],
+        "unreachable_body_bytes": 59
+      },
+      "transfers": [
+        {
+          "kind": "local.get -> local.set",
+          "pairs": 266150,
+          "bytes": 1469976
+        },
+        {
+          "kind": "i32.const 0 -> local.set",
+          "pairs": 172651,
+          "bytes": 837521
+        },
+        {
+          "kind": "global.get -> local.set",
+          "pairs": 97115,
+          "bytes": 594146
+        },
+        {
+          "kind": "i32.const 0 -> global.set",
+          "pairs": 74203,
+          "bytes": 426180
+        },
+        {
+          "kind": "local.get -> global.set",
+          "pairs": 34024,
+          "bytes": 223106
+        },
+        {
+          "kind": "global.get -> global.set",
+          "pairs": 16795,
+          "bytes": 123699
+        }
+      ],
+      "identity_transfers": [
+        {
+          "kind": "global.get -> global.set",
+          "pairs": 4,
+          "bytes": 32
+        }
+      ],
+      "local_set_then_get_same_index": {
+        "count": 0,
+        "encoded_bytes": 0,
+        "note": "Overlaps transfer runs; replacing with tee depends on other IR metadata."
+      },
+      "run_buckets": {
+        "1": {
+          "runs": 193450,
+          "pairs": 660938,
+          "bytes": 3674628
+        },
+        "4": {
+          "runs": 33582,
+          "pairs": 457110,
+          "bytes": 2603526
+        },
+        "16": {
+          "runs": 5724,
+          "pairs": 256583,
+          "bytes": 1471675
+        },
+        "64": {
+          "runs": 529,
+          "pairs": 111542,
+          "bytes": 641402
+        },
+        "256": {
+          "runs": 1,
+          "pairs": 64595,
+          "bytes": 371560
+        },
+        "1024": {
+          "runs": 1,
+          "pairs": 64595,
+          "bytes": 371560
+        }
+      },
+      "top_runs": [
+        {
+          "kind": "i32.const 0 -> global.set",
+          "function": 26,
+          "offset": 349711,
+          "pairs": 64595,
+          "bytes": 371560,
+          "first_source": 0,
+          "first_target": 374,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 0,
+          "last_target": 64968
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 4767,
+          "offset": 8146805,
+          "pairs": 217,
+          "bytes": 1302,
+          "first_source": 1791,
+          "first_target": 6780,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 2006,
+          "last_target": 6930
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 4767,
+          "offset": 8289787,
+          "pairs": 217,
+          "bytes": 1302,
+          "first_source": 5178,
+          "first_target": 6896,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 5393,
+          "last_target": 6967
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 3983,
+          "offset": 6522830,
+          "pairs": 186,
+          "bytes": 1116,
+          "first_source": 736,
+          "first_target": 1178,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 1263,
+          "last_target": 479
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 5395,
+          "offset": 9558467,
+          "pairs": 186,
+          "bytes": 1116,
+          "first_source": 736,
+          "first_target": 1178,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 1263,
+          "last_target": 479
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3938,
+          "offset": 6417308,
+          "pairs": 156,
+          "bytes": 1092,
+          "first_source": 26111,
+          "first_target": 953,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 24452,
+          "last_target": 1088
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6233,
+          "offset": 10651187,
+          "pairs": 156,
+          "bytes": 1072,
+          "first_source": 52489,
+          "first_target": 473,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 51855,
+          "last_target": 619
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 4767,
+          "offset": 8143426,
+          "pairs": 148,
+          "bytes": 1035,
+          "first_source": 32277,
+          "first_target": 1791,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 1456,
+          "last_target": 1938
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 4767,
+          "offset": 8286408,
+          "pairs": 148,
+          "bytes": 1035,
+          "first_source": 32277,
+          "first_target": 5178,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 1456,
+          "last_target": 5325
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 5629,
+          "offset": 9797179,
+          "pairs": 165,
+          "bytes": 973,
+          "first_source": 48607,
+          "first_target": 3,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 48550,
+          "last_target": 167
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3793,
+          "offset": 6051336,
+          "pairs": 125,
+          "bytes": 875,
+          "first_source": 24469,
+          "first_target": 303,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 24385,
+          "last_target": 423
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6224,
+          "offset": 10559797,
+          "pairs": 125,
+          "bytes": 864,
+          "first_source": 51864,
+          "first_target": 311,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 51756,
+          "last_target": 431
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4939271,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2167,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18648,
+          "last_target": 2125
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3427,
+          "offset": 5342851,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2167,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 20276,
+          "last_target": 2125
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3436,
+          "offset": 5540497,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2167,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 20276,
+          "last_target": 2125
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3323,
+          "offset": 5021162,
+          "pairs": 123,
+          "bytes": 858,
+          "first_source": 1360,
+          "first_target": 252,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 19758,
+          "last_target": 657
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3326,
+          "offset": 5036925,
+          "pairs": 123,
+          "bytes": 858,
+          "first_source": 1360,
+          "first_target": 252,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 19758,
+          "last_target": 657
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 7658,
+          "offset": 13770986,
+          "pairs": 124,
+          "bytes": 852,
+          "first_source": 2197,
+          "first_target": 1853,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 63161,
+          "last_target": 1853
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6872,
+          "offset": 11784557,
+          "pairs": 123,
+          "bytes": 849,
+          "first_source": 57680,
+          "first_target": 345,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 57687,
+          "last_target": 459
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4902156,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2063,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2171
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4903672,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2171,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2174
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4908201,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 174,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 286
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4911183,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 308,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 420
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4914165,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 442,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 554
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4933122,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2151,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 1043
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4941440,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2170,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2159
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4943888,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2159,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2063
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4946303,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2063,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2167
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4948293,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 1225,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 1342
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4956944,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2167,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18760,
+          "last_target": 2063
+        }
+      ]
+    },
+    "note": "Static encodings and adjacent patterns are not proofs of runtime cost or removability. Final census reused by exact Wasm SHA across bookkeeping-only change."
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2899,
+      "selected_count": 130,
+      "completed_count": 130,
+      "exit_code": 0,
+      "elapsed_seconds": 75.91473693199805,
+      "passed": 130,
+      "failed": [],
+      "full_fault_sweeps": 51,
+      "leaks": 0,
+      "logged_errors": 0,
+      "additional_tests": [
+        {
+          "name": "backend.scoped_backend_tests.test.local scalar demand caches retain checked captures through allocation failure",
+          "duration_ns": 234428266,
+          "status": "passed",
+          "leaks": 0,
+          "logged_errors": 0,
+          "allocation_failures": "full",
+          "sweeps": {
+            "full_sweeps": 1,
+            "sampled_sweeps": 0,
+            "discovered_allocations": 0,
+            "fault_runs": 0
+          }
+        }
+      ],
+      "total_selected": 131,
+      "total_full_sweeps": 52
+    },
+    "guests": {
+      "files": 36,
+      "exit_code": 1,
+      "elapsed_seconds": 6.175226772000315,
+      "summary": [
+        "FAILED | 108 passed | 2 failed (6s)"
+      ],
+      "passed": 108,
+      "baseline_failures": 2,
+      "failure_names": [
+        "executed memory costs reconcile after copies reuse traps and retained source edits (development)",
+        "executed memory costs reconcile after copies reuse traps and retained source edits (optimized)"
+      ],
+      "reason": "storage_unsupported: Array elements require a fixed inline layout; unchanged failure pair reproduces with preceding frozen LLVM compiler",
+      "preceding_baseline_evidence": "build/bench/transport-cleanup-2026-11-03/baseline-memory-profile.log"
+    },
+    "zig_lint": "590 production and 1 generated Zig files; 0 findings",
+    "deno_check": "new guest tests and dev area manifest pass",
+    "full_gate": {
+      "status": "pending: baseline failure",
+      "mode": "full",
+      "smoke_passed": 48,
+      "smoke_failed": 1,
+      "failure": "chunk runtime and static chains survive dependency bundles and retained entry edits",
+      "diagnostic": "storage_escape in List/chunk",
+      "evidence": "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/timings.json"
+    }
+  },
+  "integration": {
+    "world": {
+      "evidence": "build/bench/aggregate-identity-2026-11-03/final-world-pair/result.json",
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "entry_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+      "checks": 7,
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+          "wasm_bytes": 563087,
+          "wasm_sha256": "9acfec71f10ad99b872b2c88567b2a206a1ebc137f7967c5278d01f6993eba81",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+          "wasm_bytes": 529248,
+          "wasm_sha256": "2249ab41be63f0fc2493aa267c060d6240c6acff37f54a0405a83acd77e0c81d",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "hand": {
+      "evidence": "build/bench/aggregate-identity-2026-11-03/final-hand-pair/result.json",
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "entry_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+      "checks": 160,
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+          "wasm_bytes": 221408,
+          "wasm_sha256": "76cbc352584e4ac25f45f2c2b80fed7f580d6287ae9735cf4611c6fc20364a6c",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+          "wasm_bytes": 210126,
+          "wasm_sha256": "b1696b940d971a715c97da4620751d69319a139f25d3eb5c129bf4cf7272674c",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "renderer": {
+      "evidence": "build/bench/aggregate-identity-2026-11-03/final-renderer/pair-1a332ef247fc4fe0/result.json",
+      "status": "complete",
+      "pins": {
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "baseline_compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 106804,
+          "wasm_sha256": "e155ee0f136ab84bb95bcc1a6a0203824a6f0351b4c4387e65d9c76ba868a873",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 100146,
+          "wasm_sha256": "068a08e65ecbd351a4aea294e2529ac445b5b7eca02e3c8ca0f0a1b0e62678db",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        }
+      ],
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    },
+    "pen": {
+      "evidence": "build/bench/aggregate-identity-2026-11-03/pen-with-libs/result.json",
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+      "returncode": 1,
+      "compile_invoked": false,
+      "error": "invalid_abi: unsupported ABI version 8",
+      "no_frame_or_png_qualified": true,
+      "initial_loader_failure": "build/bench/aggregate-identity-2026-11-03/pen/result.json"
+    }
+  },
+  "review": {
+    "reviewer": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "scope": "Final live combined deferred control joins, completed helper result aliases and default-zero source",
+    "result": "No semantic blockers found",
+    "details": [
+      "ZeroSource is unwritten, follows function identity and restores through FunctionMark rollback.",
+      "Mutable scratch, flags, demand state and loop counters retain independent locals.",
+      "Partial subtree joins retain full mutable inventories and exact-width alias masks."
+    ],
+    "qualification": "Read-only review; execution and final LLVM measurements remain separate.",
+    "performance_followup": {
+      "finding": "finishJoin rebuilt all historical mutable locals at every join; 46.3% sampled emission CPU",
+      "fix": "One mutable-local set per Generator, root prefix cursor, loops and demands marked at creation, writerInput token remaps marked, export reset clears set and cursor",
+      "review": "Astra xhigh read-only review found current FunctionMark uses fresh child generators; no caller mutable rollback is needed. Root token remapping finishes before body emission.",
+      "control": "World complete Wasm SHA identical before and after incremental bookkeeping"
+    }
+  },
+  "next": "Remaining aggregate transport and outlining/global banking dominate size. Preserve measured semantic/ownership contracts while testing a narrower representation; do not repeat full-history scans.",
+  "raw_evidence": {
+    "build/bench/aggregate-identity-2026-11-03/call-fixture-v3.log": "4ae6a416b93b006c44b1d361be79795aecf41def0bdb8e39ebbd3ea37cd4da70",
+    "build/bench/aggregate-identity-2026-11-03/call-fixture-v4.log": "a772b431960e7c56a400fe558944b8a81757118f10d61c47b2f4b812b3a96ff8",
+    "build/bench/aggregate-identity-2026-11-03/call-native-compile.log": "48649dea9e5a83a7ad4a5c74f8e5beb8d43a8f2f7ad583150212c966a4ef44d7",
+    "build/bench/aggregate-identity-2026-11-03/call-native.log": "fc115f7a59eceb2c8c7820b3e1bfe175ea92151e99c2a043e66938816471dcea",
+    "build/bench/aggregate-identity-2026-11-03/call-selection.json": "4a04a917c46163c1105419bfa4adb3e57eef25de942b0fd739906d2e44fe460d",
+    "build/bench/aggregate-identity-2026-11-03/candidate-census.json": "78bb440ed9bd7a7b1c0dc049cfd7fea7e8b55b0ea98648219c173ed5244e8692",
+    "build/bench/aggregate-identity-2026-11-03/candidate-census.log": "8bcb9842127c70aca7ed1da73299db7e81e59f4d45fc94f7149e7942fbaecbf9",
+    "build/bench/aggregate-identity-2026-11-03/candidate-transfers.json": "aa3f1e35cbb8680a5be9a389fb506aed0c9c905d845f349936406f109131ffe2",
+    "build/bench/aggregate-identity-2026-11-03/candidate-transfers.log": "758c31b4298ebc912f3eee9c01de5f37aebf22ae2aa9c88b36e55caf38cb0763",
+    "build/bench/aggregate-identity-2026-11-03/combined-native-compile-v2.log": "ed6b4e492ebb90387f90bc666e3b595c6ce9cbe26bedbb364063470929e2bed2",
+    "build/bench/aggregate-identity-2026-11-03/combined-native-compile-v3.log": "68373d4324965d73f9592fd3b7305e09a3c049e42a6d25ec4b2cb2487a7c3f30",
+    "build/bench/aggregate-identity-2026-11-03/combined-native-compile.log": "316d1661d45422c41785557ef6365145b1ebdc8b6dd286ea672cda5043c3d2b9",
+    "build/bench/aggregate-identity-2026-11-03/control-integration.patch": "2817fd7fc64aacc2e4b96710556bd569b90ea06245cc1806ce4454f8e9adca10",
+    "build/bench/aggregate-identity-2026-11-03/deferred-fixture-fix.log": "d2b2871c159352de6f336ac065aad001062d53c11a36f1ab4156f6ce05693d3d",
+    "build/bench/aggregate-identity-2026-11-03/deno-check.log": "ebde1927a94f90235b10bd26e568330dedc012eb29a64c471428c518a0e83376",
+    "build/bench/aggregate-identity-2026-11-03/descriptor-fast-build.log": "09780a21ebceee766ec79cff833df425bb0da1044fa6d605cb55a9d406d7b5f5",
+    "build/bench/aggregate-identity-2026-11-03/descriptor-guests.log": "a5d822382e7ec4b2da8febbf379f7cabfc28b2b68eff6909e0aacdf11d4fc32c",
+    "build/bench/aggregate-identity-2026-11-03/descriptor-native-compile.log": "012b74f9c019983c925c77c5c904b4e974d31a8b32ef8467d5e6bc87439e01c4",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/builds.jsonl": "c842e47618218286447848427776a687e074d163d9ad57a4c02af57c2fd395cf",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/cpu-report.json": "2b16c8c48e413ffc899979e942fed2f630e8709c4cb750f09e28ace9130959ce",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/gdb.log": "df912245bd3b5758a689de8d69746550665ac66901d11bbee8f9c12c6a748633",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/profile-progress.json": "11aeca0f6c15cb0a27bed9d98cc0e7cca08c46e29fd705ec141421ca0726fc16",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/result.json": "336f294a74f6b8895c12e249edf5064de577308add0e06db36571bd47fe173bb",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/samples.jsonl": "605f0a3e57b85cc88e39d3dc2870c5c9aefc00bb227a19ffaee0e440e7f9c5cc",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/sampling-window.json": "0ffc9acc407a2567e50d15ce6a10102872d2b281c51818765abdc2ddf8b3d745",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile/main-ff3738d1ec95d253/sampling.json": "e6b79c3560c71bfe174c61c2eda42b533409353f7b331c01edf374dc09104b93",
+    "build/bench/aggregate-identity-2026-11-03/emission-profile.log": "0d472c5c5754beca2be9eb2d27b2557840c1a5a9a66673d6625ca6d7aa1a5e40",
+    "build/bench/aggregate-identity-2026-11-03/emission-summary-output.json": "3ffa37f3a8f5b69421043df8f2f794e16068dcede2d4eec896b3287759828998",
+    "build/bench/aggregate-identity-2026-11-03/final-guest-result.json": "cf33cedca91c6aefe15a741a61e8615d9663076844ce27472ebe7a0cc9d6f8d6",
+    "build/bench/aggregate-identity-2026-11-03/final-guest-selection.json": "98beeab4f75e88552b5322b2d2f63059dd380cbc5351f1610ce37e83fa4f307a",
+    "build/bench/aggregate-identity-2026-11-03/final-guests.log": "0d2778a836e96642b0812663ed7d70dcdaefc21ef1a34b9e511cfb9dcb60b2e4",
+    "build/bench/aggregate-identity-2026-11-03/final-hand-pair/result.json": "e7b6fa66146f4b57dc95d6e4dbb8f8c8843cff7d7654ff8c07b5b885f9bd64ba",
+    "build/bench/aggregate-identity-2026-11-03/final-hand.log": "d3df1d754fe8393ceb308a138a5cd2abc88af9a18f2da2db3976868522fcc075",
+    "build/bench/aggregate-identity-2026-11-03/final-main-summary.json": "1beaf6b29c8446847223f3198b247ebaf29d570d6289aece9b8af4a002674f40",
+    "build/bench/aggregate-identity-2026-11-03/final-native-compile.log": "f7451e8f91f78d232abcc6a2a1a1b2ccbc576c50f9082cf2cccd25bbd523507b",
+    "build/bench/aggregate-identity-2026-11-03/final-native-full.log": "6009d7dcdd13964f2788525af467ab7332b6c326a81c96ab5d43794dc9ab504a",
+    "build/bench/aggregate-identity-2026-11-03/final-native-result.json": "242385d96af2f9c7ef6fa92ddc3430100c143cc2b3eedc897274a475c7033abb",
+    "build/bench/aggregate-identity-2026-11-03/final-native-selection.json": "03c26bdfe968d72d88168e160eceb5d2fdc9ea8cf5ed6ef075c464bdd24f137b",
+    "build/bench/aggregate-identity-2026-11-03/final-renderer/pair-1a332ef247fc4fe0/result.json": "c2e15b67d0b155fafcd649017d0ff93c6bfd55547883682924930914798a797f",
+    "build/bench/aggregate-identity-2026-11-03/final-renderer.log": "058f59d209ce4512226fef06b97887e6a644b178ec6124cca434963ed43cd15f",
+    "build/bench/aggregate-identity-2026-11-03/final-world-pair/result.json": "bcf6c4aa1a198bff8550c22d3dff0e6d785a27b24d730005ec90cd487da2038e",
+    "build/bench/aggregate-identity-2026-11-03/final-world.log": "423096e9d02c96cb136cb43746d29715af74321d1c20915e06af18124a0f098e",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/recent-failures.json": "256bef08724893a6213d6b015e1be9d03d33ac1b842b7c7bd0f70fa31de575f8",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/run-b58cefa91c4883bc/smoke-build.stderr.log": "b3bad1e8b3f98aea1aee68eded2e15820fedf5269b1b34878c2da7908e9ca515",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/run-b58cefa91c4883bc/smoke-build.stdout.log": "78352d55b18b744a18fe3c8d3cb1d65361764465b591abda4094e15f46db7921",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/run-b58cefa91c4883bc/smoke.stderr.log": "4f229c116cbae2c6dff7f06196beb073c09053a73c31d9b53e0560bd21231525",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/run-b58cefa91c4883bc/smoke.stdout.log": "40f2c5e43b97eaceb7f3a428b7a4d9ed1058609f86a6d5c4b4659b1821a59db5",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/run-b58cefa91c4883bc/timings.json": "53b5f3f0045e4c4c7310e0b82e54c1c8c375dc94a96d8c99ca48192ac985ad5e",
+    "build/bench/aggregate-identity-2026-11-03/full-gate/timings.json": "53b5f3f0045e4c4c7310e0b82e54c1c8c375dc94a96d8c99ca48192ac985ad5e",
+    "build/bench/aggregate-identity-2026-11-03/full-gate.log": "8529ad1e7f440fff3880576e319655c1a76cd81b34c5de10eaaf5b3f52963bf9",
+    "build/bench/aggregate-identity-2026-11-03/hierarchical-call-fixture.log": "8e7a9031371f33a073afb72f43f294167301c9c66537a0dd62912dba219b9ca2",
+    "build/bench/aggregate-identity-2026-11-03/indexed-demand-native.log": "9ce13a5401d1cf56959d92dd5422c461b444c35b53a3064563e336caaebc9a1e",
+    "build/bench/aggregate-identity-2026-11-03/indexed-fast-build.log": "eb056ed18f0414eeb57b0479d0a89496dca19ec4112977a6edfc719c7e7dde6d",
+    "build/bench/aggregate-identity-2026-11-03/indexed-final-guest-result.json": "1184c69a5968ce5fe12a91985cbc9aa2475ded55c4a3d01d7990ccdd5f9b47d5",
+    "build/bench/aggregate-identity-2026-11-03/indexed-final-guests.log": "327ad3636c164fa08470dd207c1f78f50b241719c4d3936372d7b72f933cdc50",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/recent-failures.json": "256bef08724893a6213d6b015e1be9d03d33ac1b842b7c7bd0f70fa31de575f8",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/run-e6b203dfb7dfd087/smoke-build.stderr.log": "04f69975ea88a1a7974f3eae57b93a8932ed82bedd55fe8b611eb19905b921fe",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/run-e6b203dfb7dfd087/smoke-build.stdout.log": "78352d55b18b744a18fe3c8d3cb1d65361764465b591abda4094e15f46db7921",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/run-e6b203dfb7dfd087/smoke.stderr.log": "4f229c116cbae2c6dff7f06196beb073c09053a73c31d9b53e0560bd21231525",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/run-e6b203dfb7dfd087/smoke.stdout.log": "c65a6a6bf91981bcdc4659b71b177f9445bbaff9bca0423e687bd0b1dceadfa9",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/run-e6b203dfb7dfd087/timings.json": "2e082d18e4efd15b949799d2693930bc44fe49602bf8b6e5055d73dc8ba8b41e",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate/timings.json": "2e082d18e4efd15b949799d2693930bc44fe49602bf8b6e5055d73dc8ba8b41e",
+    "build/bench/aggregate-identity-2026-11-03/indexed-full-gate.log": "4271064e3b6c83ba2c19fdb253d2cf1d7d6b576b2606a18f0cbcb11b74fad4ca",
+    "build/bench/aggregate-identity-2026-11-03/indexed-guests.log": "16580a37e8edcafa15ca753bc962ae9d2d5175c1223b5007918d39460fc69500",
+    "build/bench/aggregate-identity-2026-11-03/indexed-lint-zig.log": "422c4da5c71bfb2c2b690669cbd2028a4176cea31d2b86ae55612c923ed71934",
+    "build/bench/aggregate-identity-2026-11-03/indexed-main-baseline/main-9513a55dd3e2a20d/result.json": "700e40918c0fe06d7bc1307025d249f1605753c8d273f4f57327d5ca43a02e96",
+    "build/bench/aggregate-identity-2026-11-03/indexed-main-baseline.log": "9ceddbd5d37f50d24a489db964b41db559ee7e9efda914bf0d2df97cec487f70",
+    "build/bench/aggregate-identity-2026-11-03/indexed-main-candidate/main-35a23f6c2025d542/result.json": "1559f9e914e8698c0e00cf475eeb9392dfc1cc6ce5dd8e9c7b361f8300e73d33",
+    "build/bench/aggregate-identity-2026-11-03/indexed-main-candidate.log": "27d22e8fe497970ed3aeab0af782b67d161419566540ce2e23d8f4b3cbdf395b",
+    "build/bench/aggregate-identity-2026-11-03/indexed-main-pair.json": "6a164e60fac8f708a8ec90ed7500e19709fe2f28776788ea23ee2c073c5292ff",
+    "build/bench/aggregate-identity-2026-11-03/indexed-native-compile.log": "a7a758a6433e5dea2cec4e2b6728e80a8f02e425ee6ecbd4c93291bc4d5a7e6f",
+    "build/bench/aggregate-identity-2026-11-03/indexed-native-complete.json": "0bb06c32047d46ccccbfed16a40becd89a95a92c7fd11c36e1b557224274c65c",
+    "build/bench/aggregate-identity-2026-11-03/indexed-native-full.log": "eaf28abb89f7ad6195cd464fb02430e8f2ff5aec18be2463b9586b06c671ac60",
+    "build/bench/aggregate-identity-2026-11-03/indexed-native-result.json": "95586fa9db6eb595f6262f2675c4824f2b03915c7dc7b43c86d279bf42065f5f",
+    "build/bench/aggregate-identity-2026-11-03/indexed-release-build.log": "0b2ab13677157e9cf07801f1ecae7ea1777d27e6862de19ad827cfb8badf047b",
+    "build/bench/aggregate-identity-2026-11-03/indexed-release-identity.json": "8b964efca49dd7f08be2730fda3387481ae3e39053d00003d103e68de340be1f",
+    "build/bench/aggregate-identity-2026-11-03/indexed-source-pin.json": "e16f5411ac3cb5c1de39e6d5d2e3a8cb3fc539d60b42e544ebe7db541c6085e7",
+    "build/bench/aggregate-identity-2026-11-03/indexed-source.patch": "bc908f3c32fcefd8ebb82db6a302acd9dcdeb12d0953db0f8d4d2a9afd6ecbb5",
+    "build/bench/aggregate-identity-2026-11-03/indexed-world-pair/result.json": "30540effd525a4de922328406a47d0d7497e801c0958dabace3250ef8af94a3b",
+    "build/bench/aggregate-identity-2026-11-03/indexed-world.log": "b34a32fe17cb21731a39460b425bbf5b556e665621915ef2a98d8e545c76f074",
+    "build/bench/aggregate-identity-2026-11-03/lint-zig.log": "422c4da5c71bfb2c2b690669cbd2028a4176cea31d2b86ae55612c923ed71934",
+    "build/bench/aggregate-identity-2026-11-03/main-baseline/main-8ce6b21a9d6f81f1/result.json": "9a68bbb451c7097bc4bd6a7d8b16b5d2163a28b456335b400a62c0f7832e6a60",
+    "build/bench/aggregate-identity-2026-11-03/main-baseline.log": "cd778b3555caad3ebcb551c1995d6da3c9b007dcf9f39741bd17755863f4e531",
+    "build/bench/aggregate-identity-2026-11-03/main-candidate/main-ec15400ea837054f/result.json": "76a3b7a37bd47c85d46a12f9d330051c5045f24ed0c48af099c3ac4da4ddb9b2",
+    "build/bench/aggregate-identity-2026-11-03/main-candidate.log": "dd385cbaab855066e08b1d73c674a4c6ebf94b1cc33e0414f4e2415bb57754eb",
+    "build/bench/aggregate-identity-2026-11-03/main-configured/main-3609996401724e93/result.json": "0c3b62295f4fe830967f1cba8477decb29c2dc7385005270c467bf00e499fb88",
+    "build/bench/aggregate-identity-2026-11-03/main-configured.log": "8d34348cc259de002898bfc789c63b6b5a0ae84be387d910d985144e44ab6ec7",
+    "build/bench/aggregate-identity-2026-11-03/main-engine-validation.json": "12a262c37800ee1af77358d2fad7a142b743f72236a44f8e865fcaff08feb5e4",
+    "build/bench/aggregate-identity-2026-11-03/main-pair.json": "7cae823a3d0db80dba27843e30be5f15ba88d92b35a253c6f8945155878bde18",
+    "build/bench/aggregate-identity-2026-11-03/native-fast-build-v2.log": "caa391a10e928c5740f0b2cf0dc9ec9d5c942794c7ac4bc69c04a836b91f5ebd",
+    "build/bench/aggregate-identity-2026-11-03/native-fast-build-v3.log": "e8fdd20b5db03a01b7feee0d3bc5e2c1c0d7d95b126e9df2f840f250b5d724c5",
+    "build/bench/aggregate-identity-2026-11-03/native-fast-build.log": "eef21ca40fd4cdad109a33a0eedd07de29acc6d79d88676f39f7eda1b5d3ffe0",
+    "build/bench/aggregate-identity-2026-11-03/native-full.log": "0bcd214a24631d92f931b79bd3281679bc14816efed05e29918627caf9dea849",
+    "build/bench/aggregate-identity-2026-11-03/native-main/main-7c942e7609138b70/result.json": "fd3f3285379bf8f6dcd644fd2218b03c0267754b22588de2827f048618dcea5d",
+    "build/bench/aggregate-identity-2026-11-03/native-main.log": "f345bb1a31ef17617184e559ce5b726f8c5c69cfa61619c9130f72469e51999f",
+    "build/bench/aggregate-identity-2026-11-03/native-result.json": "4dbd859538f11fbd1d79cc4ef6aca2f2d7776bbac57a6f56c59c57246bd09497",
+    "build/bench/aggregate-identity-2026-11-03/native-selection.json": "684729d55c770d826525c8f01be0e43d3a332f7ab218d719c45e63a50822abc9",
+    "build/bench/aggregate-identity-2026-11-03/partial-fast-build.log": "3c6fe3c6ee29a0dffec3e9bbe07fbc3645e42843515f87753b21a111a6a2edb1",
+    "build/bench/aggregate-identity-2026-11-03/partial-guests.log": "545a48433003d5803df6b9fc5f08cbe926e4dcca074058e09c01b223e0210265",
+    "build/bench/aggregate-identity-2026-11-03/partial-menu-pair/result.json": "c395d312a8d25007a64171839c3918112bff9f3ed0bbd76c7cd59a5dc23549aa",
+    "build/bench/aggregate-identity-2026-11-03/partial-menu.log": "591d606677ae83792fdc51ec6df6e7d3095b63a4c2b01ac92ed34a32002a8d5a",
+    "build/bench/aggregate-identity-2026-11-03/partial-native-compile.log": "63940a35716a100ca029c3dc946d8ab159899f92c8228397c5346f2afbee84d5",
+    "build/bench/aggregate-identity-2026-11-03/partial-native.log": "5cbd612012314c35c0770dcf57aa593dac8adf81e3b1879068aae454cc6d533b",
+    "build/bench/aggregate-identity-2026-11-03/partial-source-pin.json": "33fa5197af5303d723b76709ca74ad4971e76bd2119f0ca30abe2a4772db7810",
+    "build/bench/aggregate-identity-2026-11-03/partial-source.patch": "6f92cc74ce5340cf540e1e94b67407f0233e76444c3ad2a68e2071ce7004a7f9",
+    "build/bench/aggregate-identity-2026-11-03/partial-world-pair/result.json": "e2aac1f893f29452a8c1e7d865ac5e3297085f84af6f21a5bc5907f77c17f177",
+    "build/bench/aggregate-identity-2026-11-03/partial-world.log": "8cb1381d7208b0015e589a94b102b3305770373fada3d900bb082c50c352bd09",
+    "build/bench/aggregate-identity-2026-11-03/pen/command.json": "80b0dab27c2c7db3062d4a855e41e931d7a625e82845344d1968d5dac72b9e41",
+    "build/bench/aggregate-identity-2026-11-03/pen/game/game.json": "16921a0b393bef8a4ed327227a30ceaf982024fc421060e5329961d4c6ca02d8",
+    "build/bench/aggregate-identity-2026-11-03/pen/result.json": "e7f790f2c43fec018ccad45faa48ef92480534b2311ea9cbd64bfda3882578b3",
+    "build/bench/aggregate-identity-2026-11-03/pen/run.log": "d792738797e9ca3abecb2701c8346a2ef5a0252edc55ec52aeaf68fc816ef7d7",
+    "build/bench/aggregate-identity-2026-11-03/pen-with-libs/command.json": "6868f1aa289babc1c8ac0fe8ad8cffbd935ae99950177cf331ad6ce8a917accf",
+    "build/bench/aggregate-identity-2026-11-03/pen-with-libs/game/game.json": "16921a0b393bef8a4ed327227a30ceaf982024fc421060e5329961d4c6ca02d8",
+    "build/bench/aggregate-identity-2026-11-03/pen-with-libs/result.json": "924016d3e4494e50bb3ccf93b83e42d18a3dee30fcf0027816b9ea0a5ecb35a9",
+    "build/bench/aggregate-identity-2026-11-03/pen-with-libs/run.log": "23c04c160167bbbbcfac0d4aba9192a9dea05e5331dc71cb35d87f3237fc0a78",
+    "build/bench/aggregate-identity-2026-11-03/pen-with-libs.log": "f5d01082cf78c6bd165cc37a13d886de75e28d21f75f9a87e2b35b38ebb78f3f",
+    "build/bench/aggregate-identity-2026-11-03/pen.log": "802247b46c45cd63c52e0fb806f38692e9cc1c96d3dbda0f635a91c6542f82f4",
+    "build/bench/aggregate-identity-2026-11-03/prototype-guests.log": "d4bda11f7c2a150ce10f45558b17b466ce4521232524002c29de1c35e54d4b83",
+    "build/bench/aggregate-identity-2026-11-03/prototype-native-selection.json": "93fb9c7c54d6af79aa98107b9679e384fad5c12081a3eb9a53aae60ac65dfa89",
+    "build/bench/aggregate-identity-2026-11-03/prototype-native.log": "c727e1698334a978df9a48c5b93f5b71c2d440b069542bc2158daca57ad2232e",
+    "build/bench/aggregate-identity-2026-11-03/prototype-world-pair/result.json": "7f274d858b4cbcfff36367a722fb84815c9f20491da4776b79904afa996d9f7f",
+    "build/bench/aggregate-identity-2026-11-03/prototype-world.log": "c1618cfb9bfc85622cd670c6dceece60a197ec879a3b80ef7b400f88b75914ff",
+    "build/bench/aggregate-identity-2026-11-03/release-build.log": "21522297e03faf2d658d47b11110807c4e1404456535bce5a967b92fa3243619",
+    "build/bench/aggregate-identity-2026-11-03/release-identity.json": "4976092e92912481091b517fd075180288354fc7c0ced3f7479e16350c2f4e1b",
+    "build/bench/aggregate-identity-2026-11-03/release-source.json": "bb27667285c0936f420d0b9b265f7668b0f145984896c4133fe79f1382f37c63",
+    "build/bench/aggregate-identity-2026-11-03/review.json": "2603dbd8f5382898f813b50738e131ee654c060c202dfaa7d7bba8613b411bec",
+    "build/bench/aggregate-identity-2026-11-03/source-pin.json": "bb27667285c0936f420d0b9b265f7668b0f145984896c4133fe79f1382f37c63",
+    "build/bench/aggregate-identity-2026-11-03/source.patch": "899e86ffa48f59b29beca0b59804220cde74a860e3ca5502524caecfe7f122a2",
+    "build/bench/aggregate-identity-2026-11-03/zero-fast-build.log": "34928fa1920dd98b9445b4c8241c270e14fe7be8359a6578af4edaa18431a0bc",
+    "build/bench/aggregate-identity-2026-11-03/zero-guests.log": "c405f8b6c81fe58043902be5e483e928366c84327e633ddd508735ac4d90922f",
+    "build/bench/aggregate-identity-2026-11-03/zero-menu-pair/result.json": "25fbf5dc8f172001effa741b46d4393147e61b154c1742ffab423bb4f1550747",
+    "build/bench/aggregate-identity-2026-11-03/zero-menu.log": "cc9cd1c0a923155db014429d12de4879dcbbb5abc8d2a0e3829c0f07e7f8b940",
+    "build/bench/aggregate-identity-2026-11-03/zero-native-compile.log": "d8ca0328d5afcf13f8d4160ca52d7a7fcdb1657fa3d7a85b90ff91e75a715904",
+    "build/bench/aggregate-identity-2026-11-03/zero-native-probe.log": "084f72aca8d29621542feb032069f7879c08df98cb9a081a34ab1a9a836c7745",
+    "build/bench/aggregate-identity-2026-11-03/zero-world-pair/result.json": "a3f6518ac841298bdf94ba629d1eefb5e91534013e706d21a04dcee0b7c4195d",
+    "build/bench/aggregate-identity-2026-11-03/zero-world.log": "5f3de04d662132dd19b8cba002ed404637f8a6b2f95e6602659cd83cb90564d7"
+  }
+}

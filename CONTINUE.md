@@ -14,25 +14,41 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest release produces **15,535,572 bytes of Wasm**, down from 16,220,693
-(685,121B / 4.22% smaller). A matched fresh pair takes **5.652s → 5.636s**; the
-configured launcher takes **5.702s** with identical compiler identity and full
-Wasm hash. Individual cache-disabled completions under shared-host load show no
-meaningful latency gain. The five-second, subsecond and 1–2MB targets remain
-unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/transport-cleanup-2026-11-03.json).
-Release source is `4c6a253b` plus complete patch `3c99042261da`; all five
-changed implementation/test files match the frozen candidate. The installed LLVM
-binary is `05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249`.
+The latest release produces **14,332,601 bytes of Wasm**, down from 15,535,572
+(1,202,971B / 7.74% smaller). A matched fresh pair takes **5.773s → 5.778s**;
+the configured launcher takes **5.660s** with identical compiler identity and
+full Wasm hash. No meaningful latency change is established. The five-second,
+subsecond and 1–2MB targets remain unmet. Exact pins and qualification are in
+[the current evidence](zig-native/measurements/aggregate-identity-2026-11-03.json).
+Release source is `35aa2fde` plus complete patch `bc908f3c32fc`; the 15 frozen
+implementation, test and contract files match the candidate. The installed LLVM
+binary is `47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad`.
 
-Final data-stack bodies now remove same-local get/set pairs and fold set/get
-pairs to tee after local compaction. The complete output has no local self-copy
-or adjacent set/get readback pairs, down from 43,468 and 160,011 respectively.
-It gains 153,111 tee instructions; overlapping pair counts are not additive.
-Original module bodies and semantic/table coordinates stay immutable. Packed
-flags and hidden ownership/resource markers retain conservative handling;
-diagnostic origins do not select the optimization. Global banks, call
-conventions, semantic/effect checks and default-zero behavior stay intact.
+Checked aggregate joins now preserve immutable physical words and materialize
+only differing or non-dominating lanes. Mutable owner tokens, loop carriers,
+demand caches and normal fallthrough retain capture storage. Tagged, host,
+demand and unowned-reference subtrees keep ordinary transport while eligible
+siblings share. Completed buffered helpers may return unchanged input words
+without result stores or caller loads. Statement completions and static callable
+placeholders share one unwritten default-zero local per function. Complete type,
+owner, read, effect and variant checks remain. Main shares 48,699 join words,
+avoids 3,060 result stores and 24,284 result loads, and shares 145,227 zero values.
+Counts describe compiler work, not additive byte savings.
+
+The first pilot shrank the output but regressed compilation to 10.470s.
+A bounded stack sample attributed 46.3% of sampled emission CPU to rebuilding
+all historical mutable-local sets at every join. The final implementation indexes
+mutable origins once per function. Full Main and World Wasm hashes remain
+identical after that bookkeeping fix; the final matched pair restores baseline
+latency. The rejected candidate and diagnostic evidence remain pinned.
+
+The preceding final transport cleanup still removes same-local get/set pairs
+and folds set/get to tee after local compaction. Original module bodies and
+semantic/table coordinates remain immutable; neutral reservation nops disappear
+only during final assembly. Hidden ownership/resource markers and flagged table
+operands retain conservative handling. See
+[the preceding evidence](zig-native/measurements/transport-cleanup-2026-11-03.json)
+for its exact baseline and byte accounting.
 
 Packed helper inputs now reserve logical input locals in the existing Value
 layout. After complete body checking, result serialization and cleanup, the
@@ -59,22 +75,22 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,884 native laws compile; all 116 selected laws pass full allocation faults
-(47 sweeps), including the new compaction/transport/metadata/typed-local laws.
-The final LLVM guest family has 102 passes and two unsupported legacy
-memory-profile cases; both failures reproduce with the preceding frozen LLVM
-compiler. Zig lint is clean. The required full gate retains 48 passes/one
-baseline List/chunk failure, so full qualification remains pending. Final LLVM
-passes seven world/editor, 160 hand and seven identical renderer checks. World
-shrinks 588,596 → 563,087B; hand 227,033 → 221,408B; renderer 110,675 →
-106,804B. Installed Pen still rejects ABI 8 before rendering; no new frame/PNG
-is qualified. The configured launcher selects the exact measured release.
+All 2,899 native laws compile; 131 selected laws pass full allocation faults
+(52 sweeps), including deferred joins, helper result aliases, zero-source
+rollback and demand caches. The final LLVM guest family has 108 passes and the
+two unchanged unsupported legacy memory-profile cases; both reproduce with the
+preceding frozen LLVM compiler. Zig lint is clean. The required full gate still
+stops at 48 passes/one baseline List/chunk failure, so full qualification remains
+pending. Final LLVM passes seven world/editor, 160 hand and seven identical
+renderer checks. World shrinks 563,087 → 529,248B; hand 221,408 → 210,126B;
+renderer 106,804 → 100,146B. Installed Pen still rejects ABI 8 before rendering;
+no new frame/PNG is qualified. The configured launcher selects the exact release.
 
-The current artifact has 15.13MB of code, 341kB of global declarations and 50kB
-of data. Local/global instructions occupy 10.63MB (68.45%). There are still
-462,178 locals and 68,201 mutable globals. The outliner's 67,833 banked globals
-and 390,988B root reset run stay unchanged. Only four functions with 59 total
-body bytes are unreachable. Byte counts describe static encodings, not runtime
+The current artifact has 424,255 declared locals and 64,963 mutable globals.
+Local/global instructions still occupy 9,829,600B (68.58%). The outliner banks
+64,595 globals, with a 371,560B root reset run. Only four functions with 59 total
+body bytes are unreachable. Local self-copies and adjacent same-local set/get
+readbacks remain absent. Byte counts describe static encodings, not runtime
 cost or removable work.
 
 The **2,076,028B historical predecessor was recovered exactly**, with its
@@ -91,10 +107,10 @@ one pointer. Current `temporary`/`assignTransport` recursively materialize and
 copy Value leaves, including explicit owner/borrow metadata. Some resulting
 instructions are necessary for the current representation; preserving ownership
 does not require redundant or eager copies of every unchanged aggregate lane.
-Current closure admission remains its own path. The next larger pilot should
-preserve immutable word/immediate references and materialize only genuinely
-differing merge/result lanes, within existing Value/Core semantics. Keep
-complete type, owner, read, variant, loop/backedge and invocation-zero checks.
+Current closure admission remains its own path. The current selective
+merge/result pilot uses the existing Value/Core model. The remaining aggregate
+transport and global banking are the next size hills; retain complete type,
+owner, read, variant, loop/backedge and invocation-zero checks.
 
 The earlier bounded Binaryen diagnostic shrank the preceding 16.22MB artifact to
 13.54MB in 2.84s. Its broader simplification is not installed and its savings
@@ -109,7 +125,7 @@ pruning remain held; requirements, controls and raw evidence are retained in the
 [preceding frontier](https://github.com/mewhhaha/blot2/blob/8ed0781c4c623c1d8d47b47fff1f2edaebd9a9a0/CONTINUE.md)
 and linked measurements. Remaining-use counts are not a dead-binding proof.
 
-The separate release profile takes 6.13s: backend 5.12s, checking 0.53s,
+The preceding separate release profile took 6.13s: backend 5.12s, checking 0.53s,
 validation 0.11s. Borrow/owner-graph traversal and metadata copying remain the
 latency follow-up from a bounded weighted stack sample; size inspection does not
 establish CPU cost.

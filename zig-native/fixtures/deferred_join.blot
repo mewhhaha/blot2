@@ -1,0 +1,59 @@
+type Choice is data = $Some U32 | $Nothing
+const wide = func (input: U32) => return {a: input, b: @u32.add input 1, c: @u32.add input 2, d: @u32.add input 3, e: @u32.add input 4, f: @u32.add input 5, g: @u32.add input 6, h: @u32.add input 7}
+const exits = func (input: U32) => return do:
+  let base = wide input
+  if @u32.eq input 0:
+    return base
+  if @u32.eq input 1:
+    return base
+  base.d := @u32.add input 30
+  return base
+entry const three_exits = func (input: U32): Array U32 => return do:
+  let result = exits input
+  return #[result.a, result.b, result.c, result.d, result.e, result.f, result.g, result.h]
+entry const conditional = func (input: U32): Array U32 => return do:
+  let base = wide input
+  let result = if @u32.eq (@u32.rem input 2) 0 then base else {a: base.a, b: base.b, c: base.c, d: @u32.add input 40, e: base.e, f: base.f, g: base.g, h: base.h}
+  return #[result.a, result.d, result.h]
+entry const matched = func (input: U32): Array U32 => return do:
+  let base = wide input
+  let result = case @u32.rem input 3 of
+    0 => base
+    1 => base
+    _ => {a: base.a, b: base.b, c: base.c, d: @u32.add input 50, e: base.e, f: base.f, g: base.g, h: base.h}
+  return #[result.a, result.d, result.h]
+const only = func (input: U32) => return do:
+  if @u32.eq input 0:
+    return @panic "no continuation"
+  else:
+    let rows: Array U32 = #[input]
+    return {rows: rows, stamp: @u32.add input 60}
+entry const single_edge = func (input: U32): Array U32 => return do:
+  let result = only (@u32.add input 1)
+  result.rows[0] := @u32.add self 0
+  return #[result.rows[0], result.stamp]
+entry const loop_swap = func (input: U32): Array U32 => return do:
+  let left = input
+  let right = @u32.add input 100
+  let result = {left: left, right: right}
+  for index in 0..3:
+    let old = left
+    left := right
+    right := old
+    result := if @u32.eq index 0 then {left: left, right: right} else {left: left, right: right}
+  return #[result.left, result.right, left, right]
+const mixed = func state -> (flag: U32) => return do:
+  let choice: Choice = if @u32.eq flag 0 then state.choice else (if @u32.eq (@u32.rem state.a 2) 0 then $Some (@u32.add state.a 9) else $Nothing)
+  return @record.merge state {choice: choice}
+entry const variants = func (input: U32): Array U32 => return do:
+  let choice = if @u32.eq input 0 then $Nothing else $Some input
+  let base = @record.merge (wide input) {choice: choice}
+  let result = mixed base 0
+  let changed = mixed base 1
+  let original = case result.choice of
+    $Some value => value
+    $Nothing => 99
+  let updated = case changed.choice of
+    $Some value => value
+    $Nothing => 99
+  return #[original, result.a, result.h, updated]

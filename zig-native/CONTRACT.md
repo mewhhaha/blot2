@@ -93,6 +93,24 @@ callers omit stores for the remaining words. Full packet extents, word offsets
 and result serialization stay unchanged. The input mask belongs to the completed
 plan's arena and rolls back with failed plans. Direct-word calls keep their ABI.
 
+Checked aggregate joins reserve edge copies and materialize only lanes whose
+physical origins differ. Multiple edges may share only a dominating immutable
+local; a sole continuing edge may keep a branch-local definition. Normal
+fallthrough, owner tokens, loop carriers and demand caches retain fresh capture
+storage. Tagged, host, demand and unowned-reference subtrees keep ordinary
+transport while independent siblings may share. Every incoming Value still
+passes complete type, owner, read and variant checks. Outlining cannot extract
+across an unresolved copy reservation; final assembly removes released nops.
+
+Completed buffered helper results may reuse an original argument word only
+when it names a formal local that the finished helper never writes. Logical
+ordinals remain complete across blocked subtrees, packet extents and offsets
+stay fixed, and semantic calls and owner events still execute. Aliased result
+stores and caller loads disappear before packed-input demand is computed.
+Value-less completions and static callable placeholders share one unwritten
+default-zero local per function. Mutable scratch and state retain separate
+locals; speculative helper rollback restores the zero-source cache.
+
 Final data-stack prepared bodies remove adjacent same-local get/set pairs and
 fold same-local set/get pairs to tee after physical local compaction. Original
 module bodies and their semantic/table coordinates remain immutable; assembly
