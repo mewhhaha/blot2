@@ -2,10 +2,10 @@
 
 ## Current frontier
 
-Compilation latency is the active priority: **subsecond Gdev compilation**, with
-the next gate below five seconds. The throughput target is a fresh, reachable
-50k source lines in 0.5 seconds (100k lines/second), then one million
-lines/second. Use
+**Gdev Wasm size is the current priority**, with short iterations and the
+subsecond compilation goal retained; the next latency gate is below five
+seconds. The throughput target is a fresh, reachable 50k source lines in 0.5
+seconds (100k lines/second), then one million lines/second. Use
 `deno run -A scripts/bench/compiler_throughput.ts --compiler PATH --lines 50000`;
 it reports exact lines, bytes, estimated tokens, emitted work, Wasm size and
 executed checks. Generation and cold compilation remain visible; `--profile` is
@@ -62,49 +62,50 @@ still rejects ABI 8; no new frame/PNG is qualified. The configured launcher
 selects `zig-native/zig-out/bin/blotc` with the exact measured identity and
 Wasm.
 
-The preceding size census found 16.31MB (75.6% of the module) in local/global
-instruction traffic. A tiny real-menu conditional copied roughly 10k unchanged
-captured words: the backend rejected callback-bearing aggregates even when both
-branches proved the exact same dominating value. Removing that redundant shape
-restriction saves 4.90MB in the full game. Scalar-address fallback and all
-owner, read, type and variant checks remain. Mutable spill globals fall from
-110,266 to 68,879 and declared locals from 778,621 to 455,933. An older
-full-game capture is 2,076,028B (1.98MiB), with different source/config/memory
-model. Exact duplicate bodies account for only 427kB. See
-[size diagnosis](zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json).
-The current artifact still has 11.32MB of local/global instructions (69.8% of
-the module), 68,201 mutable spill globals and 462,178 declared locals. Private
-field masks remain held after neutral real-menu results; explicit callback
-capture narrowing saved only 116kB. The direct-tail-return pilot saves 969B in
-World and 110B in menu, and remains held. Ordinary statement returns can sit
-inside a synthetic completion operand, beyond that narrow tail marker.
+Fresh
+[binary inspection](zig-native/measurements/gdev-size-forensics-2026-11-03.json)
+accounts for the complete current artifact: 15.81MB is code, 341kB global
+declarations and 50kB data. Local/global instructions alone occupy 11.32MB
+(69.8%). There are 462,178 locals and 68,201 mutable globals. Only four
+functions with 59 total body bytes are unreachable; byte-identical bodies
+account for at most 406kB before index rewriting. Assets, debug names and dead
+functions do not explain the size.
 
-A bounded copy-site diagnostic counts actual emitted transfer operations, with
-argument pushes separate from copies and buffer traffic. World completes with
-identical baseline Wasm. Main prefixes stop at 30 seconds and include discarded
-planning trials; they are not full-output or CPU attribution. The exact coarse
-407,440-instruction prefix has 91,254 callee packed argument-load instructions,
-56,446 continuation assignments and 23,780 Control.result assignments. The
-per-source table saturates; the coarse call-site totals do not. Raw pins and
-limits are preserved in the
-[preceding evidence](zig-native/measurements/immutable-survivors-2026-11-03.json).
-Do not repeat unchanged capped runs.
+The output contains 43,468 exact local self-copy pairs using 254,472B. Final
+local compaction reuses slots without deleting instructions, and no cleanup runs
+after it. Another 325,398 zero/local-set pairs occupy 1.58MB, but physical slots
+are reused: most cannot be called dead Unit values from this census. The
+outliner creates 462 helpers and 67,833 bank globals. Main resets those bank
+slots in one 390,988B run, preserving function-entry zero semantics on repeated
+calls. The bank amplifies eager value/carrier materialization; it is not the
+whole cause.
 
-A follow-up compactor prototype drops only locals with no get/set/tee mentions.
-It passes 80 affected native laws with full faults and the packed guest witness,
-but saves only 1,073B (0.18%) in World. It remains held; no additional LLVM
-build was spent on it. Remaining-use counts are not a dead-binding proof: the
-current traversal misses alternative-row multiplicity and some pattern/fallback
-reads.
+A bounded Binaryen 133 diagnostic (`simplify-locals`, `vacuum`, `dce`) shrinks
+the same Wasm to 13,544,604B in 2.84s. It removes 2.35MB of local instruction
+traffic while retaining all function/local/global declaration counts and
+unchanged load/store bytes. The existing World witness also shrinks and passes
+all seven checks in sync/async modes. Main is engine-validated only. These are
+private optimizer outputs; the installed compiler still emits 16,220,693B.
+Adding that postprocessing cost to the edit loop is not the intended fix.
 
-A separate release profile takes 6.13s: backend 5.12s, checking 0.53s,
-validation 0.11s. One bounded 94-stop stack sample, weighted by per-thread CPU
-deltas, points toward borrow/owner-graph traversal and metadata copying as the
-next latency work. memcpy/memset appears in approximately 18.3% of that weighted
-sample; allocator paths appear in 8.5%. These overlapping endpoint-stack
-attributions are approximate, not a timing distribution or exact CPU shares.
-Prefer reducing repeated value/type/owner traversal and copying before another
-instruction-count pass. Static traffic and rolled-back expression counts do not
+Astra's review favors a bounded data-stack cleanup after final local compaction:
+delete exact self-copy pairs and fold adjacent set/get pairs to tee, respecting
+hidden ownership/resource coordinates. Then measure residual transport before
+choosing a larger Value/phi IR or aggregate ABI rewrite. Preserve semantic
+arguments, effects, owners, variants, loops and default-zero behavior. Use
+`scripts/bench/wasm_size.py` and the SHA-matched `wasm_transfers.py` companion
+to compare the complete emitted result; pattern byte totals overlap and are not
+removable-byte promises. There is no measured path to 1–2MB yet.
+
+Earlier identity-join and immutable-survivor fixes remain installed. Neutral
+field masks, narrow direct-tail markers and unused-local pruning remain held;
+requirements, controls and raw evidence are retained in the
+[preceding frontier](https://github.com/mewhhaha/blot2/blob/8ed0781c4c623c1d8d47b47fff1f2edaebd9a9a0/CONTINUE.md)
+and linked measurements. Remaining-use counts are not a dead-binding proof.
+
+The separate release profile takes 6.13s: backend 5.12s, checking 0.53s,
+validation 0.11s. Borrow/owner-graph traversal and metadata copying remain the
+latency follow-up from a bounded weighted stack sample; size inspection does not
 establish CPU cost.
 
 The reachable primitive benchmark compiles 50,025 lines in 16 modules in

@@ -1,0 +1,658 @@
+{
+  "date": "2026-11-03",
+  "scope": "Inspect the exact current Gdev output; no compiler, workload or deployment changes. Optimizer outputs are diagnostic artifacts, not installed compiler results.",
+  "source_head": "8ed0781c4c623c1d8d47b47fff1f2edaebd9a9a0",
+  "compiler": {
+    "binary": "zig-native/zig-out/bin/blotc",
+    "sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+    "release_source_pin": {
+      "base": "b0be28fb6377f87e3cb518063d3aa9a6ec75f428",
+      "source_snapshot_sha256": "6e4e71f237cf2bc7716552543f485dcd45350965877a9b2e7c56e95197c12f9d",
+      "patch_sha256": "75a683845ad2ce0e73872c32e1a6a222f8c71ad7a90b4fb3360c5453409ff3e3",
+      "tracked_patch_sha256": "0eadca2205a6effb061e7608890bed32167ae4b27ef23935ac648065442f7f71",
+      "files": {
+        "scripts/dev_check_areas.ts": "ee9375a49c8c2ebd81c73af3e2c670f0dfc923c08686dfbc8b88e3be60738cf5",
+        "zig-native/src/backend/scoped_backend.zig": "d9a89dbff30ade3a20bd8b8402763afbd220c53e1db6a8ec860b0ff58dc4c59b",
+        "zig-native/src/backend/storage_calls_tests.zig": "a53cc4890cdbbc7482126b504a386bfd089766100c6ecb2e4671d8e086ad2218",
+        "zig-native/src/work_counters.zig": "415cc221b4d50475d13d3ca78ae5c606ad245d92d7c8295c16d74cddebddce02",
+        "zig-native/src/backend/packed_input_demand.zig": "a63b53f4af6e91706c1de8e66dd559e1cf8ff168027ad4b76b466e657f4d087c",
+        "zig-native/src/backend/storage_packed_input_tests.zig": "e419465bca9a1eed93ab48e04b7a6b20af51a97661c0b88e9ca5b9e39c6d23ee",
+        "zig-native/fixtures/packed_input.blot.in": "97fe11b8dafcc65df87248c6669876efc4d4d55ae1e8b1ce9af17f8f919fb705",
+        "zig-native/fixtures/packed_input_oom.blot": "84263c87d9a7f9d345fa8f41a25a7ccadcd18be4c81b445fc8b9943d8aa98366",
+        "zig-native/tests/packed_input_execution.test.ts": "54d6ac01fb3dba4ba3c23894cf85e569f08c883695316a9dc0c0a4f910444cb4"
+      },
+      "note": "Source snapshot identifier combines tracked patch and untracked file contents. complete-source.patch includes every manifest file; source.patch is the original tracked-only diff."
+    },
+    "identity": "b83ce3b4d722485f7165b608a0bd9aeb0d9c3cd467cb013c0eec97272ef75d15"
+  },
+  "workload_heads": {
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+  },
+  "artifact": {
+    "path": "build/bench/private-prototypes/lazy-control-evidence/packed-main-release/main-601ad9d551778f89/main.wasm",
+    "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+    "wasm_bytes": 16220693,
+    "functions": 8000,
+    "instruction_count": 5937774,
+    "declared_locals": 462178,
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 68201
+    }
+  },
+  "sections": [
+    {
+      "id": 1,
+      "offset": 8,
+      "payload_offset": 11,
+      "payload_bytes": 5849,
+      "bytes": 5852
+    },
+    {
+      "id": 2,
+      "offset": 5860,
+      "payload_offset": 5862,
+      "payload_bytes": 40,
+      "bytes": 42
+    },
+    {
+      "id": 3,
+      "offset": 5902,
+      "payload_offset": 5905,
+      "payload_bytes": 8002,
+      "bytes": 8005
+    },
+    {
+      "id": 5,
+      "offset": 13907,
+      "payload_offset": 13909,
+      "payload_bytes": 6,
+      "bytes": 8
+    },
+    {
+      "id": 6,
+      "offset": 13915,
+      "payload_offset": 13919,
+      "payload_bytes": 341054,
+      "bytes": 341058
+    },
+    {
+      "id": 7,
+      "offset": 354973,
+      "payload_offset": 354975,
+      "payload_bytes": 51,
+      "bytes": 53
+    },
+    {
+      "id": 10,
+      "offset": 355026,
+      "payload_offset": 355031,
+      "payload_bytes": 15814924,
+      "bytes": 15814929
+    },
+    {
+      "id": 11,
+      "offset": 16169955,
+      "payload_offset": 16169959,
+      "payload_bytes": 49684,
+      "bytes": 49688
+    },
+    {
+      "id": 0,
+      "offset": 16219643,
+      "payload_offset": 16219646,
+      "payload_bytes": 1024,
+      "bytes": 1027,
+      "name": "blot:collector-contract"
+    },
+    {
+      "id": 0,
+      "offset": 16220670,
+      "payload_offset": 16220672,
+      "payload_bytes": 21,
+      "bytes": 23,
+      "name": "blot:abi"
+    }
+  ],
+  "categories": [
+    {
+      "name": "locals",
+      "count": 3315539,
+      "bytes": 9259718
+    },
+    {
+      "name": "globals",
+      "count": 594439,
+      "bytes": 2059610
+    },
+    {
+      "name": "constants",
+      "count": 748182,
+      "bytes": 1726542
+    },
+    {
+      "name": "calls",
+      "count": 389506,
+      "bytes": 883908
+    },
+    {
+      "name": "loads",
+      "count": 257377,
+      "bytes": 802069
+    },
+    {
+      "name": "control",
+      "count": 382381,
+      "bytes": 568084
+    },
+    {
+      "name": "stores",
+      "count": 109986,
+      "bytes": 337524
+    },
+    {
+      "name": "arithmetic_simd",
+      "count": 139952,
+      "bytes": 140283
+    },
+    {
+      "name": "memory_table_reference",
+      "count": 412,
+      "bytes": 1643
+    }
+  ],
+  "concentration": {
+    "local_global_bytes": 11319328,
+    "module_percent": 69.7832577190136,
+    "bodies_at_least_10kb": {
+      "count": 482,
+      "bytes": 14124465
+    },
+    "largest_body": {
+      "index": 26,
+      "name": "main",
+      "body_bytes": 965408,
+      "local_count": 12658
+    },
+    "exact_duplicates": {
+      "groups": 521,
+      "redundant_bodies": 4032,
+      "redundant_body_bytes": 405684
+    }
+  },
+  "word_transfers": {
+    "transfers": [
+      {
+        "kind": "local.get -> local.set",
+        "pairs": 378956,
+        "bytes": 2122155
+      },
+      {
+        "kind": "i32.const 0 -> local.set",
+        "pairs": 325398,
+        "bytes": 1584717
+      },
+      {
+        "kind": "global.get -> local.set",
+        "pairs": 98295,
+        "bytes": 602925
+      },
+      {
+        "kind": "i32.const 0 -> global.set",
+        "pairs": 77428,
+        "bytes": 445631
+      },
+      {
+        "kind": "local.get -> global.set",
+        "pairs": 43054,
+        "bytes": 285338
+      },
+      {
+        "kind": "global.get -> global.set",
+        "pairs": 15766,
+        "bytes": 116773
+      }
+    ],
+    "identity_transfers": [
+      {
+        "kind": "local.get -> local.set",
+        "pairs": 43468,
+        "bytes": 254472
+      },
+      {
+        "kind": "global.get -> global.set",
+        "pairs": 4,
+        "bytes": 32
+      }
+    ],
+    "local_set_then_get_same_index": {
+      "count": 160011,
+      "encoded_bytes": 900786,
+      "note": "Overlaps transfer runs; replacing with tee depends on other IR metadata."
+    },
+    "run_buckets": {
+      "1": {
+        "runs": 343480,
+        "pairs": 938897,
+        "bytes": 5157539
+      },
+      "4": {
+        "runs": 45000,
+        "pairs": 565175,
+        "bytes": 3221685
+      },
+      "16": {
+        "runs": 7175,
+        "pairs": 306771,
+        "bytes": 1760128
+      },
+      "64": {
+        "runs": 612,
+        "pairs": 125935,
+        "bytes": 729946
+      },
+      "256": {
+        "runs": 3,
+        "pairs": 68353,
+        "bytes": 394108
+      },
+      "1024": {
+        "runs": 1,
+        "pairs": 67833,
+        "bytes": 390988
+      }
+    },
+    "direct_call_reachability": {
+      "supported": true,
+      "unsupported": [],
+      "roots": [
+        23,
+        24,
+        26
+      ],
+      "unreachable_functions": [
+        1,
+        11,
+        12,
+        13
+      ],
+      "unreachable_body_bytes": 59
+    }
+  },
+  "largest_runs": [
+    {
+      "kind": "i32.const 0 -> global.set",
+      "function": 26,
+      "offset": 365980,
+      "pairs": 67833,
+      "bytes": 390988,
+      "first_source": 0,
+      "first_target": 374,
+      "consecutive_targets": true,
+      "consecutive_sources": false,
+      "last_source": 0,
+      "last_target": 68206
+    },
+    {
+      "kind": "local.get -> local.set",
+      "function": 4794,
+      "offset": 9183668,
+      "pairs": 260,
+      "bytes": 1560,
+      "first_source": 6193,
+      "first_target": 6193,
+      "consecutive_targets": false,
+      "consecutive_sources": false,
+      "last_source": 6343,
+      "last_target": 6343
+    },
+    {
+      "kind": "local.get -> local.set",
+      "function": 4794,
+      "offset": 9324577,
+      "pairs": 260,
+      "bytes": 1560,
+      "first_source": 6309,
+      "first_target": 6309,
+      "consecutive_targets": false,
+      "consecutive_sources": false,
+      "last_source": 6380,
+      "last_target": 6380
+    },
+    {
+      "kind": "global.get -> local.set",
+      "function": 4794,
+      "offset": 9178769,
+      "pairs": 216,
+      "bytes": 1512,
+      "first_source": 33747,
+      "first_target": 1494,
+      "consecutive_targets": true,
+      "consecutive_sources": false,
+      "last_source": 33927,
+      "last_target": 1709
+    },
+    {
+      "kind": "global.get -> local.set",
+      "function": 4794,
+      "offset": 9319678,
+      "pairs": 216,
+      "bytes": 1512,
+      "first_source": 33747,
+      "first_target": 4588,
+      "consecutive_targets": true,
+      "consecutive_sources": false,
+      "last_source": 33927,
+      "last_target": 4803
+    },
+    {
+      "kind": "local.get -> local.set",
+      "function": 4794,
+      "offset": 9182353,
+      "pairs": 217,
+      "bytes": 1302,
+      "first_source": 1494,
+      "first_target": 6193,
+      "consecutive_targets": false,
+      "consecutive_sources": false,
+      "last_source": 1709,
+      "last_target": 6343
+    }
+  ],
+  "bytecode_examples": [
+    {
+      "offset": 365980,
+      "function": 26,
+      "instructions": [
+        "i32.const 0",
+        "global.set 374",
+        "i32.const 0",
+        "global.set 375",
+        "i32.const 0",
+        "global.set 376"
+      ],
+      "interpretation": "First six instructions of the exact 67,833-slot outliner reset run (390,988 bytes)."
+    },
+    {
+      "offset": 9183668,
+      "function": 4794,
+      "instructions": [
+        "local.get 6193",
+        "local.set 6193",
+        "local.get 6188",
+        "local.set 6188",
+        "local.get 6189",
+        "local.set 6189"
+      ],
+      "interpretation": "Three semantically redundant self-copy pairs in final encoded Wasm."
+    }
+  ],
+  "optimizer_probe": {
+    "tool": "wasm-opt version 133 (version_133)",
+    "tool_sha256": "8f25e9fd5db0fc5f210003aaa432922feb2e52d309e430def2f929e34da9466b",
+    "runs": [
+      {
+        "name": "simplify-vacuum-dce",
+        "command": [
+          "/home/jacobt/.local/bin/wasm-opt",
+          "--all-features",
+          "--simplify-locals",
+          "--vacuum",
+          "--dce",
+          "build/bench/private-prototypes/lazy-control-evidence/packed-main-release/main-601ad9d551778f89/main.wasm",
+          "-o",
+          "build/bench/size-forensics-2026-11-03/optimizer-probe/simplify-vacuum-dce.wasm"
+        ],
+        "hard_timeout_seconds": 30,
+        "returncode": 0,
+        "elapsed_seconds": 2.8439684029726777,
+        "output": "build/bench/size-forensics-2026-11-03/optimizer-probe/simplify-vacuum-dce.wasm",
+        "output_bytes": 13544604,
+        "output_sha256": "a48ea6672a8f4daa8d8852f71c8ed8e2fe4ae42a2cdb3902565a2c3902d3abb6"
+      },
+      {
+        "name": "reachability",
+        "command": [
+          "/home/jacobt/.local/bin/wasm-opt",
+          "--all-features",
+          "--remove-unused-module-elements",
+          "build/bench/private-prototypes/lazy-control-evidence/packed-main-release/main-601ad9d551778f89/main.wasm",
+          "-o",
+          "build/bench/size-forensics-2026-11-03/optimizer-probe/reachability.wasm"
+        ],
+        "hard_timeout_seconds": 30,
+        "returncode": 0,
+        "elapsed_seconds": 1.4863039529882371,
+        "output": "build/bench/size-forensics-2026-11-03/optimizer-probe/reachability.wasm",
+        "output_bytes": 15979676,
+        "output_sha256": "79a33ecb2b89ad70c1134cbb38a9fa5229aa8c3cc00cae36ea86af04594ee557"
+      }
+    ],
+    "comparisons": [
+      {
+        "pass": "simplify-vacuum-dce",
+        "wasm_bytes": 13544604,
+        "saved_bytes": 2676089,
+        "saved_percent": 16.497994259554755,
+        "functions": 8000,
+        "declared_locals": 462178,
+        "global_types": {
+          "0x7f:mutable=0": 6,
+          "0x7f:mutable=1": 68201
+        },
+        "local_instruction_bytes": 6912758,
+        "global_instruction_bytes": 1948239,
+        "load_instruction_bytes": 802069,
+        "store_instruction_bytes": 337524,
+        "exact_duplicate_body_bytes": 335384
+      },
+      {
+        "pass": "reachability",
+        "wasm_bytes": 15979676,
+        "saved_bytes": 241017,
+        "saved_percent": 1.4858613007471382,
+        "functions": 7996,
+        "declared_locals": 462178,
+        "global_types": {
+          "0x7f:mutable=0": 6,
+          "0x7f:mutable=1": 68201
+        },
+        "local_instruction_bytes": 9157029,
+        "global_instruction_bytes": 2030690,
+        "load_instruction_bytes": 802066,
+        "store_instruction_bytes": 337518,
+        "exact_duplicate_body_bytes": 401343
+      }
+    ],
+    "world_control": {
+      "command": [
+        "/home/jacobt/.local/bin/wasm-opt",
+        "--all-features",
+        "--simplify-locals",
+        "--vacuum",
+        "--dce",
+        "build/bench/private-prototypes/lazy-control-evidence/packed-world-pair/candidate.wasm",
+        "-o",
+        "build/bench/size-forensics-2026-11-03/optimizer-probe/world-simplify-vacuum-dce.wasm"
+      ],
+      "input": "build/bench/private-prototypes/lazy-control-evidence/packed-world-pair/candidate.wasm",
+      "input_bytes": 588596,
+      "input_sha256": "297ff4889792f26e6440735a4c285cc8bae726a65d809bc2fafaaa95dfb268ac",
+      "returncode": 0,
+      "elapsed_seconds": 0.1343005459930282,
+      "stdout": "",
+      "stderr": "",
+      "output": "build/bench/size-forensics-2026-11-03/optimizer-probe/world-simplify-vacuum-dce.wasm",
+      "output_bytes": 487766,
+      "output_sha256": "83e191e6fdde3d14e2136e4cd8082cc71975274db87af34d085bd6a9f64dd8ca"
+    },
+    "world_execution": {
+      "success": true,
+      "baseline_and_optimized_calls": [
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/packed-world-pair/candidate.wasm",
+          "sync_and_async_rows": [
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ]
+          ]
+        },
+        {
+          "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/world-simplify-vacuum-dce.wasm",
+          "sync_and_async_rows": [
+            [
+              7,
+              0
+            ],
+            [
+              7,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    "main_engine_validation": {
+      "all_validate": true,
+      "all_imports_equal": true,
+      "all_exports_equal": true,
+      "engine": {
+        "deno": "2.9.8",
+        "v8": "15.0.245.2-rusty",
+        "typescript": "6.0.3"
+      },
+      "scope": "Engine validation and equivalent interface only; full-main execution is not qualified."
+    },
+    "notes": [
+      "Cheap simplification removes 2,676,089 bytes but leaves 13,544,604 bytes. It retains all 8,000 functions and declared local/global counts; load/store bytes remain unchanged.",
+      "Pass runs are separate; their savings are not additive. Static exact duplicate-body accounting is also not additive with these passes.",
+      "The direct-call graph proves only 59 bytes of function bodies unreachable. Most of the separate remove-unused-module-elements run reduction is therefore instruction rewriting/cleanup, not dead function removal.",
+      "Main imports/exports and engine validation match; this does not establish gameplay equivalence. The existing World witness passes seven checks both synchronously and asynchronously after simplification. Installed Pen still rejects ABI 8 before rendering.",
+      "Each optimizer subprocess had a hard 30-second cap. No native compiler builds or source instrumentation were needed."
+    ]
+  },
+  "source_trace": [
+    {
+      "path": "zig-native/src/backend/scoped_backend.zig",
+      "line": 418,
+      "finding": "constant() allocates and writes a physical local even for zero. Unit, terminated/control sentinels and static callback dummy words use this path. The binary contains 325,398 adjacent zero/local-set pairs (1,584,717 bytes); no per-site attribution of that total is claimed."
+    },
+    {
+      "path": "zig-native/src/backend/scoped_backend.zig",
+      "line": 1070,
+      "finding": "temporary() recursively allocates fresh lanes for the Value tree. assignTransport() at line 1105 recursively emits leaf copies while checking types, owners, reads and variants."
+    },
+    {
+      "path": "zig-native/src/backend/scoped_backend.zig",
+      "line": 6245,
+      "finding": "A return crossing a Core block allocates a Control.result carrier, assigns the value, closes runtime roots and branches. Control boundaries therefore materialize aggregate transport eagerly."
+    },
+    {
+      "path": "zig-native/src/backend/wasm_scope_outline.zig",
+      "line": 173,
+      "finding": "Cross-helper local mentions select bank globals. Current profile reports 462 outlined regions and 67,833 outlined globals."
+    },
+    {
+      "path": "zig-native/src/backend/wasm_scope_outline.zig",
+      "line": 440,
+      "finding": "Root prepareBody resets every banked local to function-entry zero; this exactly explains the 390,988-byte run. Reset elision requires definite-write-before-read proof across root and helpers on every invocation."
+    },
+    {
+      "path": "zig-native/src/backend/runtime_pipeline.zig",
+      "line": 253,
+      "finding": "Local compaction is the final pipeline pass. wasm_local_compact remaps slots without deleting instructions, so newly created same-slot copies survive final encoding."
+    }
+  ],
+  "interpretation": [
+    "The dominant size cost is eager physical value transport and temporary materialization. Outliner bank globals amplify wide cross-helper lifetimes; they do not alone explain 9.26 MB of local instruction traffic.",
+    "Only about 50 KB is data; custom metadata is about 1 KB. Assets, debug names, unreachable functions and byte-identical helper duplication cannot explain the 16.22 MB total.",
+    "The 5.16 MB adjacent copy/zero encoding total is a pattern census, not a proven removable-byte estimate. Readback pairs overlap it. Local/global argument pushes and checked runtime work can be necessary.",
+    "No measurement establishes a route to 1-2 MB yet. Use full-game bytes and executed witnesses to judge each next pilot."
+  ],
+  "next_pilot": {
+    "recommendation": "Start with a bounded post-compaction word-transport simplifier in the compiler, then measure the residual before a larger value/phi or aggregate-ABI rewrite.",
+    "first_slice": "Delete exact same-local get/set pairs after physical slot remapping; fold safe set/get pairs to tee while preserving or declining hidden ownership/resource coordinates. Keep all semantic/effect evaluation and default-zero/control behavior.",
+    "later_slice": "Use CFG-aware constant/copy propagation or immediate/zero-payload Value operands to avoid materializing Unit, terminated and static callback dummy words. Preserve exact control/owner proof boundaries.",
+    "architecture_trigger": "If remaining whole-record transfers dominate after cleanup, preserve immutable value origins through control-flow and coalesce phi/carrier lanes before assigning locals; optimize the outliner bank after this.",
+    "acceptance": "Compare exact full-game artifact bytes and size census; execute wide forwarding, joins/variants, loop/backedge/default-zero, ownership/resource, repeated invocation and sync/async guest witnesses. Do not ship a slower postprocessing step as the edit loop solution.",
+    "review": "Astra xhigh reviewed the current binary and source pipeline; favors bounded post-compaction cleanup before a new IR or aggregate ABI."
+  },
+  "raw_evidence": [
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-size-summary.json",
+      "sha256": "2b558106f116aa6c6c7d67f066a0916db5112fea2d92c27a4bd77ad8d1f0406f"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/transfers.json",
+      "sha256": "0c4b1494c35431a8731c72480760771f1b37d30ca7608ce0cd4f43fdab08e424"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/summary.json",
+      "sha256": "1a8ed42b08a073b3970abbbd070e6abbb117ca7711b874130f6a9c0536f25934"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/comparison.json",
+      "sha256": "cb30aca0f68e2d209e7ec9acdc165331228daba3d76d521d9aa4adcfc8459407"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/validation.json",
+      "sha256": "39b27ec847bd3fd1e12df90e3668346a637aa71018e2238ee017cb6d54700072"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/world-probe.json",
+      "sha256": "e2bf7b8aa53d99dfdb7c044f10800387889aac17e83b6b6194606b00c529118a"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/world-witness.json",
+      "sha256": "cbbf4c7dcd183f2081737fe339b3d1e87d560c085f39128d5df82f95f3fdd591"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/probe.py",
+      "sha256": "f9bf71e5c38ce1854716a2a280c240e805fdc4905482b82d20b92bdfeb4be81b"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/simplify-vacuum-dce-size.json",
+      "sha256": "5eb167f3a080bb2f1fd179350c2cb8f8c58bac78246b131c85f939cfa62f7259"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/optimizer-probe/reachability-size.json",
+      "sha256": "795ab8fea913a581cd165255cf35068c7d63c9ca03f43676c504a3e1fea66c4b"
+    },
+    {
+      "path": "scripts/bench/wasm_size.py",
+      "sha256": "625687c7f59d4d0af9e899a576d9508a134ad5264696c9fa48f0d145124825c8"
+    },
+    {
+      "path": "scripts/bench/wasm_transfers.py",
+      "sha256": "cc57e2f31502b92922f491f00f7255349e424982f2b6e37c86905448a22658d0"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/astra-local-audit/audit.json",
+      "sha256": "3ea4be80700c07c423acf0e52d20f8e95b3cc04e6f2a19ea9b55a47715480b3b"
+    },
+    {
+      "path": "build/bench/size-forensics-2026-11-03/astra-local-audit/reproduce.py",
+      "sha256": "ffe9fe7f280d991fcd211b8cce26e3084408655a51e17296ca6af5d1dd16c820"
+    }
+  ],
+  "local_def_use_negative_control": {
+    "elapsed_seconds": 7.225010980007937,
+    "method": "Whole-function physical-local reads/writes after compaction; no source-lifetime attribution. Recorded from original read-only run; saving/reproduction script did not trigger a rerun.",
+    "facts": {
+      "local_constzero_sets_never_read": 1400,
+      "local_constzero_pair_bytes_never_read": 5945,
+      "locals_all_writes_constzero": 15746,
+      "local_constzero_only_def_sets": 17288,
+      "local_constzero_only_def_pair_bytes": 80457,
+      "local_constzero_only_def_reads": 25415,
+      "local_copy_sets_never_read": 18682
+    },
+    "interpretation": "Only 5,945 bytes of zero/set pairs target never-read physical locals. The full 1,584,717-byte zero/set census must not be described as dead Unit traffic. Slot reuse prevents simple source-lifetime attribution."
+  }
+}

@@ -1,6 +1,7 @@
 # Owned-storage rewrite: active task index
 
-The active priority is subsecond Gdev compilation, with the next gate below five
+The current priority is reducing Gdev Wasm size while keeping iterations short.
+Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
 [Actual full main](../zig-native/measurements/lazy-packed-inputs-2026-11-03.json)
 produces **16.22 MB Wasm**, down from 16.39 MB. A matched fresh pair takes
@@ -12,10 +13,14 @@ packet offsets. All 2,878 native laws compile, 72 affected laws pass full
 faults, 96 guests pass and Zig lint is clean. Final LLVM retains world/editor,
 hand and renderer checks. The five-second target remains unmet; full
 qualification retains the baseline List/chunk failure, and installed Pen rejects
-ABI 8 before rendering. A bounded stack sample points toward borrow/owner-graph
-traversal and metadata copying for latency work. A further unused-local
-prototype remains held after saving only 1 KB in World. Ordinary `#run` build
-functions remain a separate, unimplemented simplification.
+ABI 8 before rendering. Fresh
+[binary inspection](../zig-native/measurements/gdev-size-forensics-2026-11-03.json)
+finds 11.32MB of local/global instruction traffic, including 254kB of exact
+self-copies. Only 59 function-body bytes are unreachable. A bounded optimizer
+probe removes 2.68MB but still leaves 13.54MB; it is not installed. Next is a
+small cleanup after local compaction, with measured residuals deciding whether a
+Value/phi representation is needed. Ordinary `#run` build functions remain a
+separate, unimplemented simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source
