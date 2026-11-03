@@ -1,0 +1,4834 @@
+{
+  "schema": "blot-goose-baseline-v1",
+  "date": "2026-11-03",
+  "scope": "Three of seven adapted LangArena tasks, V8 only; complete translated programs with distinct ABIs and U32 versus U8 element payloads. Not a full-language or Gdev score.",
+  "environment": {
+    "platform": "Linux-7.3.0-4-cachyos-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "node": {
+      "node": "24.22.1",
+      "acorn": "8.18.0",
+      "ada": "4.0.0",
+      "amaro": "1.1.11",
+      "ares": "1.34.9",
+      "brotli": "1.2.0",
+      "cldr": "48.0",
+      "icu": "78.3",
+      "llhttp": "9.4.3",
+      "merve": "1.2.2",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.4",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.70.0",
+      "nghttp3": "",
+      "ngtcp2": "",
+      "openssl": "3.5.9",
+      "simdjson": "4.6.11",
+      "simdutf": "6.4.0",
+      "sqlite": "3.53.4",
+      "tz": "2026e",
+      "undici": "7.30.1",
+      "unicode": "17.0",
+      "uv": "1.52.1",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.58",
+      "zlib": "1.3.2.1-motley-285e94b",
+      "zstd": "1.5.7"
+    },
+    "node_path": "/home/jacobt/.local/share/fnm/node-versions/v24.22.1/installation/bin/node",
+    "python": "3.14.8 (main, Oct 13 2026, 10:33:10) [GCC 16.2.1 20260810]",
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3\n",
+    "goose_checkout_head": "2166e2e7e25b26a54761abdf911bc3c1fcf33e58",
+    "goose_checkout_status": [
+      "M  .github/workflows/ci.yml",
+      "M  README.md",
+      "M  bench/charts/compilation.svg",
+      "M  bench/charts/examples-compilation.svg",
+      "M  bench/charts/examples-entry.svg",
+      "M  bench/charts/examples-python-runtime.svg",
+      "M  bench/charts/examples-runtime.svg",
+      "M  bench/charts/runtime-targets.svg",
+      "M  bench/charts/runtime.svg",
+      "M  bench/charts/wasmtime-host-c-wasm.svg",
+      "M  bench/charts/wasmtime-host-preparation.svg",
+      "M  bench/charts/wasmtime-host-runtime.svg",
+      "M  bench/examples.md",
+      "M  bench/results/examples-latest.json",
+      "M  bench/results/latest.json",
+      "M  bench/results/runtime-targets-latest.json",
+      "M  bench/results/wasmtime-host-latest.json",
+      "M  bench/wasmtime-host.md",
+      "M  compiler/direct_wasm.h",
+      "M  compiler/direct_wasm_emit.h",
+      "M  compiler/direct_wasm_expr.h",
+      "M  compiler/direct_wasm_funvals.h",
+      "M  docs/FUNCTIONS_PERFORMANCE.md",
+      "M  docs/PERFORMANCE_PLAN.md",
+      "M  docs/RUNTIME_TARGETS.md",
+      "M  oracle/tests/test_bootstrap.py",
+      "M  scripts/bootstrap.py",
+      "A  tests/test_memory_growth_helper.py",
+      "A  tests/test_named_callback_forwarding.py",
+      "?? bench/results/2026-11-03/functions-calls/"
+    ],
+    "compiler_sha256": {
+      "blot": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+      "goose": "353a3f1bd547330c8ecd32e9084ae92d616340f81f83a5cc30f2e657d577652e"
+    },
+    "goose_stdlib": {
+      "base64.goose": "fa1111ce46e9534311f825880dbd2988953430aeb3f1f52d8f0eaecbbc298a61",
+      "binary.goose": "6973e209428668c2db856eaa941de5d93938cfb1749ed07cac534bf9fe4cb031",
+      "csv.goose": "a49b0647f4a2f8ca36170e5a184ab6c6e505492434d0a10a5e05127e96da61ba",
+      "dictionary.goose": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322",
+      "exception.goose": "b91033a5cb9029ac56d27ffb0ed9f5841f76ff58b39de8e881101ca2b8fc39c4",
+      "ffi.goose": "e092b245fbe13ee2fdc71599b7b8eb44198e5261cad9600b7681e13ad75a6c2e",
+      "json.goose": "0e58291ed9051e4ecb8da1ad420290549d723336516507aed33cf7ced89dc29b",
+      "math.goose": "b4c1aee33b5b7033d36a4ddc5c6522c73b21cafe204dc20e8860cdeba22467da",
+      "os.goose": "2193f394d44469daffd993ed204a91b068084fd8db13e261e11156b40c66e934",
+      "regex.goose": "be0e50bab2a1db9f85e856250bcc592dfe25aca73c2ed900410047fbefb4b035",
+      "std.goose": "2243c2ef52ba5045b275eea35252d09f36544987c6884f4a8d35579fa6f781ff",
+      "vec.goose": "2cac168c72047834433bfb419734c38455c9429ea045b1273898031c53faa82e"
+    },
+    "goose_toolchain": {
+      "schema": "goose-to-wasm-toolchain-v1",
+      "repository": "https://github.com/aardappel/goose.git",
+      "revision": "2e2bedef5b980bf013cac5aaa0095bfea64e5569",
+      "emscripten": "6.0.13",
+      "emsdk_repository": "https://github.com/emscripten-core/emsdk.git",
+      "emsdk_revision": "d7b4130688bfa348392b921ab04015aa15c4f154",
+      "node": "24.22.1",
+      "v8": "13.6.233.17-node.58",
+      "wasmtime_python": "50.0.1",
+      "patches": [
+        "oracle/patches/0001-webassembly-target.patch",
+        "patches/direct-target.patch"
+      ],
+      "minimum_cmake": "3.27",
+      "minimum_python": "3.10"
+    },
+    "staged_sources_sha256": {
+      "crc32/blot/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+      "crc32/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "crc32/goose/hash_crc32.goose": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+      "custom_hash/blot/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+      "custom_hash/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "custom_hash/goose/hash_sha256.goose": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+      "fannkuch/blot/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+      "fannkuch/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "fannkuch/goose/fannkuch.goose": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004"
+    },
+    "blot_checkout_head": "70dea1242c73c3b434977495a540206a707e17f9",
+    "blot_compiler_identity_sha256": "2a928fee4075f750a48a3c37fb30c80d357d9d17edb2246640366eeec1b88413",
+    "goose_runner_sha256": "dbc9fba5acbfd4e9de0b86de58ffb3da2df921d958263f117886180dad85eb44"
+  },
+  "coverage": {
+    "reference_catalog_tasks": 50,
+    "reference_adapted_tasks": 7,
+    "selected_ports": 3,
+    "unported": [
+      "Etc::Sieve",
+      "Sort::Quick",
+      "Sort::Merge",
+      "CLBG::Mandelbrot"
+    ],
+    "not_selected": [],
+    "engines": [
+      "V8"
+    ],
+    "note": "Shared translated algorithms, not identical source or a full-language/50-task claim."
+  },
+  "method": {
+    "cold_build": "Fresh driver and compiler per sample; cache disabled. OS and installed-library caches retained. Source staging outside timer. Complete wall and native build phases retained.",
+    "runtime": "Same Node/V8 and flags for both. test/run use official inputs/iterations/warmups. bounded retains production problem sizes with reduced counts recorded per case. Same state retained after warmup. Preparation, startup, engine compilation and output outside clock; no per-element host calls. Two Blot clock packet crossings versus two Goose scalar imports are part of their ABI costs. Common process wall includes parsing the Blot TypeScript guest host for both backends; it is not Goose's standalone runner startup score.",
+    "representation": "Goose hash data is U8; Blot stores identical 0..255 values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed 1m-element capacity retained. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is the original eight-lane custom hash, not cryptographic SHA-256.",
+    "ordering": "Build phase sequential, then runtime phase; seeded paired shuffling, no deliberate concurrent measurement work."
+  },
+  "source_runs": {
+    "runtime": {
+      "raw_report": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/report.json",
+      "raw_report_sha256": "164621b2b17bd41e5cd48404ff87690464d2502890f57b4caab2333f131f92fd",
+      "started_utc": "2026-11-03T12:39:04.006259+00:00",
+      "finished_utc": "2026-11-03T12:40:20.905164+00:00",
+      "status": "passed",
+      "configuration": {
+        "compile_samples": 5,
+        "runtime_samples": 5,
+        "process_warmups": 1,
+        "profiles": [
+          "test",
+          "bounded"
+        ],
+        "timeout_seconds": 30,
+        "seed": 771923,
+        "node_flags": [
+          "--experimental-transform-types"
+        ],
+        "profile_backend": true
+      },
+      "input_sha256": {
+        "/home/jacobt/src/blot2/scripts/bench/goose/compare.py": "985e43b8a16e2117ae2bc1906044b6b9559a9ebbcbcf07c46523c73c4a024480",
+        "/home/jacobt/src/blot2/scripts/bench/goose/reference.py": "85179077b1f3e10a52213729041ef051a9c91c79c4a916a3f9b2d5acf307fae0",
+        "/home/jacobt/src/blot2/scripts/bench/goose/runtime.ts": "3260b2d94010f728cec2c1e212d424fc68d8da93454c8c3b0fc08e0372a7da94",
+        "/home/jacobt/src/blot2/scripts/bench/goose/build_blot.ts": "831c833ceb90718d1118802f686dcd642f8f9fd44e1dc8cbbefe590efabbc240",
+        "/home/jacobt/src/goose-to-wasm/scripts/goose_wasm.py": "fb6319f181316f9d33cc6a6dfe58259cb234046861aa97c5e3ad09269824977d",
+        "/home/jacobt/src/goose-to-wasm/oracle/goose_wasm.py": "617b96bab2fcd7e1cc01edc5bd205ebe537b7b9f1069f77a971b5a02ea298086",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena.py": "f7f1aa1ec5941cd34a07f37b2ffa97d6c88ca5a13009cd83dc4dd1a4d7e06c0f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/manifest.json": "95383d34c7f2214e5b7cfd346b0d0742c23df81f9d568ef4c6dad7c8a6302646",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/test.json": "424371dd25f3fa3f779789c823a05dbe90d2eddbc2a3ca3c5e4319252c572797",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/run.json": "8fe7baed41e8eb0a233057c4406446029f7e5d792cf3a3ac6fc7e714964a155f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/ports/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "/home/jacobt/src/blot2/compiler/installed_cli.ts": "76a5a774119e905284114bb707804f5f500572fb6f46417c368bff8d81d038ba",
+        "/home/jacobt/src/blot2/compiler/numeric_parser.ts": "a3a11718d2ea792dd91f1df83cf11fc60ca85a55002033074fca2302fbf13c14",
+        "/home/jacobt/src/blot2/compiler/packaged_native.ts": "b1931d1dc26c6151dd8322afae67e4c017a15a254f5365cefc5f4a8d85cb94ce",
+        "/home/jacobt/src/blot2/compiler/postfix_syntax.ts": "5b29335c404e89b3b2325cc6288ebc8a5d37a49891c60f546f243cffafbbdceb",
+        "/home/jacobt/src/blot2/compiler/test_compile.ts": "6a73423b569356987186ef17874be07307bb4fd7a7f069c254e485cbabd9183d",
+        "/home/jacobt/src/blot2/compiler/editor_completion.ts": "157cde32dbc4d9e276c8591df09da6a7fdefd3abf824fc50dfb937eacdc3a4a5",
+        "/home/jacobt/src/blot2/compiler/lsp_protocol.ts": "c81acb905c766325278a5c4b08ac2d1b5bc66c6a2dd66478a2e60a935c3cb6a3",
+        "/home/jacobt/src/blot2/compiler/bpm.test.ts": "cc5d54235cc6783c375dcfd4d6bf31eb0682d92d97a6c8ff2ca349c9ec1ba41b",
+        "/home/jacobt/src/blot2/compiler/bpm.ts": "ce750483bc2fe9643f78bd08b80f947ef28da49a510ad76a13093370e1fb6a07",
+        "/home/jacobt/src/blot2/compiler/packages.test.ts": "8b03c919600c4f717bd2cee19e3440afd5ce365a6381df2a8479d281ce1c391f",
+        "/home/jacobt/src/blot2/compiler/packages.ts": "86d394e85a6f41da64f078a21035fd7f39ca5ffb184d3b6ee14543dfee0bb428",
+        "/home/jacobt/src/blot2/compiler/resource_guest.test.ts": "c6e1f350d90b7f570b3694f0bd0ebcb7984cf5d4e5e13e5cd5e2a57732c423e5",
+        "/home/jacobt/src/blot2/compiler/guest_multiplicity.test.ts": "f65958ff4ed115e6aceefa8dd2700811c07888864fb2356ba574844403ddfcaf",
+        "/home/jacobt/src/blot2/compiler/resource_journal.test.ts": "73892388775c1c265d8b473ea610f1c8f74c41f849ed5f8ca63b53bfc7c1741a",
+        "/home/jacobt/src/blot2/compiler/resource_journal.ts": "2f665e61bdfb7492e36221c64b74ab1b2b21313d402a8e19e2b73c5651a8eb2b",
+        "/home/jacobt/src/blot2/compiler/task_resources.test.ts": "13b5db91ca2267f90d0d1166a1e471bba9177ed15d08ca5b9537eeba10d15007",
+        "/home/jacobt/src/blot2/compiler/assets.test.ts": "ca2c3b5cc8711b6342512fc4b37cf4721df0bd6486c4139d8182ef9d2a418f43",
+        "/home/jacobt/src/blot2/compiler/assets.ts": "35696134d85f8b32ea171ae3088e1fffa47395ce89be0d2d2dcc3f7f761943eb",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.test.ts": "a1795f1fc197ffb9b240bf93aac283613e42603d4de910bb692ac592943ec146",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.ts": "6cd0a32b67724eb94854486017d4840b9832e7f8de3dcccc5fb1e05f9c7e7f78",
+        "/home/jacobt/src/blot2/compiler/cli.ts": "e4dafb62de7110d6c3a4f85d92d93a3067a838ddfbe1e060476d919126300bbd",
+        "/home/jacobt/src/blot2/compiler/cli_packages.test.ts": "07f4421032fd296a6e45e91ff56954e084e8fe002f502fb8bed4d0d6441b9169",
+        "/home/jacobt/src/blot2/compiler/derive.ts": "ba1dfd76deaaf487b44c9a0050eb35cebfd4412e9e8ba00b2ad3a7e8c8291f98",
+        "/home/jacobt/src/blot2/compiler/editor_completion.test.ts": "cfdb56c1e80643de1d153080b26c30b89f45cb7171a51942f0666d4c2b3513e3",
+        "/home/jacobt/src/blot2/compiler/format.test.ts": "5cd17efb4cb9c729d8a6a65a0c7967d9b8331622e2bc70bc537180c6008ede2f",
+        "/home/jacobt/src/blot2/compiler/format.ts": "b634a5b3b79500243e2469d6aad89be7412b293478ed763495c148ab02931576",
+        "/home/jacobt/src/blot2/compiler/guest.test.ts": "02b2a868003599b9d17391fbc4afbe8c673b674d2ec398bcd768cfb5a047522e",
+        "/home/jacobt/src/blot2/compiler/guest.ts": "df2107d216956638d0cb7ba02da52da4f1194e6b7e251d46972496c539cacc57",
+        "/home/jacobt/src/blot2/compiler/guest_arrays.test.ts": "3fef7346e8935d7cc1ebbfdc092a3ee6de92c81684192d2862b51a2db66d93f3",
+        "/home/jacobt/src/blot2/compiler/guest_associated_types.test.ts": "5a726f4bb94466461f0480e4be12ac84b428f352b4bcb815f29c90bf74611413",
+        "/home/jacobt/src/blot2/compiler/guest_async.test.ts": "05e0b6937686801af60265e2992f1639177f55972537fc4d49c3b45a135a467f",
+        "/home/jacobt/src/blot2/compiler/guest_implementations.test.ts": "9e46fa902d157d8492e03235481c959cabeac21e9f7db6914c28df694179c911",
+        "/home/jacobt/src/blot2/compiler/lsp.test.ts": "449b632628393111daf77d9b920dbef152182d061836f9d2deca0749a3133b03",
+        "/home/jacobt/src/blot2/compiler/lsp.ts": "256264eaff9c0b9da657902af6374fe0484ffb4d119103e3c072110355b42ad8",
+        "/home/jacobt/src/blot2/compiler/memory_profile.ts": "9374c393b6101bdeba7b6f66d9e292bf7a7f1d47cc62b1e788b0f2fd4ac70aad",
+        "/home/jacobt/src/blot2/compiler/native_asset_client.test.ts": "7245df1cce953e2a0916709ffc0f8c78db5a0932c4d478c751590c3486c9040e",
+        "/home/jacobt/src/blot2/compiler/native_assets.ts": "7859e5eefc1f6b3a57cdbecb352802d7e541ed5c175d002c2fdc1f977efdfc0e",
+        "/home/jacobt/src/blot2/compiler/parser_source.test.ts": "064095176211aaa77b56e5c77fb31bc05e16339edb56387433fc308e2258512b",
+        "/home/jacobt/src/blot2/compiler/parser_source.ts": "11e7a3d3c30932867a53b8d63f54bfdedbe3fd047373bc57ab1daf7a9c50d44e",
+        "/home/jacobt/src/blot2/compiler/public_api.test.ts": "28ec79e974be8748ba2543580bc4917f1fe24ea83b2408357742cb4d11f112cb",
+        "/home/jacobt/src/blot2/compiler/staged_surface.test.ts": "1d85a3e02fa0d91ec6e9d66981ea91ccf54f5982ed9571dfcf3460b0aa610e98",
+        "/home/jacobt/src/blot2/compiler/storage_surface.test.ts": "b99ea754983d7ad26f8e8d28b3701f0cc073847b1bdec69e9afbfc1380e97577",
+        "/home/jacobt/src/blot2/compiler/syntax.test.ts": "006ae61dc8953d433b5a6b96b792066a568381ca21d2b034653cba5aeffbeee2",
+        "/home/jacobt/src/blot2/compiler/syntax.ts": "8c7c1d08dd4b91d4c3bf29bf9af09ce0f873981ce791ec40e8f34595328f9cff",
+        "/home/jacobt/src/blot2/compiler/task_guest.ts": "fded652c54bf721b5c33b57c7335d0669e058710f2550a4992370a556c707533",
+        "/home/jacobt/src/blot2/compiler/task_runtime.test.ts": "4b6236216a4db4c07e6f897ae0a574b3dbe460aba43743c2dffe6de628f22e4d",
+        "/home/jacobt/src/blot2/compiler/task_runtime.ts": "460400a8297c735dd3ac68e0fd36df1def33ffe0f07571681c3de25019a43318",
+        "/home/jacobt/src/blot2/compiler/text.ts": "7ebed2a7888bc1c3674f1175f99d773961201287804f364494eda437ade70b86",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.test.ts": "f8490547f0dc99b508a03236346cedb748c150018af1539b38d336846ca33810",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.ts": "ef240c126353ac432ac5d49f7866b734c8ec52bbaa85bc0a7b0a44fee719ebc6",
+        "/home/jacobt/src/blot2/compiler/zig_project_client.ts": "169637750aa22f9ef5cf2637a08ff827b5b219f140285fab41006f1a19951dd7",
+        "/home/jacobt/src/blot2/std/_summary_tree.blot": "fda6a25afef24949557fd19726f036351d7647340ee998596707de973f102a00",
+        "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+        "/home/jacobt/src/blot2/std/codec.blot": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+        "/home/jacobt/src/blot2/std/equality.blot": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+        "/home/jacobt/src/blot2/std/iter.blot": "8c65b6c09759b5f9cd56eed5259492fcef7bc245370dd41059398afcb5f94b0c",
+        "/home/jacobt/src/blot2/std/list.blot": "eb2068a130a9c41368d4fe8c3c8ba24fb0c86155a2ea0a11be1975426702e9e3",
+        "/home/jacobt/src/blot2/std/path.blot": "c30236b6ea43d30f0be9e623f5b12b2c70720402d3d6c7e5182746d96296c8e1",
+        "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+        "/home/jacobt/src/blot2/std/rolling.blot": "c0d58c9bdfec4698ffa7402a59829c6127dd7a6e487297d5b1f415e71c147562",
+        "/home/jacobt/src/blot2/std/simd.blot": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+        "/home/jacobt/src/blot2/std/summary.blot": "ce985949b9f7931c13c10c548b9484f7dcb978b0baa8f7cb4f524cfecdd93c55",
+        "/home/jacobt/src/blot2/std/text.blot": "2d730b770a4623aec53f16854469286242ea29ea88c700b7a88b80c0af07b6b7",
+        "/home/jacobt/src/blot2/std/vector.blot": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e"
+      }
+    },
+    "compilation": {
+      "raw_report": "/home/jacobt/src/blot2/build/bench/goose-unprofiled-builds-2026-11-03/report.json",
+      "raw_report_sha256": "21b231713a090086293cbc92a2ad42fee9b59303b2c94dcc215e6f21e8710f91",
+      "started_utc": "2026-11-03T12:43:11.781686+00:00",
+      "finished_utc": "2026-11-03T12:43:19.737841+00:00",
+      "status": "passed",
+      "configuration": {
+        "compile_samples": 5,
+        "profile_backend": false,
+        "runtime_samples": 1,
+        "process_warmups": 0,
+        "profiles": [
+          "test"
+        ],
+        "timeout_seconds": 30,
+        "seed": 771923,
+        "node_flags": [
+          "--experimental-transform-types"
+        ]
+      },
+      "input_sha256": {
+        "/home/jacobt/src/blot2/scripts/bench/goose/compare.py": "8a74621490c7e01acd0f908d156410568366d0c799c88b9707edeae5710cd6e9",
+        "/home/jacobt/src/blot2/scripts/bench/goose/reference.py": "9eb5ffee07703b7fd6e1d094b445921f4298bd1e432b94b210a56c545e40ef52",
+        "/home/jacobt/src/blot2/scripts/bench/goose/runtime.ts": "3260b2d94010f728cec2c1e212d424fc68d8da93454c8c3b0fc08e0372a7da94",
+        "/home/jacobt/src/blot2/scripts/bench/goose/build_blot.ts": "e45ed184297c843ff8a2399719875a7d5d0868075838509cbb5ffea4717c7feb",
+        "/home/jacobt/src/goose-to-wasm/scripts/goose_wasm.py": "fb6319f181316f9d33cc6a6dfe58259cb234046861aa97c5e3ad09269824977d",
+        "/home/jacobt/src/goose-to-wasm/oracle/goose_wasm.py": "617b96bab2fcd7e1cc01edc5bd205ebe537b7b9f1069f77a971b5a02ea298086",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena.py": "f7f1aa1ec5941cd34a07f37b2ffa97d6c88ca5a13009cd83dc4dd1a4d7e06c0f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/manifest.json": "95383d34c7f2214e5b7cfd346b0d0742c23df81f9d568ef4c6dad7c8a6302646",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/test.json": "424371dd25f3fa3f779789c823a05dbe90d2eddbc2a3ca3c5e4319252c572797",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/run.json": "8fe7baed41e8eb0a233057c4406446029f7e5d792cf3a3ac6fc7e714964a155f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/ports/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "/home/jacobt/src/blot2/compiler/installed_cli.ts": "76a5a774119e905284114bb707804f5f500572fb6f46417c368bff8d81d038ba",
+        "/home/jacobt/src/blot2/compiler/numeric_parser.ts": "a3a11718d2ea792dd91f1df83cf11fc60ca85a55002033074fca2302fbf13c14",
+        "/home/jacobt/src/blot2/compiler/packaged_native.ts": "b1931d1dc26c6151dd8322afae67e4c017a15a254f5365cefc5f4a8d85cb94ce",
+        "/home/jacobt/src/blot2/compiler/postfix_syntax.ts": "5b29335c404e89b3b2325cc6288ebc8a5d37a49891c60f546f243cffafbbdceb",
+        "/home/jacobt/src/blot2/compiler/test_compile.ts": "6a73423b569356987186ef17874be07307bb4fd7a7f069c254e485cbabd9183d",
+        "/home/jacobt/src/blot2/compiler/editor_completion.ts": "157cde32dbc4d9e276c8591df09da6a7fdefd3abf824fc50dfb937eacdc3a4a5",
+        "/home/jacobt/src/blot2/compiler/lsp_protocol.ts": "c81acb905c766325278a5c4b08ac2d1b5bc66c6a2dd66478a2e60a935c3cb6a3",
+        "/home/jacobt/src/blot2/compiler/bpm.test.ts": "cc5d54235cc6783c375dcfd4d6bf31eb0682d92d97a6c8ff2ca349c9ec1ba41b",
+        "/home/jacobt/src/blot2/compiler/bpm.ts": "ce750483bc2fe9643f78bd08b80f947ef28da49a510ad76a13093370e1fb6a07",
+        "/home/jacobt/src/blot2/compiler/packages.test.ts": "8b03c919600c4f717bd2cee19e3440afd5ce365a6381df2a8479d281ce1c391f",
+        "/home/jacobt/src/blot2/compiler/packages.ts": "86d394e85a6f41da64f078a21035fd7f39ca5ffb184d3b6ee14543dfee0bb428",
+        "/home/jacobt/src/blot2/compiler/resource_guest.test.ts": "c6e1f350d90b7f570b3694f0bd0ebcb7984cf5d4e5e13e5cd5e2a57732c423e5",
+        "/home/jacobt/src/blot2/compiler/guest_multiplicity.test.ts": "f65958ff4ed115e6aceefa8dd2700811c07888864fb2356ba574844403ddfcaf",
+        "/home/jacobt/src/blot2/compiler/resource_journal.test.ts": "73892388775c1c265d8b473ea610f1c8f74c41f849ed5f8ca63b53bfc7c1741a",
+        "/home/jacobt/src/blot2/compiler/resource_journal.ts": "2f665e61bdfb7492e36221c64b74ab1b2b21313d402a8e19e2b73c5651a8eb2b",
+        "/home/jacobt/src/blot2/compiler/task_resources.test.ts": "13b5db91ca2267f90d0d1166a1e471bba9177ed15d08ca5b9537eeba10d15007",
+        "/home/jacobt/src/blot2/compiler/assets.test.ts": "ca2c3b5cc8711b6342512fc4b37cf4721df0bd6486c4139d8182ef9d2a418f43",
+        "/home/jacobt/src/blot2/compiler/assets.ts": "35696134d85f8b32ea171ae3088e1fffa47395ce89be0d2d2dcc3f7f761943eb",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.test.ts": "a1795f1fc197ffb9b240bf93aac283613e42603d4de910bb692ac592943ec146",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.ts": "6cd0a32b67724eb94854486017d4840b9832e7f8de3dcccc5fb1e05f9c7e7f78",
+        "/home/jacobt/src/blot2/compiler/cli.ts": "e4dafb62de7110d6c3a4f85d92d93a3067a838ddfbe1e060476d919126300bbd",
+        "/home/jacobt/src/blot2/compiler/cli_packages.test.ts": "07f4421032fd296a6e45e91ff56954e084e8fe002f502fb8bed4d0d6441b9169",
+        "/home/jacobt/src/blot2/compiler/derive.ts": "ba1dfd76deaaf487b44c9a0050eb35cebfd4412e9e8ba00b2ad3a7e8c8291f98",
+        "/home/jacobt/src/blot2/compiler/editor_completion.test.ts": "cfdb56c1e80643de1d153080b26c30b89f45cb7171a51942f0666d4c2b3513e3",
+        "/home/jacobt/src/blot2/compiler/format.test.ts": "5cd17efb4cb9c729d8a6a65a0c7967d9b8331622e2bc70bc537180c6008ede2f",
+        "/home/jacobt/src/blot2/compiler/format.ts": "b634a5b3b79500243e2469d6aad89be7412b293478ed763495c148ab02931576",
+        "/home/jacobt/src/blot2/compiler/guest.test.ts": "02b2a868003599b9d17391fbc4afbe8c673b674d2ec398bcd768cfb5a047522e",
+        "/home/jacobt/src/blot2/compiler/guest.ts": "df2107d216956638d0cb7ba02da52da4f1194e6b7e251d46972496c539cacc57",
+        "/home/jacobt/src/blot2/compiler/guest_arrays.test.ts": "3fef7346e8935d7cc1ebbfdc092a3ee6de92c81684192d2862b51a2db66d93f3",
+        "/home/jacobt/src/blot2/compiler/guest_associated_types.test.ts": "5a726f4bb94466461f0480e4be12ac84b428f352b4bcb815f29c90bf74611413",
+        "/home/jacobt/src/blot2/compiler/guest_async.test.ts": "05e0b6937686801af60265e2992f1639177f55972537fc4d49c3b45a135a467f",
+        "/home/jacobt/src/blot2/compiler/guest_implementations.test.ts": "9e46fa902d157d8492e03235481c959cabeac21e9f7db6914c28df694179c911",
+        "/home/jacobt/src/blot2/compiler/lsp.test.ts": "449b632628393111daf77d9b920dbef152182d061836f9d2deca0749a3133b03",
+        "/home/jacobt/src/blot2/compiler/lsp.ts": "256264eaff9c0b9da657902af6374fe0484ffb4d119103e3c072110355b42ad8",
+        "/home/jacobt/src/blot2/compiler/memory_profile.ts": "9374c393b6101bdeba7b6f66d9e292bf7a7f1d47cc62b1e788b0f2fd4ac70aad",
+        "/home/jacobt/src/blot2/compiler/native_asset_client.test.ts": "7245df1cce953e2a0916709ffc0f8c78db5a0932c4d478c751590c3486c9040e",
+        "/home/jacobt/src/blot2/compiler/native_assets.ts": "7859e5eefc1f6b3a57cdbecb352802d7e541ed5c175d002c2fdc1f977efdfc0e",
+        "/home/jacobt/src/blot2/compiler/parser_source.test.ts": "064095176211aaa77b56e5c77fb31bc05e16339edb56387433fc308e2258512b",
+        "/home/jacobt/src/blot2/compiler/parser_source.ts": "11e7a3d3c30932867a53b8d63f54bfdedbe3fd047373bc57ab1daf7a9c50d44e",
+        "/home/jacobt/src/blot2/compiler/public_api.test.ts": "28ec79e974be8748ba2543580bc4917f1fe24ea83b2408357742cb4d11f112cb",
+        "/home/jacobt/src/blot2/compiler/staged_surface.test.ts": "1d85a3e02fa0d91ec6e9d66981ea91ccf54f5982ed9571dfcf3460b0aa610e98",
+        "/home/jacobt/src/blot2/compiler/storage_surface.test.ts": "b99ea754983d7ad26f8e8d28b3701f0cc073847b1bdec69e9afbfc1380e97577",
+        "/home/jacobt/src/blot2/compiler/syntax.test.ts": "006ae61dc8953d433b5a6b96b792066a568381ca21d2b034653cba5aeffbeee2",
+        "/home/jacobt/src/blot2/compiler/syntax.ts": "8c7c1d08dd4b91d4c3bf29bf9af09ce0f873981ce791ec40e8f34595328f9cff",
+        "/home/jacobt/src/blot2/compiler/task_guest.ts": "fded652c54bf721b5c33b57c7335d0669e058710f2550a4992370a556c707533",
+        "/home/jacobt/src/blot2/compiler/task_runtime.test.ts": "4b6236216a4db4c07e6f897ae0a574b3dbe460aba43743c2dffe6de628f22e4d",
+        "/home/jacobt/src/blot2/compiler/task_runtime.ts": "460400a8297c735dd3ac68e0fd36df1def33ffe0f07571681c3de25019a43318",
+        "/home/jacobt/src/blot2/compiler/text.ts": "7ebed2a7888bc1c3674f1175f99d773961201287804f364494eda437ade70b86",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.test.ts": "f8490547f0dc99b508a03236346cedb748c150018af1539b38d336846ca33810",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.ts": "ef240c126353ac432ac5d49f7866b734c8ec52bbaa85bc0a7b0a44fee719ebc6",
+        "/home/jacobt/src/blot2/compiler/zig_project_client.ts": "169637750aa22f9ef5cf2637a08ff827b5b219f140285fab41006f1a19951dd7",
+        "/home/jacobt/src/blot2/std/_summary_tree.blot": "fda6a25afef24949557fd19726f036351d7647340ee998596707de973f102a00",
+        "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+        "/home/jacobt/src/blot2/std/codec.blot": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+        "/home/jacobt/src/blot2/std/equality.blot": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+        "/home/jacobt/src/blot2/std/iter.blot": "8c65b6c09759b5f9cd56eed5259492fcef7bc245370dd41059398afcb5f94b0c",
+        "/home/jacobt/src/blot2/std/list.blot": "eb2068a130a9c41368d4fe8c3c8ba24fb0c86155a2ea0a11be1975426702e9e3",
+        "/home/jacobt/src/blot2/std/path.blot": "c30236b6ea43d30f0be9e623f5b12b2c70720402d3d6c7e5182746d96296c8e1",
+        "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+        "/home/jacobt/src/blot2/std/rolling.blot": "c0d58c9bdfec4698ffa7402a59829c6127dd7a6e487297d5b1f415e71c147562",
+        "/home/jacobt/src/blot2/std/simd.blot": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+        "/home/jacobt/src/blot2/std/summary.blot": "ce985949b9f7931c13c10c548b9484f7dcb978b0baa8f7cb4f524cfecdd93c55",
+        "/home/jacobt/src/blot2/std/text.blot": "2d730b770a4623aec53f16854469286242ea29ea88c700b7a88b80c0af07b6b7",
+        "/home/jacobt/src/blot2/std/vector.blot": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e"
+      }
+    },
+    "production_pilot": {
+      "raw_report": "/home/jacobt/src/blot2/build/bench/goose-production-pilot-2026-11-03/report.json",
+      "raw_report_sha256": "50fd58ee0b5f12810dedad464ef82cbdbb8ef9edfe49db5034380ef75519da66",
+      "started_utc": "2026-11-03T12:32:46.508500+00:00",
+      "finished_utc": "2026-11-03T12:34:22.566341+00:00",
+      "status": "partial",
+      "configuration": {
+        "compile_samples": 1,
+        "runtime_samples": 1,
+        "process_warmups": 0,
+        "profiles": [
+          "run"
+        ],
+        "timeout_seconds": 30,
+        "seed": 771923,
+        "profile_backend": true
+      },
+      "input_sha256": {
+        "/home/jacobt/src/blot2/scripts/bench/goose/compare.py": "4459fcb154eacd12a768d1c6c9f42e7c8c97c147031342dca3d505f407de1599",
+        "/home/jacobt/src/blot2/scripts/bench/goose/runtime.ts": "3260b2d94010f728cec2c1e212d424fc68d8da93454c8c3b0fc08e0372a7da94",
+        "/home/jacobt/src/blot2/scripts/bench/goose/build_blot.ts": "831c833ceb90718d1118802f686dcd642f8f9fd44e1dc8cbbefe590efabbc240",
+        "/home/jacobt/src/goose-to-wasm/scripts/goose_wasm.py": "fb6319f181316f9d33cc6a6dfe58259cb234046861aa97c5e3ad09269824977d",
+        "/home/jacobt/src/goose-to-wasm/oracle/goose_wasm.py": "617b96bab2fcd7e1cc01edc5bd205ebe537b7b9f1069f77a971b5a02ea298086",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena.py": "f7f1aa1ec5941cd34a07f37b2ffa97d6c88ca5a13009cd83dc4dd1a4d7e06c0f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/manifest.json": "95383d34c7f2214e5b7cfd346b0d0742c23df81f9d568ef4c6dad7c8a6302646",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/test.json": "424371dd25f3fa3f779789c823a05dbe90d2eddbc2a3ca3c5e4319252c572797",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/run.json": "8fe7baed41e8eb0a233057c4406446029f7e5d792cf3a3ac6fc7e714964a155f",
+        "/home/jacobt/src/blot2/compiler/installed_cli.ts": "76a5a774119e905284114bb707804f5f500572fb6f46417c368bff8d81d038ba",
+        "/home/jacobt/src/blot2/compiler/numeric_parser.ts": "a3a11718d2ea792dd91f1df83cf11fc60ca85a55002033074fca2302fbf13c14",
+        "/home/jacobt/src/blot2/compiler/packaged_native.ts": "b1931d1dc26c6151dd8322afae67e4c017a15a254f5365cefc5f4a8d85cb94ce",
+        "/home/jacobt/src/blot2/compiler/postfix_syntax.ts": "5b29335c404e89b3b2325cc6288ebc8a5d37a49891c60f546f243cffafbbdceb",
+        "/home/jacobt/src/blot2/compiler/test_compile.ts": "6a73423b569356987186ef17874be07307bb4fd7a7f069c254e485cbabd9183d",
+        "/home/jacobt/src/blot2/compiler/editor_completion.ts": "157cde32dbc4d9e276c8591df09da6a7fdefd3abf824fc50dfb937eacdc3a4a5",
+        "/home/jacobt/src/blot2/compiler/lsp_protocol.ts": "c81acb905c766325278a5c4b08ac2d1b5bc66c6a2dd66478a2e60a935c3cb6a3",
+        "/home/jacobt/src/blot2/compiler/bpm.test.ts": "cc5d54235cc6783c375dcfd4d6bf31eb0682d92d97a6c8ff2ca349c9ec1ba41b",
+        "/home/jacobt/src/blot2/compiler/bpm.ts": "ce750483bc2fe9643f78bd08b80f947ef28da49a510ad76a13093370e1fb6a07",
+        "/home/jacobt/src/blot2/compiler/packages.test.ts": "8b03c919600c4f717bd2cee19e3440afd5ce365a6381df2a8479d281ce1c391f",
+        "/home/jacobt/src/blot2/compiler/packages.ts": "86d394e85a6f41da64f078a21035fd7f39ca5ffb184d3b6ee14543dfee0bb428",
+        "/home/jacobt/src/blot2/compiler/resource_guest.test.ts": "c6e1f350d90b7f570b3694f0bd0ebcb7984cf5d4e5e13e5cd5e2a57732c423e5",
+        "/home/jacobt/src/blot2/compiler/guest_multiplicity.test.ts": "f65958ff4ed115e6aceefa8dd2700811c07888864fb2356ba574844403ddfcaf",
+        "/home/jacobt/src/blot2/compiler/resource_journal.test.ts": "73892388775c1c265d8b473ea610f1c8f74c41f849ed5f8ca63b53bfc7c1741a",
+        "/home/jacobt/src/blot2/compiler/resource_journal.ts": "2f665e61bdfb7492e36221c64b74ab1b2b21313d402a8e19e2b73c5651a8eb2b",
+        "/home/jacobt/src/blot2/compiler/task_resources.test.ts": "13b5db91ca2267f90d0d1166a1e471bba9177ed15d08ca5b9537eeba10d15007",
+        "/home/jacobt/src/blot2/compiler/assets.test.ts": "ca2c3b5cc8711b6342512fc4b37cf4721df0bd6486c4139d8182ef9d2a418f43",
+        "/home/jacobt/src/blot2/compiler/assets.ts": "35696134d85f8b32ea171ae3088e1fffa47395ce89be0d2d2dcc3f7f761943eb",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.test.ts": "a1795f1fc197ffb9b240bf93aac283613e42603d4de910bb692ac592943ec146",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.ts": "6cd0a32b67724eb94854486017d4840b9832e7f8de3dcccc5fb1e05f9c7e7f78",
+        "/home/jacobt/src/blot2/compiler/cli.ts": "e4dafb62de7110d6c3a4f85d92d93a3067a838ddfbe1e060476d919126300bbd",
+        "/home/jacobt/src/blot2/compiler/cli_packages.test.ts": "07f4421032fd296a6e45e91ff56954e084e8fe002f502fb8bed4d0d6441b9169",
+        "/home/jacobt/src/blot2/compiler/derive.ts": "ba1dfd76deaaf487b44c9a0050eb35cebfd4412e9e8ba00b2ad3a7e8c8291f98",
+        "/home/jacobt/src/blot2/compiler/editor_completion.test.ts": "cfdb56c1e80643de1d153080b26c30b89f45cb7171a51942f0666d4c2b3513e3",
+        "/home/jacobt/src/blot2/compiler/format.test.ts": "5cd17efb4cb9c729d8a6a65a0c7967d9b8331622e2bc70bc537180c6008ede2f",
+        "/home/jacobt/src/blot2/compiler/format.ts": "b634a5b3b79500243e2469d6aad89be7412b293478ed763495c148ab02931576",
+        "/home/jacobt/src/blot2/compiler/guest.test.ts": "02b2a868003599b9d17391fbc4afbe8c673b674d2ec398bcd768cfb5a047522e",
+        "/home/jacobt/src/blot2/compiler/guest.ts": "df2107d216956638d0cb7ba02da52da4f1194e6b7e251d46972496c539cacc57",
+        "/home/jacobt/src/blot2/compiler/guest_arrays.test.ts": "3fef7346e8935d7cc1ebbfdc092a3ee6de92c81684192d2862b51a2db66d93f3",
+        "/home/jacobt/src/blot2/compiler/guest_associated_types.test.ts": "5a726f4bb94466461f0480e4be12ac84b428f352b4bcb815f29c90bf74611413",
+        "/home/jacobt/src/blot2/compiler/guest_async.test.ts": "05e0b6937686801af60265e2992f1639177f55972537fc4d49c3b45a135a467f",
+        "/home/jacobt/src/blot2/compiler/guest_implementations.test.ts": "9e46fa902d157d8492e03235481c959cabeac21e9f7db6914c28df694179c911",
+        "/home/jacobt/src/blot2/compiler/lsp.test.ts": "449b632628393111daf77d9b920dbef152182d061836f9d2deca0749a3133b03",
+        "/home/jacobt/src/blot2/compiler/lsp.ts": "256264eaff9c0b9da657902af6374fe0484ffb4d119103e3c072110355b42ad8",
+        "/home/jacobt/src/blot2/compiler/memory_profile.ts": "9374c393b6101bdeba7b6f66d9e292bf7a7f1d47cc62b1e788b0f2fd4ac70aad",
+        "/home/jacobt/src/blot2/compiler/native_asset_client.test.ts": "7245df1cce953e2a0916709ffc0f8c78db5a0932c4d478c751590c3486c9040e",
+        "/home/jacobt/src/blot2/compiler/native_assets.ts": "7859e5eefc1f6b3a57cdbecb352802d7e541ed5c175d002c2fdc1f977efdfc0e",
+        "/home/jacobt/src/blot2/compiler/parser_source.test.ts": "064095176211aaa77b56e5c77fb31bc05e16339edb56387433fc308e2258512b",
+        "/home/jacobt/src/blot2/compiler/parser_source.ts": "11e7a3d3c30932867a53b8d63f54bfdedbe3fd047373bc57ab1daf7a9c50d44e",
+        "/home/jacobt/src/blot2/compiler/public_api.test.ts": "28ec79e974be8748ba2543580bc4917f1fe24ea83b2408357742cb4d11f112cb",
+        "/home/jacobt/src/blot2/compiler/staged_surface.test.ts": "1d85a3e02fa0d91ec6e9d66981ea91ccf54f5982ed9571dfcf3460b0aa610e98",
+        "/home/jacobt/src/blot2/compiler/storage_surface.test.ts": "b99ea754983d7ad26f8e8d28b3701f0cc073847b1bdec69e9afbfc1380e97577",
+        "/home/jacobt/src/blot2/compiler/syntax.test.ts": "006ae61dc8953d433b5a6b96b792066a568381ca21d2b034653cba5aeffbeee2",
+        "/home/jacobt/src/blot2/compiler/syntax.ts": "8c7c1d08dd4b91d4c3bf29bf9af09ce0f873981ce791ec40e8f34595328f9cff",
+        "/home/jacobt/src/blot2/compiler/task_guest.ts": "fded652c54bf721b5c33b57c7335d0669e058710f2550a4992370a556c707533",
+        "/home/jacobt/src/blot2/compiler/task_runtime.test.ts": "4b6236216a4db4c07e6f897ae0a574b3dbe460aba43743c2dffe6de628f22e4d",
+        "/home/jacobt/src/blot2/compiler/task_runtime.ts": "460400a8297c735dd3ac68e0fd36df1def33ffe0f07571681c3de25019a43318",
+        "/home/jacobt/src/blot2/compiler/text.ts": "7ebed2a7888bc1c3674f1175f99d773961201287804f364494eda437ade70b86",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.test.ts": "f8490547f0dc99b508a03236346cedb748c150018af1539b38d336846ca33810",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.ts": "ef240c126353ac432ac5d49f7866b734c8ec52bbaa85bc0a7b0a44fee719ebc6",
+        "/home/jacobt/src/blot2/compiler/zig_project_client.ts": "169637750aa22f9ef5cf2637a08ff827b5b219f140285fab41006f1a19951dd7",
+        "/home/jacobt/src/blot2/std/_summary_tree.blot": "fda6a25afef24949557fd19726f036351d7647340ee998596707de973f102a00",
+        "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+        "/home/jacobt/src/blot2/std/codec.blot": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+        "/home/jacobt/src/blot2/std/equality.blot": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+        "/home/jacobt/src/blot2/std/iter.blot": "8c65b6c09759b5f9cd56eed5259492fcef7bc245370dd41059398afcb5f94b0c",
+        "/home/jacobt/src/blot2/std/list.blot": "eb2068a130a9c41368d4fe8c3c8ba24fb0c86155a2ea0a11be1975426702e9e3",
+        "/home/jacobt/src/blot2/std/path.blot": "c30236b6ea43d30f0be9e623f5b12b2c70720402d3d6c7e5182746d96296c8e1",
+        "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+        "/home/jacobt/src/blot2/std/rolling.blot": "c0d58c9bdfec4698ffa7402a59829c6127dd7a6e487297d5b1f415e71c147562",
+        "/home/jacobt/src/blot2/std/simd.blot": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+        "/home/jacobt/src/blot2/std/summary.blot": "ce985949b9f7931c13c10c548b9484f7dcb978b0baa8f7cb4f524cfecdd93c55",
+        "/home/jacobt/src/blot2/std/text.blot": "2d730b770a4623aec53f16854469286242ea29ea88c700b7a88b80c0af07b6b7",
+        "/home/jacobt/src/blot2/std/vector.blot": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e"
+      }
+    },
+    "rejected_bounded_pilot": {
+      "raw_report": "/home/jacobt/src/blot2/build/bench/goose-bounded-pilot-2026-11-03/report.json",
+      "raw_report_sha256": "e5a671fed74d6fdd03bb926353cead57bb3304c62036848e5bb3c1fb5180c45d",
+      "started_utc": "2026-11-03T12:38:10.422680+00:00",
+      "finished_utc": "2026-11-03T12:38:23.412629+00:00",
+      "status": "partial",
+      "configuration": {
+        "compile_samples": 1,
+        "runtime_samples": 1,
+        "process_warmups": 0,
+        "profiles": [
+          "bounded"
+        ],
+        "timeout_seconds": 30,
+        "seed": 771923,
+        "node_flags": [
+          "--experimental-transform-types"
+        ],
+        "profile_backend": true
+      },
+      "input_sha256": {
+        "/home/jacobt/src/blot2/scripts/bench/goose/compare.py": "49bc3104f5567cb4a952096ad26306a0aea2220114f7913c40719eeae71e0a95",
+        "/home/jacobt/src/blot2/scripts/bench/goose/reference.py": "85179077b1f3e10a52213729041ef051a9c91c79c4a916a3f9b2d5acf307fae0",
+        "/home/jacobt/src/blot2/scripts/bench/goose/runtime.ts": "3260b2d94010f728cec2c1e212d424fc68d8da93454c8c3b0fc08e0372a7da94",
+        "/home/jacobt/src/blot2/scripts/bench/goose/build_blot.ts": "831c833ceb90718d1118802f686dcd642f8f9fd44e1dc8cbbefe590efabbc240",
+        "/home/jacobt/src/goose-to-wasm/scripts/goose_wasm.py": "fb6319f181316f9d33cc6a6dfe58259cb234046861aa97c5e3ad09269824977d",
+        "/home/jacobt/src/goose-to-wasm/oracle/goose_wasm.py": "617b96bab2fcd7e1cc01edc5bd205ebe537b7b9f1069f77a971b5a02ea298086",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena.py": "f7f1aa1ec5941cd34a07f37b2ffa97d6c88ca5a13009cd83dc4dd1a4d7e06c0f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/manifest.json": "95383d34c7f2214e5b7cfd346b0d0742c23df81f9d568ef4c6dad7c8a6302646",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/test.json": "424371dd25f3fa3f779789c823a05dbe90d2eddbc2a3ca3c5e4319252c572797",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/run.json": "8fe7baed41e8eb0a233057c4406446029f7e5d792cf3a3ac6fc7e714964a155f",
+        "/home/jacobt/src/goose-to-wasm/bench/langarena/ports/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "/home/jacobt/src/blot2/scripts/bench/goose/ports/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "/home/jacobt/src/blot2/compiler/installed_cli.ts": "76a5a774119e905284114bb707804f5f500572fb6f46417c368bff8d81d038ba",
+        "/home/jacobt/src/blot2/compiler/numeric_parser.ts": "a3a11718d2ea792dd91f1df83cf11fc60ca85a55002033074fca2302fbf13c14",
+        "/home/jacobt/src/blot2/compiler/packaged_native.ts": "b1931d1dc26c6151dd8322afae67e4c017a15a254f5365cefc5f4a8d85cb94ce",
+        "/home/jacobt/src/blot2/compiler/postfix_syntax.ts": "5b29335c404e89b3b2325cc6288ebc8a5d37a49891c60f546f243cffafbbdceb",
+        "/home/jacobt/src/blot2/compiler/test_compile.ts": "6a73423b569356987186ef17874be07307bb4fd7a7f069c254e485cbabd9183d",
+        "/home/jacobt/src/blot2/compiler/editor_completion.ts": "157cde32dbc4d9e276c8591df09da6a7fdefd3abf824fc50dfb937eacdc3a4a5",
+        "/home/jacobt/src/blot2/compiler/lsp_protocol.ts": "c81acb905c766325278a5c4b08ac2d1b5bc66c6a2dd66478a2e60a935c3cb6a3",
+        "/home/jacobt/src/blot2/compiler/bpm.test.ts": "cc5d54235cc6783c375dcfd4d6bf31eb0682d92d97a6c8ff2ca349c9ec1ba41b",
+        "/home/jacobt/src/blot2/compiler/bpm.ts": "ce750483bc2fe9643f78bd08b80f947ef28da49a510ad76a13093370e1fb6a07",
+        "/home/jacobt/src/blot2/compiler/packages.test.ts": "8b03c919600c4f717bd2cee19e3440afd5ce365a6381df2a8479d281ce1c391f",
+        "/home/jacobt/src/blot2/compiler/packages.ts": "86d394e85a6f41da64f078a21035fd7f39ca5ffb184d3b6ee14543dfee0bb428",
+        "/home/jacobt/src/blot2/compiler/resource_guest.test.ts": "c6e1f350d90b7f570b3694f0bd0ebcb7984cf5d4e5e13e5cd5e2a57732c423e5",
+        "/home/jacobt/src/blot2/compiler/guest_multiplicity.test.ts": "f65958ff4ed115e6aceefa8dd2700811c07888864fb2356ba574844403ddfcaf",
+        "/home/jacobt/src/blot2/compiler/resource_journal.test.ts": "73892388775c1c265d8b473ea610f1c8f74c41f849ed5f8ca63b53bfc7c1741a",
+        "/home/jacobt/src/blot2/compiler/resource_journal.ts": "2f665e61bdfb7492e36221c64b74ab1b2b21313d402a8e19e2b73c5651a8eb2b",
+        "/home/jacobt/src/blot2/compiler/task_resources.test.ts": "13b5db91ca2267f90d0d1166a1e471bba9177ed15d08ca5b9537eeba10d15007",
+        "/home/jacobt/src/blot2/compiler/assets.test.ts": "ca2c3b5cc8711b6342512fc4b37cf4721df0bd6486c4139d8182ef9d2a418f43",
+        "/home/jacobt/src/blot2/compiler/assets.ts": "35696134d85f8b32ea171ae3088e1fffa47395ce89be0d2d2dcc3f7f761943eb",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.test.ts": "a1795f1fc197ffb9b240bf93aac283613e42603d4de910bb692ac592943ec146",
+        "/home/jacobt/src/blot2/compiler/cleanup_data.ts": "6cd0a32b67724eb94854486017d4840b9832e7f8de3dcccc5fb1e05f9c7e7f78",
+        "/home/jacobt/src/blot2/compiler/cli.ts": "e4dafb62de7110d6c3a4f85d92d93a3067a838ddfbe1e060476d919126300bbd",
+        "/home/jacobt/src/blot2/compiler/cli_packages.test.ts": "07f4421032fd296a6e45e91ff56954e084e8fe002f502fb8bed4d0d6441b9169",
+        "/home/jacobt/src/blot2/compiler/derive.ts": "ba1dfd76deaaf487b44c9a0050eb35cebfd4412e9e8ba00b2ad3a7e8c8291f98",
+        "/home/jacobt/src/blot2/compiler/editor_completion.test.ts": "cfdb56c1e80643de1d153080b26c30b89f45cb7171a51942f0666d4c2b3513e3",
+        "/home/jacobt/src/blot2/compiler/format.test.ts": "5cd17efb4cb9c729d8a6a65a0c7967d9b8331622e2bc70bc537180c6008ede2f",
+        "/home/jacobt/src/blot2/compiler/format.ts": "b634a5b3b79500243e2469d6aad89be7412b293478ed763495c148ab02931576",
+        "/home/jacobt/src/blot2/compiler/guest.test.ts": "02b2a868003599b9d17391fbc4afbe8c673b674d2ec398bcd768cfb5a047522e",
+        "/home/jacobt/src/blot2/compiler/guest.ts": "df2107d216956638d0cb7ba02da52da4f1194e6b7e251d46972496c539cacc57",
+        "/home/jacobt/src/blot2/compiler/guest_arrays.test.ts": "3fef7346e8935d7cc1ebbfdc092a3ee6de92c81684192d2862b51a2db66d93f3",
+        "/home/jacobt/src/blot2/compiler/guest_associated_types.test.ts": "5a726f4bb94466461f0480e4be12ac84b428f352b4bcb815f29c90bf74611413",
+        "/home/jacobt/src/blot2/compiler/guest_async.test.ts": "05e0b6937686801af60265e2992f1639177f55972537fc4d49c3b45a135a467f",
+        "/home/jacobt/src/blot2/compiler/guest_implementations.test.ts": "9e46fa902d157d8492e03235481c959cabeac21e9f7db6914c28df694179c911",
+        "/home/jacobt/src/blot2/compiler/lsp.test.ts": "449b632628393111daf77d9b920dbef152182d061836f9d2deca0749a3133b03",
+        "/home/jacobt/src/blot2/compiler/lsp.ts": "256264eaff9c0b9da657902af6374fe0484ffb4d119103e3c072110355b42ad8",
+        "/home/jacobt/src/blot2/compiler/memory_profile.ts": "9374c393b6101bdeba7b6f66d9e292bf7a7f1d47cc62b1e788b0f2fd4ac70aad",
+        "/home/jacobt/src/blot2/compiler/native_asset_client.test.ts": "7245df1cce953e2a0916709ffc0f8c78db5a0932c4d478c751590c3486c9040e",
+        "/home/jacobt/src/blot2/compiler/native_assets.ts": "7859e5eefc1f6b3a57cdbecb352802d7e541ed5c175d002c2fdc1f977efdfc0e",
+        "/home/jacobt/src/blot2/compiler/parser_source.test.ts": "064095176211aaa77b56e5c77fb31bc05e16339edb56387433fc308e2258512b",
+        "/home/jacobt/src/blot2/compiler/parser_source.ts": "11e7a3d3c30932867a53b8d63f54bfdedbe3fd047373bc57ab1daf7a9c50d44e",
+        "/home/jacobt/src/blot2/compiler/public_api.test.ts": "28ec79e974be8748ba2543580bc4917f1fe24ea83b2408357742cb4d11f112cb",
+        "/home/jacobt/src/blot2/compiler/staged_surface.test.ts": "1d85a3e02fa0d91ec6e9d66981ea91ccf54f5982ed9571dfcf3460b0aa610e98",
+        "/home/jacobt/src/blot2/compiler/storage_surface.test.ts": "b99ea754983d7ad26f8e8d28b3701f0cc073847b1bdec69e9afbfc1380e97577",
+        "/home/jacobt/src/blot2/compiler/syntax.test.ts": "006ae61dc8953d433b5a6b96b792066a568381ca21d2b034653cba5aeffbeee2",
+        "/home/jacobt/src/blot2/compiler/syntax.ts": "8c7c1d08dd4b91d4c3bf29bf9af09ce0f873981ce791ec40e8f34595328f9cff",
+        "/home/jacobt/src/blot2/compiler/task_guest.ts": "fded652c54bf721b5c33b57c7335d0669e058710f2550a4992370a556c707533",
+        "/home/jacobt/src/blot2/compiler/task_runtime.test.ts": "4b6236216a4db4c07e6f897ae0a574b3dbe460aba43743c2dffe6de628f22e4d",
+        "/home/jacobt/src/blot2/compiler/task_runtime.ts": "460400a8297c735dd3ac68e0fd36df1def33ffe0f07571681c3de25019a43318",
+        "/home/jacobt/src/blot2/compiler/text.ts": "7ebed2a7888bc1c3674f1175f99d773961201287804f364494eda437ade70b86",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.test.ts": "f8490547f0dc99b508a03236346cedb748c150018af1539b38d336846ca33810",
+        "/home/jacobt/src/blot2/compiler/type_diagnostics.ts": "ef240c126353ac432ac5d49f7866b734c8ec52bbaa85bc0a7b0a44fee719ebc6",
+        "/home/jacobt/src/blot2/compiler/zig_project_client.ts": "169637750aa22f9ef5cf2637a08ff827b5b219f140285fab41006f1a19951dd7",
+        "/home/jacobt/src/blot2/std/_summary_tree.blot": "fda6a25afef24949557fd19726f036351d7647340ee998596707de973f102a00",
+        "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+        "/home/jacobt/src/blot2/std/codec.blot": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+        "/home/jacobt/src/blot2/std/equality.blot": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+        "/home/jacobt/src/blot2/std/iter.blot": "8c65b6c09759b5f9cd56eed5259492fcef7bc245370dd41059398afcb5f94b0c",
+        "/home/jacobt/src/blot2/std/list.blot": "eb2068a130a9c41368d4fe8c3c8ba24fb0c86155a2ea0a11be1975426702e9e3",
+        "/home/jacobt/src/blot2/std/path.blot": "c30236b6ea43d30f0be9e623f5b12b2c70720402d3d6c7e5182746d96296c8e1",
+        "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+        "/home/jacobt/src/blot2/std/rolling.blot": "c0d58c9bdfec4698ffa7402a59829c6127dd7a6e487297d5b1f415e71c147562",
+        "/home/jacobt/src/blot2/std/simd.blot": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+        "/home/jacobt/src/blot2/std/summary.blot": "ce985949b9f7931c13c10c548b9484f7dcb978b0baa8f7cb4f524cfecdd93c55",
+        "/home/jacobt/src/blot2/std/text.blot": "2d730b770a4623aec53f16854469286242ea29ea88c700b7a88b80c0af07b6b7",
+        "/home/jacobt/src/blot2/std/vector.blot": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e"
+      }
+    }
+  },
+  "notes": [
+    "Use unprofiled compilation observations and five-pair bounded runtime observations. Runtime artifacts were originally built with compiler profiling enabled; all twelve artifact variants match the later unprofiled builds byte-for-byte.",
+    "Official production pilot retained unmodified input sizes, repetitions and warmups. Blot hit the 30s whole-process cap on all three cells; those are not measured kernel times or numeric slowdown ratios.",
+    "Bounded workloads retain production problem sizes and fixed capacities with reduced repetition/warmup counts explicitly recorded in case configs.",
+    "Blot hash buffers have 4x element payload bytes. Owners, headers and reserved arenas have separate overhead; this is not a 4x total-memory claim.",
+    "Shared host: an unrelated Rust release compilation was observed during measurements. Paired samples and dispersion are retained; do not interpret close compile-time differences as stable rankings.",
+    "The original bounded pilot used the wrong warmup config key for Fannkuch and custom hash; checksum validation rejected both backends. It is excluded from performance results.",
+    "The Goose checkout was dirty and changed externally during this work. Its installed binary, standard library and original runtime were frozen; checkout HEAD is not asserted as binary provenance."
+  ],
+  "cases": {
+    "fannkuch": {
+      "task": "CLBG::Fannkuchredux",
+      "catalog": {
+        "name": "CLBG::Fannkuchredux",
+        "upstream_module": "goose/src/fannkuchredux.goose",
+        "test": {
+          "name": "CLBG::Fannkuchredux",
+          "checksum": 4428,
+          "n": 5,
+          "iterations": 3
+        },
+        "run": {
+          "name": "CLBG::Fannkuchredux",
+          "checksum": 135762480,
+          "n": 8,
+          "iterations": 700
+        },
+        "port": {
+          "file": "ports/fannkuch.goose",
+          "fields": [
+            "n"
+          ],
+          "bounds": {
+            "n": [
+              1,
+              32
+            ]
+          },
+          "classification": "harness-only adaptation; original fixed-array kernel",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "bounded": {
+          "n": 8,
+          "iterations": 8,
+          "warmup_iterations": 2,
+          "checksum": 1616220
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/fannkuch/goose/fannkuch.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/fannkuch/blot/fannkuch.blot"
+      }
+    },
+    "crc32": {
+      "task": "Hash::CRC32",
+      "catalog": {
+        "name": "Hash::CRC32",
+        "upstream_module": "goose/src/buffer_hash.goose",
+        "test": {
+          "name": "Hash::CRC32",
+          "checksum": 3031698216,
+          "size": 1000,
+          "iterations": 3
+        },
+        "run": {
+          "name": "Hash::CRC32",
+          "checksum": 2318723244,
+          "size": 1000000,
+          "iterations": 150
+        },
+        "port": {
+          "file": "ports/hash_crc32.goose",
+          "fields": [
+            "size"
+          ],
+          "bounds": {
+            "size": [
+              1,
+              1000000
+            ]
+          },
+          "classification": "bounded-storage adaptation",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "bounded": {
+          "size": 1000000,
+          "iterations": 4,
+          "warmup_iterations": 1,
+          "checksum": 3285634451
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/crc32/goose/hash_crc32.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/crc32/blot/crc32.blot"
+      }
+    },
+    "custom_hash": {
+      "task": "Hash::SHA256",
+      "catalog": {
+        "name": "Hash::SHA256",
+        "upstream_module": "goose/src/buffer_hash.goose",
+        "test": {
+          "name": "Hash::SHA256",
+          "checksum": 1036619072,
+          "size": 1000,
+          "iterations": 3
+        },
+        "run": {
+          "name": "Hash::SHA256",
+          "checksum": 2844672256,
+          "size": 1000000,
+          "iterations": 1200
+        },
+        "port": {
+          "file": "ports/hash_sha256.goose",
+          "fields": [
+            "size"
+          ],
+          "bounds": {
+            "size": [
+              1,
+              1000000
+            ]
+          },
+          "classification": "bounded-storage adaptation",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "notes": "Upstream task name; this is LangArena's custom hash, not standard cryptographic SHA-256.",
+        "bounded": {
+          "size": 1000000,
+          "iterations": 64,
+          "warmup_iterations": 13,
+          "checksum": 1980454664
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/custom_hash/goose/hash_sha256.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/sources/custom_hash/blot/custom_hash.blot"
+      }
+    }
+  },
+  "artifact_identity_control": [
+    {
+      "case": "fannkuch",
+      "backend": "blot",
+      "phase": "cold",
+      "sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+    },
+    {
+      "case": "fannkuch",
+      "backend": "blot",
+      "phase": "marker_edit",
+      "sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+    },
+    {
+      "case": "fannkuch",
+      "backend": "goose",
+      "phase": "cold",
+      "sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+    },
+    {
+      "case": "fannkuch",
+      "backend": "goose",
+      "phase": "marker_edit",
+      "sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+    },
+    {
+      "case": "crc32",
+      "backend": "blot",
+      "phase": "cold",
+      "sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+    },
+    {
+      "case": "crc32",
+      "backend": "blot",
+      "phase": "marker_edit",
+      "sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+    },
+    {
+      "case": "crc32",
+      "backend": "goose",
+      "phase": "cold",
+      "sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+    },
+    {
+      "case": "crc32",
+      "backend": "goose",
+      "phase": "marker_edit",
+      "sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+    },
+    {
+      "case": "custom_hash",
+      "backend": "blot",
+      "phase": "cold",
+      "sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+    },
+    {
+      "case": "custom_hash",
+      "backend": "blot",
+      "phase": "marker_edit",
+      "sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+    },
+    {
+      "case": "custom_hash",
+      "backend": "goose",
+      "phase": "cold",
+      "sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+    },
+    {
+      "case": "custom_hash",
+      "backend": "goose",
+      "phase": "marker_edit",
+      "sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+    }
+  ],
+  "compilation": {
+    "summary": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 63.130686,
+          "mad": 5.301536999999996,
+          "min": 53.503375,
+          "max": 70.215093,
+          "p25": 62.81129,
+          "p75": 68.432223,
+          "samples": [
+            53.503375,
+            62.81129,
+            63.130686,
+            68.432223,
+            70.215093
+          ]
+        },
+        "wasm_bytes": 6421
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 65.169391,
+          "mad": 11.620178999999993,
+          "min": 45.36743,
+          "max": 76.78957,
+          "p25": 45.487217,
+          "p75": 69.390466,
+          "samples": [
+            45.36743,
+            45.487217,
+            65.169391,
+            69.390466,
+            76.78957
+          ]
+        },
+        "wasm_bytes": 6421
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 98.922263,
+          "mad": 5.339158999999995,
+          "min": 72.340173,
+          "max": 104.261422,
+          "p25": 74.832671,
+          "p75": 99.989712,
+          "samples": [
+            72.340173,
+            74.832671,
+            98.922263,
+            99.989712,
+            104.261422
+          ]
+        },
+        "wasm_bytes": 4067
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 72.900467,
+          "mad": 4.768343999999999,
+          "min": 68.132123,
+          "max": 113.643376,
+          "p25": 71.922318,
+          "p75": 95.723743,
+          "samples": [
+            68.132123,
+            71.922318,
+            72.900467,
+            95.723743,
+            113.643376
+          ]
+        },
+        "wasm_bytes": 4073
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 76.252049,
+          "mad": 2.4424429999999973,
+          "min": 45.742372,
+          "max": 78.694492,
+          "p25": 58.608921,
+          "p75": 78.422304,
+          "samples": [
+            45.742372,
+            58.608921,
+            76.252049,
+            78.422304,
+            78.694492
+          ]
+        },
+        "wasm_bytes": 5324
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 47.036072,
+          "mad": 2.9036199999999965,
+          "min": 44.132452,
+          "max": 58.733999,
+          "p25": 46.94076,
+          "p75": 57.214139,
+          "samples": [
+            44.132452,
+            46.94076,
+            47.036072,
+            57.214139,
+            58.733999
+          ]
+        },
+        "wasm_bytes": 5324
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 70.672913,
+          "mad": 1.8332339999999903,
+          "min": 68.382831,
+          "max": 77.955897,
+          "p25": 68.839679,
+          "p75": 72.042226,
+          "samples": [
+            68.382831,
+            68.839679,
+            70.672913,
+            72.042226,
+            77.955897
+          ]
+        },
+        "wasm_bytes": 3309
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 72.539882,
+          "mad": 3.704983000000013,
+          "min": 68.834899,
+          "max": 94.89126,
+          "p25": 69.931494,
+          "p75": 94.718241,
+          "samples": [
+            68.834899,
+            69.931494,
+            72.539882,
+            94.718241,
+            94.89126
+          ]
+        },
+        "wasm_bytes": 3315
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 70.620924,
+          "mad": 14.930722000000003,
+          "min": 47.728308,
+          "max": 85.551646,
+          "p25": 55.124668,
+          "p75": 77.627954,
+          "samples": [
+            47.728308,
+            55.124668,
+            70.620924,
+            77.627954,
+            85.551646
+          ]
+        },
+        "wasm_bytes": 6131
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 53.450845,
+          "mad": 5.863495999999998,
+          "min": 46.469554,
+          "max": 74.401712,
+          "p25": 47.587349,
+          "p75": 58.68204,
+          "samples": [
+            46.469554,
+            47.587349,
+            53.450845,
+            58.68204,
+            74.401712
+          ]
+        },
+        "wasm_bytes": 6131
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 88.219277,
+          "mad": 7.382583999999994,
+          "min": 70.538187,
+          "max": 95.601861,
+          "p25": 73.126487,
+          "p75": 95.401841,
+          "samples": [
+            70.538187,
+            73.126487,
+            88.219277,
+            95.401841,
+            95.601861
+          ]
+        },
+        "wasm_bytes": 6788
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 74.092864,
+          "mad": 4.324300000000008,
+          "min": 68.013107,
+          "max": 93.913401,
+          "p25": 69.768564,
+          "p75": 75.73197,
+          "samples": [
+            68.013107,
+            69.768564,
+            74.092864,
+            75.73197,
+            93.913401
+          ]
+        },
+        "wasm_bytes": 6794
+      }
+    ],
+    "observations": [
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 63.130686,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 58.608921,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 99.989712,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.382831,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.215093,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 95.601861,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.728308,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 74.832671,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 77.955897,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 55.124668,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 78.694492,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 85.551646,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 78.422304,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 104.261422,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.538187,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.042226,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 77.627954,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 53.503375,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.839679,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.620924,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.432223,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 76.252049,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 88.219277,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.340173,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 45.742372,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 73.126487,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 95.401841,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.672913,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 62.81129,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 98.922263,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.834899,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 53.450845,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 45.36743,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 57.214139,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 45.487217,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.900467,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.036072,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.931494,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 74.092864,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 75.73197,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 58.68204,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 76.78957,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 65.169391,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 94.89126,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.587349,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 58.733999,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 113.643376,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 74.401712,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 71.922318,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.768564,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.539882,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 93.913401,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.013107,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 46.469554,
+        "wasm_bytes": 6131,
+        "wasm_sha256": "afe2465902089e0784cc28819ee2cdbd7262c7081092889a81e2cb06db2d53a4"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.132123,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.390466,
+        "wasm_bytes": 6421,
+        "wasm_sha256": "608e7eebf445331972ca60b0f6816b926743cabb2d51b920e15225ac8caa5135"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 46.94076,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 95.723743,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 44.132452,
+        "wasm_bytes": 5324,
+        "wasm_sha256": "4ca865d0934f4a7dc2081eb8ca00f901257a0908e3ba94c7efff013881583a2f"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 94.718241,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      }
+    ]
+  },
+  "runtime": {
+    "summary": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 1.492597,
+          "mad": 0.049954000000000054,
+          "min": 1.442643,
+          "max": 1.55714,
+          "p25": 1.479953,
+          "p75": 1.548573,
+          "samples": [
+            1.442643,
+            1.479953,
+            1.492597,
+            1.548573,
+            1.55714
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 159.68423,
+          "mad": 12.053083000000015,
+          "min": 147.631147,
+          "max": 178.617431,
+          "p25": 158.528142,
+          "p75": 174.20917,
+          "samples": [
+            147.631147,
+            158.528142,
+            159.68423,
+            174.20917,
+            178.617431
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.947051,
+          "mad": 0.015220000000000011,
+          "min": 1.896996,
+          "max": 1.969935,
+          "p25": 1.939577,
+          "p75": 1.962271,
+          "samples": [
+            1.896996,
+            1.939577,
+            1.947051,
+            1.962271,
+            1.969935
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 3.245199,
+          "mad": 0.060204000000000146,
+          "min": 3.156791,
+          "max": 3.31936,
+          "p25": 3.184995,
+          "p75": 3.302918,
+          "samples": [
+            3.156791,
+            3.184995,
+            3.245199,
+            3.302918,
+            3.31936
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 676.881617,
+          "mad": 3.7235500000000457,
+          "min": 668.754377,
+          "max": 680.605167,
+          "p25": 669.349497,
+          "p75": 678.369464,
+          "samples": [
+            668.754377,
+            669.349497,
+            676.881617,
+            678.369464,
+            680.605167
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 1018.297866,
+          "mad": 5.663718000000017,
+          "min": 1006.449722,
+          "max": 1023.961584,
+          "p25": 1011.45073,
+          "p75": 1019.880136,
+          "samples": [
+            1006.449722,
+            1011.45073,
+            1018.297866,
+            1019.880136,
+            1023.961584
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.959335,
+          "mad": 0.03902500000000009,
+          "min": 1.884482,
+          "max": 3.239378,
+          "p25": 1.92031,
+          "p75": 1.965165,
+          "samples": [
+            1.884482,
+            1.92031,
+            1.959335,
+            1.965165,
+            3.239378
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 865.024335,
+          "mad": 5.693914000000063,
+          "min": 855.282184,
+          "max": 870.718249,
+          "p25": 856.383386,
+          "p75": 866.191873,
+          "samples": [
+            855.282184,
+            856.383386,
+            865.024335,
+            866.191873,
+            870.718249
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.027973,
+          "mad": 0.000560999999999999,
+          "min": 0.027222,
+          "max": 0.028614,
+          "p25": 0.027783,
+          "p75": 0.028534,
+          "samples": [
+            0.027222,
+            0.027783,
+            0.027973,
+            0.028534,
+            0.028614
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 149.921502,
+          "mad": 2.252182000000005,
+          "min": 147.66932,
+          "max": 179.077966,
+          "p25": 149.418766,
+          "p75": 164.901958,
+          "samples": [
+            147.66932,
+            149.418766,
+            149.921502,
+            164.901958,
+            179.077966
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.407945,
+          "mad": 0.00625199999999998,
+          "min": 0.371937,
+          "max": 0.417654,
+          "p25": 0.401693,
+          "p75": 0.411142,
+          "samples": [
+            0.371937,
+            0.401693,
+            0.407945,
+            0.411142,
+            0.417654
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 0.317113,
+          "mad": 0.0019639999999999658,
+          "min": 0.315149,
+          "max": 0.336119,
+          "p25": 0.317003,
+          "p75": 0.327994,
+          "samples": [
+            0.315149,
+            0.317003,
+            0.317113,
+            0.327994,
+            0.336119
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 14.252212,
+          "mad": 0.028563999999999368,
+          "min": 14.158084,
+          "max": 14.330742,
+          "p25": 14.231673,
+          "p75": 14.280776,
+          "samples": [
+            14.158084,
+            14.231673,
+            14.252212,
+            14.280776,
+            14.330742
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 174.343646,
+          "mad": 6.762986000000012,
+          "min": 167.58066,
+          "max": 184.04095,
+          "p25": 171.53698,
+          "p75": 181.659623,
+          "samples": [
+            167.58066,
+            171.53698,
+            174.343646,
+            181.659623,
+            184.04095
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.384832,
+          "mad": 0.01389600000000002,
+          "min": 0.367489,
+          "max": 0.499549,
+          "p25": 0.38429,
+          "p75": 0.398728,
+          "samples": [
+            0.367489,
+            0.38429,
+            0.384832,
+            0.398728,
+            0.499549
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 21.730768,
+          "mad": 0.027963999999997213,
+          "min": 21.619698,
+          "max": 21.758732,
+          "p25": 21.67864,
+          "p75": 21.7578,
+          "samples": [
+            21.619698,
+            21.67864,
+            21.730768,
+            21.7578,
+            21.758732
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 2.81963,
+          "mad": 0.07131599999999993,
+          "min": 2.707166,
+          "max": 2.900354,
+          "p25": 2.748314,
+          "p75": 2.825832,
+          "samples": [
+            2.707166,
+            2.748314,
+            2.81963,
+            2.825832,
+            2.900354
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 170.718185,
+          "mad": 0.9711570000000052,
+          "min": 164.951994,
+          "max": 176.534782,
+          "p25": 169.747028,
+          "p75": 171.359153,
+          "samples": [
+            164.951994,
+            169.747028,
+            170.718185,
+            171.359153,
+            176.534782
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.929318,
+          "mad": 0.01667099999999988,
+          "min": 1.899811,
+          "max": 1.976677,
+          "p25": 1.917195,
+          "p75": 1.945989,
+          "samples": [
+            1.899811,
+            1.917195,
+            1.929318,
+            1.945989,
+            1.976677
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 19.853179,
+          "mad": 0.22356500000000068,
+          "min": 19.629614,
+          "max": 20.193738,
+          "p25": 19.630907,
+          "p75": 20.111621,
+          "samples": [
+            19.629614,
+            19.630907,
+            19.853179,
+            20.111621,
+            20.193738
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 1226.859357,
+          "mad": 7.431450000000041,
+          "min": 1205.566391,
+          "max": 1237.530103,
+          "p25": 1224.83154,
+          "p75": 1234.290807,
+          "samples": [
+            1205.566391,
+            1224.83154,
+            1226.859357,
+            1234.290807,
+            1237.530103
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 2007.454102,
+          "mad": 9.740838999999823,
+          "min": 1981.03195,
+          "max": 2031.931355,
+          "p25": 1997.713263,
+          "p75": 2007.514373,
+          "samples": [
+            1981.03195,
+            1997.713263,
+            2007.454102,
+            2007.514373,
+            2031.931355
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.928346,
+          "mad": 0.01272400000000018,
+          "min": 1.910942,
+          "max": 2.0043,
+          "p25": 1.927674,
+          "p75": 1.94107,
+          "samples": [
+            1.910942,
+            1.927674,
+            1.928346,
+            1.94107,
+            2.0043
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 1845.289626,
+          "mad": 7.905796000000009,
+          "min": 1815.805135,
+          "max": 1853.441597,
+          "p25": 1837.38383,
+          "p75": 1850.682547,
+          "samples": [
+            1815.805135,
+            1837.38383,
+            1845.289626,
+            1850.682547,
+            1853.441597
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.017353,
+          "mad": 1.9999999999999185e-05,
+          "min": 0.016992,
+          "max": 0.017373,
+          "p25": 0.017172,
+          "p75": 0.017353,
+          "samples": [
+            0.016992,
+            0.017172,
+            0.017353,
+            0.017353,
+            0.017373
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 152.343876,
+          "mad": 4.195654999999988,
+          "min": 145.548909,
+          "max": 179.498105,
+          "p25": 148.148221,
+          "p75": 155.616978,
+          "samples": [
+            145.548909,
+            148.148221,
+            152.343876,
+            155.616978,
+            179.498105
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.402435,
+          "mad": 0.02561800000000003,
+          "min": 0.376235,
+          "max": 0.913626,
+          "p25": 0.384842,
+          "p75": 0.428053,
+          "samples": [
+            0.376235,
+            0.384842,
+            0.402435,
+            0.428053,
+            0.913626
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 0.906854,
+          "mad": 0.016191000000000066,
+          "min": 0.890663,
+          "max": 0.981086,
+          "p25": 0.906012,
+          "p75": 0.928434,
+          "samples": [
+            0.890663,
+            0.906012,
+            0.906854,
+            0.928434,
+            0.981086
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 13.504231,
+          "mad": 0.08090400000000031,
+          "min": 13.343325,
+          "max": 13.592838,
+          "p25": 13.423327,
+          "p75": 13.505492,
+          "samples": [
+            13.343325,
+            13.423327,
+            13.504231,
+            13.505492,
+            13.592838
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 180.704166,
+          "mad": 1.880884999999978,
+          "min": 178.548108,
+          "max": 206.059566,
+          "p25": 178.823281,
+          "p75": 181.298286,
+          "samples": [
+            178.548108,
+            178.823281,
+            180.704166,
+            181.298286,
+            206.059566
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.416522,
+          "mad": 0.046128,
+          "min": 0.370394,
+          "max": 1.138434,
+          "p25": 0.402365,
+          "p75": 0.5362,
+          "samples": [
+            0.370394,
+            0.402365,
+            0.416522,
+            0.5362,
+            1.138434
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 32.217774,
+          "mad": 0.30862699999999776,
+          "min": 31.909147,
+          "max": 32.933314,
+          "p25": 32.055936,
+          "p75": 32.784591,
+          "samples": [
+            31.909147,
+            32.055936,
+            32.217774,
+            32.784591,
+            32.933314
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.94684,
+          "mad": 0.009939000000000031,
+          "min": 0.929066,
+          "max": 0.971527,
+          "p25": 0.94165,
+          "p75": 0.956779,
+          "samples": [
+            0.929066,
+            0.94165,
+            0.94684,
+            0.956779,
+            0.971527
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 169.338723,
+          "mad": 1.8515590000000088,
+          "min": 161.831361,
+          "max": 182.275785,
+          "p25": 169.036778,
+          "p75": 171.190282,
+          "samples": [
+            161.831361,
+            169.036778,
+            169.338723,
+            171.190282,
+            182.275785
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.91984,
+          "mad": 0.029245999999999883,
+          "min": 1.88853,
+          "max": 2.279824,
+          "p25": 1.890594,
+          "p75": 1.943334,
+          "samples": [
+            1.88853,
+            1.890594,
+            1.91984,
+            1.943334,
+            2.279824
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 17.142837,
+          "mad": 0.02319299999999913,
+          "min": 17.119644,
+          "max": 17.408312,
+          "p25": 17.142647,
+          "p75": 17.405626,
+          "samples": [
+            17.119644,
+            17.142647,
+            17.142837,
+            17.405626,
+            17.408312
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 5306.503367,
+          "mad": 37.7904580000004,
+          "min": 5268.712909,
+          "max": 7593.194365,
+          "p25": 5290.555827,
+          "p75": 5400.158073,
+          "samples": [
+            5268.712909,
+            5290.555827,
+            5306.503367,
+            5400.158073,
+            7593.194365
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 6621.569411,
+          "mad": 18.12902699999995,
+          "min": 6603.440384,
+          "max": 8980.540952,
+          "p25": 6606.084191,
+          "p75": 6741.13024,
+          "samples": [
+            6603.440384,
+            6606.084191,
+            6621.569411,
+            6741.13024,
+            8980.540952
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 1.95133,
+          "mad": 0.03529800000000005,
+          "min": 1.900423,
+          "max": 2.295253,
+          "p25": 1.916032,
+          "p75": 1.985043,
+          "samples": [
+            1.900423,
+            1.916032,
+            1.95133,
+            1.985043,
+            2.295253
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 6469.944691,
+          "mad": 18.454202999999325,
+          "min": 6451.490488,
+          "max": 8824.692243,
+          "p25": 6452.619714,
+          "p75": 6580.369985,
+          "samples": [
+            6451.490488,
+            6452.619714,
+            6469.944691,
+            6580.369985,
+            8824.692243
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.002835,
+          "mad": 7.999999999999978e-05,
+          "min": 0.002755,
+          "max": 0.004749,
+          "p25": 0.002805,
+          "p75": 0.003267,
+          "samples": [
+            0.002755,
+            0.002805,
+            0.002835,
+            0.003267,
+            0.004749
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 154.755401,
+          "mad": 4.277771999999999,
+          "min": 147.251697,
+          "max": 168.323082,
+          "p25": 150.477629,
+          "p75": 158.839613,
+          "samples": [
+            147.251697,
+            150.477629,
+            154.755401,
+            158.839613,
+            168.323082
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.427853,
+          "mad": 0.008526000000000034,
+          "min": 0.415219,
+          "max": 0.437963,
+          "p25": 0.426672,
+          "p75": 0.436379,
+          "samples": [
+            0.415219,
+            0.426672,
+            0.427853,
+            0.436379,
+            0.437963
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 0.991635,
+          "mad": 0.005279999999999951,
+          "min": 0.965625,
+          "max": 0.996915,
+          "p25": 0.980324,
+          "p75": 0.993018,
+          "samples": [
+            0.965625,
+            0.980324,
+            0.991635,
+            0.993018,
+            0.996915
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 13.874524,
+          "mad": 0.0481309999999997,
+          "min": 13.811765,
+          "max": 13.984854,
+          "p25": 13.826393,
+          "p75": 13.874755,
+          "samples": [
+            13.811765,
+            13.826393,
+            13.874524,
+            13.874755,
+            13.984854
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 185.740501,
+          "mad": 1.9463700000000017,
+          "min": 180.278517,
+          "max": 190.188345,
+          "p25": 183.794131,
+          "p75": 187.478134,
+          "samples": [
+            180.278517,
+            183.794131,
+            185.740501,
+            187.478134,
+            190.188345
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.417464,
+          "mad": 0.03029799999999999,
+          "min": 0.384191,
+          "max": 1.480764,
+          "p25": 0.387166,
+          "p75": 0.42615,
+          "samples": [
+            0.384191,
+            0.387166,
+            0.417464,
+            0.42615,
+            1.480764
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 31.006652,
+          "mad": 0.5065439999999981,
+          "min": 30.500108,
+          "max": 31.927452,
+          "p25": 30.715829,
+          "p75": 31.819607,
+          "samples": [
+            30.500108,
+            30.715829,
+            31.006652,
+            31.819607,
+            31.927452
+          ]
+        }
+      }
+    ],
+    "paired": [
+      {
+        "case": "fannkuch",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "crc32",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "custom_hash",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "fannkuch",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 47.23283811822165,
+          "mad": 0.3646480825168723,
+          "min": 46.82899423672775,
+          "max": 48.071841288694145,
+          "p25": 47.03238312178758,
+          "p75": 47.59748620073852,
+          "samples": [
+            46.82899423672775,
+            47.03238312178758,
+            47.23283811822165,
+            47.59748620073852,
+            48.071841288694145
+          ]
+        },
+        "reason": ""
+      },
+      {
+        "case": "crc32",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 90.69136763029441,
+          "mad": 1.2598160814634838,
+          "min": 89.27323525493603,
+          "max": 92.74525674822429,
+          "p25": 90.25777817700762,
+          "p75": 91.95118371175789,
+          "samples": [
+            89.27323525493603,
+            90.25777817700762,
+            90.69136763029441,
+            91.95118371175789,
+            92.74525674822429
+          ]
+        },
+        "reason": ""
+      },
+      {
+        "case": "custom_hash",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 382.46381403787257,
+          "mad": 1.1557601659303032,
+          "min": 381.30805387194226,
+          "max": 542.9584295266865,
+          "p25": 381.46557728139743,
+          "p75": 390.5688253617556,
+          "samples": [
+            381.30805387194226,
+            381.46557728139743,
+            382.46381403787257,
+            390.5688253617556,
+            542.9584295266865
+          ]
+        },
+        "reason": ""
+      }
+    ],
+    "observations": [
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 164.414953,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 941881,
+          "compile_instantiate_ns": 1937723,
+          "entry_ns": 17229472,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 153.414642,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2836,
+          "compile_instantiate_ns": 398016,
+          "entry_ns": 1047411,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 151.166187,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17453,
+          "compile_instantiate_ns": 427733,
+          "entry_ns": 961498,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 173.061078,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2826453,
+          "compile_instantiate_ns": 2616314,
+          "entry_ns": 19880722,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.052537,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1531331,
+          "compile_instantiate_ns": 2791897,
+          "entry_ns": 3236283,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 152.70862,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28694,
+          "compile_instantiate_ns": 344234,
+          "entry_ns": 320630,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 174.20917,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1557140,
+          "compile_instantiate_ns": 1962271,
+          "entry_ns": 3302918,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 179.077966,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 27973,
+          "compile_instantiate_ns": 371937,
+          "entry_ns": 336119,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 150.477629,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2805,
+          "compile_instantiate_ns": 426672,
+          "entry_ns": 996915,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 169.036778,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 946840,
+          "compile_instantiate_ns": 1890594,
+          "entry_ns": 17142647,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 155.616978,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17353,
+          "compile_instantiate_ns": 402435,
+          "entry_ns": 906012,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 170.718185,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2900354,
+          "compile_instantiate_ns": 1945989,
+          "entry_ns": 20193738,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 147.631147,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1548573,
+          "compile_instantiate_ns": 1947051,
+          "entry_ns": 3319360,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 164.901958,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 27783,
+          "compile_instantiate_ns": 417654,
+          "entry_ns": 317113,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 154.755401,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2755,
+          "compile_instantiate_ns": 436379,
+          "entry_ns": 993018,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 182.275785,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 971527,
+          "compile_instantiate_ns": 1943334,
+          "entry_ns": 17408312,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 152.343876,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17172,
+          "compile_instantiate_ns": 384842,
+          "entry_ns": 928434,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 169.747028,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2819630,
+          "compile_instantiate_ns": 1976677,
+          "entry_ns": 20111621,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 148.148221,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17353,
+          "compile_instantiate_ns": 428053,
+          "entry_ns": 890663,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 164.951994,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2707166,
+          "compile_instantiate_ns": 1917195,
+          "entry_ns": 19629614,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 147.251697,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 4749,
+          "compile_instantiate_ns": 437963,
+          "entry_ns": 980324,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 171.190282,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 956779,
+          "compile_instantiate_ns": 2279824,
+          "entry_ns": 17405626,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 158.528142,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1479953,
+          "compile_instantiate_ns": 1939577,
+          "entry_ns": 3184995,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 149.921502,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28614,
+          "compile_instantiate_ns": 401693,
+          "entry_ns": 327994,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 147.66932,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28534,
+          "compile_instantiate_ns": 407945,
+          "entry_ns": 317003,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.617431,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1492597,
+          "compile_instantiate_ns": 1969935,
+          "entry_ns": 3245199,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 169.338723,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 929066,
+          "compile_instantiate_ns": 1919840,
+          "entry_ns": 17142837,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 158.839613,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 3267,
+          "compile_instantiate_ns": 415219,
+          "entry_ns": 965625,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 176.534782,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2748314,
+          "compile_instantiate_ns": 1929318,
+          "entry_ns": 19853179,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 179.498105,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 16992,
+          "compile_instantiate_ns": 913626,
+          "entry_ns": 981086,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 161.831361,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 941650,
+          "compile_instantiate_ns": 1888530,
+          "entry_ns": 17119644,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 168.323082,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2835,
+          "compile_instantiate_ns": 427853,
+          "entry_ns": 991635,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 145.548909,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17373,
+          "compile_instantiate_ns": 376235,
+          "entry_ns": 906854,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 171.359153,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2825832,
+          "compile_instantiate_ns": 1899811,
+          "entry_ns": 19630907,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 149.418766,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 27222,
+          "compile_instantiate_ns": 411142,
+          "entry_ns": 315149,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 159.68423,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1442643,
+          "compile_instantiate_ns": 1896996,
+          "entry_ns": 3156791,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1020.996871,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 675932736,
+          "compile_instantiate_ns": 1992438,
+          "entry_ns": 864654684,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 164.027756,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14247303,
+          "compile_instantiate_ns": 387838,
+          "entry_ns": 21845026,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1970.027088,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1219588482,
+          "compile_instantiate_ns": 1863191,
+          "entry_ns": 1813197264,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 207.27175,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13490244,
+          "compile_instantiate_ns": 439956,
+          "entry_ns": 33302145,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 179.599407,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13826504,
+          "compile_instantiate_ns": 402385,
+          "entry_ns": 30871855,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 6933.906638,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5552968101,
+          "compile_instantiate_ns": 1909309,
+          "entry_ns": 6780467630,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 185.740501,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13984854,
+          "compile_instantiate_ns": 417464,
+          "entry_ns": 30715829,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 8980.540952,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 7593194365,
+          "compile_instantiate_ns": 1900423,
+          "entry_ns": 8824692243,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1019.880136,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 680605167,
+          "compile_instantiate_ns": 1884482,
+          "entry_ns": 870718249,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 174.343646,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14158084,
+          "compile_instantiate_ns": 499549,
+          "entry_ns": 21619698,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.704166,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13423327,
+          "compile_instantiate_ns": 536200,
+          "entry_ns": 32055936,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1997.713263,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1234290807,
+          "compile_instantiate_ns": 1941070,
+          "entry_ns": 1845289626,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.823281,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13343325,
+          "compile_instantiate_ns": 370394,
+          "entry_ns": 31909147,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 2007.514373,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1237530103,
+          "compile_instantiate_ns": 1928346,
+          "entry_ns": 1850682547,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 167.58066,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14330742,
+          "compile_instantiate_ns": 398728,
+          "entry_ns": 21758732,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1023.961584,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 676881617,
+          "compile_instantiate_ns": 1959335,
+          "entry_ns": 865024335,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 183.794131,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13874755,
+          "compile_instantiate_ns": 426150,
+          "entry_ns": 31006652,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 6606.084191,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5290555827,
+          "compile_instantiate_ns": 1916032,
+          "entry_ns": 6451490488,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.298286,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13504231,
+          "compile_instantiate_ns": 402365,
+          "entry_ns": 32933314,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1981.03195,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1205566391,
+          "compile_instantiate_ns": 2004300,
+          "entry_ns": 1815805135,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 6621.569411,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5306503367,
+          "compile_instantiate_ns": 2295253,
+          "entry_ns": 6469944691,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.278517,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13874524,
+          "compile_instantiate_ns": 1480764,
+          "entry_ns": 31927452,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 171.53698,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14280776,
+          "compile_instantiate_ns": 384832,
+          "entry_ns": 21730768,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1011.45073,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 668754377,
+          "compile_instantiate_ns": 1920310,
+          "entry_ns": 855282184,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.548108,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13592838,
+          "compile_instantiate_ns": 1138434,
+          "entry_ns": 32217774,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 2031.931355,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1226859357,
+          "compile_instantiate_ns": 1927674,
+          "entry_ns": 1853441597,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 184.04095,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14252212,
+          "compile_instantiate_ns": 384290,
+          "entry_ns": 21678640,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1018.297866,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 678369464,
+          "compile_instantiate_ns": 1965165,
+          "entry_ns": 866191873,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 6741.13024,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5400158073,
+          "compile_instantiate_ns": 1951330,
+          "entry_ns": 6580369985,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 187.478134,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13826393,
+          "compile_instantiate_ns": 384191,
+          "entry_ns": 31819607,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 206.059566,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 13505492,
+          "compile_instantiate_ns": 416522,
+          "entry_ns": 32784591,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 2007.454102,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1224831540,
+          "compile_instantiate_ns": 1910942,
+          "entry_ns": 1837383830,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1006.449722,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 669349497,
+          "compile_instantiate_ns": 3239378,
+          "entry_ns": 856383386,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.659623,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 14231673,
+          "compile_instantiate_ns": 367489,
+          "entry_ns": 21757800,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 190.188345,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 13811765,
+          "compile_instantiate_ns": 387166,
+          "entry_ns": 30500108,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 6603.440384,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5268712909,
+          "compile_instantiate_ns": 1985043,
+          "entry_ns": 6452619714,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      }
+    ]
+  },
+  "production_pilot": {
+    "failures": [
+      {
+        "phase": "runtime",
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "run",
+        "status": "timeout",
+        "logs": "/home/jacobt/src/blot2/build/bench/goose-production-pilot-2026-11-03/runtime/run/custom_hash/blot/0"
+      },
+      {
+        "phase": "runtime",
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "run",
+        "status": "timeout",
+        "logs": "/home/jacobt/src/blot2/build/bench/goose-production-pilot-2026-11-03/runtime/run/crc32/blot/0"
+      },
+      {
+        "phase": "runtime",
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "run",
+        "status": "timeout",
+        "logs": "/home/jacobt/src/blot2/build/bench/goose-production-pilot-2026-11-03/runtime/run/fannkuch/blot/0"
+      }
+    ],
+    "observations": [
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "run",
+        "sample": 0,
+        "status": "timeout",
+        "returncode": -9,
+        "wall_ms": 30027.419024
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "run",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 509.767126,
+        "timing": {
+          "checksum": 2844672256,
+          "elapsed_ns": 263548625,
+          "compile_instantiate_ns": 421822,
+          "entry_ns": 330790101,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "run",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 772.518636,
+        "timing": {
+          "checksum": 2318723244,
+          "elapsed_ns": 508362245,
+          "compile_instantiate_ns": 408987,
+          "entry_ns": 625773485,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "run",
+        "sample": 0,
+        "status": "timeout",
+        "returncode": -9,
+        "wall_ms": 30037.656234
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "run",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1659.488843,
+        "timing": {
+          "checksum": 135762480,
+          "elapsed_ns": 1251991313,
+          "compile_instantiate_ns": 404569,
+          "entry_ns": 1507973944,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "run",
+        "sample": 0,
+        "status": "timeout",
+        "returncode": -9,
+        "wall_ms": 30035.458114
+      }
+    ]
+  },
+  "qualification": {
+    "profiled_build_count": 60,
+    "unprofiled_build_count": 60,
+    "runtime_run_qualifications": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 148.668459,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1477860,
+          "compile_instantiate_ns": 1908588,
+          "entry_ns": 3216134,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 156.347317,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1554735,
+          "compile_instantiate_ns": 1969353,
+          "entry_ns": 3285706,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 157.381482,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28363,
+          "compile_instantiate_ns": 483890,
+          "entry_ns": 329787,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 157.685611,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28384,
+          "compile_instantiate_ns": 426891,
+          "entry_ns": 372639,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 169.089338,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2888090,
+          "compile_instantiate_ns": 1933886,
+          "entry_ns": 20241969,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 167.319785,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2856740,
+          "compile_instantiate_ns": 2884523,
+          "entry_ns": 20483418,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 145.429843,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17373,
+          "compile_instantiate_ns": 358261,
+          "entry_ns": 919528,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 153.220854,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17373,
+          "compile_instantiate_ns": 343874,
+          "entry_ns": 959654,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.614678,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 970325,
+          "compile_instantiate_ns": 1981297,
+          "entry_ns": 17624783,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 202.662118,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 962780,
+          "compile_instantiate_ns": 1948253,
+          "entry_ns": 17459639,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 144.545883,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2886,
+          "compile_instantiate_ns": 409168,
+          "entry_ns": 977759,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 151.513448,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2836,
+          "compile_instantiate_ns": 415690,
+          "entry_ns": 1020560,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      }
+    ],
+    "unprofiled_qualifications": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 166.949407,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1461278,
+          "compile_instantiate_ns": 2669655,
+          "entry_ns": 3198159,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 153.182526,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 1494130,
+          "compile_instantiate_ns": 2597758,
+          "entry_ns": 3267873,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 149.979819,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 29226,
+          "compile_instantiate_ns": 418615,
+          "entry_ns": 317103,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 150.702473,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28935,
+          "compile_instantiate_ns": 1817795,
+          "entry_ns": 374762,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 213.296599,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2750118,
+          "compile_instantiate_ns": 1923957,
+          "entry_ns": 20788277,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.576341,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 2870126,
+          "compile_instantiate_ns": 3060398,
+          "entry_ns": 19967246,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 184.147599,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17744,
+          "compile_instantiate_ns": 413696,
+          "entry_ns": 910491,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 186.872629,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17403,
+          "compile_instantiate_ns": 389009,
+          "entry_ns": 947411,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 182.18055,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 957320,
+          "compile_instantiate_ns": 1914159,
+          "entry_ns": 17157946,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 200.653215,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 952210,
+          "compile_instantiate_ns": 3321935,
+          "entry_ns": 17386800,
+          "revision": 1,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "cold",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 148.797512,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2705,
+          "compile_instantiate_ns": 384781,
+          "entry_ns": 971486,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 149.952918,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2746,
+          "compile_instantiate_ns": 430288,
+          "entry_ns": 1019598,
+          "revision": 1,
+          "guest_exit_code": 1,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      }
+    ],
+    "independent_checksums": "Official test/run expectations checked independently for all three cases before timing; bounded expectations generated by reference.py.",
+    "negative_runtime_checks": [
+      {
+        "backend": "blot",
+        "rejected": "checksum",
+        "returncode": 1
+      },
+      {
+        "backend": "blot",
+        "rejected": "revision",
+        "returncode": 1
+      },
+      {
+        "backend": "goose",
+        "rejected": "checksum",
+        "returncode": 1
+      },
+      {
+        "backend": "goose",
+        "rejected": "revision",
+        "returncode": 1
+      }
+    ],
+    "timeout_control": "Sleeping child killed at 50ms cap with SIGKILL (-9); status timeout.",
+    "runtime_host_and_versions": "Every original runtime/qualification Node and V8 version rechecked; current runtime.ts SHA-256 matches measured version."
+  }
+}

@@ -14,6 +14,16 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
+Shared Goose direct-Wasm benchmarks are available in
+[`scripts/bench/goose`](scripts/bench/goose/README.md). The
+[2026-11-03 baseline](scripts/bench/goose/results/2026-11-03.md) covers three of
+seven adapted tasks in the same V8, with five checked pairs: bounded Fannkuch,
+CRC32 and custom-hash kernels are 47x, 91x and 382x slower in Blot. Unchanged
+production Blot runs hit a 30-second whole-process cap. Ordinary tiny-source
+cold builds are 63–76ms; this does not establish Gdev or large-source
+throughput. Loop and array-access code are now measurable small runtime targets.
+No compiler behavior changed in this benchmark batch.
+
 The latest release produces **12,932,581 bytes of Wasm**, down from 13,594,002
 (661,421B / 4.87% smaller). Three matched fresh pairs add 57–149ms (median
 paired increase 66ms / 1.16%); independent medians are 5.673s → 5.809s. The

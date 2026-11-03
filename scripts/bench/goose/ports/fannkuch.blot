@@ -1,0 +1,74 @@
+// From LangArena goose/src/fannkuchredux.goose and its Goose arena port.
+// Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
+const arena_revision = 0
+entry const revision = func (): U32 => return arena_revision
+
+const fannkuchredux = func (n: U32): U32 => return do:
+  let perm1: Array U32 = @array.generate 32 (func index => return index)
+  let perm: Array U32 = @array.fill 32 0
+  let count: Array U32 = @array.fill 32 0
+  let max_flips_count = 0
+  let perm_count = 0
+  let checksum = 0
+  let r = n
+  for ever:
+    for ever:
+      if r <= 1:
+        break
+      count[r - 1] := r
+      r := self - 1
+
+    for index in 0 .. n:
+      perm[index] := perm1[index]
+
+    let flips_count = 0
+    let k = perm[0]
+    for ever:
+      if k == 0:
+        break
+      let k2 = (k + 1) >> 1
+      for index in 0 .. k2:
+        let j = k - index
+        let value = perm[index]
+        perm[index] := perm[j]
+        perm[j] := value
+      flips_count := self + 1
+      k := perm[0]
+
+    if flips_count > max_flips_count:
+      max_flips_count := flips_count
+    if perm_count % 2 == 0:
+      checksum := self + flips_count
+    else:
+      checksum := self - flips_count
+
+    for ever:
+      if r == n:
+        return checksum * 100 + max_flips_count
+      let perm0 = perm1[0]
+      for index in 0 .. r:
+        let j = index + 1
+        let value = perm1[index]
+        perm1[index] := perm1[j]
+        perm1[j] := value
+      perm1[r] := perm0
+      count[r] := self - 1
+      if count[r] > 0:
+        break
+      r := self + 1
+    perm_count := self + 1
+  return 0
+
+entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use inputs <- host #[0]
+  let n = inputs[0]
+  let iterations = inputs[1]
+  let warmups = inputs[2]
+  let checksum = 0
+  for index in 0 .. warmups:
+    checksum := self + fannkuchredux n
+  use started <- host #[1]
+  for index in 0 .. iterations:
+    checksum := self + fannkuchredux n
+  use finished <- host #[2]
+  break checksum

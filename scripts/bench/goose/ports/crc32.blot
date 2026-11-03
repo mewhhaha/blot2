@@ -1,0 +1,41 @@
+// From LangArena goose/src/buffer_hash.goose and its Goose arena port.
+// Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
+// Byte values use U32 storage: four bytes per byte, with the same 0..255 values.
+const arena_revision = 0
+entry const revision = func (): U32 => return arena_revision
+
+const prepare = func (bytes: Array U32) -> (size: U32): Unit => return do:
+  for index in 0 .. size:
+    bytes[index] := 0
+  let rng_last = 42
+  for index in 0 .. size:
+    rng_last := (self * 3877 + 29573) % 139968
+    bytes[index] := rng_last * 256 / 139968
+  return ()
+
+const crc32 = func (bytes: Array U32) -> (size: U32): U32 => return do:
+  let crc = 0xFFFFFFFF
+  for index in 0 .. size:
+    crc := self ^ bytes[index]
+    for bit in 0 .. 8:
+      if crc & 1 != 0:
+        crc := (self >> 1) ^ 0xEDB88320
+      else:
+        crc := self >> 1
+  return crc ^ 0xFFFFFFFF
+
+entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use inputs <- host #[0]
+  let size = inputs[0]
+  let iterations = inputs[1]
+  let warmups = inputs[2]
+  let bytes: Array U32 = @array.fill 1000000 0
+  prepare bytes size
+  let checksum = 0
+  for index in 0 .. warmups:
+    checksum := self + crc32 bytes size
+  use started <- host #[1]
+  for index in 0 .. iterations:
+    checksum := self + crc32 bytes size
+  use finished <- host #[2]
+  break checksum
