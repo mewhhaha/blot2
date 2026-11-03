@@ -1,0 +1,5 @@
+const pool: Array U32 = #[7]
+const escaped = func (input: U32): Ref U32 => return do:
+  let local: Array U32 = #[@u32.add pool[0] input]
+  return &local[0]
+entry const answer = func (input: U32): U32 => return @storage.load (escaped input)

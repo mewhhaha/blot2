@@ -93,7 +93,7 @@ fn aliasSource(width: usize) ![]u8 {
     return source;
 }
 
-test "completed fresh fixed owners preserve duplicate aliases borrowed siblings nested calls and packed ABI" {
+test "completed fresh fixed owners preserve duplicate aliases borrowed siblings nested calls and promoted ABI" {
     for ([_]usize{ 8, 128 }) |width| {
         const source = try aliasSource(width);
         defer a.free(source);
@@ -112,7 +112,8 @@ test "completed fresh fixed owners preserve duplicate aliases borrowed siblings 
             try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
             try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owned_packed_calls);
         } else {
-            try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
+            try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+            try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
         }
     }
 }

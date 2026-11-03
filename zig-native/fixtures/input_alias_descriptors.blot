@@ -1,0 +1,41 @@
+type Choice is data = $Empty U32 | $Words {values: Array U32}
+const pair = func (first: Array U32) -> (second: Array U32): U32 => return
+  @u32.add (@u32.mul first[0] 10) second[0]
+const variant = func (choice: Choice) -> (live: Array U32): U32 => return do:
+  let value = case choice of
+    $Empty value => value
+    $Words {values} => values[0]
+  return @u32.add (@u32.mul value 10) live[0]
+const windows = func (first: &[U32]) -> (second: &[U32]): U32 => return
+  @u32.add (@u32.add (@u32.mul (@storage.length first) 1000) (@u32.mul (@storage.length second) 100)) (@u32.add (@u32.mul first[0] 10) second[0])
+const append = func (first: GrowArray U32) -> (second: GrowArray U32) -> (view: &[U32]): {before: U32, after: U32, extent: U32, last: U32, observed: U32} => return do:
+  let before = @storage.length second
+  @storage.push first 99
+  first[0] := @u32.add self 3
+  return {before, after: @storage.length second, extent: @storage.length view, last: second[before], observed: view[0]}
+entry const answer = func (input: U32): Array U32 => return do:
+  let left: Array U32 = #[input, @u32.add input 1, @u32.add input 2, @u32.add input 3]
+  let right: Array U32 = #[@u32.add input 20]
+  let selected = right
+  let choice = $Empty 7
+  if @u32.eq input 0:
+    selected := left
+  else:
+    choice := $Words {values: right}
+  let mixed = pair selected left
+  let inactive = variant choice left
+  let identical = pair left left
+  let middle = &left[1..3]
+  let tail = &left[2..3]
+  let longer = &left[1..4]
+  let different_offsets = windows middle tail
+  let different_lengths = windows middle longer
+  let same_windows = windows middle middle
+  let growing: GrowArray U32 = #[input, @u32.add input 1]
+  let view = &growing[0..1]
+  let first = append growing growing view
+  let second = append growing growing view
+  return #[mixed, inactive, identical, different_offsets, different_lengths, same_windows,
+    first.before, first.after, first.extent, first.last, first.observed,
+    second.before, second.after, second.extent, second.last, second.observed,
+    @storage.length growing, @storage.length view]

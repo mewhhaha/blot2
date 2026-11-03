@@ -13,6 +13,11 @@ test {
     _ = @import("storage_owner_graph_tests.zig");
     _ = @import("storage_completed_function_tests.zig");
     _ = @import("storage_fresh_owner_tests.zig");
+    _ = @import("storage_input_alias.zig");
+    _ = @import("storage_input_alias_tests.zig");
+    _ = @import("storage_global_call_tests.zig");
+    _ = @import("storage_global_footprint.zig");
+    _ = @import("storage_concrete_callback_tests.zig");
     _ = @import("storage_parameter_fields_tests.zig");
     _ = @import("storage_selected_fields_tests.zig");
     _ = @import("storage_assembly_options_tests.zig");

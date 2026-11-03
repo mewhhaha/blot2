@@ -2865,7 +2865,10 @@ const Builder = struct {
             try self.tables.contracts.append(self.allocator, .{ .private = contract.private, .identity = contract.identity, .name = contract.name, .parameters = try self.projectedTypeList(contract.parameters), .variables = try self.projectedTypeList(contract.variables), .row_variables = try self.projectedRowVariables(contract.row_variables), .predicates = .{ .start = predicate_start, .len = contract.predicates.len }, .members = .{ .start = start, .len = contract.members.len }, .requires_implementation = contract.requires_implementation, .row_parameter_names = try self.saveTypes(self.source.checked.types.list(contract.row_parameter_names)), .row_parameters = try self.projectedRows(contract.row_parameters) });
         }
         for (self.source.checked.constructors) |metadata| try self.tables.constructors.append(self.allocator, .{ .identity = metadata.identity, .nominal = metadata.nominal, .tag = metadata.tag, .scheme = try self.projectScheme(metadata.scheme, false), .payload = try self.projectType(metadata.payload, 0) });
-        for (self.source.checked.associated) |metadata| try self.tables.associated.append(self.allocator, .{ .identity = metadata.identity, .member = metadata.member, .operator = metadata.operator, .target = self.target(metadata.binding) });
+        for (self.source.checked.associated) |metadata| {
+            try self.saveFieldName(metadata.member);
+            try self.tables.associated.append(self.allocator, .{ .identity = metadata.identity, .member = metadata.member, .operator = metadata.operator, .target = self.target(metadata.binding) });
+        }
         try self.implementationCatalog();
     }
     fn implementationCatalog(self: *Builder) Error!void {
@@ -3099,6 +3102,7 @@ pub fn lowerWithOrigins(allocator: Allocator, tree: *const ast.Tree, names: *con
         try builder.allCatalogs();
         try builder.allBodies();
     }
+    for (builder.tables.obligations.items) |goal| try builder.saveFieldName(goal.name);
     var result = try builder.finish();
     errdefer result.deinit(allocator);
     result.unit = checked.unit;

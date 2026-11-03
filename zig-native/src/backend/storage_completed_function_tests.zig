@@ -194,7 +194,7 @@ fn publishMutatingOwner(allocator: std.mem.Allocator, modules: []const core.Modu
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions > 0);
     try std.testing.expect(result.counters.scoped_owner_graph_definitions > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
@@ -209,7 +209,7 @@ test "completed mutating owner results retain shared distinct joined and loop ca
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishMutatingOwner, .{@as([]const core.Module, &.{module})});
 }
 
-test "completed mutating owner results retain packed wide caller roots" {
+test "completed mutating owner results retain promoted wide caller roots" {
     const source = try mutatingOwnerSource(128, "mutating_owner_return.blot.in");
     defer a.free(source);
     var module = try lower(a, source);
@@ -217,10 +217,11 @@ test "completed mutating owner results retain packed wide caller roots" {
     var result = try scoped.compile(a, &.{module}, 1);
     defer result.deinit(a);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_definitions > 0);
     try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
     try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_completed_plan_rollbacks);
-    try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
+    try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+    try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
 }
 
 test "completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes" {
@@ -263,7 +264,8 @@ fn publishNestedOwner(allocator: std.mem.Allocator, modules: []const core.Module
         try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
         try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_owned_packed_calls);
     } else {
-        try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
+        try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+        try std.testing.expect(result.counters.scoped_owned_word_calls > 0);
     }
 }
 

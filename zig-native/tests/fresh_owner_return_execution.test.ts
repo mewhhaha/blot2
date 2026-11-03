@@ -66,7 +66,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         if (width === 8) {
           assert(work.scoped_owned_word_calls > 0);
           assert.equal(work.scoped_owned_packed_calls, 0);
-        } else assert(work.scoped_owned_packed_calls > 0);
+        } else {
+          assert(work.scoped_packed_plans_promoted > 0);
+          assert(work.scoped_owned_word_calls > 0);
+        }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {

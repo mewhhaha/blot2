@@ -1,0 +1,42 @@
+const pool: GrowArray U32 = #[4]
+const append = func (value: U32): U32 => return do:
+  @storage.write (&pool[0]) (@u32.add pool[0] value)
+  @storage.push pool value
+  return @storage.length pool
+const nested = func (value: U32): U32 => return append value
+const explicit = func (alias: GrowArray U32) -> (value: U32): U32 => return do:
+  alias[0] := @u32.add self value
+  @storage.write (&pool[0]) (@u32.add pool[0] 1)
+  return @u32.add alias[0] pool[0]
+const owned = func (): GrowArray U32 => return pool
+entry const mutate = func (value: U32): Array U32 => return do:
+  let before = @storage.length pool
+  let after = nested value
+  let alias = owned ()
+  let compared = explicit alias value
+  alias[0] := @u32.add self 2
+  return #[before, after, compared, pool[0], alias[0], @storage.length alias]
+entry const observe = func (index: U32): U32 => return pool[index]
+entry const count = func (): U32 => return @storage.length pool
+entry const separate = func (value: U32): Array U32 => return do:
+  let local: GrowArray U32 = #[value]
+  let compared = explicit local 2
+  return #[local[0], pool[0], compared, @storage.length pool]
+type Choice is data = $Empty | $Words {values: GrowArray U32}
+const read_mixed = func (first: GrowArray U32): U32 => return @u32.add first[0] pool[0]
+const read_choice = func (choice: Choice): U32 => return do:
+  let before = case choice of
+    $Empty => 7
+    $Words {values} => values[0]
+  return @u32.add before pool[0]
+entry const mixed = func (flag: Bool): U32 => return do:
+  let local: GrowArray U32 = #[99]
+  let selected = pool
+  if flag:
+    selected := local
+  return read_mixed selected
+entry const inactive = func (flag: Bool): U32 => return do:
+  let choice = $Empty
+  if flag:
+    choice := $Words {values: pool}
+  return read_choice choice

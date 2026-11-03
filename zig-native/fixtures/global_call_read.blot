@@ -1,0 +1,5 @@
+const values: Array U32 = #[5, 11, 17]
+const read = func (index: U32): U32 => return @u32.add (@storage.read values index) index
+entry const twice = func (index: U32): U32 => return @u32.add (read index) (read index)
+entry const eight = func (index: U32): Array U32 => return
+  #[read index, read index, read index, read index, read index, read index, read index, read index]

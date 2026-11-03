@@ -1,0 +1,8 @@
+const select = func (first: &[U32]) -> (second: &[U32]): &[U32] => return first
+entry const answer = func (input: U32): U32 => return do:
+  let retained: ResizeArray (&[U32]) = #[]
+  do:
+    let owner: Array U32 = #[input]
+    let view = &owner[0..1]
+    @storage.push retained (select view view)
+  return @storage.length retained

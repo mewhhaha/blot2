@@ -39,7 +39,7 @@ fn lower(text: []const u8) !core.Module {
     module.unit = 1;
     return module;
 }
-test "packed input demand composes through wide forwarding while retaining owner effects" {
+test "completed input demand promotes wide forwarding while retaining owner effects" {
     const text = try source();
     defer a.free(text);
     var module = try lower(text);
@@ -48,9 +48,9 @@ test "packed input demand composes through wide forwarding while retaining owner
     defer result.deinit(a);
     if (result.diagnostic) |diagnostic| std.debug.print("packed backend: {s}\n", .{diagnostic.message()});
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
-    try std.testing.expect(result.counters.scoped_packed_input_words_avoided > 0);
-    try std.testing.expect(result.counters.scoped_packed_argument_words_avoided > 0);
+    try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+    try std.testing.expect(result.counters.scoped_direct_input_words_avoided > 0);
+    try std.testing.expect(result.counters.scoped_direct_argument_words_avoided > 0);
     try std.testing.expect(result.counters.scoped_function_plan_read_events > 0);
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
 }
@@ -58,12 +58,12 @@ fn publish(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     var result = try scoped.compile(allocator, modules, 1);
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.counters.scoped_owned_packed_calls > 0);
-    try std.testing.expect(result.counters.scoped_packed_input_words_avoided > 0);
-    try std.testing.expect(result.counters.scoped_packed_argument_words_avoided > 0);
+    try std.testing.expect(result.counters.scoped_packed_plans_promoted > 0);
+    try std.testing.expect(result.counters.scoped_direct_input_words_avoided > 0);
+    try std.testing.expect(result.counters.scoped_direct_argument_words_avoided > 0);
     try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
 }
-test "packed input demand publishes repeated wide plans through full OOM" {
+test "completed input demand publishes promoted wide plans through full OOM" {
     var module = try lower(@import("fixtures").source("packed_input_oom.blot"));
     defer module.deinit(a);
     try publish(a, &.{module});

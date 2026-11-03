@@ -15,64 +15,82 @@ Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
 The current
-[fresh-owner checkpoint](scripts/bench/goose/results/2026-11-03-fresh-owners.md)
-admits fresh fixed-array results through reusable calls. Compact fresh roles
-follow input roles; aliases/borrowed siblings share imported caller roots.
-Donors must be unconditional singleton arrays outside variant payloads, with
-plain inline elements, in the shared fixed region. Packets close before lexical
-rewind preserves results. Conditional/mixed origins, resizable results and
-borrowed escapes keep fallback/rejection. ABI 8/session protocol 2 are
-unchanged. See the updated ownership contract for the exact private boundary.
+[shared-call checkpoint](scripts/bench/goose/results/2026-11-03-call-contexts.md)
+keeps named helpers that access initialized source globals shared. A cached
+conservative dependency graph includes source calls, associated candidates and
+actual callbacks; sorted global slots and persistent owner identities enter the
+key. Global descriptors load behind per-invocation readiness guards. Mixed or
+inactive arguments cannot seed named globals. Missing imports decline before
+initialization; input-owner mutation/lifetime barriers remain. Core retains
+associated and obligation spellings even without executable projections.
 
-Three fresh uncached Gdev pairs improve **6.848 → 6.526s (4.7%)** in this round.
-The 6.85s baseline is a new shared-host control, not the earlier 5.81s snapshot.
-Main Wasm shrinks **12,490,827 → 12,113,691B (3.0%)**; local/global traffic is
-8,017,336B. Rollbacks fall **2,009 → 1,464**, discarded expressions **184,212 →
-108,775** and emission expressions **998,564 → 853,678**. There are 405
-successful owner-transfer definitions; work counts are not runtime counts.
-Five-second, subsecond and 1–2MB targets remain unmet.
+Exact immutable input words share canonical logical parameters before nested
+planning; complete-body proofs retain independent fallback on writes/hidden
+identities. Completed physical demand chooses direct calls without widening the
+512-parameter limit. Scalar results return exact bits through either transport.
+Concrete bound callback qualifiers retain closed-row certificates and complete
+signature/capture evidence; quantified/obligated closures keep fallback. ABI 8
+and session protocol 2 remain unchanged. Fresh fixed-owner transfer keeps its
+narrow donor/lifetime contract in zig-native/CONTRACT.md.
+
+Gdev `38af070` replaces four world captures with one closed HookOperation
+dispatcher. Typed associated methods preserve calls; saved schema 26 and owner
+lifetimes remain. Ink/Pen sources and all assets remain unchanged.
+
+Three fresh uncached pairs record compile medians **5.634 → 5.278s**, Main Wasm
+**12,113,691 → 10,241,074B (15.5%)**, rollbacks **1,464 → 577**, discarded
+expressions **108,775 → 75,786**, and emitted expressions **853,678 → 645,290**.
+Each pair improves by 312/334/376ms; median paired reduction is 334ms, a
+different statistic from the difference of medians. Local/global instructions
+still occupy 6,694,005B. Five-second, subsecond and 1–2MB goals remain unmet.
 
 Final LLVM compiler:
-`1ccf0e50b158971a3fa3d7943be3f6393db4212e61714cfc7ca0835c8b57068a`. A separate
-exact-artifact profile records backend **5.440s**, check **0.565s**, lower
-**0.139s**, validation **0.121s**; backend remains the main latency target. Do
-not sum overlapping timing families. Development compiler builds take 5–6s,
-native inventory compilation 10–11s. Fast noLLVM Main stopped at its 30s cap.
-Two LLVM builds were needed after wider checks found an older constexpr bug;
-only the final candidate supplies published performance numbers.
+`4ea42109bf2d13afacb04e226a1182a5372f110f83e70042f04603c7ff29431d`. Final Main
+SHA256: `7ccfba9e576ec342b7d5c402f68b963b307f8fb6394e73f927da15b0cc1bf8fe`. A
+separate same-artifact profile records backend **4.404s**, checking **0.492s**,
+lowering **0.129s**, validation **0.103s**, backend requested bytes **5.21GB**
+cumulative and whole-process peak **1.05GiB**. Do not sum overlapping timing
+families or compare separate shared-host rounds as paired measurements.
 
-All 2,954 native laws compile. Affected batches pass 390 unique native laws; ten
-focused laws pass full-fault mode. The final LLVM guest union has 280 passes and
-two failures also reproduced on the frozen baseline: unsupported ECS summary-job
-export and legacy optimized iter.take(0) allocation. Full gate passes 49
-smoke/57 harness checks, then stops at 180s: 102 completed native laws, 76 full
-sweeps, zero failures/leaks/logged errors. This is incomplete; full
-qualification remains pending. Zig lint is clean. Staged numeric aliases now use
-ordinary typed application when selected methods have nonexact syntactic arity;
-effects/providers and integer division checks remain intact.
+All 2,969 native laws compile without LLVM. Affected families pass 405 unique
+native laws; the scoped development family passes 238 native/202 guests. Eleven
+focused laws pass full-fault mode. Release guests pass 284/286; the unsupported
+ECS summary-job export and legacy optimized iter.take(0) allocation also fail on
+the frozen baseline. Full gate passes 49 smoke/57 harness checks, then stops at
+180s after 100 native laws, zero failures/leaks/logged errors. Incomplete is not
+a pass; full qualification remains pending. Zig lint/format/type checks pass.
 
-World/editor, hand and seven renderer scenarios match their controls. Hand and
-renderer small binaries grow slightly; retain these regressions in evidence. The
-final Main passes the original budgets in a headless NVIDIA frame; its inspected
-PNG and guest trace match the baseline byte for byte. See
-[current frame evidence](tasks/storage-handoff-evidence/2026-11-03-fresh-owners-frame.json).
-Broader gameplay/software-adapter coverage remains pending. Ink/Gdev/Pen
-sources/assets are unchanged and clean. Numeric benchmark binaries are
-byte-identical to the preceding checkpoint; runtime fluctuations are controls.
-The README charts rerun the seven adapted Goose cases with the final compiler;
-two recursive sorts and original F64 remain unsupported.
+World/editor and seven renderer streams match. Hand/renderer small binaries grow
+slightly; retain these regressions. Final Main passes the original budgets in a
+headless NVIDIA frame. Its inspected PNG and guest trace match the baseline byte
+for byte; see
+[current frame evidence](tasks/storage-handoff-evidence/2026-11-03-call-contexts-frame.json).
+Broader gameplay/software-adapter coverage remains pending. Pen codegen checks
+pass; normal check/test-blot stop before compilation because the host omits
+inferenceBudget. Bounded Deno runners execute the affected source. Ink/Pen
+sources and all assets remain unchanged; Gdev source is committed. Four numeric
+kernels are byte-identical; Mandelbrot F32 grows 10B with overlapping paired
+timings, no runtime gain claimed. README charts rerun five matched Goose pairs
+and two unsupported recursive sorts; original F64 remains unsupported.
 
-Next measure repeated physical descriptors in wide callback environments. Gdev
-world_storage.with_owners creates four callbacks capturing the same base;
-semantic owner-role deduplication does not deduplicate every physical word.
-Prototype a separate donor table seeded only by unconditional singleton array
-leaves. Existing root assignments are unsafe donors after mixed-root arguments
-or inactive variants. Select donors structurally, not by caller-local IDs. Probe
-width32/128, one/four captures, one/eight calls, then consider immutable
-aggregate places. Preserve argument evaluation, owner and effect facts, snapshot
-indices/lengths and logical packet extents. Do not widen the 512-word ABI
-selector. Classify remaining non-result rollbacks before attributing them to
-globals or callbacks. Preserve earlier
+The 32-shape capture matrix runs three repetitions and 384 executed checks per
+compiler. Shared width128/four captures/eight calls shrinks **86,413 →
+50,307B**; its distinct-owner control regresses **134,653 → 263,521B**, exposing
+private packet serialization. All-global context import was rejected at
+16.6s/24.1GB requested allocation; dependency footprints reduce owner roles
+806,909 → 44,446. The landed one-dispatcher Hooks source adds 2,961B; its
+separate same-compiler round improves 5.672 → 5.397s. Compiler-only on original
+source records 6.546 → 5.965s. Keep both rounds separate from the final combined
+comparison. The evidence preserves all controls and the source patch.
+Development compiler builds take 5–7s, native inventory 10–13s; two
+interim/final LLVM builds took about five/six minutes. A new noLLVM Main probe
+stopped at 30s before the spelling fix and is excluded.
+
+Next measure immutable addressed bundles across calls, preserving owner/effect
+facts, old snapshots and invocation lifetimes. There are still 282 bodies above
+10KB containing 7.68MB; logical leaf/packet transport remains a large size cost.
+Preserve the
+[fresh-owner evidence](scripts/bench/goose/results/2026-11-03-fresh-owners.md),
 [primitive-alias evidence](scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
 and [survey controls](scripts/bench/goose/results/2026-11-03-expanded.md).
 

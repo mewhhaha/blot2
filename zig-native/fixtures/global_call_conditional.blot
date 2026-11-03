@@ -1,0 +1,8 @@
+const values: Array U32 = #[5, 11]
+const conditional = func (flag: Bool): U32 => return do:
+  let before = 0
+  if flag:
+    before := @storage.read values 1
+  return @u32.add before (@storage.read values 0)
+entry const answer = func (flag: Bool): U32 => return
+  @u32.add (conditional flag) (conditional flag)

@@ -1,0 +1,11 @@
+const audit: GrowArray U32 = #[0]
+const tick = func (value: U32): U32 => return do:
+  @storage.write (&audit[0]) (@u32.add (@u32.mul audit[0] 10) value)
+  return audit[0]
+const first: Array U32 = #[tick 1]
+const second: Array U32 = #[@u32.add first[0] (tick 2)]
+const read = func (value: U32): U32 => return
+  @u32.add (@u32.add audit[0] first[0]) (@u32.add second[0] value)
+entry const answer = func (input: U32): Array U32 => return
+  #[audit[0], first[0], second[0], read input, read input]
+entry const advance = func (value: U32): U32 => return tick value

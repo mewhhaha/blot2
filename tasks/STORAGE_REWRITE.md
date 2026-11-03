@@ -3,45 +3,47 @@
 The current priorities are shared-kernel runtime and Gdev Wasm size, with short
 iterations. Subsecond compilation remains the goal; the next latency gate is
 below five seconds. The
-[fresh-owner checkpoint](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
-shares helpers returning fresh fixed arrays through explicit owner roles. Narrow
-unconditional donors and imported caller lifetimes preserve cleanup, aliases,
-borrowed siblings and input-event contracts. Conditional/mixed origins and
-resizable results keep fallback. ABI 8 and session protocol 2 stay unchanged.
+[shared-call checkpoint](../scripts/bench/goose/results/2026-11-03-call-contexts.md)
+imports initialized source globals through checked implicit owner roles with
+cached dependency footprints. Exact immutable input equality propagates into
+nested planning, completed physical demand selects the existing 512-parameter
+ABI, and concrete callback qualifiers retain their certificates without forcing
+expansion. ABI 8/session protocol 2 and fresh-owner lifetime contracts remain.
 
-Current paired Main builds improve **6.848 → 6.526s**, with Wasm **12,490,827 →
-12,113,691B (3.0%)**. The earlier 5.81s snapshot is a different round; use the
-paired control. Rollbacks fall 2,009 → 1,464 and discarded expressions 184,212 →
-108,775. Local/global instructions still occupy 8,017,336B. Backend time is
-5.440s in the separate profile. Subsecond/five-second and 1–2MB goals remain
-unmet.
+Current paired Main medians are **5.634 → 5.278s**, Wasm **12,113,691 →
+10,241,074B (15.5%)**, rollbacks **1,464 → 577**, discarded expressions
+**108,775 → 75,786**. Each pair improves 312/334/376ms; the median paired
+reduction is 334ms. Local/global instructions still occupy 6.69MB. A separate
+profile has backend 4.404s/5.21GB cumulative requests, peak process RSS 1.05GiB.
+The five-second, subsecond and 1–2MB targets remain unmet.
 
-All 2,954 native laws compile. Affected batches pass 390 unique native laws; ten
-focused laws pass full-fault mode. Final LLVM guests have 280 passes and two
-failures also present on the frozen baseline: the ECS summary-job export and
-legacy iter.take(0) allocation fixture. Full gate stops at its 180s budget after
-49 smoke/57 harness checks and 102 native laws, 76 full sweeps, zero
-failures/leaks/logged errors. Full qualification remains incomplete. Staged
-numeric aliases now use the ordinary typed-call path with effects/providers and
-integer division diagnostics preserved.
+All 2,969 native laws compile without LLVM; affected families pass 405 unique
+native laws. Eleven focused laws pass full-fault mode. Release guests pass
+284/286; unsupported ECS summary-job export and legacy optimized iter.take(0)
+also fail on the frozen baseline. Full gate passes 49 smoke/57 harness checks,
+then stops at 180s after 100 native laws, zero failures/leaks/logged errors.
+Full qualification remains incomplete. Zig lint/format/type checks pass.
 
-World/editor, hand and seven renderer streams match; small hand/renderer
-binaries grow slightly. The final Main's inspected NVIDIA PNG and guest trace
-match the baseline exactly; see
-[frame evidence](storage-handoff-evidence/2026-11-03-fresh-owners-frame.json).
-Broader gameplay/software-adapter coverage remains pending. Next measure
-physical descriptor duplication across wide callback captures before a larger
-addressed-environment IR change. Mixed-root/inactive-variant descriptors cannot
-seed donors; keep logical packet bounds and the existing 512-word selector. The
-remaining rollback causes are not yet classified. Preserve previous
-[primitive-alias evidence](../scripts/bench/goose/results/2026-11-03-primitive-aliases.md)
+World/editor and seven renderer streams match; small hand/renderer binaries
+grow. The final Main's inspected NVIDIA PNG and guest trace match the baseline
+exactly; see
+[frame evidence](storage-handoff-evidence/2026-11-03-call-contexts-frame.json).
+Broader gameplay/software-adapter coverage remains pending. Gdev `38af070`
+captures one hook environment; Ink/Pen and all assets are unchanged. The
+32-shape capture matrix shrinks shared environments up to 41.8% but its largest
+distinct-owner control nearly doubles; preserve that regression. Next measure
+immutable addressed bundles across calls, with complete semantic facts, snapshot
+behavior and invocation lifetimes. The rejected all-global context prototype and
+landed single-dispatcher source patch remain pinned in the report. Preserve
+earlier
+[fresh-owner evidence](../scripts/bench/goose/results/2026-11-03-fresh-owners.md)
 and [survey controls](../scripts/bench/goose/results/2026-11-03-expanded.md).
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves
 physical Value leaves and owner/borrow metadata. Remaining local/global
 instructions occupied 8.54MB at that older checkpoint; the current census is
-8.02MB. Preserve semantic checks and explicit copies while changing that
+6.69MB. Preserve semantic checks and explicit copies while changing that
 representation. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.
 

@@ -1,0 +1,15 @@
+const pair = func (row: {left: U32, right: U32}): U32 => return
+  @u32.add (@u32.mul row.left 10) row.right
+const edited = func (row: {left: U32, right: U32}): U32 => return do:
+  row.left := @u32.add self 1
+  return @u32.add (@u32.mul row.left 10) row.right
+entry const answer = func (input: U32): Array U32 => return do:
+  let marker: GrowArray U32 = #[input, @u32.add input 7]
+  let x = marker[0]
+  let y = marker[1]
+  let shared = pair {left: x, right: x}
+  let distinct = pair {left: x, right: y}
+  let shared_later = pair {left: y, right: y}
+  let distinct_later = pair {left: y, right: x}
+  let changed = edited {left: x, right: x}
+  return #[shared, distinct, shared_later, distinct_later, changed, x]

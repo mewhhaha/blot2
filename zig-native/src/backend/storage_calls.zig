@@ -9,8 +9,9 @@ pub const Key = struct {
     context: u32 = 0,
     /// A checked context-independent alias is distinct from real origin zero.
     context_free: bool = false,
-    /// Complete checked type substitution, callback identity, and static region
-    /// mapping are serialized here. Equality compares all bytes, not a hash.
+    /// Checked type substitution, callback identity, static region mapping and
+    /// normalized input equality are serialized here. No runtime bits/local IDs.
+    /// Equality compares all bytes, not a hash.
     evidence: []const u32,
     pub fn eql(self: Key, other: Key) bool {
         return self.unit == other.unit and self.binding == other.binding and self.context == other.context and self.context_free == other.context_free and std.mem.eql(u32, self.evidence, other.evidence);

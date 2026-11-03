@@ -23,12 +23,12 @@ blocked by owned-storage recursion.
 
 ![Bounded Wasm runtime: five paired cases and two unsupported Blot sorts](scripts/bench/goose/charts/runtime.svg)
 
-Five matched pairs expose **8.1x CRC32**, **7.0x custom hash**, **3.2x Sieve**
+Five matched pairs expose **7.4x CRC32**, **6.9x custom hash**, **3.1x Sieve**
 and **1.9x F32 Mandelbrot** gaps; Fannkuch is roughly at parity. Unsupported
-cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Fresh-owner
-reuse reduces Gdev Wasm **12.49 → 12.11MB**; paired builds improve **6.85 →
-6.53s** in this shared-host round. See
-[results, qualification and next hills](scripts/bench/goose/results/2026-11-03-fresh-owners.md).
+cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Shared call
+contexts and one hook environment reduce Gdev Wasm **12.11 → 10.24MB**; fresh
+compile medians are **5.63 → 5.28s**. Numeric timings are controls. See
+[results, qualification and next hills](scripts/bench/goose/results/2026-11-03-call-contexts.md).
 
 ## Development
 

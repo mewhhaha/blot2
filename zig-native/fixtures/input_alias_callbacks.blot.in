@@ -1,0 +1,22 @@
+type Bundle is data = $Bundle {__TYPES__}
+const total = func (bundle: Bundle): U32 => return do:
+  let result = 0
+__READS__
+  return result
+const visit = func (bundle: Bundle) -> (first: Unit -> U32 ! {}) -> (second: Unit -> U32 ! {}): U32 => return
+  @u32.add (total bundle) (@u32.add (first ()) (second ()))
+entry const answer = func (input: U32): Array U32 => return do:
+  let original: Array U32 = #[input]
+  let later: Array U32 = #[@u32.add input 7]
+__DECLARATIONS__
+  let bundle = $Bundle {__ORIGINAL__}
+  let next = $Bundle {__LATER__}
+  let first = func (): U32 => return total bundle
+  let second = func (): U32 => return total __SECOND_BUNDLE__
+  let next_first = func (): U32 => return total next
+  let next_second = func (): U32 => return total next
+  let before = visit bundle first second
+  bundle.f0[0] := @u32.add self 1
+  let after = visit bundle first second
+  let distinct = visit next next_first next_second
+  return #[before, after, distinct]

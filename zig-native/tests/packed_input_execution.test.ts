@@ -11,7 +11,7 @@ const fields = Array.from(
 ).join("");
 const source = template.replace("__FIELDS__", fields);
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`packed input demand forwards fields and preserves effects (${codegenTier})`, async () => {
+  Deno.test(`completed input demand promotes wide fields and preserves effects (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-packed-input-" });
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({
@@ -28,9 +28,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
       });
       assert(built.success, JSON.stringify(built));
       const work = built.stats.workCounters as Record<string, number>;
-      assert(work.scoped_owned_packed_calls > 0);
-      assert(work.scoped_packed_input_words_avoided > 0);
-      assert(work.scoped_packed_argument_words_avoided > 0);
+      assert(work.scoped_packed_plans_promoted > 0);
+      assert(work.scoped_owned_word_calls > 0);
+      assert(work.scoped_direct_input_words_avoided > 0);
+      assert(work.scoped_direct_argument_words_avoided > 0);
       assert(work.scoped_function_plan_hits > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });

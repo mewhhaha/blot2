@@ -47,13 +47,17 @@ for (const codegenTier of ["development", "optimized"] as const) {
         });
         assert(built.success, JSON.stringify(built));
         const work = built.stats.workCounters as Record<string, number>;
-        assert(work.scoped_function_plan_hits > 0);
+        // Returned logical lanes can have a different exact-word partition.
+        assert(work.scoped_function_plan_definitions > 0);
         assert(work.scoped_function_plan_write_events > 0);
         assert.equal(work.scoped_completed_plan_rollbacks, 0);
         if (width === 8) {
           assert(work.scoped_owned_word_calls > 0);
           assert.equal(work.scoped_owned_packed_calls, 0);
-        } else assert(work.scoped_owned_packed_calls > 0);
+        } else {
+          assert(work.scoped_packed_plans_promoted > 0);
+          assert(work.scoped_owned_word_calls > 0);
+        }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {
@@ -97,7 +101,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         if (width === 8) {
           assert(nestedWork.scoped_owned_word_calls > 0);
           assert.equal(nestedWork.scoped_owned_packed_calls, 0);
-        } else assert(nestedWork.scoped_owned_packed_calls > 0);
+        } else {
+          assert(nestedWork.scoped_packed_plans_promoted > 0);
+          assert(nestedWork.scoped_owned_word_calls > 0);
+        }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(nested.bytes, { asynchronous });
           try {

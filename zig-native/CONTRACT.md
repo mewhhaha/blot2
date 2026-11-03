@@ -42,16 +42,17 @@ package authority. Lexical row facts are bounded sparse pages copied by value
 for rollback; saturation declines the optional proof. Open substitutions remain
 private, and ordinary package admission retains its existing size limits.
 Completed source-body authority may instead come from the private factory that
-itself checks and lowers the exact source context. Its live prefix/entry receipts
-are distinct from Core-validation receipts, match immutable Core and identity,
-and are revoked on ownership transfer. Decoded, precomputed, mixed and copied
-entry inputs retain reconstruction. All backend bounds, Core, instantiated-call
-and storage ownership checks still apply; this authority is never serialized.
-Successful checked source instantiation may retain lexical ownership of its
-exact generic row-tail witnesses. These facts are copied and restored with the
-source scope and are published only after every prerequisite succeeds. They do
-not assert purity, closure or Foreign authority, and invocation rows still have
-to match the body's ambient effects. Portable admission does not use them.
+itself checks and lowers the exact source context. Its live prefix/entry
+receipts are distinct from Core-validation receipts, match immutable Core and
+identity, and are revoked on ownership transfer. Decoded, precomputed, mixed and
+copied entry inputs retain reconstruction. All backend bounds, Core,
+instantiated-call and storage ownership checks still apply; this authority is
+never serialized. Successful checked source instantiation may retain lexical
+ownership of its exact generic row-tail witnesses. These facts are copied and
+restored with the source scope and are published only after every prerequisite
+succeeds. They do not assert purity, closure or Foreign authority, and
+invocation rows still have to match the body's ambient effects. Portable
+admission does not use them.
 
 One source equation inquiry may reuse completed callee prerequisites with exact
 immutable-prefix data arguments, closed rows and unchanged lexical authority.
@@ -91,19 +92,32 @@ owners, reads and variants. Equal shapes or scalar bits never prove identity.
 
 A statement-match arm with one pattern row may retain its introduced Binding
 metadata directly when the compilation has no scalar addresses, matching the
-existing `if` survivor rule. Only a sole continuing arm publishes those bindings.
-Explicit SSA merges remain independent; multi-row arms retain checked physical
-carriers. The rule does not use remaining-use counts as a dead-value proof:
-their current traversal is not complete for alternative rows, value patterns or
-refutable-binding fallbacks.
+existing `if` survivor rule. Only a sole continuing arm publishes those
+bindings. Explicit SSA merges remain independent; multi-row arms retain checked
+physical carriers. The rule does not use remaining-use counts as a dead-value
+proof: their current traversal is not complete for alternative rows, value
+patterns or refutable-binding fallbacks.
 
-Packed named-function inputs retain their complete semantic Value tree and
-owner/event contracts. Their logical words occupy locals `1..W` after packet
-parameter zero. After result serialization and cleanup, physical demand follows
-the completed helper IR's local reads. Demanded words load at function entry;
-callers omit stores for the remaining words. Full packet extents, word offsets
-and result serialization stay unchanged. The input mask belongs to the completed
-plan's arena and rolls back with failed plans. Direct-word calls keep their ABI.
+Private named calls retain their complete semantic Value tree and owner/event
+contracts. Exact caller-local equality becomes a normalized input partition in
+the call key; runtime bits and local numbers never become specialization keys.
+Logical input slots remain reserved, but identical words bind to one canonical
+entry local before body construction, so nested calls retain that identity.
+Before publication, the complete body must leave every shared entry local
+unwritten, without hidden identities or semantic coordinates. Scalar addresses
+disable sharing. Failed proofs roll back and retry independent inputs before
+recording a declined key. The alias counter counts shared logical bindings,
+including bindings that ordinary dead-input analysis could also omit.
+
+Packed inputs occupy logical locals `1..W` after parameter zero. Physical demand
+follows the completed body, result serialization and cleanup. A packed helper
+with at most 512 demanded words, including a needed result pointer, promotes to
+ordinary parameters. Descending entry copies preserve logical IDs; the promoted
+result pointer occupies logical slot zero. Only compiler-owned result-store
+offsets are rebased. Larger or opaque helpers retain packets with full logical
+input extents and masked stores/loads. Scalar results return their word directly
+through either ABI, including exact F32 bits. Masks belong to the completed
+plan's arena and roll back with failed plans.
 
 Completed direct helpers likewise retain only incoming words read by their
 finished body, including result serialization. A narrower private signature and
@@ -113,8 +127,32 @@ logical caller arguments. All semantic arguments execute before physical
 filtering; ordered owner events remain independent. Only unpublished helpers
 without semantic/table position catalogs may gain this prefix. Hidden operands,
 table identities, entry/provider roles and non-i32 formals keep ordinary inputs.
-Packed inputs retain their existing path. Unused result pointers may disappear
-from the private signature; logical result word positions remain unchanged.
+Unused result pointers may disappear from the private signature; logical result
+word positions remain unchanged.
+
+After dependency-ordered source-global initialization dominates an export, named
+helpers may import the persistent owners as implicit semantic input roles. These
+roles add no physical arguments. Their complete row shapes and argument alias
+edges participate in the call key, ordered read/write replay and result
+provenance. A cached source dependency graph includes transitive declarations,
+associated candidates by name/operator, and actual callback bodies/captures.
+Unknown metadata and bounded scans retain all globals conservatively. Sorted
+global slots and persistent owner identities enter the key. Missing imports
+decline before initialization. Core retains associated and obligation spellings
+even when no executable projection uses them. Each actual global reference
+guards freshly allocated helper-local descriptors with a runtime readiness bit;
+conditional first use cannot leave a later reference uninitialized. Unused roles
+allocate no locals. Mixed-root or inactive argument descriptors never seed these
+named-global descriptors. Initializers are not replayed, persistent owners
+remain outside cleanup, and the ordinary input-owner mutation/lifetime barriers
+remain in force. Helpers constructed during initialization retain the earlier
+fallback.
+
+A bound closure's nonzero qualifier does not by itself require expansion.
+Concrete qualifiers with no type/row variables, obligations, generative bindings
+or public quantifiers may participate in graph helpers. Closed-row certificates
+remain attached. Closure identity, selected signature and complete capture
+evidence still determine sharing; qualified polymorphism retains fallback.
 
 Graph helpers may write input owners and return input-owned records or borrows.
 Ordered event shapes retain only input owner ordinals; caller replay checks
@@ -129,14 +167,14 @@ Imported roots use caller depth and ordinary mutable-token analysis. Packets
 close after result import; rewind preserves transferred extents until enclosing
 scope cleanup. Packet bytes can remain below live results, but packet owner
 slots close immediately. Bare borrowed escapes and fresh borrows stored into
-input owners remain rejected. Input freeze, reserve, pop and truncate retain their separate
-barriers. A helper's input-root prefix precedes every cleanup range, so its token
-locals are immutable through joins; local owners, loop carriers and demand
-caches retain their mutable marking. This exemption does not apply to exports.
-Direct results with complete input-alias recipes need no caller result slot or
-rewind. The logical result-pointer mask position remains present; an unchanged
-signature receives an unread zero pointer. Partial results retain allocation,
-and packed packets keep their existing layout and allocation.
+input owners remain rejected. Input freeze, reserve, pop and truncate retain
+their separate barriers. A helper's input-root prefix precedes every cleanup
+range, so its token locals are immutable through joins; local owners, loop
+carriers and demand caches retain their mutable marking. This exemption does not
+apply to exports. Direct results with complete input-alias recipes need no
+caller result slot or rewind. The logical result-pointer mask position remains
+present; an unchanged signature receives an unread zero pointer. Partial results
+retain allocation, and packed packets keep their existing layout and allocation.
 
 Checked aggregate joins reserve edge copies and materialize only lanes whose
 physical origins differ. Multiple edges may share only a dominating immutable
@@ -147,14 +185,14 @@ transport while independent siblings may share. Every incoming Value still
 passes complete type, owner, read and variant checks. Outlining cannot extract
 across an unresolved copy reservation; final assembly removes released nops.
 
-Completed buffered helper results may reuse an original argument word only
-when it names a formal local that the finished helper never writes. Logical
-ordinals remain complete across blocked subtrees, packet extents and offsets
-stay fixed, and semantic calls and owner events still execute. Aliased result
-stores and caller loads disappear before packed-input demand is computed.
-Value-less completions and static callable placeholders share one unwritten
-default-zero local per function. Mutable scratch and state retain separate
-locals; speculative helper rollback restores the zero-source cache.
+Completed buffered helper results may reuse an original argument word only when
+it names a formal local that the finished helper never writes. Logical ordinals
+remain complete across blocked subtrees, packet extents and offsets stay fixed,
+and semantic calls and owner events still execute. Aliased result stores and
+caller loads disappear before packed-input demand is computed. Value-less
+completions and static callable placeholders share one unwritten default-zero
+local per function. Mutable scratch and state retain separate locals;
+speculative helper rollback restores the zero-source cache.
 
 Final data-stack prepared bodies remove adjacent same-local get/set pairs and
 fold same-local set/get pairs to tee after physical local compaction. Original
@@ -166,30 +204,30 @@ call conventions, semantic arguments and ownership admission remain independent.
 
 Before physical slot reuse, single-set/single-read numeric locals may become
 ordered stack expression trees. Only typed, pure, nontrapping producers move.
-Calls, memory, globals, local writes, control and symbolic operands flush pending
-definitions and the live operand stack. Unknown stack prefixes remain in place.
-Only eliminated locals disappear; parameter positions and original bodies stay
-unchanged. Hidden ownership/resource/layout operands decline the pass. Tree
+Calls, memory, globals, local writes, control and symbolic operands flush
+pending definitions and the live operand stack. Unknown stack prefixes remain in
+place. Only eliminated locals disappear; parameter positions and original bodies
+stay unchanged. Hidden ownership/resource/layout operands decline the pass. Tree
 emission is iterative, including long chains.
 
-Before outline banking, adjacent numeric copies may share a retained source
-when every destination read observes that exact unchanged source version within
-one control segment. The unique-callsite outline tree is traversed iteratively;
+Before outline banking, adjacent numeric copies may share a retained source when
+every destination read observes that exact unchanged source version within one
+control segment. The unique-callsite outline tree is traversed iteratively;
 ordinary calls cannot mutate caller locals. Computation and effects never move.
-Only complete destination proofs erase copies; published aliases stop at retained
-snapshots. Cached helper entry reads translate through accepted aliases and keep
-only words actually read. A replay audit reconstructs entry reads independently.
-Bank writes and sharing are recomputed from staged bodies before publication.
-Ordinary completed bodies use the same proof before slot reuse, pruning only the
-eliminated destinations. Parameters, hidden operands and source bodies retain
-their identities. Source writes, branches, default-zero reads and loop backedges
-retain snapshots when the complete proof fails.
+Only complete destination proofs erase copies; published aliases stop at
+retained snapshots. Cached helper entry reads translate through accepted aliases
+and keep only words actually read. A replay audit reconstructs entry reads
+independently. Bank writes and sharing are recomputed from staged bodies before
+publication. Ordinary completed bodies use the same proof before slot reuse,
+pruning only the eliminated destinations. Parameters, hidden operands and source
+bodies retain their identities. Source writes, branches, default-zero reads and
+loop backedges retain snapshots when the complete proof fails.
 
 Flat unowned scalar record loop carries may share fields whose exact Core
-projection identities survive every backedge, continue and break. Changed
-fields retain carriers and simultaneous snapshots. Complete assignment, owner,
-read and variant checks still run; tagged, nominal, borrowed, callable and nested
-fields keep ordinary transport. Field proofs have a separate bounded budget.
+projection identities survive every backedge, continue and break. Changed fields
+retain carriers and simultaneous snapshots. Complete assignment, owner, read and
+variant checks still run; tagged, nominal, borrowed, callable and nested fields
+keep ordinary transport. Field proofs have a separate bounded budget.
 
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
@@ -238,12 +276,12 @@ candidate, and publication retains no temporary span. Schemes without residual
 predicates keep their ordinary quantified types and rows; they omit only
 metadata for shared-predicate instantiation, which they cannot request.
 
-Unqualified Array, GrowArray and ResizeArray locals may omit generalization
-when a current closed-graph certificate proves both quantifier sets empty.
-The shortcut requires no generative bindings and declines pending contracts
-before the inherited-explicit exclusion, then declines retained methods or
-explicit predicates. It preserves the binding's raw type and resolved root.
-Open elements, open callback rows and revoked certificates use generalization.
+Unqualified Array, GrowArray and ResizeArray locals may omit generalization when
+a current closed-graph certificate proves both quantifier sets empty. The
+shortcut requires no generative bindings and declines pending contracts before
+the inherited-explicit exclusion, then declines retained methods or explicit
+predicates. It preserves the binding's raw type and resolved root. Open
+elements, open callback rows and revoked certificates use generalization.
 
 Shared read-only aggregate results require plain, stable layouts without variant
 tags or borrowed roots. Their keys bind the result's semantic and physical
@@ -259,11 +297,12 @@ old leaf before the RHS, retain extent protection and reacquire the address
 afterward. Getter fallback releases temporary view protection before calling the
 getter; rows with variants or borrows retain whole-value loading.
 
-Owned assembly honors the selected tier, worker count, IO, profiling and physical
-machine-code sharing. Defaults remain optimized, serial and unshared. Returned
-optimizer counters describe actual assembly; unchanged-output replay can report
-zero fresh work. Emitted-function counts exclude physically shared functions.
-The complete execution policy remains part of retained whole-output identity.
+Owned assembly honors the selected tier, worker count, IO, profiling and
+physical machine-code sharing. Defaults remain optimized, serial and unshared.
+Returned optimizer counters describe actual assembly; unchanged-output replay
+can report zero fresh work. Emitted-function counts exclude physically shared
+functions. The complete execution policy remains part of retained whole-output
+identity.
 
 Type transformations preserve shared subgraphs. Ordinary covariance opening
 reuses unchanged data while keeping changed occurrences' fresh rows independent.
@@ -276,8 +315,8 @@ reads into enclosing loops and writers. Qualified/goaled closures keep the
 checked scalar leaf fallback; pending array destinations still decline aggregate
 scratch calls. Literal closures retain this separate admission path.
 
-Named functions use one immutable completed plan keyed by complete semantic
-and owner-graph evidence. It stores the ABI, result layout, ordered actual
+Named functions use one immutable completed plan keyed by complete semantic and
+owner-graph evidence. It stores the ABI, result layout, ordered actual
 reads/writes and required regions. Every call replays those events, including
 reads from compiled branches; unused arguments do not invent reads. Caller
 initialization, alias, frozen-owner, outlives and epoch checks remain. Returned
@@ -287,24 +326,24 @@ result layout. Export bodies stay in registered outline roots; oversized helpers
 roll back before publication. Raw-body feasibility never replaces final encoder
 limits. Planning and key construction still perform semantic work.
 
-Reusable plain inline aggregates with one to four scalar words may return through
-an eager instance-private word bank and the ordinary scalar return. Callees
-publish only after nested calls and cleanup; callers immediately drain every
-word into fresh locals. Other shapes retain caller-owned scratch. Physical
+Reusable plain inline aggregates with one to four scalar words may return
+through an eager instance-private word bank and the ordinary scalar return.
+Callees publish only after nested calls and cleanup; callers immediately drain
+every word into fresh locals. Other shapes retain caller-owned scratch. Physical
 argument projection follows complete original source/type checking, uses one
-consistent descriptor ordinal space, and preserves complete formal type admission.
-Expanded fallback always binds the original arguments.
-Zero-argument, nonopaque single-constructor data may narrow its named-record
-payload under the same complete footprint. The nominal wrapper and full semantic
-witness remain intact; getters and whole-value uses retain the full argument.
+consistent descriptor ordinal space, and preserves complete formal type
+admission. Expanded fallback always binds the original arguments. Zero-argument,
+nonopaque single-constructor data may narrow its named-record payload under the
+same complete footprint. The nominal wrapper and full semantic witness remain
+intact; getters and whole-value uses retain the full argument.
 
 Normalization work counters record recursive entries and inclusive node growth
 under import, substitution, resolution and covariance operations. Nested counts
 can overlap and are not exclusive CPU timings. View and binder counters include
 rolled-back creation work; they grant no type, cache or publication authority.
-Unification caller counters attribute its type pairs and resolver work, including
-projection-bearing stores. They preserve the original normalization path and do
-not establish a CPU share or reusable inference result.
+Unification caller counters attribute its type pairs and resolver work,
+including projection-bearing stores. They preserve the original normalization
+path and do not establish a CPU share or reusable inference result.
 
 Recursive normalization receipts retain the cursor, depth and exact type/row
 epochs; changing the depth limit invalidates them. Closing receipts also retain
@@ -331,12 +370,12 @@ failure releases speculative modules and replays the serial check. Allocation
 failure joins all workers before returning. No worker owns the borrowed symbol
 pool.
 
-Ready checker jobs dispatch by descending syntax size with a stable unit-ID
-tie break. Name preparation, ordered budget charging, diagnostics and publication
+Ready checker jobs dispatch by descending syntax size with a stable unit-ID tie
+break. Name preparation, ordered budget charging, diagnostics and publication
 retain dependency traversal order; the dispatch queue grants no new readiness.
-With `profileTrace`, bounded per-worker clocks report preparation, batch capacity
-and worker wall/CPU sums after joining. Capacity gaps include narrow batches,
-launch delay and uneven work; worker CPU includes allocator spin.
+With `profileTrace`, bounded per-worker clocks report preparation, batch
+capacity and worker wall/CPU sums after joining. Capacity gaps include narrow
+batches, launch delay and uneven work; worker CPU includes allocator spin.
 
 The same opt-in trace records pooled allocation-lock diagnostics. Waits sum
 elapsed acquisition intervals across workers, including scheduling delay, rather
@@ -1328,18 +1367,18 @@ An ordinary scope wrapper requires a once callback universally quantified over
 its fresh region. That region cannot occur in the callback's result or effects.
 The primitive creates the region when the wrapper executes; forwarding uses
 ordinary calls and retains the callback's rank evidence. The exact
-`func body => return @task.scope body` marker is checked against its immutable Core body.
-Neither the marker nor a physical closure layout certifies arbitrary callbacks
-or permits a scoped result to escape.
+`func body => return @task.scope body` marker is checked against its immutable
+Core body. Neither the marker nor a physical closure layout certifies arbitrary
+callbacks or permits a scoped result to escape.
 
-The exact `func group => return func action => return @task.spawn group action` body has a
-separate spawn contract. Its group parameter is symbolic; the action has once
-usage. Frozen admission validates both formal references and checks the actual
-action at every completed call, including aliases and partial applications.
-These callable values cannot flow into arbitrary data or higher-order inputs. A
-partial call retains its already evaluated group in a private carrier; final
-emission uses the actual action's capture descriptor. That carrier never grants
-authority through an ordinary indirect invocation.
+The exact `func group => return func action => return @task.spawn group action`
+body has a separate spawn contract. Its group parameter is symbolic; the action
+has once usage. Frozen admission validates both formal references and checks the
+actual action at every completed call, including aliases and partial
+applications. These callable values cannot flow into arbitrary data or
+higher-order inputs. A partial call retains its already evaluated group in a
+private carrier; final emission uses the actual action's capture descriptor.
+That carrier never grants authority through an ordinary indirect invocation.
 
 Receiver helpers retain a `task_receive` type/effect predicate until the input
 shape is known. Its generic form requires the exact consuming body or a checked

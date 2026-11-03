@@ -14,4 +14,5 @@ entry const answer = func (input: U32): U32 => return do:
   let r7 = {a: r6, b: r6}
   let r8 = {a: r7, b: r7}
   let state = {tree: r8, extra: input}
+  let repeated = forward state input
   return @u32.add (forward state input) (forward state 0)

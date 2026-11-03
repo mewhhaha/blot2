@@ -1,0 +1,7 @@
+const pool: GrowArray U32 = #[7]
+const close = func (): Array U32 => return @storage.freeze pool
+entry const answer = func (): U32 => return do:
+  let alias = pool
+  let fixed = close ()
+  @storage.push alias 1
+  return fixed[0]
