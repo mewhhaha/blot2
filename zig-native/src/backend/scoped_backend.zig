@@ -187,7 +187,8 @@ fn orderFields(fields: []Value) void {
         }
     }.less);
 }
-const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true };
+const FixedSpan = struct { length: Local, stride: Local, ready: ?Local = null };
+const Root = struct { word: Local, token: Local, epoch_low: Local, epoch_high: Local, stack: u32, depth: usize, element: Value, element_initialized: bool = true, known_empty: bool = false, capacity_request: ?usize = null, live: bool = true, frozen: bool = false, persistent: bool = false, dedicated: bool = true, fixed_span: ?FixedSpan = null };
 const Global = struct { target: core.BindingRef, word: u32, token: u32, epoch_low: u32, epoch_high: u32, capacity_request: usize, literal_bytes: ?u32 = null, initializing: bool = false };
 const TypeRef = struct { unit: u32, ty: T.Id, environment: ?[]const TypeArgument = null };
 const TypeArgument = struct { unit: u32, parameter: T.Id, argument: T.Id, argument_unit: u32, environment: ?[]const TypeArgument = null };
@@ -983,11 +984,46 @@ const Generator = struct {
         return value;
     }
     const ElementPlace = struct { address: Local, element: Value };
+    fn fixedScalarSpan(self: *Generator, value: Value) Error!?FixedSpan {
+        // Private helpers cannot cross the host boundary or close input owners.
+        // Match immutable physical descriptors, never only a possible root set.
+        if (self.writer_trace == null or value.tag != .array or value.mode != .fixed or value.other_roots.len != 0 or value.host != null or value.demand != null) return null;
+        const root_id = value.root orelse return null;
+        const owner = &self.roots.items[root_id];
+        if (!owner.live or owner.element.tag != .scalar or owner.element.fields.len != 0 or owner.element.root != null or owner.element.host != null or owner.element.demand != null) return null;
+        if (value.word.id != owner.word.id or value.token.id != owner.token.id or value.epoch_low.id != owner.epoch_low.id or value.epoch_high.id != owner.epoch_high.id) return null;
+        if (owner.fixed_span == null) {
+            // Locals recreated in a loop need a fresh create receipt, not a
+            // function-wide lazy cache (including growers frozen later).
+            if (root_id >= self.writer_trace.?.inputs) return null;
+            owner.fixed_span = .{ .length = try self.c.temp(), .stride = try self.c.temp(), .ready = try self.c.temp() };
+            self.emission_work.scoped_fixed_spans +|= 1;
+        }
+        const span = owner.fixed_span.?;
+        if (span.ready) |ready| {
+            // Readiness starts at typed zero on each function call. Validate at
+            // the first actual use, preserving zero-iteration and branch order.
+            try self.c.when(.{ .i32_eqz, ready });
+            try self.c.set(span.length, .{ .call, self.runtime.functions.length, value.token, value.epoch_low, value.epoch_high, value.word });
+            try self.c.set(span.stride, .{ .load, value.word, 12 });
+            try self.c.set(ready, 1);
+            try self.c.end();
+        }
+        return span;
+    }
+    fn elementAddress(self: *Generator, value: Value, index: Local) Error!Local {
+        const address = try self.c.temp();
+        if (try self.fixedScalarSpan(value)) |span| {
+            try self.c.trap(.{ .i32_ge_u, index, span.length });
+            try self.c.set(address, .{ .i32_add, .{ .i32_add, value.word, storage.header_bytes }, .{ .i32_mul, index, span.stride } });
+            self.emission_work.scoped_fixed_span_accesses +|= 1;
+        } else try self.c.set(address, .{ .call, self.runtime.functions.address, value.token, value.epoch_low, value.epoch_high, value.word, index });
+        return address;
+    }
     fn readElementPlace(self: *Generator, m: *const core.Module, id: core.Id, array_: Value, index: Local) Error!?ElementPlace {
         try self.writerEvent(m, id, array_, .read);
         try self.registerShapeRead(array_);
-        const address = try self.c.temp();
-        try self.c.set(address, .{ .call, self.runtime.functions.address, array_.token, array_.epoch_low, array_.epoch_high, array_.word, index });
+        const address = try self.elementAddress(array_, index);
         if (self.emptyUninitialized(array_)) {
             // The checked address traps: every possible owner was constructed
             // with zero rows and has had no write. Do not manufacture payload
@@ -1111,8 +1147,11 @@ const Generator = struct {
             owner.known_empty = false;
         };
         try self.writerEvent(m, id, array_, .write);
-        const address = try self.c.temp();
-        if (index) |at| try self.c.set(address, .{ .call, self.runtime.functions.address, array_.token, array_.epoch_low, array_.epoch_high, array_.word, at }) else try self.c.set(address, .{ .call, self.runtime.functions.append_space, array_.token, array_.epoch_low, array_.epoch_high, array_.word });
+        var address: Local = undefined;
+        if (index) |at| address = try self.elementAddress(array_, at) else {
+            address = try self.c.temp();
+            try self.c.set(address, .{ .call, self.runtime.functions.append_space, array_.token, array_.epoch_low, array_.epoch_high, array_.word });
+        }
         try self.storeValue(address, 0, value);
     }
     fn inputOwner(self: *const Generator, value: Value) bool {
@@ -1423,6 +1462,12 @@ const Generator = struct {
             self.destination = null;
         } else value = try self.reserveOwner(m, id, mode, element_shape);
         try self.c.set(value.word, .{ .call, self.runtime.functions.create, value.token, value.epoch_low, value.epoch_high, capacity, @backingInt(mode), try width(element_shape) });
+        if (self.writer_trace != null and mode == .fixed and element_shape.tag == .scalar and element_shape.fields.len == 0) {
+            const length_ = try self.c.temp();
+            try self.c.set(length_, capacity);
+            self.roots.items[value.root.?].fixed_span = .{ .length = length_, .stride = (try self.constant(try width(element_shape))).word };
+            self.emission_work.scoped_fixed_spans +|= 1;
+        }
         return value;
     }
     fn reserveOwner(self: *Generator, m: *const core.Module, id: core.Id, mode: storage.Mode, element_shape: Value) Error!Value {
@@ -1621,6 +1666,7 @@ const Generator = struct {
     fn length(self: *Generator, m: *const core.Module, id: core.Id, value: Value) Error!Local {
         if (value.tag == .view) return value.length;
         if (value.tag != .array) return self.unsupported(m, id);
+        if (try self.fixedScalarSpan(value)) |span| return span.length;
         const result = try self.c.temp();
         try self.c.set(result, .{ .call, self.runtime.functions.length, value.token, value.epoch_low, value.epoch_high, value.word });
         return result;
@@ -1758,6 +1804,11 @@ const Generator = struct {
         try self.c.end();
     }
     fn collection(self: *Generator, m: *const core.Module, id: core.Id, depth: usize) Error!Value {
+        const region_count = self.append_regions.items.len;
+        defer self.append_regions.shrinkRetainingCapacity(region_count);
+        if (self.destination == null) if (private_append.analyzeConversion(m, id)) |plan| {
+            try self.append_regions.append(self.allocator, .{ .unit = m.unit, .plan = plan });
+        };
         const inputs = m.children(id);
         if (inputs.len > 3 or inputs.len == 0) return self.unsupported(m, id);
         var args: [3]Value = undefined;
@@ -4059,7 +4110,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_fixed_spans", "scoped_fixed_span_accesses", "scoped_result_slots_avoided", "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -6146,14 +6197,15 @@ const Generator = struct {
         for (values, carries, headers, shared, 0..) |*value, carry, *header, *reuse, ordinal| {
             const incoming = try self.bindingValue(m, carry.incoming);
             if (!@import("storage_control.zig").fixedCarry(incoming)) return self.unsupported(m, id);
-            if (transport) |index| if (incoming.tag == .aggregate) {
+            const fixed_array = incoming.tag == .array and incoming.mode == .fixed and incoming.root != null and incoming.other_roots.len == 0;
+            if (transport) |index| if (incoming.tag == .aggregate or fixed_array) {
                 reuse.whole = try index.invariant(id, ordinal);
-                if (!reuse.whole and !self.scalar_admission.hasScalarReferences() and incoming.variant_tags.len == 0 and incoming.nominal == null and incoming.host == null and incoming.demand == null and incoming.root == null) {
-                    var flat = incoming.fields.len != 0;
+                if (incoming.tag == .aggregate and !reuse.whole and !self.scalar_admission.hasScalarReferences() and incoming.variant_tags.len == 0 and incoming.nominal == null and incoming.host == null and incoming.demand == null and incoming.root == null) {
+                    var named = incoming.fields.len != 0;
                     for (incoming.fields) |field| {
-                        if (field.tag != .scalar or field.name.len == 0 or field.fields.len != 0 or field.root != null or field.host != null or field.demand != null) flat = false;
+                        if (field.name.len == 0) named = false;
                     }
-                    if (flat) {
+                    if (named) {
                         const fields = try self.arena.allocator().alloc(bool, incoming.fields.len);
                         for (fields, incoming.fields) |*field, input| field.* = try index.invariantField(id, ordinal, input.name);
                         reuse.fields = fields;
@@ -6940,6 +6992,7 @@ pub fn compileWithOptions(allocator: std.mem.Allocator, units: []const core.Modu
     emission_work.scoped_outlined_regions = outlined.regions;
     emission_work.scoped_outlined_globals = outlined.globals;
     emission_work.scoped_copy_pairs_removed = outlined.copies_removed;
+    emission_work.scoped_bank_operand_bytes_saved = outlined.bank_operand_bytes_saved;
     emission_work.scoped_copy_reads_forwarded = outlined.reads_forwarded;
     var runtime_optimization: @import("optimized_bodies.zig").Stats = .{ .tier = options.tier };
     const bytes = assembly_block: {

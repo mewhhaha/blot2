@@ -115,6 +115,9 @@ pub const Index = struct {
         }
         if (node.tag == .update) {
             const selectors = self.module.updateSelectors(id);
+            // Indexed writes change the selected payload, not any descriptor
+            // or enclosing inline record. Match whole-value canonicalization.
+            for (selectors) |selector| if (selector.kind == .index) return self.laneExpression(self.module.updateInfo(id).root, field, query, depth + 1);
             var projection_id: u32 = undefined;
             if (selectors.len != 0) {
                 if (selectors[0].kind != .field) return null;

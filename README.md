@@ -23,11 +23,11 @@ medians; three of seven adapted LangArena tasks.
 ![Bounded Wasm runtime: Blot before and after optimization, and Goose, milliseconds](scripts/bench/goose/charts/runtime.svg)
 
 Runtime uses production input sizes with fewer repetitions. Hash buffers use U32
-elements in Blot and U8 in Goose. Five matched pairs show **3.9–9.5x faster**
-Blot kernels. All checksums pass; unchanged production runs now finish below 30
-seconds. See
-[results and methodology](scripts/bench/goose/results/2026-11-03-runtime-hills.md)
-for exact inputs, samples and limitations.
+elements in Blot and U8 in Goose. Five matched pairs improve Fannkuch **12.5x**,
+custom hash **9.4x** and CRC32 **1.19x** over the preceding compiler. Fannkuch
+now runs about as fast as Goose. All checksums pass. Gdev Main is **12.48 MB**
+and fresh compilation remains about **6.1 seconds**. See
+[results and limits](scripts/bench/goose/results/2026-11-03-fixed-spans.md).
 
 ## Development
 

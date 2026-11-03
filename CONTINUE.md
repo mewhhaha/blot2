@@ -16,28 +16,50 @@ diagnostic.
 
 Shared Goose direct-Wasm benchmarks are available in
 [`scripts/bench/goose`](scripts/bench/goose/README.md). The
-[runtime checkpoint](scripts/bench/goose/results/2026-11-03-runtime-hills.md)
+[fixed-span checkpoint](scripts/bench/goose/results/2026-11-03-fixed-spans.md)
 covers three of seven adapted tasks in the same V8. Five matched pairs improve
-Fannkuch 729 → 186ms (3.9x), CRC32 1,329 → 142ms (9.5x), and custom hash 5,768 →
-987ms (5.8x). All unchanged official production cases now pass below the
-30-second process cap. The original timeouts remain in the pinned baseline.
-Owner-free loops omit rewind, completed owner-free scopes discard unused marks,
-and indexed assignments reuse their pinned pre-RHS checked address. Allocating
-loops, conditional returns, variant checks and bounds-before-RHS ordering retain
-their proofs. Repeated array descriptor/epoch checks are the next runtime hill.
+Fannkuch 179.50 → 14.37ms (12.49x), CRC32 129.94 → 109.97ms (1.19x), and custom
+hash 955.26 → 101.75ms (9.40x). Fannkuch now roughly matches Goose. Unchanged
+official production workloads finish in 1.64s, 5.28s and 2.53s respectively.
+Private helpers validate fixed scalar-array descriptors lazily once per
+invocation while retaining every bounds check. Fresh creates refresh length
+snapshots; grow/freeze locals and merged descriptors retain fallback.
 
-The latest release produces **12,550,610 bytes of Main Wasm**, down from
-12,932,581 (381,971B / 2.95%). One same-workload compile pair takes 6.16s →
-6.07s; this is a pilot, not an established latency improvement. World/editor,
-hand and seven identical renderer streams pass with smaller output. The affected
-family passes all 195 native laws and 190 guests; ten focused laws pass full
-allocation faults. Full qualification still stops at the baseline List/chunk
-smoke failure, and installed Pen still rejects ABI 8. No new frame is qualified.
-Five-second, subsecond and 1–2MB goals remain unmet. Source, compiler, workload
-and raw evidence are pinned in
-[the runtime evidence](scripts/bench/goose/results/2026-11-03-runtime-hills.json).
-The installed LLVM compiler is
-`b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed`.
+Invariant fixed-array descriptors and named nested record fields share loop
+carriers under existing all-exit identity and storage proofs. Frequency-ordered
+private bank IDs save 85,891 encoded operand bytes in Main. Final Main is
+**12,476,667 bytes**, down 73,943B (0.59%); local/global traffic still occupies
+8,254,281B. Three fresh compile pairs have medians **5.987 → 6.140s**, an
+observed 2.6% regression. World/editor, hand and seven identical renderer
+streams pass, but their small Wasm controls grow. Five-second, subsecond and
+1–2MB targets remain unmet. Exact samples, source and compiler pins are in
+[the evidence](scripts/bench/goose/results/2026-11-03-fixed-spans.json). The
+installed LLVM compiler is
+`89cd47f3b9a3d4bbfa37857edb6b974d0e8bbf11432c3a4531f44d3b51c96bcb`.
+
+All 2,937 native laws compile. The affected 201-law/192-guest family passes in
+60.04s, nine focused laws pass exhaustive allocation faults, final LLVM passes
+all 192 guests, and Zig lint is clean. The List/chunk smoke is fixed by applying
+the existing guarded private append proof to explicit consuming conversions. The
+full gate passes 49 smoke and 57 harness checks; a generated TypeScript
+fixture's invalid logical operators were repaired. Broad full-fault execution
+was stopped after 355.79s: 445 completed laws, 298 full sweeps, no failures,
+leaks or logged errors. This is incomplete; full qualification remains pending.
+
+Rebuilt Pen accepts ABI 8. The current final Main passes all headless NVIDIA
+one-frame checks; its inspected PNG and guest trace are byte-identical to the
+baseline. See
+[frame evidence](tasks/storage-handoff-evidence/2026-11-03-fixed-spans-frame.json).
+Software-adapter coverage remains unavailable. Sibling sources/assets are clean
+and preserved. This qualifies one frame, not full gameplay.
+
+Next classify Main's 2,009 completed-plan rollbacks and 181,762 discarded
+expressions, especially fresh fixed-array returns that force caller expansion.
+The 512-word selector already chooses a buffered ABI, with zero machine-limit or
+outline-key declines; do not widen limits. CRC32's remaining conditional
+shift/XOR recurrence has a promising source-only basis-column control; a proved
+compiler fold is still unimplemented. Larger aggregate boundaries remain the
+main size target.
 
 The preceding
 [copy-coalescing checkpoint](zig-native/measurements/copy-coalesce-2026-11-03.json)

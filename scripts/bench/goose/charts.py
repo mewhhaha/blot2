@@ -8,7 +8,7 @@ from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-03-runtime-hills.json"
+EVIDENCE = HERE / "results/2026-11-03-fixed-spans.json"
 LABELS = {"fannkuch": "Fannkuch", "crc32": "CRC32", "custom_hash": "Custom hash"}
 COLORS = {"blot": "#c94d3f", "goose": "#087f8c"}
 
@@ -105,8 +105,8 @@ def main():
         "Bounded Wasm runtime",
         "Five matched before/after pairs · Goose measured separately · same V8",
         "runtime.svg",
-        6000,
-        [0, 1500, 3000, 4500, 6000],
+        1100,
+        [0, 250, 500, 750, 1000],
         [
             ("before", "Blot before", "#94a3b8"),
             ("blot", "Blot now", COLORS["blot"]),

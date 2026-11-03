@@ -208,7 +208,7 @@ const Analyzer = struct {
     }
 };
 
-pub fn analyze(m: *const core.Module, id: core.Id) ?Plan {
+fn analyzeBlock(m: *const core.Module, id: core.Id, conversion: core.Id, converted: core.Id) ?Plan {
     if (m.node(id).tag != .block) return null;
     const statements = m.children(id);
     if (statements.len < 3 or statements.len > 19) return null;
@@ -216,15 +216,37 @@ pub fn analyze(m: *const core.Module, id: core.Id) ?Plan {
     const last = m.node(statements[statements.len - 1]);
     if (first.tag != .bind or last.tag != .return_ or last.b != id) return null;
     if (m.node(first.b).tag != .array or m.children(first.b).len != 0 or m.types.node(m.typeOf(first.b)).tag != .list) return null;
-    if (m.node(last.a).tag != .array_op or m.arrayOperation(last.a) != .convert or m.types.node(m.typeOf(last.a)).tag != .array) return null;
-    const converted = m.children(last.a);
-    if (converted.len != 1) return null;
-    var analyzer: Analyzer = .{ .m = m, .plan = .{ .initial = first.b, .conversion = last.a } };
+    var analyzer: Analyzer = .{ .m = m, .plan = .{ .initial = first.b, .conversion = conversion } };
     if (!analyzer.add(first.a)) return null;
     var outgoing = first.a;
     for (statements[1 .. statements.len - 1]) |statement| outgoing = analyzer.region(statement, outgoing) orelse return null;
-    if (analyzer.loops == 0 or analyzer.plan.append == 0 or !analyzer.local(converted[0], outgoing)) return null;
+    if (analyzer.loops == 0 or analyzer.plan.append == 0 or !analyzer.local(converted, outgoing)) return null;
     for (analyzer.other_carries[0..analyzer.other_count]) |binding| if (analyzer.alias(binding)) return null;
     for (analyzer.expressions[0..analyzer.expression_count]) |expression| if (!analyzer.independent(expression)) return null;
     return analyzer.plan;
+}
+
+pub fn analyze(m: *const core.Module, id: core.Id) ?Plan {
+    if (m.node(id).tag != .block) return null;
+    const statements = m.children(id);
+    if (statements.len == 0) return null;
+    const last = m.node(statements[statements.len - 1]);
+    if (last.tag != .return_ or last.b != id) return null;
+    if (m.node(last.a).tag != .array_op or m.arrayOperation(last.a) != .convert or m.types.node(m.typeOf(last.a)).tag != .array) return null;
+    const converted = m.children(last.a);
+    if (converted.len != 1) return null;
+    return analyzeBlock(m, id, last.a, converted[0]);
+}
+
+/// An explicit @array.from_list may consume the whole private List block.
+/// Keep the same proof and evaluate the original block before freezing it.
+pub fn analyzeConversion(m: *const core.Module, id: core.Id) ?Plan {
+    if (m.node(id).tag != .array_op or m.arrayOperation(id) != .convert or m.types.node(m.typeOf(id)).tag != .array) return null;
+    const inputs = m.children(id);
+    if (inputs.len != 1 or m.node(inputs[0]).tag != .block or m.types.node(m.typeOf(inputs[0])).tag != .list) return null;
+    const statements = m.children(inputs[0]);
+    if (statements.len == 0) return null;
+    const last = m.node(statements[statements.len - 1]);
+    if (last.tag != .return_ or last.b != inputs[0]) return null;
+    return analyzeBlock(m, inputs[0], id, last.a);
 }

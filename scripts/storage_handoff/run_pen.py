@@ -15,6 +15,7 @@ PEN = ROOT.parent / 'pen/target/release/pen'
 PROJECT = ROOT.parent / 'gdev'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--launch', action='store_true', help='Launch after the candidate builds successfully.')
+parser.add_argument('--hardware', action='store_true', help='Use the available GPU instead of requiring a software adapter.')
 parser.add_argument('--output', type=Path, help='New output directory; default is a unique attempt directory beside this script.')
 parser.add_argument('--compiled-main', type=Path, help='Load a previously built actual main through Pen bundle mode, without recompiling.')
 parser.add_argument('--expected-wasm-sha256', help='Required with --compiled-main: the reviewed build artifact hash.')
@@ -84,7 +85,9 @@ if args.compiled_main:
     command = [str(PEN), '--game', str(bundle), '--assets', str(PROJECT / 'src/assets')]
 else:
     command = [str(PEN), 'run', '--project', str(PROJECT)]
-command += ['--headless', '--software', '--mute',
+if not args.hardware:
+    command.append('--software')
+command += ['--headless', '--mute',
            '--frames', '1', '--fps', '60', '--size', '640x480', '--data', str(data),
            '--trace', str(OUT / 'frames.trace'), '--screenshot', str(OUT / 'frame.png')]
 identity = {'pen_sha256': hashlib.sha256(PEN.read_bytes()).hexdigest(), 'command': command,

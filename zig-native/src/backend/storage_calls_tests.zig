@@ -1788,3 +1788,90 @@ test "flat scalar loop lanes prove all continue and break edges through OOM" {
     try publishAggregateTransport(a, &.{module});
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateTransport, .{@as([]const core.Module, &.{module})});
 }
+
+fn publishFixedScalarSpans(allocator: std.mem.Allocator, modules: []const core.Module) !void {
+    var result = try scoped.compile(allocator, modules, 1);
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.counters.scoped_fixed_spans > 0);
+    try std.testing.expect(result.counters.scoped_fixed_span_accesses > 0);
+}
+
+test "fixed scalar helper spans retain checked input bounds through every allocation failure" {
+    var module = try lower(a,
+        \\const read = func (rows: Array U32) -> (index: U32): U32 => return rows[index]
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let rows: Array U32 = #[input, 7]
+        \\  return read rows (@u32.rem input 2)
+    );
+    defer module.deinit(a);
+    try publishFixedScalarSpans(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishFixedScalarSpans, .{@as([]const core.Module, &.{module})});
+}
+
+test "fixed scalar spans preserve fresh lifetimes nested array carries and explicit conversion regions" {
+    var module = try lower(a, @import("fixtures").source("fixed_scalar_spans.blot"));
+    defer module.deinit(a);
+    try publishFixedScalarSpans(a, &.{module});
+}
+
+test "nested array carry fields retain exact identities across exits and reject replacements" {
+    const source =
+        \\entry const stable = func (input: U32): U32 => return do:
+        \\  let rows: Array U32 = #[input]
+        \\  let state = {nested: {rows: rows, stamp: 7}, total: 0}
+        \\  for step in 0..4:
+        \\    if @u32.eq step 1:
+        \\      continue
+        \\    state.nested.rows[0] := @u32.add self 1
+        \\    state.total := @u32.add self step
+        \\    if @u32.eq step 2:
+        \\      break
+        \\  return @u32.add state.total state.nested.rows[0]
+        \\entry const changed = func (input: U32): U32 => return do:
+        \\  let rows: Array U32 = #[input]
+        \\  let state = {nested: {rows: rows, stamp: 7}, total: 0}
+        \\  for step in 0..4:
+        \\    state.nested := {rows: state.nested.rows, stamp: step}
+        \\    if @u32.eq step 1:
+        \\      continue
+        \\    state.total := @u32.add self step
+        \\    if @u32.eq step 2:
+        \\      break
+        \\  return @u32.add state.total state.nested.stamp
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    var arena: std.heap.ArenaAllocator = .init(a);
+    defer arena.deinit();
+    const index = (try @import("storage_transport.zig").Index.create(&arena, &module)).?;
+    const changed_start = std.mem.find(u8, source, "entry const changed").?;
+    var loops: usize = 0;
+    for (module.nodes, 0..) |node, ordinal| {
+        if (node.tag != .loop) continue;
+        const id: core.Id = @intCast(ordinal);
+        for (module.loopCarries(id), 0..) |_, position| {
+            try std.testing.expect(!try index.invariant(id, position));
+            try std.testing.expect(!try index.invariantField(id, position, "total"));
+            try std.testing.expectEqual(module.span(id).start < changed_start, try index.invariantField(id, position, "nested"));
+            loops += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), loops);
+    try publishAggregateTransport(a, &.{module});
+    var replaced = try lower(a,
+        \\entry const answer = func (input: U32): U32 => return do:
+        \\  let rows: Array U32 = #[input]
+        \\  let other: Array U32 = #[7]
+        \\  let state = {nested: {rows: rows}, total: 0}
+        \\  for step in 0..4:
+        \\    state.nested.rows := other
+        \\    state.total := @u32.add self step
+        \\  return @u32.add state.total state.nested.rows[0]
+    );
+    defer replaced.deinit(a);
+    var refused = try scoped.compile(a, &.{replaced}, 1);
+    defer refused.deinit(a);
+    try std.testing.expect(refused.diagnostic != null);
+    try std.testing.expectEqual(@import("core_backend.zig").Code.storage_escape, refused.diagnostic.?.code);
+}

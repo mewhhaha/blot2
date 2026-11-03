@@ -23,8 +23,9 @@ pub const Options = struct {
 pub const Work = struct { expressions: usize, layouts: usize };
 pub const Ticket = struct { function: u32, start: usize, work: Work };
 pub const Credit = Work;
-pub const Stats = struct { regions: u64 = 0, globals: u64 = 0, copies_removed: u64 = 0, reads_forwarded: u64 = 0 };
+pub const Stats = struct { regions: u64 = 0, globals: u64 = 0, copies_removed: u64 = 0, reads_forwarded: u64 = 0, bank_operand_bytes_saved: u64 = 0 };
 const Total = struct { references: usize = 0, writes: usize = 0 };
+const Reference = struct { function: u32 = absent, weight: u64 = 0 };
 const Root = struct {
     function: u32,
     scanned: usize = 0,
@@ -208,6 +209,7 @@ pub const Context = struct {
         var next_global = first_global;
         var copies_removed: u64 = 0;
         var reads_forwarded: u64 = 0;
+        var bank_operand_bytes_saved: u64 = 0;
         for (0..self.roots.items.len) |root_index| {
             if (self.roots.items[root_index].pending.count() != 0) return error.InvalidOutline;
             try self.sync(root_index);
@@ -239,9 +241,9 @@ pub const Context = struct {
             var map_owned = true;
             errdefer if (map_owned) self.allocator.free(map);
             @memset(map, absent);
-            const first = try self.allocator.alloc(u32, count);
+            const first = try self.allocator.alloc(Reference, count);
             defer self.allocator.free(first);
-            @memset(first, absent);
+            @memset(first, .{});
             const shared = try self.allocator.alloc(bool, count);
             defer self.allocator.free(shared);
             @memset(shared, false);
@@ -272,12 +274,40 @@ pub const Context = struct {
                 }
             }
             @memset(map, absent);
+            const bank_start = next_global;
             for (shared, 0..) |yes, id| {
                 if (!yes or (id >= source.parameters.len and writes[id] == 0)) continue; // independently zero
                 if (localType(source, @intCast(id)) != .i32) return error.InvalidOutline;
                 if (next_global >= self.options.maximum_globals or next_global >= absent) return error.OutlineLimit;
                 map[id] = @intCast(next_global);
                 next_global += 1;
+            }
+            // IDs carry no identity outside this private bank. Put frequently
+            // encoded operands below LEB thresholds; equal weights retain local
+            // order. Skip sorting when every operand already has equal width.
+            if (next_global > bank_start and uleb(bank_start) != uleb(next_global - 1)) {
+                const order = try self.allocator.alloc(u32, next_global - bank_start);
+                defer self.allocator.free(order);
+                var at: usize = 0;
+                var old_bytes: u64 = 0;
+                for (map, 0..) |global, id| {
+                    if (global == absent) continue;
+                    order[at] = @intCast(id);
+                    at += 1;
+                    old_bytes += (@as(u64, first[id].weight) + 1) * uleb(global);
+                }
+                std.mem.sort(u32, order, first, struct {
+                    fn less(references: []const Reference, left: u32, right: u32) bool {
+                        if (references[left].weight != references[right].weight) return references[left].weight > references[right].weight;
+                        return left < right;
+                    }
+                }.less);
+                var new_bytes: u64 = 0;
+                for (order, bank_start..) |id, global| {
+                    map[id] = @intCast(global);
+                    new_bytes += (@as(u64, first[id].weight) + 1) * uleb(global);
+                }
+                bank_operand_bytes_saved += old_bytes - new_bytes;
             }
             try banks.append(self.allocator, .{ .root = root.function, .globals = map });
             map_owned = false;
@@ -311,7 +341,7 @@ pub const Context = struct {
             destination.annotations = 0;
             item.body = .{};
         }
-        self.stats = .{ .regions = self.helpers.items.len, .globals = next_global - first_global, .copies_removed = copies_removed, .reads_forwarded = reads_forwarded };
+        self.stats = .{ .regions = self.helpers.items.len, .globals = next_global - first_global, .copies_removed = copies_removed, .reads_forwarded = reads_forwarded, .bank_operand_bytes_saved = bank_operand_bytes_saved };
         self.finalized = true;
         return self.stats;
     }
@@ -586,10 +616,15 @@ fn prepareBody(a: A, source: *const ir.Function, code: []const ir.Instruction, i
     }
     return result;
 }
-fn observe(body: coalesce.Body, first: []u32, shared: []bool, writes: []u32, reads: []u32) Error!void {
+fn observe(body: coalesce.Body, first: []Reference, shared: []bool, writes: []u32, reads: []u32) Error!void {
     for (body.instructions) |inst| if (local(inst.op)) {
         if (inst.operand >= first.len) return error.InvalidOutline;
-        if (first[inst.operand] == absent) first[inst.operand] = body.function else if (first[inst.operand] != body.function) shared[inst.operand] = true;
+        const reference = &first[inst.operand];
+        if (reference.function == absent) reference.function = body.function else if (reference.function != body.function) shared[inst.operand] = true;
+        // A banked tee becomes set/get. Root initialization adds one equal
+        // reference to every bank slot and therefore cannot change the order.
+        reference.weight += 1;
+        if (inst.op == .local_tee) reference.weight += 1;
         if (inst.op == .local_get) reads[inst.operand] = body.function else writes[inst.operand] +|= 1;
     };
 }

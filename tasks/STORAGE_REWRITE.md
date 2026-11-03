@@ -3,40 +3,39 @@
 The current priorities are shared-kernel runtime and Gdev Wasm size, with short
 iterations. Subsecond compilation remains the goal; the next latency gate is
 below five seconds.
-[The current runtime checkpoint](../scripts/bench/goose/results/2026-11-03-runtime-hills.md)
-produces **12.55 MB Main Wasm**, down from 12.93 MB (381,971B / 2.95%). One
-compile pilot takes 6.16s → 6.07s; this does not establish a latency gain. Five
-matched kernel pairs improve Fannkuch 3.9x, CRC32 9.5x and custom hash 5.8x. All
-official production cases now finish below the 30-second process cap.
-World/editor, hand and seven renderer streams retain their executed results.
+[The current fixed-span checkpoint](../scripts/bench/goose/results/2026-11-03-fixed-spans.md)
+produces **12,476,667B Main Wasm**, down another 73,943B (0.59%). Three fresh
+compile pairs have medians 5.987 → 6.140s, an observed 2.6% regression. Five
+matched kernel pairs improve Fannkuch 12.49x, CRC32 1.19x and custom hash 9.40x
+over the preceding release; all production cases finish below the 30-second cap.
+World/editor, hand and seven renderer streams retain their executed results;
+their small control binaries grow. Five-second, subsecond and 1–2MB goals remain
+unmet.
 
-Owner-free loops skip rewind, completed owner-free scopes discard unused marks,
-and indexed assignments reuse their pinned pre-RHS address. Allocating scopes,
-conditional owner returns, variant checks and bounds ordering retain complete
-checks. Repeated descriptor/epoch validation is the next runtime hill.
+Private helpers validate stable fixed scalar-array descriptors lazily once per
+invocation, retaining every bounds check. Fresh creates refresh snapshots; local
+grow/freeze and merged descriptors retain fallback. Existing owner, borrow,
+escape, variant and effect proofs remain. Invariant array descriptors and
+unchanged named nested fields share loop carries. Frequency-ordered private bank
+IDs save 85,891 operand bytes in Main; local/global traffic still occupies
+8,254,281B.
 
-Multi-use numeric copies coalesce across the unique-callsite outline tree only
-when every read observes the exact unchanged source version within one control
-segment. No computation/effects move. Accepted aliases stop at retained
-snapshots; cached entry reads translate and bank sharing/writes are recomputed
-from staged IR. All 411 rewritten helper inputs pass independent reconstruction.
-Main removes 110,067 pre-bank copies and reduces the bank from 64,876 to 55,754
-globals. Complete semantic/type/owner/read/write/escape/variant checks remain.
-Larger aggregate boundaries and live outlined interfaces are the next hills.
+All 2,937 native laws compile. The affected 201-law/192-guest family passes in
+60.04s; nine focused laws pass full allocation faults, final LLVM passes all 192
+guests, and Zig lint is clean. The prior List/chunk smoke now passes by applying
+the existing guarded private append proof to explicit consuming conversions.
+Full qualification passes 49 smoke and 57 harness checks, but broad native
+execution was stopped after 355.79s with 445 completed laws and 298 full sweeps,
+no failures/leaks/logged errors. This remains **incomplete**.
 
-The tracked private IR capture/replay tools now support real-game backend
-experiments without full source compilation. The replay executable builds in
-~0.5s and finalization takes ~3s; its extra input audit is separate. Exact
-source, compiler, IR and Wasm fingerprints are pinned. No noLLVM whole-game
-probe was run.
-
-All 2,931 native laws compile. The affected 195-law and 190-guest family passes
-in 44.79s; ten focused laws pass exhaustive allocation faults without leaks.
-Final LLVM also passes all 190 affected guests. Zig lint is clean. Full
-qualification retains the baseline List/chunk smoke failure; installed Pen
-rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB targets remain
-unmet. Preceding full-fault batches and baseline assertion records remain pinned
-in the earlier copy-coalescing evidence.
+Rebuilt unchanged Pen accepts ABI 8. Current Main passes all headless NVIDIA
+one-frame checks; the inspected PNG and guest trace are byte-identical to the
+baseline. See
+[current frame evidence](storage-handoff-evidence/2026-11-03-fixed-spans-frame.json).
+Broader gameplay and software-adapter coverage remain pending. Next classify
+completed-plan rollbacks, especially fresh fixed-array returns, before changing
+larger aggregate boundaries. The existing 512-word selector already admits wide
+calls through a buffered ABI; no machine-limit widening is justified.
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves

@@ -1,0 +1,90 @@
+{
+  "pen_sha256": "c5012f1cc13dad5e643348932ace58e5ee271430edf10ad2a1cbd5f2246b7d8d",
+  "command": [
+    "/home/jacobt/src/pen/target/release/pen",
+    "--game",
+    "/home/jacobt/src/blot2/build/bench/fixed-spans/pen-candidate-repeat/game",
+    "--assets",
+    "/home/jacobt/src/gdev/src/assets",
+    "--headless",
+    "--mute",
+    "--frames",
+    "1",
+    "--fps",
+    "60",
+    "--size",
+    "640x480",
+    "--data",
+    "/home/jacobt/src/blot2/build/bench/fixed-spans/pen-candidate-repeat/data",
+    "--trace",
+    "/home/jacobt/src/blot2/build/bench/fixed-spans/pen-candidate-repeat/frames.trace",
+    "--screenshot",
+    "/home/jacobt/src/blot2/build/bench/fixed-spans/pen-candidate-repeat/frame.png"
+  ],
+  "entry": "src/main.blot:main",
+  "project": "/home/jacobt/src/gdev",
+  "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+  "compiler_sha256": "89cd47f3b9a3d4bbfa37857edb6b974d0e8bbf11432c3a4531f44d3b51c96bcb",
+  "storage": {
+    "temporaryBytes": 2097152,
+    "persistentBytes": 262144,
+    "transportBytes": 2097152,
+    "ownerCapacity": 4096
+  },
+  "compile_invoked": false,
+  "graphics_environment": {
+    "XDG_RUNTIME_DIR": "/run/user/1000"
+  },
+  "compiled_main_source": "/home/jacobt/src/blot2/build/bench/fixed-spans/main-integration/main-a427fb4ec764a6e9/main.wasm",
+  "wasm_sha256": "0b03bffa5de05f2c698a895f86f21b4cd8f30fa6c7a51795b4c7207b15eeba64",
+  "scene_sha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+  "assets": "/home/jacobt/src/gdev/src/assets",
+  "returncode": 0,
+  "checks": {
+    "exit_zero": true,
+    "one_completed_guest_trace": true,
+    "one_headless_step": true,
+    "first_guest_frame": true,
+    "complete_render": true,
+    "screenshot_640x480": true
+  },
+  "compiled_wasm_unchanged": true,
+  "success": true,
+  "png_sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+  "baseline_png_identical": true,
+  "baseline_trace_identical": true,
+  "inspected": "Original detail: centered title lettering and dark tile strip on black; byte-identical to baseline.",
+  "png": "tasks/storage-handoff-evidence/2026-11-03-fixed-spans-frame.png",
+  "source": {
+    "base_commit": "be80ad75b9eaf28eb7894f13b136ff4ad7b63deb",
+    "patch": {
+      "path": "/home/jacobt/src/blot2/build/bench/fixed-spans/compiler.patch",
+      "sha256": "758c28a1d0a02f6334efb653ba6918baa5ff7a031bcc4523f136c1e6f9aabba5"
+    },
+    "files": {
+      "scripts/dev_check_areas.ts": "d893b81b8252d0510e7fb2451acca8d085ca129ebb1ecdb7b0c39676edcc34e1",
+      "scripts/run_native_tests.test.ts": "9e18116c6e1a851b5d7ac98a3e675a74f7e140d2f0b1ab34c89829b256fe27aa",
+      "scripts/storage_handoff/run_pen.py": "21654d65be50484b2ece98ab9873fdff0d4bb58e1fc5b599abccc069c894d98f",
+      "zig-native/src/backend/private_append_region.zig": "93a751146f325d993d8dce619e842649fea4139401496fec851f93606ea06895",
+      "zig-native/src/backend/private_append_region_tests.zig": "c9e92190465e32700d29f4d9d58c6d79b2daa417b16bc13fda0171d20f04acd6",
+      "zig-native/src/backend/scoped_backend.zig": "bd53b2eb4e8c6a5e4a6636fc9075f0fec59dda30b9b91b6cd84b12a76bb32b1b",
+      "zig-native/src/backend/storage_calls_tests.zig": "445af2661f7b7f325ad716acf38117887f1721b2ca1ff2590346d818de5539b7",
+      "zig-native/src/backend/storage_transport.zig": "6c9a52d16a6a272b62ccd87fc8ce367bea3ade82d5dd971b3bfca1734dd843d8",
+      "zig-native/src/backend/wasm_scope_outline.zig": "0069f5e2cf8f0f7a81c1e471285e68576d663e93933422f203f02dd5de7c73e6",
+      "zig-native/src/backend/wasm_scope_outline_tests.zig": "578e811bfaabfff3641212dd5f4118c5e11c38fcaa9fa13c3a92171fb1fdc495",
+      "zig-native/src/work_counters.zig": "c7fde73cb47428a4f6fd9929592ee7f4780ee68458cc429396f060a90a8bfeb5",
+      "zig-native/tests/checked_store_execution.test.ts": "a967992efa38907aae30d52936a2e0267b3db87beac9d7f78cda8e3f53b4ecea",
+      "zig-native/fixtures/fixed_scalar_spans.blot": "761b7fbe7cd46a074a2e2571e2ed1eaa9d01ec456cbe11812a82cb275882862b",
+      "zig-native/tests/fixed_scalar_spans_execution.test.ts": "b6492c941b5a62c55ba79b8f4c0a2517d91b06c11040d3b8da20677205715aa6"
+    },
+    "workload_manifest_sha256": "d30bbc13d2a034c6aecb6057566d188478ab4b36129cef455e7a4aa89521f0f4",
+    "sibling_heads": {
+      "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "gdev": "a99703d89b19210040d996f121884126eeb62f2d",
+      "pen": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf"
+    },
+    "workload_files": 1010
+  },
+  "wasm_bytes": 12476667,
+  "build_compiler_sha256": "89cd47f3b9a3d4bbfa37857edb6b974d0e8bbf11432c3a4531f44d3b51c96bcb"
+}

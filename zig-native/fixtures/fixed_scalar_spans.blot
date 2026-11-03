@@ -1,0 +1,76 @@
+const events: GrowArray U32 = #[]
+const read_if = func (rows: Array U32) -> (enabled: Bool) -> (index: U32): U32 => return
+  if enabled then rows[index] else 0
+const read_loop = func (rows: Array U32) -> (count: U32): U32 => return do:
+  let total = 0
+  for index in 0..count:
+    total := @u32.add self rows[0]
+  return total
+const fresh_fixed = func (limit: U32): U32 => return do:
+  let total = 0
+  for turn in 0..limit:
+    let count = @u32.rem turn 4
+    let rows: Array U32 = @array.fill count turn
+    if @u32.lt 0 count:
+      total := @u32.add self rows[@u32.sub count 1]
+  return total
+const fresh_frozen = func (limit: U32): U32 => return do:
+  let total = 0
+  for turn in 0..limit:
+    let count = @u32.rem turn 4
+    let growing: GrowArray U32 = #[]
+    for index in 0..count:
+      @storage.push growing turn
+    let rows = @storage.freeze growing
+    if @u32.lt 0 count:
+      total := @u32.add self rows[@u32.sub count 1]
+  return total
+const nested = func (rows: Array U32) -> (limit: U32): U32 => return do:
+  let state = {nested: {rows: rows}, total: 0}
+  for step in 0..limit:
+    if @u32.eq step 1:
+      continue
+    state.nested.rows[0] := @u32.add self 1
+    state.total := @u32.add self state.nested.rows[0]
+    if @u32.eq step 3:
+      break
+  return state.total
+const write = func (rows: Array U32) -> (trace: GrowArray U32) -> (index: U32): U32 => return do:
+  rows[index] := do:
+    @storage.push trace 99
+    break 42
+  return rows[0]
+const replaced = func (rows: Array U32) -> (limit: U32): U32 => return do:
+  let state = {nested: {rows: rows, stamp: 0}, total: 0}
+  for step in 0..limit:
+    state.nested := {rows: state.nested.rows, stamp: step}
+    if @u32.eq step 1:
+      continue
+    state.total := @u32.add self state.nested.stamp
+    if @u32.eq step 3:
+      break
+  return @u32.add state.total state.nested.rows[0]
+entry const varying = func (limit: U32): U32 => return do:
+  let total = 0
+  for turn in 0..limit:
+    let count = @u32.rem turn 4
+    let rows: Array U32 = @array.fill count turn
+    let ignored = read_if rows false 4_294_967_295
+    let zero = read_loop rows 0
+    let value = read_if rows (@u32.lt 0 count) (@u32.sub count 1)
+    total := @u32.add self (@u32.add value (@u32.add ignored zero))
+  return total
+entry const fresh = func (limit: U32): Array U32 => return #[fresh_fixed limit, fresh_frozen limit]
+entry const carried = func (limit: U32): Array U32 => return do:
+  let rows: Array U32 = #[10]
+  let answer = nested rows limit
+  return #[answer, rows[0]]
+entry const replacement = func (limit: U32): U32 => return do:
+  let rows: Array U32 = #[10]
+  return replaced rows limit
+entry const ordered = func (index: U32): U32 => return do:
+  let rows: Array U32 = #[7, 8]
+  return write rows events index
+entry const event_count = func (): U32 => return @storage.length events
+entry const filtered = func (cutoff: U32): Array U32 => return
+  @array.from_list [value | value <- @array.generate 513 (func index => return index), @u32.lt cutoff value]

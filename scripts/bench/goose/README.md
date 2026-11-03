@@ -6,12 +6,13 @@ on every sample. This currently covers **three of Goose's seven adapted tasks**
 from the 50-task catalog: Fannkuch, CRC32 and the custom eight-lane hash named
 `Hash::SHA256` upstream. That last kernel is not cryptographic SHA-256.
 
-[Runtime improvements, 2026-11-03](results/2026-11-03-runtime-hills.md): matched
-before/after pairs, ordinary compilation and unchanged production completion.
-The [original baseline](results/2026-11-03.md) retains its production timeouts.
-With Matplotlib installed, `python3 scripts/bench/goose/charts.py` regenerates
-the root README's SVG charts from that pinned evidence without running
-benchmarks.
+[Fixed spans, 2026-11-03](results/2026-11-03-fixed-spans.md): current matched
+pairs, compilation, production completion and real-game checks. The
+[preceding runtime checkpoint](results/2026-11-03-runtime-hills.md) is
+preserved. The [original baseline](results/2026-11-03.md) retains its production
+timeouts. With Matplotlib installed, `python3 scripts/bench/goose/charts.py`
+regenerates the root README's SVG charts from that pinned evidence without
+running benchmarks.
 
 ```sh
 python3 scripts/bench/goose/compare.py \

@@ -6,6 +6,7 @@ const executable = Deno.args[0] ??
 const source = `
 entry const integers = func (seed: U32) => return @array.from_list [@u32.add value seed | value <- #[1, 2, 3]]
 entry const floating = func (seed: F32) => return @array.from_list [@f32.add seed 0.5 | value <- #[1, 2, 3]]
+entry const filtered = func (cutoff: U32) => return @array.from_list [value | value <- @array.generate 513 (func index => return index), @u32.lt cutoff value]
 entry const zero_width = func (count: U32) => return @list.length [() | value <- @array.fill count 9]
 entry const reference = func (seed: U32) => return do:
   let rows = #[@array.fill 256 seed, @array.fill 256 (@u32.add seed 1)]
@@ -47,6 +48,14 @@ for (const codegenTier of ["optimized", "development"] as const) {
           guest.call("floating", 1.25),
           new Float32Array([1.75, 1.75, 1.75]),
         );
+        for (const cutoff of [0, 127, 256, 512, 513]) {
+          assert.deepEqual(
+            guest.call("filtered", cutoff),
+            Uint32Array.from({ length: Math.max(0, 512 - cutoff) }, (_, index) =>
+              cutoff + index + 1
+            ),
+          );
+        }
         for (const count of [0, 1, 3, 64, 241, 242, 513]) {
           assert.equal(guest.call("zero_width", count), count);
         }

@@ -27,6 +27,42 @@ fn plans(module: *const core.Module) usize {
     }
     return found;
 }
+fn conversionPlans(module: *const core.Module) usize {
+    var found: usize = 0;
+    for (module.nodes, 0..) |_, id| {
+        if (region.analyzeConversion(module, @intCast(id)) != null) found += 1;
+    }
+    return found;
+}
+
+test "private append explicit conversions consume the same guarded private List region" {
+    const sources = [_][]const u8{
+        "entry const run = func (values: Array U32) => return @array.from_list [x | x <- values, @u32.lt 1 x]\n",
+        "entry const run = func (values: Array U32) => return @array.from_list [@u32.add x y | x <- values, y <- #[x, 1], @u32.lt 0 y]\n",
+        "entry const run = func (count: U32) => return @array.from_list (do:\n  let rows: List U32 = []\n  for x in 0..count:\n    rows := @list.append rows x\n  break rows\n)\n",
+    };
+    for (sources) |source| {
+        var module = try lower(source);
+        defer module.deinit(a);
+        try std.testing.expectEqual(@as(usize, 0), plans(&module));
+        try std.testing.expectEqual(@as(usize, 1), conversionPlans(&module));
+    }
+}
+
+test "private append explicit conversions reject observable and returned alternate accumulators" {
+    const sources = [_][]const u8{
+        "entry const run = func (count: U32) => return @array.from_list (do:\n  let rows: List U32 = []\n  for x in 0..count:\n    rows := @list.append rows (@list.length rows)\n  break rows\n)\n",
+        "entry const run = func (count: U32) => return @array.from_list (do:\n  let rows: List U32 = []\n  for x in 0..count:\n    let observed = func () => return @list.length rows\n    rows := @list.append rows (observed ())\n  break rows\n)\n",
+        "entry const run = func (count: U32) => return @array.from_list (do:\n  let rows: List U32 = []\n  for x in 0..count:\n    rows := @list.append rows x\n  break [42]\n)\n",
+        "entry const run = func (values: Array U32) => return [x | x <- values, @u32.lt 1 x]\n",
+    };
+    for (sources) |source| {
+        var module = try lower(source);
+        defer module.deinit(a);
+        try std.testing.expectEqual(@as(usize, 0), plans(&module));
+        try std.testing.expectEqual(@as(usize, 0), conversionPlans(&module));
+    }
+}
 
 test "private append regions preserve guarded nested and dependent generator order" {
     const sources = [_][]const u8{

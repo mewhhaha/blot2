@@ -151,6 +151,77 @@ test "scoped machine helper banks initialize parameters from each root invocatio
     try std.testing.expectEqual(ir.Op.global_get, module.functions.items[1].instructions.items[0].op);
 }
 
+fn executeBank(module: *const wasm.Module, function: u32, parameters: []const u32, globals: []u32, calls: *std.ArrayList(u32)) A.Error!u32 {
+    try calls.append(a, function);
+    const body = module.functions.items[function];
+    const locals = try a.alloc(u32, body.parameters.len + body.locals.items.len);
+    defer a.free(locals);
+    @memset(locals, 0);
+    @memcpy(locals[0..parameters.len], parameters);
+    var stack: std.ArrayList(u32) = .empty;
+    defer stack.deinit(a);
+    for (body.instructions.items) |inst| switch (inst.op) {
+        .i32_const => try stack.append(a, inst.operand),
+        .local_get => try stack.append(a, locals[inst.operand]),
+        .global_get => try stack.append(a, globals[inst.operand]),
+        .global_set => globals[inst.operand] = stack.pop().?,
+        .drop => _ = stack.pop(),
+        .i32_add => {
+            const right = stack.pop().?;
+            const left = stack.pop().?;
+            try stack.append(a, left +% right);
+        },
+        .call => {
+            const result = try executeBank(module, inst.operand, &.{}, globals, calls);
+            if (module.functions.items[inst.operand].result != .none) try stack.append(a, result);
+        },
+        else => unreachable,
+    };
+    if (body.result == .none) return 0;
+    return stack.pop().?;
+}
+
+test "scoped bank frequency ordering crosses LEB thresholds deterministically and preserves repeated invocations" {
+    for ([_]usize{ 126, 16_382 }) |existing_globals| {
+        var module = try moduleWithRoot(a, &.{.i32}, .i32, &.{ .i32, .i32, .i32 });
+        defer module.deinit();
+        for (0..existing_globals) |_| _ = try module.addGlobal(.u32, 0, true);
+        var context = outline.Context.init(a, &module, .scoped_numeric_adapter_nonreentrant, .{ .minimum_instructions = 1 });
+        defer context.deinit();
+        try context.registerRoot(0);
+        for (1..4) |id| try emit(&module, 0, &.{ .{ .op = .i32_const, .operand = @intCast(id * 7) }, .{ .op = .local_set, .operand = @intCast(id) } });
+        const ticket = context.begin(0, .{ .expressions = 0, .layouts = 0 }).?;
+        try emit(&module, 0, &.{
+            .{ .op = .local_get, .operand = 1 },  .{ .op = .drop },
+            .{ .op = .local_get, .operand = 2 },  .{ .op = .drop },
+            .{ .op = .local_get, .operand = 1 },  .{ .op = .drop },
+            .{ .op = .local_get, .operand = 2 },  .{ .op = .drop },
+            .{ .op = .i32_const, .operand = 13 }, .{ .op = .local_tee, .operand = 3 },
+            .{ .op = .drop },                     .{ .op = .local_get },
+            .{ .op = .local_get, .operand = 3 },  .{ .op = .i32_add },
+            .{ .op = .local_set, .operand = 3 },
+        });
+        try std.testing.expect((try context.tryExtract(ticket, .{ .expressions = 1, .layouts = 0 })) != null);
+        try emit(&module, 0, &.{.{ .op = .local_get, .operand = 3 }});
+        const stats = try context.finalize();
+        try std.testing.expectEqual(@as(u64, 4), stats.globals);
+        try std.testing.expectEqual(@as(u64, 5), stats.bank_operand_bytes_saved);
+        const root = module.functions.items[0].instructions.items;
+        // Local 3 is hottest; equal-weight locals 1 and 2 retain their order.
+        const mapping = [_]u32{ @intCast(existing_globals + 3), @intCast(existing_globals + 1), @intCast(existing_globals + 2), @intCast(existing_globals) };
+        for (mapping, 0..) |global, id| try std.testing.expectEqual(global, root[id * 2 + 1].operand);
+        const globals = try a.alloc(u32, module.globals.items.len);
+        defer a.free(globals);
+        @memset(globals, 99);
+        var calls: std.ArrayList(u32) = .empty;
+        defer calls.deinit(a);
+        try std.testing.expectEqual(@as(u32, 18), try executeBank(&module, 0, &.{5}, globals, &calls));
+        try std.testing.expectEqual(@as(u32, 22), try executeBank(&module, 0, &.{9}, globals, &calls));
+        try std.testing.expectEqualSlices(u32, &.{ 0, 1, 0, 1 }, calls.items);
+        try std.testing.expectEqual(@as(u32, 99), globals[0]);
+    }
+}
+
 test "scoped final encoding counts parameters with declared locals at the existing engine bound" {
     for ([_]usize{ 49_999, 50_000 }) |count| {
         var module = try moduleWithRoot(a, &.{.i32}, .i32, &.{});
