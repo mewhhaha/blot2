@@ -3,6 +3,8 @@
 
 import argparse
 import json
+import math
+import struct
 import zlib
 from functools import cache
 
@@ -74,13 +76,97 @@ def custom_hash(size):
     return int.from_bytes(digest[:4], "little")
 
 
+@cache
+def sieve(limit):
+    flags = bytearray(b"\1") * (limit + 1)
+    flags[:2] = b"\0\0"
+    for prime in range(2, math.isqrt(limit) + 1):
+        if flags[prime]:
+            start = prime * prime
+            flags[start::prime] = b"\0" * ((limit - start) // prime + 1)
+    last = next(n for n in range(limit, 1, -1) if flags[n])
+    return last + sum(flags)
+
+
+@cache
+def sorted_data(size):
+    state = 42
+    values = []
+    for _ in range(size):
+        state = (state * 3877 + 29573) % 139968
+        values.append(int(state / 139968 * 1000000))
+    return values, sorted(values), state
+
+
+def sort_checksum(size, iterations, warmups):
+    values, ordered, state = sorted_data(size)
+    total = 0
+    for count in [warmups, iterations]:
+        for _ in range(count):
+            state = (state * 3877 + 29573) % 139968
+            total += values[int(state / 139968 * size)]
+            state = (state * 3877 + 29573) % 139968
+            total += ordered[int(state / 139968 * size)]
+        state = 42
+    return total & MASK
+
+
+def f32(value):
+    return struct.unpack("<f", struct.pack("<f", value))[0]
+
+
+@cache
+def mandelbrot_image(width, height, binary32):
+    number = float
+    if binary32:
+        number = f32
+    image = bytearray(f"P4\n{width} {height}\n".encode())
+    for y in range(height):
+        ci = number(number(number(2.0 * number(y)) / number(height)) - 1.0)
+        accumulator = bits = 0
+        for x in range(width):
+            cr = number(number(number(2.0 * number(x)) / number(width)) - 1.5)
+            zr = zi = tr = ti = 0.0
+            for _ in range(50):
+                if number(tr + ti) > 4.0:
+                    break
+                zi = number(number(number(2.0 * zr) * zi) + ci)
+                zr = number(number(tr - ti) + cr)
+                tr = number(zr * zr)
+                ti = number(zi * zi)
+            accumulator <<= 1
+            if number(tr + ti) <= 4.0:
+                accumulator |= 1
+            bits += 1
+            if bits == 8:
+                image.append(accumulator)
+                accumulator = bits = 0
+            elif x == width - 1:
+                image.append(accumulator << (8 - width % 8))
+                accumulator = bits = 0
+    return bytes(image)
+
+
 def checksum(name, parameter, iterations, warmups):
+    if name in ("mandelbrot_f32", "mandelbrot_f64"):
+        width, height = parameter
+        image = mandelbrot_image(width, height, name == "mandelbrot_f32")
+        result = 5381
+        for byte in image * (iterations + warmups):
+            result = (result * 33 + byte) & MASK
+        return result
+    if isinstance(parameter, (list, tuple)):
+        (parameter,) = parameter
+    if name in ("sort_merge", "sort_quick"):
+        return sort_checksum(parameter, iterations, warmups)
     if name == "fannkuch":
         value = fannkuch(parameter)
     elif name == "crc32":
         value = zlib.crc32(prepared_bytes(parameter))
     elif name == "custom_hash":
         value = custom_hash(parameter)
+    elif name == "sieve":
+        value = sieve(parameter)
     else:
         raise ValueError(name)
     return value * (iterations + warmups) & MASK
@@ -91,16 +177,30 @@ PROFILES = {
         ("fannkuch", 5, 3, 1, 4428),
         ("crc32", 1000, 3, 1, 3031698216),
         ("custom_hash", 1000, 3, 1, 1036619072),
+        ("sieve", 1000, 3, 1, 4660),
+        ("sort_merge", 100000, 2, 1, 2548773),
+        ("sort_quick", 100000, 2, 1, 2548773),
+        ("mandelbrot_f64", (30, 30), 3, 1, 2236342953),
+        ("mandelbrot_f32", (30, 30), 3, 1, None),
     ],
     "run": [
         ("fannkuch", 8, 700, 140, 135762480),
         ("crc32", 1000000, 150, 30, 2318723244),
         ("custom_hash", 1000000, 1200, 240, 2844672256),
+        ("sieve", 3000000, 270, 54, 1042248060),
+        ("sort_merge", 400000, 50, 10, 61757772),
+        ("sort_quick", 400000, 50, 10, 61757772),
+        ("mandelbrot_f64", (400, 400), 100, 20, 3455988829),
+        ("mandelbrot_f32", (400, 400), 100, 20, None),
     ],
     "bounded": [
         ("fannkuch", 8, 8, 2, None),
         ("crc32", 1000000, 4, 1, None),
         ("custom_hash", 1000000, 64, 13, None),
+        ("sieve", 3000000, 4, 1, None),
+        ("sort_merge", 400000, 4, 1, None),
+        ("sort_quick", 400000, 4, 1, None),
+        ("mandelbrot_f32", (400, 400), 4, 1, None),
     ],
 }
 
@@ -117,12 +217,15 @@ def main():
             actual = checksum(name, parameter, iterations, warmups)
             if expected is not None and actual != expected:
                 raise AssertionError((profile, name, expected, actual))
+            parameters = [parameter]
+            if isinstance(parameter, tuple):
+                parameters = list(parameter)
             print(
                 json.dumps(
                     {
                         "profile": profile,
                         "name": name,
-                        "parameters": [parameter],
+                        "parameters": parameters,
                         "iterations": iterations,
                         "warmups": warmups,
                         "checksum": actual,

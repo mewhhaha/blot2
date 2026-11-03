@@ -24,8 +24,14 @@ function u32(value: unknown, name: string): asserts value is number {
 function parseInput(text: string): Input {
   const input = JSON.parse(text);
   assert(input !== null && typeof input === "object", "invalid runtime input");
-  assert(Array.isArray(input.parameters) && input.parameters.length === 1);
-  u32(input.parameters[0], "parameter");
+  assert(
+    Array.isArray(input.parameters) && input.parameters.length >= 1 &&
+      input.parameters.length <= 2,
+  );
+  for (const value of input.parameters) {
+    u32(value, "parameter");
+    assert(value > 0);
+  }
   u32(input.iterations, "iterations");
   u32(input.warmups, "warmups");
   u32(input.expected, "expected");

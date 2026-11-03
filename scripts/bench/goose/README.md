@@ -1,18 +1,19 @@
 # Goose direct Wasm comparison
 
 Run translated LangArena kernels against the sibling Goose compiler's direct
-Wasm backend. Both artifacts execute in the same Node/V8, with checksum checks
-on every sample. This currently covers **three of Goose's seven adapted tasks**
-from the 50-task catalog: Fannkuch, CRC32 and the custom eight-lane hash named
-`Hash::SHA256` upstream. That last kernel is not cryptographic SHA-256.
+Wasm backend. Both artifacts execute in the same Node/V8, checking every
+checksum. All seven adapted cases are attempted: four original-numeric pairs, an
+explicit Mandelbrot F32 control, and two sorting ports blocked by owned-storage
+recursion. Original F64 Mandelbrot and the other 43 catalog tasks remain outside
+paired coverage. The custom eight-lane `Hash::SHA256` task is not cryptographic
+SHA-256.
 
-[Fixed spans, 2026-11-03](results/2026-11-03-fixed-spans.md): current matched
-pairs, compilation, production completion and real-game checks. The
-[preceding runtime checkpoint](results/2026-11-03-runtime-hills.md) is
-preserved. The [original baseline](results/2026-11-03.md) retains its production
-timeouts. With Matplotlib installed, `python3 scripts/bench/goose/charts.py`
-regenerates the root README's SVG charts from that pinned evidence without
-running benchmarks.
+[Expanded survey, 2026-11-03](results/2026-11-03-expanded.md) records current
+pairs, failed builds and diagnostic source controls. The
+[fixed-span checkpoint](results/2026-11-03-fixed-spans.md) and
+[original baseline](results/2026-11-03.md) retain preceding results. With
+Matplotlib installed, `python3 scripts/bench/goose/charts.py` regenerates the
+README's SVG charts from pinned evidence without running benchmarks.
 
 ```sh
 python3 scripts/bench/goose/compare.py \
@@ -30,16 +31,24 @@ revision edit; one process warmup and five measured runtime samples; official
 `test` and explicitly bounded runtime profiles. All children have a hard
 30-second cap. A failing runtime cell is stopped after its first failure, while
 other cells finish. Failed/timed-out cells never receive a performance score.
+The default survey currently exits nonzero with partial results because both
+Blot sorting builds are unsupported. Use `--cases sieve mandelbrot_f32` (or
+other supported cases) for a fully runnable subset. Build diagnostics are
+retained as structured data, not missing or zero timings.
 
 Use `--profiles run` to request unchanged official production iteration counts.
 The first production pilot hit the cap on all three Blot programs. That evidence
 is retained separately; bounded results do not replace it.
 
-| Bounded case | Production problem size | Measured iterations | Kernel warmups |
-| ------------ | ----------------------: | ------------------: | -------------: |
-| Fannkuch     |                   n = 8 |                   8 |              2 |
-| CRC32        |         1,000,000 bytes |                   4 |              1 |
-| Custom hash  |         1,000,000 bytes |                  64 |             13 |
+| Bounded case   | Production problem size | Measured iterations | Kernel warmups |
+| -------------- | ----------------------: | ------------------: | -------------: |
+| Fannkuch       |                   n = 8 |                   8 |              2 |
+| CRC32          |         1,000,000 bytes |                   4 |              1 |
+| Custom hash    |         1,000,000 bytes |                  64 |             13 |
+| Sieve          |         limit 3,000,000 |                   4 |              1 |
+| Merge sort     |        400,000 elements |                   4 |              1 |
+| Quicksort      |        400,000 elements |                   4 |              1 |
+| Mandelbrot F32 |               400 × 400 |                   4 |              1 |
 
 Only the repetition counts change. The kernels, production input sizes, fixed
 buffer capacities and cumulative checksum state across warmup remain intact.
@@ -76,10 +85,16 @@ times have separate fields. V8 is the only engine measured here.
 Blot uses nonnegative U32 indices and wrapping checksum arithmetic instead of
 Goose's wider scalar plumbing. Hash inputs retain identical byte values, but use
 U32 elements instead of Goose's U8 elements. Owner metadata, checks and language
-ABI also differ. No algorithm shortcut removes unused digest lanes: all eight
-lanes and the complete 32-byte digest remain in both sources. These differences
-must accompany runtime and output-size comparisons. The tiny source fixtures do
-not establish Gdev performance or large-source compiler throughput.
+ABI also differ. Sieve flags and retained Mandelbrot bytes also use U32 versus
+U8. Both Mandelbrot sources explicitly use F32, with per-operation rounding
+checked by the independent oracle; the original F64 result differs. Sorting
+ports accept only the official 100,000/400,000 sizes, where their exact integer
+RNG conversion matches every Goose F64 RNG state. They preserve the recursive
+algorithms and remain runtime-unqualified until the backend supports them. No
+algorithm shortcut removes unused digest lanes: all eight lanes and the complete
+32-byte digest remain in both sources. These differences must accompany runtime
+and output-size comparisons. The tiny source fixtures do not establish Gdev
+performance or large-source compiler throughput.
 
 Builds finish before runtime measurements. Runtime samples pair both backends
 with seeded shuffled order. Reports include individual observations, median,
@@ -104,6 +119,13 @@ Outputs:
   artifacts and per-child command/stdout/stderr evidence.
 
 The ports preserve the upstream MIT attribution in
-[ports/LICENSE](ports/LICENSE). Sorting, Sieve and Mandelbrot remain unported;
-their absence is not a compiler failure or a claim that their algorithms are
-unsupported.
+[ports/LICENSE](ports/LICENSE). The new recursive sorting ports expose an actual
+owned-backend restriction; their failures and lack of runtime scores remain
+visible. The original F64 workload is not replaced by the separately labelled
+F32 control.
+
+Independent checksum and precision regression tests:
+
+```sh
+python3 -m unittest discover -s scripts/bench/goose -p test_reference.py
+```

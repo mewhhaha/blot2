@@ -1,0 +1,48 @@
+// From LangArena goose/src/sieve.goose and its bounded Goose arena port.
+// Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
+// Flags use U32 storage, four times Goose's U8 payload. Same 0/1 values.
+const arena_revision = 0
+entry const revision = func (): U32 => return arena_revision
+
+const run = func (primes: Array U32) -> (limit: U32): U32 => return do:
+  for index in 0 .. @u32.add limit 1:
+    primes[index] := 1
+  primes[0] := 0
+  primes[1] := 0
+  let sqrt_limit = @f32.to_u32 (@f32.sqrt (@u32.to_f32 limit))
+  for p in 2 .. @u32.add sqrt_limit 1:
+    if @u32.eq primes[p] 1:
+      let multiple = @u32.mul p p
+      for ever:
+        if @u32.lt limit multiple:
+          break
+        primes[multiple] := 0
+        multiple := @u32.add self p
+  let last_prime = 2
+  let count = 1
+  let n = 3
+  for ever:
+    if @u32.lt limit n:
+      break
+    if @u32.eq primes[n] 1:
+      last_prime := n
+      count := @u32.add self 1
+    n := @u32.add self 2
+  return @u32.add last_prime count
+
+entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use inputs <- host #[0]
+  let limit = inputs[0]
+  let iterations = inputs[1]
+  let warmups = inputs[2]
+  if @u32.lt limit 2 or @u32.lt 3000000 limit:
+    @panic "sieve limit outside supported range"
+  let primes: Array U32 = @array.fill 3000001 0
+  let checksum = 0
+  for index in 0 .. warmups:
+    checksum := @u32.add self (run primes limit)
+  use started <- host #[1]
+  for index in 0 .. iterations:
+    checksum := @u32.add self (run primes limit)
+  use finished <- host #[2]
+  break checksum

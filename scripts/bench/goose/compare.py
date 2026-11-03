@@ -32,7 +32,12 @@ CASES = {
     "fannkuch": ("CLBG::Fannkuchredux", "fannkuch.goose", "fannkuch.blot"),
     "crc32": ("Hash::CRC32", "hash_crc32.goose", "crc32.blot"),
     "custom_hash": ("Hash::SHA256", "hash_sha256.goose", "custom_hash.blot"),
+    "sieve": ("Etc::Sieve", "sieve.goose", "sieve.blot"),
+    "sort_merge": ("Sort::Merge", "sort_merge.goose", "sort_merge.blot"),
+    "sort_quick": ("Sort::Quick", "sort_quick.goose", "sort_quick.blot"),
+    "mandelbrot_f32": ("CLBG::Mandelbrot", "mandelbrot.goose", "mandelbrot.blot"),
 }
+CONTROLS = {"mandelbrot_f32": HERE / "ports/mandelbrot_f32.goose"}
 
 
 def sha(path):
@@ -126,10 +131,15 @@ def write_results(output, report):
     for short in report["cases"]:
         blot = find(report["build_summary"], case=short, backend="blot", phase="cold")
         goose = find(report["build_summary"], case=short, backend="goose", phase="cold")
-        if blot["wall_ms"] and goose["wall_ms"]:
-            lines.append(
-                f"| {short} | {blot['wall_ms']['median']:.2f} / {goose['wall_ms']['median']:.2f} | {blot['wasm_bytes']} / {goose['wasm_bytes']} |"
-            )
+        cells = []
+        for row in [blot, goose]:
+            value = "unavailable"
+            if row["wall_ms"]:
+                value = f"{row['wall_ms']['median']:.2f}"
+            cells.append(value)
+        lines.append(
+            f"| {short} | {' / '.join(cells)} | {blot['wasm_bytes']} / {goose['wasm_bytes']} |"
+        )
     lines += [
         "",
         "| Profile / case | Kernel Blot / Goose (ms) | Paired Blot / Goose |",
@@ -156,7 +166,7 @@ def write_results(output, report):
         )
     lines += [
         "",
-        "Bounded uses production problem sizes with explicitly reduced repetition counts. It is not an official LangArena production score. Blot hash inputs have 4x Goose's element payload bytes (U32 vs U8); owner and arena overhead are separate. Results compare the complete translated programs and their ABI costs. Three of seven adapted tasks are ported; the 50-task catalog is not covered. Process wall includes the common TypeScript runner for both backends. V8 only; no Wasmtime result.",
+        "Bounded uses production problem sizes with explicitly reduced repetition counts. It is not an official LangArena production score. Blot byte buffers have 4x Goose's element payload bytes (U32 vs U8); owner and arena overhead are separate. Mandelbrot is an explicit F32 control for both languages; the original F64 workload is unavailable in Blot. Unsupported builds remain visible and receive no timing. Coverage and qualification are recorded per case; the 50-task catalog is not covered. Process wall includes the common TypeScript runner for both backends. V8 only; no Wasmtime result.",
         "",
         "Failures:",
     ]
@@ -287,30 +297,51 @@ def main():
         catalog_case = dict(catalog[task])
         bounded = next(r for r in PROFILES["bounded"] if r[0] == short)
         _, parameter, iterations, warmups, _ = bounded
+        parameters = [parameter]
+        if isinstance(parameter, tuple):
+            parameters = list(parameter)
         catalog_case["bounded"] = {
-            catalog_case["port"]["fields"][0]: parameter,
+            **dict(zip(catalog_case["port"]["fields"], parameters, strict=True)),
             "iterations": iterations,
             "warmup_iterations": warmups,
             "checksum": checksum(short, parameter, iterations, warmups),
         }
         for profile in ["test", "run", "bounded"]:
             config = catalog_case[profile]
-            assert (
-                checksum(
-                    short,
-                    config[catalog_case["port"]["fields"][0]],
+            values = [config[f] for f in catalog_case["port"]["fields"]]
+            actual = checksum(
+                short, values, config["iterations"], arena.warmup_count(config)
+            )
+            if short in CONTROLS and profile != "bounded":
+                original = checksum(
+                    "mandelbrot_f64",
+                    values,
                     config["iterations"],
                     arena.warmup_count(config),
                 )
-                == config["checksum"]
-            ), "independent oracle mismatch"
+                assert original == config["checksum"], "original F64 oracle mismatch"
+                catalog_case[profile] = {
+                    **config,
+                    "original_f64_checksum": original,
+                    "checksum": actual,
+                }
+            else:
+                assert actual == config["checksum"], "independent oracle mismatch"
         row = {"task": task, "catalog": catalog_case, "sources": {}}
+        row["variant"] = "original numeric workload"
+        if short in CONTROLS:
+            row["variant"] = (
+                "explicit F32 control; original Mandelbrot F64 unavailable in Blot"
+            )
         for backend in ["goose", "blot"]:
             folder = output / "sources" / short / backend
             folder.mkdir(parents=True)
             if backend == "goose":
                 file = folder / goose_name
-                shutil.copy2(goose_root / "bench/langarena/ports" / goose_name, file)
+                reference_source = goose_root / "bench/langarena/ports" / goose_name
+                if short in CONTROLS:
+                    reference_source = CONTROLS[short]
+                shutil.copy2(reference_source, file)
                 shutil.copy2(
                     goose_root / "bench/langarena/ports/common.goose",
                     folder / "common.goose",
@@ -334,6 +365,8 @@ def main():
         goose_root / "bench/langarena/ports/common.goose",
     ]
     tracked += list((HERE / "ports").glob("*.blot"))
+    tracked += list((HERE / "ports").glob("*.goose"))
+    tracked += [goose_root / "bench/langarena/ports" / CASES[s][1] for s in cases]
     tracked += list((ROOT / "compiler").glob("*.ts"))
     tracked += list((ROOT / "std").rglob("*.blot"))
     report = {
@@ -380,6 +413,11 @@ def main():
             "reference_catalog_tasks": 50,
             "reference_adapted_tasks": 7,
             "selected_ports": len(cases),
+            "numeric_controls": [s for s in cases if s in CONTROLS],
+            "original_numeric_attempts": [s for s in cases if s not in CONTROLS],
+            "original_numeric_unavailable": [
+                "CLBG::Mandelbrot: F64 is unavailable in Blot"
+            ],
             "unported": [
                 c["name"]
                 for c in manifest["cases"]
@@ -392,7 +430,7 @@ def main():
         "method": {
             "cold_build": "Fresh driver and compiler per sample; cache disabled. OS and installed-library caches retained. Source staging outside timer. Complete wall and native build phases retained.",
             "runtime": "Same Node/V8 and flags for both. test/run use official inputs/iterations/warmups. bounded retains production problem sizes with reduced counts recorded per case. Same state retained after warmup. Preparation, startup, engine compilation and output outside clock; no per-element host calls. Two Blot clock packet crossings versus two Goose scalar imports are part of their ABI costs. Common process wall includes parsing the Blot TypeScript guest host for both backends; it is not Goose's standalone runner startup score.",
-            "representation": "Goose hash data is U8; Blot stores identical 0..255 values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed 1m-element capacity retained. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is the original eight-lane custom hash, not cryptographic SHA-256.",
+            "representation": "Goose byte buffers use U8; Blot stores identical values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed backing capacities retained. Sort U32 values are nonnegative and preserve I32 ordering; ports restrict sizes to100000/400000, where exact integer RNG conversion matches every Goose F64 RNG state. Mandelbrot uses explicit ordered F32 in BOTH sources; original F64 remains unavailable. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is not cryptographic SHA-256.",
             "ordering": "Build phase sequential, then runtime phase; seeded paired shuffling, no deliberate concurrent measurement work.",
         },
         "cases": cases,
@@ -541,6 +579,11 @@ def main():
                         )
                         artifacts[short, backend, phase] = artifact
                     else:
+                        if stats.is_file():
+                            row["driver_stats"] = json.loads(stats.read_text())
+                            row["diagnostics"] = row["driver_stats"].get(
+                                "diagnostics", []
+                            )
                         failed_builds.add((short, backend))
                         report["failures"].append(
                             {
@@ -549,6 +592,7 @@ def main():
                                 "backend": backend,
                                 "status": result["status"],
                                 "logs": str(directory),
+                                "diagnostics": row.get("diagnostics", []),
                             }
                         )
                     report["build_observations"].append(row)
@@ -609,6 +653,12 @@ def main():
                     checkpoint()
                 if passed:
                     qualified.add((short, backend))
+        report["coverage"]["qualified_pairs"] = [
+            s for s in cases if all((s, b) in qualified for b in ["blot", "goose"])
+        ]
+        report["coverage"]["qualified_original_pairs"] = [
+            s for s in report["coverage"]["qualified_pairs"] if s not in CONTROLS
+        ]
         disabled = set()
         for profile in args.profiles:
             for sample in range(-args.warmups, args.samples):
@@ -735,6 +785,8 @@ def main():
                 )
                 if failed:
                     reason = "failed cell; no ranking"
+                if not all((short, b) in qualified for b in ["blot", "goose"]):
+                    reason = "unavailable backend; no comparison"
                 if len(complete) >= 5 and not failed:
                     reason = "kernel below 10ms"
                     if all(

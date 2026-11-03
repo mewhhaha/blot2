@@ -1,0 +1,103 @@
+// From LangArena goose/src/sort.goose and its Goose arena port.
+// Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
+// Prepared values are nonnegative and below 1,000,000, so U32 comparisons
+// preserve the Goose I32 ordering. Keep the original recursive algorithm.
+const arena_revision = 0
+entry const revision = func (): U32 => return arena_revision
+
+// Exact floor(next * maximum / 139968) without overflowing U32. Goose uses
+// F64 for this conversion; base-8192 limbs keep each intermediate below 2^32.
+// All RNG states match the official 100000/400000 sizes and prepare maximum.
+// Other Goose-valid sizes can differ at exact-integer F64 rounding boundaries;
+// the entrypoint restricts inputs to those two proven arena profile sizes.
+const next_int = func (rng: Array U32) -> (maximum: U32): U32 => return do:
+  let next = @u32.rem (@u32.add (@u32.mul rng[0] 3877) 29573) 139968
+  rng[0] := next
+  let high = @u32.mul next (@u32.div maximum 8192)
+  let low = @u32.mul next (@u32.rem maximum 8192)
+  let remainder = @u32.add (@u32.mul (@u32.rem high 139968) 8192) low
+  return @u32.add (@u32.mul (@u32.div high 139968) 8192) (@u32.div remainder 139968)
+
+const prepare = func (prepared: Array U32) -> (rng: Array U32) -> (size: U32): Unit => return do:
+  for index in 0 .. size:
+    prepared[index] := next_int rng 1000000
+  return ()
+
+const merge = func (arr: Array U32) -> (temp: Array U32) -> (left: U32) -> (mid: U32) -> (right: U32): Unit => return do:
+  for index in left .. @u32.add right 1:
+    temp[index] := arr[index]
+  let i = left
+  let j = @u32.add mid 1
+  let k = left
+  for ever:
+    if @u32.lt mid i:
+      break
+    if @u32.lt right j:
+      break
+    if @u32.lt temp[j] temp[i]:
+      arr[k] := temp[j]
+      j := @u32.add self 1
+    else:
+      arr[k] := temp[i]
+      i := @u32.add self 1
+    k := @u32.add self 1
+  for ever:
+    if @u32.lt mid i:
+      break
+    arr[k] := temp[i]
+    i := @u32.add self 1
+    k := @u32.add self 1
+  return ()
+
+const merge_sort_helper = func (arr: Array U32) -> (temp: Array U32) -> (left: U32) -> (right: U32): Unit => return do:
+  if @u32.lt left right:
+    let mid = @u32.div (@u32.add left right) 2
+    merge_sort_helper arr temp left mid
+    merge_sort_helper arr temp (@u32.add mid 1) right
+    merge arr temp left mid right
+  return ()
+
+const merge_sort_inplace = func (arr: Array U32) -> (temp: Array U32) -> (size: U32): Unit => return do:
+  // Original temp.resize(arr.len, 0) initializes the active prefix each run.
+  for index in 0 .. size:
+    temp[index] := 0
+  merge_sort_helper arr temp 0 (@u32.sub size 1)
+  return ()
+
+const run = func (prepared: Array U32) -> (working: Array U32) -> (temp: Array U32) -> (rng: Array U32) -> (size: U32): U32 => return do:
+  let before = prepared[next_int rng size]
+  for index in 0 .. size:
+    working[index] := prepared[index]
+  merge_sort_inplace working temp size
+  return @u32.add before working[next_int rng size]
+
+entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use inputs <- host #[0]
+  let size = inputs[0]
+  let iterations = inputs[1]
+  let warmups = inputs[2]
+  // Restrict the translated profile domain: the exact integer RNG conversion
+  // agrees with Goose F64 for every state at these official arena sizes.
+  if @u32.eq size 100000:
+    ()
+  else:
+    if @u32.eq size 400000:
+      ()
+    else:
+      @panic "sort supports arena sizes 100000 or 400000"
+  if @u32.eq iterations 0:
+    @panic "sort iterations must be positive"
+  let prepared: Array U32 = @array.fill 400000 0
+  let working: Array U32 = @array.fill 400000 0
+  let temp: Array U32 = @array.fill 400000 0
+  let rng: Array U32 = #[42]
+  prepare prepared rng size
+  let checksum = 0
+  for index in 0 .. warmups:
+    checksum := @u32.add self (run prepared working temp rng size)
+  rng[0] := 42
+  use started <- host #[1]
+  for index in 0 .. iterations:
+    checksum := @u32.add self (run prepared working temp rng size)
+  use finished <- host #[2]
+  break checksum

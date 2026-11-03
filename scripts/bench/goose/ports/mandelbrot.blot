@@ -1,0 +1,95 @@
+// From LangArena goose/src/mandelbrot.goose and its Goose arena port.
+// Copyright (c) 2026 'Konstantin Makarchev'. MIT; see LICENSE.
+// F32 adaptation: the original Goose workload uses F64, so compare with its
+// explicit F32 control. Each retained PBM byte occupies one U32 (four bytes).
+const arena_revision = 0
+entry const revision = func (): U32 => return arena_revision
+
+const append_byte = func (image: Array U32) -> (size: U32) -> (value: U32): U32 => return do:
+  image[size] := value
+  return size + 1
+
+const append_dimension = func (image: Array U32) -> (size: U32) -> (value: U32): U32 => return do:
+  let digits: Array U32 = @array.fill 20 0
+  let length = 0
+  let remaining = value
+  for ever:
+    digits[length] := 48 + remaining % 10
+    length := self + 1
+    remaining := self / 10
+    if remaining == 0:
+      break
+  let result_size = size
+  for ever:
+    if length == 0:
+      break
+    length := self - 1
+    result_size := append_byte image self digits[length]
+  return result_size
+
+const run = func (image: Array U32) -> (size: U32) -> (w: U32) -> (h: U32): U32 => return do:
+  let result_size = append_byte image size 80
+  result_size := append_byte image self 52
+  result_size := append_byte image self 10
+  result_size := append_dimension image self w
+  result_size := append_byte image self 32
+  result_size := append_dimension image self h
+  result_size := append_byte image self 10
+  let bit_num = 0
+  let byte_acc = 0
+  for y in 0 .. h:
+    let ci = 2.0 * U32.to_f32 y / U32.to_f32 h - 1.0
+    for x in 0 .. w:
+      let zr = 0.0
+      let zi = 0.0
+      let tr = 0.0
+      let ti = 0.0
+      let cr = 2.0 * U32.to_f32 x / U32.to_f32 w - 1.5
+      let iteration = 0
+      for ever:
+        if iteration >= 50 or tr + ti > 2.0 * 2.0:
+          break
+        zi := 2.0 * zr * self + ci
+        zr := tr - ti + cr
+        tr := zr * zr
+        ti := zi * zi
+        iteration := self + 1
+      byte_acc := self << 1
+      if tr + ti <= 2.0 * 2.0:
+        byte_acc := self | 1
+      bit_num := self + 1
+      if bit_num == 8:
+        result_size := append_byte image self byte_acc
+        byte_acc := 0
+        bit_num := 0
+      else:
+        if x == w - 1:
+          byte_acc := self << (8 - w % 8)
+          result_size := append_byte image self byte_acc
+          byte_acc := 0
+          bit_num := 0
+  return result_size
+
+entry const benchmark = func (host: Array U32 -> Array U32 ! {Foreign}): U32 ! {Foreign} => return do:
+  use inputs <- host #[0]
+  let w = inputs[0]
+  let h = inputs[1]
+  let iterations = inputs[2]
+  let warmups = inputs[3]
+  if w < 1 or w > 400 or h < 1 or h > 400:
+    @panic "invalid Mandelbrot dimensions"
+  if iterations < 1 or iterations > 120 or warmups > 120 or iterations + warmups > 120:
+    @panic "invalid Mandelbrot iteration count"
+  // Retain every complete PBM, including warmups: 120 * (11 + 400 * 50).
+  let image: Array U32 = @array.fill 2401320 0
+  let result_size = 0
+  for index in 0 .. warmups:
+    result_size := run image self w h
+  use started <- host #[1]
+  for index in 0 .. iterations:
+    result_size := run image self w h
+  use finished <- host #[2]
+  let checksum = 5381
+  for index in 0 .. result_size:
+    checksum := (self << 5) + self + image[index]
+  break checksum

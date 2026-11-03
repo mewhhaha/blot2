@@ -15,19 +15,19 @@ implementations and APIs rather than maintaining legacy compatibility.
 
 ## Benchmarks
 
-Blot versus Goose's direct Wasm backend, measured on 2026-11-03. Shared-host
-medians; three of seven adapted LangArena tasks.
+Blot versus Goose's direct Wasm backend, measured on 2026-11-03. Four
+original-numeric pairs plus a Mandelbrot F32 control; two sorting ports are
+blocked by owned-storage recursion.
 
 ![Cold compilation time: Blot and Goose, milliseconds](scripts/bench/goose/charts/compilation.svg)
 
-![Bounded Wasm runtime: Blot before and after optimization, and Goose, milliseconds](scripts/bench/goose/charts/runtime.svg)
+![Bounded Wasm runtime: five paired cases and two unsupported Blot sorts](scripts/bench/goose/charts/runtime.svg)
 
-Runtime uses production input sizes with fewer repetitions. Hash buffers use U32
-elements in Blot and U8 in Goose. Five matched pairs improve Fannkuch **12.5x**,
-custom hash **9.4x** and CRC32 **1.19x** over the preceding compiler. Fannkuch
-now runs about as fast as Goose. All checksums pass. Gdev Main is **12.48 MB**
-and fresh compilation remains about **6.1 seconds**. See
-[results and limits](scripts/bench/goose/results/2026-11-03-fixed-spans.md).
+Five matched pairs expose **8.1x CRC32**, **6.7x custom hash**, **3.1x Sieve**
+and **2.4x F32 Mandelbrot** gaps; Fannkuch is roughly at parity. Unsupported
+cases have no bar. Byte buffers use U32 in Blot and U8 in Goose. Gdev remains
+**12.48MB / 6.14s** with the same compiler. See
+[results, controls and next hills](scripts/bench/goose/results/2026-11-03-expanded.md).
 
 ## Development
 

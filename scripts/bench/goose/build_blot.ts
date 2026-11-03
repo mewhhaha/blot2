@@ -35,7 +35,23 @@ const opened = performance.now();
 try {
   const result = await compiler.build({ signal: AbortSignal.timeout(30_000) });
   const finished = performance.now();
-  if (!result.success) throw new Error(JSON.stringify(result.diagnostics));
+  if (!result.success) {
+    await Deno.writeTextFile(
+      stats,
+      JSON.stringify(
+        {
+          success: false,
+          compiler_identity: compiler.compilerIdentity,
+          session_open_ms: opened - started,
+          build_ms: finished - opened,
+          diagnostics: result.diagnostics,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    throw new Error(JSON.stringify(result.diagnostics));
+  }
   await Deno.writeFile(artifact, result.bytes);
   await Deno.writeTextFile(
     stats,

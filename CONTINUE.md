@@ -16,14 +16,27 @@ diagnostic.
 
 Shared Goose direct-Wasm benchmarks are available in
 [`scripts/bench/goose`](scripts/bench/goose/README.md). The
+[seven-case survey](scripts/bench/goose/results/2026-11-03-expanded.md) uses the
+same installed compiler: four original-numeric pairs and an explicit F32
+Mandelbrot control qualify; two original recursive sort ports fail with
+`storage_unsupported`. Original F64 Mandelbrot fails a native type probe and is
+not scored. The other 43 catalog tasks remain unadapted in Goose.
+
+Five matched pairs show Blot/Goose time ratios: CRC32 8.08x, custom hash 6.71x,
+Sieve 3.10x, F32 Mandelbrot 2.40x and Fannkuch 0.96x. A matched-width Sieve
+control still leaves about 2.3x. In Mandelbrot, replacing only two `2.0 * 2.0`
+expressions with `4.0` gives 1.297x, essentially matching broad primitive
+substitution. Investigate constant propagation/inlining decisions before broad
+helper inlining. These source controls are diagnostic; baseline ports are
+unchanged. Structured build failures remain visible; the survey is partial. No
+compiler rebuild or source change was needed. Existing compiler-wide
+qualification and Gdev results remain unchanged.
+
+The preceding
 [fixed-span checkpoint](scripts/bench/goose/results/2026-11-03-fixed-spans.md)
-covers three of seven adapted tasks in the same V8. Five matched pairs improve
-Fannkuch 179.50 → 14.37ms (12.49x), CRC32 129.94 → 109.97ms (1.19x), and custom
-hash 955.26 → 101.75ms (9.40x). Fannkuch now roughly matches Goose. Unchanged
-official production workloads finish in 1.64s, 5.28s and 2.53s respectively.
-Private helpers validate fixed scalar-array descriptors lazily once per
-invocation while retaining every bounds check. Fresh creates refresh length
-snapshots; grow/freeze locals and merged descriptors retain fallback.
+validated fixed scalar-array descriptors lazily in private helpers while
+retaining every bounds check. Fresh creates refresh length snapshots;
+grow/freeze locals and merged descriptors retain fallback.
 
 Invariant fixed-array descriptors and named nested record fields share loop
 carriers under existing all-exit identity and storage proofs. Frequency-ordered
