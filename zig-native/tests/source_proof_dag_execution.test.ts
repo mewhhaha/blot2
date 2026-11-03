@@ -67,15 +67,16 @@ for (const codegenTier of ["development", "optimized"] as const) {
           if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
           const counters = result.stats.workCounters as Record<string, number>;
           assert(
-            counters.scoped_source_proof_instances > 0,
+            counters.scoped_source_completed_bodies > 0,
             JSON.stringify(counters),
           );
           assert(
-            counters.scoped_source_proof_hits > 0,
+            counters.scoped_function_plan_definitions >= depth + 1 &&
+              counters.scoped_function_plan_hits > 0,
             JSON.stringify(counters),
           );
           assert(
-            counters.scoped_source_proof_instances < 1_000,
+            counters.scoped_function_plan_preparations < 1_000,
             JSON.stringify(counters),
           );
           for (const asynchronous of [false, true]) {

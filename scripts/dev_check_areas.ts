@@ -45,6 +45,8 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.scoped_backend_tests.test.scoped loop cleanup retains temporary owners and conditional exits through OOM",
+      "backend.scoped_backend_tests.test.scoped indexed replacements preserve pinned growth and sibling writes through OOM",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing follows nested logical helpers and transitive multiuse aliases through OOM",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing handles wide chains without recursive alias walks",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains every read after unsafe late source writes and tee",
@@ -230,7 +232,6 @@ export const devCheckAreas = {
       "backend.wasm_scope_outline_tests.test.scoped machine helpers require closed typed controls and use complete call signatures",
       "backend.wasm_scope_outline_tests.test.scoped machine helpers keep written lanes when one branch leaves them unchanged",
       "backend.wasm_scope_outline_tests.test.scoped helper initialization retains exact branch intersections through churn and OOM",
-      "backend.wasm_scope_outline_tests.test.scoped final encoding counts parameters with declared locals at the existing engine bound",
       "backend.wasm_scope_outline_tests.test.scoped machine helper banks reject internal cycles unknown dispatch and global overflow",
       "backend.storage_calls_tests.test.selected pure calls follow exact reference aliases without expanding callers",
       "backend.storage_calls_tests.test.selected primitive associated partials reuse their saturated callers",
@@ -243,6 +244,7 @@ export const devCheckAreas = {
       "backend.storage_initialization_tests.test.owned computed flat pools publish a complete module",
     ],
     guests: [
+      "zig-native/tests/scoped_loop_cleanup_execution.test.ts",
       "zig-native/tests/stack_expression_execution.test.ts",
       "zig-native/tests/loop_lane_execution.test.ts",
       "zig-native/tests/mutating_owner_return_execution.test.ts",
@@ -370,6 +372,8 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.scoped_backend_tests.test.scoped loop cleanup retains temporary owners and conditional exits through OOM",
+      "backend.scoped_backend_tests.test.scoped indexed replacements preserve pinned growth and sibling writes through OOM",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing follows nested logical helpers and transitive multiuse aliases through OOM",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing handles wide chains without recursive alias walks",
       "backend.wasm_copy_coalesce_tests.test.scoped copy coalescing retains every read after unsafe late source writes and tee",
@@ -589,6 +593,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/scoped_loop_cleanup_execution.test.ts",
       "zig-native/tests/stack_expression_execution.test.ts",
       "zig-native/tests/loop_lane_execution.test.ts",
       "zig-native/tests/mutating_owner_return_execution.test.ts",

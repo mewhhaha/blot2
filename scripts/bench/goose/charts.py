@@ -1,24 +1,27 @@
 """Regenerate the README charts from pinned evidence; requires matplotlib."""
 
 import json
+import subprocess
 from pathlib import Path
 
 from matplotlib import rcParams
 from matplotlib.figure import Figure
 
 HERE = Path(__file__).resolve().parent
-EVIDENCE = HERE / "results/2026-11-03.json"
+EVIDENCE = HERE / "results/2026-11-03-runtime-hills.json"
 LABELS = {"fannkuch": "Fannkuch", "crc32": "CRC32", "custom_hash": "Custom hash"}
 COLORS = {"blot": "#c94d3f", "goose": "#087f8c"}
 
 
-def chart(rows, field, title, subtitle, filename, limit, ticks):
+def chart(rows, field, title, subtitle, filename, limit, ticks, series):
     figure = Figure(figsize=(10, 4.2))
     axes = figure.subplots()
     figure.subplots_adjust(left=0.18, right=0.90, top=0.74, bottom=0.18)
     figure.suptitle(title, x=0.04, y=0.97, ha="left", fontsize=19, weight="bold")
     figure.text(0.04, 0.84, subtitle, fontsize=10, color="#475569")
-    for backend, offset in [("blot", -0.17), ("goose", 0.17)]:
+    step = 0.68 / len(series)
+    for ordinal, (backend, label, color) in enumerate(series):
+        offset = (ordinal - (len(series) - 1) / 2) * step
         values = [
             next(
                 row[field]["median"]
@@ -30,9 +33,9 @@ def chart(rows, field, title, subtitle, filename, limit, ticks):
         bars = axes.barh(
             [index + offset for index in range(len(LABELS))],
             values,
-            height=0.28,
-            color=COLORS[backend],
-            label=backend.capitalize(),
+            height=step * 0.82,
+            color=color,
+            label=label,
         )
         axes.bar_label(
             bars, labels=[f"{value:,.2f}" for value in values], padding=5, fontsize=10
@@ -47,7 +50,9 @@ def chart(rows, field, title, subtitle, filename, limit, ticks):
     axes.grid(axis="x", color="#e2e8f0", linewidth=0.8)
     for spine in axes.spines.values():
         spine.set_visible(False)
-    figure.legend(loc="upper right", bbox_to_anchor=(0.97, 0.98), ncol=2, frameon=False)
+    figure.legend(
+        loc="upper right", bbox_to_anchor=(0.97, 0.98), ncol=len(series), frameon=False
+    )
     figure.text(
         0.04,
         0.025,
@@ -65,6 +70,7 @@ def chart(rows, field, title, subtitle, filename, limit, ticks):
     destination.write_text(
         "\n".join(line.rstrip() for line in destination.read_text().splitlines()) + "\n"
     )
+    subprocess.run(["deno", "fmt", str(destination)], check=True)
 
 
 def main():
@@ -76,6 +82,13 @@ def main():
     runtime = [
         row for row in evidence["runtime"]["summary"] if row["profile"] == "bounded"
     ]
+    for pair in evidence["before_after"]["summary"]:
+        for row in runtime:
+            if row["case"] == pair["case"] and row["backend"] == "blot":
+                row["kernel_ms"] = pair["after_ms"]
+        runtime.append(
+            {"case": pair["case"], "backend": "before", "kernel_ms": pair["before_ms"]}
+        )
     chart(
         builds,
         "wall_ms",
@@ -84,15 +97,21 @@ def main():
         "compilation.svg",
         110,
         [0, 25, 50, 75, 100],
+        [("blot", "Blot", COLORS["blot"]), ("goose", "Goose", COLORS["goose"])],
     )
     chart(
         runtime,
         "kernel_ms",
         "Bounded Wasm runtime",
-        "Five checked pairs in the same V8 · production input sizes, fewer repetitions",
+        "Five matched before/after pairs · Goose measured separately · same V8",
         "runtime.svg",
         6000,
         [0, 1500, 3000, 4500, 6000],
+        [
+            ("before", "Blot before", "#94a3b8"),
+            ("blot", "Blot now", COLORS["blot"]),
+            ("goose", "Goose", COLORS["goose"]),
+        ],
     )
 
 

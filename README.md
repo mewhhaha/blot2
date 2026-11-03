@@ -20,13 +20,14 @@ medians; three of seven adapted LangArena tasks.
 
 ![Cold compilation time: Blot and Goose, milliseconds](scripts/bench/goose/charts/compilation.svg)
 
-![Bounded Wasm kernel runtime: Blot and Goose, milliseconds](scripts/bench/goose/charts/runtime.svg)
+![Bounded Wasm runtime: Blot before and after optimization, and Goose, milliseconds](scripts/bench/goose/charts/runtime.svg)
 
 Runtime uses production input sizes with fewer repetitions. Hash buffers use U32
-elements in Blot and U8 in Goose. All checksums pass; unchanged production Blot
-runs hit the 30-second limit. See
-[results and methodology](scripts/bench/goose/results/2026-11-03.md) for exact
-inputs, samples and limitations.
+elements in Blot and U8 in Goose. Five matched pairs show **3.9–9.5x faster**
+Blot kernels. All checksums pass; unchanged production runs now finish below 30
+seconds. See
+[results and methodology](scripts/bench/goose/results/2026-11-03-runtime-hills.md)
+for exact inputs, samples and limitations.
 
 ## Development
 

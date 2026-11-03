@@ -1,0 +1,5576 @@
+{
+  "schema": "blot-goose-runtime-hills-v1",
+  "date": "2026-11-03",
+  "source": {
+    "base_commit": "894fc560e2b6cea5b437dc3e141a86abeedd4e8e",
+    "compiler_patch": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/final-compiler.patch",
+      "sha256": "6401839d25ac73cdbf1063d75e6894eaa292329d6013063735f233a8a16e4f43"
+    },
+    "files": {
+      "zig-native/src/backend/scoped_backend.zig": "647ad2ad0b83245d97292941181c1f042cfa9cc8acc3a519aa4404b98e430842",
+      "zig-native/src/backend/scoped_backend_tests.zig": "70e282526c35c472ab67b59414ad348087512949896b8ff50fe6a8fbeba18e96",
+      "zig-native/src/backend/storage_call_graph_tests.zig": "645228fdbbb11254df09f06dd5b9e470e387a2628d518d26d86ba6aa51767cac",
+      "zig-native/fixtures/scoped-loop-cleanup.blot": "4c83f43594d4a1001ef546f53cb15f23904d1efaba8872b9e7537be6d0d2d635",
+      "zig-native/tests/scoped_loop_cleanup_execution.test.ts": "5aec8122b621f41c7b6bf4f32123d45eee1713609d92f41dbfbae332225bbb30",
+      "zig-native/tests/source_proof_dag_execution.test.ts": "be88d48f89f9bb2f05df1b47a6088018d57fa0e8ef14b377f0f535d3a5776f3e",
+      "zig-native/tests/storage_refinement_index_execution.test.ts": "98f09ac3164c3da7d3abe564d67bf6f376538e78d5e0a63df0d69b56c709fade"
+    }
+  },
+  "environment": {
+    "platform": "Linux-7.3.0-4-cachyos-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "node": {
+      "node": "24.22.1",
+      "acorn": "8.18.0",
+      "ada": "4.0.0",
+      "amaro": "1.1.11",
+      "ares": "1.34.9",
+      "brotli": "1.2.0",
+      "cldr": "48.0",
+      "icu": "78.3",
+      "llhttp": "9.4.3",
+      "merve": "1.2.2",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.4",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.70.0",
+      "nghttp3": "",
+      "ngtcp2": "",
+      "openssl": "3.5.9",
+      "simdjson": "4.6.11",
+      "simdutf": "6.4.0",
+      "sqlite": "3.53.4",
+      "tz": "2026e",
+      "undici": "7.30.1",
+      "unicode": "17.0",
+      "uv": "1.52.1",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.58",
+      "zlib": "1.3.2.1-motley-285e94b",
+      "zstd": "1.5.7"
+    },
+    "node_path": "/home/jacobt/.local/share/fnm/node-versions/v24.22.1/installation/bin/node",
+    "python": "3.14.8 (main, Oct 13 2026, 10:33:10) [GCC 16.2.1 20260810]",
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3\n",
+    "goose_checkout_head": "7a8e089da8fb304474b1d558fc1156dcd0598b8b",
+    "goose_checkout_status": [
+      " M .github/workflows/ci.yml",
+      " M compiler/direct_wasm.h",
+      " M compiler/direct_wasm_expr.h",
+      " M compiler/direct_wasm_storage.h",
+      "?? tests/test_fresh_initialization.py"
+    ],
+    "compiler_sha256": {
+      "blot": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed",
+      "goose": "353a3f1bd547330c8ecd32e9084ae92d616340f81f83a5cc30f2e657d577652e"
+    },
+    "goose_stdlib": {
+      "base64.goose": "fa1111ce46e9534311f825880dbd2988953430aeb3f1f52d8f0eaecbbc298a61",
+      "binary.goose": "6973e209428668c2db856eaa941de5d93938cfb1749ed07cac534bf9fe4cb031",
+      "csv.goose": "a49b0647f4a2f8ca36170e5a184ab6c6e505492434d0a10a5e05127e96da61ba",
+      "dictionary.goose": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322",
+      "exception.goose": "b91033a5cb9029ac56d27ffb0ed9f5841f76ff58b39de8e881101ca2b8fc39c4",
+      "ffi.goose": "e092b245fbe13ee2fdc71599b7b8eb44198e5261cad9600b7681e13ad75a6c2e",
+      "json.goose": "0e58291ed9051e4ecb8da1ad420290549d723336516507aed33cf7ced89dc29b",
+      "math.goose": "b4c1aee33b5b7033d36a4ddc5c6522c73b21cafe204dc20e8860cdeba22467da",
+      "os.goose": "2193f394d44469daffd993ed204a91b068084fd8db13e261e11156b40c66e934",
+      "regex.goose": "be0e50bab2a1db9f85e856250bcc592dfe25aca73c2ed900410047fbefb4b035",
+      "std.goose": "2243c2ef52ba5045b275eea35252d09f36544987c6884f4a8d35579fa6f781ff",
+      "vec.goose": "2cac168c72047834433bfb419734c38455c9429ea045b1273898031c53faa82e"
+    },
+    "goose_toolchain": {
+      "schema": "goose-to-wasm-toolchain-v1",
+      "repository": "https://github.com/aardappel/goose.git",
+      "revision": "2e2bedef5b980bf013cac5aaa0095bfea64e5569",
+      "emscripten": "6.0.13",
+      "emsdk_repository": "https://github.com/emscripten-core/emsdk.git",
+      "emsdk_revision": "d7b4130688bfa348392b921ab04015aa15c4f154",
+      "node": "24.22.1",
+      "v8": "13.6.233.17-node.58",
+      "wasmtime_python": "50.0.1",
+      "patches": [
+        "oracle/patches/0001-webassembly-target.patch",
+        "patches/direct-target.patch"
+      ],
+      "minimum_cmake": "3.27",
+      "minimum_python": "3.10"
+    },
+    "input_sha256": {
+      "/home/jacobt/src/blot2/scripts/bench/goose/compare.py": "8a74621490c7e01acd0f908d156410568366d0c799c88b9707edeae5710cd6e9",
+      "/home/jacobt/src/blot2/scripts/bench/goose/reference.py": "9eb5ffee07703b7fd6e1d094b445921f4298bd1e432b94b210a56c545e40ef52",
+      "/home/jacobt/src/blot2/scripts/bench/goose/runtime.ts": "3260b2d94010f728cec2c1e212d424fc68d8da93454c8c3b0fc08e0372a7da94",
+      "/home/jacobt/src/blot2/scripts/bench/goose/build_blot.ts": "e45ed184297c843ff8a2399719875a7d5d0868075838509cbb5ffea4717c7feb",
+      "/home/jacobt/src/goose-to-wasm/scripts/goose_wasm.py": "fb6319f181316f9d33cc6a6dfe58259cb234046861aa97c5e3ad09269824977d",
+      "/home/jacobt/src/goose-to-wasm/oracle/goose_wasm.py": "617b96bab2fcd7e1cc01edc5bd205ebe537b7b9f1069f77a971b5a02ea298086",
+      "/home/jacobt/src/goose-to-wasm/bench/langarena.py": "f7f1aa1ec5941cd34a07f37b2ffa97d6c88ca5a13009cd83dc4dd1a4d7e06c0f",
+      "/home/jacobt/src/goose-to-wasm/bench/langarena/manifest.json": "95383d34c7f2214e5b7cfd346b0d0742c23df81f9d568ef4c6dad7c8a6302646",
+      "/home/jacobt/src/goose-to-wasm/bench/langarena/test.json": "424371dd25f3fa3f779789c823a05dbe90d2eddbc2a3ca3c5e4319252c572797",
+      "/home/jacobt/src/goose-to-wasm/bench/langarena/run.json": "8fe7baed41e8eb0a233057c4406446029f7e5d792cf3a3ac6fc7e714964a155f",
+      "/home/jacobt/src/goose-to-wasm/bench/langarena/ports/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "/home/jacobt/src/blot2/scripts/bench/goose/ports/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+      "/home/jacobt/src/blot2/scripts/bench/goose/ports/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+      "/home/jacobt/src/blot2/scripts/bench/goose/ports/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+      "/home/jacobt/src/blot2/compiler/installed_cli.ts": "76a5a774119e905284114bb707804f5f500572fb6f46417c368bff8d81d038ba",
+      "/home/jacobt/src/blot2/compiler/numeric_parser.ts": "a3a11718d2ea792dd91f1df83cf11fc60ca85a55002033074fca2302fbf13c14",
+      "/home/jacobt/src/blot2/compiler/packaged_native.ts": "b1931d1dc26c6151dd8322afae67e4c017a15a254f5365cefc5f4a8d85cb94ce",
+      "/home/jacobt/src/blot2/compiler/postfix_syntax.ts": "5b29335c404e89b3b2325cc6288ebc8a5d37a49891c60f546f243cffafbbdceb",
+      "/home/jacobt/src/blot2/compiler/test_compile.ts": "6a73423b569356987186ef17874be07307bb4fd7a7f069c254e485cbabd9183d",
+      "/home/jacobt/src/blot2/compiler/editor_completion.ts": "157cde32dbc4d9e276c8591df09da6a7fdefd3abf824fc50dfb937eacdc3a4a5",
+      "/home/jacobt/src/blot2/compiler/lsp_protocol.ts": "c81acb905c766325278a5c4b08ac2d1b5bc66c6a2dd66478a2e60a935c3cb6a3",
+      "/home/jacobt/src/blot2/compiler/bpm.test.ts": "cc5d54235cc6783c375dcfd4d6bf31eb0682d92d97a6c8ff2ca349c9ec1ba41b",
+      "/home/jacobt/src/blot2/compiler/bpm.ts": "ce750483bc2fe9643f78bd08b80f947ef28da49a510ad76a13093370e1fb6a07",
+      "/home/jacobt/src/blot2/compiler/packages.test.ts": "8b03c919600c4f717bd2cee19e3440afd5ce365a6381df2a8479d281ce1c391f",
+      "/home/jacobt/src/blot2/compiler/packages.ts": "86d394e85a6f41da64f078a21035fd7f39ca5ffb184d3b6ee14543dfee0bb428",
+      "/home/jacobt/src/blot2/compiler/resource_guest.test.ts": "c6e1f350d90b7f570b3694f0bd0ebcb7984cf5d4e5e13e5cd5e2a57732c423e5",
+      "/home/jacobt/src/blot2/compiler/guest_multiplicity.test.ts": "f65958ff4ed115e6aceefa8dd2700811c07888864fb2356ba574844403ddfcaf",
+      "/home/jacobt/src/blot2/compiler/resource_journal.test.ts": "73892388775c1c265d8b473ea610f1c8f74c41f849ed5f8ca63b53bfc7c1741a",
+      "/home/jacobt/src/blot2/compiler/resource_journal.ts": "2f665e61bdfb7492e36221c64b74ab1b2b21313d402a8e19e2b73c5651a8eb2b",
+      "/home/jacobt/src/blot2/compiler/task_resources.test.ts": "13b5db91ca2267f90d0d1166a1e471bba9177ed15d08ca5b9537eeba10d15007",
+      "/home/jacobt/src/blot2/compiler/assets.test.ts": "ca2c3b5cc8711b6342512fc4b37cf4721df0bd6486c4139d8182ef9d2a418f43",
+      "/home/jacobt/src/blot2/compiler/assets.ts": "35696134d85f8b32ea171ae3088e1fffa47395ce89be0d2d2dcc3f7f761943eb",
+      "/home/jacobt/src/blot2/compiler/cleanup_data.test.ts": "a1795f1fc197ffb9b240bf93aac283613e42603d4de910bb692ac592943ec146",
+      "/home/jacobt/src/blot2/compiler/cleanup_data.ts": "6cd0a32b67724eb94854486017d4840b9832e7f8de3dcccc5fb1e05f9c7e7f78",
+      "/home/jacobt/src/blot2/compiler/cli.ts": "e4dafb62de7110d6c3a4f85d92d93a3067a838ddfbe1e060476d919126300bbd",
+      "/home/jacobt/src/blot2/compiler/cli_packages.test.ts": "07f4421032fd296a6e45e91ff56954e084e8fe002f502fb8bed4d0d6441b9169",
+      "/home/jacobt/src/blot2/compiler/derive.ts": "ba1dfd76deaaf487b44c9a0050eb35cebfd4412e9e8ba00b2ad3a7e8c8291f98",
+      "/home/jacobt/src/blot2/compiler/editor_completion.test.ts": "cfdb56c1e80643de1d153080b26c30b89f45cb7171a51942f0666d4c2b3513e3",
+      "/home/jacobt/src/blot2/compiler/format.test.ts": "5cd17efb4cb9c729d8a6a65a0c7967d9b8331622e2bc70bc537180c6008ede2f",
+      "/home/jacobt/src/blot2/compiler/format.ts": "b634a5b3b79500243e2469d6aad89be7412b293478ed763495c148ab02931576",
+      "/home/jacobt/src/blot2/compiler/guest.test.ts": "02b2a868003599b9d17391fbc4afbe8c673b674d2ec398bcd768cfb5a047522e",
+      "/home/jacobt/src/blot2/compiler/guest.ts": "df2107d216956638d0cb7ba02da52da4f1194e6b7e251d46972496c539cacc57",
+      "/home/jacobt/src/blot2/compiler/guest_arrays.test.ts": "3fef7346e8935d7cc1ebbfdc092a3ee6de92c81684192d2862b51a2db66d93f3",
+      "/home/jacobt/src/blot2/compiler/guest_associated_types.test.ts": "5a726f4bb94466461f0480e4be12ac84b428f352b4bcb815f29c90bf74611413",
+      "/home/jacobt/src/blot2/compiler/guest_async.test.ts": "05e0b6937686801af60265e2992f1639177f55972537fc4d49c3b45a135a467f",
+      "/home/jacobt/src/blot2/compiler/guest_implementations.test.ts": "9e46fa902d157d8492e03235481c959cabeac21e9f7db6914c28df694179c911",
+      "/home/jacobt/src/blot2/compiler/lsp.test.ts": "449b632628393111daf77d9b920dbef152182d061836f9d2deca0749a3133b03",
+      "/home/jacobt/src/blot2/compiler/lsp.ts": "256264eaff9c0b9da657902af6374fe0484ffb4d119103e3c072110355b42ad8",
+      "/home/jacobt/src/blot2/compiler/memory_profile.ts": "9374c393b6101bdeba7b6f66d9e292bf7a7f1d47cc62b1e788b0f2fd4ac70aad",
+      "/home/jacobt/src/blot2/compiler/native_asset_client.test.ts": "7245df1cce953e2a0916709ffc0f8c78db5a0932c4d478c751590c3486c9040e",
+      "/home/jacobt/src/blot2/compiler/native_assets.ts": "7859e5eefc1f6b3a57cdbecb352802d7e541ed5c175d002c2fdc1f977efdfc0e",
+      "/home/jacobt/src/blot2/compiler/parser_source.test.ts": "064095176211aaa77b56e5c77fb31bc05e16339edb56387433fc308e2258512b",
+      "/home/jacobt/src/blot2/compiler/parser_source.ts": "11e7a3d3c30932867a53b8d63f54bfdedbe3fd047373bc57ab1daf7a9c50d44e",
+      "/home/jacobt/src/blot2/compiler/public_api.test.ts": "28ec79e974be8748ba2543580bc4917f1fe24ea83b2408357742cb4d11f112cb",
+      "/home/jacobt/src/blot2/compiler/staged_surface.test.ts": "1d85a3e02fa0d91ec6e9d66981ea91ccf54f5982ed9571dfcf3460b0aa610e98",
+      "/home/jacobt/src/blot2/compiler/storage_surface.test.ts": "b99ea754983d7ad26f8e8d28b3701f0cc073847b1bdec69e9afbfc1380e97577",
+      "/home/jacobt/src/blot2/compiler/syntax.test.ts": "006ae61dc8953d433b5a6b96b792066a568381ca21d2b034653cba5aeffbeee2",
+      "/home/jacobt/src/blot2/compiler/syntax.ts": "8c7c1d08dd4b91d4c3bf29bf9af09ce0f873981ce791ec40e8f34595328f9cff",
+      "/home/jacobt/src/blot2/compiler/task_guest.ts": "fded652c54bf721b5c33b57c7335d0669e058710f2550a4992370a556c707533",
+      "/home/jacobt/src/blot2/compiler/task_runtime.test.ts": "4b6236216a4db4c07e6f897ae0a574b3dbe460aba43743c2dffe6de628f22e4d",
+      "/home/jacobt/src/blot2/compiler/task_runtime.ts": "460400a8297c735dd3ac68e0fd36df1def33ffe0f07571681c3de25019a43318",
+      "/home/jacobt/src/blot2/compiler/text.ts": "7ebed2a7888bc1c3674f1175f99d773961201287804f364494eda437ade70b86",
+      "/home/jacobt/src/blot2/compiler/type_diagnostics.test.ts": "f8490547f0dc99b508a03236346cedb748c150018af1539b38d336846ca33810",
+      "/home/jacobt/src/blot2/compiler/type_diagnostics.ts": "ef240c126353ac432ac5d49f7866b734c8ec52bbaa85bc0a7b0a44fee719ebc6",
+      "/home/jacobt/src/blot2/compiler/zig_project_client.ts": "169637750aa22f9ef5cf2637a08ff827b5b219f140285fab41006f1a19951dd7",
+      "/home/jacobt/src/blot2/std/_summary_tree.blot": "fda6a25afef24949557fd19726f036351d7647340ee998596707de973f102a00",
+      "/home/jacobt/src/blot2/std/array.blot": "42da3fe4073df85c646a70eeb044bd7311a39b6c93305a9983326225ae235829",
+      "/home/jacobt/src/blot2/std/codec.blot": "742d3f366b8244ae24a10da7e58b1986dfca2bcb8d08b0efa03abbe5d60ecbf3",
+      "/home/jacobt/src/blot2/std/equality.blot": "8732b7bad93b7a7495da482df8bc92a478f2b813beb3101bbeb6d3ad2c62eea4",
+      "/home/jacobt/src/blot2/std/iter.blot": "8c65b6c09759b5f9cd56eed5259492fcef7bc245370dd41059398afcb5f94b0c",
+      "/home/jacobt/src/blot2/std/list.blot": "eb2068a130a9c41368d4fe8c3c8ba24fb0c86155a2ea0a11be1975426702e9e3",
+      "/home/jacobt/src/blot2/std/path.blot": "c30236b6ea43d30f0be9e623f5b12b2c70720402d3d6c7e5182746d96296c8e1",
+      "/home/jacobt/src/blot2/std/prelude.blot": "8a1cbca5b99035d8373f81ef15f56ed9808f69c7dfbcb21adb36f534e37a62d1",
+      "/home/jacobt/src/blot2/std/rolling.blot": "c0d58c9bdfec4698ffa7402a59829c6127dd7a6e487297d5b1f415e71c147562",
+      "/home/jacobt/src/blot2/std/simd.blot": "b4d1e648fe2f91951b00b7af307a5ebddaacc8b27635024b7193c4fdbf70ed06",
+      "/home/jacobt/src/blot2/std/summary.blot": "ce985949b9f7931c13c10c548b9484f7dcb978b0baa8f7cb4f524cfecdd93c55",
+      "/home/jacobt/src/blot2/std/text.blot": "2d730b770a4623aec53f16854469286242ea29ea88c700b7a88b80c0af07b6b7",
+      "/home/jacobt/src/blot2/std/vector.blot": "e491f111173ef695883f96ebb4878d6a8c5ff4b2fb1797e3f66b5bdae2e2e66e"
+    },
+    "staged_sources_sha256": {
+      "crc32/blot/crc32.blot": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+      "crc32/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "crc32/goose/hash_crc32.goose": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+      "custom_hash/blot/custom_hash.blot": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+      "custom_hash/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "custom_hash/goose/hash_sha256.goose": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+      "fannkuch/blot/fannkuch.blot": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+      "fannkuch/goose/common.goose": "c25a158f5d17037c46243c970a573e846080c4c8adfd32164ad1b6212d91a65c",
+      "fannkuch/goose/fannkuch.goose": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004"
+    },
+    "blot_checkout_head": "894fc560e2b6cea5b437dc3e141a86abeedd4e8e",
+    "blot_compiler_identity_sha256": "918b1dab88f102dede1a66e370a057b202be37b64aa96bc37a1d1bd8312c2a05",
+    "goose_runner_sha256": "dbc9fba5acbfd4e9de0b86de58ffb3da2df921d958263f117886180dad85eb44"
+  },
+  "configuration": {
+    "compile_samples": 5,
+    "profile_backend": false,
+    "runtime_samples": 5,
+    "process_warmups": 1,
+    "profiles": [
+      "test",
+      "bounded"
+    ],
+    "timeout_seconds": 30,
+    "seed": 771923,
+    "node_flags": [
+      "--experimental-transform-types"
+    ]
+  },
+  "coverage": {
+    "reference_catalog_tasks": 50,
+    "reference_adapted_tasks": 7,
+    "selected_ports": 3,
+    "unported": [
+      "Etc::Sieve",
+      "Sort::Quick",
+      "Sort::Merge",
+      "CLBG::Mandelbrot"
+    ],
+    "not_selected": [],
+    "engines": [
+      "V8"
+    ],
+    "note": "Shared translated algorithms, not identical source or a full-language/50-task claim."
+  },
+  "method": {
+    "cold_build": "Fresh driver and compiler per sample; cache disabled. OS and installed-library caches retained. Source staging outside timer. Complete wall and native build phases retained.",
+    "runtime": "Same Node/V8 and flags for both. test/run use official inputs/iterations/warmups. bounded retains production problem sizes with reduced counts recorded per case. Same state retained after warmup. Preparation, startup, engine compilation and output outside clock; no per-element host calls. Two Blot clock packet crossings versus two Goose scalar imports are part of their ABI costs. Common process wall includes parsing the Blot TypeScript guest host for both backends; it is not Goose's standalone runner startup score.",
+    "representation": "Goose hash data is U8; Blot stores identical 0..255 values in U32, 4x element payload bytes; owner and arena overhead are separate. Fixed 1m-element capacity retained. Fannkuch indices/permutations are nonnegative; U32 checksum wrap preserves final U32 accumulation. Wider parameter/clock plumbing stays outside kernels. Custom Hash::SHA256 is the original eight-lane custom hash, not cryptographic SHA-256.",
+    "ordering": "Build phase sequential, then runtime phase; seeded paired shuffling, no deliberate concurrent measurement work."
+  },
+  "cases": {
+    "fannkuch": {
+      "task": "CLBG::Fannkuchredux",
+      "catalog": {
+        "name": "CLBG::Fannkuchredux",
+        "upstream_module": "goose/src/fannkuchredux.goose",
+        "test": {
+          "name": "CLBG::Fannkuchredux",
+          "checksum": 4428,
+          "n": 5,
+          "iterations": 3
+        },
+        "run": {
+          "name": "CLBG::Fannkuchredux",
+          "checksum": 135762480,
+          "n": 8,
+          "iterations": 700
+        },
+        "port": {
+          "file": "ports/fannkuch.goose",
+          "fields": [
+            "n"
+          ],
+          "bounds": {
+            "n": [
+              1,
+              32
+            ]
+          },
+          "classification": "harness-only adaptation; original fixed-array kernel",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "bounded": {
+          "n": 8,
+          "iterations": 8,
+          "warmup_iterations": 2,
+          "checksum": 1616220
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/fannkuch/goose/fannkuch.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/fannkuch/blot/fannkuch.blot"
+      }
+    },
+    "crc32": {
+      "task": "Hash::CRC32",
+      "catalog": {
+        "name": "Hash::CRC32",
+        "upstream_module": "goose/src/buffer_hash.goose",
+        "test": {
+          "name": "Hash::CRC32",
+          "checksum": 3031698216,
+          "size": 1000,
+          "iterations": 3
+        },
+        "run": {
+          "name": "Hash::CRC32",
+          "checksum": 2318723244,
+          "size": 1000000,
+          "iterations": 150
+        },
+        "port": {
+          "file": "ports/hash_crc32.goose",
+          "fields": [
+            "size"
+          ],
+          "bounds": {
+            "size": [
+              1,
+              1000000
+            ]
+          },
+          "classification": "bounded-storage adaptation",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "bounded": {
+          "size": 1000000,
+          "iterations": 4,
+          "warmup_iterations": 1,
+          "checksum": 3285634451
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/crc32/goose/hash_crc32.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/crc32/blot/crc32.blot"
+      }
+    },
+    "custom_hash": {
+      "task": "Hash::SHA256",
+      "catalog": {
+        "name": "Hash::SHA256",
+        "upstream_module": "goose/src/buffer_hash.goose",
+        "test": {
+          "name": "Hash::SHA256",
+          "checksum": 1036619072,
+          "size": 1000,
+          "iterations": 3
+        },
+        "run": {
+          "name": "Hash::SHA256",
+          "checksum": 2844672256,
+          "size": 1000000,
+          "iterations": 1200
+        },
+        "port": {
+          "file": "ports/hash_sha256.goose",
+          "fields": [
+            "size"
+          ],
+          "bounds": {
+            "size": [
+              1,
+              1000000
+            ]
+          },
+          "classification": "bounded-storage adaptation",
+          "revision_marker": "let ARENA_REVISION = 0;",
+          "edited_exit_code": 1
+        },
+        "notes": "Upstream task name; this is LangArena's custom hash, not standard cryptographic SHA-256.",
+        "bounded": {
+          "size": 1000000,
+          "iterations": 64,
+          "warmup_iterations": 13,
+          "checksum": 1980454664
+        }
+      },
+      "sources": {
+        "goose": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/custom_hash/goose/hash_sha256.goose",
+        "blot": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/sources/custom_hash/blot/custom_hash.blot"
+      }
+    }
+  },
+  "changes": [
+    "Use the existing no-owner rewind proof on loop backedges and exits; closed or conditional owners still retain cleanup.",
+    "Remove unused frame marks only after completed scopes prove that they created no owner; neutral instructions retain machine coordinates.",
+    "Reuse the pre-RHS checked indexed address while its selected borrow pins the nonmoving extent; preserve variant checks and ordered read/write events."
+  ],
+  "source_runs": {
+    "release": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/release/report.json",
+      "sha256": "75dc31f811f86db0af423834d39b479ef685e03d43a3d3cd295f4e36f7bac7c0"
+    },
+    "paired": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/paired/result.json",
+      "sha256": "789df32a2b0d0a69cf2af5bda51c1ae9fa481cf3cf39de38e4dec781362ddc9c"
+    },
+    "paired_script": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/paired.py",
+      "sha256": "4343e64124183730c73058277b706687113d58ec0a8fc0b580e99b845965a5f5"
+    },
+    "production": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/production/result.json",
+      "sha256": "e015fed9ce32e30bd2462d633fe2a7ed7181261b2756fd22964bf463ee3c09fa"
+    },
+    "production_script": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/production.py",
+      "sha256": "4684496f6c953f4a4b7daa14166b04d2659cdb420ed4a393fdeb94dd63d046a5"
+    }
+  },
+  "compilation": {
+    "summary": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 68.528905,
+          "mad": 2.1589699999999965,
+          "min": 66.369935,
+          "max": 77.313836,
+          "p25": 68.06941,
+          "p75": 76.182193,
+          "samples": [
+            66.369935,
+            68.06941,
+            68.528905,
+            76.182193,
+            77.313836
+          ]
+        },
+        "wasm_bytes": 6073
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 63.211843,
+          "mad": 12.620563000000004,
+          "min": 50.59128,
+          "max": 78.412407,
+          "p25": 55.939661,
+          "p75": 77.496825,
+          "samples": [
+            50.59128,
+            55.939661,
+            63.211843,
+            77.496825,
+            78.412407
+          ]
+        },
+        "wasm_bytes": 6073
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 71.00622,
+          "mad": 1.469407000000004,
+          "min": 69.417245,
+          "max": 99.051955,
+          "p25": 70.058145,
+          "p75": 72.475627,
+          "samples": [
+            69.417245,
+            70.058145,
+            71.00622,
+            72.475627,
+            99.051955
+          ]
+        },
+        "wasm_bytes": 4067
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 94.555176,
+          "mad": 1.604221999999993,
+          "min": 75.119159,
+          "max": 98.350339,
+          "p25": 93.229782,
+          "p75": 96.159398,
+          "samples": [
+            75.119159,
+            93.229782,
+            94.555176,
+            96.159398,
+            98.350339
+          ]
+        },
+        "wasm_bytes": 4073
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 49.876369,
+          "mad": 7.874499,
+          "min": 42.00187,
+          "max": 72.415442,
+          "p25": 46.227735,
+          "p75": 70.713973,
+          "samples": [
+            42.00187,
+            46.227735,
+            49.876369,
+            70.713973,
+            72.415442
+          ]
+        },
+        "wasm_bytes": 5068
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 48.843944,
+          "mad": 1.1002239999999972,
+          "min": 47.74372,
+          "max": 72.828498,
+          "p25": 48.646719,
+          "p75": 54.651769,
+          "samples": [
+            47.74372,
+            48.646719,
+            48.843944,
+            54.651769,
+            72.828498
+          ]
+        },
+        "wasm_bytes": 5068
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 73.967938,
+          "mad": 0.7539660000000055,
+          "min": 70.399034,
+          "max": 75.890697,
+          "p25": 73.213972,
+          "p75": 74.201933,
+          "samples": [
+            70.399034,
+            73.213972,
+            73.967938,
+            74.201933,
+            75.890697
+          ]
+        },
+        "wasm_bytes": 3309
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 74.890613,
+          "mad": 4.509793000000002,
+          "min": 69.867131,
+          "max": 99.770362,
+          "p25": 70.38082,
+          "p75": 75.926476,
+          "samples": [
+            69.867131,
+            70.38082,
+            74.890613,
+            75.926476,
+            99.770362
+          ]
+        },
+        "wasm_bytes": 3315
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 53.677625,
+          "mad": 6.516312999999997,
+          "min": 43.65662,
+          "max": 77.545367,
+          "p25": 47.161312,
+          "p75": 56.762107,
+          "samples": [
+            43.65662,
+            47.161312,
+            53.677625,
+            56.762107,
+            77.545367
+          ]
+        },
+        "wasm_bytes": 5833
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 48.124826,
+          "mad": 1.292301000000002,
+          "min": 46.832525,
+          "max": 72.762383,
+          "p25": 47.750553,
+          "p75": 49.940412,
+          "samples": [
+            46.832525,
+            47.750553,
+            48.124826,
+            49.940412,
+            72.762383
+          ]
+        },
+        "wasm_bytes": 5833
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "cold",
+        "wall_ms": {
+          "n": 5,
+          "median": 71.677327,
+          "mad": 1.2507300000000043,
+          "min": 70.426597,
+          "max": 99.891182,
+          "p25": 70.538269,
+          "p75": 93.800539,
+          "samples": [
+            70.426597,
+            70.538269,
+            71.677327,
+            93.800539,
+            99.891182
+          ]
+        },
+        "wasm_bytes": 6788
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "phase": "marker_edit",
+        "wall_ms": {
+          "n": 5,
+          "median": 70.636787,
+          "mad": 1.3559109999999919,
+          "min": 68.53701,
+          "max": 100.41003,
+          "p25": 69.280876,
+          "p75": 71.401161,
+          "samples": [
+            68.53701,
+            69.280876,
+            70.636787,
+            71.401161,
+            100.41003
+          ]
+        },
+        "wasm_bytes": 6794
+      }
+    ],
+    "observations": [
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 66.369935,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.713973,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.475627,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 75.890697,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.528905,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.538269,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 56.762107,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 71.00622,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.399034,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 43.65662,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 42.00187,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.161312,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 49.876369,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 99.051955,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 93.800539,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 73.967938,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 77.545367,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.06941,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 74.201933,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "06e2859b71f55fa78fed8479897707356b3e2ab4038a276b8f06f1b39eed8b4e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 53.677625,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 76.182193,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.415442,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      {
+        "phase": "cold",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 99.891182,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.417245,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "cold",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "2f687025b4ad9b2442a2a63f955532d623982432defde43134dbaff634553aef",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 46.227735,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 71.677327,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "e530813993a835ec10b4e8978d3d5d82d585a1a55b0291045e2afe046c8ebf1e",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.426597,
+        "wasm_bytes": 6788,
+        "wasm_sha256": "dbb796ecd8967341ccc14117fd92743ef48f3aa368a0b41b859d83bfc593de95"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "22891f3c000d0eac66742cfe4bb234ab7ddf3dce0b803aaae15908c0d9a2c4a2",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 73.213972,
+        "wasm_bytes": 3309,
+        "wasm_sha256": "d63f80bcf5527bd0f97ca9724cfc860fabd5556dd69744e3c6622823675dc09e"
+      },
+      {
+        "phase": "cold",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "60e9fe26464bfa54ae985d9a3201eea437693605360e2dba97438e4357a4e83d",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 77.313836,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      {
+        "phase": "cold",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "13fe4b2630a22e717ba583e9c9b255cc3ccc6c605351a652bb73e07d636ee004",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.058145,
+        "wasm_bytes": 4067,
+        "wasm_sha256": "4a416cda55e53175910f971ba1a202f442a88b8d18641b7fe00cf07e3d1fc708"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 74.890613,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 49.940412,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "14e483cc659cb3e4e8d0cdedb3418550d1c2bfbc475a5bc027f316ac5b423029"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 63.211843,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "83b0c200a24b78a79b73e553af9e7670448966a9aeab064972c2ab0670a12bfa"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.828498,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "e3fcd52918188285af33b2fa4e72da9fe7c9b9e5bd90ffa77fa08a62af9cc42a"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 77.496825,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "83b0c200a24b78a79b73e553af9e7670448966a9aeab064972c2ab0670a12bfa"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 93.229782,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 48.843944,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "e3fcd52918188285af33b2fa4e72da9fe7c9b9e5bd90ffa77fa08a62af9cc42a"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 75.926476,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 100.41003,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 71.401161,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 48.124826,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "14e483cc659cb3e4e8d0cdedb3418550d1c2bfbc475a5bc027f316ac5b423029"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 50.59128,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "83b0c200a24b78a79b73e553af9e7670448966a9aeab064972c2ab0670a12bfa"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 78.412407,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "83b0c200a24b78a79b73e553af9e7670448966a9aeab064972c2ab0670a12bfa"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 99.770362,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 46.832525,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "14e483cc659cb3e4e8d0cdedb3418550d1c2bfbc475a5bc027f316ac5b423029"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.74372,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "e3fcd52918188285af33b2fa4e72da9fe7c9b9e5bd90ffa77fa08a62af9cc42a"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 94.555176,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 47.750553,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "14e483cc659cb3e4e8d0cdedb3418550d1c2bfbc475a5bc027f316ac5b423029"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 98.350339,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.636787,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 70.38082,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 68.53701,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 0,
+        "case": "custom_hash",
+        "backend": "goose",
+        "source_sha256": "54df3fdeb18372cc6addc00e6e2ad75291cb67082e2cbcc6b7fdb25ec2995d9a",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.280876,
+        "wasm_bytes": 6794,
+        "wasm_sha256": "268f5fdbfc19034e63951e7c2f6e48c235d312f4f1dc3c58ee8e120d01c21e0c"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "custom_hash",
+        "backend": "blot",
+        "source_sha256": "390b79ebc17bfc3be43c91a31b54943898d5dd902462a9cf6986544710e2a691",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 72.762383,
+        "wasm_bytes": 5833,
+        "wasm_sha256": "14e483cc659cb3e4e8d0cdedb3418550d1c2bfbc475a5bc027f316ac5b423029"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 96.159398,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 2,
+        "case": "fannkuch",
+        "backend": "blot",
+        "source_sha256": "a0c8419d31581e27185aa6f23a074dc5441f7923d9759d47a8cf78278d711a98",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 55.939661,
+        "wasm_bytes": 6073,
+        "wasm_sha256": "83b0c200a24b78a79b73e553af9e7670448966a9aeab064972c2ab0670a12bfa"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 54.651769,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "e3fcd52918188285af33b2fa4e72da9fe7c9b9e5bd90ffa77fa08a62af9cc42a"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 4,
+        "case": "fannkuch",
+        "backend": "goose",
+        "source_sha256": "361561578128e51df1d2b0cc0e6a8c30f3ae5307ae6b5721262cd57f0062f4dc",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 75.119159,
+        "wasm_bytes": 4073,
+        "wasm_sha256": "bf5ca00f31e89ea9ceddc831a9fc2a404d4c192a3b1a295905447d26f033b176"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 3,
+        "case": "crc32",
+        "backend": "blot",
+        "source_sha256": "3623348665cf65b88549d6d1dd964619311c31a81abfd150627c6a8844531640",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 48.646719,
+        "wasm_bytes": 5068,
+        "wasm_sha256": "e3fcd52918188285af33b2fa4e72da9fe7c9b9e5bd90ffa77fa08a62af9cc42a"
+      },
+      {
+        "phase": "marker_edit",
+        "sample": 1,
+        "case": "crc32",
+        "backend": "goose",
+        "source_sha256": "b0916f2f4fcdc30428579598c5485da65696d56f81a3d88fd97b7d2678814b29",
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 69.867131,
+        "wasm_bytes": 3315,
+        "wasm_sha256": "0d069f05a4b3f198d07979b65d69d26db0932beb0a066781e490960d76d2c517"
+      }
+    ]
+  },
+  "runtime": {
+    "summary": [
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.612105,
+          "mad": 0.00759399999999999,
+          "min": 0.601195,
+          "max": 0.636181,
+          "p25": 0.605793,
+          "p75": 0.619699,
+          "samples": [
+            0.601195,
+            0.605793,
+            0.612105,
+            0.619699,
+            0.636181
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 158.261198,
+          "mad": 5.553802000000019,
+          "min": 152.707396,
+          "max": 181.71412,
+          "p25": 154.892915,
+          "p75": 172.440608,
+          "samples": [
+            152.707396,
+            154.892915,
+            158.261198,
+            172.440608,
+            181.71412
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.088475,
+          "mad": 0.14260099999999976,
+          "min": 1.945874,
+          "max": 3.65108,
+          "p25": 1.997823,
+          "p75": 3.102936,
+          "samples": [
+            1.945874,
+            1.997823,
+            2.088475,
+            3.102936,
+            3.65108
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 2.073286,
+          "mad": 0.017132000000000147,
+          "min": 2.056154,
+          "max": 2.11715,
+          "p25": 2.06454,
+          "p75": 2.102904,
+          "samples": [
+            2.056154,
+            2.06454,
+            2.073286,
+            2.102904,
+            2.11715
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 187.366845,
+          "mad": 2.2159070000000156,
+          "min": 181.419818,
+          "max": 189.889148,
+          "p25": 185.150938,
+          "p75": 189.493315,
+          "samples": [
+            181.419818,
+            185.150938,
+            187.366845,
+            189.493315,
+            189.889148
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 423.121326,
+          "mad": 1.6281829999999786,
+          "min": 412.264846,
+          "max": 432.763792,
+          "p25": 422.215112,
+          "p75": 424.749509,
+          "samples": [
+            412.264846,
+            422.215112,
+            423.121326,
+            424.749509,
+            432.763792
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.096221,
+          "mad": 0.03491500000000025,
+          "min": 2.042408,
+          "max": 2.174148,
+          "p25": 2.077434,
+          "p75": 2.131136,
+          "samples": [
+            2.042408,
+            2.077434,
+            2.096221,
+            2.131136,
+            2.174148
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 265.220157,
+          "mad": 3.8780309999999645,
+          "min": 257.454849,
+          "max": 271.021212,
+          "p25": 261.342126,
+          "p75": 268.820712,
+          "samples": [
+            257.454849,
+            261.342126,
+            265.220157,
+            268.820712,
+            271.021212
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.030588,
+          "mad": 0.001753000000000001,
+          "min": 0.028835,
+          "max": 0.060164,
+          "p25": 0.030458,
+          "p75": 0.033274,
+          "samples": [
+            0.028835,
+            0.030458,
+            0.030588,
+            0.033274,
+            0.060164
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 158.094741,
+          "mad": 4.386770000000013,
+          "min": 151.059851,
+          "max": 181.121241,
+          "p25": 156.782163,
+          "p75": 162.481511,
+          "samples": [
+            151.059851,
+            156.782163,
+            158.094741,
+            162.481511,
+            181.121241
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.432313,
+          "mad": 0.038773999999999975,
+          "min": 0.376737,
+          "max": 0.481286,
+          "p25": 0.393539,
+          "p75": 0.46243,
+          "samples": [
+            0.376737,
+            0.393539,
+            0.432313,
+            0.46243,
+            0.481286
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 0.36222,
+          "mad": 0.014859000000000011,
+          "min": 0.341249,
+          "max": 0.659555,
+          "p25": 0.347361,
+          "p75": 0.368241,
+          "samples": [
+            0.341249,
+            0.347361,
+            0.36222,
+            0.368241,
+            0.659555
+          ]
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 15.651933,
+          "mad": 0.33133000000000123,
+          "min": 15.127265,
+          "max": 15.983263,
+          "p25": 15.209922,
+          "p75": 15.831956,
+          "samples": [
+            15.127265,
+            15.209922,
+            15.651933,
+            15.831956,
+            15.983263
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 178.357168,
+          "mad": 0.6424010000000067,
+          "min": 177.561813,
+          "max": 186.312299,
+          "p25": 178.038272,
+          "p75": 178.999569,
+          "samples": [
+            177.561813,
+            178.038272,
+            178.357168,
+            178.999569,
+            186.312299
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.407676,
+          "mad": 0.015829999999999955,
+          "min": 0.391846,
+          "max": 0.490894,
+          "p25": 0.405572,
+          "p75": 0.443985,
+          "samples": [
+            0.391846,
+            0.405572,
+            0.407676,
+            0.443985,
+            0.490894
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 23.811915,
+          "mad": 0.2920560000000023,
+          "min": 22.761506,
+          "max": 24.103971,
+          "p25": 22.964522,
+          "p75": 23.85121,
+          "samples": [
+            22.761506,
+            22.964522,
+            23.811915,
+            23.85121,
+            24.103971
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.949558,
+          "mad": 0.03933500000000001,
+          "min": 0.896887,
+          "max": 0.988893,
+          "p25": 0.907177,
+          "p75": 0.951001,
+          "samples": [
+            0.896887,
+            0.907177,
+            0.949558,
+            0.951001,
+            0.988893
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 180.319836,
+          "mad": 3.516194000000013,
+          "min": 176.442515,
+          "max": 188.428431,
+          "p25": 176.803642,
+          "p75": 181.19391,
+          "samples": [
+            176.442515,
+            176.803642,
+            180.319836,
+            181.19391,
+            188.428431
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.29051,
+          "mad": 0.2694129999999997,
+          "min": 2.005488,
+          "max": 3.128004,
+          "p25": 2.021097,
+          "p75": 2.460694,
+          "samples": [
+            2.005488,
+            2.021097,
+            2.29051,
+            2.460694,
+            3.128004
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 17.879674,
+          "mad": 0.29679500000000303,
+          "min": 17.582879,
+          "max": 18.481378,
+          "p25": 17.822014,
+          "p75": 18.231553,
+          "samples": [
+            17.582879,
+            17.822014,
+            17.879674,
+            18.231553,
+            18.481378
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 138.249153,
+          "mad": 1.3410539999999855,
+          "min": 132.996064,
+          "max": 143.897012,
+          "p25": 138.001261,
+          "p75": 139.590207,
+          "samples": [
+            132.996064,
+            138.001261,
+            138.249153,
+            139.590207,
+            143.897012
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 488.731996,
+          "mad": 12.840424000000041,
+          "min": 463.6259,
+          "max": 501.57242,
+          "p25": 473.52013,
+          "p75": 499.033161,
+          "samples": [
+            463.6259,
+            473.52013,
+            488.731996,
+            499.033161,
+            501.57242
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.324264,
+          "mad": 0.05356200000000033,
+          "min": 2.097142,
+          "max": 2.820288,
+          "p25": 2.285681,
+          "p75": 2.377826,
+          "samples": [
+            2.097142,
+            2.285681,
+            2.324264,
+            2.377826,
+            2.820288
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 313.699195,
+          "mad": 4.12374699999998,
+          "min": 309.575448,
+          "max": 326.871982,
+          "p25": 310.802996,
+          "p75": 323.501473,
+          "samples": [
+            309.575448,
+            310.802996,
+            313.699195,
+            323.501473,
+            326.871982
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.018294,
+          "mad": 0.00016099999999999795,
+          "min": 0.017613,
+          "max": 0.018696,
+          "p25": 0.018265,
+          "p75": 0.018455,
+          "samples": [
+            0.017613,
+            0.018265,
+            0.018294,
+            0.018455,
+            0.018696
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 167.327085,
+          "mad": 5.223063000000025,
+          "min": 159.447917,
+          "max": 177.761065,
+          "p25": 162.104022,
+          "p75": 169.36332,
+          "samples": [
+            159.447917,
+            162.104022,
+            167.327085,
+            169.36332,
+            177.761065
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.44144,
+          "mad": 0.0037679999999999936,
+          "min": 0.423917,
+          "max": 0.718227,
+          "p25": 0.438274,
+          "p75": 0.445208,
+          "samples": [
+            0.423917,
+            0.438274,
+            0.44144,
+            0.445208,
+            0.718227
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 0.983502,
+          "mad": 0.01375599999999999,
+          "min": 0.969746,
+          "max": 1.009622,
+          "p25": 0.97741,
+          "p75": 1.003481,
+          "samples": [
+            0.969746,
+            0.97741,
+            0.983502,
+            1.003481,
+            1.009622
+          ]
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 14.423866,
+          "mad": 0.06183799999999984,
+          "min": 14.362028,
+          "max": 14.931351,
+          "p25": 14.404098,
+          "p75": 14.673911,
+          "samples": [
+            14.362028,
+            14.404098,
+            14.423866,
+            14.673911,
+            14.931351
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 191.540971,
+          "mad": 7.185675000000003,
+          "min": 177.074727,
+          "max": 206.102701,
+          "p25": 184.355296,
+          "p75": 196.481025,
+          "samples": [
+            177.074727,
+            184.355296,
+            191.540971,
+            196.481025,
+            206.102701
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.412294,
+          "mad": 0.035428000000000015,
+          "min": 0.354845,
+          "max": 1.416407,
+          "p25": 0.392437,
+          "p75": 0.447722,
+          "samples": [
+            0.354845,
+            0.392437,
+            0.412294,
+            0.447722,
+            1.416407
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 35.119319,
+          "mad": 0.2575690000000037,
+          "min": 34.258039,
+          "max": 35.376888,
+          "p25": 34.640808,
+          "p75": 35.245889,
+          "samples": [
+            34.258039,
+            34.640808,
+            35.119319,
+            35.245889,
+            35.376888
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.281356,
+          "mad": 0.004518999999999995,
+          "min": 0.269523,
+          "max": 0.289892,
+          "p25": 0.276837,
+          "p75": 0.284441,
+          "samples": [
+            0.269523,
+            0.276837,
+            0.281356,
+            0.284441,
+            0.289892
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 180.092724,
+          "mad": 6.482650000000007,
+          "min": 168.006157,
+          "max": 195.456908,
+          "p25": 173.610074,
+          "p75": 182.117638,
+          "samples": [
+            168.006157,
+            173.610074,
+            180.092724,
+            182.117638,
+            195.456908
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.056315,
+          "mad": 0.044875999999999916,
+          "min": 2.011439,
+          "max": 3.36779,
+          "p25": 2.013163,
+          "p75": 2.375902,
+          "samples": [
+            2.011439,
+            2.013163,
+            2.056315,
+            2.375902,
+            3.36779
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 17.46809,
+          "mad": 0.38303900000000013,
+          "min": 16.741016,
+          "max": 18.093702,
+          "p25": 17.085051,
+          "p75": 17.638424,
+          "samples": [
+            16.741016,
+            17.085051,
+            17.46809,
+            17.638424,
+            18.093702
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 984.792352,
+          "mad": 20.004762000000028,
+          "min": 964.78759,
+          "max": 1014.526793,
+          "p25": 967.96795,
+          "p75": 1007.740649,
+          "samples": [
+            964.78759,
+            967.96795,
+            984.792352,
+            1007.740649,
+            1014.526793
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 1439.927778,
+          "mad": 20.23463700000002,
+          "min": 1419.693141,
+          "max": 1504.513168,
+          "p25": 1420.164279,
+          "p75": 1474.448231,
+          "samples": [
+            1419.693141,
+            1420.164279,
+            1439.927778,
+            1474.448231,
+            1504.513168
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 2.094307,
+          "mad": 0.02387499999999987,
+          "min": 2.015055,
+          "max": 2.118182,
+          "p25": 2.065902,
+          "p75": 2.094367,
+          "samples": [
+            2.015055,
+            2.065902,
+            2.094307,
+            2.094367,
+            2.118182
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 1279.925708,
+          "mad": 22.878637000000026,
+          "min": 1257.047071,
+          "max": 1340.819592,
+          "p25": 1259.62172,
+          "p75": 1313.997919,
+          "samples": [
+            1257.047071,
+            1259.62172,
+            1279.925708,
+            1313.997919,
+            1340.819592
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "kernel_ms": {
+          "n": 5,
+          "median": 0.002925,
+          "mad": 5.099999999999983e-05,
+          "min": 0.002855,
+          "max": 0.003016,
+          "p25": 0.002925,
+          "p75": 0.002976,
+          "samples": [
+            0.002855,
+            0.002925,
+            0.002925,
+            0.002976,
+            0.003016
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 157.647098,
+          "mad": 2.236436999999995,
+          "min": 155.410661,
+          "max": 168.787555,
+          "p25": 157.354181,
+          "p75": 167.0985,
+          "samples": [
+            155.410661,
+            157.354181,
+            157.647098,
+            167.0985,
+            168.787555
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.479974,
+          "mad": 0.05719000000000002,
+          "min": 0.422784,
+          "max": 1.190576,
+          "p25": 0.449586,
+          "p75": 0.615452,
+          "samples": [
+            0.422784,
+            0.449586,
+            0.479974,
+            0.615452,
+            1.190576
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 1.091638,
+          "mad": 0.035197000000000145,
+          "min": 1.014221,
+          "max": 1.205094,
+          "p25": 1.056441,
+          "p75": 1.110864,
+          "samples": [
+            1.014221,
+            1.056441,
+            1.091638,
+            1.110864,
+            1.205094
+          ]
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "kernel_ms": {
+          "n": 5,
+          "median": 15.670368,
+          "mad": 0.05896300000000032,
+          "min": 15.209952,
+          "max": 15.729331,
+          "p25": 15.300274,
+          "p75": 15.696086,
+          "samples": [
+            15.209952,
+            15.300274,
+            15.670368,
+            15.696086,
+            15.729331
+          ]
+        },
+        "process_ms": {
+          "n": 5,
+          "median": 191.799785,
+          "mad": 1.4163839999999936,
+          "min": 189.086812,
+          "max": 209.341776,
+          "p25": 190.947935,
+          "p75": 193.216169,
+          "samples": [
+            189.086812,
+            190.947935,
+            191.799785,
+            193.216169,
+            209.341776
+          ]
+        },
+        "compile_instantiate_ms": {
+          "n": 5,
+          "median": 0.412075,
+          "mad": 0.011412000000000033,
+          "min": 0.400663,
+          "max": 0.563353,
+          "p25": 0.410591,
+          "p75": 0.481176,
+          "samples": [
+            0.400663,
+            0.410591,
+            0.412075,
+            0.481176,
+            0.563353
+          ]
+        },
+        "entry_ms": {
+          "n": 5,
+          "median": 34.645306,
+          "mad": 0.16901099999999758,
+          "min": 34.201662,
+          "max": 35.257281,
+          "p25": 34.476295,
+          "p75": 34.724196,
+          "samples": [
+            34.201662,
+            34.476295,
+            34.645306,
+            34.724196,
+            35.257281
+          ]
+        }
+      }
+    ],
+    "paired": [
+      {
+        "case": "fannkuch",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "crc32",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "custom_hash",
+        "profile": "test",
+        "ratio": null,
+        "reason": "kernel below 10ms"
+      },
+      {
+        "case": "fannkuch",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 12.131993409376337,
+          "mad": 0.18673149927210986,
+          "min": 11.459090588680262,
+          "max": 12.318724908648447,
+          "p25": 11.85573402627486,
+          "p75": 12.239551432463172,
+          "samples": [
+            11.459090588680262,
+            11.85573402627486,
+            12.131993409376337,
+            12.239551432463172,
+            12.318724908648447
+          ]
+        },
+        "reason": ""
+      },
+      {
+        "case": "crc32",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 9.62601890206592,
+          "mad": 0.05170598805715798,
+          "min": 9.233210160053062,
+          "max": 9.677724890123079,
+          "p25": 9.404531688927376,
+          "p75": 9.637239925576727,
+          "samples": [
+            9.233210160053062,
+            9.404531688927376,
+            9.62601890206592,
+            9.637239925576727,
+            9.677724890123079
+          ]
+        },
+        "reason": ""
+      },
+      {
+        "case": "custom_hash",
+        "profile": "bounded",
+        "ratio": {
+          "n": 5,
+          "median": 64.20330832794876,
+          "mad": 0.29573444761493306,
+          "min": 61.77059466631543,
+          "max": 64.4990427755637,
+          "p25": 63.43133692992588,
+          "p75": 64.3643605336741,
+          "samples": [
+            61.77059466631543,
+            63.43133692992588,
+            64.20330832794876,
+            64.3643605336741,
+            64.4990427755637
+          ]
+        },
+        "reason": ""
+      }
+    ],
+    "observations": [
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.085354,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 279051,
+          "compile_instantiate_ns": 2007721,
+          "entry_ns": 17153121,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 159.695469,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2895,
+          "compile_instantiate_ns": 428375,
+          "entry_ns": 1035381,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 155.160566,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 25949,
+          "compile_instantiate_ns": 417836,
+          "entry_ns": 964175,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.786445,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 984163,
+          "compile_instantiate_ns": 2362327,
+          "entry_ns": 18410014,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 159.28171,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 619369,
+          "compile_instantiate_ns": 2023182,
+          "entry_ns": 2171664,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 159.185227,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 31319,
+          "compile_instantiate_ns": 826884,
+          "entry_ns": 369914,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 152.707396,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 601195,
+          "compile_instantiate_ns": 1945874,
+          "entry_ns": 2056154,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 151.059851,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 28835,
+          "compile_instantiate_ns": 432313,
+          "entry_ns": 341249,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 168.787555,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 3016,
+          "compile_instantiate_ns": 615452,
+          "entry_ns": 1205094,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 168.006157,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 284441,
+          "compile_instantiate_ns": 2011439,
+          "entry_ns": 17085051,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 159.447917,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 18265,
+          "compile_instantiate_ns": 441440,
+          "entry_ns": 977410,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 188.428431,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 951001,
+          "compile_instantiate_ns": 2290510,
+          "entry_ns": 17879674,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 158.261198,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 636181,
+          "compile_instantiate_ns": 3102936,
+          "entry_ns": 2117150,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 158.094741,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 30588,
+          "compile_instantiate_ns": 393539,
+          "entry_ns": 347361,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 167.0985,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2925,
+          "compile_instantiate_ns": 449586,
+          "entry_ns": 1056441,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.092724,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 289892,
+          "compile_instantiate_ns": 2056315,
+          "entry_ns": 17638424,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 167.327085,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 18294,
+          "compile_instantiate_ns": 423917,
+          "entry_ns": 1003481,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 180.319836,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 896887,
+          "compile_instantiate_ns": 2005488,
+          "entry_ns": 17822014,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 177.761065,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 17613,
+          "compile_instantiate_ns": 445208,
+          "entry_ns": 1009622,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 176.803642,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 907177,
+          "compile_instantiate_ns": 3128004,
+          "entry_ns": 17582879,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 155.410661,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2855,
+          "compile_instantiate_ns": 422784,
+          "entry_ns": 1014221,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 195.456908,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 276837,
+          "compile_instantiate_ns": 2375902,
+          "entry_ns": 18093702,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.71412,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 612105,
+          "compile_instantiate_ns": 3651080,
+          "entry_ns": 2064540,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 156.782163,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 30458,
+          "compile_instantiate_ns": 376737,
+          "entry_ns": 362220,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.121241,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 33274,
+          "compile_instantiate_ns": 462430,
+          "entry_ns": 368241,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 172.440608,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 605793,
+          "compile_instantiate_ns": 1997823,
+          "entry_ns": 2073286,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 173.610074,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 281356,
+          "compile_instantiate_ns": 3367790,
+          "entry_ns": 17468090,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 157.647098,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2976,
+          "compile_instantiate_ns": 1190576,
+          "entry_ns": 1091638,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 181.19391,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 949558,
+          "compile_instantiate_ns": 2021097,
+          "entry_ns": 18231553,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 162.104022,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 18455,
+          "compile_instantiate_ns": 438274,
+          "entry_ns": 969746,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 182.117638,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 269523,
+          "compile_instantiate_ns": 2013163,
+          "entry_ns": 16741016,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 157.354181,
+        "timing": {
+          "checksum": 1036619072,
+          "elapsed_ns": 2925,
+          "compile_instantiate_ns": 479974,
+          "entry_ns": 1110864,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 169.36332,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 18696,
+          "compile_instantiate_ns": 718227,
+          "entry_ns": 983502,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 176.442515,
+        "timing": {
+          "checksum": 3031698216,
+          "elapsed_ns": 988893,
+          "compile_instantiate_ns": 2460694,
+          "entry_ns": 18481378,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 162.481511,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 60164,
+          "compile_instantiate_ns": 481286,
+          "entry_ns": 659555,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "test",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 154.892915,
+        "timing": {
+          "checksum": 4428,
+          "elapsed_ns": 619699,
+          "compile_instantiate_ns": 2088475,
+          "entry_ns": 2102904,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 445.248111,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 185312099,
+          "compile_instantiate_ns": 1995349,
+          "entry_ns": 262687881,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 184.138323,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15887662,
+          "compile_instantiate_ns": 441530,
+          "entry_ns": 23908540,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 484.603913,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 136995569,
+          "compile_instantiate_ns": 2683077,
+          "entry_ns": 310817014,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 198.727193,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14816984,
+          "compile_instantiate_ns": 371437,
+          "entry_ns": 36704626,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 194.210516,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15552514,
+          "compile_instantiate_ns": 520200,
+          "entry_ns": 34476195,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": -1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1420.407324,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 962661505,
+          "compile_instantiate_ns": 2155013,
+          "entry_ns": 1252319703,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 190.947935,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15209952,
+          "compile_instantiate_ns": 412075,
+          "entry_ns": 34724196,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1420.164279,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 964787590,
+          "compile_instantiate_ns": 2094367,
+          "entry_ns": 1259621720,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 412.264846,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 181419818,
+          "compile_instantiate_ns": 2042408,
+          "entry_ns": 257454849,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.357168,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15831956,
+          "compile_instantiate_ns": 405572,
+          "entry_ns": 23851210,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 184.355296,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14362028,
+          "compile_instantiate_ns": 354845,
+          "entry_ns": 34258039,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 0,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 463.6259,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 138249153,
+          "compile_instantiate_ns": 2820288,
+          "entry_ns": 310802996,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 177.074727,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14423866,
+          "compile_instantiate_ns": 412294,
+          "entry_ns": 35119319,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 501.57242,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 139590207,
+          "compile_instantiate_ns": 2285681,
+          "entry_ns": 326871982,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.038272,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15983263,
+          "compile_instantiate_ns": 443985,
+          "entry_ns": 24103971,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 424.749509,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 189493315,
+          "compile_instantiate_ns": 2131136,
+          "entry_ns": 271021212,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 189.086812,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15729331,
+          "compile_instantiate_ns": 563353,
+          "entry_ns": 34476295,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 1,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1504.513168,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 1014526793,
+          "compile_instantiate_ns": 2094307,
+          "entry_ns": 1340819592,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 206.102701,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14404098,
+          "compile_instantiate_ns": 447722,
+          "entry_ns": 34640808,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 488.731996,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 132996064,
+          "compile_instantiate_ns": 2377826,
+          "entry_ns": 309575448,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1439.927778,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 984792352,
+          "compile_instantiate_ns": 2118182,
+          "entry_ns": 1279925708,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 209.341776,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15300274,
+          "compile_instantiate_ns": 481176,
+          "entry_ns": 35257281,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 186.312299,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15651933,
+          "compile_instantiate_ns": 391846,
+          "entry_ns": 23811915,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 2,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 432.763792,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 189889148,
+          "compile_instantiate_ns": 2096221,
+          "entry_ns": 268820712,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 196.481025,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14673911,
+          "compile_instantiate_ns": 392437,
+          "entry_ns": 35245889,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 473.52013,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 138001261,
+          "compile_instantiate_ns": 2097142,
+          "entry_ns": 313699195,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 178.999569,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15127265,
+          "compile_instantiate_ns": 490894,
+          "entry_ns": 22761506,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 422.215112,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 185150938,
+          "compile_instantiate_ns": 2174148,
+          "entry_ns": 261342126,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1474.448231,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 1007740649,
+          "compile_instantiate_ns": 2015055,
+          "entry_ns": 1313997919,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 3,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 191.799785,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15696086,
+          "compile_instantiate_ns": 400663,
+          "entry_ns": 34645306,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 191.540971,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 14931351,
+          "compile_instantiate_ns": 1416407,
+          "entry_ns": 35376888,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 499.033161,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 143897012,
+          "compile_instantiate_ns": 2324264,
+          "entry_ns": 323501473,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 423.121326,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 187366845,
+          "compile_instantiate_ns": 2077434,
+          "entry_ns": 265220157,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 177.561813,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 15209922,
+          "compile_instantiate_ns": 407676,
+          "entry_ns": 22964522,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "goose",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 193.216169,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 15670368,
+          "compile_instantiate_ns": 410591,
+          "entry_ns": 34201662,
+          "revision": 0,
+          "guest_exit_code": 0,
+          "abi": "goose-scalar",
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "backend": "blot",
+        "profile": "bounded",
+        "sample": 4,
+        "status": "passed",
+        "returncode": 0,
+        "wall_ms": 1419.693141,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 967967950,
+          "compile_instantiate_ns": 2065902,
+          "entry_ns": 1257047071,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      }
+    ]
+  },
+  "before_after": {
+    "node": {
+      "node": "24.22.1",
+      "acorn": "8.18.0",
+      "ada": "4.0.0",
+      "amaro": "1.1.11",
+      "ares": "1.34.9",
+      "brotli": "1.2.0",
+      "cldr": "48.0",
+      "icu": "78.3",
+      "llhttp": "9.4.3",
+      "merve": "1.2.2",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.4",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.70.0",
+      "nghttp3": "",
+      "ngtcp2": "",
+      "openssl": "3.5.9",
+      "simdjson": "4.6.11",
+      "simdutf": "6.4.0",
+      "sqlite": "3.53.4",
+      "tz": "2026e",
+      "undici": "7.30.1",
+      "unicode": "17.0",
+      "uv": "1.52.1",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.58",
+      "zlib": "1.3.2.1-motley-285e94b",
+      "zstd": "1.5.7"
+    },
+    "compiler_sha256": {
+      "before": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+      "after": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed"
+    },
+    "artifact_sha256": {
+      "fannkuch": {
+        "before": "bda3b87ddd9f580bd2cb792344f08824c8cd7a168f4f9ae25ac1ac8ea9639cb0",
+        "after": "8c0ded4e5fdecebf02443f24b9cfe8ba1ea2f3533a0e7a7b039f905f3a78baf7"
+      },
+      "crc32": {
+        "before": "23cd910f8a8307220af1f6f364804941d66934dc2f3e1ebbfbc99aa0f32b3ba2",
+        "after": "08fcac4d4396637252567d760c51b9f374960fc663aa8f023ea6bd4d3bcf9a4d"
+      },
+      "custom_hash": {
+        "before": "81bea989774c47df8722e243da5355df336f81a2c1bda4b85d39b054db81ec54",
+        "after": "56c6db3836835c7b3859e057e3a907b75c496f2a2732efd583b0c7c7a3dd5fbd"
+      }
+    },
+    "observations": [
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": -1,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 184038750,
+          "compile_instantiate_ns": 2124674,
+          "entry_ns": 261581910,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": -1,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 725900371,
+          "compile_instantiate_ns": 2064330,
+          "entry_ns": 925006250,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": -1,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1358045719,
+          "compile_instantiate_ns": 2062546,
+          "entry_ns": 2030754641,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": -1,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 141364060,
+          "compile_instantiate_ns": 2670834,
+          "entry_ns": 354816006,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": -1,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 1460498499,
+          "compile_instantiate_ns": 2617332,
+          "entry_ns": 1904680840,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": -1,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5992231604,
+          "compile_instantiate_ns": 2178126,
+          "entry_ns": 7314334090,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": 0,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5738799023,
+          "compile_instantiate_ns": 3688530,
+          "entry_ns": 7026743932,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": 0,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 987317725,
+          "compile_instantiate_ns": 2483137,
+          "entry_ns": 1282402911,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": 0,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 719053771,
+          "compile_instantiate_ns": 1997572,
+          "entry_ns": 919567776,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": 0,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 181158573,
+          "compile_instantiate_ns": 2031758,
+          "entry_ns": 256858723,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": 0,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1328811291,
+          "compile_instantiate_ns": 1991852,
+          "entry_ns": 2007304396,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": 0,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 144379677,
+          "compile_instantiate_ns": 2496363,
+          "entry_ns": 359518357,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": 1,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1344132639,
+          "compile_instantiate_ns": 2061514,
+          "entry_ns": 1992667990,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": 1,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 142030966,
+          "compile_instantiate_ns": 2001369,
+          "entry_ns": 317202362,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": 1,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 728861223,
+          "compile_instantiate_ns": 2055833,
+          "entry_ns": 932213089,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": 1,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 185312268,
+          "compile_instantiate_ns": 2180260,
+          "entry_ns": 265920209,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": 1,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5767964914,
+          "compile_instantiate_ns": 2335806,
+          "entry_ns": 7067664745,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": 1,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 999245570,
+          "compile_instantiate_ns": 2090409,
+          "entry_ns": 1297654257,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": 2,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 187033743,
+          "compile_instantiate_ns": 2033511,
+          "entry_ns": 265257105,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": 2,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 717658122,
+          "compile_instantiate_ns": 2044242,
+          "entry_ns": 917508299,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": 2,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 138071738,
+          "compile_instantiate_ns": 2008744,
+          "entry_ns": 307694840,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": 2,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1335239431,
+          "compile_instantiate_ns": 2001160,
+          "entry_ns": 1970536053,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": 2,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 998547987,
+          "compile_instantiate_ns": 1993113,
+          "entry_ns": 1297328469,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": 2,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5772607668,
+          "compile_instantiate_ns": 2087373,
+          "entry_ns": 7056527112,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": 3,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 6394646301,
+          "compile_instantiate_ns": 2138149,
+          "entry_ns": 7679249508,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": 3,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 958217557,
+          "compile_instantiate_ns": 2011569,
+          "entry_ns": 1248290319,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": 3,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 136925834,
+          "compile_instantiate_ns": 1988495,
+          "entry_ns": 307733468,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": 3,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1308790321,
+          "compile_instantiate_ns": 2006209,
+          "entry_ns": 1955100344,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": 3,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 186211643,
+          "compile_instantiate_ns": 2121438,
+          "entry_ns": 265097274,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": 3,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 731848624,
+          "compile_instantiate_ns": 2034974,
+          "entry_ns": 935183249,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "after",
+        "sample": 4,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 190039790,
+          "compile_instantiate_ns": 2416329,
+          "entry_ns": 267464289,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "fannkuch",
+        "side": "before",
+        "sample": 4,
+        "timing": {
+          "checksum": 1616220,
+          "elapsed_ns": 730547035,
+          "compile_instantiate_ns": 2172585,
+          "entry_ns": 934294015,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "after",
+        "sample": 4,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 963259857,
+          "compile_instantiate_ns": 2206961,
+          "entry_ns": 1256849783,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "custom_hash",
+        "side": "before",
+        "sample": 4,
+        "timing": {
+          "checksum": 1980454664,
+          "elapsed_ns": 5595534425,
+          "compile_instantiate_ns": 2137499,
+          "entry_ns": 6847994361,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "after",
+        "sample": 4,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 141688337,
+          "compile_instantiate_ns": 2044452,
+          "entry_ns": 317439539,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      },
+      {
+        "case": "crc32",
+        "side": "before",
+        "sample": 4,
+        "timing": {
+          "checksum": 3285634451,
+          "elapsed_ns": 1285776159,
+          "compile_instantiate_ns": 1994727,
+          "entry_ns": 1935450576,
+          "revision": 0,
+          "abi": 8,
+          "memory_pages": 547,
+          "engine": "V8",
+          "node": "v24.22.1",
+          "v8": "13.6.233.17-node.58"
+        }
+      }
+    ],
+    "summary": [
+      {
+        "case": "fannkuch",
+        "pairs": [
+          {
+            "before": 719.053771,
+            "after": 181.158573
+          },
+          {
+            "before": 728.861223,
+            "after": 185.312268
+          },
+          {
+            "after": 187.033743,
+            "before": 717.658122
+          },
+          {
+            "after": 186.211643,
+            "before": 731.848624
+          },
+          {
+            "after": 190.03979,
+            "before": 730.547035
+          }
+        ],
+        "before_ms": {
+          "samples": [
+            719.053771,
+            728.861223,
+            717.658122,
+            731.848624,
+            730.547035
+          ],
+          "median": 728.861223,
+          "mad": 2.987400999999977
+        },
+        "after_ms": {
+          "samples": [
+            181.158573,
+            185.312268,
+            187.033743,
+            186.211643,
+            190.03979
+          ],
+          "median": 186.211643,
+          "mad": 0.8993750000000205
+        },
+        "paired_speedup": 3.9301979844514876
+      },
+      {
+        "case": "crc32",
+        "pairs": [
+          {
+            "before": 1328.811291,
+            "after": 144.379677
+          },
+          {
+            "before": 1344.132639,
+            "after": 142.030966
+          },
+          {
+            "after": 138.071738,
+            "before": 1335.239431
+          },
+          {
+            "after": 136.925834,
+            "before": 1308.790321
+          },
+          {
+            "after": 141.688337,
+            "before": 1285.776159
+          }
+        ],
+        "before_ms": {
+          "samples": [
+            1328.811291,
+            1344.132639,
+            1335.239431,
+            1308.790321,
+            1285.776159
+          ],
+          "median": 1328.811291,
+          "mad": 15.321347999999944
+        },
+        "after_ms": {
+          "samples": [
+            144.379677,
+            142.030966,
+            138.071738,
+            136.925834,
+            141.688337
+          ],
+          "median": 141.688337,
+          "mad": 2.6913399999999967
+        },
+        "paired_speedup": 9.463659065727962
+      },
+      {
+        "case": "custom_hash",
+        "pairs": [
+          {
+            "before": 5738.799023,
+            "after": 987.317725
+          },
+          {
+            "before": 5767.964914,
+            "after": 999.24557
+          },
+          {
+            "after": 998.547987,
+            "before": 5772.607668
+          },
+          {
+            "before": 6394.646301,
+            "after": 958.217557
+          },
+          {
+            "after": 963.259857,
+            "before": 5595.534425
+          }
+        ],
+        "before_ms": {
+          "samples": [
+            5738.799023,
+            5767.964914,
+            5772.607668,
+            6394.646301,
+            5595.534425
+          ],
+          "median": 5767.964914,
+          "mad": 29.165891000000556
+        },
+        "after_ms": {
+          "samples": [
+            987.317725,
+            999.24557,
+            998.547987,
+            958.217557,
+            963.259857
+          ],
+          "median": 987.317725,
+          "mad": 11.927845000000048
+        },
+        "paired_speedup": 5.80895631052961
+      }
+    ]
+  },
+  "production": [
+    {
+      "case": "fannkuch",
+      "input": {
+        "parameters": [
+          8
+        ],
+        "iterations": 700,
+        "warmups": 140,
+        "expected": 135762480,
+        "revision": 0
+      },
+      "status": "passed",
+      "wall_ms": 19602.064389997395,
+      "timing": {
+        "checksum": 135762480,
+        "elapsed_ns": 16168160031,
+        "compile_instantiate_ns": 4335602,
+        "entry_ns": 19440400826,
+        "revision": 0,
+        "abi": 8,
+        "memory_pages": 547,
+        "engine": "V8",
+        "node": "v24.22.1",
+        "v8": "13.6.233.17-node.58"
+      }
+    },
+    {
+      "case": "crc32",
+      "input": {
+        "parameters": [
+          1000000
+        ],
+        "iterations": 150,
+        "warmups": 30,
+        "expected": 2318723244,
+        "revision": 0
+      },
+      "status": "passed",
+      "wall_ms": 6503.64167499356,
+      "timing": {
+        "checksum": 2318723244,
+        "elapsed_ns": 5163991328,
+        "compile_instantiate_ns": 2037678,
+        "entry_ns": 6338190704,
+        "revision": 0,
+        "abi": 8,
+        "memory_pages": 547,
+        "engine": "V8",
+        "node": "v24.22.1",
+        "v8": "13.6.233.17-node.58"
+      }
+    },
+    {
+      "case": "custom_hash",
+      "input": {
+        "parameters": [
+          1000000
+        ],
+        "iterations": 1200,
+        "warmups": 240,
+        "expected": 2844672256,
+        "revision": 0
+      },
+      "status": "passed",
+      "wall_ms": 22405.114633991616,
+      "timing": {
+        "checksum": 2844672256,
+        "elapsed_ns": 18471560404,
+        "compile_instantiate_ns": 2067055,
+        "entry_ns": 22245085245,
+        "revision": 0,
+        "abi": 8,
+        "memory_pages": 547,
+        "engine": "V8",
+        "node": "v24.22.1",
+        "v8": "13.6.233.17-node.58"
+      }
+    }
+  ],
+  "profiles": {
+    "before": {
+      "raw_profile": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/profile/CPU.20261103.141553.1560624.0.001.cpuprofile",
+        "sha256": "e6aa5082d69b44e8f0174c6a86fd134ce229d3845cd808443572c9f4221d6595"
+      },
+      "samples": 6402,
+      "top_self_samples": [
+        {
+          "function": "wasm-function[17]",
+          "samples": 2443,
+          "percent": 38.15995001562012
+        },
+        {
+          "function": "wasm-function[8]",
+          "samples": 1747,
+          "percent": 27.288347391440176
+        },
+        {
+          "function": "wasm-function[39]",
+          "samples": 754,
+          "percent": 11.777569509528272
+        },
+        {
+          "function": "wasm-function[19]",
+          "samples": 497,
+          "percent": 7.763199000312403
+        },
+        {
+          "function": "wasm-function[22]",
+          "samples": 419,
+          "percent": 6.544829740706029
+        },
+        {
+          "function": "wasm-function[44]",
+          "samples": 323,
+          "percent": 5.045298344267416
+        },
+        {
+          "function": "wasm-function[38]",
+          "samples": 31,
+          "percent": 0.48422368009996875
+        },
+        {
+          "function": "__require",
+          "samples": 17,
+          "percent": 0.2655420181193377
+        }
+      ]
+    },
+    "after": {
+      "raw_profile": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/profile-after/CPU.20261103.145454.1711426.0.001.cpuprofile",
+        "sha256": "55fbea0dfa3fa0eb496152cd8a0713069257e9a41bf846bc08248d0014e5b1c6"
+      },
+      "samples": 1313,
+      "top_self_samples": [
+        {
+          "function": "wasm-function[39]",
+          "samples": 1088,
+          "percent": 82.86367098248286
+        },
+        {
+          "function": "wasm-function[17]",
+          "samples": 51,
+          "percent": 3.884234577303884
+        },
+        {
+          "function": "__require",
+          "samples": 23,
+          "percent": 1.7517136329017517
+        },
+        {
+          "function": "wasm-function[19]",
+          "samples": 9,
+          "percent": 0.6854531607006854
+        },
+        {
+          "function": "wasm-function[29]",
+          "samples": 8,
+          "percent": 0.6092916984006093
+        },
+        {
+          "function": "compileForInternalLoader",
+          "samples": 6,
+          "percent": 0.456968773800457
+        },
+        {
+          "function": "Module",
+          "samples": 5,
+          "percent": 0.38080731150038083
+        },
+        {
+          "function": "wasm-function[63]",
+          "samples": 5,
+          "percent": 0.38080731150038083
+        }
+      ]
+    }
+  },
+  "gdev_main": {
+    "before": {
+      "evidence": "/home/jacobt/src/blot2/build/bench/runtime-hills/main-before/main-2df1e780e654a386",
+      "identity": "a304dd9749c9e053d62a3fdc337155cf4789b4e2b5ea836456fdf0dfdfc1b93f",
+      "compiler": "/home/jacobt/src/blot2/build/bench/goose-v8-2026-11-03/frozen/blot/bin/blotc",
+      "compilerSha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "sourceCheckpoint": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "deadlineMs": 30000,
+      "codegenTier": "optimized",
+      "codegenWorkers": 1,
+      "frontendWorkers": 4,
+      "buildMs": 6157.276516000001,
+      "sessionOpenMs": 6.509546999999998,
+      "totalCompileMs": 6163.788748,
+      "profileBackend": false,
+      "profileTrace": false,
+      "success": true,
+      "compiled": true,
+      "wasmBytes": 12932581,
+      "assetCount": 0,
+      "wasm_sha256": "2dec52c42d3f557551bb38cd1cd689e14130a7f24c3d9bfd8caed2b1e0c9795e",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/main-before/main-2df1e780e654a386/result.json",
+        "sha256": "97c5f114d5d375b2f8b7acbc31d38bc8950d582e5ea5056d7124a6546cce0818"
+      }
+    },
+    "after": {
+      "evidence": "/home/jacobt/src/blot2/build/bench/runtime-hills/main-after/main-bb0744f55cd19961",
+      "identity": "1e8a2c1ce550265fc4d4d319566c153381d2b9433e4358afb4b5e2f32201cf8b",
+      "compiler": "/home/jacobt/src/blot2/zig-native/zig-out/bin/blotc",
+      "compilerSha256": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed",
+      "entry": "/home/jacobt/src/gdev/src/main.blot",
+      "sourceCheckpoint": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "deadlineMs": 30000,
+      "codegenTier": "optimized",
+      "codegenWorkers": 1,
+      "frontendWorkers": 4,
+      "buildMs": 6062.127255,
+      "sessionOpenMs": 8.839259000000013,
+      "totalCompileMs": 6070.969379,
+      "profileBackend": false,
+      "profileTrace": false,
+      "success": true,
+      "compiled": true,
+      "wasmBytes": 12550610,
+      "assetCount": 0,
+      "wasm_sha256": "994cc7119b5ac72f8c242c3434ae3b9ae3d57fa08df8d936e164d8e9841d6715",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/main-after/main-bb0744f55cd19961/result.json",
+        "sha256": "130c1d26231a5df007a91f998b1e2792818dd468cd8b8087e1e6ef17c21400cf"
+      }
+    }
+  },
+  "components": {
+    "world": {
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/world/result.json",
+        "sha256": "63a3de3d4e35e46443ce364eebcb3c7f43f576905c77f9986d3c6febddeb2c96"
+      },
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "entry_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+          "wasm_bytes": 495494,
+          "wasm_sha256": "24b246aafa89e5c22cf4ed5f72b03f369c633a7579819426166c61337abed99e",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed",
+          "wasm_bytes": 480499,
+          "wasm_sha256": "10bbb908671b769b36b145cc698b67affae8268c4b3951263817ab5fe918a4a7",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "hand": {
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/hand/result.json",
+        "sha256": "8d2f4fe48e4b71ec32e9a1737236f8420026647f12cb123c33fada9063922543"
+      },
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "entry_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+          "wasm_bytes": 203340,
+          "wasm_sha256": "c07f159e73d22c494efd3e2bbc1d03dfd22630fbe34ee5dacaa919b7de3b4513",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed",
+          "wasm_bytes": 197999,
+          "wasm_sha256": "d2a42162c9e52eecc7b34fff4dc58bd828d63275a5996d73dd1815f6d6368d82",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "renderer": {
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/renderer/pair-47d6abdc34a68488/result.json",
+        "sha256": "8eb62669b828a2d0417611462f92bebeab3ee19cd321e2656378bf61cd52c69f"
+      },
+      "pins": {
+        "compiler_sha256": "b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed",
+        "baseline_compiler_sha256": "f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 94648,
+          "wasm_sha256": "bde5380d6049f1ac7b28d5c47353c374e6854a58f0cc8f6abfec8ae313285729",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 91157,
+          "wasm_sha256": "e2e32d9e419ee974dcffc2d699189017ada37aa940d7cfb895edc0da6726e86c",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        }
+      ],
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "development": {
+      "passed": true,
+      "wall_seconds": 44.793012905999994,
+      "complete_native_inventory": 2931,
+      "native_laws": 195,
+      "guest_tests": 190,
+      "allocation_failures": "sampled",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/check-dev-pass/results.json",
+        "sha256": "d4a373acd5d32e8a3422bbc09607e97194e2e38def866aead5ffcd0e9d904702"
+      }
+    },
+    "full_faults": [
+      {
+        "name": "backend.scoped_backend_tests.test.scoped source storage publishes validated Wasm and releases every failed allocation",
+        "duration_ns": 419880431,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.scoped_backend_tests.test.inline nominal patterns and updates preserve type evidence through allocation failure",
+        "duration_ns": 423667063,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.scoped_backend_tests.test.data stack host callbacks publish copy transport through allocation failure",
+        "duration_ns": 588900495,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.scoped_backend_tests.test.owned return children preserve completed nominal exits through allocation failure",
+        "duration_ns": 964867527,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.scoped_backend_tests.test.scoped loop cleanup retains temporary owners and conditional exits through OOM",
+        "duration_ns": 1367283602,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.scoped_backend_tests.test.scoped indexed replacements preserve pinned growth and sibling writes through OOM",
+        "duration_ns": 1669456684,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_calls_tests.test.loop header inline variants publish across entry backedge and continue allocation failures",
+        "duration_ns": 804182285,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_calls_tests.test.proven empty borrowed rows keep zero iteration exits and trap reads across allocation failures",
+        "duration_ns": 492604322,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_call_graph_tests.test.storage descriptor DAGs share nested reader and writer definitions",
+        "duration_ns": 29520019,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 0,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      },
+      {
+        "name": "backend.storage_call_graph_tests.test.storage descriptor DAG publication survives allocation failures",
+        "duration_ns": 1678288868,
+        "status": "passed",
+        "leaks": 0,
+        "logged_errors": 0,
+        "allocation_failures": "full",
+        "sweeps": {
+          "full_sweeps": 1,
+          "sampled_sweeps": 0,
+          "discovered_allocations": 0,
+          "fault_runs": 0
+        }
+      }
+    ],
+    "llvm_guests": {
+      "passed": 190,
+      "failed": 0,
+      "junit": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/llvm-scoped-guests.xml",
+        "sha256": "2084cbcbb08b5bba2bb34851d4a0c06e00807d6035c5e25a5dfbcd46add9e2b4"
+      }
+    },
+    "full_gate": {
+      "status": "48 smoke passes / 1 unchanged List/chunk storage_escape failure; later qualification phases not reached",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/full-gate-final/timings.json",
+        "sha256": "35e515181c7859a5ab5ce9f8602bf23fedd583ffdce2444cabcdae398cc22451"
+      }
+    },
+    "pen": {
+      "status": "Installed host rejects ABI 8; no frame/PNG qualification",
+      "log": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/pen-with-libraries/run.log",
+        "sha256": "23c04c160167bbbbcfac0d4aba9192a9dea05e5331dc71cb35d87f3237fc0a78"
+      },
+      "initial_loader_failure": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/pen/run.log",
+        "sha256": "d792738797e9ca3abecb2701c8346a2ef5a0252edc55ec52aeaf68fc816ef7d7"
+      }
+    },
+    "format": "Full repository format check passed after formatting generated charts; generator now applies Deno fmt.",
+    "types": "Development family typecheck passed.",
+    "zig_lint": "596 source files and 1 Zig fixture checked; zero findings.",
+    "main_engine": {
+      "valid": true,
+      "bytes": 12550610,
+      "engine_compile_ms": 38.354761999999994,
+      "imports": 1,
+      "exports": 4,
+      "node": "v24.22.1",
+      "v8": "13.6.233.17-node.58"
+    }
+  },
+  "test_repairs": {
+    "native_dag": "Two retired reader/admission counter assertions failed on untouched baseline native source. Replaced with exact 6/18 completed-plan definitions, positive reuse and ordered read/write events; retained DAG growth bounds and full OOM.",
+    "source_dag": "Untouched baseline LLVM also failed retired source-proof instance assertions. Now checks completed source bodies, bounded plan counts and reuse, retaining all executed recurrence checks.",
+    "wide_fields": "Untouched baseline LLVM failed positive-index-work assertions because all 72 result words already forward. Accept either positive indexing or complete store/load elimination with a completed plan, preserving exact executed results.",
+    "duplicate_selection": "Removed a duplicate scoped-storage family entry; runner rejected incomplete selection before the fix.",
+    "evidence": [
+      {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/baseline-native/test.log",
+        "sha256": "35d621f555cc3fe771e2b584c1fce1fad9599c5bb5e323d84922b555e3eaa9c9"
+      },
+      {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/baseline-source-proof.log",
+        "sha256": "bb63d9e8267034aa2bc31718f043977dc5abc4ab33b0a51de7c367de8c05fc94"
+      },
+      {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/baseline-refinement.log",
+        "sha256": "7ec6f2f3d6ba12dd91cb7a6a4e268305a1f9b364804dcf7d847575b0cd5278f5"
+      }
+    ]
+  },
+  "notes": [
+    "Three of seven adapted LangArena tasks; V8 only. Bounded retains production problem sizes with reduced counts, not an official production score.",
+    "Blot U32 hash buffers have 4x Goose U8 element payload bytes; owner metadata and reserved arenas are separate. Distinct language ABI costs remain included.",
+    "All Goose artifacts match the original frozen comparator byte-for-byte. Its live sibling binary changed externally; final runs explicitly use the original frozen binary.",
+    "Matched before/after timings execute byte-identical frozen LLVM baseline programs. The before byte files were reproduced with noLLVM and checked against the actual old LLVM artifact hashes; noLLVM baseline producer SHA256: 0b454fec22cd30e180bdb7546b77968255e4db9279161aba632b3d34f1a18e4c",
+    "Current release artifacts match the final noLLVM diagnostic artifacts; compiler build times from those diagnostic runs are not compared to LLVM.",
+    "Shared-host timings with seeded paired order; dispersion and all samples retained. No deliberate concurrent measurement work.",
+    "Production uses one checked run per case under a 30-second whole-process cap. It is completion evidence, not a production ranking.",
+    "Gdev compile latency is one before/after pilot pair, not a demonstrated latency gain. Size and workload hashes are exact.",
+    "Full compiler/runtime qualification remains pending despite the passing affected family; installed Pen still rejects ABI 8."
+  ],
+  "next_hill": "A validated fixed-array span can hoist descriptor/owner checks while preserving per-access bounds, lifetime and effect order. Current hot accesses still use the ordinary checked path.",
+  "diagnostic_hills": [
+    {
+      "tag": "loop-rewind",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/loop-rewind/results.json",
+        "sha256": "e895b0fd9a4410ffa4ade06d32e6d4c6fe5af69eb88af624dd7dbbcba3d4b3e5"
+      },
+      "compiler_patch": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/loop-rewind/compiler.patch",
+        "sha256": "24c7b5ba1682d1d6f7d56a133394fd1377678fb9620aa371ba82d64a2d20f8ff"
+      },
+      "Blot_pilot": [
+        {
+          "case": "fannkuch",
+          "kernel_ms": 419.270191,
+          "wasm_bytes": 6349
+        },
+        {
+          "case": "crc32",
+          "kernel_ms": 543.515122,
+          "wasm_bytes": 5288
+        },
+        {
+          "case": "custom_hash",
+          "kernel_ms": 3712.99586,
+          "wasm_bytes": 6095
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "tag": "marks-removed",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/marks-removed/report.json",
+        "sha256": "df215c10a3143fe9ea527cf320afbd1f4d8704f526f2bd955a121fad8c3e3b5b"
+      },
+      "compiler_patch": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/marks-removed/compiler.patch",
+        "sha256": "e4a2778e115bb129eb83ec231a8d3f9908e873b7cab7cbe124f7cf28087c137f"
+      },
+      "Blot_pilot": [
+        {
+          "case": "fannkuch",
+          "kernel_ms": 264.102171
+        },
+        {
+          "case": "crc32",
+          "kernel_ms": 126.221245
+        },
+        {
+          "case": "custom_hash",
+          "kernel_ms": 1128.500601
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "tag": "address-reuse",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/address-reuse/report.json",
+        "sha256": "597cf774d7c294e37773887acf0850ef1e1e6d560fbd386ebd09cc27bf9e223e"
+      },
+      "compiler_patch": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/address-reuse/compiler.patch",
+        "sha256": "67481a67b652de7bee25c011b178f3645b18bbe040fee74d1c8af90b595c92c8"
+      },
+      "Blot_pilot": [
+        {
+          "case": "fannkuch",
+          "kernel_ms": 173.54872
+        },
+        {
+          "case": "crc32",
+          "kernel_ms": 130.401542
+        },
+        {
+          "case": "custom_hash",
+          "kernel_ms": 926.527239
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "tag": "scalar-inline",
+      "raw_report": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/scalar-inline/report.json",
+        "sha256": "bbf4a311be8b93fe760aab3d5642c081b9f167b12d737e6eae54c47adc14d753"
+      },
+      "compiler_patch": {
+        "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/scalar-inline/compiler.patch",
+        "sha256": "ddbfc4de0a10791e9f733f58d9855af4bfd1d27b615578175173179fa341f752"
+      },
+      "Blot_pilot": [
+        {
+          "case": "fannkuch",
+          "kernel_ms": 179.06349
+        },
+        {
+          "case": "crc32",
+          "kernel_ms": 131.103573
+        },
+        {
+          "case": "custom_hash",
+          "kernel_ms": 928.228947
+        }
+      ],
+      "accepted": false
+    }
+  ],
+  "rejected_experiment": "Eight-node scalar inlining reduced fixture bytes but showed no runtime improvement over address reuse; reverted before qualification and release.",
+  "gdev_census": {
+    "raw_report": {
+      "path": "/home/jacobt/src/blot2/build/bench/runtime-hills/main-census.json",
+      "sha256": "be8f0d7d18073f48ba51ca786d31aa132871a1b743fe547738d243b124975941"
+    },
+    "declared_locals": 413749,
+    "declared_locals_before": 408892,
+    "mutable_globals": 56176,
+    "mutable_globals_before": 56122,
+    "categories": [
+      {
+        "name": "locals",
+        "count": 2414568,
+        "bytes": 6658593,
+        "before_bytes": 6812073,
+        "delta_bytes": -153480
+      },
+      {
+        "name": "globals",
+        "count": 499147,
+        "bytes": 1698465,
+        "before_bytes": 1729884,
+        "delta_bytes": -31419
+      },
+      {
+        "name": "constants",
+        "count": 544964,
+        "bytes": 1279158,
+        "before_bytes": 1391139,
+        "delta_bytes": -111981
+      },
+      {
+        "name": "calls",
+        "count": 339751,
+        "bytes": 781406,
+        "before_bytes": 866598,
+        "delta_bytes": -85192
+      },
+      {
+        "name": "loads",
+        "count": 234709,
+        "bytes": 731635,
+        "before_bytes": 731635,
+        "delta_bytes": 0
+      },
+      {
+        "name": "control",
+        "count": 371808,
+        "bytes": 551616,
+        "before_bytes": 551622,
+        "delta_bytes": -6
+      },
+      {
+        "name": "stores",
+        "count": 107674,
+        "bytes": 330424,
+        "before_bytes": 330424,
+        "delta_bytes": 0
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 136173,
+        "bytes": 136497,
+        "before_bytes": 136497,
+        "delta_bytes": 0
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643,
+        "before_bytes": 1643,
+        "delta_bytes": 0
+      }
+    ]
+  }
+}

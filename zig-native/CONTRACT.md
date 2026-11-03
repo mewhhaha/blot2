@@ -69,6 +69,18 @@ owners without walking their contents. This path is not yet the default for
 ordinary programs; the migration document lists the required remaining work.
 These guest rules do not change the host compiler allocation contracts below.
 
+Completed scopes that added no owner omit their fixed-region mark and rewind.
+The owner inventory remains monotonic after release, so a closed temporary or
+conditional return still retains cleanup. Loop exits keep the shared mark until
+the whole body is known; neutral instructions preserve machine coordinates.
+Calls remain responsible for reclaiming their own temporary owners.
+
+An indexed assignment validates its selected address before evaluating the
+replacement. Its live borrow pins the nonmoving extent across that evaluation,
+including growth. The final store reuses that address and writes only the
+selected field, retaining sibling writes through aliases. Shrinking remains
+rejected while the selected borrow is live.
+
 A control-flow merge may retain a dominating aggregate's physical words when
 both incoming Core values canonicalize to that exact binding and the complete
 compilation has no scalar addresses. This identity proof includes unchanged

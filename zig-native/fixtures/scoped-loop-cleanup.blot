@@ -1,0 +1,101 @@
+const anchor: Array U32 = #[7]
+
+const scratch = func (value: U32): U32 => return do:
+  let rows: Array U32 = #[value, @u32.add value 1]
+  return @u32.add rows[0] rows[1]
+
+entry const scalar = func (count: U32): U32 => return do:
+  let total = 0
+  for index in 0 .. count:
+    if @u32.eq (@u32.rem index 2) 0:
+      continue
+    for lane in 0 .. 4:
+      if @u32.eq lane 3:
+        break
+      total := @u32.add self (@u32.add index lane)
+  return @u32.add total anchor[0]
+
+entry const forever = func (count: U32): U32 => return do:
+  let remaining = count
+  let total = 0
+  for ever:
+    if @u32.eq remaining 0:
+      break
+    remaining := @u32.sub self 1
+    if @u32.eq (@u32.rem remaining 2) 0:
+      continue
+    total := @u32.add self remaining
+  return total
+
+entry const temporary = func (count: U32): U32 => return do:
+  let kept: ResizeArray U32 = #[7]
+  let total = 0
+  for index in 0 .. count:
+    let closed = do:
+      let earlier: Array U32 = #[index]
+      break earlier[0]
+    let rows: Array U32 = #[closed, scratch index]
+    for lane in 0 .. 2:
+      let nested: Array U32 = #[rows[lane]]
+      total := @u32.add self nested[0]
+      if @u32.eq lane 0:
+        continue
+      break
+    if @u32.eq (@u32.rem index 2) 0:
+      continue
+  return @u32.add total kept[0]
+
+const choose = func (count: U32): Array U32 => return do:
+  for index in 0 .. count:
+    if @u32.eq (@u32.add index 1) count:
+      return #[index, @u32.add index 1]
+  return #[99]
+
+entry const conditional = func (count: U32): Array U32 => return choose count
+
+const choose_scratch = func (count: U32): Array U32 => return do:
+  for index in 0 .. count:
+    let rows: Array U32 = #[index, @u32.add index 1]
+    if @u32.eq (@u32.add index 1) count:
+      return #[rows[0], rows[1]]
+  return #[99]
+
+entry const conditional_scratch = func (count: U32): Array U32 => return choose_scratch count
+
+entry const bounds = func (index: U32): U32 => return do:
+  let rows: ResizeArray U32 = #[41, 42]
+  return rows[index]
+
+const append_rhs = func (rows: ResizeArray U32) -> (value: U32): U32 => return do:
+  @storage.push rows (@u32.add value 1)
+  return @u32.add value 10
+
+entry const grow_rhs = func (value: U32): Array U32 => return do:
+  let rows: ResizeArray U32 = #[value]
+  @storage.reserve rows 2
+  let alias = rows
+  rows[0] := append_rhs alias value
+  return @storage.freeze rows
+
+const mutate_sibling = func (rows: Array {left: U32, right: U32}) -> (value: U32): U32 => return do:
+  rows[0].right := @u32.add value 1
+  return value
+
+entry const sibling_rhs = func (value: U32): Array U32 => return do:
+  let rows: Array {left: U32, right: U32} = #[{left: 1, right: 2}]
+  let alias = rows
+  rows[0].left := mutate_sibling alias value
+  return #[rows[0].left, rows[0].right]
+
+const counter: Array U32 = #[0]
+const bump = func (): U32 => return do:
+  let state = counter
+  state[0] := @u32.add self 1
+  return 42
+
+entry const counter_read = func (): U32 => return counter[0]
+
+entry const checked_order = func (index: U32): U32 => return do:
+  let rows: ResizeArray U32 = #[1]
+  rows[index] := bump ()
+  return rows[0]

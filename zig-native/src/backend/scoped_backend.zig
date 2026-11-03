@@ -201,7 +201,8 @@ const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining:
 const ValueJoin = struct { value: ?Value = null, physical: deferred_join.Join, selective: bool = false };
 const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ValueJoin };
 const LoopSharing = struct { whole: bool = false, fields: []const bool = &.{} };
-const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const LoopSharing, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
+const FrameMark = struct { word: Local, first: usize, end: usize };
+const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const LoopSharing, headers: []const Value, iterator: ?Local, mark: FrameMark, depth: usize, read_frame: usize };
 const RootRead = struct { owner: usize, shape: *const Value };
 const ReadFrame = struct {
     owner_limit: usize,
@@ -659,21 +660,26 @@ const Generator = struct {
             try self.c.set(owner.token, 0);
         }
     }
-    fn frameMark(self: *Generator) Error!Local {
+    fn frameMark(self: *Generator) Error!FrameMark {
         const mark = try self.c.temp();
+        const first = self.module.functions.items[self.c.function].instructions.items.len;
         try self.c.set(mark, .{ .call, self.runtime.functions.mark, self.fixed_region });
-        return mark;
+        return .{ .word = mark, .first = first, .end = self.module.functions.items[self.c.function].instructions.items.len };
     }
-    fn rewindUnescaped(self: *Generator, first: usize, mark: Local, keep: Value) Error!void {
+    fn rewindUnescaped(self: *Generator, first: usize, mark: FrameMark, keep: Value) Error!void {
         // Pure helper/block evaluation creates no owner to invalidate and
-        // cannot advance this fixed region. Avoid scanning unrelated owners.
-        if (first == self.roots.items.len) return;
+        // cannot advance this fixed region. Its completed scope needs neither
+        // a mark nor a scan of unrelated owners. Keep instruction coordinates.
+        if (first == self.roots.items.len) {
+            @memset(self.module.functions.items[self.c.function].instructions.items[mark.first..mark.end], .{ .op = .nop });
+            return;
+        }
         // A caller opened this owner before entering the callee, but its
         // payload is constructed after the callee's mark. Root creation order
         // alone cannot prove that rewinding preserves the returned payload.
         if (self.external_destination) |root_id| if (hasRoot(keep, root_id)) return;
         for (first..self.roots.items.len) |index| if (hasRoot(keep, index)) return;
-        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark });
+        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark.word });
     }
     fn root(self: *Generator, m: *const core.Module, id: core.Id, value: Value) Error!*Root {
         return &self.roots.items[value.root orelse return self.unsupported(m, id)];
@@ -1589,7 +1595,7 @@ const Generator = struct {
         if (!plainShape(source_shape) or try width(source_shape) != try width(shape_)) return self.unsupported(owner, initializer);
         try self.c.copy(.{ .i32_add, word, storage.header_bytes }, .{ .i32_add, source.word, storage.header_bytes }, .{ .i32_mul, count, try width(shape_) });
         try self.release(temporary_start, null);
-        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, initialization_mark });
+        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, initialization_mark.word });
         try self.c.value(word);
         try self.c.op(.global_set, global.word);
         self.nesting -= 1;
@@ -4494,7 +4500,7 @@ const Generator = struct {
         var returned: Value = .{ .word = word };
         if (!unit_result) returned = try self.loadPlannedResult(address, @intCast(words * 4), result_template, plan.result_aliases, arguments);
         try self.release(first_root, null);
-        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark });
+        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, mark.word });
         returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(body.root) }, .arguments = try self.captureTypes() });
         return returned;
@@ -4518,7 +4524,7 @@ const Generator = struct {
         self.emission_work.scoped_owned_word_calls +|= 1;
         self.emission_work.scoped_owned_argument_words_avoided +|= words;
         const first_root = self.roots.items.len;
-        var mark: ?Local = null;
+        var mark: ?FrameMark = null;
         var address: ?Local = null;
         const result_slot = template.tag != .scalar and return_registers == 0;
         const forwarded_result = result_slot and fullyAliasedResult(result_aliases);
@@ -4565,7 +4571,7 @@ const Generator = struct {
         } else if (address) |pointer| returned = try self.loadPlannedResult(pointer, 0, template, result_aliases, arguments);
         if (mark) |saved| {
             try self.release(first_root, null);
-            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
+            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved.word });
         }
         returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = T.unit }, .arguments = &.{} });
         if (!unit_result) returned.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = m.unit, .ty = m.typeOf(id) }, .arguments = try self.captureTypes() });
@@ -4979,7 +4985,7 @@ const Generator = struct {
         self.noteCalleeContext(entry);
         if (entry.building) return self.fail(m, id, .storage_unsupported, "Recursive callback specialization is not admitted");
         const first_root = self.roots.items.len;
-        const mark: ?Local = if (aggregate_result) try self.frameMark() else null;
+        const mark: ?FrameMark = if (aggregate_result) try self.frameMark() else null;
         var address: ?Local = null;
         if (aggregate_result) {
             const slot = try self.arrayWithShape(m, id, (try self.constant(1)).word, .fixed, result_shape);
@@ -4996,7 +5002,7 @@ const Generator = struct {
         if (address) |pointer| result = try self.loadValue(pointer, 0, result_shape);
         if (mark) |saved| {
             try self.release(first_root, null);
-            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved });
+            try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, saved.word });
         }
         result.type_evidence = try self.boxTypeEvidence(.{ .root = .{ .unit = owner.unit, .ty = owner.typeOf(closure.body) }, .arguments = try self.captureTypes() });
         return result;
@@ -6064,11 +6070,11 @@ const Generator = struct {
                 owner.known_empty = false;
             };
             try self.writerEvent(m, id, value, .write);
-            const address = try self.c.temp();
-            try self.c.set(address, .{ .call, self.runtime.functions.address, value.token, value.epoch_low, value.epoch_high, value.word, index });
             // Write the selected place only. The RHS may have written other
             // fields through an alias; rebuilding the row would erase them.
-            try self.storeValue(address, offset, replacement);
+            // The selected borrow pins this nonmoving extent across the RHS,
+            // so its pre-RHS checked address remains valid after growth too.
+            try self.storeValue(place.address, offset, replacement);
         } else {
             const projection = if (selectors.len != 0) selectors[at].projection else path[at];
             const field = try self.writableProjected(m, id, &value, projection);
@@ -6166,8 +6172,7 @@ const Generator = struct {
         try self.c.op(.block, 0);
         try self.c.op(.loop, 0);
         self.nesting += 2;
-        const frame_mark = try self.c.temp();
-        try self.c.set(frame_mark, .{ .call, self.runtime.functions.mark, self.fixed_region });
+        const frame_mark = try self.frameMark();
         try self.loops.append(self.allocator, .{ .unit = m.unit, .id = id, .nesting = self.nesting, .roots_before = roots_before, .carries = values, .shared = shared, .headers = headers, .iterator = if (info.kind != .forever) iterator else null, .mark = frame_mark, .depth = self.depth + 1, .read_frame = read_frame });
         defer _ = self.loops.pop();
         if (info.kind != .forever) {
@@ -6200,7 +6205,7 @@ const Generator = struct {
         // Rewind that iteration too; the next iteration reopens the same slot.
         try self.closeRuntime(roots_before, try self.unitValue());
         try self.release(roots_before, null);
-        try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, frame_mark });
+        try self.rewindUnescaped(roots_before, frame_mark, try self.unitValue());
         self.depth -= 1;
         self.bindings.shrinkRetainingCapacity(bindings_before);
         if (info.kind != .forever) try self.c.next(iterator);
@@ -6461,7 +6466,9 @@ const Generator = struct {
                     }
                     if (n.op == .continue_) try self.checkReadFrame(m, id, target.read_frame);
                     try self.closeRuntime(target.roots_before, try self.unitValue());
-                    try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, target.mark });
+                    // Other paths may still allocate after this exit. Only
+                    // the completed loop may discard its shared header mark.
+                    if (target.roots_before != self.roots.items.len) try self.c.value(.{ .call, self.runtime.functions.rewind, self.fixed_region, target.mark.word });
                     if (n.op == .continue_) if (target.iterator) |iterator| try self.c.next(iterator);
                     try self.c.op(.br, self.nesting - target.nesting + @as(u32, if (n.op == .continue_) 0 else 1));
                     return self.terminated();

@@ -2,10 +2,10 @@
 
 ## Current frontier
 
-**Gdev Wasm size is the current priority**, with short iterations and the
-subsecond compilation goal retained; the next latency gate is below five
-seconds. The throughput target is a fresh, reachable 50k source lines in 0.5
-seconds (100k lines/second), then one million lines/second. Use
+**Shared-kernel runtime and Gdev Wasm size are current priorities**, with short
+iterations and the subsecond compilation goal retained; the next latency gate is
+below five seconds. The throughput target is a fresh, reachable 50k source lines
+in 0.5 seconds (100k lines/second), then one million lines/second. Use
 `deno run -A scripts/bench/compiler_throughput.ts --compiler PATH --lines 50000`;
 it reports exact lines, bytes, estimated tokens, emitted work, Wasm size and
 executed checks. Generation and cold compilation remain visible; `--profile` is
@@ -16,27 +16,34 @@ diagnostic.
 
 Shared Goose direct-Wasm benchmarks are available in
 [`scripts/bench/goose`](scripts/bench/goose/README.md). The
-[2026-11-03 baseline](scripts/bench/goose/results/2026-11-03.md) covers three of
-seven adapted tasks in the same V8, with five checked pairs: bounded Fannkuch,
-CRC32 and custom-hash kernels are 47x, 91x and 382x slower in Blot. Unchanged
-production Blot runs hit a 30-second whole-process cap. Ordinary tiny-source
-cold builds are 63–76ms; this does not establish Gdev or large-source
-throughput. Loop and array-access code are now measurable small runtime targets.
-No compiler behavior changed in this benchmark batch.
+[runtime checkpoint](scripts/bench/goose/results/2026-11-03-runtime-hills.md)
+covers three of seven adapted tasks in the same V8. Five matched pairs improve
+Fannkuch 729 → 186ms (3.9x), CRC32 1,329 → 142ms (9.5x), and custom hash 5,768 →
+987ms (5.8x). All unchanged official production cases now pass below the
+30-second process cap. The original timeouts remain in the pinned baseline.
+Owner-free loops omit rewind, completed owner-free scopes discard unused marks,
+and indexed assignments reuse their pinned pre-RHS checked address. Allocating
+loops, conditional returns, variant checks and bounds-before-RHS ordering retain
+their proofs. Repeated array descriptor/epoch checks are the next runtime hill.
 
-The latest release produces **12,932,581 bytes of Wasm**, down from 13,594,002
-(661,421B / 4.87% smaller). Three matched fresh pairs add 57–149ms (median
-paired increase 66ms / 1.16%); independent medians are 5.673s → 5.809s. The
-configured launcher repeats at 6.470s beside a 6.404s preserved-compiler
-control, with identical compiler identity and full Wasm hash. Its first isolated
-8.308s result remains recorded; do not compare absolute times across shared-host
-rounds. This remains a size/compile-time tradeoff, with no latency or
-runtime-speed improvement established. The five-second, subsecond and 1–2MB
-targets remain unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/copy-coalesce-2026-11-03.json).
-Release source is `fca848cd` plus complete patch `60d1d680bd10`; all 11 frozen
-compiler/build/benchmark/test/contract files match. The installed LLVM binary is
-`f5433089972067d2e26dafad2a3c489608af7b2b0ae536d508ac3487fbe8c643`.
+The latest release produces **12,550,610 bytes of Main Wasm**, down from
+12,932,581 (381,971B / 2.95%). One same-workload compile pair takes 6.16s →
+6.07s; this is a pilot, not an established latency improvement. World/editor,
+hand and seven identical renderer streams pass with smaller output. The affected
+family passes all 195 native laws and 190 guests; ten focused laws pass full
+allocation faults. Full qualification still stops at the baseline List/chunk
+smoke failure, and installed Pen still rejects ABI 8. No new frame is qualified.
+Five-second, subsecond and 1–2MB goals remain unmet. Source, compiler, workload
+and raw evidence are pinned in
+[the runtime evidence](scripts/bench/goose/results/2026-11-03-runtime-hills.json).
+The installed LLVM compiler is
+`b4526a5dc54e4cb09a4e6c8e7751256857776f58b70106beb5dec50cbec4c6ed`.
+
+The preceding
+[copy-coalescing checkpoint](zig-native/measurements/copy-coalesce-2026-11-03.json)
+reduced Main from 13,594,002 to 12,932,581B with a measured 66ms median paired
+compile penalty. Its exact source, qualification and rejected timing controls
+remain pinned there; do not compare absolute times across shared-host rounds.
 
 Multi-use aggregate copies now coalesce before outline banking. A complete
 adjacent numeric copy disappears only when every destination read can use the
@@ -50,15 +57,15 @@ hidden identities and symbolic operands retain their required snapshots.
 Ordinary completed bodies use the same proof before slot reuse, pruning only
 eliminated destinations. Empty candidate inventories skip the second scan.
 
-Actual Main removes 110,067 pre-bank copy pairs and forwards 39,299 surviving
-reads. Its outline bank shrinks **64,876 → 55,754 globals**; reset bytes fall
-373,246 → 318,514. These are work counts, not additive byte savings. The nine
-small scalar/branch/loop source controls retain identical sizes and pass 270
-executed checks per compiler. Wide chains, retained intermediate snapshots,
-parallel writes, nested helpers and full allocation faults have dedicated native
-laws. The earlier scalar stackification and flat scalar loop-field sharing
-remain installed; stop scalar widening and target larger aggregate boundaries
-and live outlined interfaces next.
+At that checkpoint, Main removed 110,067 pre-bank copy pairs and forwarded
+39,299 surviving reads. Its outline bank shrank **64,876 → 55,754 globals**;
+reset bytes fell 373,246 → 318,514. These are work counts, not additive byte
+savings. The nine small scalar/branch/loop source controls retain identical
+sizes and pass 270 executed checks per compiler. Wide chains, retained
+intermediate snapshots, parallel writes, nested helpers and full allocation
+faults have dedicated native laws. The earlier scalar stackification and flat
+scalar loop-field sharing remain installed; stop scalar widening and target
+larger aggregate boundaries and live outlined interfaces next.
 
 Real-game backend iterations can now replay a checked private IR snapshot. Use
 `deno run -A scripts/bench/capture_outline.ts --output DIR` once with the pinned
@@ -158,26 +165,27 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,929 native laws compile. The integrated 165-law family has 162 passes and
-three unchanged completed-plan assertions with 63 full allocation-failure
-sweeps, no leaks or logged errors. The affected 34-law family passes full faults
-again after the output-preserving no-candidate fast exit. The exact baseline
-assertion reproductions remain pinned in the preceding evidence. Final LLVM
-guests have 119 passes/two unchanged unsupported legacy memory-profile cases.
-Zig lint is clean. The full gate still stops at 48 passes/one baseline
-List/chunk failure: full qualification remains pending. Final LLVM passes seven
-world/editor, 160 hand and seven identical renderer streams. World shrinks
-507,288 → 495,494B; hand 205,425 → 203,340B; renderer 97,891 → 94,648B.
-Installed Pen still rejects ABI 8 before rendering; no new frame/PNG is
-qualified. The configured launcher selects the exact measured release.
+At the preceding copy-coalescing checkpoint, all 2,929 native laws compiled. Its
+integrated 165-law family had 162 passes and three unchanged completed-plan
+assertions with 63 full allocation-failure sweeps, no leaks or logged errors.
+The affected 34-law family passes full faults again after the output-preserving
+no-candidate fast exit. The exact baseline assertion reproductions remain pinned
+in the preceding evidence. Final LLVM guests have 119 passes/two unchanged
+unsupported legacy memory-profile cases. Zig lint is clean. The full gate still
+stops at 48 passes/one baseline List/chunk failure: full qualification remains
+pending. Final LLVM passes seven world/editor, 160 hand and seven identical
+renderer streams. World shrinks 507,288 → 495,494B; hand 205,425 → 203,340B;
+renderer 97,891 → 94,648B. Installed Pen still rejects ABI 8 before rendering;
+no new frame/PNG is qualified. The configured launcher selects the exact
+measured release.
 
-The current artifact has 408,892 declared locals and 56,122 mutable globals.
-Local/global instructions occupy 8,541,957B: 6,812,073B local and 1,729,884B
-global. Only four functions with 59 total body bytes are unreachable. Calls,
-loads, stores and arithmetic instruction bytes remain unchanged; constants lose
-the removed bank resets. Static encoding counts do not establish runtime cost or
-prove removable work. Larger aggregate boundary and outlining representation
-changes remain the next size hills.
+The current artifact has 413,749 declared locals and 56,176 mutable globals, up
+by 4,857 and 54. Local/global instructions occupy 8,357,058B: 6,658,593B local
+and 1,698,465B global, down 184,899B. Call bytes drop another 85,192B and
+constants 111,981B; payload loads, stores and arithmetic retain identical byte
+counts. Static encoding counts do not establish runtime cost or prove removable
+work. Larger aggregate boundaries and outlining representation remain size
+hills.
 
 The **2,076,028B historical predecessor was recovered exactly**, with its
 original SHA, using the preserved compiler and source in one 30-second-capped

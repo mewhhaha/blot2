@@ -67,11 +67,11 @@ test "storage descriptor DAGs share nested reader and writer definitions" {
     defer deep.deinit(a);
     try std.testing.expect(shallow.diagnostic == null);
     try std.testing.expect(deep.diagnostic == null);
-    try std.testing.expect(deep.counters.scoped_reader_definitions > 0);
-    try std.testing.expect(deep.counters.scoped_reader_cache_hits > 0);
-    try std.testing.expect(deep.counters.scoped_writer_definitions > 0);
-    try std.testing.expect(deep.counters.scoped_writer_cache_hits > 0);
-    try std.testing.expect(deep.counters.scoped_descriptor_admission_hits > 0);
+    // Read-only and mutating calls now share the unified completed plans.
+    try std.testing.expectEqual(@as(u64, 18), deep.counters.scoped_function_plan_definitions);
+    try std.testing.expect(deep.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(deep.counters.scoped_function_plan_read_events > 0);
+    try std.testing.expect(deep.counters.scoped_function_plan_write_events > 0);
     // Six more levels should add bounded definitions rather than copying 256 leaves.
     try std.testing.expect(deep.counters.scoped_emission_expressions < shallow.counters.scoped_emission_expressions + 2_000);
     try std.testing.expect(deep.counters.scoped_call_admission_nodes < shallow.counters.scoped_call_admission_nodes + 2_000);
@@ -84,8 +84,10 @@ fn publish(allocator: std.mem.Allocator, modules: []const core.Module) !void {
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.bytes.len > 8);
-    try std.testing.expect(result.counters.scoped_reader_definitions > 0);
-    try std.testing.expect(result.counters.scoped_writer_definitions > 0);
+    try std.testing.expectEqual(@as(u64, 6), result.counters.scoped_function_plan_definitions);
+    try std.testing.expect(result.counters.scoped_function_plan_hits > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_read_events > 0);
+    try std.testing.expect(result.counters.scoped_function_plan_write_events > 0);
 }
 
 test "storage descriptor DAG publication survives allocation failures" {

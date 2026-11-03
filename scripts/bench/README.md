@@ -285,11 +285,12 @@ costs, output sizes and input hashes. See
 `deno run -A scripts/bench/aggregate_scaling.ts` runs 45 small width/call/owner
 cases with three fresh compilations each and executed checksums in sync and
 async guests. The default sweep takes about two seconds with the pinned release.
-It records source/compiler/Wasm hashes, cold and build medians, work counters and
-raw samples. Each cold compile is capped at five seconds; the sweep has a total
-budget and reports failures or incomplete coverage explicitly.
+It records source/compiler/Wasm hashes, cold and build medians, work counters
+and raw samples. Each cold compile is capped at five seconds; the sweep has a
+total budget and reports failures or incomplete coverage explicitly.
 
-Use `--widths 32,128 --operations 32 --kinds shared,shared-unit,shared-read,distinct,distinct-unit`
+Use
+`--widths 32,128 --operations 32 --kinds shared,shared-unit,shared-read,distinct,distinct-unit`
 to isolate mutation plus owner-bearing returns from Unit and read-only controls.
 `--profile --repetitions 1` is a separate phase/allocation diagnostic, not a
 latency measurement. Scale one axis before returning to the full game. Existing

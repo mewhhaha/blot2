@@ -1,15 +1,19 @@
 # Owned-storage rewrite: active task index
 
-The current priority is reducing Gdev Wasm size while keeping iterations short.
-Subsecond compilation remains the goal; the next latency gate is below five
-seconds.
-[Actual full main](../zig-native/measurements/copy-coalesce-2026-11-03.json)
-produces **12.93 MB Wasm**, down from 13.59 MB (661,421B / 4.87%). Three matched
-pairs add 57–149ms (median paired increase 66ms / 1.16%); independent medians
-are 5.673s → 5.809s. The configured repeat takes 6.470s beside a 6.404s
-preserved-compiler control. Its isolated 8.308s first result remains recorded.
-Do not compare absolute shared-host times across rounds. No latency or
-runtime-speed improvement is established.
+The current priorities are shared-kernel runtime and Gdev Wasm size, with short
+iterations. Subsecond compilation remains the goal; the next latency gate is
+below five seconds.
+[The current runtime checkpoint](../scripts/bench/goose/results/2026-11-03-runtime-hills.md)
+produces **12.55 MB Main Wasm**, down from 12.93 MB (381,971B / 2.95%). One
+compile pilot takes 6.16s → 6.07s; this does not establish a latency gain. Five
+matched kernel pairs improve Fannkuch 3.9x, CRC32 9.5x and custom hash 5.8x. All
+official production cases now finish below the 30-second process cap.
+World/editor, hand and seven renderer streams retain their executed results.
+
+Owner-free loops skip rewind, completed owner-free scopes discard unused marks,
+and indexed assignments reuse their pinned pre-RHS address. Allocating scopes,
+conditional owner returns, variant checks and bounds ordering retain complete
+checks. Repeated descriptor/epoch validation is the next runtime hill.
 
 Multi-use numeric copies coalesce across the unique-callsite outline tree only
 when every read observes the exact unchanged source version within one control
@@ -26,13 +30,13 @@ experiments without full source compilation. The replay executable builds in
 source, compiler, IR and Wasm fingerprints are pinned. No noLLVM whole-game
 probe was run.
 
-All 2,929 native laws compile. Integrated execution has 162 passes/three
-baseline assertions and 63 full fault sweeps, with no leaks. The final fast-exit
-change passes its affected 34-law full-fault family. Final LLVM guests have 119
-passes/two baseline legacy memory-profile failures. Zig lint and world/editor,
-hand and seven identical renderer streams pass with smaller output. Full
-qualification retains the baseline List/chunk failure; installed Pen rejects ABI
-8 before rendering. Five-second, subsecond and 1–2MB targets remain unmet.
+All 2,931 native laws compile. The affected 195-law and 190-guest family passes
+in 44.79s; ten focused laws pass exhaustive allocation faults without leaks.
+Final LLVM also passes all 190 affected guests. Zig lint is clean. Full
+qualification retains the baseline List/chunk smoke failure; installed Pen
+rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB targets remain
+unmet. Preceding full-fault batches and baseline assertion records remain pinned
+in the earlier copy-coalescing evidence.
 
 The historical 2.08MB output was recovered from preserved inputs in a bounded
 2.88s replay. Historical records used heap pointers; current transport moves

@@ -22,7 +22,7 @@ ${
 }  return total
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`wide field refinements use scoped binding indexes (${codegenTier})`, async () => {
+  Deno.test(`wide fields use scoped indexes or forward complete result words (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-refinement-index-",
     });
@@ -40,8 +40,13 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
       const counters = result.stats.workCounters as Record<string, number>;
+      // A completed identity result may forward every field without needing
+      // to materialize the old refinement environment at all.
+      const forwarded = counters.scoped_function_plan_definitions > 0 &&
+        counters.scoped_result_store_words_avoided >= fields &&
+        counters.scoped_result_load_words_avoided >= fields;
       assert(
-        counters.scoped_refinement_indexed_bindings > 0,
+        counters.scoped_refinement_indexed_bindings > 0 || forwarded,
         JSON.stringify(counters),
       );
       assert.equal(counters.scoped_refinement_index_declines, 0);

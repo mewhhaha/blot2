@@ -203,6 +203,7 @@ test "scoped storage rejects borrowed escapes and shrinking through aliases" {
     const cases = [_]struct { text: []const u8, code: backend.Code }{
         .{ .text = "const escape = func () => return &(#[42])[0]\nentry const bad = func () => return @storage.load (escape ())\n", .code = .storage_escape },
         .{ .text = "entry const bad = func () => return do:\n  let items: ResizeArray U32 = #[42]\n  let first = &items[0]\n  let alias = items\n  let shrunk = @storage.truncate alias 0\n  break @storage.load first\n", .code = .storage_borrow_conflict },
+        .{ .text = "const shrink = func (items: ResizeArray U32): U32 => return do:\n  @storage.truncate items 0\n  return 42\nentry const bad = func () => return do:\n  let items: ResizeArray U32 = #[1]\n  let alias = items\n  items[0] := shrink alias\n  return items[0]\n", .code = .storage_borrow_conflict },
     };
     for (cases) |item| {
         var module = try lower(a, item.text);
@@ -380,4 +381,84 @@ test "scoped scalar literal copies retain mixed and computed child evaluation" {
         try std.testing.expect(result.diagnostic == null);
         try std.testing.expectEqual(@as(u64, 0), result.counters.scoped_literal_data_bytes);
     }
+}
+
+test "scoped loop cleanup retains temporary owners and conditional exits through OOM" {
+    const source =
+        \\entry const scalar = func (count: U32): U32 => return do:
+        \\  let remaining = count
+        \\  let total = 0
+        \\  for ever:
+        \\    if @u32.eq remaining 0:
+        \\      break
+        \\    remaining := @u32.sub self 1
+        \\    if @u32.eq (@u32.rem remaining 2) 0:
+        \\      continue
+        \\    total := @u32.add self remaining
+        \\  return total
+        \\const scratch = func (value: U32): U32 => return do:
+        \\  let rows: Array U32 = #[value, @u32.add value 1]
+        \\  return @u32.add rows[0] rows[1]
+        \\const choose = func (count: U32): Array U32 => return do:
+        \\  for index in 0 .. count:
+        \\    if @u32.eq (@u32.add index 1) count:
+        \\      return #[index]
+        \\  return #[99]
+        \\entry const answer = func (count: U32): U32 => return do:
+        \\  let kept: ResizeArray U32 = #[7]
+        \\  let total = 0
+        \\  for index in 0 .. count:
+        \\    let scalar = scratch index
+        \\    let rows: Array U32 = #[scalar]
+        \\    for lane in 0 .. 2:
+        \\      let nested: Array U32 = #[rows[0]]
+        \\      total := @u32.add self nested[0]
+        \\      if @u32.eq lane 0:
+        \\        continue
+        \\      break
+        \\    if @u32.eq (@u32.rem index 2) 0:
+        \\      continue
+        \\  let selected = choose count
+        \\  return @u32.add (@u32.add total kept[0]) selected[0]
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publish(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
+}
+
+test "scoped indexed replacements preserve pinned growth and sibling writes through OOM" {
+    const source =
+        \\const append_rhs = func (rows: ResizeArray U32) -> (value: U32): U32 => return do:
+        \\  @storage.push rows (@u32.add value 1)
+        \\  return @u32.add value 10
+        \\entry const grow_rhs = func (value: U32): Array U32 => return do:
+        \\  let rows: ResizeArray U32 = #[value]
+        \\  @storage.reserve rows 2
+        \\  let alias = rows
+        \\  rows[0] := append_rhs alias value
+        \\  return @storage.freeze rows
+        \\const mutate_sibling = func (rows: Array {left: U32, right: U32}) -> (value: U32): U32 => return do:
+        \\  rows[0].right := @u32.add value 1
+        \\  return value
+        \\entry const sibling_rhs = func (value: U32): Array U32 => return do:
+        \\  let rows: Array {left: U32, right: U32} = #[{left: 1, right: 2}]
+        \\  let alias = rows
+        \\  rows[0].left := mutate_sibling alias value
+        \\  return #[rows[0].left, rows[0].right]
+        \\const counter: Array U32 = #[0]
+        \\const bump = func (): U32 => return do:
+        \\  let state = counter
+        \\  state[0] := @u32.add self 1
+        \\  return 42
+        \\entry const counter_read = func (): U32 => return counter[0]
+        \\entry const checked_order = func (index: U32): U32 => return do:
+        \\  let rows: ResizeArray U32 = #[1]
+        \\  rows[index] := bump ()
+        \\  return rows[0]
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    try publish(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publish, .{@as([]const core.Module, &.{module})});
 }
