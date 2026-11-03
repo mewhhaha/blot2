@@ -8,6 +8,7 @@ const scoped = @import("scoped_backend.zig");
 const a = std.testing.allocator;
 test {
     _ = @import("packed_input_demand.zig");
+    _ = @import("direct_input_demand.zig");
 }
 fn source() ![]u8 {
     var fields: std.ArrayList(u8) = .empty;

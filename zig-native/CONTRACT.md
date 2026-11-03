@@ -93,6 +93,17 @@ callers omit stores for the remaining words. Full packet extents, word offsets
 and result serialization stay unchanged. The input mask belongs to the completed
 plan's arena and rolls back with failed plans. Direct-word calls keep their ABI.
 
+Completed direct helpers likewise retain only incoming words read by their
+finished body, including result serialization. A narrower private signature and
+descending entry copies preserve the original logical local IDs and types;
+padding locals retain the old body suffix. Result aliases still address complete
+logical caller arguments. All semantic arguments execute before physical
+filtering; ordered owner events remain independent. Only unpublished helpers
+without semantic/table position catalogs may gain this prefix. Hidden operands,
+table identities, entry/provider roles and non-i32 formals keep ordinary inputs.
+Packed inputs retain their existing path. Unused result pointers may disappear
+from the private signature; packet allocation/layout remain unchanged.
+
 Checked aggregate joins reserve edge copies and materialize only lanes whose
 physical origins differ. Multiple edges may share only a dominating immutable
 local; a sole continuing edge may keep a branch-local definition. Normal

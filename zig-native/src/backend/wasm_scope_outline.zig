@@ -285,7 +285,7 @@ fn localType(function: *const ir.Function, id: u32) ?ir.ValueType {
     const index = id - function.parameters.len;
     return if (index < function.locals.items.len) function.locals.items[index] else null;
 }
-fn hasCoordinates(module: *const wasm.Module, function: u32) bool {
+pub fn hasCoordinates(module: *const wasm.Module, function: u32) bool {
     // Scoped emission currently has neither coordinate catalog. Decline until
     // relocation of these out-of-band instruction positions is implemented.
     for (module.semantic_sites.items) |site| if (site.function == function) return true;

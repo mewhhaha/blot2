@@ -3,22 +3,27 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/aggregate-identity-2026-11-03.json)
-produces **14.33 MB Wasm**, down from 15.54 MB (1.20MB / 7.74%). A matched fresh
-pair takes 5.773s → 5.778s; the configured launcher takes 5.660s with identical
-output. Deferred aggregate joins, helper input/result aliases and immutable zero
-sources reduce physical materialization. An initial 10.470s regression was held;
-indexing mutable locals once per function restores baseline latency with exact
-Wasm preserved. All 2,899 native laws compile; 131 selected laws pass full faults
-(52 sweeps). Final LLVM guests have 108 passes/two baseline legacy memory-profile
-failures. Zig lint and world/editor, hand and renderer checks pass. Full
-qualification retains the baseline List/chunk failure; installed Pen rejects
-ABI 8 before rendering. Five-second, subsecond and 1–2MB targets remain unmet.
+[Actual full main](../zig-native/measurements/direct-input-2026-11-03.json)
+produces **14.13 MB Wasm**, down from 14.33 MB (207kB / 1.45%). A matched fresh
+pair takes 5.588s → 5.555s; the configured launcher takes 5.551s with identical
+output. Completed direct-input demand removes 74,421 physical call arguments
+while preserving full semantic evaluation and owner contracts. A roughly
+2-second, 45-case aggregate sweep isolates width, copying and ownership effects;
+keep using it before full-game confirmation. Mutation-plus-owner-result helpers
+still decline reuse and are the next focused target.
+
+All 2,902 native laws compile. Selected native execution has 137 passes/three
+reproduced baseline assertions; all 134 core selected laws pass full faults.
+Final LLVM guests have 110 passes/two baseline legacy memory-profile failures.
+Zig lint and world/editor, hand and seven identical renderer streams pass.
+Renderer size grows 173B while whole-game output shrinks. Full qualification
+retains the baseline List/chunk failure; installed Pen rejects ABI 8 before
+rendering. Five-second, subsecond and 1–2MB targets remain unmet.
 
 The exact historical 2.08MB output was recovered from preserved inputs in a
 bounded 2.88s replay. Historical records used heap pointers; current aggregate
 transport still moves physical Value leaves and owner/borrow metadata. The
-remaining 9.83MB of local/global instructions makes selective materialization
+remaining 9.63MB of local/global instructions makes selective materialization
 and global banking the next size hills. Preserve semantic checks and explicit
 copies. Ordinary `#run` build functions remain a separate, unimplemented
 simplification.

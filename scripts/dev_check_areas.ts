@@ -45,6 +45,9 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.direct_input_demand.test.direct input demand preserves overlapping moves logical locals and body suffix through full OOM",
+      "backend.direct_input_demand.test.direct input demand keeps written then read parameters and removes all unread parameters",
+      "backend.direct_input_demand.test.direct input demand declines hidden operands and retains fully demanded signatures",
       "backend.storage_deferred_join_tests.test.deferred joins materialize only a changed wide lane",
       "backend.storage_deferred_join_tests.test.deferred joins backfill every earlier equal exit when the third changes",
       "backend.storage_deferred_join_tests.test.deferred sole continuing edges retain branch local definitions",
@@ -212,6 +215,7 @@ export const devCheckAreas = {
       "backend.storage_initialization_tests.test.owned computed flat pools publish a complete module",
     ],
     guests: [
+      "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",
       "zig-native/tests/storage_result_alias_execution.test.ts",
       "compiler/storage_surface.test.ts",
@@ -335,6 +339,9 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.direct_input_demand.test.direct input demand preserves overlapping moves logical locals and body suffix through full OOM",
+      "backend.direct_input_demand.test.direct input demand keeps written then read parameters and removes all unread parameters",
+      "backend.direct_input_demand.test.direct input demand declines hidden operands and retains fully demanded signatures",
       "backend.storage_deferred_join_tests.test.deferred joins materialize only a changed wide lane",
       "backend.storage_deferred_join_tests.test.deferred joins backfill every earlier equal exit when the third changes",
       "backend.storage_deferred_join_tests.test.deferred sole continuing edges retain branch local definitions",
@@ -523,6 +530,7 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",
       "zig-native/tests/storage_result_alias_execution.test.ts",
       "zig-native/tests/arena.test.ts",

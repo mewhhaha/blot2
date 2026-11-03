@@ -1,0 +1,2566 @@
+{
+  "date": "2026-11-03",
+  "scope": "Microbenchmark-driven omission of unread physical arguments from completed direct helpers. Semantic arguments, owner events, result aliases, packed ABI, ABI 8 and session protocol 2 remain intact.",
+  "source_pin": {
+    "base": "5eb12b319e00c67c3d2c970c84838cd927a9fd8a",
+    "patch_sha256": "e72d54d4c8a4d83c5eff487abc253a97aba3ac3795e2dcb2e5bc90f8140640a4",
+    "files": {
+      "scripts/dev_check_areas.ts": "f7229bd68f32d457796b8fe5b9085e0dd14afffe73efdcf50d3bbb521e2a6a91",
+      "zig-native/CONTRACT.md": "6a38c31e95d7f830037729e6eedc0d83c2cfe7bdcb7546fdeff9fbf0a9834eed",
+      "zig-native/src/backend/scoped_backend.zig": "697442195a3216322facd522c3295e96003ade5fb966c33dd6d0fa64a5806f6f",
+      "zig-native/src/backend/storage_packed_input_tests.zig": "7adff1fe13d191d9abc1aff3b2254863d51445d0fdb1032cc0731c512d8f9f5c",
+      "zig-native/src/backend/wasm_scope_outline.zig": "7e10b29f602b4fa141381717e65f4c1d301c9df3ac45994a063edd07032236da",
+      "zig-native/src/work_counters.zig": "4368c218f44ee03b35a3248bd1f147f3255d0ef55518de4ff98bb33655c33a18",
+      "zig-native/src/backend/direct_input_demand.zig": "6c82bb1aa8631bfc2b378746acb510a0e4ce4e3a5b862aafa020972dbba162bf",
+      "zig-native/tests/direct_input_execution.test.ts": "1f5cf4ec3710e6c6874413a148450415725a876557dce3b1eb365596d382a9f8"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "native": "Safe/noLLVM complete inventory and exhaustive selected allocation faults",
+    "release": {
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-direct-input-e72d54d4c8a4/zig-native/zig-out/bin/blotc",
+      "sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+      "sidecar_hex": "c406d0dca10bf92b13bc32313f2770b64c13d19eba43b9ee2a5852e4a9425db1",
+      "runtime_project_identity": "2dadacc4540175ac5770d45570f3e35e61a29106d21d5d39ab6b83fbba35b5d9",
+      "zig": "0.17.0",
+      "release_backend": "LLVM Fast",
+      "release_build_exit": 0
+    },
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3"
+  },
+  "workload": {
+    "heads": {
+      "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+    },
+    "entry_sha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a",
+    "source_bytes": 2537167,
+    "siblings_unchanged": true
+  },
+  "main": {
+    "runs": {
+      "baseline": {
+        "evidence": "build/bench/direct-input-2026-11-03/main-baseline/main-27c1bedc1fa51fc6/result.json",
+        "build_ms": 5587.647328,
+        "wasm_bytes": 14332601,
+        "wasm_sha256": "167af7f16bfd64ebcadb1800f6a419568e1407bb6f33d1394b87e676b8871e26",
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "compiler_identity": "3be40c1c8262abe550732163d1a19d718a25fae9e261356f984e0ab4875779c0",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_owned_word_calls": 172393,
+          "scoped_outlined_regions": 424,
+          "scoped_outlined_globals": 64595
+        }
+      },
+      "candidate": {
+        "evidence": "build/bench/direct-input-2026-11-03/main-candidate/main-efdebe832c1f61bf/result.json",
+        "build_ms": 5555.342675999999,
+        "wasm_bytes": 14125344,
+        "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "compiler_identity": "2dadacc4540175ac5770d45570f3e35e61a29106d21d5d39ab6b83fbba35b5d9",
+        "source_bytes": 2537167,
+        "work": {
+          "scoped_owned_word_calls": 172393,
+          "scoped_direct_input_words_avoided": 12522,
+          "scoped_direct_argument_words_avoided": 74421,
+          "scoped_outlined_regions": 422,
+          "scoped_outlined_globals": 64032
+        }
+      },
+      "configured": {
+        "evidence": "build/bench/direct-input-2026-11-03/main-configured/main-8ce8b727cd6e9fa9/result.json",
+        "build_ms": 5550.601396,
+        "wasm_bytes": 14125344,
+        "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "compiler_identity": "2dadacc4540175ac5770d45570f3e35e61a29106d21d5d39ab6b83fbba35b5d9",
+        "source_bytes": 2537167
+      }
+    },
+    "bytes_removed": 207257,
+    "size_reduction_percent": 1.4460529529845978,
+    "limits": "Individual fresh cache-disabled completions with four frontend/codegen workers and a 30-second cap. Matched 5.588 to 5.555s is effectively unchanged latency, configured 5.551s. Five-second/subsecond and 1-2MB targets remain unmet.",
+    "engine_validation": {
+      "valid": true,
+      "imports": [
+        {
+          "module": "blot:host/1",
+          "name": "call_array_f32_array_f32",
+          "kind": "function"
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function"
+        },
+        {
+          "name": "blot:memory",
+          "kind": "memory"
+        },
+        {
+          "name": "blot:allocate",
+          "kind": "function"
+        },
+        {
+          "name": "blot:reset",
+          "kind": "function"
+        }
+      ]
+    }
+  },
+  "microbenchmarks": {
+    "runs": {
+      "micro-baseline": {
+        "evidence": "build/bench/direct-input-2026-11-03/micro-baseline/run-efe8f5aa62cda563/result.json",
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "elapsed_ms": 2018.408314,
+        "executed_checks": 1350,
+        "samples": 135,
+        "results": [
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.149916999999988,
+            "coldMs": 5.390944000000019,
+            "wasmBytes": 3631,
+            "sourceBytes": 839,
+            "sourceLines": 19
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.0986509999999896,
+            "coldMs": 4.036099000000007,
+            "wasmBytes": 3652,
+            "sourceBytes": 871,
+            "sourceLines": 19
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.3496020000000044,
+            "coldMs": 3.1611599999999953,
+            "wasmBytes": 3598,
+            "sourceBytes": 905,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.4787879999999802,
+            "coldMs": 3.2209939999999904,
+            "wasmBytes": 3871,
+            "sourceBytes": 809,
+            "sourceLines": 21
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.372556000000003,
+            "coldMs": 3.333377999999982,
+            "wasmBytes": 4540,
+            "sourceBytes": 1174,
+            "sourceLines": 28
+          },
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.826399000000009,
+            "coldMs": 4.7001450000000204,
+            "wasmBytes": 4495,
+            "sourceBytes": 1147,
+            "sourceLines": 26
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.7532299999999736,
+            "coldMs": 5.041217000000017,
+            "wasmBytes": 4537,
+            "sourceBytes": 1179,
+            "sourceLines": 26
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.2996839999999565,
+            "coldMs": 4.270636999999965,
+            "wasmBytes": 3598,
+            "sourceBytes": 905,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.723402999999962,
+            "coldMs": 4.509862999999996,
+            "wasmBytes": 4501,
+            "sourceBytes": 1117,
+            "sourceLines": 28
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.636816999999951,
+            "coldMs": 4.566630000000032,
+            "wasmBytes": 5170,
+            "sourceBytes": 1482,
+            "sourceLines": 35
+          },
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.677543000000014,
+            "coldMs": 5.44145999999995,
+            "wasmBytes": 7279,
+            "sourceBytes": 2249,
+            "sourceLines": 50
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.154710000000023,
+            "coldMs": 7.050810000000013,
+            "wasmBytes": 7321,
+            "sourceBytes": 2281,
+            "sourceLines": 50
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.211406000000011,
+            "coldMs": 4.157740999999987,
+            "wasmBytes": 3598,
+            "sourceBytes": 906,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.041544000000044,
+            "coldMs": 6.879562000000021,
+            "wasmBytes": 6661,
+            "sourceBytes": 2219,
+            "sourceLines": 52
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.027909000000022,
+            "coldMs": 6.911714000000018,
+            "wasmBytes": 7330,
+            "sourceBytes": 2584,
+            "sourceLines": 59
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.750571000000036,
+            "coldMs": 5.5935799999999745,
+            "wasmBytes": 4161,
+            "sourceBytes": 2205,
+            "sourceLines": 43
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.061427000000037,
+            "coldMs": 4.918943000000013,
+            "wasmBytes": 4182,
+            "sourceBytes": 2237,
+            "sourceLines": 43
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.6133800000000065,
+            "coldMs": 5.563844000000017,
+            "wasmBytes": 4343,
+            "sourceBytes": 2271,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.7889579999999796,
+            "coldMs": 4.5848759999999515,
+            "wasmBytes": 5335,
+            "sourceBytes": 1985,
+            "sourceLines": 45
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.045011000000045,
+            "coldMs": 7.037183000000027,
+            "wasmBytes": 8738,
+            "sourceBytes": 3616,
+            "sourceLines": 76
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.2622049999999945,
+            "coldMs": 7.239970000000085,
+            "wasmBytes": 5361,
+            "sourceBytes": 2513,
+            "sourceLines": 50
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.171152000000006,
+            "coldMs": 7.185737000000017,
+            "wasmBytes": 5403,
+            "sourceBytes": 2545,
+            "sourceLines": 50
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.95168799999999,
+            "coldMs": 4.762284000000022,
+            "wasmBytes": 4343,
+            "sourceBytes": 2271,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.320255000000088,
+            "coldMs": 7.216344000000049,
+            "wasmBytes": 5965,
+            "sourceBytes": 2293,
+            "sourceLines": 52
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.0843150000000605,
+            "coldMs": 6.998278999999911,
+            "wasmBytes": 9501,
+            "sourceBytes": 3924,
+            "sourceLines": 83
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 9.382227000000057,
+            "coldMs": 10.145872999999938,
+            "wasmBytes": 9297,
+            "sourceBytes": 3615,
+            "sourceLines": 74
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 9.254412000000002,
+            "coldMs": 10.19650999999999,
+            "wasmBytes": 9339,
+            "sourceBytes": 3647,
+            "sourceLines": 74
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.484323000000018,
+            "coldMs": 5.493297999999982,
+            "wasmBytes": 4343,
+            "sourceBytes": 2272,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 17.27793799999995,
+            "coldMs": 18.235022999999956,
+            "wasmBytes": 8189,
+            "sourceBytes": 3395,
+            "sourceLines": 76
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 19.451242999999977,
+            "coldMs": 20.504633000000013,
+            "wasmBytes": 12126,
+            "sourceBytes": 5026,
+            "sourceLines": 107
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 11.318119000000024,
+            "coldMs": 12.34783399999992,
+            "wasmBytes": 6598,
+            "sourceBytes": 7705,
+            "sourceLines": 139
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 11.166910999999914,
+            "coldMs": 12.269584000000009,
+            "wasmBytes": 6625,
+            "sourceBytes": 7737,
+            "sourceLines": 139
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 10.62583799999993,
+            "coldMs": 11.60652899999991,
+            "wasmBytes": 8394,
+            "sourceBytes": 7771,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 8.308637999999974,
+            "coldMs": 9.288618000000042,
+            "wasmBytes": 11394,
+            "sourceBytes": 6689,
+            "sourceLines": 141
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 18.631249000000025,
+            "coldMs": 19.663848000000144,
+            "wasmBytes": 27149,
+            "sourceBytes": 13492,
+            "sourceLines": 268
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 14.219924999999876,
+            "coldMs": 15.325573000000077,
+            "wasmBytes": 9486,
+            "sourceBytes": 8013,
+            "sourceLines": 146
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 14.442489000000023,
+            "coldMs": 15.470600000000104,
+            "wasmBytes": 9540,
+            "sourceBytes": 8045,
+            "sourceLines": 146
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 11.137854999999945,
+            "coldMs": 12.172919000000093,
+            "wasmBytes": 8394,
+            "sourceBytes": 7771,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 17.464723999999933,
+            "coldMs": 18.481844000000137,
+            "wasmBytes": 12167,
+            "sourceBytes": 6997,
+            "sourceLines": 148
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 25.85030000000006,
+            "coldMs": 26.841560999999956,
+            "wasmBytes": 27912,
+            "sourceBytes": 13800,
+            "sourceLines": 275
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 24.94077500000003,
+            "coldMs": 26.072683999999754,
+            "wasmBytes": 19664,
+            "sourceBytes": 9115,
+            "sourceLines": 170
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 22.914339000000155,
+            "coldMs": 23.970052000000123,
+            "wasmBytes": 19718,
+            "sourceBytes": 9147,
+            "sourceLines": 170
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 10.373227000000043,
+            "coldMs": 11.42515400000002,
+            "wasmBytes": 8394,
+            "sourceBytes": 7772,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 73.28560200000015,
+            "coldMs": 74.26990999999998,
+            "wasmBytes": 14735,
+            "sourceBytes": 8099,
+            "sourceLines": 172
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 70.6727579999997,
+            "coldMs": 71.63199800000007,
+            "wasmBytes": 30528,
+            "sourceBytes": 14902,
+            "sourceLines": 299
+          }
+        ]
+      },
+      "micro-candidate": {
+        "evidence": "build/bench/direct-input-2026-11-03/micro-candidate/run-8acaefbdc4244800/result.json",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "elapsed_ms": 1586.079323,
+        "executed_checks": 1350,
+        "samples": 135,
+        "results": [
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.186846000000003,
+            "coldMs": 5.833007000000009,
+            "wasmBytes": 3625,
+            "sourceBytes": 839,
+            "sourceLines": 19
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.4458440000000223,
+            "coldMs": 4.614011000000005,
+            "wasmBytes": 3646,
+            "sourceBytes": 871,
+            "sourceLines": 19
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.8862060000000156,
+            "coldMs": 3.9735489999999913,
+            "wasmBytes": 3598,
+            "sourceBytes": 905,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.9428740000000175,
+            "coldMs": 3.9533910000000105,
+            "wasmBytes": 3871,
+            "sourceBytes": 809,
+            "sourceLines": 21
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.7251579999999933,
+            "coldMs": 3.577403000000004,
+            "wasmBytes": 4540,
+            "sourceBytes": 1174,
+            "sourceLines": 28
+          },
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.739014999999995,
+            "coldMs": 3.7232529999999997,
+            "wasmBytes": 4381,
+            "sourceBytes": 1147,
+            "sourceLines": 26
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.861577000000011,
+            "coldMs": 5.278829000000002,
+            "wasmBytes": 4441,
+            "sourceBytes": 1179,
+            "sourceLines": 26
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.8222539999999867,
+            "coldMs": 3.681791999999973,
+            "wasmBytes": 3598,
+            "sourceBytes": 905,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.2921499999999924,
+            "coldMs": 4.0350970000000075,
+            "wasmBytes": 4501,
+            "sourceBytes": 1117,
+            "sourceLines": 28
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.795291999999961,
+            "coldMs": 3.5233199999999556,
+            "wasmBytes": 5170,
+            "sourceBytes": 1482,
+            "sourceLines": 35
+          },
+          {
+            "kind": "scalar",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.528658000000007,
+            "coldMs": 5.294969000000037,
+            "wasmBytes": 6781,
+            "sourceBytes": 2249,
+            "sourceLines": 50
+          },
+          {
+            "kind": "branch",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.64984000000004,
+            "coldMs": 5.4164519999999925,
+            "wasmBytes": 6889,
+            "sourceBytes": 2281,
+            "sourceLines": 50
+          },
+          {
+            "kind": "loop",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 1.934410000000014,
+            "coldMs": 2.691313999999977,
+            "wasmBytes": 3598,
+            "sourceBytes": 906,
+            "sourceLines": 21
+          },
+          {
+            "kind": "shared",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.8996080000000006,
+            "coldMs": 4.68207000000001,
+            "wasmBytes": 6661,
+            "sourceBytes": 2219,
+            "sourceLines": 52
+          },
+          {
+            "kind": "distinct",
+            "width": 8,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 7.100254000000007,
+            "coldMs": 7.9603440000000205,
+            "wasmBytes": 7330,
+            "sourceBytes": 2584,
+            "sourceLines": 59
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.565895000000012,
+            "coldMs": 3.311817000000019,
+            "wasmBytes": 4107,
+            "sourceBytes": 2205,
+            "sourceLines": 43
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.398811000000023,
+            "coldMs": 5.3290250000000015,
+            "wasmBytes": 4128,
+            "sourceBytes": 2237,
+            "sourceLines": 43
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 5.28672499999999,
+            "coldMs": 6.060870999999963,
+            "wasmBytes": 4343,
+            "sourceBytes": 2271,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 2.5209090000000174,
+            "coldMs": 3.476981999999964,
+            "wasmBytes": 5335,
+            "sourceBytes": 1985,
+            "sourceLines": 45
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.234350000000063,
+            "coldMs": 4.038654000000065,
+            "wasmBytes": 8738,
+            "sourceBytes": 3616,
+            "sourceLines": 76
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.4564430000000357,
+            "coldMs": 4.316502999999898,
+            "wasmBytes": 4863,
+            "sourceBytes": 2513,
+            "sourceLines": 50
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.31967300000008,
+            "coldMs": 3.9976460000000316,
+            "wasmBytes": 4923,
+            "sourceBytes": 2545,
+            "sourceLines": 50
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.662534000000051,
+            "coldMs": 5.538355000000024,
+            "wasmBytes": 4343,
+            "sourceBytes": 2271,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 3.5451329999999643,
+            "coldMs": 4.234707999999955,
+            "wasmBytes": 5965,
+            "sourceBytes": 2293,
+            "sourceLines": 52
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.4276459999999815,
+            "coldMs": 5.1315969999999425,
+            "wasmBytes": 9501,
+            "sourceBytes": 3924,
+            "sourceLines": 83
+          },
+          {
+            "kind": "scalar",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 9.016158000000019,
+            "coldMs": 9.945680999999922,
+            "wasmBytes": 7263,
+            "sourceBytes": 3615,
+            "sourceLines": 74
+          },
+          {
+            "kind": "branch",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.65597600000001,
+            "coldMs": 7.343677999999954,
+            "wasmBytes": 7371,
+            "sourceBytes": 3647,
+            "sourceLines": 74
+          },
+          {
+            "kind": "loop",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 4.254275000000007,
+            "coldMs": 5.2488120000000436,
+            "wasmBytes": 4343,
+            "sourceBytes": 2272,
+            "sourceLines": 45
+          },
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 15.632589000000053,
+            "coldMs": 16.559436000000005,
+            "wasmBytes": 8189,
+            "sourceBytes": 3395,
+            "sourceLines": 76
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 17.86319299999991,
+            "coldMs": 18.658210000000054,
+            "wasmBytes": 12126,
+            "sourceBytes": 5026,
+            "sourceLines": 107
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 9.075781000000006,
+            "coldMs": 10.164389000000028,
+            "wasmBytes": 6337,
+            "sourceBytes": 7705,
+            "sourceLines": 139
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 7.154206000000045,
+            "coldMs": 8.175505000000044,
+            "wasmBytes": 6367,
+            "sourceBytes": 7737,
+            "sourceLines": 139
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.111617000000024,
+            "coldMs": 6.912314999999921,
+            "wasmBytes": 8394,
+            "sourceBytes": 7771,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 8.809282999999937,
+            "coldMs": 9.76960500000007,
+            "wasmBytes": 11394,
+            "sourceBytes": 6689,
+            "sourceLines": 141
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 1,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 11.394725999999991,
+            "coldMs": 12.531093000000055,
+            "wasmBytes": 27149,
+            "sourceBytes": 13492,
+            "sourceLines": 268
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 13.807988000000023,
+            "coldMs": 14.626429000000144,
+            "wasmBytes": 7267,
+            "sourceBytes": 8013,
+            "sourceLines": 146
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 14.116347000000133,
+            "coldMs": 15.232124999999996,
+            "wasmBytes": 7354,
+            "sourceBytes": 8045,
+            "sourceLines": 146
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.260882999999922,
+            "coldMs": 7.280387000000019,
+            "wasmBytes": 8394,
+            "sourceBytes": 7771,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 18.68027199999983,
+            "coldMs": 19.718252999999777,
+            "wasmBytes": 12167,
+            "sourceBytes": 6997,
+            "sourceLines": 148
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 8,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 13.647371999999905,
+            "coldMs": 14.429854999999861,
+            "wasmBytes": 27912,
+            "sourceBytes": 13800,
+            "sourceLines": 275
+          },
+          {
+            "kind": "scalar",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 12.228826000000026,
+            "coldMs": 13.065742999999884,
+            "wasmBytes": 10227,
+            "sourceBytes": 9115,
+            "sourceLines": 170
+          },
+          {
+            "kind": "branch",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 11.695148000000017,
+            "coldMs": 12.367972000000009,
+            "wasmBytes": 10402,
+            "sourceBytes": 9147,
+            "sourceLines": 170
+          },
+          {
+            "kind": "loop",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 6.8825480000000425,
+            "coldMs": 7.6559729999999035,
+            "wasmBytes": 8394,
+            "sourceBytes": 7772,
+            "sourceLines": 141
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 33.819349999999986,
+            "coldMs": 34.650465999999824,
+            "wasmBytes": 14735,
+            "sourceBytes": 8099,
+            "sourceLines": 172
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "completed": 3,
+            "requested": 3,
+            "buildMs": 41.958515000000034,
+            "coldMs": 42.787597000000005,
+            "wasmBytes": 30528,
+            "sourceBytes": 14902,
+            "sourceLines": 299
+          }
+        ]
+      },
+      "control-baseline": {
+        "evidence": "build/bench/direct-input-2026-11-03/control-baseline/run-a43c21b147698e7/result.json",
+        "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "elapsed_ms": 1487.5740369999999,
+        "executed_checks": 500,
+        "samples": 50,
+        "results": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 15.202238000000008,
+            "coldMs": 19.39378400000001,
+            "wasmBytes": 8189,
+            "sourceBytes": 3395,
+            "sourceLines": 76
+          },
+          {
+            "kind": "shared-unit",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 6.865185999999994,
+            "coldMs": 8.156258000000008,
+            "wasmBytes": 14097,
+            "sourceBytes": 2964,
+            "sourceLines": 76
+          },
+          {
+            "kind": "shared-read",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 6.779791999999986,
+            "coldMs": 7.599335999999994,
+            "wasmBytes": 16842,
+            "sourceBytes": 3362,
+            "sourceLines": 75
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 15.23739599999999,
+            "coldMs": 15.931960000000004,
+            "wasmBytes": 12126,
+            "sourceBytes": 5026,
+            "sourceLines": 107
+          },
+          {
+            "kind": "distinct-unit",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 6.513092999999969,
+            "coldMs": 7.437688000000037,
+            "wasmBytes": 17490,
+            "sourceBytes": 4595,
+            "sourceLines": 107
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 54.029030000000034,
+            "coldMs": 55.08585700000003,
+            "wasmBytes": 14735,
+            "sourceBytes": 8099,
+            "sourceLines": 172
+          },
+          {
+            "kind": "shared-unit",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 21.741490999999996,
+            "coldMs": 22.756316999999967,
+            "wasmBytes": 14601,
+            "sourceBytes": 7668,
+            "sourceLines": 172
+          },
+          {
+            "kind": "shared-read",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 22.488246000000004,
+            "coldMs": 23.62138899999991,
+            "wasmBytes": 14163,
+            "sourceBytes": 8066,
+            "sourceLines": 171
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 81.25830100000007,
+            "coldMs": 82.42131900000004,
+            "wasmBytes": 30528,
+            "sourceBytes": 14902,
+            "sourceLines": 299
+          },
+          {
+            "kind": "distinct-unit",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 24.644369000000097,
+            "coldMs": 25.719039000000066,
+            "wasmBytes": 31026,
+            "sourceBytes": 14471,
+            "sourceLines": 299
+          }
+        ]
+      },
+      "control-candidate": {
+        "evidence": "build/bench/direct-input-2026-11-03/control-candidate/run-134d4387b4fe3c41/result.json",
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "elapsed_ms": 1158.932133,
+        "executed_checks": 500,
+        "samples": 50,
+        "results": [
+          {
+            "kind": "shared",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 9.962524000000002,
+            "coldMs": 14.499015999999997,
+            "wasmBytes": 8189,
+            "sourceBytes": 3395,
+            "sourceLines": 76
+          },
+          {
+            "kind": "shared-unit",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 4.844571000000002,
+            "coldMs": 5.715102000000002,
+            "wasmBytes": 6098,
+            "sourceBytes": 2964,
+            "sourceLines": 76
+          },
+          {
+            "kind": "shared-read",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 9.293888000000038,
+            "coldMs": 10.29549800000001,
+            "wasmBytes": 8612,
+            "sourceBytes": 3362,
+            "sourceLines": 75
+          },
+          {
+            "kind": "distinct",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 10.493717000000004,
+            "coldMs": 11.659379999999999,
+            "wasmBytes": 12126,
+            "sourceBytes": 5026,
+            "sourceLines": 107
+          },
+          {
+            "kind": "distinct-unit",
+            "width": 32,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 8.461780999999974,
+            "coldMs": 9.716223000000014,
+            "wasmBytes": 9346,
+            "sourceBytes": 4595,
+            "sourceLines": 107
+          },
+          {
+            "kind": "shared",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 35.90902700000004,
+            "coldMs": 36.95034199999998,
+            "wasmBytes": 14735,
+            "sourceBytes": 8099,
+            "sourceLines": 172
+          },
+          {
+            "kind": "shared-unit",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 12.391417000000047,
+            "coldMs": 13.20486799999992,
+            "wasmBytes": 14601,
+            "sourceBytes": 7668,
+            "sourceLines": 172
+          },
+          {
+            "kind": "shared-read",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 17.673262000000022,
+            "coldMs": 18.572095999999988,
+            "wasmBytes": 14163,
+            "sourceBytes": 8066,
+            "sourceLines": 171
+          },
+          {
+            "kind": "distinct",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 47.151310999999964,
+            "coldMs": 48.26437400000009,
+            "wasmBytes": 30528,
+            "sourceBytes": 14902,
+            "sourceLines": 299
+          },
+          {
+            "kind": "distinct-unit",
+            "width": 128,
+            "operations": 32,
+            "completed": 5,
+            "requested": 5,
+            "buildMs": 25.3375410000001,
+            "coldMs": 26.30716099999995,
+            "wasmBytes": 31026,
+            "sourceBytes": 14471,
+            "sourceLines": 299
+          }
+        ]
+      }
+    },
+    "method": "Fresh cache-disabled single-worker processes; medians of 3 or 5 repetitions. Each retained source drives an independently checked checksum in both sync/async guests. Timing includes startup separately; total sweep elapsed includes generation, IO and execution. Small timing figures vary under shared-host load; byte hashes are deterministic. Both compilers are LLVM Fast.",
+    "selected_size_controls": [
+      {
+        "case": "scalar128fields/32calls",
+        "before": 19664,
+        "after": 10227
+      },
+      {
+        "case": "shared-unit32fields/32calls",
+        "before": 14097,
+        "after": 6098
+      },
+      {
+        "case": "shared-read32fields/32calls",
+        "before": 16842,
+        "after": 8612
+      }
+    ],
+    "limits": "This fixes direct-argument traffic. Mutating owner-bearing result helpers still expand under the existing admission policy; packed controls retain the existing path. Microbenchmark percentage reductions do not predict whole-game savings. Earlier wider-source validation failures remain pinned in aggregate-scaling-2026-11-03.json."
+  },
+  "implementation": {
+    "input_demand": "All local_get reads in the finished helper, including serialization, determine which original formal words arrive physically. Writes alone do not need incoming values; read-after-write stays conservative.",
+    "coordinates": "A narrower private signature, i32 padding and descending entry copies preserve logical local IDs/types and original body suffix. The prefix shifts instruction indices; helpers with semantic/table position catalogs retain ordinary inputs. Hidden resource/table/provider operands and non-i32 inputs likewise retain ordinary inputs.",
+    "caller": "All actual arguments and ordered owner events execute before physical masking. Logical result aliases reconstruct from full original arguments, including omitted input words. Unused result pointers can be omitted from signature; caller packet allocation and layouts stay unchanged.",
+    "rollback": "Only unpublished helpers are transformed; FunctionMark owns changed function and appended signature on decline/OOM. Published counters roll back too.",
+    "work": {
+      "scoped_owned_word_calls": 172393,
+      "scoped_direct_input_words_avoided": 12522,
+      "scoped_direct_argument_words_avoided": 74421,
+      "scoped_outlined_regions": 422,
+      "scoped_outlined_globals": 64032
+    }
+  },
+  "byte_accounting": {
+    "after": {
+      "wasm_bytes": 14125344,
+      "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+      "declared_locals": 430867,
+      "global_types": {
+        "0x7f:mutable=0": 6,
+        "0x7f:mutable=1": 64400
+      },
+      "instruction_count": 5190877,
+      "instruction_bytes": 13703273,
+      "categories": [
+        {
+          "name": "locals",
+          "count": 2780708,
+          "bytes": 7703574
+        },
+        {
+          "name": "globals",
+          "count": 559077,
+          "bytes": 1923545
+        },
+        {
+          "name": "constants",
+          "count": 599154,
+          "bytes": 1428486
+        },
+        {
+          "name": "calls",
+          "count": 389466,
+          "bytes": 883788
+        },
+        {
+          "name": "loads",
+          "count": 232985,
+          "bytes": 726424
+        },
+        {
+          "name": "control",
+          "count": 382341,
+          "bytes": 568044
+        },
+        {
+          "name": "stores",
+          "count": 106782,
+          "bytes": 327486
+        },
+        {
+          "name": "arithmetic_simd",
+          "count": 139952,
+          "bytes": 140283
+        },
+        {
+          "name": "memory_table_reference",
+          "count": 412,
+          "bytes": 1643
+        }
+      ],
+      "sections": [
+        {
+          "id": 1,
+          "offset": 8,
+          "payload_offset": 11,
+          "payload_bytes": 6004,
+          "bytes": 6007
+        },
+        {
+          "id": 2,
+          "offset": 6015,
+          "payload_offset": 6017,
+          "payload_bytes": 40,
+          "bytes": 42
+        },
+        {
+          "id": 3,
+          "offset": 6057,
+          "payload_offset": 6060,
+          "payload_bytes": 7962,
+          "bytes": 7965
+        },
+        {
+          "id": 5,
+          "offset": 14022,
+          "payload_offset": 14024,
+          "payload_bytes": 6,
+          "bytes": 8
+        },
+        {
+          "id": 6,
+          "offset": 14030,
+          "payload_offset": 14034,
+          "payload_bytes": 322049,
+          "bytes": 322053
+        },
+        {
+          "id": 7,
+          "offset": 336083,
+          "payload_offset": 336085,
+          "payload_bytes": 51,
+          "bytes": 53
+        },
+        {
+          "id": 10,
+          "offset": 336136,
+          "payload_offset": 336141,
+          "payload_bytes": 13738465,
+          "bytes": 13738470
+        },
+        {
+          "id": 11,
+          "offset": 14074606,
+          "payload_offset": 14074610,
+          "payload_bytes": 49684,
+          "bytes": 49688
+        },
+        {
+          "id": 0,
+          "offset": 14124294,
+          "payload_offset": 14124297,
+          "payload_bytes": 1024,
+          "bytes": 1027,
+          "name": "blot:collector-contract"
+        },
+        {
+          "id": 0,
+          "offset": 14125321,
+          "payload_offset": 14125323,
+          "payload_bytes": 21,
+          "bytes": 23,
+          "name": "blot:abi"
+        }
+      ]
+    },
+    "remaining_local_global_bytes": 9627119,
+    "transfers": {
+      "format": 1,
+      "path": "build/bench/direct-input-2026-11-03/main-candidate/main-efdebe832c1f61bf/main.wasm",
+      "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+      "wasm_bytes": 14125344,
+      "elapsed_seconds": 6.395956789987395,
+      "note": "Static nonoverlapping adjacent get/set or zero/set runs. These are not proofs of removability.",
+      "direct_call_reachability": {
+        "supported": true,
+        "unsupported": [],
+        "roots": [
+          23,
+          24,
+          26
+        ],
+        "unreachable_functions": [
+          1,
+          11,
+          12,
+          13
+        ],
+        "unreachable_body_bytes": 59
+      },
+      "transfers": [
+        {
+          "kind": "local.get -> local.set",
+          "pairs": 275078,
+          "bytes": 1505334
+        },
+        {
+          "kind": "i32.const 0 -> local.set",
+          "pairs": 172652,
+          "bytes": 837402
+        },
+        {
+          "kind": "global.get -> local.set",
+          "pairs": 96992,
+          "bytes": 593503
+        },
+        {
+          "kind": "i32.const 0 -> global.set",
+          "pairs": 73640,
+          "bytes": 422785
+        },
+        {
+          "kind": "local.get -> global.set",
+          "pairs": 33802,
+          "bytes": 221558
+        },
+        {
+          "kind": "global.get -> global.set",
+          "pairs": 16681,
+          "bytes": 122849
+        }
+      ],
+      "identity_transfers": [
+        {
+          "kind": "global.get -> global.set",
+          "pairs": 4,
+          "bytes": 32
+        }
+      ],
+      "local_set_then_get_same_index": {
+        "count": 0,
+        "encoded_bytes": 0,
+        "note": "Overlaps transfer runs; replacing with tee depends on other IR metadata."
+      },
+      "run_buckets": {
+        "1": {
+          "runs": 194685,
+          "pairs": 668845,
+          "bytes": 3703431
+        },
+        "4": {
+          "runs": 34180,
+          "pairs": 464239,
+          "bytes": 2629536
+        },
+        "16": {
+          "runs": 5871,
+          "pairs": 260152,
+          "bytes": 1482759
+        },
+        "64": {
+          "runs": 533,
+          "pairs": 111261,
+          "bytes": 638295
+        },
+        "256": {
+          "runs": 1,
+          "pairs": 64032,
+          "bytes": 368182
+        },
+        "1024": {
+          "runs": 1,
+          "pairs": 64032,
+          "bytes": 368182
+        }
+      },
+      "top_runs": [
+        {
+          "kind": "i32.const 0 -> global.set",
+          "function": 26,
+          "offset": 347049,
+          "pairs": 64032,
+          "bytes": 368182,
+          "first_source": 0,
+          "first_target": 374,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 0,
+          "last_target": 64405
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 4766,
+          "offset": 8033187,
+          "pairs": 217,
+          "bytes": 1302,
+          "first_source": 1756,
+          "first_target": 6690,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 1971,
+          "last_target": 6840
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 4766,
+          "offset": 8173358,
+          "pairs": 217,
+          "bytes": 1302,
+          "first_source": 5098,
+          "first_target": 6806,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 5313,
+          "last_target": 6877
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 3982,
+          "offset": 6442140,
+          "pairs": 186,
+          "bytes": 1116,
+          "first_source": 736,
+          "first_target": 1191,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 1265,
+          "last_target": 479
+        },
+        {
+          "kind": "local.get -> local.set",
+          "function": 5394,
+          "offset": 9416765,
+          "pairs": 186,
+          "bytes": 1116,
+          "first_source": 736,
+          "first_target": 1191,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 1265,
+          "last_target": 479
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3937,
+          "offset": 6325327,
+          "pairs": 156,
+          "bytes": 1092,
+          "first_source": 25990,
+          "first_target": 1245,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 24344,
+          "last_target": 1380
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6232,
+          "offset": 10499114,
+          "pairs": 156,
+          "bytes": 1072,
+          "first_source": 52013,
+          "first_target": 464,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 51379,
+          "last_target": 614
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 4766,
+          "offset": 8029808,
+          "pairs": 148,
+          "bytes": 1035,
+          "first_source": 32127,
+          "first_target": 1756,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 1456,
+          "last_target": 1903
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 4766,
+          "offset": 8169979,
+          "pairs": 148,
+          "bytes": 1035,
+          "first_source": 32127,
+          "first_target": 5098,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 1456,
+          "last_target": 5245
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 5628,
+          "offset": 9654216,
+          "pairs": 165,
+          "bytes": 973,
+          "first_source": 48281,
+          "first_target": 3,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 48224,
+          "last_target": 167
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3793,
+          "offset": 5980018,
+          "pairs": 125,
+          "bytes": 875,
+          "first_source": 24354,
+          "first_target": 299,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 24278,
+          "last_target": 419
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6223,
+          "offset": 10408689,
+          "pairs": 125,
+          "bytes": 864,
+          "first_source": 51388,
+          "first_target": 307,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 51281,
+          "last_target": 427
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4903696,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2166,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18583,
+          "last_target": 2146
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3427,
+          "offset": 5293452,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2166,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 20205,
+          "last_target": 2146
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3436,
+          "offset": 5482259,
+          "pairs": 124,
+          "bytes": 862,
+          "first_source": 1360,
+          "first_target": 2166,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 20205,
+          "last_target": 2146
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3323,
+          "offset": 4979673,
+          "pairs": 123,
+          "bytes": 858,
+          "first_source": 1360,
+          "first_target": 252,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 19687,
+          "last_target": 657
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3326,
+          "offset": 4994862,
+          "pairs": 123,
+          "bytes": 858,
+          "first_source": 1360,
+          "first_target": 252,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 19687,
+          "last_target": 657
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 7657,
+          "offset": 13581214,
+          "pairs": 124,
+          "bytes": 852,
+          "first_source": 2197,
+          "first_target": 1760,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 62600,
+          "last_target": 1760
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 6871,
+          "offset": 11617684,
+          "pairs": 123,
+          "bytes": 849,
+          "first_source": 57160,
+          "first_target": 340,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 57167,
+          "last_target": 454
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4868957,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2062,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2170
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4870473,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2170,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2173
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4875002,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 174,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 286
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4877984,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 308,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 420
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4880966,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 442,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 554
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4897732,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2150,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 1042
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4905836,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2169,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2125
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4908284,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2125,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2062
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4910699,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2062,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2166
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4912689,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 1224,
+          "consecutive_targets": true,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 1341
+        },
+        {
+          "kind": "global.get -> local.set",
+          "function": 3299,
+          "offset": 4920344,
+          "pairs": 118,
+          "bytes": 823,
+          "first_source": 1360,
+          "first_target": 2166,
+          "consecutive_targets": false,
+          "consecutive_sources": false,
+          "last_source": 18695,
+          "last_target": 2062
+        }
+      ]
+    },
+    "note": "Declared locals increase because preserved logical input coordinates become padding locals. Total size falls; static opcode counts do not measure runtime cost or prove removable work."
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2902,
+      "selected_count": 140,
+      "completed_count": 140,
+      "exit_code": 1,
+      "elapsed_seconds": 68.18404851297964,
+      "passed": 137,
+      "failed": [
+        "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+        "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+        "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM"
+      ],
+      "core_selected": 134,
+      "core_passed": 134,
+      "baseline_failure_names": [
+        "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+        "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+        "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM"
+      ],
+      "full_fault_sweeps": 56,
+      "leaks": 0,
+      "logged_errors": 0
+    },
+    "baseline_native_failures": {
+      "failures": [
+        {
+          "name": "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+          "prototypeExit": 1,
+          "baselineExit": 1,
+          "baselineBinarySha256": "10aa4e698283fee8fd9a49d8741729065b11c3e819c66c0baa39aa6b57040cf2"
+        },
+        {
+          "name": "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+          "prototypeExit": 1,
+          "baselineExit": 1,
+          "baselineBinarySha256": "10aa4e698283fee8fd9a49d8741729065b11c3e819c66c0baa39aa6b57040cf2"
+        },
+        {
+          "name": "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM",
+          "prototypeExit": 1,
+          "baselineExit": 1,
+          "baselineBinarySha256": "10aa4e698283fee8fd9a49d8741729065b11c3e819c66c0baa39aa6b57040cf2"
+        }
+      ],
+      "raw_log": "build/bench/private-prototypes/direct-input-pilot/measurements/native-related.log",
+      "raw_sha256": "10ad60a46e5bc038418081dafbde8e307ca00115521bf3bf93639ba8be702bbb"
+    },
+    "guest": {
+      "files": 37,
+      "exit_code": 1,
+      "elapsed_seconds": 6.576993263995973,
+      "summary": [
+        "FAILED | 110 passed | 2 failed (6s)"
+      ],
+      "passed": 110,
+      "baseline_failures": 2,
+      "failure": "legacy memory-profile Array elements require a fixed inline layout; same pair as previous frozen compiler",
+      "baseline_evidence": "build/bench/transport-cleanup-2026-11-03/baseline-memory-profile.log"
+    },
+    "zig_lint": "591 production and 1 generated files, zero findings with Zig 0.17 on PATH; no unavailable-environment warnings",
+    "deno_check": "new direct-input executed guest and dev area manifest pass",
+    "full_gate": {
+      "evidence": "build/bench/direct-input-2026-11-03/full-gate/timings.json",
+      "status": "pending: baseline List/chunk storage_escape",
+      "smoke_passed": 48,
+      "smoke_failed": 1
+    }
+  },
+  "integration": {
+    "world": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "entry_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+      "checks": 7,
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+          "wasm_bytes": 529248,
+          "wasm_sha256": "2249ab41be63f0fc2493aa267c060d6240c6acff37f54a0405a83acd77e0c81d",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+          "wasm_bytes": 526637,
+          "wasm_sha256": "7cc8df5169dcf0d37cac4ad81cf22f43b4cfa3ec0cdd830c5d4a0c079adf1873",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "hand": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "entry_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+      "checks": 160,
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+          "wasm_bytes": 210126,
+          "wasm_sha256": "b1696b940d971a715c97da4620751d69319a139f25d3eb5c129bf4cf7272674c",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+          "wasm_bytes": 209182,
+          "wasm_sha256": "5691466bedf702b31476efae9323ad3405edd06a701d57553d8c5397b7ff5857",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "renderer": {
+      "evidence": "build/bench/direct-input-2026-11-03/renderer/pair-e29eb6610245e4fe/result.json",
+      "pins": {
+        "compiler_sha256": "a8a5121bca564df965b68e3a1c97609681e2db8deb5c41a6dec4f4f6cca4c5a3",
+        "baseline_compiler_sha256": "47a7c70efd802bd0ab9d24b21c2078d14854154d5aacc0fad433429fa4e860ad",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ],
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 100146,
+          "wasm_sha256": "068a08e65ecbd351a4aea294e2529ac445b5b7eca02e3c8ca0f0a1b0e62678db",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 100319,
+          "wasm_sha256": "f3bec51b2e80e63d5da35acd267164de8340ec9d0f591cb1bfffe22041721026",
+          "runs": [
+            {
+              "scenario": 0,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "f07b36def960bae326b6a0d874c5e19f593c3bf2b8d08f0f7bbccc3c977a3237"
+            },
+            {
+              "scenario": 1,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "3113bca2d7d91c1c62b3dedcb5bdbc2a69fc29285b8d677b44d43148e06bf95b"
+            },
+            {
+              "scenario": 2,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            },
+            {
+              "scenario": 4,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "4c579447505ce2b888e1f0f01647c29b338702db5c2c305569bf38c5316575c9"
+            },
+            {
+              "scenario": 8,
+              "draw_count": 57,
+              "vector_count": 1,
+              "lane_count": 1254,
+              "sha256": "c01046f57a561bd4909d670b23dec05a3cfc246a4047d3c9045d24fac3002b5a"
+            },
+            {
+              "scenario": 16,
+              "draw_count": 64,
+              "vector_count": 92,
+              "lane_count": 1786,
+              "sha256": "70da62cf03a0480982e41b266ccde11dc80f2a80dd370a97d769dba004edc96c"
+            },
+            {
+              "scenario": 31,
+              "draw_count": 34,
+              "vector_count": 1,
+              "lane_count": 702,
+              "sha256": "ead5b42d14a7e24755559061f339a6a469a02777cdf0ba283109e4799811492f"
+            }
+          ]
+        }
+      ],
+      "size_regression_bytes": 173,
+      "note": "Entry parameter copies can outweigh argument savings in small helpers. This control grows 0.17% while complete Main shrinks 1.45%."
+    },
+    "pen": {
+      "evidence": "build/bench/direct-input-2026-11-03/pen/result.json",
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "0b2a86a636335ed6be8c5d133f82cb8ed01871591f6984e642a552eb40b0c6a1",
+      "returncode": 1,
+      "error": "invalid_abi: unsupported ABI version 8",
+      "compiled_main_reused": true,
+      "frame_png_qualified": false
+    }
+  },
+  "review": {
+    "reviewer": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "scope": "Completed direct-input demand and coordinate-preserving local remap",
+    "result": "No current semantic blockers found",
+    "proofs": [
+      "Descending source-to-logical moves preserve overlap, original local IDs and types.",
+      "Unused local writes do not require incoming values; every local_get conservatively retains the argument.",
+      "Result aliases keep logical ordinals and use full caller arguments; all semantic arguments execute before physical masking.",
+      "FunctionMark protects unpublished helper and newly interned signature under OOM and decline.",
+      "Scope only unpublished non-outline helpers without semantic/table position catalogs; table_kind and hidden resource/provider operands decline optimization."
+    ],
+    "root_refinement": "Reused hasCoordinates guard keeps ordinary inputs instead of declining the completed helper. New signatures are interned only after actual omission.",
+    "policy": "Mutating owner-bearing result admission remains unchanged."
+  },
+  "next_target": "Continue using the two-second aggregate scaling suite. Separate the mutation-plus-owner-result admission cliff from physical argument transport; preserve fresh-owner/borrow rejection and owner events before broadening it.",
+  "raw_evidence": {
+    "build/bench/direct-input-2026-11-03/baseline-native-failures.json": "c43618a6caa1394dd3d4b523322ff973c78cc1142fa582032466b26f1ebb4394",
+    "build/bench/direct-input-2026-11-03/candidate-census.json": "08315af7a70d77a21dae56b2d44aee7a09e8e9790f8a4c83a77fe31cf75ba255",
+    "build/bench/direct-input-2026-11-03/candidate-census.log": "78b344a1533bee425ddf28b28ea3bbc2cc2f4ee75cd2643dbb425765acf96744",
+    "build/bench/direct-input-2026-11-03/candidate-transfers.json": "96940c8619e4f5b64dd980b6749d94a89cf10a754fdda0fb04a28d87028b8021",
+    "build/bench/direct-input-2026-11-03/candidate-transfers.log": "640524fa2871e0367c69b918952f5ca7655ae87d3cf08023a1762f49198c675e",
+    "build/bench/direct-input-2026-11-03/control-baseline/run-a43c21b147698e7/result.json": "251e0fd32c2f8f3208724e8b2bb90d71709bdc2b56a0ed6f49f477ffe5503c6e",
+    "build/bench/direct-input-2026-11-03/control-baseline/run-a43c21b147698e7/samples.jsonl": "8f8ba5ebad4c8206dd2e96389a5dd8207501fc2c9d25ff4be20f2cf65cd6ac07",
+    "build/bench/direct-input-2026-11-03/control-baseline.log": "5ad6dfbaf52fa4f29735a927ca0b7f849078e7d6d9bbefd55b1cef436d12c540",
+    "build/bench/direct-input-2026-11-03/control-candidate/run-134d4387b4fe3c41/result.json": "75217e7615ddf3e784a948be414ac854c634c34f77453ca81ae1fb5436c53778",
+    "build/bench/direct-input-2026-11-03/control-candidate/run-134d4387b4fe3c41/samples.jsonl": "41ff6c4e81821a6698394b7ce35b7595519c91a05fa43c387334c124b9e9e071",
+    "build/bench/direct-input-2026-11-03/control-candidate.log": "847b71aa4f812bfed426bf884fb8ac248d769a1680161af843a8881f61d14e0f",
+    "build/bench/direct-input-2026-11-03/final-guests.log": "54ae7c4892c319b90370d0a74e3ec7e3a26dc12c416e86ec5a4ecce8c18b9513",
+    "build/bench/direct-input-2026-11-03/full-gate/recent-failures.json": "256bef08724893a6213d6b015e1be9d03d33ac1b842b7c7bd0f70fa31de575f8",
+    "build/bench/direct-input-2026-11-03/full-gate/run-944452c04a003bb4/smoke-build.stderr.log": "686983b7f04cf75680d8418a6113c4512b799049e2a4d75a0c3ef7b48a2c31d5",
+    "build/bench/direct-input-2026-11-03/full-gate/run-944452c04a003bb4/smoke-build.stdout.log": "78352d55b18b744a18fe3c8d3cb1d65361764465b591abda4094e15f46db7921",
+    "build/bench/direct-input-2026-11-03/full-gate/run-944452c04a003bb4/smoke.stderr.log": "4f229c116cbae2c6dff7f06196beb073c09053a73c31d9b53e0560bd21231525",
+    "build/bench/direct-input-2026-11-03/full-gate/run-944452c04a003bb4/smoke.stdout.log": "c13581576f53cd08bec429d9224afd5866bcaf4461b609955ccf1300f34865d5",
+    "build/bench/direct-input-2026-11-03/full-gate/run-944452c04a003bb4/timings.json": "ebdf78d9252124a6328d5e00c905fd5eca6e238cebc6482941cf0ace7a1114ca",
+    "build/bench/direct-input-2026-11-03/full-gate/timings.json": "ebdf78d9252124a6328d5e00c905fd5eca6e238cebc6482941cf0ace7a1114ca",
+    "build/bench/direct-input-2026-11-03/full-gate.log": "9619cf2783b2cbdac78a9e6bec3f6f3228fffa6fc8eca77211ed240583902fa4",
+    "build/bench/direct-input-2026-11-03/guest-result.json": "115be8109837706ceeb405b51eb6d8ff47077658a66c6ead02515598013fd743",
+    "build/bench/direct-input-2026-11-03/guest-selection.json": "dfcbb1064e2160f80731bde8a1f253bfb29e7c9b5f357d747e72819502737da3",
+    "build/bench/direct-input-2026-11-03/hand-pair/result.json": "108440a47db7ee2894278000a7994fee18c70cbc5a1d6c10290c4f5857543f88",
+    "build/bench/direct-input-2026-11-03/hand.log": "22dcf003eaeb25460b92d342cc1a48f1ad5236bfffcbe7f4e55a1a40ec99c682",
+    "build/bench/direct-input-2026-11-03/main-baseline/main-27c1bedc1fa51fc6/result.json": "54b23475a448bf25c85a0a75409a8ead0f9ddb21223447f5f5a180f9700153b3",
+    "build/bench/direct-input-2026-11-03/main-baseline.log": "604831c49fddff33589fc25b3dad12f77b21ffb0e2ee007da8d8cdcadab4fe89",
+    "build/bench/direct-input-2026-11-03/main-candidate/main-efdebe832c1f61bf/result.json": "8c62739a5ab30de0c1f78397f17d286ea371e88b8e535851820b66c7b04807f1",
+    "build/bench/direct-input-2026-11-03/main-candidate.log": "9ab870ee3d26cee70bf9ac17a865d1fab0315d17462f3f216143b02e01c59f01",
+    "build/bench/direct-input-2026-11-03/main-configured/main-8ce8b727cd6e9fa9/result.json": "3f85fc7f9cf3c0b47a3a298ba4e25e52b751e98bcf4784b35c9d2fbe15b144ff",
+    "build/bench/direct-input-2026-11-03/main-configured.log": "81a621c3ca46bbe8b2c123a254cfbcca3f82d8bf2dc8e39194374098651bc1bb",
+    "build/bench/direct-input-2026-11-03/main-engine-validation.json": "12a262c37800ee1af77358d2fad7a142b743f72236a44f8e865fcaff08feb5e4",
+    "build/bench/direct-input-2026-11-03/main-pair.json": "08f94a1e5ae2feeb99c6b2bae7e3e8167fb7247897bdca9da99679c2d22f0ab5",
+    "build/bench/direct-input-2026-11-03/main-summary.json": "38976f95e10694818c5d20bef3446a2bfcc341e03e7da01237e39ff2c336a07d",
+    "build/bench/direct-input-2026-11-03/micro-baseline/run-efe8f5aa62cda563/result.json": "f7321901e84fbc91387e76a25ff898b509c3ac4c74ca96d170602284cc5a9716",
+    "build/bench/direct-input-2026-11-03/micro-baseline/run-efe8f5aa62cda563/samples.jsonl": "0b5e680fe6323f2164fb3bc5423365f8059c7a1dcb23932e605ca1fe6676d654",
+    "build/bench/direct-input-2026-11-03/micro-baseline.log": "a8452db7eb62db43cc75c76417dca3e7ba31782f3152ec3c6d307a38a78fc0db",
+    "build/bench/direct-input-2026-11-03/micro-candidate/run-8acaefbdc4244800/result.json": "51d90aebeafaedc66cd14119d3edc26217a7a56d52ccd292bfce7e7d102b2376",
+    "build/bench/direct-input-2026-11-03/micro-candidate/run-8acaefbdc4244800/samples.jsonl": "08f8d2e2491a194b9b92f871bf4b1367d38b034b8c72ce557a5d48d99c46378d",
+    "build/bench/direct-input-2026-11-03/micro-candidate.log": "859a4adda5d93a483d23a160b9a343221d2ec8d4e3be579cf67902d1147d3e47",
+    "build/bench/direct-input-2026-11-03/native-compile.log": "e4cbb1bfbcd132b8c89b6b482bd90e72a9c7ca31cb7946e7d5140b3695cefedb",
+    "build/bench/direct-input-2026-11-03/native-full.log": "656cf3cce985b72cd1212ffa1472f842905ac9516af5eb6e6b31f5529aaec555",
+    "build/bench/direct-input-2026-11-03/native-result.json": "edfbe73d2d2d62ecddb2a0b5882130f9512705b803d7a9aa7fea1ed5a7e4e1da",
+    "build/bench/direct-input-2026-11-03/native-selection.json": "db1b2397635c5b923868deada6a173df58163bfcf161eca635bd5a638ac475ec",
+    "build/bench/direct-input-2026-11-03/pen/command.json": "f42e7460aa336bd8786e856994e3c863568f985b9b18a2187194988fe31cc5b7",
+    "build/bench/direct-input-2026-11-03/pen/game/game.json": "16921a0b393bef8a4ed327227a30ceaf982024fc421060e5329961d4c6ca02d8",
+    "build/bench/direct-input-2026-11-03/pen/result.json": "ecf06e36bd3634a06b031e39c97335eb749b837abf039bfe28a69642f7de8cbc",
+    "build/bench/direct-input-2026-11-03/pen/run.log": "23c04c160167bbbbcfac0d4aba9192a9dea05e5331dc71cb35d87f3237fc0a78",
+    "build/bench/direct-input-2026-11-03/pen.log": "97a5cad7be878dd281e0a8237459fa46978992bac09b551a3107d681cc18cc8b",
+    "build/bench/direct-input-2026-11-03/release-build.log": "86a6b7c9e0fd0ebef7dae9d42dc26b037ee82425673d7b010bc3703e69170838",
+    "build/bench/direct-input-2026-11-03/release-identity.json": "da3d4a19e3b4070761f8f1c038cce9274fca6dd094b379e8d696f4300fc33a23",
+    "build/bench/direct-input-2026-11-03/renderer/pair-e29eb6610245e4fe/result.json": "4952cfb3f294c579dc23162d5eb4b79b485a95469abeec3d0ef0551623121ca9",
+    "build/bench/direct-input-2026-11-03/renderer.log": "8b499f985682cc3a756aca0393e2d93c7448555f730e252533795cdd9a86fb63",
+    "build/bench/direct-input-2026-11-03/review.json": "cb5747dbf4f8d1bf2fb227ff23160a71be5f55e69d50f7e95e147b40211546e1",
+    "build/bench/direct-input-2026-11-03/source-pin.json": "b033d91457f8fbb464e0da579063c327f55b3f2fcb1bf184e1ee0733835d1c34",
+    "build/bench/direct-input-2026-11-03/source.patch": "e72d54d4c8a4d83c5eff487abc253a97aba3ac3795e2dcb2e5bc90f8140640a4",
+    "build/bench/direct-input-2026-11-03/world-pair/result.json": "ea540fc863e1685b9e7fcb53544bf3abaae386815bfa0016e2d8bf465e61a43b",
+    "build/bench/direct-input-2026-11-03/world.log": "428be93b058daafe2aa4d80847d6a76d40b1a618e86ef794012a5447ca132a1b",
+    "build/bench/direct-input-2026-11-03/zig-lint.log": "086d0cc2d3a59d366fdbb23dd884e98362cc16633472d948bf7a2d256310ee7b"
+  }
+}

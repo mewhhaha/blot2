@@ -3281,18 +3281,28 @@ const Generator = struct {
         }
     }
     fn readerValues(self: *Generator, value: Value) Error!void {
+        var ordinal: usize = 0;
+        try self.readerValuesMasked(value, &.{}, &ordinal);
+    }
+    fn readerInputWord(self: *Generator, word: Local, used: []const bool, ordinal: *usize) Error!void {
+        if (used.len == 0 or used[ordinal.*]) {
+            try self.c.value(word);
+        } else self.emission_work.scoped_direct_argument_words_avoided +|= 1;
+        ordinal.* += 1;
+    }
+    fn readerValuesMasked(self: *Generator, value: Value, used: []const bool, ordinal: *usize) Error!void {
         if (value.tag == .aggregate or value.tag == .callable) {
-            if (value.variant_tags.len != 0) try self.c.value(value.word);
-            for (value.fields) |field| try self.readerValues(field);
+            if (value.variant_tags.len != 0) try self.readerInputWord(value.word, used, ordinal);
+            for (value.fields) |field| try self.readerValuesMasked(field, used, ordinal);
             return;
         }
-        try self.c.value(value.word);
+        try self.readerInputWord(value.word, used, ordinal);
         if (value.tag == .scalar) return;
-        try self.c.value(value.token);
-        try self.c.value(value.epoch_low);
-        try self.c.value(value.epoch_high);
-        if (value.tag != .array) try self.c.value(value.index);
-        if (value.tag == .view) try self.c.value(value.length);
+        try self.readerInputWord(value.token, used, ordinal);
+        try self.readerInputWord(value.epoch_low, used, ordinal);
+        try self.readerInputWord(value.epoch_high, used, ordinal);
+        if (value.tag != .array) try self.readerInputWord(value.index, used, ordinal);
+        if (value.tag == .view) try self.readerInputWord(value.length, used, ordinal);
     }
     fn readerWordLocals(self: *Generator, value: Value, output: *std.ArrayList(Local)) Error!void {
         if (value.tag == .aggregate or value.tag == .callable) {
@@ -4019,7 +4029,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_zero_values_shared", "scoped_join_words_shared", "scoped_result_store_words_avoided", "scoped_result_load_words_avoided", "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_direct_input_words_avoided", "scoped_direct_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -4247,7 +4257,22 @@ const Generator = struct {
         const machine = &self.module.functions.items[function];
         var input_demand: []bool = &.{};
         defer self.allocator.free(input_demand);
-        if (!direct) {
+        if (direct) {
+            // Only this new helper may gain an entry prefix. No published
+            // semantic or table position may refer into its original body.
+            if (!scope_outline.hasCoordinates(self.module, function)) {
+                const demand = try @import("direct_input_demand.zig").materialize(self.allocator, machine);
+                input_demand = demand.used;
+                self.emission_work.scoped_direct_input_words_avoided +|= demand.omitted;
+                if (input_demand.len != 0) {
+                    machine.signature = self.module.internType(machine.parameters, machine.result) catch |err| switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        else => return error.Declined,
+                    };
+                    machine.parameters = self.module.signatures.items[machine.signature].parameters;
+                }
+            }
+        } else {
             const demand = try @import("packed_input_demand.zig").materialize(self.allocator, machine, words);
             input_demand = demand.used;
             self.emission_work.scoped_packed_input_words_avoided +|= demand.omitted;
@@ -4415,7 +4440,7 @@ const Generator = struct {
         if (plan.abi != .buffered) {
             var template = plan.result;
             if (!unit_result) template = try self.graphCallerShape(plan.result, owners);
-            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers, plan.result_aliases);
+            return try self.callOwnedWords(m, body.root, entry, arguments, template, words, unit_result, plan.return_registers, plan.result_aliases, plan.used_input_words);
         }
         self.emission_work.scoped_owned_packed_calls +|= 1;
         const first_root = self.roots.items.len;
@@ -4458,7 +4483,7 @@ const Generator = struct {
         std.debug.assert(ordinal == aliases.len);
         return result;
     }
-    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize, result_aliases: []const u32) Error!Value {
+    fn callOwnedWords(self: *Generator, m: *const core.Module, id: core.Id, entry: call_plan.Entry, arguments: []const Value, template: Value, words: usize, unit_result: bool, return_registers: usize, result_aliases: []const u32, used: []const bool) Error!Value {
         self.emission_work.scoped_owned_word_calls +|= 1;
         self.emission_work.scoped_owned_argument_words_avoided +|= words;
         const first_root = self.roots.items.len;
@@ -4472,8 +4497,11 @@ const Generator = struct {
             try self.c.set(pointer, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
             address = pointer;
         }
-        for (arguments) |argument| try self.readerValues(argument);
-        if (address) |pointer| try self.c.value(pointer);
+        std.debug.assert(used.len == 0 or used.len == words + @intFromBool(address != null));
+        var ordinal: usize = 0;
+        for (arguments) |argument| try self.readerValuesMasked(argument, used, &ordinal);
+        std.debug.assert(ordinal == words);
+        if (address) |pointer| try self.readerInputWord(pointer, used, &ordinal);
         try self.c.op(.call, entry.function);
         const word = try self.c.temp();
         try self.c.op(.local_set, word.id);
