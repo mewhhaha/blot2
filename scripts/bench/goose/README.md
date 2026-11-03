@@ -7,7 +7,9 @@ from the 50-task catalog: Fannkuch, CRC32 and the custom eight-lane hash named
 `Hash::SHA256` upstream. That last kernel is not cryptographic SHA-256.
 
 [Measured baseline, 2026-11-03](results/2026-11-03.md): ordinary cold builds,
-checked bounded runtime, Wasm sizes and the unchanged production timeouts.
+checked bounded runtime, Wasm sizes and the unchanged production timeouts. With
+Matplotlib installed, `python3 scripts/bench/goose/charts.py` regenerates the
+root README's SVG charts from that pinned evidence without running benchmarks.
 
 ```sh
 python3 scripts/bench/goose/compare.py \

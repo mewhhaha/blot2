@@ -13,6 +13,21 @@ evidence.
 This is a greenfield project. Breaking changes are welcome; remove superseded
 implementations and APIs rather than maintaining legacy compatibility.
 
+## Benchmarks
+
+Blot versus Goose's direct Wasm backend, measured on 2026-11-03. Shared-host
+medians; three of seven adapted LangArena tasks.
+
+![Cold compilation time: Blot and Goose, milliseconds](scripts/bench/goose/charts/compilation.svg)
+
+![Bounded Wasm kernel runtime: Blot and Goose, milliseconds](scripts/bench/goose/charts/runtime.svg)
+
+Runtime uses production input sizes with fewer repetitions. Hash buffers use U32
+elements in Blot and U8 in Goose. All checksums pass; unchanged production Blot
+runs hit the 30-second limit. See
+[results and methodology](scripts/bench/goose/results/2026-11-03.md) for exact
+inputs, samples and limitations.
+
 ## Development
 
 Use the existing sibling `blot2`, `pen`, `ink` and `gdev` checkouts. Requires
