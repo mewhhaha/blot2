@@ -93,6 +93,14 @@ callers omit stores for the remaining words. Full packet extents, word offsets
 and result serialization stay unchanged. The input mask belongs to the completed
 plan's arena and rolls back with failed plans. Direct-word calls keep their ABI.
 
+Final data-stack prepared bodies remove adjacent same-local get/set pairs and
+fold same-local set/get pairs to tee after physical local compaction. Original
+module bodies and their semantic/table coordinates remain immutable; assembly
+captures the shortened prepared body. Ownership/resource markers decline this
+cleanup, and flagged table operands remain unchanged. Diagnostic origins never
+select an optimization; a surviving tee retains the set's origin. Global banks,
+call conventions, semantic arguments and ownership admission remain independent.
+
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
 ordered immutable unit context. Receipt allocation failure propagates before

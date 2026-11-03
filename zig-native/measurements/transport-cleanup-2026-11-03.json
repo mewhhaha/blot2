@@ -1,0 +1,620 @@
+{
+  "date": "2026-11-03",
+  "scope": "Final prepared data-stack bodies remove same-local get/set pairs and fold set/get to tee after physical local compaction. No ABI, library/game or environment publication changes.",
+  "source_pin": {
+    "base": "4c6a253b5d52f9a554572b2cc7770a3336a6c4d9",
+    "patch_sha256": "3c99042261daff0cb809e24ef1e43d42b4675b8b7856cb3de75de7a8b1db40d5",
+    "files": {
+      "scripts/dev_check_areas.ts": "8224f2fe609377eaca110985dd3f10d9009e4c2fbd2eca84edadbe19cddf5382",
+      "zig-native/src/backend/runtime_pipeline.zig": "ce5c8c33d64cb46a4ae572c8ca5516e7f7b630c27dfd8cb6c15c88e7c1945dc5",
+      "zig-native/src/backend/wasm_transport_cleanup.zig": "ad06fb43ed65171c18e957ba5e09dd84360b5b4490500c1433064a61879f0cd9",
+      "zig-native/src/backend/wasm_transport_cleanup_tests.zig": "79046df635848f48d2412940ba72ebab7e12c67d17d529bf4b54871d7ae6dd76",
+      "zig-native/tests/storage_transport_execution.test.ts": "56b1d4c7f1bd253cd90f8c9fd0bf3929b345338496c72c56cbf33d593478e0dd"
+    }
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "native_backend": "noLLVM, Safe, complete inventory compilation",
+    "native_compile_report": "9s, MaxRSS899M",
+    "release_backend": "LLVM, Fast",
+    "release_build": {
+      "directory": "/home/jacobt/src/blot2/build/bench/frozen-transport-cleanup-3c99042261da",
+      "exit_code": 0,
+      "elapsed_seconds": 314.625151825021
+    },
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3"
+  },
+  "workload_heads": {
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+  },
+  "main": {
+    "runs": {
+      "baseline": {
+        "evidence": "build/bench/transport-cleanup-2026-11-03/main-baseline/main-cd4ac35b7943a7bd/result.json",
+        "build_ms": 5652.357114,
+        "wasm_bytes": 16220693,
+        "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+        "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+        "compiler_identity": "b83ce3b4d722485f7165b608a0bd9aeb0d9c3cd467cb013c0eec97272ef75d15",
+        "source_bytes": 2537167
+      },
+      "candidate": {
+        "evidence": "build/bench/transport-cleanup-2026-11-03/main-candidate/main-41c74e758e6ecde2/result.json",
+        "build_ms": 5635.642741000001,
+        "wasm_bytes": 15535572,
+        "wasm_sha256": "c66846282b714a801af94ca91d57813704cc0591900eb3f381feba46b148abd8",
+        "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "compiler_identity": "2b303b4e4e6730639eceff7032752ebabe01e9522fdc31dc2a2917c0e9f708c6",
+        "source_bytes": 2537167
+      },
+      "configured": {
+        "evidence": "build/bench/transport-cleanup-2026-11-03/main-configured/main-ee9b26ca76dd31f3/result.json",
+        "build_ms": 5702.229778,
+        "wasm_bytes": 15535572,
+        "wasm_sha256": "c66846282b714a801af94ca91d57813704cc0591900eb3f381feba46b148abd8",
+        "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "compiler_identity": "2b303b4e4e6730639eceff7032752ebabe01e9522fdc31dc2a2917c0e9f708c6",
+        "source_bytes": 2537167
+      }
+    },
+    "bytes_removed": 685121,
+    "size_reduction_percent": 4.223746790596431,
+    "limits": "Individual fresh cache-disabled completions under shared-host load, four codegen/frontend workers and 30-second hard cap. Matched 5.652 to 5.636 seconds shows no meaningful latency improvement. Configured 5.702 seconds. Five-second/subsecond and 1-2MB goals remain unmet.",
+    "engine_validation": {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-candidate/main-41c74e758e6ecde2/main.wasm",
+      "valid": true,
+      "imports": [
+        {
+          "module": "blot:host/1",
+          "name": "call_array_f32_array_f32",
+          "kind": "function"
+        }
+      ],
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function"
+        },
+        {
+          "name": "blot:memory",
+          "kind": "memory"
+        },
+        {
+          "name": "blot:allocate",
+          "kind": "function"
+        },
+        {
+          "name": "blot:reset",
+          "kind": "function"
+        }
+      ]
+    }
+  },
+  "byte_accounting": {
+    "before": {
+      "instruction_count": 5937774,
+      "instruction_bytes": 15779381,
+      "declared_locals": 462178,
+      "global_types": {
+        "0x7f:mutable=0": 6,
+        "0x7f:mutable=1": 68201
+      },
+      "categories": [
+        {
+          "name": "locals",
+          "count": 3315539,
+          "bytes": 9259718
+        },
+        {
+          "name": "globals",
+          "count": 594439,
+          "bytes": 2059610
+        },
+        {
+          "name": "constants",
+          "count": 748182,
+          "bytes": 1726542
+        },
+        {
+          "name": "calls",
+          "count": 389506,
+          "bytes": 883908
+        },
+        {
+          "name": "loads",
+          "count": 257377,
+          "bytes": 802069
+        },
+        {
+          "name": "control",
+          "count": 382381,
+          "bytes": 568084
+        },
+        {
+          "name": "stores",
+          "count": 109986,
+          "bytes": 337524
+        },
+        {
+          "name": "arithmetic_simd",
+          "count": 139952,
+          "bytes": 140283
+        },
+        {
+          "name": "memory_table_reference",
+          "count": 412,
+          "bytes": 1643
+        }
+      ]
+    },
+    "after": {
+      "instruction_count": 5697727,
+      "instruction_bytes": 15094295,
+      "declared_locals": 462178,
+      "global_types": {
+        "0x7f:mutable=0": 6,
+        "0x7f:mutable=1": 68201
+      },
+      "categories": [
+        {
+          "name": "locals",
+          "count": 3075492,
+          "bytes": 8574632
+        },
+        {
+          "name": "globals",
+          "count": 594439,
+          "bytes": 2059610
+        },
+        {
+          "name": "constants",
+          "count": 748182,
+          "bytes": 1726542
+        },
+        {
+          "name": "calls",
+          "count": 389506,
+          "bytes": 883908
+        },
+        {
+          "name": "loads",
+          "count": 257377,
+          "bytes": 802069
+        },
+        {
+          "name": "control",
+          "count": 382381,
+          "bytes": 568084
+        },
+        {
+          "name": "stores",
+          "count": 109986,
+          "bytes": 337524
+        },
+        {
+          "name": "arithmetic_simd",
+          "count": 139952,
+          "bytes": 140283
+        },
+        {
+          "name": "memory_table_reference",
+          "count": 412,
+          "bytes": 1643
+        }
+      ]
+    },
+    "local_instruction_bytes_removed": 685086,
+    "other_instruction_categories_unchanged": true,
+    "remaining_local_global_bytes": 10634242,
+    "remaining_local_global_percent": 68.45092024934776,
+    "local_identity_pairs_before": 43468,
+    "local_identity_pairs_after": 0,
+    "local_set_readback_pairs_before": 160011,
+    "local_set_readback_pairs_after": 0,
+    "new_local_tee_instructions": 153111,
+    "note": "Source pairs overlap; measured binary delta is authoritative. All local self-copy/readback patterns are absent after final encoding. Global bank/reset work stays unchanged.",
+    "functions_before_after": {
+      "before": 8000,
+      "after": 8000
+    }
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2884,
+      "selected_count": 116,
+      "completed_count": 116,
+      "elapsed_seconds": 65.229673187976,
+      "exit_code": 0,
+      "statuses": {
+        "passed": 116
+      },
+      "binary_sha256": "42b66fd3d62ae1cd6cd98fefef7a6bb1dd3e869e457bbd4f8a8aba0dfd3ceeb8",
+      "full_sweeps": 47,
+      "leaks": 0,
+      "logged_errors": 0,
+      "failed": []
+    },
+    "guest": {
+      "passed": 102,
+      "failed": 2,
+      "baseline_failures": {
+        "failures": [
+          "executed memory costs reconcile after copies reuse traps and retained source edits (development)",
+          "executed memory costs reconcile after copies reuse traps and retained source edits (optimized)"
+        ],
+        "status": "Same two legacy memory-profile emission failures reproduced with preceding frozen LLVM binary.",
+        "baseline_compiler": "build/bench/frozen-packed-inputs-6e4e71f237cf/zig-native/zig-out/bin/blotc",
+        "code": "storage_unsupported",
+        "message": "Array elements require a fixed inline layout; resizable and unresolved elements cannot be stored here"
+      },
+      "status": "Full selected 34-file family executed with final LLVM compiler; same two unsupported legacy memory-profile cases as preceding frozen release. Not a complete-suite pass."
+    },
+    "required_full_gate": {
+      "passed": 48,
+      "failed": 1,
+      "stage": "smoke",
+      "diagnostic": "List/chunk storage_escape at312..345; same baseline failure",
+      "status": "Attempted with exact candidate source. Full qualification remains pending."
+    },
+    "zig_lint_findings": 0,
+    "review": {
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "result": "No blockers. Reviewed detached body/source-coordinate boundary, overlapping rewrites, typed/default-zero locals, metadata and OOM ownership."
+    }
+  },
+  "integration": {
+    "world": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+          "wasm_bytes": 588596,
+          "wasm_sha256": "297ff4889792f26e6440735a4c285cc8bae726a65d809bc2fafaaa95dfb268ac",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+          "wasm_bytes": 563087,
+          "wasm_sha256": "9acfec71f10ad99b872b2c88567b2a206a1ebc137f7967c5278d01f6993eba81",
+          "calls": [
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": false,
+              "row": [
+                7,
+                0
+              ]
+            },
+            {
+              "name": "test_hooks_keep_world_and_editor_behavior",
+              "asynchronous": true,
+              "row": [
+                7,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "hand": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "builds": [
+        {
+          "name": "baseline",
+          "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+          "wasm_bytes": 227033,
+          "wasm_sha256": "aec4abb8b3203cc9e227cfe7fe97a8a049a63d19f07ccf401ae7f3e1c1264592",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "candidate",
+          "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+          "wasm_bytes": 221408,
+          "wasm_sha256": "76cbc352584e4ac25f45f2c2b80fed7f580d6287ae9735cf4611c6fc20364a6c",
+          "calls": [
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": false,
+              "row": [
+                160,
+                0
+              ]
+            },
+            {
+              "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+              "asynchronous": true,
+              "row": [
+                160,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "renderer": {
+      "evidence": "build/bench/transport-cleanup-2026-11-03/renderer/pair-a32656d377f04b01/result.json",
+      "pins": {
+        "compiler_sha256": "05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249",
+        "baseline_compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "builds": [
+        {
+          "name": "baseline",
+          "wasm_bytes": 110675,
+          "wasm_sha256": "0b156fb7bdb11140bfd29cecf1d319525ba7f72daa84661cf9e1bf6a39c10a59"
+        },
+        {
+          "name": "candidate",
+          "wasm_bytes": 106804,
+          "wasm_sha256": "e155ee0f136ab84bb95bcc1a6a0203824a6f0351b4c4387e65d9c76ba868a873"
+        }
+      ],
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    },
+    "pen": {
+      "success": false,
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "status": "Installed Pen rejects ABI8 before rendering; no frame/PNG qualified. Exact compiled main reused, no recompile."
+    }
+  },
+  "historical": {
+    "wasm_bytes": 2076028,
+    "wasm_sha256": "bc6a86fe51d4af82ff2e34dee4660c976a499c3437cbd4c8df4efccdad6a1afa",
+    "functions": 3824,
+    "instruction_count": 784917,
+    "declared_locals": 150277,
+    "global_types": {
+      "0x7f:mutable=1": 29,
+      "0x7f:mutable=0": 6
+    },
+    "source_bytes": 1265243,
+    "local_global_instruction_bytes": 1000142,
+    "compiler_commit": "67f10684d09717f5f14a87c8c81a26ee85d963a0",
+    "replay": {
+      "success": true,
+      "elapsed_ms": 2880.786184,
+      "compiler_identity": "c28e69f4cfdcc1ad0fda24a3e66294cfa31ce89a2ad277aef3a4a7b5b96f4078",
+      "executable_sha256": "5b58c87b1cf46e3e8957f8354d32e2a0f03a4706e80fa5a8300c4797df894121",
+      "source_pin_count_before": 578,
+      "wasm_bytes": 2076028,
+      "wasm_sha256": "bc6a86fe51d4af82ff2e34dee4660c976a499c3437cbd4c8df4efccdad6a1afa",
+      "source_pin_count_after": 578
+    },
+    "representation": {
+      "old": "Records/products are heap-backed pointers: aggregate construction allocates four bytes per field, stores each field word and returns the address. Closures generally use a descriptor and capture environment with a narrow one-scalar special case.",
+      "source": {
+        "commit": "67f10684d09717f5f14a87c8c81a26ee85d963a0",
+        "record_emission": "zig-native/src/backend/backend_emission.zig:2655",
+        "record_merge": "zig-native/src/backend/backend_emission.zig:2619",
+        "closure_descriptor": "zig-native/src/backend/backend_emission.zig:5259",
+        "closure_environment": "zig-native/src/backend/backend_emission.zig:5743"
+      },
+      "current": "scoped_backend temporary/assignTransport recursively allocate and copy Value leaves, including owner/borrow metadata. Current closures have their own admission path.",
+      "limit": "The snapshots differ in source, API, configuration and memory model. Category deltas locate growth but do not quantify causal savings or all removable instructions."
+    }
+  },
+  "interpretation": [
+    "Some local/global instructions are necessary for argument/result passing and checked owner/borrow/default-zero semantics. The new model does not require redundant copies or eager copying of every unchanged aggregate lane.",
+    "Exact historical replay proves the 2,076,028-byte predecessor. Before this cleanup, growth to 16,220,693B included 10,319,186B of added local/global instructions (72.95% of total growth); embedded data shrank. These are static category differences, not a controlled compiler-only regression attribution.",
+    "The prior heap-pointer representation made record transport one word while moving allocation and field accesses into runtime storage. The current recursive physical representation can expand control/call boundaries into many word transfers. Preserve ownership requirements while delaying materialization and sharing unchanged lanes.",
+    "This bounded cleanup removes 685,121B (4.22%) but leaves 15,535,572B. A measured representation/transport pilot is still needed for the much larger remaining gap; no promise of 1-2MB follows from this slice."
+  ],
+  "next": "Prototype immutable word/immediate references and selective materialization of genuinely differing aggregate merge/result lanes within existing Value/Core semantics. Measure large result/control transport before another ABI rewrite. Keep type/owner/read/variant checks, explicit copies, loop/backedge correctness and repeated invocation zeros.",
+  "raw_evidence": [
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/release-source.json",
+      "sha256": "2edd64d58b803ea49d45de28c2ac94004e542a9d262a22ea4976858873e82dfe"
+    },
+    {
+      "path": "/home/jacobt/src/blot2/build/bench/frozen-transport-cleanup-3c99042261da/source.patch",
+      "sha256": "3c99042261daff0cb809e24ef1e43d42b4675b8b7856cb3de75de7a8b1db40d5"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/release-build.log",
+      "sha256": "2941861bedcc3e7d5194d2d7b4622e9408e9b497091df44dcb0d2c0da62df4f4"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/native-compile.log",
+      "sha256": "d2da3f37f70f04b40d47492b885c439c52db2012dd0749e185ac38a1efa89ecd"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/native-inventory.txt",
+      "sha256": "90ef129e86342c1f5bc6955478b51d1509372d9ffb3e5f92189e946786390a37"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/native-selection.json",
+      "sha256": "b18c070566be213914d4591379641315687232e33878c783839cd994b732d4fa"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/native-full.log",
+      "sha256": "c1b127174cd10fa7e5d3698a6b878ad248f65e35865f269e3a613902237d2ebf"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/native-result.json",
+      "sha256": "2e3a15e0fe27810a029078dbc71c1c43451e04b03ce4cd31b26758bc17699874"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/guest-selection.json",
+      "sha256": "ade8c3461756a244dd10ac601e3a983a4a717eb47b17c8cc5bfd24dd4d98de87"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/development-guests.log",
+      "sha256": "6db8460b7867ab7bb93b996d2741d11db9e1b8312bd29fd056ab8898792502e8"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/release-guests.log",
+      "sha256": "8ac1afbdb15223d3c6072d119a669c6c9674cd7767b02d80f753d8db3ef96f05"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/baseline-memory-profile.log",
+      "sha256": "38ac0fc8fa3aafa5a962caf64fd59006651e461a42f1911f8e73cb7367b70de8"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/baseline-failures.json",
+      "sha256": "3f9f4775c25a43cdddf428e340b8586f237b8f0c7e57ccf52f0a4bdd439bc7b6"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/full-gate.log",
+      "sha256": "c67a8c9783f8a9704cf5da3828ea431220829e436468b43df3c3778799334959"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/full-gate/timings.json",
+      "sha256": "f59b3e1f01bda053043ebe020ceb23be4ccaa01fc7dcadb9d37bf40f3378388e"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/zig-lint.log",
+      "sha256": "9efc0b2984fde9250aaf2bf0478870cfe6809f9794528df6bd6214353d9e72b5"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-summary.json",
+      "sha256": "9b862f0210e910cf20bf3a13150b2dd51d48730a24e6da4526955755268c2841"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-engine-validation.json",
+      "sha256": "562be43736771d61a85e932eb9e84c303ab4a2366ba20a9d0dac2e3e06fb5581"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/candidate-census.json",
+      "sha256": "7522654965bbef00457ab0fae680483f010668d517d217c715a89fd0a90be8b5"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/candidate-transfers.json",
+      "sha256": "93149a40f116b73be8b352805d30f01137459a39e0c27597c651781be66671ad"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/world-pair/result.json",
+      "sha256": "d2dbbb0b3d3d4319c38b9e00c0791e9078191a55e9741fa2b059196818cda93f"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/hand-pair/result.json",
+      "sha256": "af9f203843487a84d18042d5903f68e57995319e6b20b59fe75d3dd059e33d30"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/renderer/pair-a32656d377f04b01/result.json",
+      "sha256": "3d6bb6f9a7ab6dadcc7e6de450b220562e927451188d457bdc337fc161b6de43"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/pen/result.json",
+      "sha256": "88c05f4ece0ef2eaf1c86395f4b35c4873cbd53843515646f326feafbc8bb084"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/historical/comparison.json",
+      "sha256": "e40e4ac040ca285230e098fddfcca50857e875f38dd85c1f413c6886ec08bba4"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/historical/replay-result.json",
+      "sha256": "92c5ec2a5035ca8ec1ddf10b4c65d2b092720f8c9252d7f26adf1e6f56d86d81"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/historical/old-census.json",
+      "sha256": "e68b0d3b4c0ba84e431ae740436a1ddb9ddb9900db67e6fcc35c3d3ada094f71"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/historical/compiler-representation.md",
+      "sha256": "6afc3d3cd525c3c3f6d9e166aa13840548eebb72573d771b014d9d8372c7867b"
+    },
+    {
+      "path": "build/bench/current-gdev-20261018T101948Z/input-pins.json",
+      "sha256": "916fd31526066402709ae0505b552e8cc6e9f442239a468274b9eccb0e315355"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-baseline/main-cd4ac35b7943a7bd/result.json",
+      "sha256": "c9a35af2588c82ab8357e163c0d1514c5bbb013628a2691a99bbebe98474790b"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-candidate/main-41c74e758e6ecde2/result.json",
+      "sha256": "e6e46ec346e588f67ad0526a564ab43efac0035337c769d7e097e0e2d901439a"
+    },
+    {
+      "path": "build/bench/transport-cleanup-2026-11-03/main-configured/main-ee9b26ca76dd31f3/result.json",
+      "sha256": "0188d40a15338123c37f4b84d8ef6a5be12b48153798498478900afd795d68bf"
+    }
+  ]
+}

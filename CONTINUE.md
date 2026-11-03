@@ -14,16 +14,25 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest release produces **16,220,693 bytes of Wasm**, down from 16,392,014
-(171,321B / 1.05% smaller). A matched fresh pair takes **6.204s → 6.177s**; the
-configured launcher takes **6.100s** with identical compiler identity and full
-Wasm hash. These individual cache-disabled completions under shared-host load
-show no meaningful latency gain. The five-second and subsecond targets remain
+The latest release produces **15,535,572 bytes of Wasm**, down from 16,220,693
+(685,121B / 4.22% smaller). A matched fresh pair takes **5.652s → 5.636s**; the
+configured launcher takes **5.702s** with identical compiler identity and full
+Wasm hash. Individual cache-disabled completions under shared-host load show no
+meaningful latency gain. The five-second, subsecond and 1–2MB targets remain
 unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/lazy-packed-inputs-2026-11-03.json).
-Release source is `b0be28fb` plus source snapshot `6e4e71f237cf`; the complete
-patch and per-file hashes are pinned separately. The installed LLVM binary is
-`638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22`.
+[the current evidence](zig-native/measurements/transport-cleanup-2026-11-03.json).
+Release source is `4c6a253b` plus complete patch `3c99042261da`; all five
+changed implementation/test files match the frozen candidate. The installed LLVM
+binary is `05b05beef0cc7fc5c323296db7494fd665747aca2a1cb336440a259e9eae4249`.
+
+Final data-stack bodies now remove same-local get/set pairs and fold set/get
+pairs to tee after local compaction. The complete output has no local self-copy
+or adjacent set/get readback pairs, down from 43,468 and 160,011 respectively.
+It gains 153,111 tee instructions; overlapping pair counts are not additive.
+Original module bodies and semantic/table coordinates stay immutable. Packed
+flags and hidden ownership/resource markers retain conservative handling;
+diagnostic origins do not select the optimization. Global banks, call
+conventions, semantic/effect checks and default-zero behavior stay intact.
 
 Packed helper inputs now reserve logical input locals in the existing Value
 layout. After complete body checking, result serialization and cleanup, the
@@ -50,56 +59,53 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,878 native laws compile; all 72 affected laws pass full allocation faults
-(33 sweeps), 96 guest tests pass with the final LLVM compiler, and Zig lint is
-clean. New witnesses cover wide forwarding beyond the 512-word direct ABI,
-variant/descriptor results, reads after nested packed calls, repeated plan hits
-and observable unused-argument effects. The broader family retains 187 passes
-and the same 15 failure names with its required runtime fixtures. The required
-full gate retains 48 passes/one baseline List/chunk failure. Final LLVM passes
-seven world/editor, 160 hand and seven identical renderer checks. Installed Pen
-still rejects ABI 8; no new frame/PNG is qualified. The configured launcher
-selects `zig-native/zig-out/bin/blotc` with the exact measured identity and
-Wasm.
+All 2,884 native laws compile; all 116 selected laws pass full allocation faults
+(47 sweeps), including the new compaction/transport/metadata/typed-local laws.
+The final LLVM guest family has 102 passes and two unsupported legacy
+memory-profile cases; both failures reproduce with the preceding frozen LLVM
+compiler. Zig lint is clean. The required full gate retains 48 passes/one
+baseline List/chunk failure, so full qualification remains pending. Final LLVM
+passes seven world/editor, 160 hand and seven identical renderer checks. World
+shrinks 588,596 → 563,087B; hand 227,033 → 221,408B; renderer 110,675 →
+106,804B. Installed Pen still rejects ABI 8 before rendering; no new frame/PNG
+is qualified. The configured launcher selects the exact measured release.
 
-Fresh
-[binary inspection](zig-native/measurements/gdev-size-forensics-2026-11-03.json)
-accounts for the complete current artifact: 15.81MB is code, 341kB global
-declarations and 50kB data. Local/global instructions alone occupy 11.32MB
-(69.8%). There are 462,178 locals and 68,201 mutable globals. Only four
-functions with 59 total body bytes are unreachable; byte-identical bodies
-account for at most 406kB before index rewriting. Assets, debug names and dead
-functions do not explain the size.
+The current artifact has 15.13MB of code, 341kB of global declarations and 50kB
+of data. Local/global instructions occupy 10.63MB (68.45%). There are still
+462,178 locals and 68,201 mutable globals. The outliner's 67,833 banked globals
+and 390,988B root reset run stay unchanged. Only four functions with 59 total
+body bytes are unreachable. Byte counts describe static encodings, not runtime
+cost or removable work.
 
-The output contains 43,468 exact local self-copy pairs using 254,472B. Final
-local compaction reuses slots without deleting instructions, and no cleanup runs
-after it. Another 325,398 zero/local-set pairs occupy 1.58MB, but physical slots
-are reused: most cannot be called dead Unit values from this census. The
-outliner creates 462 helpers and 67,833 bank globals. Main resets those bank
-slots in one 390,988B run, preserving function-entry zero semantics on repeated
-calls. The bank amplifies eager value/carrier materialization; it is not the
-whole cause.
+The **2,076,028B historical predecessor was recovered exactly**, with its
+original SHA, using the preserved compiler and source in one 30-second-capped
+replay (2.88s). All 578 input pins match before and after. Its local/global
+instructions occupy 1,000,142B and it has 29 mutable globals. Against the
+preceding 16.22MB artifact, local/global growth accounts for 73% of total byte
+growth; embedded data shrank. Source bytes grew about 2×, but these snapshots
+differ in source, APIs, configuration and memory model, so that category delta
+is not a controlled compiler-only attribution.
 
-A bounded Binaryen 133 diagnostic (`simplify-locals`, `vacuum`, `dce`) shrinks
-the same Wasm to 13,544,604B in 2.84s. It removes 2.35MB of local instruction
-traffic while retaining all function/local/global declaration counts and
-unchanged load/store bytes. The existing World witness also shrinks and passes
-all seven checks in sync/async modes. Main is engine-validated only. These are
-private optimizer outputs; the installed compiler still emits 16,220,693B.
-Adding that postprocessing cost to the edit loop is not the intended fix.
+Historical aggregate construction stored fields in a heap object and returned
+one pointer. Current `temporary`/`assignTransport` recursively materialize and
+copy Value leaves, including explicit owner/borrow metadata. Some resulting
+instructions are necessary for the current representation; preserving ownership
+does not require redundant or eager copies of every unchanged aggregate lane.
+Current closure admission remains its own path. The next larger pilot should
+preserve immutable word/immediate references and materialize only genuinely
+differing merge/result lanes, within existing Value/Core semantics. Keep
+complete type, owner, read, variant, loop/backedge and invocation-zero checks.
 
-Astra's review favors a bounded data-stack cleanup after final local compaction:
-delete exact self-copy pairs and fold adjacent set/get pairs to tee, respecting
-hidden ownership/resource coordinates. Then measure residual transport before
-choosing a larger Value/phi IR or aggregate ABI rewrite. Preserve semantic
-arguments, effects, owners, variants, loops and default-zero behavior. Use
-`scripts/bench/wasm_size.py` and the SHA-matched `wasm_transfers.py` companion
-to compare the complete emitted result; pattern byte totals overlap and are not
-removable-byte promises. There is no measured path to 1–2MB yet.
+The earlier bounded Binaryen diagnostic shrank the preceding 16.22MB artifact to
+13.54MB in 2.84s. Its broader simplification is not installed and its savings
+cannot be added to this batch. Use `scripts/bench/wasm_size.py` and the
+SHA-matched `wasm_transfers.py` companion to measure complete output; most of
+the 1.58MB zero/local-set category is not trivially dead. Another full IR or
+aggregate ABI rewrite needs evidence from the remaining large transfers.
 
-Earlier identity-join and immutable-survivor fixes remain installed. Neutral
-field masks, narrow direct-tail markers and unused-local pruning remain held;
-requirements, controls and raw evidence are retained in the
+Earlier identity-join, immutable-survivor and packed-input fixes remain
+installed. Neutral field masks, narrow direct-tail markers and unused-local
+pruning remain held; requirements, controls and raw evidence are retained in the
 [preceding frontier](https://github.com/mewhhaha/blot2/blob/8ed0781c4c623c1d8d47b47fff1f2edaebd9a9a0/CONTINUE.md)
 and linked measurements. Remaining-use counts are not a dead-binding proof.
 

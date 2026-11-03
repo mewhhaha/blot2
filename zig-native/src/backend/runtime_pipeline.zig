@@ -259,6 +259,16 @@ pub const Session = struct {
                 if (owned) |*body| body.deinit(self.allocator);
                 owned = replacement;
             }
+            // Only detached prepared bodies change. Module semantic/table places
+            // continue to name immutable source arrays, never this output.
+            if (owned) |body| {
+                view.locals = body.locals;
+                view.instructions = body.instructions;
+            }
+            if (try @import("wasm_transport_cleanup.zig").run(self.allocator, &view)) |replacement| {
+                if (owned) |*body| body.deinit(self.allocator);
+                owned = replacement;
+            }
         }
         return owned;
     }

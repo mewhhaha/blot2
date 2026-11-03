@@ -3,23 +3,22 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/lazy-packed-inputs-2026-11-03.json)
-produces **16.22 MB Wasm**, down from 16.39 MB. A matched fresh pair takes
-6.204s → 6.177s; the configured launcher takes 6.100s with identical output.
-These individual completions show no meaningful latency gain. Completed helper
-IR now determines packed input loads and caller stores, avoiding 7,392 and
-11,088 words respectively in main while retaining complete semantic checks and
-packet offsets. All 2,878 native laws compile, 72 affected laws pass full
-faults, 96 guests pass and Zig lint is clean. Final LLVM retains world/editor,
-hand and renderer checks. The five-second target remains unmet; full
-qualification retains the baseline List/chunk failure, and installed Pen rejects
-ABI 8 before rendering. Fresh
-[binary inspection](../zig-native/measurements/gdev-size-forensics-2026-11-03.json)
-finds 11.32MB of local/global instruction traffic, including 254kB of exact
-self-copies. Only 59 function-body bytes are unreachable. A bounded optimizer
-probe removes 2.68MB but still leaves 13.54MB; it is not installed. Next is a
-small cleanup after local compaction, with measured residuals deciding whether a
-Value/phi representation is needed. Ordinary `#run` build functions remain a
+[Actual full main](../zig-native/measurements/transport-cleanup-2026-11-03.json)
+produces **15.54 MB Wasm**, down from 16.22 MB (685kB / 4.22%). A matched fresh
+pair takes 5.652s → 5.636s; the configured launcher takes 5.702s with identical
+output. Final local transport cleanup removes every measured self-copy and
+set/get readback pair; no meaningful latency gain is established. All 2,884
+native laws compile, 116 selected laws pass full faults, and the final LLVM
+guest family has 102 passes/two baseline legacy memory-profile failures. Zig
+lint and world/editor, hand and renderer checks pass. Full qualification retains
+the baseline List/chunk failure; installed Pen rejects ABI 8 before rendering.
+
+The exact historical 2.08MB output was recovered from preserved inputs in a
+bounded 2.88s replay. Historical records used heap pointers; the current backend
+recursively transports Value leaves and owner/borrow metadata. Source snapshots
+differ, but the remaining 10.63MB of local/global instructions points toward
+selective aggregate materialization as the next size pilot. Preserve complete
+semantic checks and explicit copies. Ordinary `#run` build functions remain a
 separate, unimplemented simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
