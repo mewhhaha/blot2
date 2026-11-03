@@ -529,7 +529,17 @@ fn prepareBody(a: A, source: *const ir.Function, code: []const ir.Instruction, i
         try result.instructions.append(a, output);
     }
     // Pruning above is mandatory: the existing compactor pins unused locals.
-    const view: ir.Function = .{ .parameters = parameters, .result = if (is_root) source.result else .none, .signature = source.signature, .locals = result.locals, .instructions = result.instructions };
+    var view: ir.Function = .{ .parameters = parameters, .result = if (is_root) source.result else .none, .signature = source.signature, .locals = result.locals, .instructions = result.instructions };
+    // Admission previews need a conservative bound, not final expression trees.
+    switch (globals) {
+        .sparse => {},
+        .dense => if (try @import("wasm_stackify.zig").run(a, &view)) |stackified| {
+            result.deinit(a);
+            result = stackified;
+            view.locals = result.locals;
+            view.instructions = result.instructions;
+        },
+    }
     if (try @import("wasm_local_compact.zig").run(a, &view)) |compacted| {
         result.deinit(a);
         result = compacted;

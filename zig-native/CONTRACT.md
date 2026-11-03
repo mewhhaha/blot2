@@ -142,6 +142,20 @@ cleanup, and flagged table operands remain unchanged. Diagnostic origins never
 select an optimization; a surviving tee retains the set's origin. Global banks,
 call conventions, semantic arguments and ownership admission remain independent.
 
+Before physical slot reuse, single-set/single-read numeric locals may become
+ordered stack expression trees. Only typed, pure, nontrapping producers move.
+Calls, memory, globals, local writes, control and symbolic operands flush pending
+definitions and the live operand stack. Unknown stack prefixes remain in place.
+Only eliminated locals disappear; parameter positions and original bodies stay
+unchanged. Hidden ownership/resource/layout operands decline the pass. Tree
+emission is iterative, including long chains.
+
+Flat unowned scalar record loop carries may share fields whose exact Core
+projection identities survive every backedge, continue and break. Changed
+fields retain carriers and simultaneous snapshots. Complete assignment, owner,
+read and variant checks still run; tagged, nominal, borrowed, callable and nested
+fields keep ordinary transport. Field proofs have a separate bounded budget.
+
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
 ordered immutable unit context. Receipt allocation failure propagates before

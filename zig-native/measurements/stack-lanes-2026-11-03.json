@@ -1,0 +1,676 @@
+{
+  "date": "2026-11-03",
+  "decision": "Retain the bounded scalar stackification and flat scalar loop-lane pilots for the current size-first priority. This is a measured size/compile-time tradeoff; stop scalar widening and target aggregate/outlined transport next.",
+  "source": {
+    "head": "6bb30d10a386d4ecaef7a5b9e7e34cb265e343e2",
+    "patch_sha256": "3f12a3012325c53ab1c50d426faa24d679a52180c48a458c7de325a668a1a14d",
+    "directory": "/home/jacobt/src/blot2/build/bench/frozen-stack-lanes-3f12a3012325",
+    "files": {
+      "scripts/bench/aggregate_scaling.ts": "068f0eb84cc035ea9b1b9a8e24bcc154eb5c028da0434b498f4c163e1543dc68",
+      "scripts/dev_check_areas.ts": "3746d2d287637849266a3843c8f0f7c71554475e76937f71d12a4b6983e38ce4",
+      "zig-native/CONTRACT.md": "efa6b44e98a4e9c88869a7c7c7267137c675dbd6d0b8a7ddb60cc6b40fa868b5",
+      "zig-native/src/backend/runtime_pipeline.zig": "525e0d4b49785467dd5a1e1c07ba421ad7de927259665a702201a7b4c15d0c0a",
+      "zig-native/src/backend/scoped_backend.zig": "9f78199274cc310970bf39ec035ac76ef492445dba5eb059d55f1b4357ce6c83",
+      "zig-native/src/backend/storage_calls_tests.zig": "4a64c07da302206667b68015b49d8fde46ff83df28e9c01f517f300712ecc6db",
+      "zig-native/src/backend/storage_transport.zig": "9a0200df63c09c0152a2e2f54efd9844f15cabff1aa950c01e8107f27a4e1f86",
+      "zig-native/src/backend/wasm_scope_outline.zig": "5ee592f0fd12fb46eff71d840facdb085455913981e56e13881ebeeea96e3dad",
+      "zig-native/src/backend/wasm_transport_cleanup_tests.zig": "9bedbf43e72e61ce554eca4860bc2885b18620cbff9cc6bf57eac2fcf1ce2ec0",
+      "zig-native/src/backend/wasm_stackify.zig": "70ce79ba78b5099768066dbff9a4bec5e4ee4ca8714bccf8231b3dda2fc7aa45",
+      "zig-native/src/backend/wasm_stackify_tests.zig": "e35029cb305b97ca4c6ce1ae8c9bf9bf437bafacd0a2fccc5317a0d80a6ea63e",
+      "zig-native/tests/loop_lane_execution.test.ts": "99c2593ed15221ff836d3ffc82e00c3a9383170f29dd632833fb840fd1bcdc58",
+      "zig-native/tests/stack_expression_execution.test.ts": "195a549a53039957933efef1f13b725df18d0c465dadebad3e7914cf1ec77bdb"
+    },
+    "native_test_binary_sha256": "81c47902d6a9b16e8b37797e1917d29aeb0e04b8a2dc21dbf4f8b47b2d55a593",
+    "release_binary_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+    "release_identity_sidecar_sha256": "1fc4885214fc13b03828d3c9fa7c6d17dff81af7dabe3c4aec2e126614b47cef"
+  },
+  "workload": {
+    "blot2": {
+      "head": "6bb30d10a386d4ecaef7a5b9e7e34cb265e343e2",
+      "status": [
+        " M scripts/bench/aggregate_scaling.ts",
+        " M scripts/dev_check_areas.ts",
+        " M zig-native/CONTRACT.md",
+        " M zig-native/src/backend/runtime_pipeline.zig",
+        " M zig-native/src/backend/scoped_backend.zig",
+        " M zig-native/src/backend/storage_calls_tests.zig",
+        " M zig-native/src/backend/storage_transport.zig",
+        " M zig-native/src/backend/wasm_scope_outline.zig",
+        " M zig-native/src/backend/wasm_transport_cleanup_tests.zig",
+        "?? zig-native/src/backend/wasm_stackify.zig",
+        "?? zig-native/src/backend/wasm_stackify_tests.zig",
+        "?? zig-native/tests/loop_lane_execution.test.ts",
+        "?? zig-native/tests/stack_expression_execution.test.ts"
+      ]
+    },
+    "ink": {
+      "head": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+      "status": []
+    },
+    "gdev": {
+      "head": "a99703d89b19210040d996f121884126eeb62f2d",
+      "status": []
+    },
+    "pen": {
+      "head": "d159492cab6de97f3b4a4fbc7c03b00f420e60cf",
+      "status": []
+    },
+    "/home/jacobt/src/gdev/src/main.blot": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+    "/home/jacobt/src/gdev/pen.json": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+  },
+  "contracts": [
+    "ABI 8; session protocol 2; schema 26 unchanged",
+    "Complete semantic, owner, read, write, escape and variant checks remain",
+    "Numeric single-set/single-read trees only; typed pure nontrapping producers; effect/control/local-write/symbolic barriers",
+    "Opaque stack prefixes stay in place; only eliminated numeric locals are pruned; iterative emission",
+    "Hard-barrier intervals only skip wholly futile passes, never change rewrite candidacy",
+    "Sparse outline previews retain their conservative preexisting bound; stackification runs on final dense preparation",
+    "Flat named unowned scalar loop fields require exact Core identity through every backedge/continue/break; other shapes retain ordinary transport"
+  ],
+  "review": {
+    "model": "gpt-6-astra",
+    "reasoning": "xhigh",
+    "findings": "Reviewed ordering, opaque prefixes, OOM cleanup, source immutability, symbolic flags, destination types and fast rejection. Added successful mutation/opaque-prefix and no-new-barrier laws. Retain the explicit size tradeoff; no measured runtime-speed benefit."
+  },
+  "scalar_control": {
+    "description": "16 multiply/xor pairs over dynamic U32 input; subtract zero-operation body scaffold",
+    "baseline": {
+      "empty_body_bytes": 44,
+      "chain_body_bytes": 432,
+      "incremental_bytes": 388,
+      "incremental_local_bytes": 254,
+      "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325"
+    },
+    "candidate": {
+      "0": {
+        "wasm_sha256": "5c39235a0c6432b95edd490e31d7e4a0ec4e0b6f10bd250923b61934d65f791f",
+        "source_sha256": "0da785a1672940d7671bcb20005ee49ff86a6c6b92cf1f4e116db864d4ecc285",
+        "body_bytes": 44,
+        "locals": 4,
+        "categories": {
+          "constants": 8,
+          "calls": 8,
+          "locals": 16,
+          "control": 9
+        }
+      },
+      "16": {
+        "wasm_sha256": "13d9615cc00c41d0ffbf1eafbd1502d86166bf8f0f03460fae76c99be0060602",
+        "source_sha256": "cdc4c4e8e4a09eec6c7c0911d9629e2d46029c46acd9d52b75d943da114eeec5",
+        "body_bytes": 178,
+        "locals": 4,
+        "categories": {
+          "constants": 110,
+          "calls": 8,
+          "locals": 16,
+          "control": 9,
+          "arithmetic_simd": 32
+        }
+      }
+    },
+    "incremental_bytes": 134,
+    "incremental_local_bytes": 0,
+    "checks": 8,
+    "clang_reference": {
+      "status": "Preserved Clang23.1.4 -Oz wasm32 controls re-executed this turn",
+      "incremental_bytes": 134,
+      "checks": 8
+    },
+    "source_generator": "build/bench/stack-lanes-2026-11-03/scalar_control.ts",
+    "generator_sha256": "41e75861667aa4d85f531252942dfdf8ca53f4a44ac74f3a044bc5cbdbb63da9"
+  },
+  "isolated_loop_control": {
+    "scope": "Flat named scalar-only untagged record carries. Whole semantic assignment/owner/variant checks retained. Every fallthrough/continue/break projection must match incoming field identity. Unsupported owner/borrow/callable/variant subtrees retain baseline transport.",
+    "baseline_head": "6bb30d10a386d4ecaef7a5b9e7e34cb265e343e2",
+    "compiler_build": {
+      "zig": "0.17.0",
+      "optimize": "fast",
+      "llvm": false,
+      "baseline_sha256": "17387a6c7acc874c72598e88a199e258173e4a2bf3b26648970196b477311d6e",
+      "candidate_sha256": "a91fb6e30a7f5a0cb52b31108a7a02c3201d3e1f52828d176d90461c17047d2d",
+      "baseline_identity": "b126843fdfcaa7a8a1d669ee627843ce17238b37ecede39278f700ded7563d64",
+      "candidate_identity": "f355844d84e5056f4d8186b9a806a1c5beccb2d0818c184c0619f713e42430bf"
+    },
+    "source_pins": {
+      "zig-native/src/backend/scoped_backend.zig": "9f78199274cc310970bf39ec035ac76ef492445dba5eb059d55f1b4357ce6c83",
+      "zig-native/src/backend/storage_transport.zig": "9a0200df63c09c0152a2e2f54efd9844f15cabff1aa950c01e8107f27a4e1f86",
+      "zig-native/src/backend/storage_calls_tests.zig": "4a64c07da302206667b68015b49d8fde46ff83df28e9c01f517f300712ecc6db",
+      "zig-native/tests/loop_lane_execution.test.ts": "99c2593ed15221ff836d3ffc82e00c3a9383170f29dd632833fb840fd1bcdc58",
+      "scripts/bench/aggregate_scaling.ts": "068f0eb84cc035ea9b1b9a8e24bcc154eb5c028da0434b498f4c163e1543dc68"
+    },
+    "rows": [
+      {
+        "kind": "loop-noop",
+        "width": 8,
+        "baseline_bytes": 3495,
+        "candidate_bytes": 3495,
+        "delta_bytes": 0,
+        "baseline_build_ms": 9.239238,
+        "candidate_build_ms": 9.127676000000008,
+        "identical_wasm": true
+      },
+      {
+        "kind": "loop",
+        "width": 8,
+        "baseline_bytes": 3598,
+        "candidate_bytes": 3512,
+        "delta_bytes": -86,
+        "baseline_build_ms": 7.638728000000015,
+        "candidate_build_ms": 7.565588999999989,
+        "identical_wasm": false
+      },
+      {
+        "kind": "loop-all",
+        "width": 8,
+        "baseline_bytes": 3647,
+        "candidate_bytes": 3647,
+        "delta_bytes": 0,
+        "baseline_build_ms": 8.236987999999997,
+        "candidate_build_ms": 7.638948000000028,
+        "identical_wasm": true
+      },
+      {
+        "kind": "loop-noop",
+        "width": 32,
+        "baseline_bytes": 3952,
+        "candidate_bytes": 3952,
+        "delta_bytes": 0,
+        "baseline_build_ms": 11.239900999999975,
+        "candidate_build_ms": 14.274383999999998,
+        "identical_wasm": true
+      },
+      {
+        "kind": "loop",
+        "width": 32,
+        "baseline_bytes": 4343,
+        "candidate_bytes": 3969,
+        "delta_bytes": -374,
+        "baseline_build_ms": 17.219277000000034,
+        "candidate_build_ms": 12.297697000000028,
+        "identical_wasm": false
+      },
+      {
+        "kind": "loop-all",
+        "width": 32,
+        "baseline_bytes": 4560,
+        "candidate_bytes": 4560,
+        "delta_bytes": 0,
+        "baseline_build_ms": 15.00462600000003,
+        "candidate_build_ms": 14.968878000000018,
+        "identical_wasm": true
+      },
+      {
+        "kind": "loop-noop",
+        "width": 128,
+        "baseline_bytes": 6319,
+        "candidate_bytes": 6319,
+        "delta_bytes": 0,
+        "baseline_build_ms": 34.996687000000065,
+        "candidate_build_ms": 32.927505,
+        "identical_wasm": true
+      },
+      {
+        "kind": "loop",
+        "width": 128,
+        "baseline_bytes": 8394,
+        "candidate_bytes": 6343,
+        "delta_bytes": -2051,
+        "baseline_build_ms": 61.7836299999999,
+        "candidate_build_ms": 50.12206400000002,
+        "identical_wasm": false
+      },
+      {
+        "kind": "loop-all",
+        "width": 128,
+        "baseline_bytes": 9537,
+        "candidate_bytes": 9537,
+        "delta_bytes": 0,
+        "baseline_build_ms": 51.132249,
+        "candidate_build_ms": 68.69806699999992,
+        "identical_wasm": true
+      }
+    ],
+    "checks_per_compiler": 270,
+    "interpretation": "One-field carry overhead above the same no-op control falls from 103/391/2075 to 17/17/24 bytes. No-op and all-field controls retain identical Wasm. Shared-host micro timings are noisy; no speed claim.",
+    "evidence": "build/bench/private-prototypes/loop-lanes/loop-lanes-results.json",
+    "known_incomplete": "Two agent NativeFast whole-game probes timed out at30s; they establish no Gdev result and were stopped. Final whole-game measurements use LLVM."
+  },
+  "main": {
+    "baseline_bytes": 13935123,
+    "candidate_bytes": 13594002,
+    "saved_bytes": 341121,
+    "saved_percent": 2.447922418768747,
+    "samples": [
+      {
+        "name": "baseline",
+        "sample": 1,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-baseline-1/main-4735f5d97748aa59/result.json",
+        "build_ms": 6766.779691,
+        "wasm_bytes": 13935123,
+        "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 1,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-candidate-1/main-2e629f6000c893be/result.json",
+        "build_ms": 6972.643255999999,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 2,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-candidate-2/main-11b32338455c76ce/result.json",
+        "build_ms": 7136.796998,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "baseline",
+        "sample": 2,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-baseline-2/main-49300b2d3dbe86cf/result.json",
+        "build_ms": 6771.685138999999,
+        "wasm_bytes": 13935123,
+        "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "baseline",
+        "sample": 3,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-baseline-3/main-18e13001fdf7bfbc/result.json",
+        "build_ms": 6432.417217,
+        "wasm_bytes": 13935123,
+        "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+        "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+        "identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+        "source_bytes": 2537167
+      },
+      {
+        "name": "candidate",
+        "sample": 3,
+        "result": "build/bench/stack-lanes-2026-11-03/final-main-candidate-3/main-33091abd0ee54212/result.json",
+        "build_ms": 6783.199817,
+        "wasm_bytes": 13594002,
+        "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+        "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+        "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+        "source_bytes": 2537167
+      }
+    ],
+    "independent_median_build_ms": {
+      "baseline": 6766.779691,
+      "candidate": 6972.643255999999
+    },
+    "paired": [
+      {
+        "sample": 1,
+        "baseline_ms": 6766.779691,
+        "candidate_ms": 6972.643255999999,
+        "delta_ms": 205.86356499999965,
+        "delta_percent": 3.0422678792661806
+      },
+      {
+        "sample": 2,
+        "baseline_ms": 6771.685138999999,
+        "candidate_ms": 7136.796998,
+        "delta_ms": 365.11185900000055,
+        "delta_percent": 5.391742993146864
+      },
+      {
+        "sample": 3,
+        "baseline_ms": 6432.417217,
+        "candidate_ms": 6783.199817,
+        "delta_ms": 350.78259999999955,
+        "delta_percent": 5.453355840677276
+      }
+    ],
+    "median_paired_delta_ms": 350.78259999999955,
+    "median_paired_delta_percent": 5.391742993146864,
+    "interpretation": "All three pairs are slower by206-365ms. Shared-host baseline shifted from earlier5.6s to6.4-6.8s; do not compare absolute times across rounds. No latency improvement. Difference of independent medians3.04% is not the typical paired overhead5.39%.",
+    "configured": {
+      "evidence": "build/bench/stack-lanes-2026-11-03/configured-main/main-7811b9b69047dd9b/result.json",
+      "build_ms": 6369.39471,
+      "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+      "identity": "fce23de2bc1eec237ce7440fcfc7b45170c5e8c02b9e5a2c120f037f2791f929",
+      "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243"
+    },
+    "validation": [
+      {
+        "path": "build/bench/stack-lanes-2026-11-03/main-candidate/main-35af923dd433a3c1/main.wasm",
+        "valid": true,
+        "imports": [
+          {
+            "module": "blot:host/1",
+            "name": "call_array_f32_array_f32",
+            "kind": "function"
+          }
+        ],
+        "exports": [
+          {
+            "name": "main",
+            "kind": "function"
+          },
+          {
+            "name": "blot:memory",
+            "kind": "memory"
+          },
+          {
+            "name": "blot:allocate",
+            "kind": "function"
+          },
+          {
+            "name": "blot:reset",
+            "kind": "function"
+          }
+        ]
+      }
+    ],
+    "remaining": {
+      "declared_locals": 420741,
+      "mutable_i32_globals": 65244,
+      "local_instruction_bytes": 7227350,
+      "global_instruction_bytes": 1912130,
+      "outline_regions": 411,
+      "outline_bank_globals": 64876,
+      "root_reset_bytes": 373246,
+      "unreachable_functions": 4,
+      "unreachable_body_bytes": 59,
+      "note": "Static encoding counts do not establish runtime cost or prove removable work. Final Main work counters, call/load/store/constant bytes and outline bank remain unchanged."
+    }
+  },
+  "initial_candidate": {
+    "status": "Superseded before installation because of measured compile overhead. Final candidate removes stackification in provisional previews and cheaply rejects wholly futile bodies. Main bytes stay exactly identical; timing rounds differ in host load, so no speedup is attributed to that bookkeeping change.",
+    "source": {
+      "head": "6bb30d10a386d4ecaef7a5b9e7e34cb265e343e2",
+      "patch_sha256": "b61eb5f7708075f0bfc364b2db7a86deabbcf5ff5b7164880581c59e5207becd",
+      "directory": "/home/jacobt/src/blot2/build/bench/frozen-stack-lanes-b61eb5f77080",
+      "files": {
+        "scripts/bench/aggregate_scaling.ts": "068f0eb84cc035ea9b1b9a8e24bcc154eb5c028da0434b498f4c163e1543dc68",
+        "scripts/dev_check_areas.ts": "ee05009318dd019393652aeba0ba2b5a4ab284e5013ecc3d0ec462c230420db5",
+        "zig-native/CONTRACT.md": "efa6b44e98a4e9c88869a7c7c7267137c675dbd6d0b8a7ddb60cc6b40fa868b5",
+        "zig-native/src/backend/runtime_pipeline.zig": "525e0d4b49785467dd5a1e1c07ba421ad7de927259665a702201a7b4c15d0c0a",
+        "zig-native/src/backend/scoped_backend.zig": "9f78199274cc310970bf39ec035ac76ef492445dba5eb059d55f1b4357ce6c83",
+        "zig-native/src/backend/storage_calls_tests.zig": "4a64c07da302206667b68015b49d8fde46ff83df28e9c01f517f300712ecc6db",
+        "zig-native/src/backend/storage_transport.zig": "9a0200df63c09c0152a2e2f54efd9844f15cabff1aa950c01e8107f27a4e1f86",
+        "zig-native/src/backend/wasm_scope_outline.zig": "0909b84a461a9b90a543ff0b8d06674de0cff7d47de1c746d8ad9a6089adef67",
+        "zig-native/src/backend/wasm_stackify.zig": "aedcea66f81393ca4d250b3568e2cafddd4e78528fe096a1ea62f28db27cf84c",
+        "zig-native/src/backend/wasm_stackify_tests.zig": "844f0bb2beac64739f27871d19f3a105e840ef6dbd8eb9c1ade81241c5e47a05",
+        "zig-native/tests/loop_lane_execution.test.ts": "99c2593ed15221ff836d3ffc82e00c3a9383170f29dd632833fb840fd1bcdc58",
+        "zig-native/tests/stack_expression_execution.test.ts": "195a549a53039957933efef1f13b725df18d0c465dadebad3e7914cf1ec77bdb"
+      },
+      "post_build_test_only_patch_sha256": "3210bcb495d3e024212157db34115438ddfe1eaa80c169775592cf40951ff095",
+      "post_build_test_only_files": {
+        "zig-native/src/backend/wasm_transport_cleanup_tests.zig": "9bedbf43e72e61ce554eca4860bc2885b18620cbff9cc6bf57eac2fcf1ce2ec0"
+      },
+      "native_test_binary_sha256": "07c13913a1271cf9abf2219f1106808009b4a7c85a270c3b47a75fae3fadf78a",
+      "release_binary_sha256": "270aac448559ddfaa4e27d6d71ca081e34dc07503ddd1e67897d9c5ed1c4e95f",
+      "release_identity_sidecar_sha256": "adb6f0e88c7f4329e5365890e67f1f10c1f0c7a0bece3abeb0839e7a945fa878"
+    },
+    "measurements": [
+      {
+        "name": "baseline",
+        "build_ms": 5660.253777,
+        "wasm_bytes": 13935123,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-baseline/main-119f5c8a8a06744f/result.json"
+      },
+      {
+        "name": "baseline",
+        "build_ms": 5718.396362,
+        "wasm_bytes": 13935123,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-baseline-repeat2/main-74b859bc5eaff58/result.json"
+      },
+      {
+        "name": "baseline",
+        "build_ms": 5665.866333,
+        "wasm_bytes": 13935123,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-baseline-repeat3/main-22bba92411b0e213/result.json"
+      },
+      {
+        "name": "candidate",
+        "build_ms": 5928.921606999999,
+        "wasm_bytes": 13594002,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-candidate/main-35af923dd433a3c1/result.json"
+      },
+      {
+        "name": "candidate",
+        "build_ms": 5763.222344000001,
+        "wasm_bytes": 13594002,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-candidate-repeat2/main-1b1f91c13be44c17/result.json"
+      },
+      {
+        "name": "candidate",
+        "build_ms": 6019.656664,
+        "wasm_bytes": 13594002,
+        "evidence": "build/bench/stack-lanes-2026-11-03/main-candidate-repeat3/main-f50d28d67b7238a2/result.json"
+      }
+    ]
+  },
+  "qualification": {
+    "native": {
+      "selected": 153,
+      "passed": 150,
+      "failed": [
+        "backend.storage_completed_function_tests.test.completed function borrowed results reuse distinct caller owners and preserve lifetime rejection",
+        "backend.storage_completed_function_tests.test.completed plain plans retain functional nominal updates and local scratch results through OOM",
+        "backend.storage_completed_function_tests.test.completed plain word ABI retains scalar float nullary variants scratch and local references through OOM"
+      ],
+      "full_sweeps": 61,
+      "leaks": 0,
+      "logged_errors": 0,
+      "inventory": 2916,
+      "binary_sha256": "81c47902d6a9b16e8b37797e1917d29aeb0e04b8a2dc21dbf4f8b47b2d55a593",
+      "evidence": "build/bench/stack-lanes-2026-11-03/native-final-selected.log",
+      "baseline_failure_binary_sha256": "d45d426515f2711a8b1669c8b2740b17a970345e727f18044cf621ed473b749e",
+      "baseline_failure_evidence": "build/bench/stack-lanes-2026-11-03/baseline-failures.log"
+    },
+    "llvm_guests": {
+      "passed": 119,
+      "failed": 2,
+      "failure_kind": "Unchanged unsupported legacy memory-profile programs; both reproduced on exact baseline LLVM compiler",
+      "evidence": "build/bench/stack-lanes-2026-11-03/llvm-final-guests.log"
+    },
+    "full_gate": {
+      "status": "Attempted on final source; smoke48 passed/1 known List/chunk storage_escape failure; broader phases not reached; full qualification pending",
+      "evidence": "build/bench/stack-lanes-2026-11-03/final-full-gate/timings.json"
+    },
+    "lint": "593 source Zig files and1 fixture file checked, zero findings",
+    "format": "Changed Zig and Deno files checked",
+    "components": {
+      "world": {
+        "evidence": "build/bench/stack-lanes-2026-11-03/world/result.json",
+        "entry_sha256": "db739407c152c547fc8625f51d688539ba59572956d8d42640078e7d26a6beac",
+        "builds": [
+          {
+            "name": "baseline",
+            "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+            "wasm_bytes": 520832,
+            "wasm_sha256": "9dd99a1be6a03579d22ef5cc18af70f64689f51659f427c8006db69ad1bd6ccb",
+            "calls": [
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": false,
+                "row": [
+                  7,
+                  0
+                ]
+              },
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": true,
+                "row": [
+                  7,
+                  0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "candidate",
+            "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+            "wasm_bytes": 507288,
+            "wasm_sha256": "f7006c72d0dae951bb1f72d48dff4761834d59576506fbdc9efd397f88fa49ac",
+            "calls": [
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": false,
+                "row": [
+                  7,
+                  0
+                ]
+              },
+              {
+                "name": "test_hooks_keep_world_and_editor_behavior",
+                "asynchronous": true,
+                "row": [
+                  7,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "hand": {
+        "evidence": "build/bench/stack-lanes-2026-11-03/hand/result.json",
+        "entry_sha256": "2a8f1cbf2725a633c6989ebc89911f205c4214974fd62898067c0eb4e26ef0e7",
+        "builds": [
+          {
+            "name": "baseline",
+            "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+            "wasm_bytes": 208221,
+            "wasm_sha256": "5efc4e2dee0a1cc95d7b835d286deac262aff099ff737007873f0646ba554664",
+            "calls": [
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": false,
+                "row": [
+                  160,
+                  0
+                ]
+              },
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": true,
+                "row": [
+                  160,
+                  0
+                ]
+              }
+            ]
+          },
+          {
+            "name": "candidate",
+            "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+            "wasm_bytes": 205425,
+            "wasm_sha256": "a6ad79c9167aedf6822f463d95446f084c3b0f8a262752434a63b839168ce652",
+            "calls": [
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": false,
+                "row": [
+                  160,
+                  0
+                ]
+              },
+              {
+                "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+                "asynchronous": true,
+                "row": [
+                  160,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "renderer": {
+        "evidence": "build/bench/stack-lanes-2026-11-03/renderer/pair-6fbfc9c7735d7a21/result.json",
+        "pins": {
+          "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+          "baseline_compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+          "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+          "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+          "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+          "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+        },
+        "builds": [
+          {
+            "name": "baseline",
+            "wasm_bytes": 100229
+          },
+          {
+            "name": "candidate",
+            "wasm_bytes": 97891
+          }
+        ],
+        "comparisons": [
+          {
+            "scenario": 0,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 1,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 2,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 4,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 8,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 16,
+            "equal": true,
+            "first_difference": -1
+          },
+          {
+            "scenario": 31,
+            "equal": true,
+            "first_difference": -1
+          }
+        ]
+      }
+    },
+    "pen": {
+      "status": "Installed Pen rejects ABI8 before rendering; no PNG/frame qualified",
+      "evidence": "build/bench/stack-lanes-2026-11-03/pen-configured/result.json",
+      "compiler_sha256": "ed0cc3dcdfcd9114b40b84bc91b0f6f24caeed69291df4caf349047a26a99d0e",
+      "wasm_sha256": "4202404aff593d6c57d3dfc5e1b58d6bbd1c1b5b2c9fd9f420f4041a0d115243",
+      "compile_invoked": false,
+      "returncode": 1,
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "compiled_wasm_unchanged": true
+    }
+  },
+  "next": "Aggregate boundary materialization and explicit live outlined interfaces. Existing7.23MB local and1.91MB global traffic is outside the single-use scalar pilot; do not ask Gdev to contort ordinary source or claim all9.14MB removable."
+}

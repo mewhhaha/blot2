@@ -3,32 +3,38 @@
 The current priority is reducing Gdev Wasm size while keeping iterations short.
 Subsecond compilation remains the goal; the next latency gate is below five
 seconds.
-[Actual full main](../zig-native/measurements/owned-return-2026-11-03.json)
-produces **13.94 MB Wasm**, down from 14.13 MB (190kB / 1.35%). A matched fresh
-pair takes 5.605s → 5.552s; the configured launcher takes 5.675s with identical
-output. No meaningful latency gain is established. Checked helpers now admit
-mutation plus input-owned results, preserve input tokens and omit fully aliased
-direct result slots. Source/owner/read/write/escape checks and invalidation
-barriers remain intact. Packed and partial-result allocation paths remain.
+[Actual full main](../zig-native/measurements/stack-lanes-2026-11-03.json)
+produces **13.59 MB Wasm**, down from 13.94 MB (341,121B / 2.45%). This is a
+size/compile-time tradeoff: three matched pairs add 206–365ms, with a median
+paired increase of 351ms / 5.39%. Independent medians are 6.767s → 6.973s on a
+slower shared-host round; the configured launcher takes 6.369s with identical
+output. Do not compare absolute times across rounds. No latency or runtime-speed
+improvement is established.
 
-The roughly two-second aggregate suite isolated a gate-only size regression and
-verified the narrower transport fix. Whole Main admits only 99 more helpers;
-classify the remaining 2,009 rollbacks before selecting another admission hill.
-All 2,907 native laws compile; selected execution has 142 passes/three exact
-baseline assertions with 59 full fault sweeps. Final LLVM guests have 112
-passes/two baseline legacy memory-profile failures. Zig lint and world/editor,
-hand and seven identical renderer streams pass, with smaller output in all
-three. Full qualification retains the baseline List/chunk failure; installed
-Pen rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB targets
-remain unmet.
+Single-use pure numeric expressions now stay on the Wasm stack inside checked
+barriers. The scalar control adds 134B instead of 388B, matching Clang's added
+arithmetic/constant bytes. Flat unowned scalar record loops copy only changed
+fields after exact Core identity proofs on every exit; the width-128 one-field
+control shrinks 8,394 → 6,343B. Complete source/owner/read/write/escape/variant
+checks remain, with fallback for unsupported shapes. Provisional outline
+previews skip final expression trees, and wholly futile stack passes exit early.
+
+All 2,916 native laws compile; selected execution has 150 passes/three exact
+baseline assertions with 61 full fault sweeps and no leaks. Final LLVM guests
+have 119 passes/two baseline legacy memory-profile failures. Zig lint and
+world/editor, hand and seven identical renderer streams pass, with smaller
+output in all three. Full qualification retains the baseline List/chunk failure;
+installed Pen rejects ABI 8 before rendering. Five-second, subsecond and 1–2MB
+targets remain unmet.
 
 The exact historical 2.08MB output was recovered from preserved inputs in a
 bounded 2.88s replay. Historical records used heap pointers; current aggregate
 transport still moves physical Value leaves and owner/borrow metadata. The
-remaining 9.48MB of local/global instructions makes selective materialization
-and global banking the next size hills. Preserve semantic checks and explicit
-copies. Ordinary `#run` build functions remain a separate, unimplemented
-simplification.
+remaining 7.23MB of local and 1.91MB of global instructions, including the
+unchanged 64,876-slot outline bank, make aggregate boundary materialization and
+live outlined interfaces the next hills. Stop scalar widening; preserve semantic
+checks and explicit copies. Ordinary `#run` build functions remain a separate,
+unimplemented simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

@@ -140,7 +140,8 @@ fn pipelineReplacement(allocator: A, module: *const wasm.Module) !void {
     defer pipeline.deinit();
     var output = (try pipeline.optimize(&module.functions.items[0])).?;
     defer output.deinit(allocator);
-    try std.testing.expectEqualSlices(ir.Instruction, &.{ .{ .op = .i32_const, .operand = 7 }, .{ .op = .local_tee } }, output.instructions.items);
+    try std.testing.expectEqualSlices(ir.Instruction, &.{.{ .op = .i32_const, .operand = 7 }}, output.instructions.items);
+    try std.testing.expectEqual(@as(usize, 0), output.locals.items.len);
 }
 test "scoped transport pipeline preserves source coordinates and final body identity in both tiers through OOM" {
     var module = wasm.Module.init(a);
@@ -165,8 +166,8 @@ test "scoped transport pipeline preserves source coordinates and final body iden
         pipeline.tier = tier;
         var output = (try pipeline.optimize(&module.functions.items[id])).?;
         defer output.deinit(a);
-        try std.testing.expectEqual(@as(usize, 1), output.locals.items.len);
-        try std.testing.expectEqual(@as(usize, 2), output.instructions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), output.locals.items.len);
+        try std.testing.expectEqual(@as(usize, 1), output.instructions.items.len);
         // Assembly captures the actual final prepared body, not source coordinates.
         var capture: @import("optimized_bodies.zig").Capture = .{ .allocator = a };
         defer capture.deinit();

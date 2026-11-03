@@ -45,6 +45,16 @@ export const devCheckAreas = {
     description:
       "Type-directed arrays, data-stack reuse, inline records, captured borrows and Wasm bounds.",
     native: [
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain ordered single use trees and original coordinates through OOM",
+      "backend.wasm_stackify_tests.test.scoped stack expressions flush at effects traps writes control and symbolic operands",
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain opaque prefixes reused locals zero reads and tee",
+      "backend.wasm_stackify_tests.test.scoped stack expressions preserve float signed zero NaN vector and flagged bits",
+      "backend.wasm_stackify_tests.test.scoped stack expressions handle long chains iteratively and remove eliminated locals",
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain old mutable reads and opaque prefixes in successful rewrites",
+      "backend.wasm_stackify_tests.test.scoped stack expression fast rejection never adds barriers to other viable trees",
+      "backend.storage_calls_tests.test.literal lane wrappers retain selector evidence across scoped numeric fallback allocation failures",
+      "backend.storage_calls_tests.test.flat scalar loop lanes prove all continue and break edges through OOM",
+
       "backend.storage_completed_function_tests.test.completed mutating owner results retain shared distinct joined and loop caller roots through OOM",
       "backend.storage_completed_function_tests.test.completed mutating owner results retain packed wide caller roots",
       "backend.storage_completed_function_tests.test.completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes",
@@ -220,6 +230,8 @@ export const devCheckAreas = {
       "backend.storage_initialization_tests.test.owned computed flat pools publish a complete module",
     ],
     guests: [
+      "zig-native/tests/stack_expression_execution.test.ts",
+      "zig-native/tests/loop_lane_execution.test.ts",
       "zig-native/tests/mutating_owner_return_execution.test.ts",
       "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",
@@ -345,6 +357,16 @@ export const devCheckAreas = {
     description:
       "Static aggregate sharing, retained replay, admission and fault-policy laws.",
     native: [
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain ordered single use trees and original coordinates through OOM",
+      "backend.wasm_stackify_tests.test.scoped stack expressions flush at effects traps writes control and symbolic operands",
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain opaque prefixes reused locals zero reads and tee",
+      "backend.wasm_stackify_tests.test.scoped stack expressions preserve float signed zero NaN vector and flagged bits",
+      "backend.wasm_stackify_tests.test.scoped stack expressions handle long chains iteratively and remove eliminated locals",
+      "backend.wasm_stackify_tests.test.scoped stack expressions retain old mutable reads and opaque prefixes in successful rewrites",
+      "backend.wasm_stackify_tests.test.scoped stack expression fast rejection never adds barriers to other viable trees",
+      "backend.storage_calls_tests.test.literal lane wrappers retain selector evidence across scoped numeric fallback allocation failures",
+      "backend.storage_calls_tests.test.flat scalar loop lanes prove all continue and break edges through OOM",
+
       "backend.storage_completed_function_tests.test.completed mutating owner results retain shared distinct joined and loop caller roots through OOM",
       "backend.storage_completed_function_tests.test.completed mutating owner results retain packed wide caller roots",
       "backend.storage_completed_function_tests.test.completed mutating owner result cache hits reject shorter stored borrows and fresh event escapes",
@@ -541,6 +563,8 @@ export const devCheckAreas = {
       "allocation_failures.test.sampled allocation failures reject swallowed faults and propagate scenario failures",
     ],
     guests: [
+      "zig-native/tests/stack_expression_execution.test.ts",
+      "zig-native/tests/loop_lane_execution.test.ts",
       "zig-native/tests/mutating_owner_return_execution.test.ts",
       "zig-native/tests/direct_input_execution.test.ts",
       "zig-native/tests/deferred_join_execution.test.ts",

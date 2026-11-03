@@ -200,7 +200,8 @@ fn boxTypeEvidenceIn(arena: std.mem.Allocator, source: TypeEvidence) Error!*cons
 const Binding = struct { unit: u32, id: core.BindingId, value: Value, remaining: u32 };
 const ValueJoin = struct { value: ?Value = null, physical: deferred_join.Join, selective: bool = false };
 const Control = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, result: ValueJoin };
-const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const bool, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
+const LoopSharing = struct { whole: bool = false, fields: []const bool = &.{} };
+const Loop = struct { unit: u32, id: core.Id, nesting: u32, roots_before: usize, carries: []Value, shared: []const LoopSharing, headers: []const Value, iterator: ?Local, mark: Local, depth: usize, read_frame: usize };
 const RootRead = struct { owner: usize, shape: *const Value };
 const ReadFrame = struct {
     owner_limit: usize,
@@ -550,6 +551,27 @@ const Generator = struct {
         if (!shared) return self.snapshot(value);
         self.emission_work.scoped_transport_words_avoided +|= snapshotWords(value);
         return value;
+    }
+    fn loopTemporary(self: *Generator, value: Value, sharing: LoopSharing) Error!Value {
+        if (sharing.whole) return value;
+        if (sharing.fields.len == 0) return self.temporary(value);
+        var result = value;
+        const fields = initializeFields(&result, try self.arena.allocator().alloc(Value, value.fields.len));
+        for (fields, value.fields, sharing.fields) |*field, input, shared| {
+            field.* = input;
+            if (!shared) field.* = try self.temporary(input);
+        }
+        return result;
+    }
+    fn loopSnapshot(self: *Generator, value: Value, sharing: LoopSharing) Error!Value {
+        if (sharing.fields.len == 0) return self.transportSnapshot(value, sharing.whole);
+        var result = value;
+        const fields = initializeFields(&result, try self.arena.allocator().alloc(Value, value.fields.len));
+        for (fields, value.fields, sharing.fields) |*field, input, shared| field.* = try self.transportSnapshot(input, shared);
+        return result;
+    }
+    fn assignLoop(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, sharing: LoopSharing) Error!void {
+        return self.assignTransportParts(m, id, target, value, !sharing.whole, sharing.fields);
     }
     fn snapshotWords(value: Value) usize {
         if (value.tag == .scalar) return 1;
@@ -1174,6 +1196,9 @@ const Generator = struct {
         return self.assignTransport(m, id, target, value, true);
     }
     fn assignTransport(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, copies: bool) Error!void {
+        return self.assignTransportParts(m, id, target, value, copies, &.{});
+    }
+    fn assignTransportParts(self: *Generator, m: *const core.Module, id: core.Id, target: *Value, value: Value, copies: bool, shared_fields: []const bool) Error!void {
         target.literal = null;
         if (target.tag != value.tag or target.fields.len != value.fields.len or target.mode != value.mode or target.floating != value.floating) return self.unsupported(m, id);
         if (!std.meta.eql(target.nominal, value.nominal) or target.demand != value.demand) return self.unsupported(m, id);
@@ -1200,7 +1225,7 @@ const Generator = struct {
         try self.unionRoots(target, value);
         for (try self.writableFields(target), value.fields, 0..) |*field, original, index| {
             if (!possibleVariant(value, index)) continue;
-            try self.assignTransport(m, id, field, original, copies);
+            try self.assignTransport(m, id, field, original, copies and (shared_fields.len == 0 or !shared_fields[index]));
         }
         try self.unionVariants(target, value);
     }
@@ -6109,18 +6134,28 @@ const Generator = struct {
         const carries = m.loopCarries(id);
         const values = try self.arena.allocator().alloc(Value, carries.len);
         const headers = try self.arena.allocator().alloc(Value, carries.len);
-        const shared = try self.arena.allocator().alloc(bool, carries.len);
-        @memset(shared, false);
+        const shared = try self.arena.allocator().alloc(LoopSharing, carries.len);
+        @memset(shared, .{});
         const transport = try self.transportIndex(m);
         for (values, carries, headers, shared, 0..) |*value, carry, *header, *reuse, ordinal| {
             const incoming = try self.bindingValue(m, carry.incoming);
             if (!@import("storage_control.zig").fixedCarry(incoming)) return self.unsupported(m, id);
             if (transport) |index| if (incoming.tag == .aggregate) {
-                reuse.* = try index.invariant(id, ordinal);
+                reuse.whole = try index.invariant(id, ordinal);
+                if (!reuse.whole and !self.scalar_admission.hasScalarReferences() and incoming.variant_tags.len == 0 and incoming.nominal == null and incoming.host == null and incoming.demand == null and incoming.root == null) {
+                    var flat = incoming.fields.len != 0;
+                    for (incoming.fields) |field| {
+                        if (field.tag != .scalar or field.name.len == 0 or field.fields.len != 0 or field.root != null or field.host != null or field.demand != null) flat = false;
+                    }
+                    if (flat) {
+                        const fields = try self.arena.allocator().alloc(bool, incoming.fields.len);
+                        for (fields, incoming.fields) |*field, input| field.* = try index.invariantField(id, ordinal, input.name);
+                        reuse.fields = fields;
+                    }
+                }
             };
-            value.* = incoming;
-            if (!reuse.*) value.* = try self.temporary(incoming);
-            try self.assignTransport(m, id, value, incoming, !reuse.*);
+            value.* = try self.loopTemporary(incoming, reuse.*);
+            try self.assignLoop(m, id, value, incoming, reuse.*);
             try self.loopHeader(value);
             header.* = value.*;
         }
@@ -6151,13 +6186,13 @@ const Generator = struct {
             try self.checkReadFrame(m, id, read_frame);
             const next_values = try self.arena.allocator().alloc(Value, carries.len);
             for (carries, next_values, shared) |carry, *next, reuse| {
-                next.* = try self.transportSnapshot(try self.bindingValue(m, carry.backedge), reuse);
+                next.* = try self.loopSnapshot(try self.bindingValue(m, carry.backedge), reuse);
                 try self.checkEscape(m, id, next.*, self.depth);
             }
             for (values, next_values, headers, shared) |*value, next, header, reuse| {
                 if (!@import("storage_control.zig").stableCarry(value.*, next)) return self.fail(m, id, .storage_escape, "A loop must retain the same named owners and borrowed roots across iterations");
                 if (!includesReadShape(header, next)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
-                try self.assignTransport(m, id, value, next, !reuse);
+                try self.assignLoop(m, id, value, next, reuse);
             }
         }
         // A conditional return reserves its result's static slot for the
@@ -6416,13 +6451,13 @@ const Generator = struct {
                     if (args.len != target.carries.len) return self.unsupported(m, id);
                     const snapshots = try self.arena.allocator().alloc(Value, args.len);
                     for (args, snapshots, target.shared) |arg, *value, reuse| {
-                        value.* = try self.transportSnapshot(try self.expression(m, arg, depth + 1), reuse);
+                        value.* = try self.loopSnapshot(try self.expression(m, arg, depth + 1), reuse);
                         try self.checkEscape(m, id, value.*, target.depth);
                     }
                     for (target.carries, snapshots, target.headers, target.shared) |*carry, value, header, reuse| {
                         if (!@import("storage_control.zig").stableCarry(carry.*, value)) return self.fail(m, id, .storage_escape, "A loop exit must retain the same named owners and borrowed roots");
                         if (n.op == .continue_ and !includesReadShape(header, value)) return self.fail(m, id, .storage_escape, "A loop cannot activate a variant without complete incoming payload evidence");
-                        try self.assignTransport(m, id, carry, value, !reuse);
+                        try self.assignLoop(m, id, carry, value, reuse);
                     }
                     if (n.op == .continue_) try self.checkReadFrame(m, id, target.read_frame);
                     try self.closeRuntime(target.roots_before, try self.unitValue());

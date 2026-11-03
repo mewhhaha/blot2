@@ -1743,3 +1743,48 @@ test "foreign getter bounds receipts preserve private members and catalog budget
     try foreignGetterBounds(a, &producer, &caller, members);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, foreignGetterBounds, .{ &producer, &caller, members });
 }
+
+const lane_transport_source =
+    \\entry const lanes = func (input: U32): Array U32 => return do:
+    \\  let marker: Array U32 = #[input]
+    \\  let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
+    \\  for index in 0 .. 4:
+    \\    row.first := @u32.add self 1
+    \\    if @u32.eq index 1:
+    \\      continue
+    \\    row.second := @u32.add self 2
+    \\    if @u32.eq index 2:
+    \\      break
+    \\  return #[row.first, row.second, row.steady, marker[0]]
+    \\entry const changed = func (input: U32): Array U32 => return do:
+    \\  let marker: Array U32 = #[input]
+    \\  let row = {first: input, second: @u32.add input 1, steady: @u32.add input 9}
+    \\  for index in 0 .. 4:
+    \\    row.first := @u32.add self 1
+    \\    if @u32.eq index 1:
+    \\      row.steady := @u32.add self 7
+    \\      continue
+    \\  return #[row.first, row.second, row.steady, marker[0]]
+;
+test "flat scalar loop lanes prove all continue and break edges through OOM" {
+    var module = try lower(a, lane_transport_source);
+    defer module.deinit(a);
+    var arena: std.heap.ArenaAllocator = .init(a);
+    defer arena.deinit();
+    const index = (try @import("storage_transport.zig").Index.create(&arena, &module)).?;
+    const changed_start = std.mem.find(u8, lane_transport_source, "entry const changed").?;
+    var loops: usize = 0;
+    for (module.nodes, 0..) |node, ordinal| {
+        if (node.tag != .loop) continue;
+        const id: core.Id = @intCast(ordinal);
+        for (module.loopCarries(id), 0..) |_, position| {
+            try std.testing.expect(!try index.invariantField(id, position, "first"));
+            try std.testing.expectEqual(module.span(id).start >= changed_start, try index.invariantField(id, position, "second"));
+            try std.testing.expectEqual(module.span(id).start < changed_start, try index.invariantField(id, position, "steady"));
+            loops += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), loops);
+    try publishAggregateTransport(a, &.{module});
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publishAggregateTransport, .{@as([]const core.Module, &.{module})});
+}

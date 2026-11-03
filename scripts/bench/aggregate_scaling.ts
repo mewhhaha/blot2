@@ -9,6 +9,8 @@ const kinds = [
   "scalar",
   "branch",
   "loop",
+  "loop-noop",
+  "loop-all",
   "shared",
   "distinct",
   "shared-unit",
@@ -94,11 +96,21 @@ function sourceFor(kind: Kind, width: number, count: number) {
   }
   lines.push(`  let row_0 = {${members.join(", ")}}`);
   let result = `row_${count}`;
-  if (kind === "loop") {
+  if (kind.startsWith("loop")) {
+    let update =
+      "    current := @record.merge self {f000: @u32.add self.f000 1}";
+    if (kind === "loop-noop") update = "    current := self";
+    if (kind === "loop-all") {
+      const fields = Array.from(
+        { length: width },
+        (_, index) => `${field(index)}: @u32.add self.${field(index)} 1`,
+      );
+      update = `    current := @record.merge self {${fields.join(", ")}}`;
+    }
     lines.push(
       "  let current = row_0",
       `  for index in 0 .. ${count}:`,
-      "    current := @record.merge self {f000: @u32.add self.f000 1}",
+      update,
     );
     result = "current";
   } else {
@@ -117,6 +129,8 @@ function expected(kind: Kind, width: number, count: number, input: number) {
   let sum = Math.imul(width, input) >>> 0;
   if (!kind.startsWith("shared")) sum = (sum + width * (width - 1) / 2) >>> 0;
   let increment = count;
+  if (kind === "loop-noop") increment = 0;
+  if (kind === "loop-all") increment *= width;
   if (kind.startsWith("shared")) increment *= width;
   if (kind === "shared-read") increment = 0;
   if (kind === "branch" && input % 2 === 0) increment = 0;
