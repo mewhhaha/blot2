@@ -2,18 +2,20 @@
 
 The active priority is subsecond Gdev compilation, with the next gate below five
 seconds.
-[Actual full main](../zig-native/measurements/immutable-survivors-2026-11-03.json)
-produces **16.39 MB Wasm**, down from 16.68 MB. A matched fresh pair takes 6.13s
-→ 5.97s; the configured launcher takes 5.64s with identical output. These are
-individual completions. Single-row statement-match arms retain immutable binding
-metadata, avoiding 3,488 copies in main while preserving explicit merges,
-multi-row carriers and scalar-address fallback. All 2,872 native laws compile,
-67 affected laws pass full faults, 94 guests pass and Zig lint is clean. Final
-LLVM retains world/editor, hand and renderer checks. The five-second target
-remains unmet; full qualification retains the baseline List/chunk failure, and
-installed Pen rejects ABI 8 before rendering. The next private slice defers
-packed input loads/stores using demanded words from completed checked helper IR.
-Ordinary `#run` build functions remain a separate, unimplemented simplification.
+[Actual full main](../zig-native/measurements/lazy-packed-inputs-2026-11-03.json)
+produces **16.22 MB Wasm**, down from 16.39 MB. A matched fresh pair takes
+6.204s → 6.177s; the configured launcher takes 6.100s with identical output.
+These individual completions show no meaningful latency gain. Completed helper
+IR now determines packed input loads and caller stores, avoiding 7,392 and
+11,088 words respectively in main while retaining complete semantic checks and
+packet offsets. All 2,878 native laws compile, 72 affected laws pass full
+faults, 96 guests pass and Zig lint is clean. Final LLVM retains world/editor,
+hand and renderer checks. The five-second target remains unmet; full
+qualification retains the baseline List/chunk failure, and installed Pen rejects
+ABI 8 before rendering. A bounded stack sample points toward borrow/owner-graph
+traversal and metadata copying for latency work. A further unused-local
+prototype remains held after saving only 1 KB in World. Ordinary `#run` build
+functions remain a separate, unimplemented simplification.
 
 Read [CONTINUE.md](../CONTINUE.md) for the current compile frontier and exact
 handoff evidence. The earlier candidate advanced through checked source

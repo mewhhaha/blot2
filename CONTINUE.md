@@ -14,14 +14,25 @@ diagnostics default to five seconds and have a hard 30-second iteration cap.
 Never repeat the recorded 36-minute build or an unchanged five-minute
 diagnostic.
 
-The latest release produces **16,392,014 bytes of Wasm**, down from 16,677,822
-(285,808B / 1.7% smaller). A matched fresh pair takes **6.13s → 5.97s**; the
-configured launcher takes **5.64s** with identical compiler identity and full
-Wasm hash. These are individual cache-disabled completions under shared-host
-load, not a timing distribution. The five-second and subsecond targets remain
+The latest release produces **16,220,693 bytes of Wasm**, down from 16,392,014
+(171,321B / 1.05% smaller). A matched fresh pair takes **6.204s → 6.177s**; the
+configured launcher takes **6.100s** with identical compiler identity and full
+Wasm hash. These individual cache-disabled completions under shared-host load
+show no meaningful latency gain. The five-second and subsecond targets remain
 unmet. Exact pins and qualification are in
-[the current evidence](zig-native/measurements/immutable-survivors-2026-11-03.json).
-Release source is `6d853b51` plus patch `e108f3d4ccef`.
+[the current evidence](zig-native/measurements/lazy-packed-inputs-2026-11-03.json).
+Release source is `b0be28fb` plus source snapshot `6e4e71f237cf`; the complete
+patch and per-file hashes are pinned separately. The installed LLVM binary is
+`638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22`.
+
+Packed helper inputs now reserve logical input locals in the existing Value
+layout. After complete body checking, result serialization and cleanup, the
+backend loads only words read by the finished IR and omits their unused caller
+stores. Main avoids 7,392 input-word loads and 11,088 argument-word stores; the
+World witness shrinks 10%. Semantic arguments, owner/read/effect admission,
+evaluation order, full packet offsets and output serialization remain intact.
+Direct-word calls retain their ABI. This uses the existing value tree rather
+than adding another representation or source-footprint cache.
 
 Statement-match arms with a single pattern row now retain immutable Binding
 metadata instead of copying every introduced value into a carrier. Only a sole
@@ -39,15 +50,17 @@ back, and trapping helpers retain declared result layouts. Closures still use
 their separate path. This is a function-contract boundary, not a completed
 monomorphic expression IR.
 
-All 2,872 native laws compile; all 67 affected laws pass full allocation faults
-(31 sweeps), 94 guest tests pass with the final LLVM compiler, and Zig lint is
-clean. A strengthened fallback rerun executes 120 assertions, combining an
-otherwise eligible match with active scalar-address code. The broader family
-retains 187 passes and the same 15 failure names after generating two missing
-private runtime fixtures. The required full gate retains 48 passes/one baseline
-List/chunk failure. Final LLVM passes seven world/editor, 160 hand and seven
-identical renderer checks. Installed Pen still rejects ABI 8; no new frame/PNG
-is qualified. The configured launcher selects `zig-native/zig-out/bin/blotc`.
+All 2,878 native laws compile; all 72 affected laws pass full allocation faults
+(33 sweeps), 96 guest tests pass with the final LLVM compiler, and Zig lint is
+clean. New witnesses cover wide forwarding beyond the 512-word direct ABI,
+variant/descriptor results, reads after nested packed calls, repeated plan hits
+and observable unused-argument effects. The broader family retains 187 passes
+and the same 15 failure names with its required runtime fixtures. The required
+full gate retains 48 passes/one baseline List/chunk failure. Final LLVM passes
+seven world/editor, 160 hand and seven identical renderer checks. Installed Pen
+still rejects ABI 8; no new frame/PNG is qualified. The configured launcher
+selects `zig-native/zig-out/bin/blotc` with the exact measured identity and
+Wasm.
 
 The preceding size census found 16.31MB (75.6% of the module) in local/global
 instruction traffic. A tiny real-menu conditional copied roughly 10k unchanged
@@ -59,12 +72,12 @@ owner, read, type and variant checks remain. Mutable spill globals fall from
 full-game capture is 2,076,028B (1.98MiB), with different source/config/memory
 model. Exact duplicate bodies account for only 427kB. See
 [size diagnosis](zig-native/measurements/gdev-code-size-diagnosis-2026-11-02.json).
-The current artifact still has 11.41MB of local/global instructions, 68,686
-mutable spill globals and 454,492 declared locals. Private field masks remain
-held after neutral real-menu results; explicit callback capture narrowing saved
-only 116kB. The direct-tail-return pilot saves 969B in World and 110B in menu,
-and remains held. Ordinary statement returns can sit inside a synthetic
-completion operand, beyond that narrow tail marker.
+The current artifact still has 11.32MB of local/global instructions (69.8% of
+the module), 68,201 mutable spill globals and 462,178 declared locals. Private
+field masks remain held after neutral real-menu results; explicit callback
+capture narrowing saved only 116kB. The direct-tail-return pilot saves 969B in
+World and 110B in menu, and remains held. Ordinary statement returns can sit
+inside a synthetic completion operand, beyond that narrow tail marker.
 
 A bounded copy-site diagnostic counts actual emitted transfer operations, with
 argument pushes separate from copies and buffer traffic. World completes with
@@ -73,23 +86,26 @@ planning trials; they are not full-output or CPU attribution. The exact coarse
 407,440-instruction prefix has 91,254 callee packed argument-load instructions,
 56,446 continuation assignments and 23,780 Control.result assignments. The
 per-source table saturates; the coarse call-site totals do not. Raw pins and
-limits are preserved in the current evidence. Do not repeat unchanged capped
-runs.
+limits are preserved in the
+[preceding evidence](zig-native/measurements/immutable-survivors-2026-11-03.json).
+Do not repeat unchanged capped runs.
 
-The next private pilot makes packed function inputs lazy at the completed-plan
-boundary. Reserve logical input locals using the existing Value layout; inspect
-the fully checked helper IR after result serialization/cleanup; load only
-demanded input words at entry and omit their unused caller stores. Keep complete
-semantic arguments, owner/read/effect checks, evaluation order, packet offsets
-and result serialization. Direct-word calls remain unchanged. This composes
-physical demand through calls without another source-footprint cache. It is not
-implemented in the installed release. Remaining-use counts are not a
-dead-binding proof: the current traversal misses alternative-row multiplicity
-and some pattern/fallback reads.
+A follow-up compactor prototype drops only locals with no get/set/tee mentions.
+It passes 80 affected native laws with full faults and the packed guest witness,
+but saves only 1,073B (0.18%) in World. It remains held; no additional LLVM
+build was spent on it. Remaining-use counts are not a dead-binding proof: the
+current traversal misses alternative-row multiplicity and some pattern/fallback
+reads.
 
-A separate new profile takes 5.68s: backend 4.71s, checking 0.51s, validation
-0.10s. Backend type/key preparation remains a major unresolved latency cost;
-static traffic proportions and rolled-back expression counts are not CPU shares.
+A separate release profile takes 6.13s: backend 5.12s, checking 0.53s,
+validation 0.11s. One bounded 94-stop stack sample, weighted by per-thread CPU
+deltas, points toward borrow/owner-graph traversal and metadata copying as the
+next latency work. memcpy/memset appears in approximately 18.3% of that weighted
+sample; allocator paths appear in 8.5%. These overlapping endpoint-stack
+attributions are approximate, not a timing distribution or exact CPU shares.
+Prefer reducing repeated value/type/owner traversal and copying before another
+instruction-count pass. Static traffic and rolled-back expression counts do not
+establish CPU cost.
 
 The reachable primitive benchmark compiles 50,025 lines in 16 modules in
 0.480–0.491s, plus 0.026s generation, producing 973,511B Wasm with all three

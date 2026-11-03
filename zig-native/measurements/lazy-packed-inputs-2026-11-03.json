@@ -1,0 +1,641 @@
+{
+  "date": "2026-11-03",
+  "scope": "Demand-driven physical loads/stores for packed named-function inputs. Full semantic Values, source checks, owner/events, argument evaluation, packet extents/offsets and output serialization remain.",
+  "release_source_pin": {
+    "base": "b0be28fb6377f87e3cb518063d3aa9a6ec75f428",
+    "source_snapshot_sha256": "6e4e71f237cf2bc7716552543f485dcd45350965877a9b2e7c56e95197c12f9d",
+    "patch_sha256": "75a683845ad2ce0e73872c32e1a6a222f8c71ad7a90b4fb3360c5453409ff3e3",
+    "tracked_patch_sha256": "0eadca2205a6effb061e7608890bed32167ae4b27ef23935ac648065442f7f71",
+    "files": {
+      "scripts/dev_check_areas.ts": "ee9375a49c8c2ebd81c73af3e2c670f0dfc923c08686dfbc8b88e3be60738cf5",
+      "zig-native/src/backend/scoped_backend.zig": "d9a89dbff30ade3a20bd8b8402763afbd220c53e1db6a8ec860b0ff58dc4c59b",
+      "zig-native/src/backend/storage_calls_tests.zig": "a53cc4890cdbbc7482126b504a386bfd089766100c6ecb2e4671d8e086ad2218",
+      "zig-native/src/work_counters.zig": "415cc221b4d50475d13d3ca78ae5c606ad245d92d7c8295c16d74cddebddce02",
+      "zig-native/src/backend/packed_input_demand.zig": "a63b53f4af6e91706c1de8e66dd559e1cf8ff168027ad4b76b466e657f4d087c",
+      "zig-native/src/backend/storage_packed_input_tests.zig": "e419465bca9a1eed93ab48e04b7a6b20af51a97661c0b88e9ca5b9e39c6d23ee",
+      "zig-native/fixtures/packed_input.blot.in": "97fe11b8dafcc65df87248c6669876efc4d4d55ae1e8b1ce9af17f8f919fb705",
+      "zig-native/fixtures/packed_input_oom.blot": "84263c87d9a7f9d345fa8f41a25a7ccadcd18be4c81b445fc8b9943d8aa98366",
+      "zig-native/tests/packed_input_execution.test.ts": "54d6ac01fb3dba4ba3c23894cf85e569f08c883695316a9dc0c0a4f910444cb4"
+    },
+    "note": "Source snapshot identifier combines tracked patch and untracked file contents. complete-source.patch includes every manifest file; source.patch is the original tracked-only diff."
+  },
+  "toolchain": {
+    "zig": "0.17.0",
+    "development_llvm": false,
+    "native_test_optimize": "safe",
+    "native_test_llvm": false,
+    "release_optimize": "fast",
+    "release_llvm": true,
+    "abi": 8,
+    "session_protocol": 2,
+    "saved_schema": 26
+  },
+  "workload_heads": {
+    "ink": "ccaf08fa85c3735cec137dbbdd433b0e0ee55a07",
+    "gdev": "a99703d89b19210040d996f121884126eeb62f2d"
+  },
+  "main": {
+    "baseline": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-main-baseline-pair/main-a9b72a5c2b2e1d1f/result.json",
+      "compiler_sha256": "688f82d56f09ef15247bf975a1bb5d840ed316aee2322a83111a07933e13f789",
+      "identity": "470fc1dc9284139ac4c944b804eb126489fb863363a4afc3073c485d15155a46",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 6203.616661,
+      "total_compile_ms": 6212.691347,
+      "wasm_bytes": 16392014,
+      "wasm_sha256": "93a1d482a092f6e1de1b767c5b6a85cac758a97a0893db88248e26061d99b253",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "candidate": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-main-release/main-601ad9d551778f89/result.json",
+      "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+      "identity": "b83ce3b4d722485f7165b608a0bd9aeb0d9c3cd467cb013c0eec97272ef75d15",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 6176.796379,
+      "total_compile_ms": 6183.80074,
+      "wasm_bytes": 16220693,
+      "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "configured_path": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-main-configured/main-3b4f818eceab1bb2/result.json",
+      "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+      "identity": "b83ce3b4d722485f7165b608a0bd9aeb0d9c3cd467cb013c0eec97272ef75d15",
+      "source": {
+        "entrySha256": "54ed584ce8cabe61a22581a756288db0f2f74b4ee447251eda5896a6e5a2cd9d",
+        "penJsonSha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "build_ms": 6100.296295,
+      "total_compile_ms": 6106.9230210000005,
+      "wasm_bytes": 16220693,
+      "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+      "source_bytes": 2537167,
+      "success": true,
+      "workers": 4,
+      "frontend_workers": 4,
+      "deadline_ms": 30000,
+      "cache_directory": false
+    },
+    "bytes_removed": 171321,
+    "size_reduction_percent": 1.0451491805704927,
+    "timing_limit": "Individual cache-disabled completions under shared-host load. Matched 6.204\u21926.177s does not show a meaningful latency improvement. Configured 6.100s. Sub-five-second and subsecond targets remain unmet.",
+    "omitted_input_words": 7392,
+    "omitted_argument_store_words": 11088,
+    "engine_validation": {
+      "valid": true,
+      "imports": 1,
+      "exports": 4
+    }
+  },
+  "profile": {
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-main-profile/main-f1907dd28eb91bcf/result.json",
+    "build_ms": 6133.298263000001,
+    "total_us": 6077286,
+    "peak_rss_kib": 1235692,
+    "phases": {
+      "other": {
+        "us": 15734,
+        "requested_bytes": 17919611,
+        "allocations": 652,
+        "rss_growth_kib": 404
+      },
+      "assets": {
+        "us": 27357,
+        "requested_bytes": 28714381,
+        "allocations": 517,
+        "rss_growth_kib": 3540
+      },
+      "inputs": {
+        "us": 454,
+        "requested_bytes": 206080,
+        "allocations": 444,
+        "rss_growth_kib": 0
+      },
+      "load": {
+        "us": 10406,
+        "requested_bytes": 10919780,
+        "allocations": 21056,
+        "rss_growth_kib": 1892
+      },
+      "lex": {
+        "us": 47292,
+        "requested_bytes": 28518784,
+        "allocations": 4750,
+        "rss_growth_kib": 15228
+      },
+      "parse": {
+        "us": 29022,
+        "requested_bytes": 43645564,
+        "allocations": 137698,
+        "rss_growth_kib": 4948
+      },
+      "check": {
+        "us": 530364,
+        "requested_bytes": 676080848,
+        "allocations": 1417424,
+        "rss_growth_kib": 187804
+      },
+      "lower": {
+        "us": 128621,
+        "requested_bytes": 161025716,
+        "allocations": 168173,
+        "rss_growth_kib": 57180
+      },
+      "freeze": {
+        "us": 58429,
+        "requested_bytes": 103608101,
+        "allocations": 346990,
+        "rss_growth_kib": 23160
+      },
+      "validation": {
+        "us": 107975,
+        "requested_bytes": 40018973,
+        "allocations": 40789,
+        "rss_growth_kib": 4452
+      },
+      "backend": {
+        "us": 5121626,
+        "requested_bytes": 4949484662,
+        "allocations": 3400512,
+        "rss_growth_kib": 934864
+      }
+    }
+  },
+  "byte_census": {
+    "wasm_bytes": 16220693,
+    "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+    "functions": 8000,
+    "instruction_bytes": 15779381,
+    "instruction_count": 5937774,
+    "declared_locals": 462178,
+    "categories": [
+      {
+        "name": "locals",
+        "count": 3315539,
+        "bytes": 9259718
+      },
+      {
+        "name": "globals",
+        "count": 594439,
+        "bytes": 2059610
+      },
+      {
+        "name": "constants",
+        "count": 748182,
+        "bytes": 1726542
+      },
+      {
+        "name": "calls",
+        "count": 389506,
+        "bytes": 883908
+      },
+      {
+        "name": "loads",
+        "count": 257377,
+        "bytes": 802069
+      },
+      {
+        "name": "control",
+        "count": 382381,
+        "bytes": 568084
+      },
+      {
+        "name": "stores",
+        "count": 109986,
+        "bytes": 337524
+      },
+      {
+        "name": "arithmetic_simd",
+        "count": 139952,
+        "bytes": 140283
+      },
+      {
+        "name": "memory_table_reference",
+        "count": 412,
+        "bytes": 1643
+      }
+    ],
+    "global_types": {
+      "0x7f:mutable=0": 6,
+      "0x7f:mutable=1": 68201
+    }
+  },
+  "world_control": {
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-world-pair/result.json",
+    "builds": [
+      {
+        "name": "baseline",
+        "compiler_sha256": "64725aa09891c32581811db7b4329673a8034bccdef8f68249bed53b79aa0515",
+        "build_ms": 8214.545505,
+        "wasm_bytes": 654117,
+        "wasm_sha256": "f7dd5660a6f14d4399e38623dc9a5606e7dfae158db43c875ed666f9448d2ac2",
+        "backend": {
+          "us": 2144587,
+          "requested_bytes": 272136817,
+          "allocations": 144208,
+          "rss_growth_kib": 0
+        },
+        "calls": [
+          {
+            "name": "test_hooks_keep_world_and_editor_behavior",
+            "asynchronous": false,
+            "row": [
+              7,
+              0
+            ]
+          },
+          {
+            "name": "test_hooks_keep_world_and_editor_behavior",
+            "asynchronous": true,
+            "row": [
+              7,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "compiler_sha256": "5bb9126f5e6608679fe6fdb2aa392daa7a19e8a04e6a459b5930131031ce821b",
+        "build_ms": 8003.641724000001,
+        "wasm_bytes": 588596,
+        "wasm_sha256": "297ff4889792f26e6440735a4c285cc8bae726a65d809bc2fafaaa95dfb268ac",
+        "backend": {
+          "us": 2096833,
+          "requested_bytes": 265604984,
+          "allocations": 143806,
+          "rss_growth_kib": 0
+        },
+        "calls": [
+          {
+            "name": "test_hooks_keep_world_and_editor_behavior",
+            "asynchronous": false,
+            "row": [
+              7,
+              0
+            ]
+          },
+          {
+            "name": "test_hooks_keep_world_and_editor_behavior",
+            "asynchronous": true,
+            "row": [
+              7,
+              0
+            ]
+          }
+        ]
+      }
+    ],
+    "bytes_removed": 65521,
+    "size_reduction_percent": 10.016709548903336
+  },
+  "qualification": {
+    "native": {
+      "inventory_count": 2878,
+      "selected_count": 72,
+      "completed_count": 72,
+      "elapsed_seconds": 35.33454696802073,
+      "exit_code": 0,
+      "statuses": {
+        "passed": 72,
+        "failed": 0,
+        "skipped": 0
+      },
+      "full_sweeps": 33,
+      "allocation_modes": [
+        "full"
+      ],
+      "leaks": 0,
+      "logged_errors": 0,
+      "failed": [],
+      "binary_sha256": "e96eaaeab0e75da535dc73b07c3a0780feb29455139ae144f1b78c80afbd83b4",
+      "inventory_sha256": "4ce2621ebc73710bb73a544957942e68723658f7c4730eebd4f85ff8d7fbb43e",
+      "selection_sha256": "dd7f9a8fd87cbf37503429e3761cdd9c2b752a60c9b704ca333e099fce50ea1f",
+      "log_sha256": "ea5ed4d129b56ad858d8f90fbc0578f3b904fe1b6b47816fb85ebc8133553d28"
+    },
+    "native_source_evidence": "build/bench/private-prototypes/lazy-packed-input-prototype/packed-source-pin.json",
+    "guest": {
+      "passed_tests": 96,
+      "release_compiler": true,
+      "log": "build/bench/private-prototypes/lazy-control-evidence/packed-release-guests.log",
+      "new_fixture_executed_calls": 28,
+      "new_fixture_covers": [
+        "wide forwarding past 512-word direct ABI",
+        "conditional fields",
+        "read after nested packed call",
+        "unused argument effect",
+        "repeated plan hits",
+        "variant and returned descriptor serialization"
+      ]
+    },
+    "broader": {
+      "passed": 187,
+      "failed": 15,
+      "known_baseline_failure_names": [
+        "finite nominal source proofs admit depth 10 width 1 (development)",
+        "finite nominal source proofs admit depth 10 width 1 (optimized)",
+        "finite nominal source proofs admit depth 10 width 8 (development)",
+        "finite nominal source proofs admit depth 10 width 8 (optimized)",
+        "finite nominal source proofs admit depth 6 width 1 (development)",
+        "finite nominal source proofs admit depth 6 width 1 (optimized)",
+        "finite nominal source proofs admit depth 6 width 8 (development)",
+        "finite nominal source proofs admit depth 6 width 8 (optimized)",
+        "finite nominal source proofs admit depth 8 width 1 (development)",
+        "finite nominal source proofs admit depth 8 width 1 (optimized)",
+        "finite nominal source proofs admit depth 8 width 8 (development)",
+        "finite nominal source proofs admit depth 8 width 8 (optimized)",
+        "principal inputs survive summary jobs drained inside the recorded region",
+        "wide field refinements use scoped binding indexes (development)",
+        "wide field refinements use scoped binding indexes (optimized)"
+      ],
+      "status": "Complete selected family executed with required runtime fixtures; same 15 failure names as preceding release, not a full pass.",
+      "raw": [
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/packed-broad.log",
+          "sha256": "52fbd8850b98640830973fbd3f42f2c01f742929157cb7633adbec415f9e3d91"
+        },
+        {
+          "path": "build/bench/private-prototypes/lazy-control-evidence/packed-storage-surface.log",
+          "sha256": "12d2ab16532d708520c1fe18514ac747bf9f41c608932f2c90218b8b4bff86c9"
+        }
+      ]
+    },
+    "required_full_gate": {
+      "passed": 48,
+      "failed": 1,
+      "baseline": true,
+      "phase": "smoke",
+      "diagnostic": "List/chunk storage_escape at 312..345",
+      "log": "build/bench/private-prototypes/lazy-control-evidence/packed-full-gate.log",
+      "status": "Attempted; full qualification pending."
+    },
+    "zig_lint": {
+      "findings": 0,
+      "log": "build/bench/private-prototypes/lazy-control-evidence/packed-zig-lint.log"
+    },
+    "release_world": {
+      "entry": "/home/jacobt/src/gdev/tests/world_hooks.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-packed-inputs-6e4e71f237cf/zig-native/zig-out/bin/blotc",
+      "buildMs": 1191.479634,
+      "wasmBytes": 588596,
+      "wasmSha256": "297ff4889792f26e6440735a4c285cc8bae726a65d809bc2fafaaa95dfb268ac",
+      "calls": [
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": false,
+          "runtimeMs": 55.406193999999914,
+          "row": [
+            7,
+            0
+          ]
+        },
+        {
+          "name": "test_hooks_keep_world_and_editor_behavior",
+          "asynchronous": true,
+          "runtimeMs": 22.360420000000204,
+          "row": [
+            7,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_hand": {
+      "entry": "/home/jacobt/src/gdev/tests/frame_edit_policy.blot",
+      "compiler": "/home/jacobt/src/blot2/build/bench/frozen-packed-inputs-6e4e71f237cf/zig-native/zig-out/bin/blotc",
+      "buildMs": 972.6452049999999,
+      "wasmBytes": 227033,
+      "wasmSha256": "aec4abb8b3203cc9e227cfe7fe97a8a049a63d19f07ccf401ae7f3e1c1264592",
+      "calls": [
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": false,
+          "runtimeMs": 42.87940600000002,
+          "row": [
+            160,
+            0
+          ]
+        },
+        {
+          "name": "test_frame_edit_copies_preserve_isolation_and_commit_bits",
+          "asynchronous": true,
+          "runtimeMs": 18.78896399999985,
+          "row": [
+            160,
+            0
+          ]
+        }
+      ],
+      "abi": 8,
+      "success": true
+    },
+    "release_renderer": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-release-kites/pair-d2ba32a8018a1167/result.json",
+      "status": "complete",
+      "pins": {
+        "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+        "baseline_compiler_sha256": "688f82d56f09ef15247bf975a1bb5d840ed316aee2322a83111a07933e13f789",
+        "entry_sha256": "e21fc0db90d50463cad1f2144a84d2314f5d075d5e90e27388fe4e0bf2ffff2a",
+        "baseline_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "candidate_producer_sha256": "0f340054abd08cac5d1e5d3e937840e61c08f092e012909932283c324e305307",
+        "pen_json_sha256": "5e298aa52f16e2d5cfa8ffe94cc2697b75b8a915e0bbfa588862ccb3e044d88a"
+      },
+      "comparisons": [
+        {
+          "scenario": 0,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 1,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 2,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 4,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 8,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 16,
+          "equal": true,
+          "first_difference": -1
+        },
+        {
+          "scenario": 31,
+          "equal": true,
+          "first_difference": -1
+        }
+      ]
+    },
+    "release_pen": {
+      "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-release-pen/result.json",
+      "pen_sha256": "662b7f6e9f6bd54a3557916e39cb1aa97468c413c2d1c8628d136860ad621b24",
+      "wasm_sha256": "465f5fc5c9920f2d28fb34cd8d5a8cf1cff45310749cd86947bd708cafc76269",
+      "checks": {
+        "exit_zero": false,
+        "one_completed_guest_trace": false,
+        "one_headless_step": false,
+        "first_guest_frame": false,
+        "complete_render": false,
+        "screenshot_640x480": false
+      },
+      "success": false,
+      "status": "Installed host rejects ABI 8 before rendering; no new frame/PNG qualified."
+    }
+  },
+  "bounded_stack_sample": {
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/packed-cpu-sample",
+    "compiler_sha256": "638f0b453da644a2d5cb7acc6239463e4e77c9172564e38309febe29d9ff1c22",
+    "completed": true,
+    "stops": 94,
+    "interval_ms": [
+      40,
+      80
+    ],
+    "attach_seconds": 1.72,
+    "detach_ms": 22,
+    "build_ms": 6600,
+    "wasm_bytes": 16220693,
+    "weighting": "Positive per-thread schedstat deltas; attribution to endpoint stacks is approximate. Raw unweighted waiting stacks are not CPU percentages.",
+    "memcpy_memset_weight_percent": 18.3,
+    "allocator_path_presence_percent": 8.5,
+    "leading_copy_callers": [
+      "storage_plan.borrows",
+      "storage_owner_graph.Graph(Value).visit",
+      "Generator.writableFields"
+    ],
+    "limits": "One noisy instrumented run, not compile performance evidence. Categories can overlap. Source pins reverified unchanged."
+  },
+  "held_unused_local_probe": {
+    "decision": "Held: only1073B (0.18%) World size saving; no third release build or live promotion.",
+    "source_pin": "build/bench/private-prototypes/unused-local-prototype/unused-source-pin.json",
+    "native": {
+      "inventory": 2880,
+      "passed": 80,
+      "full_fault_sweeps": 38
+    },
+    "evidence": "build/bench/private-prototypes/lazy-control-evidence/unused-world-pair/result.json",
+    "baseline_bytes": 588596,
+    "candidate_bytes": 587523,
+    "scope": "Drop only body locals with no get/set/tee mentions. Preserve parameters, default-zero reads, typed locals and metadata guards. Safe reviewed prototype; neutral gain is not completion."
+  },
+  "raw_evidence": [
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-build.log",
+      "sha256": "f75752cd6237c265360b6ee45eb9825eff25e6aa3333294c7ac5534d12a426e3"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-size-summary.json",
+      "sha256": "2b558106f116aa6c6c7d67f066a0916db5112fea2d92c27a4bd77ad8d1f0406f"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-guests.log",
+      "sha256": "bab84ba7b066bffb32120d09b9c3b1c2f30d7f19225492c458d14a40c2c0a385"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-guests.log",
+      "sha256": "9d86a19ffb43d7ebbd2e8fd03fa3007352a1db792d033698970353b462149017"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-broad-result.json",
+      "sha256": "19de0ca972e79961735e786febcd64e1d3c310b65f82ba9a65fce6fe82c15edd"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-full-gate.log",
+      "sha256": "90e8637df8e19a515b33bab3f4a94663917f9eb58aee0d6c2b53aac1eb6e9b1b"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-zig-lint.log",
+      "sha256": "983d6a60cf76a3503cd4f753171e05bfc53885c8bf886a70d1683f26c7ce5758"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-packed-input-prototype/packed-source-pin.json",
+      "sha256": "27a105cbc310044fa3a2e207e619c2764a74c049841d7a1d198d93fa38a035a2"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-packed-input-prototype/packed-native-full-result.json",
+      "sha256": "ad18d8da493eb34c98d6f35af0a036e22df4120d4684f6725ffb59d2139b7b64"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-world-pair/result.json",
+      "sha256": "5462d5be78684dd7494ff0d2900c540af86fd119bedfa896c5d6e5c9220fbdb0"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/unused-world-pair/result.json",
+      "sha256": "f065166f98386591bdf3da79ab381e5aed03f919ff42bfd2c50a3464996dee34"
+    },
+    {
+      "path": "build/bench/private-prototypes/unused-local-prototype/unused-source-pin.json",
+      "sha256": "4d5ee711be60752734542ebe0fb530d2343e9041992e18caa0a57721b78f73b2"
+    },
+    {
+      "path": "build/bench/private-prototypes/unused-local-prototype/unused-native-full-result.json",
+      "sha256": "aaaa7ca1da8965d16b76b2621bee2f1a5014b5a8791ef5681ea449314f581dfe"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-cpu-sample/metadata.json",
+      "sha256": "ac70c3a216cf13f792e24b2218a6f11ead63d289adf9e34199328918d5b7742d"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-cpu-sample/source-pins.json",
+      "sha256": "80350881a163e5f363d3123a270abcee2b1f18116ef69fe2ea0213c0fd1f5512"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-cpu-sample/cpu-weighted.txt",
+      "sha256": "2ee7a7661473c2047fd1c6e00dbeb991fc12ed1c2277ae9f60911f856f430108"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-cpu-sample/driver.ts",
+      "sha256": "933151d8ddff5b5121d3c0defc345d5aa034f8fcd62ae2a41cbe2c249d00dc46"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-world.json",
+      "sha256": "65f737cc1e1c256867257d20f7cb1cceb8ce4c3db89abce48e04a2980e137e09"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-hand.json",
+      "sha256": "2a28a1b7fe7065c1e4020a5b3582e119d80c666aa75ceaf0d9fbcd1d3af64eaf"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-kites/pair-d2ba32a8018a1167/result.json",
+      "sha256": "abf39ce490c5b7e7baacd32ea0ed0fb4013b3d5fa20bade95583c3fba9365425"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-pen/result.json",
+      "sha256": "ca95fc3b589926d30470421d47cd3912fd05739371d8ee7d008334a1c160618d"
+    },
+    {
+      "path": "build/bench/private-prototypes/lazy-control-evidence/packed-release-integration.json",
+      "sha256": "e28b13330e74f3d7d2fe582d2610583c677e6e730cfab29bfabffe4310d8e483"
+    }
+  ]
+}

@@ -3,7 +3,9 @@
   "scope": "Retain immutable Binding metadata for single-pattern-row statement-match arms; only a sole continuing arm publishes it. Explicit merges, multi-row and scalar-address carriers remain.",
   "release_source_pin": {
     "base": "6d853b5124bd691ffe30134c1ba0df84c8aeb1d2",
-    "patch_sha256": "e108f3d4ccef4693c645424a232357a854fa6c26f531a290d0282ec3c18d1fb1",
+    "source_snapshot_sha256": "e108f3d4ccef4693c645424a232357a854fa6c26f531a290d0282ec3c18d1fb1",
+    "patch_sha256": "1b577dbe95d2db4f4d07d2edf920eb15e4687bb36a8e621293f71159e9406e0f",
+    "tracked_patch_sha256": "c83793fa89648762728c00399a008017d406b1edca8ec3b063297c7762d4c6ca",
     "files": {
       "scripts/dev_check_areas.ts": "c300155fa675eb2623c3395cb225bc6ffd9c0d0519805e28f25388768c6baef8",
       "zig-native/src/backend/scoped_backend.zig": "a45a496563fd1bb2703e7d13b639f492b398a707a9a1e1d94bf6b00a286b88bb",
@@ -12,7 +14,8 @@
       "zig-native/src/backend/storage_immutable_survivor_tests.zig": "60120817a03b07da514e2636ea9d7110456640be7183bb7fe434a540c7ff37ba",
       "zig-native/fixtures/immutable_survivor.blot": "5dd6d793ffa91e1193fe489221dc0fb3944618e725cc29b42a1906771fb1426b",
       "zig-native/tests/immutable_survivor_execution.test.ts": "3c6101bb1bd74392d0cb5032ed44e4b4f8deaac7f50d5bdfd653a5c75b8225b6"
-    }
+    },
+    "note": "Source snapshot identifier combines tracked patch and untracked file contents. complete-source.patch includes every manifest file; source.patch is the original tracked-only diff."
   },
   "production_source_unchanged_after_freeze": true,
   "guest_test_followup": {

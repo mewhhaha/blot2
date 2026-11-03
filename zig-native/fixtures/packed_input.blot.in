@@ -1,0 +1,24 @@
+type Pick is data = $Small U32 | $Large {left: U32, right: U32}
+const leaf = func state -> (flag: U32): U32 => return @u32.add (if @u32.eq flag 0 then state.f0 else state.f599) state.rows[0]
+const middle = func state -> (flag: U32): U32 => return do:
+  let scratch: GrowArray U32 = #[flag]
+  @storage.push scratch 1
+  return leaf state flag
+const forward = func state -> (flag: U32): U32 => return do:
+  let result = middle state flag
+  return @u32.add result state.f1
+const reflect = func state => return {alias: state.rows, pick: state.pick}
+const transfer = func state => return reflect state
+const tick = func (counter: Array U32): U32 => return do:
+  counter[0] := @u32.add self 1
+  return counter[0]
+entry const answer = func (input: U32): Array U32 => return do:
+  let rows: Array U32 = #[@u32.add input 3]
+  let effects: Array U32 = #[0]
+  let pick: Pick = if @u32.eq (@u32.rem input 2) 0 then $Small input else $Large {left: input, right: @u32.add input 9}
+  let state = {__FIELDS__ rows: rows, stamp: tick effects, pick: pick}
+  let echoed = transfer state
+  let selected = case echoed.pick of
+    $Small value => value
+    $Large {left, right} => @u32.add left right
+  return #[forward state (@u32.rem input 2), forward state 0, effects[0], rows[0], echoed.alias[0], selected]

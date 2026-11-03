@@ -85,6 +85,14 @@ carriers. The rule does not use remaining-use counts as a dead-value proof:
 their current traversal is not complete for alternative rows, value patterns or
 refutable-binding fallbacks.
 
+Packed named-function inputs retain their complete semantic Value tree and
+owner/event contracts. Their logical words occupy locals `1..W` after packet
+parameter zero. After result serialization and cleanup, physical demand follows
+the completed helper IR's local reads. Demanded words load at function entry;
+callers omit stores for the remaining words. Full packet extents, word offsets
+and result serialization stay unchanged. The input mask belongs to the completed
+plan's arena and rolls back with failed plans. Direct-word calls keep their ABI.
+
 Backend getter selection shares the existing bounds-only equation workspace
 across generators in one compilation. Its successful receipts retain the exact
 ordered immutable unit context. Receipt allocation failure propagates before

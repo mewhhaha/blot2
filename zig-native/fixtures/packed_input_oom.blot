@@ -1,0 +1,17 @@
+const leaf = func state -> (flag: U32): U32 => return if @u32.eq flag 0 then state.tree.a.a.a.a.a.a.a.a.a else state.tree.b.b.b.b.b.b.b.b.b
+const forward = func state -> (flag: U32): U32 => return do:
+  let scratch: GrowArray U32 = #[flag]
+  @storage.push scratch 1
+  return leaf state flag
+entry const answer = func (input: U32): U32 => return do:
+  let r0 = {a: input, b: @u32.add input 1}
+  let r1 = {a: r0, b: r0}
+  let r2 = {a: r1, b: r1}
+  let r3 = {a: r2, b: r2}
+  let r4 = {a: r3, b: r3}
+  let r5 = {a: r4, b: r4}
+  let r6 = {a: r5, b: r5}
+  let r7 = {a: r6, b: r6}
+  let r8 = {a: r7, b: r7}
+  let state = {tree: r8, extra: input}
+  return @u32.add (forward state input) (forward state 0)

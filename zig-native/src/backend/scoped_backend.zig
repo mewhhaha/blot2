@@ -163,6 +163,7 @@ const FunctionAbi = enum { scalar, registers, result_slot, buffered };
 const CheckedFunctionPlan = struct {
     entry: call_plan.Entry,
     input_words: usize,
+    used_input_words: []const bool,
     unit_result: bool,
     abi: FunctionAbi,
     return_registers: usize,
@@ -3269,25 +3270,38 @@ const Generator = struct {
     // ABI slots are temporary U32 buffers, never language rows containing
     // owning descriptors. Every descriptor word is copied before slot rewind.
     fn storeReaderResult(self: *Generator, address: Local, offset: u32, value: Value) Error!void {
+        return self.storeReaderResultMasked(address, offset, value, null);
+    }
+    fn storeReaderWord(self: *Generator, address: Local, offset: u32, value: Local, used: ?[]const bool) Error!void {
+        if (used) |mask| {
+            std.debug.assert(offset % 4 == 0 and offset / 4 < mask.len);
+            if (!mask[offset / 4]) {
+                self.emission_work.scoped_packed_argument_words_avoided +|= 1;
+                return;
+            }
+        }
+        try self.c.store(address, offset, value);
+    }
+    fn storeReaderResultMasked(self: *Generator, address: Local, offset: u32, value: Value, used: ?[]const bool) Error!void {
         var at = offset;
         if (value.tag == .aggregate or value.tag == .callable) {
             if (value.variant_tags.len != 0) {
-                try self.c.store(address, at, value.word);
+                try self.storeReaderWord(address, at, value.word, used);
                 at += 4;
             }
             for (value.fields) |field| {
-                try self.storeReaderResult(address, at, field);
+                try self.storeReaderResultMasked(address, at, field, used);
                 at += @intCast(readerWords(field) * 4);
             }
             return;
         }
-        try self.c.store(address, at, value.word);
+        try self.storeReaderWord(address, at, value.word, used);
         if (value.tag == .scalar) return;
-        try self.c.store(address, at + 4, value.token);
-        try self.c.store(address, at + 8, value.epoch_low);
-        try self.c.store(address, at + 12, value.epoch_high);
-        if (value.tag != .array) try self.c.store(address, at + 16, value.index);
-        if (value.tag == .view) try self.c.store(address, at + 20, value.length);
+        try self.storeReaderWord(address, at + 4, value.token, used);
+        try self.storeReaderWord(address, at + 8, value.epoch_low, used);
+        try self.storeReaderWord(address, at + 12, value.epoch_high, used);
+        if (value.tag != .array) try self.storeReaderWord(address, at + 16, value.index, used);
+        if (value.tag == .view) try self.storeReaderWord(address, at + 20, value.length, used);
     }
     fn loadReaderResult(self: *Generator, address: Local, offset: u32, template: Value) Error!Value {
         var result = template;
@@ -3794,7 +3808,7 @@ const Generator = struct {
         for (value.fields) |field| if (field.tag == .aggregate and containsCallback(field, remaining, depth + 1)) return true;
         return false;
     }
-    const published_fields = .{ "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
+    const published_fields = .{ "scoped_packed_input_words_avoided", "scoped_packed_argument_words_avoided", "scoped_immutable_survivor_bindings", "scoped_function_plan_read_events", "scoped_function_plan_write_events", "scoped_function_plan_empty_owner_contracts", "scoped_function_plan_definitions", "scoped_function_plan_emissions", "scoped_function_plan_register_calls", "scoped_inline_register_calls", "scoped_inline_result_owners_avoided", "scoped_inline_result_roots_avoided", "scoped_inline_result_bytes_avoided", "scoped_scalar_definitions", "scoped_inline_definitions", "scoped_closure_definitions", "scoped_reader_definitions", "scoped_writer_definitions", "scoped_owner_graph_definitions", "scoped_owner_graph_inputs", "scoped_completed_plan_definitions", "scoped_plain_plan_definitions", "scoped_context_free_definitions", "scoped_context_sensitive_definitions", "scoped_reader_projection_calls", "scoped_reader_argument_fields_omitted", "scoped_reader_argument_words_omitted", "scoped_owned_projection_calls", "scoped_owned_argument_fields_omitted", "scoped_owned_argument_words_omitted", "scoped_projection_word_counts_limited" };
     const FunctionMark = struct {
         module: wasm.Module.TailCheckpoint,
         local_calls: usize,
@@ -3953,16 +3967,17 @@ const Generator = struct {
         @memset(assigned, false);
         const inputs = try child.arena.allocator().alloc(Value, arguments.len);
         var offset: u32 = 0;
+        if (!direct) {
+            // Logical words keep packet order; dummy callable words and body
+            // temporaries allocate after this complete reserved input range.
+            try self.module.functions.items[function].locals.appendNTimes(self.allocator, .i32, words);
+            offset = 1;
+        }
         for (inputs, arguments) |*input, argument| {
-            if (direct) {
-                input.* = try child.readerWordParameter(argument, &offset);
-            } else {
-                input.* = try child.loadReaderResult(.{ .id = 0 }, offset, argument);
-                offset += @intCast(readerWords(argument) * 4);
-            }
+            input.* = try child.readerWordParameter(argument, &offset);
             try child.writerInput(input, owners, assigned);
         }
-        if (direct) std.debug.assert(offset == words);
+        if (direct) std.debug.assert(offset == words) else std.debug.assert(offset == words + 1);
         const output = child.invokeBody(target, inputs, 0, false) catch |err| {
             if (child.diagnostic) |diagnostic| self.diagnostic = diagnostic;
             return err;
@@ -3993,6 +4008,13 @@ const Generator = struct {
         // body bound includes local groups/header; final encoding remains the
         // authority after optimization (this is not an arbitrary-IR proof).
         const machine = &self.module.functions.items[function];
+        var input_demand: []bool = &.{};
+        defer self.allocator.free(input_demand);
+        if (!direct) {
+            const demand = try @import("packed_input_demand.zig").materialize(self.allocator, machine, words);
+            input_demand = demand.used;
+            self.emission_work.scoped_packed_input_words_avoided +|= demand.omitted;
+        }
         const raw_bytes = 6 +| (machine.locals.items.len *| 6) +| (machine.instructions.items.len *| 64);
         if (machine.parameters.len > 50_000 or machine.locals.items.len > 50_000 - machine.parameters.len or raw_bytes > 7_654_321) {
             self.emission_work.scoped_function_plan_machine_declines +|= 1;
@@ -4018,9 +4040,10 @@ const Generator = struct {
         }
         const retained_regions = try summary_arena.dupe(usize, regions.items);
         const plan = try summary_arena.create(CheckedFunctionPlan);
+        const used_input_words = try summary_arena.dupe(bool, input_demand);
         try self.descriptor_calls.plans.ensureUnusedCapacity(self.allocator, 1);
         try self.completeCall(cache, inserted, child.context_sensitive, shared and graph_mode);
-        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
+        plan.* = .{ .entry = cache.entries.items[inserted], .input_words = words, .used_input_words = used_input_words, .unit_result = unit_result, .abi = if (!direct) .buffered else if (return_registers != 0) .registers else if (buffered_result) .result_slot else .scalar, .return_registers = return_registers, .result = result_template, .events = facts, .regions = retained_regions };
         self.descriptor_calls.plans.putAssumeCapacityNoClobber(function, plan);
         for (facts) |event| {
             if (event.kind == .read) self.emission_work.scoped_function_plan_read_events +|= 1 else self.emission_work.scoped_function_plan_write_events +|= 1;
@@ -4169,9 +4192,10 @@ const Generator = struct {
         const slot = try self.arrayWithShape(m, body.root, (try self.constant(count)).word, .fixed, .{ .word = .{ .id = 0 } });
         const address = try self.c.temp();
         try self.c.set(address, .{ .call, self.runtime.functions.address, slot.token, slot.epoch_low, slot.epoch_high, slot.word, 0 });
+        std.debug.assert(plan.used_input_words.len == words);
         var offset: u32 = 0;
         for (arguments) |argument| {
-            try self.storeReaderResult(address, offset, argument);
+            try self.storeReaderResultMasked(address, offset, argument, plan.used_input_words);
             offset += @intCast(readerWords(argument) * 4);
         }
         try self.c.value(address);
