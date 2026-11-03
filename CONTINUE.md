@@ -25,6 +25,18 @@ Release source is `3ab232b4` plus complete patch `9ac688127317`; all 14 frozen
 implementation, test and contract files match the candidate. The installed LLVM
 binary is `a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325`.
 
+The [Astra architecture review](zig-native/measurements/representation-review-2026-11-03.json)
+identifies eager scalar locals, recursive aggregate/loop transport and outlining
+through global banks as compiler representation problems. A checked 32-operation
+scalar control adds 388B in Blot versus 134B in Clang after subtracting each
+zero-operation baseline; the entire 254B excess is local instructions, with
+identical arithmetic/constant bytes. This does not quantify whole-game savings.
+Next compare single-use/reused scalar values and one-field/full-field loop
+carries, then addressed aggregate boundaries and live outlined interfaces.
+Preserve semantic/effect/ownership checks; do not ask Gdev to work around these
+costs. Existing Core/stack IR is enough for the first experiments. No new compiler
+optimization or language/memory-model rewrite is implemented by this review.
+
 Checked graph helpers now reuse bodies that mutate input owners and return
 input-owned records or borrows. Complete result/event retention, actual caller
 lifetimes, alias topology and ordered reads/writes remain checked. Fresh results

@@ -1,0 +1,178 @@
+{
+  "date": "2026-11-03",
+  "reviewed_head": "9cb66a838255380bdf708a2ee68952697427d740",
+  "status": "Architectural review and executed control only; compiler and Gdev source unchanged.",
+  "main_artifact": {
+    "evidence": "build/bench/owned-return-2026-11-03/main-candidate/main-60ca2ed74b409c54/result.json",
+    "build_ms": 5551.82381,
+    "wasm_bytes": 13935123,
+    "wasm_sha256": "0db4f7f92e22b6a3349f7ec72c8f0be7b43c5417b5093d8827d2c3209b292719",
+    "compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+    "compiler_identity": "93770c9e34d632ba7a8e561ace2ef4cea59d4ea0c91a0e94b30fd9d4ce2cf121",
+    "source_bytes": 2537167,
+    "work": {
+      "scoped_emission_expressions": 988608,
+      "scoped_result_slots_avoided": 288,
+      "scoped_result_store_words_avoided": 3657,
+      "scoped_result_load_words_avoided": 29642,
+      "scoped_completed_plan_definitions": 7557,
+      "scoped_completed_plan_rollbacks": 2009,
+      "scoped_completed_plan_discarded_expressions": 181762,
+      "scoped_join_words_shared": 44426,
+      "scoped_outlined_regions": 411,
+      "scoped_outlined_globals": 64876
+    }
+  },
+  "reviewer": {
+    "model": "gpt-6-astra",
+    "reasoning": "xhigh"
+  },
+  "verdict": "Primarily a compiler backend representation problem. Ordinary records, borrows and helper calls should not need source rewrites to accommodate eager physical materialization.",
+  "distinction": "local.get/set are Wasm operand/local operations, not heap loads/stores. Percentage of bytes alone is not a removability or runtime cost proof.",
+  "evidence": [
+    {
+      "mechanism": "Scalar values become physical locals immediately",
+      "source": [
+        "zig-native/src/backend/scoped_backend.zig:86",
+        "zig-native/src/backend/scoped_backend.zig:485",
+        "zig-native/src/backend/scoped_backend.zig:5710",
+        "zig-native/src/backend/runtime_code.zig:15"
+      ],
+      "finding": "Constants allocate/set locals; primitive operations emit their result into another local. Later consumers load those locals. Code.value already supports nested stack expressions. Ordinary scalar bindings without scalar addresses already share their original Value, so not every binding creates a copy."
+    },
+    {
+      "mechanism": "Recursive aggregate transport and coarse loop carries",
+      "source": [
+        "zig-native/src/backend/scoped_backend.zig:579",
+        "zig-native/src/backend/scoped_backend.zig:1141",
+        "zig-native/src/backend/scoped_backend.zig:1176",
+        "zig-native/src/backend/scoped_backend.zig:6115",
+        "zig-native/src/backend/scoped_backend.zig:6153"
+      ],
+      "finding": "Snapshot/temporary/assignment recurse through physical fields and owner metadata. Loop invariance is chosen per whole aggregate; changing one field can still snapshot and assign the whole carrier at the emitted boundary."
+    },
+    {
+      "mechanism": "Outlining amplifies local pressure into a global bank",
+      "source": [
+        "zig-native/src/backend/wasm_scope_outline.zig:225",
+        "zig-native/src/backend/wasm_scope_outline.zig:486"
+      ],
+      "finding": "Outlined regions use no-argument/no-result helpers. Cross-region locals become mutable globals, root entry resets them, and banked tee becomes global.set plus global.get. Local compaction occurs after bank selection."
+    }
+  ],
+  "executed_scalar_control": {
+    "workload": "16 successive multiply/xor pairs over a dynamic U32 input; 32 arithmetic operations and identical constants in both emitted bodies. Zero-operation controls subtract each ABI/function scaffold.",
+    "source_inputs": [
+      0,
+      1,
+      17,
+      4294967295
+    ],
+    "blot_abi": 8,
+    "blot_tier": "optimized",
+    "blot_compiler_sha256": "a2842dc99410ce7c592af5bb5e19215040678f0b9f8526423a561c0eb44ff325",
+    "clang_version": "clang version 23.1.4",
+    "clang_flags": [
+      "--target=wasm32",
+      "-Oz",
+      "-nostdlib",
+      "-Wl,--no-entry",
+      "-Wl,--strip-all"
+    ],
+    "results": {
+      "blot": {
+        "empty_body_bytes": 44,
+        "chain_body_bytes": 432,
+        "incremental_body_bytes": 388,
+        "incremental_local_instruction_bytes": 254,
+        "incremental_constant_bytes": 102,
+        "arithmetic_instruction_bytes": 32,
+        "wasm_sha256": {
+          "0": "25cd46bb06f1603982bbcdf008c67aaa496054545ceb630c30588ddcf2996fee",
+          "16": "3c44905ceccebdae62e5b782e24ddd6ae7a4a3f1c175ede66fd087cf046692f7"
+        },
+        "checks_passed": 8
+      },
+      "clang": {
+        "empty_body_bytes": 4,
+        "chain_body_bytes": 138,
+        "incremental_body_bytes": 134,
+        "incremental_local_instruction_bytes": 0,
+        "incremental_constant_bytes": 102,
+        "arithmetic_instruction_bytes": 32,
+        "wasm_sha256": {
+          "0": "3051d4f2100bfbbb4c7d11c3eda3a842ebf1e9833c13bcb1745a4975524ded03",
+          "16": "6b8f38637b5aa88ebd0ef5aa9af96a5c653ae971503e44c1fa6ab18ca17a967a"
+        },
+        "checks_passed": 8
+      }
+    },
+    "finding": "The 254-byte difference in incremental computational body size is entirely local-variable traffic; arithmetic and constant bytes match.",
+    "limits": "A small output-quality control, not a whole-language throughput benchmark or an estimate of whole-game savings. Local operations are not heap memory accesses.",
+    "sources": {
+      "build/bench/representation-review-2026-11-03/chain-0.blot": {
+        "sha256": "0da785a1672940d7671bcb20005ee49ff86a6c6b92cf1f4e116db864d4ecc285",
+        "text": "entry const touch = func (input: U32): U32 => return do:\n  let marker: Array U32 = #[input]\n  marker[0] := input\n  return marker[0]\nentry const answer = func (input: U32): U32 => return do:\n  let value = input\n  return value\n"
+      },
+      "build/bench/representation-review-2026-11-03/chain-16.blot": {
+        "sha256": "cdc4c4e8e4a09eec6c7c0911d9629e2d46029c46acd9d52b75d943da114eeec5",
+        "text": "entry const touch = func (input: U32): U32 => return do:\n  let marker: Array U32 = #[input]\n  marker[0] := input\n  return marker[0]\nentry const answer = func (input: U32): U32 => return do:\n  let value = input\n  value := @u32.mul self 3\n  value := @u32.bit_xor self 12345\n  value := @u32.mul self 5\n  value := @u32.bit_xor self 117074\n  value := @u32.mul self 7\n  value := @u32.bit_xor self 221803\n  value := @u32.mul self 9\n  value := @u32.bit_xor self 326532\n  value := @u32.mul self 11\n  value := @u32.bit_xor self 431261\n  value := @u32.mul self 13\n  value := @u32.bit_xor self 535990\n  value := @u32.mul self 15\n  value := @u32.bit_xor self 640719\n  value := @u32.mul self 17\n  value := @u32.bit_xor self 745448\n  value := @u32.mul self 19\n  value := @u32.bit_xor self 850177\n  value := @u32.mul self 21\n  value := @u32.bit_xor self 954906\n  value := @u32.mul self 23\n  value := @u32.bit_xor self 1059635\n  value := @u32.mul self 25\n  value := @u32.bit_xor self 1164364\n  value := @u32.mul self 27\n  value := @u32.bit_xor self 1269093\n  value := @u32.mul self 29\n  value := @u32.bit_xor self 1373822\n  value := @u32.mul self 31\n  value := @u32.bit_xor self 1478551\n  value := @u32.mul self 33\n  value := @u32.bit_xor self 1583280\n  return value\n"
+      },
+      "build/bench/representation-review-2026-11-03/clang-0.c": {
+        "sha256": "eff83fb65ec4614e4adb83408812c7cab7179f6b5420ede0354a2dafba102e06",
+        "text": "__attribute__((export_name(\"answer\"))) unsigned answer(unsigned value) {\nreturn value;\n}\n"
+      },
+      "build/bench/representation-review-2026-11-03/clang-16.c": {
+        "sha256": "12bd20a9fcd97fa3777254356b32d43cfacc65c7afcb8c80835aed4ef695e3d0",
+        "text": "__attribute__((export_name(\"answer\"))) unsigned answer(unsigned value) {\nvalue *= 3u;\nvalue ^= 12345u;\nvalue *= 5u;\nvalue ^= 117074u;\nvalue *= 7u;\nvalue ^= 221803u;\nvalue *= 9u;\nvalue ^= 326532u;\nvalue *= 11u;\nvalue ^= 431261u;\nvalue *= 13u;\nvalue ^= 535990u;\nvalue *= 15u;\nvalue ^= 640719u;\nvalue *= 17u;\nvalue ^= 745448u;\nvalue *= 19u;\nvalue ^= 850177u;\nvalue *= 21u;\nvalue ^= 954906u;\nvalue *= 23u;\nvalue ^= 1059635u;\nvalue *= 25u;\nvalue ^= 1164364u;\nvalue *= 27u;\nvalue ^= 1269093u;\nvalue *= 29u;\nvalue ^= 1373822u;\nvalue *= 31u;\nvalue ^= 1478551u;\nvalue *= 33u;\nvalue ^= 1583280u;\nreturn value;\n}\n"
+      }
+    },
+    "raw_evidence": {
+      "build/bench/representation-review-2026-11-03/clang-validation.json": "1ec149739a7bc468e018eaaa0e50e5303183450c3540c74c3619bc10b2e4a835",
+      "build/bench/representation-review-2026-11-03/scalar-comparison.json": "bf511ecbc148542029445f7920581c9ec6a692a1d3ba8f160fb73c2558f95949",
+      "build/bench/representation-review-2026-11-03/scalar-control.log": "52520fd7c00c3b0a4b48e4f8399c8ab8d1d8e2004b0575d48691e18ca9dabcea",
+      "build/bench/representation-review-2026-11-03/scalar_control.ts": "3588db294d3bfa68b8c8e905baec9a35c60ec4d101d53663a4fce2740995444d"
+    }
+  },
+  "ranked_experiments": [
+    {
+      "priority": 1,
+      "direction": "Separate logical values from physical storage in the existing backend",
+      "experiment": "Single-use versus reused scalar chains, and width/changed-lane loop controls. Keep immediates and single-use expressions on the operand stack where order permits; materialize only actual mutable/reused/escaping lanes.",
+      "preserve": [
+        "parallel assignments and cycles",
+        "zero-iteration/default-zero paths",
+        "owner invalidation and prewrite borrows",
+        "trap and effect order"
+      ]
+    },
+    {
+      "priority": 2,
+      "direction": "Compare scalarized and addressed representations at large aggregate boundaries",
+      "experiment": "The same 32/128-field programs with identity return, one-field update and full update, including shared and distinct owners. Small records remain scalarized. Measure memory operations and execution as well as code size.",
+      "preserve": [
+        "ABI8",
+        "explicit copies and borrow rules",
+        "invocation-local lifetime and nonescaping scratch"
+      ]
+    },
+    {
+      "priority": 3,
+      "direction": "Give outlined regions live input/output interfaces instead of an unbounded global bank",
+      "experiment": "A small fixture crossing the outline threshold; compare real parameters/results for narrow interfaces and scoped frames for wide interfaces. Measure code, bank/frame slots, initialization and repeated invocation behavior.",
+      "preserve": [
+        "function-entry zero semantics",
+        "live ownership/resource words",
+        "no invalid reentrancy or shared-bank cycles"
+      ]
+    }
+  ],
+  "architecture": "Core already has single-assignment bindings, merges and loop carries, plus a typed stack IR. Add value identity/demand/def-use information or a small virtual-word representation first. A whole new frontend or large semantic IR is not justified by this review.",
+  "limits": [
+    "No quantified removable fraction of the 9.48MB local/global instructions.",
+    "No demonstrated path from13.94MB to1\u20132MB yet.",
+    "No proof that reducing instruction count alone fixes 5.6s compiler latency.",
+    "Current stripped Wasm lacks per-instruction source attribution; function indices from different frozen builds must not be equated.",
+    "Historical 2.08MB heap-record output used different source/APIs/memory model, so it motivates a controlled representation test, not a promised gain."
+  ]
+}
